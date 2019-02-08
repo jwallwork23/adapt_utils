@@ -51,24 +51,24 @@ class AdaptOptions(FrozenConfigurable):
 
     def final_index(self):
         """Final timestep index"""
-        return int(np.ceil(self.end_time / self.timestep))
+        return int(np.ceil(self.end_time / self.dt))
 
     def first_export(self):
         """First exported timestep of period of interest"""
-        return int(self.start_time / (self.timesteps_per_export * self.timestep))
+        return int(self.start_time / (self.dt_per_export * self.dt))
 
     def final_export(self):
         """Final exported timestep of period of interest"""
-        return int(self.final_index() / self.timesteps_per_export)
+        return int(np.ceil(self.end_time / (self.dt_per_export * self.dt)))
 
     def final_mesh_index(self):
         """Final mesh index"""
-        return int(self.final_index() / self.timesteps_per_remesh)
+        return int(self.final_index() / self.dt_per_remesh)
 
     def exports_per_remesh(self):
         """Number of exports per mesh adaptation"""
-        assert self.timesteps_per_remesh % self.timesteps_per_export == 0
-        return int(self.timesteps_per_remesh / self.timesteps_per_export)
+        assert self.dt_per_remesh % self.dt_per_export == 0
+        return int(self.dt_per_remesh / self.dt_per_export)
 
     def mixed_space(self, mesh, enrich=False):
         """
@@ -127,7 +127,7 @@ class DefaultOptions(AdaptOptions):
     # Adaptivity parameters
     h_min = PositiveFloat(1e-6, help="Minimum tolerated element size").tag(config=True)
     h_max = PositiveFloat(1., help="Maximum tolerated element size").tag(config=True)
-    target_vertices = PositiveInteger(1000, help="Target number of vertices")
+    target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)")
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
     # Physical parameters

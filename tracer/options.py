@@ -11,6 +11,7 @@ class TracerOptions(AdaptOptions):
 
     # Domain
     nx = PositiveInteger(4).tag(config=True)  # TODO: help
+    target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)")
 
     # Timestepping
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
