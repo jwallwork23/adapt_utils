@@ -190,11 +190,7 @@ def normalise_indicator(f, op=DefaultOptions()):
         print("WARNING: minimum norm attained")
     elif scale_factor == op.max_norm:
         print("WARNING: maximum norm attained")
-    # f.interpolate(Constant(op.target_vertices / scale_factor) * abs(f))
-    name = f.dat.name
-    fs = f.function_space()
-    f = project(Constant(op.target_vertices / scale_factor) * abs(f), fs)
-    f.rename(name)
+    f.interpolate(Constant(op.target_vertices / scale_factor) * abs(f))
 
     return f
 
