@@ -22,7 +22,7 @@ def interp(mesh, *fields):
         raise NotImplementedError('3D implementation not yet considered.')
     fields_new = ()
     for f in fields:
-        element = f.function_space().ufl_element()
+        element = f.ufl_element()
         family = element.family()
         degree = element.degree()
         f_new = Function(FunctionSpace(mesh, element), name=f.dat.name)
@@ -30,8 +30,8 @@ def interp(mesh, *fields):
         if family == 'Lagrange' and degree == 1:
             coords = mesh.coordinates.dat.data      # Vertex/node coords
         elif family in ('Lagrange', 'Discontinuous Lagrange'):
-            C = VectorFunctionSpace(mesh, family, degree)
-            interp_coordinates = Function(C).interpolate(mesh.coordinates)
+            fs = VectorFunctionSpace(mesh, family, degree)
+            interp_coordinates = interpolate(mesh.coordinates, fs)
             coords = interp_coordinates.dat.data    # Node coords (NOT just vertices)
         else:
             raise NotImplementedError('Interpolation not currently supported on requested field type.')

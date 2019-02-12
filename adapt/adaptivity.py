@@ -24,15 +24,16 @@ def construct_gradient(f):
     :arg f: (scalar) P1 solution field.
     :return: reconstructed gradient associated with `f`.
     """
+    # NOTE: A P1 field is not actually strictly required
     W = VectorFunctionSpace(f.function_space().mesh(), "CG", 1)
     g = Function(W)
     psi = TestFunction(W)
     Lg = (inner(g, psi) - inner(grad(f), psi)) * dx
-    NonlinearVariationalSolver(NonlinearVariationalProblem(Lg, g),
-                               solver_parameters={'snes_rtol': 1e8,
-                                                  'ksp_rtol': 1e-5,
-                                                  'ksp_gmres_restart': 20,
-                                                  'pc_type': 'sor'}).solve()
+    params = {'snes_rtol': 1e8,
+              'ksp_rtol': 1e-5,
+              'ksp_gmres_restart': 20,
+              'pc_type': 'sor'}
+    NonlinearVariationalSolver(NonlinearVariationalProblem(Lg, g), solver_parameters=params).solve()
     return g
 
 
@@ -55,6 +56,7 @@ def construct_hessian(f, g=None, op=DefaultOptions()):
     :param op: AdaptOptions class object providing min/max cell size values.
     :return: reconstructed Hessian associated with ``f``.
     """
+    # NOTE: A P1 field is not actually strictly required
     mesh = f.function_space().mesh()
     V = TensorFunctionSpace(mesh, "CG", 1)
     H = Function(V)
@@ -89,6 +91,7 @@ def steady_metric(f, H=None, op=DefaultOptions()):
     :param op: AdaptOptions class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
+    # NOTE: A P1 field is not actually strictly required
     if H is None:
         H = construct_hessian(f, op=op)
     V = H.function_space()
