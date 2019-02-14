@@ -14,7 +14,7 @@ __all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropi
            "metric_complexity", "normalise_indicator"]
 
 
-def construct_gradient(f):
+def construct_gradient(f, mesh=None):
     """
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
@@ -25,7 +25,9 @@ def construct_gradient(f):
     :return: reconstructed gradient associated with `f`.
     """
     # NOTE: A P1 field is not actually strictly required
-    W = VectorFunctionSpace(f.function_space().mesh(), "CG", 1)
+    if mesh is None:
+        mesh = f.function_space().mesh()
+    W = VectorFunctionSpace(mesh, "CG", 1)
     g = Function(W)
     psi = TestFunction(W)
     Lg = (inner(g, psi) - inner(grad(f), psi)) * dx
@@ -37,7 +39,7 @@ def construct_gradient(f):
     return g
 
 
-def construct_hessian(f, g=None, op=DefaultOptions()):
+def construct_hessian(f, g=None, mesh=None, op=DefaultOptions()):
     """
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all
     second derivative information has been lost. As such, the Hessian of `f` cannot be directly
@@ -57,7 +59,8 @@ def construct_hessian(f, g=None, op=DefaultOptions()):
     :return: reconstructed Hessian associated with ``f``.
     """
     # NOTE: A P1 field is not actually strictly required
-    mesh = f.function_space().mesh()
+    if mesh is None:
+        mesh = f.function_space().mesh()
     V = TensorFunctionSpace(mesh, "CG", 1)
     H = Function(V)
     tau = TestFunction(V)
@@ -69,7 +72,7 @@ def construct_hessian(f, g=None, op=DefaultOptions()):
         Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds
     elif op.hessian_recovery == 'dL2':
         if g is None:
-            g = construct_gradient(f)
+            g = construct_gradient(f, mesh=mesh)
         Lh = (inner(tau, H) + inner(div(tau), g)) * dx
         Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
         Lh -= (tau[0, 0] * nhat[1] * g[0] + tau[1, 1] * nhat[0] * g[1]) * ds
@@ -81,7 +84,7 @@ def construct_hessian(f, g=None, op=DefaultOptions()):
     return H
 
 
-def steady_metric(f, H=None, op=DefaultOptions()):
+def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
     """
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
@@ -93,7 +96,7 @@ def steady_metric(f, H=None, op=DefaultOptions()):
     """
     # NOTE: A P1 field is not actually strictly required
     if H is None:
-        H = construct_hessian(f, op=op)
+        H = construct_hessian(f, mesh=mesh, op=op)
     V = H.function_space()
     mesh = V.mesh()
 
@@ -101,6 +104,8 @@ def steady_metric(f, H=None, op=DefaultOptions()):
     ih_min2 = 1. / pow(op.h_min, 2)  # Inverse square minimal side-length
     ih_max2 = 1. / pow(op.h_max, 2)  # Inverse square maximal side-length
     M = Function(V)
+
+    msg = "WARNING: minimum element size reached as {m:.2e}"
 
     if op.normalisation == 'manual':
 
@@ -123,8 +128,7 @@ def steady_metric(f, H=None, op=DefaultOptions()):
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
             if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
-                print(
-                "WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
+                print(msg.format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -169,8 +173,7 @@ def steady_metric(f, H=None, op=DefaultOptions()):
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
             if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
-                print(
-                "WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
+                print(msg.format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
 
             # Reconstruct edited Hessian
             M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
@@ -189,23 +192,22 @@ def normalise_indicator(f, op=DefaultOptions()):
     :return: normalised indicator.
     """
     scale_factor = min(max(norm(f), op.min_norm), op.max_norm)
-    if scale_factor == op.min_norm:
+    if scale_factor < 1.00001*op.min_norm:
         print("WARNING: minimum norm attained")
-    elif scale_factor == op.max_norm:
+    elif scale_factor > 0.99999*op.max_norm:
         print("WARNING: maximum norm attained")
     f.interpolate(Constant(op.target_vertices / scale_factor) * abs(f))
+    # NOTE: If `project` is used then positivity cannot be guaranteed
 
     return f
 
 
-def isotropic_metric(f, bdy=None, invert=True, op=DefaultOptions()):
+def isotropic_metric(f, bdy=None, op=DefaultOptions()):
     """
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
     :arg f: function to adapt to.
     :param bdy: specify domain boundary to compute metric on.
-    :param invert: when True, the inverse square of field `f` is considered, as in anisotropic mesh
-                   adaptivity.
     :param op: AdaptOptions class object providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
@@ -224,25 +226,27 @@ def isotropic_metric(f, bdy=None, invert=True, op=DefaultOptions()):
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
     M = Function(V)
-    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(len(g.dat.data)):
-        if scalar:
-            if invert:
-                alpha = 1. / max(h_min2, min(pow(g.dat.data[i], 2), h_max2))
-            else:
+    if bdy is not None:
+        for i in DirichletBC(V, 0, bdy).nodes:
+            if scalar:
                 alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
-            beta = alpha
-        else:
-            if invert:
-                alpha = 1. / max(h_min2, min(pow(g.dat.data[i, 0], 2), h_max2))
-                beta = 1. / max(h_min2, min(pow(g.dat.data[i, 1], 2), h_max2))
+                beta = alpha
             else:
                 alpha = max(1. / h_max2, min(g.dat.data[i, 0], 1. / h_min2))
                 beta = max(1. / h_max2, min(g.dat.data[i, 1], 1. / h_min2))
-        M.dat.data[i][0, 0] = alpha
-        M.dat.data[i][1, 1] = beta
+            M.dat.data[i][0, 0] = alpha
+            M.dat.data[i][1, 1] = beta
 
-        if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
-            print("WARNING: minimum element size reached as {m:.2e}".format(m=np.sqrt(min(min(1. / alpha, 1. / beta)))))
+            if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
+                print("WARNING: minimum element size reached!")
+    else:
+        if scalar:
+            alpha = Max(1./h_max2, Min(g, 1./h_min2))
+            beta = alpha
+        else:
+            alpha = Max(1./h_max2, Min(g[0], 1./h_min2))
+            beta = Max(1./h_max2, Min(g[1], 1./h_min2))
+        M.interpolate(as_tensor([[alpha, 0],[0, beta]]))
 
     return M
 
@@ -414,9 +418,7 @@ def metric_convex_combination(M1, M2, alpha=0.5):
     """
     V = M1.function_space()
     assert V == M2.function_space()
-    M = Function(V)
-    M.dat.data[:] = alpha * M1.dat.data + (1 - alpha) * M2.dat.data
-    return M
+    return project(alpha*M1+(1-alpha)*M2, V)
 
 
 def symmetric_product(A, b):
