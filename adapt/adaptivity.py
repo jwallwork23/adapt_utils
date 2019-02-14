@@ -283,13 +283,21 @@ def anisotropic_refinement(M, direction=0):
 def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this in pyop2
     """
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear
-    interpolation. Python code found here is based on the C code of Nicolas Barral's function
+    interpolation. Python code found here is based on the PETSc code of Nicolas Barral's function
     ``DMPlexMetricGradation2d_Internal``, found in ``plex-metGradation.c``, 2017.
 
     :arg M: metric to be gradated.
     :param op: AdaptOptions class object providing parameter values.
     :return: gradated metric.
     """
+    try:
+        assert(M.ufl_element().family() == 'Lagrange' and M.ufl_element().degree() == 1)
+    except:
+        ValueError("Metric field must be P1.")
+    try:
+        assert(M.ufl_element().value_shape() == (2, 2))
+    except:
+        NotImplementedError('Only 2x2 metric fields considered so far.')
     ln_beta = np.log(op.max_element_growth)
 
     # Get vertices and edges of mesh
@@ -309,7 +317,7 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
     correction = True
     i = 0
 
-    while correction & (i < 500):
+    while correction and (i < 500):
         i += 1
         correction = False
 
@@ -318,7 +326,7 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
             cone = plex.getCone(e)  # Get vertices associated with edge e
             iVer1 = cone[0] - vStart  # Vertex 1 index
             iVer2 = cone[1] - vStart  # Vertex 2 index
-            if (verTag[iVer1] < i) & (verTag[iVer2] < i):
+            if (verTag[iVer1] < i) and (verTag[iVer2] < i):
                 continue
 
             # Assemble local metrics and calculate edge lengths
@@ -330,8 +338,10 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
             v21[1] = - v12[1]
 
             if iso:  # TODO: This does not currently work
-                eta2_12 = 1. / pow(1 + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
-                eta2_21 = 1. / pow(1 + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
+                # eta2_12 = 1. / pow(1. + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
+                eta2_12 = 1. / pow(1. + sqrt(symmetric_product(met1, v12)) * ln_beta, 2)
+                # eta2_21 = 1. / pow(1. + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
+                eta2_21 = 1. / pow(1. + sqrt(symmetric_product(met2, v21)) * ln_beta, 2)
                 # print('#### gradate_metric DEBUG: 1,1 entries ', met1[0, 0], met2[0, 0])
                 # print('#### gradate_metric DEBUG: scale factors', eta2_12, eta2_21)
                 redMet1 = eta2_21 * met2
@@ -339,36 +349,32 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
             else:
 
                 # Intersect metric with a scaled 'grown' metric to get reduced metric
-                eta2_12 = 1. / pow(1 + symmetric_product(met1, v12) * ln_beta, 2)
-                eta2_21 = 1. / pow(1 + symmetric_product(met2, v21) * ln_beta, 2)
+                # eta2_12 = 1. / pow(1. + symmetric_product(met1, v12) * ln_beta, 2)
+                eta2_12 = 1. / pow(1. + sqrt(symmetric_product(met1, v12)) * ln_beta, 2)
+                #eta2_21 = 1. / pow(1. + symmetric_product(met2, v21) * ln_beta, 2)
+                eta2_21 = 1. / pow(1. + sqrt(symmetric_product(met2, v21)) * ln_beta, 2)
                 # print('#### gradate_metric DEBUG: scale factors', eta2_12, eta2_21)
                 # print('#### gradate_metric DEBUG: determinants', la.det(met1), la.det(met2))
                 redMet1 = local_metric_intersection(met1, eta2_21 * met2)
                 redMet2 = local_metric_intersection(met2, eta2_12 * met1)
 
             # Calculate difference in order to ascertain whether the metric is modified
-            diff = np.abs(met1[0, 0] - redMet1[0, 0])
-            diff += np.abs(met1[0, 1] - redMet1[0, 1])
-            diff += np.abs(met1[1, 1] - redMet1[1, 1])
-            diff /= (np.abs(met1[0, 0]) + np.abs(met1[0, 1]) + np.abs(met1[1, 1]))
+            diff = abs(met1[0, 0] - redMet1[0, 0])
+            diff += abs(met1[0, 1] - redMet1[0, 1])
+            diff += abs(met1[1, 1] - redMet1[1, 1])
+            diff /= (abs(met1[0, 0]) + abs(met1[0, 1]) + abs(met1[1, 1]))
             if diff > 1e-3:
-                M_grad.dat.data[iVer1][0, 0] = redMet1[0, 0]
-                M_grad.dat.data[iVer1][0, 1] = redMet1[0, 1]
-                M_grad.dat.data[iVer1][1, 0] = redMet1[1, 0]
-                M_grad.dat.data[iVer1][1, 1] = redMet1[1, 1]
+                M_grad.dat.data[iVer1] = redMet1
                 verTag[iVer1] = i + 1
                 correction = True
 
             # Repeat above process using other reduced metric
-            diff = np.abs(met2[0, 0] - redMet2[0, 0])
-            diff += np.abs(met2[0, 1] - redMet2[0, 1])
-            diff += np.abs(met2[1, 1] - redMet2[1, 1])
-            diff /= (np.abs(met2[0, 0]) + np.abs(met2[0, 1]) + np.abs(met2[1, 1]))
+            diff = abs(met2[0, 0] - redMet2[0, 0])
+            diff += abs(met2[0, 1] - redMet2[0, 1])
+            diff += abs(met2[1, 1] - redMet2[1, 1])
+            diff /= (abs(met2[0, 0]) + abs(met2[0, 1]) + abs(met2[1, 1]))
             if diff > 1e-3:
-                M_grad.dat.data[iVer2][0, 0] = redMet2[0, 0]
-                M_grad.dat.data[iVer2][0, 1] = redMet2[0, 1]
-                M_grad.dat.data[iVer2][1, 0] = redMet2[1, 0]
-                M_grad.dat.data[iVer2][1, 1] = redMet2[1, 1]
+                M_grad.dat.data[iVer2] = redMet2
                 verTag[iVer2] = i + 1
                 correction = True
 
