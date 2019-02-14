@@ -15,6 +15,7 @@ class AdaptOptions(FrozenConfigurable):
                        help="Mesh adaptive approach, from {'FixedMesh', 'HessianBased', 'DWP', 'DWR'}"
                        ).tag(config=True)
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
+    intersect = Bool(False, help='Intersect with previous metric.').tag(config=True)
     intersect_boundary = Bool(False, help='Intersect with initial boundary metric.').tag(config=True)
     adapt_on_bathymetry = Bool(False, help='Toggle adaptation based on bathymetry.').tag(config=True)
     plot_pvd = Bool(False, help='Toggle plotting of fields.').tag(config=True)

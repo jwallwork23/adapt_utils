@@ -240,13 +240,25 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
             if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
                 print("WARNING: minimum element size reached!")
     else:
-        if scalar:
-            alpha = Max(1./h_max2, Min(g, 1./h_min2))
-            beta = alpha
-        else:
-            alpha = Max(1./h_max2, Min(g[0], 1./h_min2))
-            beta = Max(1./h_max2, Min(g[1], 1./h_min2))
-        M.interpolate(as_tensor([[alpha, 0],[0, beta]]))
+        for i in range(len(M.dat.data)):
+            if scalar:
+                alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
+                beta = alpha
+            else:
+                alpha = max(1. / h_max2, min(g.dat.data[i, 0], 1. / h_min2))
+                beta = max(1. / h_max2, min(g.dat.data[i, 1], 1. / h_min2))
+            M.dat.data[i][0, 0] = alpha
+            M.dat.data[i][1, 1] = beta
+
+            if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
+                print("WARNING: minimum element size reached!")
+        #if scalar:  # FIXME
+        #    alpha = Max(1./h_max2, Min(g, 1./h_min2))
+        #    beta = alpha
+        #else:
+        #    alpha = Max(1./h_max2, Min(g[0], 1./h_min2))
+        #    beta = Max(1./h_max2, Min(g[1], 1./h_min2))
+        #M.interpolate(as_tensor([[alpha, 0],[0, beta]]))
 
     return M
 
