@@ -14,6 +14,8 @@ class AdaptOptions(FrozenConfigurable):
     approach = Unicode('FixedMesh',
                        help="Mesh adaptive approach, from {'FixedMesh', 'HessianBased', 'DWP', 'DWR'}"
                        ).tag(config=True)
+    dwr_approach = Unicode('error_representation',
+                           help="DWR error estimation approach, from {'error_representation', 'dwr', 'cell_facet_split'}. (See [Rognes & Logg, 2010])").tag(config=True)
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
     intersect = Bool(False, help='Intersect with previous mesh.').tag(config=True)
     intersect_boundary = Bool(False, help='Intersect with initial boundary metric.').tag(config=True)
