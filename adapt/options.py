@@ -108,14 +108,55 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
     def directory(self):
         return 'outputs/' + self.approach + '/'
 
-    def indicator(self, mesh):
-        """Indicator function associated with region of interest"""
+    def indicator(self, mesh, scale=1.):
+        """Indicator function associated with region(s) of interest"""
         P1DG = FunctionSpace(mesh, "DG", 1)
-        iA = Function(P1DG, name="Region of interest")
-        x = SpatialCoordinate(mesh)
+        x, y = SpatialCoordinate(mesh)
+        locs = self.region_of_interest
+        b = False
         eps = 1e-10
-        expr = conditional(lt(pow(x[0]-self.loc_x, 2) + pow(x[1]-self.loc_y, 2), pow(self.loc_r, 2) + eps), 1, 0)
-        return project(expr, P1DG)
+        for j in range(len(locs)):
+            x0 = locs[j][0]
+            y0 = locs[j][1]
+            r = locs[j][2]
+            b = Or(b, lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps))
+        expr = conditional(b, scale, 0.)
+        indi = Function(P1DG)
+        indi.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        return indi
+
+    def bump(self, mesh, scale=1.):
+        """Bump function associated with region(s) of interest"""
+        P1 = FunctionSpace(mesh, "CG", 1)
+        x, y = SpatialCoordinate(mesh)
+        locs = self.region_of_interest
+        i = 0
+        for j in range(len(locs)):
+            x0 = locs[j][0]
+            y0 = locs[j][1]
+            r = locs[j][2]
+            i += conditional(lt(((x-x0)*(x-x0) + (y-y0)*(y-y0)), r*r),
+                             scale*exp(1. - 1. / (1. - ((x-x0)*(x-x0) + (y-y0)*(y-y0)) / r ** 2)),
+                             0.)
+        bump = Function(P1)
+        bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        return bump
+
+    def box(self, mesh, scale=1.):
+        """Box function associated with region(s) of interest"""
+        P0 = FunctionSpace(mesh, "DG", 0)
+        x, y = SpatialCoordinate(mesh)
+        locs = self.region_of_interest
+        b = False
+        for j in range(len(locs)):
+            x0 = locs[j][0]
+            y0 = locs[j][1]
+            r = locs[j][2]
+            b = Or(b, And(And(gt(x, x0-r/2), lt(x, x0+r/2)), And(gt(y, y0-r/2), lt(y, y0+r/2))))
+        expr = conditional(b, scale, 0.)
+        box = Function(P0)
+        box.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        return box
 
 
 class DefaultOptions(AdaptOptions):
@@ -139,6 +180,7 @@ class DefaultOptions(AdaptOptions):
     drag_coefficient = NonNegativeFloat(0.0025).tag(config=True)
 
     # Indicator function and adjoint
+    region_of_interest = List(default_value=[(0.5, 0.5, 0.1)]).tag(config=True)
     loc_x = Float(0., help="x-coordinate of centre of important region").tag(config=True)
     loc_y = Float(0., help="y-coordinate of centre of important region").tag(config=True)
     loc_r = PositiveFloat(1., help="Radius of important region").tag(config=True)
