@@ -47,7 +47,7 @@ class AdaptOptions(FrozenConfigurable):
 
     def __init__(self, approach='FixedMesh'):
         try:
-            assert(approach in ('FixedMesh', 'HessianBased', 'DWP', 'DWR'))
+            assert(approach in ('FixedMesh', 'HessianBased', 'DWP', 'DWR', 'AdjointOnly'))
         except:
             raise ValueError
         self.approach = approach
@@ -127,6 +127,23 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
 
     def bump(self, mesh, scale=1.):
         """Bump function associated with region(s) of interest"""
+        P1 = FunctionSpace(mesh, "CG", 1)
+        x, y = SpatialCoordinate(mesh)
+        locs = self.region_of_interest
+        i = 0
+        for j in range(len(locs)):
+            x0 = locs[j][0]
+            y0 = locs[j][1]
+            r = locs[j][2]
+            i += conditional(lt(((x-x0)*(x-x0) + (y-y0)*(y-y0)), r*r),
+                             scale*exp(1.-1./(1.-(x-x0)*(x-x0)/r**2))*exp(1.-1./(1.-(y-y0)*(y-y0)/r**2)),
+                             0.)
+        bump = Function(P1)
+        bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        return bump
+
+    def gaussian(self, mesh, scale=1.):
+        """Gaussian function associated with region(s) of interest"""
         P1 = FunctionSpace(mesh, "CG", 1)
         x, y = SpatialCoordinate(mesh)
         locs = self.region_of_interest
