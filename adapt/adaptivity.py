@@ -10,7 +10,7 @@ from adapt.options import DefaultOptions
 
 __all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric", "iso_P2",
            "pointwise_max", "anisotropic_refinement", "gradate_metric", "local_metric_intersection",
-           "metric_intersection", "metric_convex_combination", "symmetric_product",
+           "metric_intersection", "metric_relaxation", "symmetric_product",
            "metric_complexity", "normalise_indicator"]
 
 
@@ -107,14 +107,14 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
 
     msg = "WARNING: minimum element size reached as {m:.2e}"
 
-    if op.normalisation == 'manual':
+    if op.restrict == 'num_cells':
 
         f_min = 1e-6  # Minimum tolerated value for the solution field
 
-        for i in range(mesh.topology.num_vertices()):
+        for i in range(mesh.num_vertices()):
 
             # Generate local Hessian, avoiding round-off error
-            H_loc = H.dat.data[i] * op.target_vertices / max(np.sqrt(assemble(f * f * dx)), f_min)
+            H_loc = H.dat.data[i] * op.target_vertices / max(sqrt(assemble(f*f*dx)), f_min)
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
@@ -135,9 +135,9 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
-    else:
+    elif op.restrict == 'anisotropy':
         detH = Function(FunctionSpace(mesh, "CG", 1))
-        for i in range(mesh.topology.num_vertices()):
+        for i in range(mesh.num_vertices()):
 
             # Generate local Hessian
             H_loc = H.dat.data[i]
@@ -163,7 +163,7 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
         # Scale by the target number of vertices and Hessian complexity
         M *= op.target_vertices / assemble(detH * dx)
 
-        for i in range(mesh.topology.num_vertices()):
+        for i in range(mesh.num_vertices()):
             # Find eigenpairs of metric and truncate eigenvalues
             lam, v = la.eig(M.dat.data[i])
             v1, v2 = v[0], v[1]
@@ -180,6 +180,8 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
+    else:
+        raise ValueError("Restriction by {:s} not recognised.".format(op.restrict))
     return M
 
 
@@ -191,7 +193,8 @@ def normalise_indicator(f, op=DefaultOptions()):
     :param op: option parameters object.
     :return: normalised indicator.
     """
-    scale_factor = min(max(norm(f), op.min_norm), op.max_norm)
+    # scale_factor = min(max(norm(abs(f)), op.min_norm), op.max_norm)
+    scale_factor = min(max(sqrt(assemble(f*f*dx)), op.min_norm), op.max_norm)
     if scale_factor < 1.00001*op.min_norm:
         print("WARNING: minimum norm attained")
     elif scale_factor > 0.99999*op.max_norm:
@@ -411,7 +414,7 @@ def metric_intersection(M1, M2, bdy=None):
     return M
 
 
-def metric_convex_combination(M1, M2, alpha=0.5):
+def metric_relaxation(M1, M2, alpha=0.5):
     """
     Alternatively to intersection, pointwise metric information may be combined using a convex
     combination. Whilst this method does not have as clear an interpretation as metric intersection,

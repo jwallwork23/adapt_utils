@@ -11,43 +11,35 @@ class AdaptOptions(FrozenConfigurable):
     name = 'Common parameters for mesh adaptive simulations'
 
     # Mesh adaptivity parameters
-    approach = Unicode('FixedMesh',
-                       help="Mesh adaptive approach, from {'FixedMesh', 'HessianBased', 'DWP', 'DWR'}"
-                       ).tag(config=True)
-    dwr_approach = Unicode('error_representation',
-                           help="DWR error estimation approach, from {'error_representation', 'dwr', 'cell_facet_split'}. (See [Rognes & Logg, 2010])").tag(config=True)
+    approach = Unicode('FixedMesh', help="Mesh adaptive approach, from {'FixedMesh', 'HessianBased', 'Vorticity', 'DWP', 'DWR'}").tag(config=True)
+    dwr_approach = Unicode('error_representation', help="DWR error estimation approach, from {'error_representation', 'dwr', 'cell_facet_split'}. (See [Rognes & Logg, 2010])").tag(config=True)
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
     intersect = Bool(False, help='Intersect with previous mesh.').tag(config=True)
     intersect_boundary = Bool(False, help='Intersect with initial boundary metric.').tag(config=True)
     adapt_on_bathymetry = Bool(False, help='Toggle adaptation based on bathymetry.').tag(config=True)
     plot_pvd = Bool(False, help='Toggle plotting of fields.').tag(config=True)
     plot_metric = Bool(False, help='Toggle plotting of metric field.').tag(config=True)
-    max_element_growth = PositiveFloat(1.4,
-                                       help="Metric gradation scaling parameter.").tag(config=True)
+    max_element_growth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
     max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
-    num_adapt = NonNegativeInteger(1, help="Number of mesh adaptations per remesh.").tag(config=True)
-    order_increase = Bool(False,
-                          help="Interpolate adjoint solution into higher order space."
-                          ).tag(config=True)
-    normalisation = Unicode('lp',
-                            help="Normalisation approach, from {'lp', 'manual'}.").tag(config=True)
-    hessian_recovery = Unicode('dL2',
-                               help="Hessian recovery technique, from {'dL2', 'parts'}."
-                               ).tag(config=True)
+    num_adapt = NonNegativeInteger(12, help="Number of mesh adaptations per remesh.").tag(config=True)
+    order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
+    restrict = Unicode('anisotropy', help="Hessian restriction approach, from {'num_cells', 'anisotropy'}.").tag(config=True)
+    hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
     norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used.")
-    family = Unicode('dg-dg',
-                     help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
+    family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
     min_norm = PositiveFloat(1e-6).tag(config=True)
     max_norm = PositiveFloat(1e9).tag(config=True)
+    element_rtol = PositiveFloat(0.01, help="Relative tolerance for convergence in mesh element count").tag(config=True)
 
     # Initialisation for number of adjoint steps (always be changed by a call to `store_adjoint`)
     adjoint_steps = NonNegativeInteger(1000, help="Number of adjoint steps used").tag(config=True)
     solve_adjoint = Bool(False).tag(config=True)
+    objective_rtol = PositiveFloat(0.00025, help="Relative tolerance for convergence in objective value.").tag(config=True)
 
     def __init__(self, approach='FixedMesh'):
         try:
-            assert(approach in ('FixedMesh', 'HessianBased', 'DWP', 'DWR', 'AdjointOnly'))
+            assert(approach in ('FixedMesh', 'HessianBased', 'Vorticity', 'DWP', 'DWR', 'AdjointOnly'))
         except:
             raise ValueError
         self.approach = approach
@@ -113,13 +105,15 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
         P1DG = FunctionSpace(mesh, "DG", 1)
         x, y = SpatialCoordinate(mesh)
         locs = self.region_of_interest
-        b = False
         eps = 1e-10
         for j in range(len(locs)):
             x0 = locs[j][0]
             y0 = locs[j][1]
             r = locs[j][2]
-            b = Or(b, lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps))
+            if j == 0:
+                b = lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps)
+            else:
+                b = Or(b, lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps))
         expr = conditional(b, scale, 0.)
         indi = Function(P1DG)
         indi.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
@@ -189,7 +183,7 @@ class DefaultOptions(AdaptOptions):
     # Adaptivity parameters
     h_min = PositiveFloat(1e-6, help="Minimum tolerated element size").tag(config=True)
     h_max = PositiveFloat(1., help="Maximum tolerated element size").tag(config=True)
-    target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)")
+    target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)").tag(config=True)
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
     # Physical parameters
