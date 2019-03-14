@@ -35,6 +35,11 @@ class TracerOptions(AdaptOptions):
     loc_y = Float(7.5, help="y-coordinate of centre of important region").tag(config=True)
     loc_r = PositiveFloat(0.5, help="Radius of important region").tag(config=True)
 
+    # Adaptivity options
+    h_min = PositiveFloat(1e-4, help="Minimum tolerated element size").tag(config=True)
+    h_max = PositiveFloat(5., help="Maximum tolerated element size").tag(config=True)
+
+
     def __init__(self, approach='FixedMesh'):
         super(TracerOptions, self).__init__(approach)
 
