@@ -158,12 +158,14 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
         P0 = FunctionSpace(mesh, "DG", 0)
         x, y = SpatialCoordinate(mesh)
         locs = self.region_of_interest
-        b = False
         for j in range(len(locs)):
             x0 = locs[j][0]
             y0 = locs[j][1]
             r = locs[j][2]
-            b = Or(b, And(And(gt(x, x0-r/2), lt(x, x0+r/2)), And(gt(y, y0-r/2), lt(y, y0+r/2))))
+            if j == 0:
+                b = And(And(gt(x, x0-r), lt(x, x0+r)), And(gt(y, y0-r), lt(y, y0+r)))
+            else:
+                b = Or(b, And(And(gt(x, x0-r), lt(x, x0+r)), And(gt(y, y0-r), lt(y, y0+r))))
         expr = conditional(b, scale, 0.)
         box = Function(P0)
         box.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions

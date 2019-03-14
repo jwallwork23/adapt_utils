@@ -427,7 +427,7 @@ def metric_relaxation(M1, M2, alpha=0.5):
     """
     V = M1.function_space()
     assert V == M2.function_space()
-    return project(alpha*M1+(1-alpha)*M2, V)
+    return project(alpha*M1+(1-alpha)*M2, V)  # TODO: Should this be interpolate?
 
 
 def symmetric_product(A, b):
