@@ -439,7 +439,7 @@ def metric_relaxation(M1, M2, alpha=0.5):
     """
     V = M1.function_space()
     assert V == M2.function_space()
-    return project(alpha*M1+(1-alpha)*M2, V)  # TODO: Should this be interpolate?
+    return project(alpha*M1+(1-alpha)*M2, V)  # TODO: Should this be interpolate? Or take direct sum?
 
 
 def symmetric_product(A, b):
@@ -473,19 +473,35 @@ def pointwise_max(f, g):
     fu = f.ufl_element()
     gu = g.ufl_element()
     try:
-        assert (len(f.dat.data) == len(g.dat.data))
+        assert (f.function_space() == g.function_space())
     except:
         msg = "Function space mismatch: {f1:s} {d1:d} vs. {f2:s} {d2:d}"
         raise ValueError(msg.format(f1=fu.family(), d1=fu.degree(), f2=gu.family(), d2=gu.degree()))
-    for i in range(len(f.dat.data)):
-        if fu.value_size() == 1:
-            if np.abs(g.dat.data[i]) > np.abs(f.dat.data[i]):
-                f.dat.data[i] = g.dat.data[i]
-        else:
-            for j in range(fu.value_size()):
-                if np.abs(g.dat.data[i, j]) > np.abs(f.dat.data[i, j]):
-                    f.dat.data[i, j] = g.dat.data[i, j]
-    return f
+    try:
+        assert fu.family() == 'Lagrange' and fu.degree() == 1
+    except:
+        raise NotImplementedError
+    h = Function(f.function_space()).assign(np.finfo(0.).min)
+
+    # TODO: Test
+    max_kernel = """
+for (int i=0; i<z.dofs; i++) {
+    for (int j=0; j<3; j++) {
+        z[i][j] = fmax(x[i][j], y[i][j]);
+    }
+}
+"""
+    par_loop(max_kernel, dx, {'x': (f, READ), 'y': (g, READ), 'z': (h, WRITE)})
+
+    #for i in range(len(f.dat.data)):
+    #    if fu.value_size() == 1:
+    #        if np.abs(g.dat.data[i]) > np.abs(f.dat.data[i]):
+    #            f.dat.data[i] = g.dat.data[i]
+    #    else:
+    #        for j in range(fu.value_size()):
+    #            if np.abs(g.dat.data[i, j]) > np.abs(f.dat.data[i, j]):
+    #                f.dat.data[i, j] = g.dat.data[i, j]
+    return h
 
 
 def metric_complexity(M):

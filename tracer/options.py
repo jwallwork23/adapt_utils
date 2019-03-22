@@ -31,6 +31,7 @@ class TracerOptions(AdaptOptions):
 
     # Indicator function and adjoint
     solve_adjoint = Bool(False).tag(config=True)
+    # TODO: Surely the below are redundant?
     loc_x = Float(40., help="x-coordinate of centre of important region").tag(config=True)
     loc_y = Float(7.5, help="y-coordinate of centre of important region").tag(config=True)
     loc_r = PositiveFloat(0.5, help="Radius of important region").tag(config=True)
@@ -46,6 +47,9 @@ class TracerOptions(AdaptOptions):
         self.end_time -= 0.5*self.dt
 
         # Plotting
-        self.adjoint_outfile = File(self.directory()+'Tracer2d/Adjoint2d.pvd')
+        self.adjoint_outfile = File(self.directory()+'Tracer2d/Adjoint2d.pvd')  # TODO: Inconsistent
         if self.solve_adjoint:
             self.estimator_outfile = File(self.directory()+'Tracer2d/'+self.approach+'Estimator2d.pvd')
+
+        # Adjoint modelling
+        region_of_interest = List(default_value=[(20., 7.5, 0.5)]).tag(config=True)

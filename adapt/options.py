@@ -194,7 +194,12 @@ class DefaultOptions(AdaptOptions):
 
     # Indicator function and adjoint
     region_of_interest = List(default_value=[(0.5, 0.5, 0.1)]).tag(config=True)
+    # TODO: Surely below is redundant?
     loc_x = Float(0., help="x-coordinate of centre of important region").tag(config=True)
     loc_y = Float(0., help="y-coordinate of centre of important region").tag(config=True)
     loc_r = PositiveFloat(1., help="Radius of important region").tag(config=True)
 
+    def __init__(self, approach='FixedMesh'):
+        super(DefaultOptions, self).__init__(approach)
+
+        self.end_time -= 0.5*self.dt
