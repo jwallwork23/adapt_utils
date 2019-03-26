@@ -18,8 +18,8 @@ def construct_gradient(f, mesh=None):
     """
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
-    smooth gradient, an L2 projection gradient recovery technique is performed, which makes use of
-    the Cl\'ement interpolation operator.
+    smooth gradient, we solve an auxiliary finite element problem in P1 space. This "L2 projection"
+    gradient recovery technique makes use of the Cl\'ement interpolation operator.
 
     :arg f: (scalar) P1 solution field.
     :return: reconstructed gradient associated with `f`.
@@ -27,15 +27,16 @@ def construct_gradient(f, mesh=None):
     # NOTE: A P1 field is not actually strictly required
     if mesh is None:
         mesh = f.function_space().mesh()
-    W = VectorFunctionSpace(mesh, "CG", 1)
-    g = Function(W)
-    psi = TestFunction(W)
-    Lg = (inner(g, psi) - inner(grad(f), psi)) * dx
-    params = {'snes_rtol': 1e8,
-              'ksp_rtol': 1e-5,
-              'ksp_gmres_restart': 20,
-              'pc_type': 'sor'}
-    NonlinearVariationalSolver(NonlinearVariationalProblem(Lg, g), solver_parameters=params).solve()
+    P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+    g = Function(P1_vec)
+    psi = TestFunction(P1_vec)
+    #Lg = inner(g, psi)*dx - inner(grad(f), psi)*dx
+    Lg = inner(g, psi)*dx - f*dot(psi, FacetNormal(mesh))*ds + f*div(psi)*dx
+    g_prob = NonlinearVariationalProblem(Lg, g)
+    NonlinearVariationalSolver(g_prob, solver_parameters={'snes_rtol': 1e8,
+                                                          'ksp_rtol': 1e-5,
+                                                          'ksp_gmres_restart': 20,
+                                                          'pc_type': 'sor'}).solve()
     return g
 
 
@@ -61,9 +62,9 @@ def construct_hessian(f, g=None, mesh=None, op=DefaultOptions()):
     # NOTE: A P1 field is not actually strictly required
     if mesh is None:
         mesh = f.function_space().mesh()
-    V = TensorFunctionSpace(mesh, "CG", 1)
-    H = Function(V)
-    tau = TestFunction(V)
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    H = Function(P1_ten)
+    tau = TestFunction(P1_ten)
     nhat = FacetNormal(mesh)  # Normal vector
     if op.hessian_recovery == 'parts':
         Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx

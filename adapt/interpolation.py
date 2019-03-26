@@ -68,11 +68,10 @@ def interp(mesh, *fields):
         return fields_new
 
 
-def mixed_pair_interp(mesh, V, *fields):
+def mixed_pair_interp(V, *fields, proj=False):
     """
     Interpolate mixed function space pairs onto a new mesh.
 
-    :arg mesh: new mesh to be interpolated onto.
     :arg V: mixed function space defined on new mesh.
     :arg fields: (mixed function space) fields to be interpolated.
     :return: interpolated function pair(s).
@@ -82,7 +81,11 @@ def mixed_pair_interp(mesh, V, *fields):
         p = Function(V)
         p0, p1 = p.split()
         q0, q1 = q.split()
-        q0, q1 = interp(mesh, q0, q1)
+        if proj:  # FIXME
+            q0 = project(q0, V)
+            q1 = project(q1, V)
+        else:
+            q0, q1 = interp(V.mesh(), q0, q1)
         p0.assign(q0), p1.assign(q1)
         fields_new += (p,)
     if len(fields_new) == 1:

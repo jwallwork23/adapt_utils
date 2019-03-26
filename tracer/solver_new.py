@@ -1,62 +1,55 @@
 from firedrake import *
-
-from adapt.metric import *
 from tracer.options import TracerOptions
-
-
-__all__ = ["TracerProblem"]
+from adapt.metric import *
 
 
 class TracerProblem():
     def __init__(self,
                  op=TracerOptions(),
-                 stab='no',
+                 stab=None,
                  mesh=None,
+                 approach='fixed_mesh',
                  n=2,
                  fe=FiniteElement("Lagrange", triangle, 1),
                  high_order=False):
-        
-        # Mesh and function spaces
         assert(fe.family() == 'Lagrange')  # TODO: DG option if finite_element.family() == 'DG'
         if mesh is None:
-            self.mesh = RectangleMesh(50*n, 10*n, 50, 10)
+            self.mesh = SquareMesh(20*n, 20*n, 4, 4)
         else:
             self.mesh = mesh
+        self.approach = approach
+
+        # function spaces
         self.V = FunctionSpace(self.mesh, fe)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
         
-        # Parameters
+        # parameters
         self.op = op
-        self.op.restrict = 'num_cells'
-        self.op.region_of_interest = [(20., 7.5, 0.5)]  # TODO: Check works without this
+        self.op.region_of_interest = [(3., 2., 0.1)]
         self.x0 = 1.
-        self.y0 = 5.
-        self.r0 = 0.457
-        self.nu = Constant(0.1)
-        self.u = Constant([1., 0.])
-        self.params = {'pc_type': 'lu', 'mat_type': 'aij' , 'ksp_monitor': None, 'ksp_converged_reason': None}
-        self.stab = stab
+        self.y0 = 2.
+        self.r0 = 0.1
+        self.nu = Constant(1.)
+        self.u = Constant([15., 0.])
+        self.params = {'pc_type': 'lu',
+                       'mat_type': 'aij' ,
+                       'ksp_monitor': None,
+                       'ksp_converged_reason': None}
+        self.stab = stab if stab is not None else 'no'
         self.high_order = high_order
         
-        # Outputting
+        # outputting
         self.di = 'plots/'
         self.ext = ''
         if self.stab == 'SU':
             self.ext = '_su'
         elif self.stab == 'SUPG':
             self.ext = '_supg'
-        self.sol_file = File(self.di + 'stationary_tracer' + self.ext + '.pvd')
-        
-        # Attributes to be populated
-        self.lhs = None
-        self.rhs = None
-        self.bc = None
-        self.lhs_adjoint = None
-        self.rhs_adjoint = None
-        self.bc_adjoint = None
+        self.sol_file = File(self.di + 'sol' + self.ext + '.pvd')
+        self.sol_adjoint_file = File(self.di + 'sol_adjoint' + self.ext + '.pvd')
         
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         if num_vertices is None:
@@ -65,25 +58,25 @@ class TracerProblem():
         
     def source_term(self):
         x, y = SpatialCoordinate(self.mesh)
-        bell = 1 + cos(pi * min_value(sqrt(pow(x - self.x0, 2) + pow(y - self.y0, 2)) / self.r0, 1.0))
-        return interpolate(0. + conditional(ge(bell, 0.), bell, 0.), self.P1)
-
+        cond = And(And(gt(x, self.x0-self.r0), lt(x, self.x0+self.r0)),
+                   And(gt(y, self.y0-self.r0), lt(y, self.y0+self.r0)))
+        return interpolate(conditional(cond, 1., 0.), self.P0)
+    
     def setup_equation(self):
         u = self.u
         nu = self.nu
         n = self.n
         f = self.source_term()
 
-        # Finite element problem
+        # finite element problem
         phi = TrialFunction(self.V)
         psi = TestFunction(self.V)
         a = psi*dot(u, grad(phi))*dx
         a += nu*inner(grad(phi), grad(psi))*dx
         a += - nu*psi*dot(n, nabla_grad(phi))*ds(1)
-        a += - nu*psi*dot(n, nabla_grad(phi))*ds(2)
         L = f*psi*dx
 
-        # Stabilisation
+        # stabilisation
         if self.stab in ("SU", "SUPG"):
             tau = self.h / (2*sqrt(inner(u, u)))
             stab_coeff = tau * dot(u, grad(psi))
@@ -99,15 +92,11 @@ class TracerProblem():
         self.bc = DirichletBC(self.V, 0, 1)
 
     def solve(self):
-        if self.lhs is None or self.rhs is None or self.bc is None:
-            self.setup_equation()
         phi = Function(self.V, name='Tracer concentration')
         solve(self.lhs == self.rhs, phi, bcs=self.bc, solver_parameters=self.params)
         self.sol = phi
-        
-    def plot(self):
         self.sol_file.write(self.sol)
-
+        
     def setup_adjoint_equation(self):
         u = self.u
         nu = self.nu
@@ -115,7 +104,7 @@ class TracerProblem():
         
         # Adjoint source term
         dJdphi = Function(self.P0)
-        dJdphi.interpolate(self.op.indicator(self.mesh))
+        dJdphi.interpolate(self.op.box(self.mesh))
         lam = TrialFunction(self.V)
         psi = TestFunction(self.V)
         
@@ -139,64 +128,57 @@ class TracerProblem():
         
         self.lhs_adjoint = a
         self.rhs_adjoint = L
-        self.bc_adjoint = DirichletBC(self.V, 0, [1, 2])
+        self.bc_adjoint = DirichletBC(self.V, 0, 1)
 
     def solve_adjoint(self):
-        if self.lhs_adjoint is None or self.rhs_adjoint is None or self.bc_adjoint is None:
-            self.setup_adjoint_equation()
         lam = Function(self.V, name='Adjoint tracer concentration')
         solve(self.lhs_adjoint == self.rhs_adjoint, lam, bcs=self.bc_adjoint, solver_parameters=self.params)
         self.sol_adjoint = lam
-
-    def plot_adjoint(self):
-        File(self.di + 'stationary_tracer' + self.ext + '_adjoint.pvd').write(self.sol_adjoint)
+        self.sol_adjoint_file.write(self.sol_adjoint)
 
     def objective_functional(self):
-        ks = interpolate(self.op.indicator(self.mesh), self.P0)
+        ks = interpolate(self.op.box(self.mesh), self.P0)
         return assemble(self.sol * ks * dx)
-        
-    def get_hessian_metric(self):
-        self.M = steady_metric(self.sol, op=self.op)
+
+    def get_hessian_metric(self, adjoint=False):
+        self.M = steady_metric(self.sol_adjoint if adjoint else self.sol, op=self.op)
 
     def explicit_estimation(self):
         phi = self.sol
         i = TestFunction(self.P0)
         
-        # Compute residuals
-        self.cell_res = self.source_term() - dot(self.u, grad(phi)) + div(self.nu*grad(phi))
-        self.edge_res = -self.nu*dot(self.n, nabla_grad(phi))
+        # compute residuals
+        self.cell_res = dot(self.u, grad(phi)) - div(self.nu*grad(phi))
+        self.edge_res = phi*dot(self.u, self.n) - self.nu*dot(self.n, nabla_grad(phi))
         R = self.cell_res
         r = self.edge_res
 
-        # Assemble cell residual
+        # assemble cell residual
         R_norm = assemble(i*R*R*dx)
 
-        # Solve auxiliary problem to assemble edge residual
+        # solve auxiliary problem to assemble edge residual
         r_norm = TrialFunction(self.P0)
         mass_term = i*r_norm*dx
-        flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS + i*r*r*ds(3) + i*r*r*ds(4)
-        flux_terms += -i*phi*phi*ds(1)
+        flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS + i*r*r*ds
         r_norm = Function(self.P0)
         solve(mass_term == flux_terms, r_norm)
 
-        # Form error estimator
+        # form error estimator
         self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), self.P0)
         self.indicator.rename('explicit')
-        
-    def difference_quotient_estimation(self):
-        raise NotImplementedError  # TODO
  
     def get_isotropic_metric(self):
         name = self.indicator.name()
-        self.indicator = project(self.indicator, self.P1)
-        self.indicator = normalise_indicator(self.indicator, op=self.op)
-        self.indicator.rename(name + '_indicator')
-        self.M = isotropic_metric(self.indicator, op=self.op)
-
-    def plot_indicator(self):
-        f = File(self.di + 'stationary_tracer' + self.ext + '_indicator_' + self.indicator.name() + '.pvd')
-        f.write(self.indicator)
+        eh = project(self.indicator, self.P1)
+        eh = normalise_indicator(eh, op=self.op)
+        eh.rename(name + '_indicator')
+        File(self.di + 'power_' + self.ext + '_indicator_' + name + '.pvd').write(eh)
+        self.M = isotropic_metric(eh, op=self.op)
         
+    def get_hybrid_metric(self):
+        eh = interpolate(Constant(self.mesh.num_vertices()/0.001)*abs(self.indicator), self.P1)
+        self.M = scaled_hessian(eh, self.sol, op=self.op)
+
     def dwr_estimation(self):
         i = TestFunction(self.P0)
         phi = self.sol
@@ -216,11 +198,10 @@ class TracerProblem():
             lam = self.sol_adjoint
             
             
-        # Cell residual
-        self.cell_res = (f - dot(u, grad(phi)) + div(nu*grad(phi)))
-        R = self.cell_res*lam
+        # cell residual
+        R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
 
-        # Edge residual
+        # edge residual
         r = TrialFunction(self.P0)
         flux = nu*lam*dot(n, nabla_grad(phi))
         flux_terms = ((i*flux)('+') + (i*flux)('-')) * dS + i*flux*ds(3) + i*flux*ds(4)
@@ -228,31 +209,6 @@ class TracerProblem():
         mass_term = i*r*dx
         r = Function(self.P0)
         solve(mass_term == flux_terms, r)
-
-
-#         R = f*lam
-#         R -= lam*dot(u, grad(phi))
-#         R -= nu*inner(grad(phi), grad(lam))
-#         flux_terms = 0
-#         flux_terms -= - i*nu*lam*dot(n, nabla_grad(phi))*ds(1)
-#         flux_terms -= - i*nu*lam*dot(n, nabla_grad(phi))*ds(2)
-
-#         # Stabilisation
-#         if self.stab in ("SU", "SUPG"):
-#             tau = self.h / (2*sqrt(inner(u, u)))
-#             stab_coeff = tau * dot(u, grad(lam))
-#             R_a = dot(u, grad(phi))         # LHS component of strong residual
-#             if self.stab == 'SUPG':
-#                 R_a += - div(nu*grad(phi))
-#                 R_L = f                     # RHS component of strong residual
-#                 R += stab_coeff*R_L
-#             R -= stab_coeff*R_a
-            
-#         r = TrialFunction(self.P0)
-#         mass_term = i*r*dx
-#         r = Function(self.P0)
-#         solve(mass_term == flux_terms, r)
-        
 
         self.cell_res = R
         self.edge_res = r
@@ -276,15 +232,13 @@ class TracerProblem():
         else:
             phi = self.sol
             
-        # Adjoint source term
-        dJdphi = Function(self.P0)
-        dJdphi.interpolate(self.op.indicator(self.mesh))
+        # adjoint source term
+        dJdphi = interpolate(self.op.box(self.mesh), self.P0)
             
-        # Cell residual
-        self.cell_res_adjoint = (dJdphi + div(u*lam) + div(nu*grad(lam)))
-        R = self.cell_res_adjoint * phi
+        # cell residual
+        R = (dJdphi + div(u*lam) + div(nu*grad(lam)))*phi
         
-        # Edge residual
+        # edge residual
         r = TrialFunction(self.P0)
         flux = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
         flux_terms = ((i*flux)('+') + (i*flux)('-')) * dS
@@ -302,63 +256,115 @@ class TracerProblem():
     def dwp_indication(self):
         self.indicator = project(self.sol * self.sol_adjoint, self.P0)
         self.indicator.rename('dwp')
+
+    def get_anisotropic_metric(self, adjoint=False):
+        try:
+            assert self.op.restrict == 'anisotropy'
+        except:
+            self.op.restrict = 'anisotropy'
+            raise Warning("Setting metric restriction method to 'anisotropy'")
+
+        # gradient of adjoint solution
+        adj = self.sol_adjoint
+        adj_diff = construct_gradient(adj)
+
+        # get fields to take Hessian wrt
+        if adjoint:
+            F1 = -self.sol*self.u[0] - self.nu*self.sol.dx(0)
+            F2 = -self.sol*self.u[1] - self.nu*self.sol.dx(1)
+            #source = interpolate(self.op.box(self.mesh), self.P0)
+        else:
+            F1 = self.sol*self.u[0] - self.nu*self.sol.dx(0)
+            F2 = self.sol*self.u[1] - self.nu*self.sol.dx(1)
+            #source = self.source_term()
+
+        # construct Hessians
+        H1 = construct_hessian(F1, mesh=self.mesh, op=self.op)
+        H2 = construct_hessian(F2, mesh=self.mesh, op=self.op)
+        #Hf = construct_hessian(source, mesh=self.mesh, op=self.op)
+
+        # form metric
+        #self.M = Hf.copy()
+        self.M = Function(H1.function_space())
+        for i in range(len(adj.dat.data)):
+        #    self.M.dat.data[i][:,:] *= adj.dat.data[i]
+            self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
+            self.M.dat.data[i][:,:] += H2.dat.data[i]*adj_diff.dat.data[i][1]
+        self.M = steady_metric(None, H=self.M, op=self.op)
+
+        # TODO: boundary contributions
+
         
-    def adapt_mesh(self, mode='hessian', relaxation_parameter=0.9, prev_metric=None, plot_mesh=True):
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None):
         
-        # Estimate error and generate associated metric
-        if mode == 'hessian':
-            self.get_hessian_metric()
-        elif mode == 'explicit':
+        # estimate error and generate associated metric
+        if self.approach == 'hessian':
+            self.get_hessian_metric(adjoint=False)
+        elif self.approach == 'hessian_adjoint':
+            self.get_hessian_metric(adjoint=True)
+        elif self.approach == 'hessian_superposed':
+            self.get_hessian_metric(adjoint=False)
+            M = self.M.copy()
+            self.get_hessian_metric(adjoint=True)
+            self.M = metric_intersection(M, self.M)
+        elif self.approach == 'explicit':
             self.explicit_estimation()
             self.get_isotropic_metric()
-        elif mode == 'dwp':
+        elif self.approach == 'dwp':
             self.dwp_indication()
             self.get_isotropic_metric()
-        elif mode == 'dwr':
+        elif self.approach == 'dwr':
             self.dwr_estimation()
             self.get_isotropic_metric()
-        elif mode == 'dwr_adjoint':
+        elif self.approach == 'dwr_adjoint':
             self.dwr_estimation_adjoint()
             self.get_isotropic_metric()
-        elif mode == 'dwr_both':
+        elif self.approach == 'dwr_both':
             self.dwr_estimation()
             self.get_isotropic_metric()
             i = self.indicator.copy()
             self.dwr_estimation_adjoint()
             self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
             self.get_isotropic_metric()
-        elif mode == 'dwr_averaged':
+        elif self.approach == 'dwr_averaged':
             self.dwr_estimation()
             self.get_isotropic_metric()
             i = self.indicator.copy()
             self.dwr_estimation_adjoint()
             self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
             self.get_isotropic_metric()
-        elif mode == 'dwr_relaxed':
+        elif self.approach == 'dwr_relaxed':
             self.dwr_estimation()
             self.get_isotropic_metric()
             M = self.M.copy()
             self.dwr_estimation_adjoint()
             self.get_isotropic_metric()
             self.M = metric_relaxation(M, self.M)
-        elif mode == 'dwr_superposed':
+        elif self.approach == 'dwr_superposed':
             self.dwr_estimation()
             self.get_isotropic_metric()
             M = self.M.copy()
             self.dwr_estimation_adjoint()
             self.get_isotropic_metric()
             self.M = metric_intersection(M, self.M)
+        elif self.approach == 'dwr_anisotropic':
+            self.get_anisotropic_metric(adjoint=False)
+        elif self.approach == 'dwr_anisotropic_adjoint':
+            self.get_anisotropic_metric(adjoint=True)
+        elif self.approach == 'dwr_anisotropic_superposed':
+            self.get_anisotropic_metric(adjoint=False)
+            M = self.M.copy()
+            self.get_anisotropic_metric(adjoint=True)
+            self.M = metric_intersection(M, self.M)
         else:
-            raise ValueError("Adaptivity mode {:s} not regcognised.".format(mode))
+            raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
-        # Apply metric relaxation, if requested
+        # apply metric relaxation, if requested
         self.M_unrelaxed = self.M.copy()
         if prev_metric is not None:
-            self.M.assign(metric_relaxation(project(prev_metric, self.M.function_space()), self.M, relaxation_parameter))
-        # (Default relaxation of 0.9 following [Power et al 2006])
+            self.M.project(metric_relaxation(interp(self.mesh, prev_metric), self.M, relaxation_parameter))
+        # (default relaxation of 0.9 following [Power et al 2006])
             
-        # Adapt mesh
-        self.mesh = adapt(self.mesh, self.M)
-        if plot_mesh:
-            f = File(self.di + 'stationary_tracer' + self.ext + '_mesh_' + mode + '.pvd')
-            f.write(self.mesh.coordinates)
+        # adapt mesh
+        self.mesh = AnisotropicAdaptation(self.mesh, self.M).adapted_mesh
+        #File(self.di + 'mesh_' + mode + '.pvd').write(self.mesh.coordinates)
