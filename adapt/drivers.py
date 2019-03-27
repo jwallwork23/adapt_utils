@@ -1,6 +1,6 @@
 from thetis import *
 
-from adapt.options import DefaultOptions
+from adapt_utils.adapt.options import DefaultOptions
 
 
 __all__ = ["adapt_mesh"]

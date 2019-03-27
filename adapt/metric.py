@@ -5,7 +5,7 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from adapt.options import DefaultOptions
+from adapt_utils.adapt.options import DefaultOptions
 
 
 __all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric", "iso_P2",
@@ -30,8 +30,9 @@ def construct_gradient(f, mesh=None):
     P1_vec = VectorFunctionSpace(mesh, "CG", 1)
     g = Function(P1_vec)
     psi = TestFunction(P1_vec)
+    # TODO: include an option to swap between these two: 'parts' vs 'L2'
     #Lg = inner(g, psi)*dx - inner(grad(f), psi)*dx
-    Lg = inner(g, psi)*dx - f*dot(psi, FacetNormal(mesh))*ds + f*div(psi)*dx
+    Lg = inner(g, psi)*dx - f*dot(psi, FacetNormal(mesh))*ds + f*div(psi)*dx  # enables f to be P0
     g_prob = NonlinearVariationalProblem(Lg, g)
     NonlinearVariationalSolver(g_prob, solver_parameters={'snes_rtol': 1e8,
                                                           'ksp_rtol': 1e-5,
@@ -267,6 +268,7 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
     return M
 
 
+# TODO: This is not really to do with metrics
 def iso_P2(mesh):
     """
     Uniformly refine a mesh (in each canonical direction) using an iso-P2 refinement. That is, nodes
@@ -275,6 +277,7 @@ def iso_P2(mesh):
     return MeshHierarchy(mesh, 1).__getitem__(1)
 
 
+# TODO: Revisit this approach
 def anisotropic_refinement(M, direction=0):
     """
     Anisotropically refine a mesh (or, more precisely, the metric field `M` associated with a mesh)

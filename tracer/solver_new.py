@@ -1,6 +1,7 @@
 from firedrake import *
-from tracer.options import TracerOptions
-from adapt.metric import *
+
+from adapt_utils.tracer.options import TracerOptions
+from adapt_utils.adapt.metric import *
 
 
 class TracerProblem():
@@ -40,7 +41,10 @@ class TracerProblem():
                        'ksp_converged_reason': None}
         self.stab = stab if stab is not None else 'no'
         self.high_order = high_order
-        
+
+        # attributes to populate        
+        self.sol_adjoint = None
+
         # outputting
         self.di = 'plots/'
         self.ext = ''
@@ -179,6 +183,40 @@ class TracerProblem():
         eh = interpolate(Constant(self.mesh.num_vertices()/0.001)*abs(self.indicator), self.P1)
         self.M = scaled_hessian(eh, self.sol, op=self.op)
 
+    def solve_high_order(self, adjoint=True):
+
+        # consider an iso-P2 refined mesh
+        fine_mesh = iso_P2(self.mesh)
+
+        # solve adjoint problem on fine mesh using linear elements
+        tp_p1 = TracerProblem(stab=self.stab,
+                              mesh=fine_mesh,
+                              fe=FiniteElement('Lagrange', triangle, 1))
+        if adjoint:
+            tp_p1.setup_adjoint_equation()
+            tp_p1.solve_adjoint()
+        else:
+            tp_p1.setup_equation()
+            tp_p1.solve()
+
+        # solve adjoint problem on fine mesh using quadratic elements
+        tp_p2 = TracerProblem(stab=self.stab,
+                              mesh=fine_mesh,
+                              fe=FiniteElement('Lagrange', triangle, 2))
+        if adjoint:
+            tp_p2.setup_adjoint_equation()
+            tp_p2.solve_adjoint()
+        else:
+            tp_p2.setup_equation()
+            tp_p2.solve()
+
+        # evaluate difference on fine mesh and project onto coarse mesh
+        sol_p1 = tp_p1.sol_adjoint if adjoint else tp_p1.sol
+        sol_p2 = tp_p2.sol_adjoint if adjoint else tp_p2.sol
+        sol = interpolate(sol_p1, tp_p2.V)
+        sol.interpolate(sol_p2 - sol)
+        return project(sol, self.V)
+
     def dwr_estimation(self):
         i = TestFunction(self.P0)
         phi = self.sol
@@ -188,13 +226,11 @@ class TracerProblem():
         f = self.source_term()
         
         if self.high_order:
-            tp_ho = TracerProblem(stab=self.stab,
-                                  mesh=self.mesh,
-                                  fe=FiniteElement('Lagrange', triangle, 2))
-            tp_ho.setup_adjoint_equation()
-            tp_ho.solve_adjoint()
-            lam = tp_ho.sol_adjoint - self.sol_adjoint
+            lam = self.solve_high_order(adjoint=True)
         else:
+            if self.sol_adjoint is None:
+                self.setup_adjoint_equation()
+                self.solve_adjoint()
             lam = self.sol_adjoint
             
             
@@ -217,18 +253,16 @@ class TracerProblem():
         
     def dwr_estimation_adjoint(self):
         i = TestFunction(self.P0)
+        if self.sol_adjoint is None:
+            self.setup_adjoint_equation()
+            self.solve_adjoint()
         lam = self.sol_adjoint
         u = self.u
         nu = self.nu
         n = self.n
         
         if self.high_order:
-            tp_ho = TracerProblem(stab=self.stab,
-                                  mesh=self.mesh,
-                                  fe=FiniteElement('Lagrange', triangle, 2))
-            tp_ho.setup_equation()
-            tp_ho.solve()
-            phi = tp_ho.sol - self.sol
+            phi = self.solve_high_order(adjoint=False)
         else:
             phi = self.sol
             
@@ -264,18 +298,28 @@ class TracerProblem():
             self.op.restrict = 'anisotropy'
             raise Warning("Setting metric restriction method to 'anisotropy'")
 
-        # gradient of adjoint solution
-        adj = self.sol_adjoint
+        # solve adjoint problem
+        if not adjoint and self.sol_adjoint is None:
+            self.setup_adjoint_equation()
+            self.solve_adjoint()
+        if self.high_order:
+            adj = self.solve_high_order(adjoint=not adjoint)
+        else:
+            adj = self.sol if adjoint else self.sol_adjoint
+        if adjoint and self.sol_adjoint is None:
+            self.setup_adjoint_equation()
+            self.solve_adjoint()
+        sol = self.sol_adjoint if adjoint else self.sol
         adj_diff = construct_gradient(adj)
 
         # get fields to take Hessian wrt
         if adjoint:
-            F1 = -self.sol*self.u[0] - self.nu*self.sol.dx(0)
-            F2 = -self.sol*self.u[1] - self.nu*self.sol.dx(1)
+            F1 = -sol*self.u[0] - self.nu*sol.dx(0)
+            F2 = -sol*self.u[1] - self.nu*sol.dx(1)
             #source = interpolate(self.op.box(self.mesh), self.P0)
         else:
-            F1 = self.sol*self.u[0] - self.nu*self.sol.dx(0)
-            F2 = self.sol*self.u[1] - self.nu*self.sol.dx(1)
+            F1 = sol*self.u[0] - self.nu*sol.dx(0)  # uses the fact that u is constant
+            F2 = sol*self.u[1] - self.nu*sol.dx(1)  #               "
             #source = self.source_term()
 
         # construct Hessians

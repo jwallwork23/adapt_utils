@@ -1,7 +1,7 @@
 from firedrake import File
 from thetis.configuration import *
 
-from adapt.options import AdaptOptions
+from adapt_utils.adapt.options import AdaptOptions
 
 
 __all__ = ["TracerOptions"]

@@ -1,7 +1,7 @@
 from firedrake import *
 
-from adapt.metric import *
-from tracer.options import TracerOptions
+from adapt_utils.adapt.metric import *
+from adapt_utils.tracer.options import TracerOptions
 
 
 __all__ = ["TracerProblem"]
