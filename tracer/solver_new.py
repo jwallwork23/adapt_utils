@@ -312,29 +312,43 @@ class TracerProblem():
         sol = self.sol_adjoint if adjoint else self.sol
         adj_diff = construct_gradient(adj)
 
-        # get fields to take Hessian wrt
+        # get potential to take Hessian wrt
+        x, y = SpatialCoordinate(self.mesh)
         if adjoint:
+            source = interpolate(self.op.box(self.mesh), self.P0)
+            # F1 = -sol*self.u[0] - self.nu*sol.dx(0) - source*x
+            # F2 = -sol*self.u[1] - self.nu*sol.dx(1) - source*y
             F1 = -sol*self.u[0] - self.nu*sol.dx(0)
             F2 = -sol*self.u[1] - self.nu*sol.dx(1)
-            #source = interpolate(self.op.box(self.mesh), self.P0)
         else:
-            # using the fact u is constant
+            source = self.source_term()
+            # F1 = sol*self.u[0] - self.nu*sol.dx(0) - source*x
+            # F2 = sol*self.u[1] - self.nu*sol.dx(1) - source*y
             F1 = sol*self.u[0] - self.nu*sol.dx(0)
             F2 = sol*self.u[1] - self.nu*sol.dx(1)
-            #source = self.source_term()
+
+        # NOTES:
+        #  * The derivation for the second potential uses the fact that u is divergence free (in
+        #    particular, it is constant).
+        #  * It is NOT the case that div(F) = f when the commented-out versions of F1 and F2 are
+        #    used. In fact:
+        #                    div(F)(x) = 1     if x in A
+        #                                infty if x in partial A
+        #                                0     else
+        #    Using these forms lead to high resolution of the boundaries of the source / receiver
+        #    regions and low resolution elsewhere.
 
         # construct Hessians
         H1 = construct_hessian(F1, mesh=self.mesh, op=self.op)
         H2 = construct_hessian(F2, mesh=self.mesh, op=self.op)
-        #Hf = construct_hessian(source, mesh=self.mesh, op=self.op)
+        # Hf = construct_hessian(source, mesh=self.mesh, op=self.op)
 
         # form metric
-        #self.M = Hf.copy()
         self.M = Function(H1.function_space())
         for i in range(len(adj.dat.data)):
-        #    self.M.dat.data[i][:,:] *= adj.dat.data[i]
             self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
             self.M.dat.data[i][:,:] += H2.dat.data[i]*adj_diff.dat.data[i][1]
+        #     self.M.dat.data[i][:,:] += Hf.dat.dat[i]*adj.dat.data[i]
         self.M = steady_metric(None, H=self.M, op=self.op)
 
         # TODO: boundary contributions
