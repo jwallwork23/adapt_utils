@@ -1,5 +1,6 @@
 from firedrake import *
 
+import datetime
 from time import clock
 
 from adapt_utils.tracer.options import TracerOptions
@@ -8,6 +9,9 @@ from adapt_utils.adapt.metric import *
 
 __all__ = ["TracerProblem", "MeshOptimisation"]
 
+
+now = datetime.datetime.now()
+date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 class TracerProblem():
     def __init__(self,
@@ -433,25 +437,35 @@ class MeshOptimisation():
         self.n = n
         self.outdir = outdir
         self.logmsg = logmsg
-        
+
+        # Default tolerances etc
         self.msg = "Mesh {:2d}: {:7d} cells, objective {:.4e}"
         self.conv_msg = "Converged after {:d} iterations due to {:s}"
         self.maxit = 35
         self.element_rtol = 0.005    # Following [Power et al 2006]
         self.objective_rtol = 0.005
-        
+
         self.dat = {'elements': [], 'vertices': [], 'objective': [], 'approach': self.approach}
-        
-    def optimise(self):  # TODO: use outdir
+
+    def optimise(self):
         tstart = clock()
         M_ = None
         M = None
+
+        # create a log file and spit out parameters used
         self.logfile = open('{:s}/{:s}/log'.format(self.outdir, self.approach), 'a+')
-        date = '28-3-19'  # FIXME
-        self.logfile.write('{:s}{:s}\n\n'.format(date, self.logmsg))
+        self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
+        self.logfile.write('stabilisation: {:s}\n'.format(self.stab))
+        self.logfile.write('high_order: {:b}\n'.format(self.high_order))
+        self.logfile.write('relax: {:b}\n'.format(self.relax))
+        self.logfile.write('maxit: {:d}\n'.format(self.maxit))
+        self.logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
+        self.logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
+
         for i in range(self.maxit):
+            print('Solving on mesh {:d}'.format(i))
             tp = TracerProblem(stab=self.stab,
-                               mesh=tp.mesh if i != 0 else None,
+                               mesh=self.mesh if i == 0 else tp.mesh,
                                approach=self.approach,
                                n=self.n,
                                high_order=self.high_order)
@@ -464,29 +478,31 @@ class MeshOptimisation():
             self.dat['elements'].append(tp.mesh.num_cells())
             self.dat['vertices'].append(tp.mesh.num_vertices())
             self.dat['objective'].append(tp.objective_functional())
-            print(self.msg.format(i+1, self.dat['elements'][i], self.dat['objective'][i]))
+            print(self.msg.format(i, self.dat['elements'][i], self.dat['objective'][i]))
             self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][i]))
             self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][i]))
             self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][i]))
-            
+
             # Stopping criteria
             if i > 0:
+                out = None
                 obj_diff = abs(self.dat['objective'][i] - self.dat['objective'][i-1])
-                if obj_diff < self.objective_rtol*self.dat['objective'][i-1]:
-                    print(self.conv_msg.format(i+1, 'convergence in objective functional.'))
-                    break
                 el_diff = abs(self.dat['elements'][i] - self.dat['elements'][i-1])
-                if el_diff < self.element_rtol*self.dat['elements'][i-1]:
-                    print(self.conv_msg.format(i+1, 'convergence in mesh element count.'))
-                    break
+                if obj_diff < self.objective_rtol*self.dat['objective'][i-1]:
+                    out = self.conv_msg.format(i+1, 'convergence in objective functional.')
+                elif el_diff < self.element_rtol*self.dat['elements'][i-1]:
+                    out = self.conv_msg.format(i+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
-                    print(self.conv_msg.format(i+1, 'maximum mesh adaptation count reached.'))
+                    out = self.conv_msg.format(i+1, 'maximum mesh adaptation count reached.')
+                if out is not None:
+                    print(out)
+                    self.logfile.write(out+'\n')
+                    File(self.outdir + self.approach + '/mesh.pvd').write(tp.mesh.coordinates)
                     break
 
             # Otherwise, adapt mesh
             tp.set_target_vertices(num_vertices=self.dat['vertices'][0], rescaling=self.rescaling)
             tp.adapt_mesh(prev_metric=M_)
-            File(tp.di + self.approach + '/mesh' + str(i) + '.pvd').write(tp.mesh.coordinates) # FIXME
             if self.relax:
                 M_ = tp.M_unrelaxed
         self.dat['time'] = clock() - tstart
