@@ -564,6 +564,32 @@ class OuterLoop():
         self.gather()
         logfile.close()
 
+    def test_to_convergence(self):
+        logfile = open('plots/' + self.approach + '/full.log', 'a+')
+        logfile.write('\n' + date + '\n\n')
+        for i in range(self.maxit):
+            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
+            self.opt[i] = MeshOptimisation(n=i+1,
+                                           approach=self.approach,
+                                           rescaling=self.rescaling,
+                                           high_order=self.high_order,
+                                           log=False)
+            self.opt[i].maxit = self.maxit
+            self.opt[i].element_rtol = self.element_rtol
+            self.opt[i].objective_rtol = self.objective_rtol
+            self.opt[i].optimise()
+            if self.opt[i].maxit_flag:
+                self.opt[i].dat['objective'][-1] = np.nan
+            logfile.write("loop {:d} elements {:7d} objective {:.4e}\n".format(i, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
+
+            # convergence criterion
+            obj_diff = abs(self.opt[i].dat['objective'][-1] - self.opt[i-1].dat['objective'][-1])
+            if obj_diff < self.objective_rtol*self.opt[i-1].dat['objective'][-1]:
+                print(self.opt[i].conv_msg.format(i+1, 'convergence in objective functional.'))
+                break
+        self.gather()
+        logfile.close()
+
     # TODO: Not sure the test_rescaling approach is particularly useful
 
     def test_rescaling(self):
