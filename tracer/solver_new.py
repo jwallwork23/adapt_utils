@@ -1,7 +1,12 @@
 from firedrake import *
 
+from time import clock
+
 from adapt_utils.tracer.options import TracerOptions
 from adapt_utils.adapt.metric import *
+
+
+__all__ = ["TracerProblem", "MeshOptimisation"]
 
 
 class TracerProblem():
@@ -145,6 +150,9 @@ class TracerProblem():
         return assemble(self.sol * ks * dx)
 
     def get_hessian_metric(self, adjoint=False):
+        if adjoint and self.sol_adjoint is None:
+            self.setup_adjoint_equation()
+            self.solve_adjoint()
         self.M = steady_metric(self.sol_adjoint if adjoint else self.sol, op=self.op)
 
     def explicit_estimation(self):
@@ -176,7 +184,7 @@ class TracerProblem():
         eh = project(self.indicator, self.P1)
         eh = normalise_indicator(eh, op=self.op)
         eh.rename(name + '_indicator')
-        File(self.di + 'power_' + self.ext + '_indicator_' + name + '.pvd').write(eh)
+        File(self.di + self.approach + '/indicator_' + name + '.pvd').write(eh)
         self.M = isotropic_metric(eh, op=self.op)
         
     def get_hybrid_metric(self):
@@ -412,3 +420,75 @@ class TracerProblem():
         # adapt mesh
         self.mesh = AnisotropicAdaptation(self.mesh, self.M).adapted_mesh
         #File(self.di + 'mesh_' + mode + '.pvd').write(self.mesh.coordinates)
+
+
+class MeshOptimisation():
+    def __init__(self, mesh=None, n=2, rescaling=0.85, approach='hessian', stab='SUPG', high_order=False, relax=False, outdir='plots', logmsg=''):
+        self.mesh = mesh
+        self.rescaling = rescaling
+        self.approach = approach
+        self.stab = stab
+        self.high_order = high_order
+        self.relax = relax
+        self.n = n
+        self.outdir = outdir
+        self.logmsg = logmsg
+        
+        self.msg = "Mesh {:2d}: {:7d} cells, objective {:.4e}"
+        self.conv_msg = "Converged after {:d} iterations due to {:s}"
+        self.maxit = 35
+        self.element_rtol = 0.005    # Following [Power et al 2006]
+        self.objective_rtol = 0.005
+        
+        self.dat = {'elements': [], 'vertices': [], 'objective': [], 'approach': self.approach}
+        
+    def optimise(self):  # TODO: use outdir
+        tstart = clock()
+        M_ = None
+        M = None
+        self.logfile = open('{:s}/{:s}/log'.format(self.outdir, self.approach), 'a+')
+        date = '28-3-19'  # FIXME
+        self.logfile.write('{:s}{:s}\n\n'.format(date, self.logmsg))
+        for i in range(self.maxit):
+            tp = TracerProblem(stab=self.stab,
+                               mesh=tp.mesh if i != 0 else None,
+                               approach=self.approach,
+                               n=self.n,
+                               high_order=self.high_order)
+                
+            # Solve
+            tp.setup_equation()
+            tp.solve()
+            
+            # Extract data
+            self.dat['elements'].append(tp.mesh.num_cells())
+            self.dat['vertices'].append(tp.mesh.num_vertices())
+            self.dat['objective'].append(tp.objective_functional())
+            print(self.msg.format(i+1, self.dat['elements'][i], self.dat['objective'][i]))
+            self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][i]))
+            self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][i]))
+            self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][i]))
+            
+            # Stopping criteria
+            if i > 0:
+                obj_diff = abs(self.dat['objective'][i] - self.dat['objective'][i-1])
+                if obj_diff < self.objective_rtol*self.dat['objective'][i-1]:
+                    print(self.conv_msg.format(i+1, 'convergence in objective functional.'))
+                    break
+                el_diff = abs(self.dat['elements'][i] - self.dat['elements'][i-1])
+                if el_diff < self.element_rtol*self.dat['elements'][i-1]:
+                    print(self.conv_msg.format(i+1, 'convergence in mesh element count.'))
+                    break
+                elif i >= self.maxit-1:
+                    print(self.conv_msg.format(i+1, 'maximum mesh adaptation count reached.'))
+                    break
+
+            # Otherwise, adapt mesh
+            tp.set_target_vertices(num_vertices=self.dat['vertices'][0], rescaling=self.rescaling)
+            tp.adapt_mesh(prev_metric=M_)
+            File(tp.di + self.approach + '/mesh' + str(i) + '.pvd').write(tp.mesh.coordinates) # FIXME
+            if self.relax:
+                M_ = tp.M_unrelaxed
+        self.dat['time'] = clock() - tstart
+        print('Time to solution: {:.1f}s'.format(self.dat['time']))
+        self.logfile.close()
