@@ -533,11 +533,15 @@ class MeshOptimisation():
             self.logfile.close()
 
 class OuterLoop():
-    def __init__(self, approach='hessian', rescaling=0.85, iterates=4, high_order=False):
+    def __init__(self, approach='hessian', rescaling=0.85, iterates=4, high_order=False, maxit=35, element_rtol=0.005, objective_rtol=0.005):
         self.approach = approach
         self.rescaling = rescaling
         self.iterates = iterates
         self.high_order = high_order
+        self.maxit = maxit
+        self.element_rtol = element_rtol
+        self.objective_rtol = objective_rtol
+
         self.opt = {}
 
     def test_meshes(self):
@@ -550,6 +554,9 @@ class OuterLoop():
                                            rescaling=self.rescaling,
                                            high_order=self.high_order,
                                            log=False)
+            self.opt[i].maxit = self.maxit
+            self.opt[i].element_rtol = self.element_rtol
+            self.opt[i].objective_rtol = self.objective_rtol
             self.opt[i].optimise()
             if self.opt[i].maxit_flag:
                 self.opt[i].dat['objective'][-1] = np.nan
@@ -569,6 +576,9 @@ class OuterLoop():
                                            rescaling=self.rescaling,
                                            high_order=self.high_order,
                                            log=False)
+            self.opt[i].maxit = self.maxit
+            self.opt[i].element_rtol = self.element_rtol
+            self.opt[i].objective_rtol = self.objective_rtol
             self.opt[i].optimise()
             if self.opt[i].maxit_flag:
                 self.opt[i].dat['objective'][-1] = np.nan
