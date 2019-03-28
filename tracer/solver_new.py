@@ -7,11 +7,13 @@ from adapt_utils.tracer.options import TracerOptions
 from adapt_utils.adapt.metric import *
 
 
-__all__ = ["TracerProblem", "MeshOptimisation"]
+__all__ = ["TracerProblem", "MeshOptimisation", "OuterLoop"]
 
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
+
+# TODO: Generalise
 
 class TracerProblem():
     def __init__(self,
@@ -438,9 +440,10 @@ class TracerProblem():
         # adapt mesh
         self.mesh = AnisotropicAdaptation(self.mesh, self.M).adapted_mesh
 
+# TODO: Generalise
 
 class MeshOptimisation():
-    def __init__(self, mesh=None, n=2, rescaling=0.85, approach='hessian', stab='SUPG', high_order=False, relax=False, outdir='plots/', logmsg=''):
+    def __init__(self, mesh=None, n=2, rescaling=0.85, approach='hessian', stab='SUPG', high_order=False, relax=False, outdir='plots/', logmsg='', log=True):
         self.mesh = SquareMesh(20*n, 20*n, 4, 4) if mesh is None else mesh
         self.rescaling = rescaling
         self.approach = approach
@@ -450,11 +453,13 @@ class MeshOptimisation():
         self.n = n
         self.outdir = outdir
         self.logmsg = logmsg
+        self.log = log
 
         # Default tolerances etc
         self.msg = "Mesh {:2d}: {:7d} cells, objective {:.4e}"
         self.conv_msg = "Converged after {:d} iterations due to {:s}"
         self.maxit = 35
+        self.maxit_flag = False
         self.element_rtol = 0.005    # Following [Power et al 2006]
         self.objective_rtol = 0.005
 
@@ -466,14 +471,15 @@ class MeshOptimisation():
         M = None
 
         # create a log file and spit out parameters used
-        self.logfile = open('{:s}/{:s}/log'.format(self.outdir, self.approach), 'a+')
-        self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
-        self.logfile.write('stabilisation: {:s}\n'.format(self.stab))
-        self.logfile.write('high_order: {:b}\n'.format(self.high_order))
-        self.logfile.write('relax: {:b}\n'.format(self.relax))
-        self.logfile.write('maxit: {:d}\n'.format(self.maxit))
-        self.logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
-        self.logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
+        if self.log:
+            self.logfile = open('{:s}/{:s}/log'.format(self.outdir, self.approach), 'a+')
+            self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
+            self.logfile.write('stabilisation: {:s}\n'.format(self.stab))
+            self.logfile.write('high_order: {:b}\n'.format(self.high_order))
+            self.logfile.write('relax: {:b}\n'.format(self.relax))
+            self.logfile.write('maxit: {:d}\n'.format(self.maxit))
+            self.logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
+            self.logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
 
         for i in range(self.maxit):
             print('Solving on mesh {:d}'.format(i))
@@ -482,19 +488,20 @@ class MeshOptimisation():
                                approach=self.approach,
                                n=self.n,
                                high_order=self.high_order)
-                
+
             # Solve
             tp.setup_equation()
             tp.solve()
-            
+
             # Extract data
             self.dat['elements'].append(tp.mesh.num_cells())
             self.dat['vertices'].append(tp.mesh.num_vertices())
             self.dat['objective'].append(tp.objective_functional())
             print(self.msg.format(i, self.dat['elements'][i], self.dat['objective'][i]))
-            self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][i]))
-            self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][i]))
-            self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][i]))
+            if self.log:
+                self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][i]))
+                self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][i]))
+                self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][i]))
 
             # Stopping criteria
             if i > 0:
@@ -507,9 +514,11 @@ class MeshOptimisation():
                     out = self.conv_msg.format(i+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
                     out = self.conv_msg.format(i+1, 'maximum mesh adaptation count reached.')
+                    self.maxit_flag = True
                 if out is not None:
                     print(out)
-                    self.logfile.write(out+'\n')
+                    if self.log:
+                        self.logfile.write(out+'\n')
                     File(self.outdir + self.approach + '/mesh.pvd').write(tp.mesh.coordinates)
                     break
 
@@ -520,4 +529,55 @@ class MeshOptimisation():
                 M_ = tp.M_unrelaxed
         self.dat['time'] = clock() - tstart
         print('Time to solution: {:.1f}s'.format(self.dat['time']))
-        self.logfile.close()
+        if self.log:
+            self.logfile.close()
+
+class OuterLoop():
+    def __init__(self, approach='hessian', rescaling=0.85, iterates=4, high_order=False):
+        self.approach = approach
+        self.rescaling = rescaling
+        self.iterates = iterates
+        self.high_order = high_order
+        self.opt = {}
+
+    def test_meshes(self):
+        logfile = open('plots/' + self.approach + '/resolution.log', 'a+')
+        logfile.write('\n' + date + '\n\n')
+        for i in range(self.iterates):
+            print("\nOuter loop {:d}/{:d} for approach '{:s}'".format(i+1, self.iterates, self.approach))
+            self.opt[i] = MeshOptimisation(n=2**i,
+                                           approach=self.approach,
+                                           rescaling=self.rescaling,
+                                           high_order=self.high_order,
+                                           log=False)
+            self.opt[i].optimise()
+            if self.opt[i].maxit_flag:
+                self.opt[i].dat['objective'][-1] = np.nan
+            logfile.write("loop {:d} elements {:7d} objective {:.4e}\n".format(i, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
+        self.gather()
+        logfile.close()
+
+    # TODO: Not sure the test_rescaling approach is particularly useful
+
+    def test_rescaling(self):
+        logfile = open('plots/' + self.approach + '/rescaling.log', 'a+')
+        logfile.write('\n' + date + '\n\n')
+        for r, i in zip(np.linspace(0.05, 1., self.iterates), range(self.iterates)):
+            self.rescaling = r
+            print("\nOuter loop {:d}/{:d} for approach '{:s}'".format(i+1, self.iterates, self.approach))
+            self.opt[i] = MeshOptimisation(approach=self.approach,
+                                           rescaling=self.rescaling,
+                                           high_order=self.high_order,
+                                           log=False)
+            self.opt[i].optimise()
+            if self.opt[i].maxit_flag:
+                self.opt[i].dat['objective'][-1] = np.nan
+            logfile.write("loop {:d} elements {:7d} objective {:.4e}\n".format(i, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
+        self.gather()
+        logfile.close()
+                  
+    def gather(self):
+        self.elements = [self.opt[i].dat['elements'][-1] for i in range(self.iterates)]
+        self.objective = [self.opt[i].dat['objective'][-1] for i in range(self.iterates)]
+        self.time = [self.opt[i].dat['time'] for i in range(self.iterates)]
+        self.rescaling = [self.opt[i].rescaling for i in range(self.iterates)]
