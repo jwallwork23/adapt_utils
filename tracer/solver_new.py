@@ -429,6 +429,11 @@ class TracerProblem():
                 self.get_anisotropic_metric(adjoint=False)
             elif self.approach == 'dwr_anisotropic_adjoint':
                 self.get_anisotropic_metric(adjoint=True)
+            elif self.approach == 'dwr_anisotropic_relaxed':
+                self.get_anisotropic_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_anisotropic_metric(adjoint=True)
+                self.M = metric_relaxation(M, self.M)
             elif self.approach == 'dwr_anisotropic_superposed':
                 self.get_anisotropic_metric(adjoint=False)
                 M = self.M.copy()
@@ -618,8 +623,39 @@ class OuterLoop():
         self.gather()
         logfile.close()
                   
+    def scale_to_convergence(self):
+        logfile = open('plots/' + self.approach + '/scale_to_convergence.log', 'a+')
+        logfile.write('\n' + date + '\n\n')
+        logfile.write('maxit: {:d}\n'.format(self.maxit))
+        logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
+        logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
+        for i in range(self.maxit):
+            self.rescaling = float(i+1)*0.4
+            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
+            self.opt[i] = MeshOptimisation(n=3,
+                                           approach=self.approach,
+                                           rescaling=self.rescaling,
+                                           high_order=self.high_order,
+                                           log=False)
+            self.opt[i].maxit = self.maxit
+            self.opt[i].element_rtol = self.element_rtol
+            self.opt[i].objective_rtol = self.objective_rtol
+            self.opt[i].optimise()
+            if self.opt[i].maxit_flag:
+                self.opt[i].dat['objective'][-1] = np.nan
+            logfile.write("rescaling {:.2f} elements {:7d} objective {:.4e}\n".format(self.rescaling, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
+
+            # convergence criterion
+            if i > 0:
+                obj_diff = abs(self.opt[i].dat['objective'][-1] - self.opt[i-1].dat['objective'][-1])
+                if obj_diff < self.objective_rtol*self.opt[i-1].dat['objective'][-1]:
+                    print(self.opt[i].conv_msg.format(i+1, 'convergence in objective functional.'))
+                    break
+        self.gather()
+        logfile.close()
     def gather(self):
-        self.elements = [self.opt[i].dat['elements'][-1] for i in range(self.iterates)]
-        self.objective = [self.opt[i].dat['objective'][-1] for i in range(self.iterates)]
-        self.time = [self.opt[i].dat['time'] for i in range(self.iterates)]
-        self.rescaling = [self.opt[i].rescaling for i in range(self.iterates)]
+        N = len(self.opt.keys())
+        self.elements = [self.opt[i].dat['elements'][-1] for i in range(N)]
+        self.objective = [self.opt[i].dat['objective'][-1] for i in range(N)]
+        self.time = [self.opt[i].dat['time'] for i in range(N)]
+        self.rescaling = [self.opt[i].rescaling for i in range(N)]
