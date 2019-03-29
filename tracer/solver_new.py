@@ -1,7 +1,9 @@
 from firedrake import *
+from firedrake_adjoint import *
 
 import datetime
 from time import clock
+import numpy as np
 
 from adapt_utils.tracer.options import TracerOptions
 from adapt_utils.adapt.metric import *
@@ -35,6 +37,7 @@ class TracerProblem():
         self.V = FunctionSpace(self.mesh, fe)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
+        self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
         
@@ -45,7 +48,8 @@ class TracerProblem():
         self.y0 = 2.
         self.r0 = 0.1
         self.nu = Constant(1.)
-        self.u = Constant([15., 0.])
+        # self.u = Constant([15., 0.])
+        self.u = Function(self.P1_vec).interpolate(as_vector((15., 0.)))  # for pyadjoint
         self.params = {'pc_type': 'lu',
                        'mat_type': 'aij' ,
                        'ksp_monitor': None,
@@ -72,7 +76,8 @@ class TracerProblem():
         x, y = SpatialCoordinate(self.mesh)
         cond = And(And(gt(x, self.x0-self.r0), lt(x, self.x0+self.r0)),
                    And(gt(y, self.y0-self.r0), lt(y, self.y0+self.r0)))
-        return interpolate(conditional(cond, 1., 0.), self.P0)
+        #return interpolate(conditional(cond, 1., 0.), self.P0)
+        return Function(self.P0).interpolate(conditional(cond, 1., 0.))  # for pyadjoint
     
     def setup_equation(self):
         u = self.u
@@ -149,8 +154,9 @@ class TracerProblem():
         self.sol_adjoint_file.write(self.sol_adjoint)
 
     def objective_functional(self):
-        ks = interpolate(self.op.box(self.mesh), self.P0)
-        return assemble(self.sol * ks * dx)
+        #ks = interpolate(self.op.box(self.mesh), self.P0)
+        ks = Function(self.P0).interpolate(self.op.box(self.mesh))  # for pyadjoint
+        return assemble(self.sol*ks*dx)
 
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.sol_adjoint if adjoint else self.sol, op=self.op)
