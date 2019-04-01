@@ -1,5 +1,7 @@
 from firedrake import *
 from firedrake_adjoint import *
+from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
+from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
 
 import datetime
 from time import clock
@@ -7,6 +9,7 @@ import numpy as np
 
 from adapt_utils.tracer.options import TracerOptions
 from adapt_utils.adapt.metric import *
+from adapt_utils.solver import BaseProblem
 
 
 __all__ = ["TracerProblem", "MeshOptimisation", "OuterLoop"]
@@ -17,7 +20,7 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 # TODO: Generalise
 
-class TracerProblem():
+class TracerProblem(BaseProblem):
     def __init__(self,
                  op=TracerOptions(),
                  stab=None,
@@ -48,14 +51,17 @@ class TracerProblem():
         self.y0 = 2.
         self.r0 = 0.1
         self.nu = Constant(1.)
-        # self.u = Constant([15., 0.])
-        self.u = Function(self.P1_vec).interpolate(as_vector((15., 0.)))  # for pyadjoint
+        self.u = Function(self.P1_vec).interpolate(as_vector((15., 0.)))
         self.params = {'pc_type': 'lu',
                        'mat_type': 'aij' ,
                        'ksp_monitor': None,
                        'ksp_converged_reason': None}
         self.stab = stab if stab is not None else 'no'
         self.high_order = high_order
+
+        # solution fields
+        self.sol = Function(self.V, name='Tracer concentration')
+        self.sol_adjoint = Function(self.V, name='Adjoint tracer concentration')
 
         # outputting
         self.di = 'plots/'
@@ -76,8 +82,7 @@ class TracerProblem():
         x, y = SpatialCoordinate(self.mesh)
         cond = And(And(gt(x, self.x0-self.r0), lt(x, self.x0+self.r0)),
                    And(gt(y, self.y0-self.r0), lt(y, self.y0+self.r0)))
-        #return interpolate(conditional(cond, 1., 0.), self.P0)
-        return Function(self.P0).interpolate(conditional(cond, 1., 0.))  # for pyadjoint
+        return Function(self.P0).interpolate(conditional(cond, 1., 0.))
     
     def setup_equation(self):
         u = self.u
@@ -109,9 +114,7 @@ class TracerProblem():
         self.bc = DirichletBC(self.V, 0, 1)
 
     def solve(self):
-        phi = Function(self.V, name='Tracer concentration')
-        solve(self.lhs == self.rhs, phi, bcs=self.bc, solver_parameters=self.params)
-        self.sol = phi
+        solve(self.lhs == self.rhs, self.sol, bcs=self.bc, solver_parameters=self.params)
         self.sol_file.write(self.sol)
         
     def setup_adjoint_equation(self):
@@ -147,15 +150,25 @@ class TracerProblem():
         self.rhs_adjoint = L
         self.bc_adjoint = DirichletBC(self.V, 0, 1)
 
-    def solve_adjoint(self):
-        lam = Function(self.V, name='Adjoint tracer concentration')
-        solve(self.lhs_adjoint == self.rhs_adjoint, lam, bcs=self.bc_adjoint, solver_parameters=self.params)
-        self.sol_adjoint = lam
-        self.sol_adjoint_file.write(self.sol_adjoint)
+    def solve_adjoint(self, discrete=False):
+        if discrete:
+            J = self.objective_functional()
+            compute_gradient(J, self.nu)
+            tape = get_working_tape()
+            solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
+                                                            and not isinstance(block, ProjectBlock)
+                                                            and block.adj_sol is not None]
+            assert(len(solve_blocks) == 1)
+            self.sol_adjoint.assign(solve_blocks[0].adj_sol)
+        else:
+            solve(self.lhs_adjoint == self.rhs_adjoint,
+                  self.sol_adjoint,
+                  bcs=self.bc_adjoint,
+                  solver_parameters=self.params)
+            self.sol_adjoint_file.write(self.sol_adjoint)
 
     def objective_functional(self):
-        #ks = interpolate(self.op.box(self.mesh), self.P0)
-        ks = Function(self.P0).interpolate(self.op.box(self.mesh))  # for pyadjoint
+        ks = Function(self.P0).interpolate(self.op.box(self.mesh))
         return assemble(self.sol*ks*dx)
 
     def get_hessian_metric(self, adjoint=False):
@@ -186,13 +199,30 @@ class TracerProblem():
         self.indicator.rename('explicit')
 
     def explicit_estimation_adjoint(self):
-        adj = self.sol_adjoint
+        phi = self.sol
+        lam = self.sol_adjoint
+        u = self.u
+        nu = self.nu
+        n = self.n
         i = TestFunction(self.P0)
 
-        # compute residuals
-        self.cell_res = -div(self.u*adj) - div(self.nu*grad(adj))
+        # cell residual
+        R = -div(u*lam) - div(nu*grad(lam))
+        R_norm = assemble(i*R*R*dx)
 
-        raise NotImplementedError  # TODO
+        # edge residual
+        r = TrialFunction(self.P0)
+        flux = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
+        flux_terms = ((i*flux*flux)('+') + (i*flux*flux)('-')) * dS
+        flux_terms += i*flux*flux*ds(2) + i*flux*flux*ds(3) + i*flux*flux*ds(4)  # Robin BC
+        flux_terms += i*lam*lam*ds(1) + i*lam*lam*ds(2)                          # Dirichlet BC
+        mass_term = i*r*dx
+        r_norm = Function(self.P0)
+        solve(mass_term == flux_terms, r_norm)
+
+        # form error estimator
+        self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), self.P0)
+        self.indicator.rename('explicit_adjoint')
  
     def get_isotropic_metric(self):
         name = self.indicator.name()
@@ -388,6 +418,9 @@ class TracerProblem():
                 M = self.M.copy()
                 self.get_hessian_metric(adjoint=True)
                 self.M = metric_intersection(M, self.M)
+            elif self.approach == 'explicit_adjoint':
+                self.explicit_estimation_adjoint()
+                self.get_isotropic_metric()
             elif self.approach == 'dwp':
                 self.dwp_indication()
                 self.get_isotropic_metric()
