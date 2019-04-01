@@ -3,7 +3,7 @@ from thetis.configuration import *
 
 import numpy as np
 
-from adapt.options import AdaptOptions
+from adapt_utils.adapt.options import AdaptOptions
 
 
 __all__ = ["TurbineOptions"]
