@@ -12,40 +12,25 @@ from adapt_utils.adapt.metric import *
 from adapt_utils.solver import BaseProblem
 
 
-__all__ = ["TracerProblem", "MeshOptimisation", "OuterLoop"]
+__all__ = ["SteadyTracerProblem", "OuterLoop"]
 
 
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
-# TODO: Generalise
-
-class TracerProblem(BaseProblem):
+class SteadyTracerProblem(BaseProblem):
     def __init__(self,
                  op=TracerOptions(),
                  stab=None,
-                 mesh=None,
+                 mesh=SquareMesh(40, 40, 4, 4),
                  approach='fixed_mesh',
-                 n=2,
-                 fe=FiniteElement("Lagrange", triangle, 1),
+                 discrete_adjoint=False,
+                 finite_element=FiniteElement("Lagrange", triangle, 1),
                  high_order=False):
-        assert(fe.family() == 'Lagrange')  # TODO: DG option if finite_element.family() == 'DG'
-        if mesh is None:
-            self.mesh = SquareMesh(20*n, 20*n, 4, 4)
-        else:
-            self.mesh = mesh
-        self.approach = approach
+        super(SteadyTracerProblem, self).__init__(mesh, finite_element, approach, stab, True, discrete_adjoint, op, high_order)
+        assert(finite_element.family() == 'Lagrange')  # TODO: DG option if finite_element.family() == 'DG'
 
-        # function spaces
-        self.V = FunctionSpace(self.mesh, fe)
-        self.P0 = FunctionSpace(self.mesh, "DG", 0)
-        self.P1 = FunctionSpace(self.mesh, "CG", 1)
-        self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
-        self.n = FacetNormal(self.mesh)
-        self.h = CellSize(self.mesh)
-        
         # parameters
-        self.op = op
         self.op.region_of_interest = [(3., 2., 0.1)]
         self.x0 = 1.
         self.y0 = 2.
@@ -56,12 +41,11 @@ class TracerProblem(BaseProblem):
                        'mat_type': 'aij' ,
                        'ksp_monitor': None,
                        'ksp_converged_reason': None}
-        self.stab = stab if stab is not None else 'no'
-        self.high_order = high_order
+        self.gradient_field = self.nu
 
         # solution fields
-        self.sol = Function(self.V, name='Tracer concentration')
-        self.sol_adjoint = Function(self.V, name='Adjoint tracer concentration')
+        self.solution.rename('Tracer concentration')
+        self.adjoint_solution.rename('Adjoint tracer concentration')
 
         # outputting
         self.di = 'plots/'
@@ -73,18 +57,13 @@ class TracerProblem(BaseProblem):
         self.sol_file = File(self.di + 'sol' + self.ext + '.pvd')
         self.sol_adjoint_file = File(self.di + 'sol_adjoint' + self.ext + '.pvd')
         
-    def set_target_vertices(self, rescaling=0.85, num_vertices=None):
-        if num_vertices is None:
-            num_vertices = self.mesh.num_vertices()
-        self.op.target_vertices = num_vertices * rescaling
-        
-    def source_term(self):
+    def source_term(self):  # TODO: What about other source terms?
         x, y = SpatialCoordinate(self.mesh)
         cond = And(And(gt(x, self.x0-self.r0), lt(x, self.x0+self.r0)),
                    And(gt(y, self.y0-self.r0), lt(y, self.y0+self.r0)))
         return Function(self.P0).interpolate(conditional(cond, 1., 0.))
     
-    def setup_equation(self):
+    def solve(self):
         u = self.u
         nu = self.nu
         n = self.n
@@ -108,16 +87,13 @@ class TracerProblem(BaseProblem):
                 R_L = f                     # RHS component of strong residual
                 L += stab_coeff*R_L*dx
             a += stab_coeff*R_a*dx
-        
-        self.lhs = a
-        self.rhs = L
-        self.bc = DirichletBC(self.V, 0, 1)
 
-    def solve(self):
-        solve(self.lhs == self.rhs, self.sol, bcs=self.bc, solver_parameters=self.params)
-        self.sol_file.write(self.sol)
+        # solve
+        bc = DirichletBC(self.V, 0, 1)
+        solve(a == L, self.solution, bcs=bc, solver_parameters=self.params)
+        self.sol_file.write(self.solution)
         
-    def setup_adjoint_equation(self):
+    def solve_continuous_adjoint(self):
         u = self.u
         nu = self.nu
         n = self.n
@@ -146,36 +122,19 @@ class TracerProblem(BaseProblem):
                 L += stab_coeff*R_L*dx
             a += stab_coeff*R_a*dx
         
-        self.lhs_adjoint = a
-        self.rhs_adjoint = L
-        self.bc_adjoint = DirichletBC(self.V, 0, 1)
-
-    def solve_adjoint(self, discrete=False):
-        if discrete:
-            J = self.objective_functional()
-            compute_gradient(J, self.nu)
-            tape = get_working_tape()
-            solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
-                                                            and not isinstance(block, ProjectBlock)
-                                                            and block.adj_sol is not None]
-            assert(len(solve_blocks) == 1)
-            self.sol_adjoint.assign(solve_blocks[0].adj_sol)
-        else:
-            solve(self.lhs_adjoint == self.rhs_adjoint,
-                  self.sol_adjoint,
-                  bcs=self.bc_adjoint,
-                  solver_parameters=self.params)
-            self.sol_adjoint_file.write(self.sol_adjoint)
+        bc = DirichletBC(self.V, 0, 1)
+        solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.params)
+        self.sol_adjoint_file.write(self.adjoint_solution)
 
     def objective_functional(self):
         ks = Function(self.P0).interpolate(self.op.box(self.mesh))
-        return assemble(self.sol*ks*dx)
+        return assemble(self.solution*ks*dx)
 
     def get_hessian_metric(self, adjoint=False):
-        self.M = steady_metric(self.sol_adjoint if adjoint else self.sol, op=self.op)
+        self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
 
     def explicit_estimation(self):
-        phi = self.sol
+        phi = self.solution
         i = TestFunction(self.P0)
         
         # compute residuals
@@ -199,8 +158,8 @@ class TracerProblem(BaseProblem):
         self.indicator.rename('explicit')
 
     def explicit_estimation_adjoint(self):
-        phi = self.sol
-        lam = self.sol_adjoint
+        phi = self.solution
+        lam = self.adjoint_solution
         u = self.u
         nu = self.nu
         n = self.n
@@ -224,22 +183,13 @@ class TracerProblem(BaseProblem):
         self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), self.P0)
         self.indicator.rename('explicit_adjoint')
  
-    def get_isotropic_metric(self):
-        name = self.indicator.name()
-        el = self.indicator.ufl_element()
-        if (el.family(), el.degree()) != ('Lagrange', 1):
-            self.indicator = project(self.indicator, self.P1)
-        self.indicator = normalise_indicator(self.indicator, op=self.op)
-        self.indicator.rename(name + '_indicator')
-        self.M = isotropic_metric(self.indicator, op=self.op)
-        
-    def solve_high_order(self, adjoint=True):
+    def solve_high_order(self, adjoint=True):  # TODO: reimplement in base class
 
         # consider an iso-P2 refined mesh
         fine_mesh = iso_P2(self.mesh)
 
         # solve adjoint problem on fine mesh using linear elements
-        tp_p1 = TracerProblem(stab=self.stab,
+        tp_p1 = SteadyTracerProblem(stab=self.stab,
                               mesh=fine_mesh,
                               fe=FiniteElement('Lagrange', triangle, 1))
         if adjoint:
@@ -250,9 +200,9 @@ class TracerProblem(BaseProblem):
             tp_p1.solve()
 
         # solve adjoint problem on fine mesh using quadratic elements
-        tp_p2 = TracerProblem(stab=self.stab,
-                              mesh=fine_mesh,
-                              fe=FiniteElement('Lagrange', triangle, 2))
+        tp_p2 = SteadyTracerProblem(stab=self.stab,
+                                    mesh=fine_mesh,
+                                    fe=FiniteElement('Lagrange', triangle, 2))
         if adjoint:
             tp_p2.setup_adjoint_equation()
             tp_p2.solve_adjoint()
@@ -263,13 +213,15 @@ class TracerProblem(BaseProblem):
         # evaluate difference on fine mesh and project onto coarse mesh
         sol_p1 = tp_p1.sol_adjoint if adjoint else tp_p1.sol
         sol_p2 = tp_p2.sol_adjoint if adjoint else tp_p2.sol
-        sol = interpolate(sol_p1, tp_p2.V)
+        sol = Function(tp_p2.V).interpolate(sol_p1)
         sol.interpolate(sol_p2 - sol)
-        return project(sol, self.V)
+        coarse = Function(self.V)
+        coarse.project(sol)
+        return coarse
 
     def dwr_estimation(self):
         i = TestFunction(self.P0)
-        phi = self.sol
+        phi = self.solution
         u = self.u
         nu = self.nu
         n = self.n
@@ -278,7 +230,7 @@ class TracerProblem(BaseProblem):
         if self.high_order:
             lam = self.solve_high_order(adjoint=True)
         else:
-            lam = self.sol_adjoint
+            lam = self.adjoint_solution
             
             
         # cell residual
@@ -300,7 +252,7 @@ class TracerProblem(BaseProblem):
         
     def dwr_estimation_adjoint(self):
         i = TestFunction(self.P0)
-        lam = self.sol_adjoint
+        lam = self.adjoint_solution
         u = self.u
         nu = self.nu
         n = self.n
@@ -308,7 +260,7 @@ class TracerProblem(BaseProblem):
         if self.high_order:
             phi = self.solve_high_order(adjoint=False)
         else:
-            phi = self.sol
+            phi = self.solution
             
         # adjoint source term
         dJdphi = interpolate(self.op.box(self.mesh), self.P0)
@@ -331,10 +283,6 @@ class TracerProblem(BaseProblem):
         self.indicator = project(R + r, self.P0)
         self.indicator.rename('dwr_adjoint')
         
-    def dwp_indication(self):
-        self.indicator = project(self.sol * self.sol_adjoint, self.P1)  # project straight to P1
-        self.indicator.rename('dwp')
-
     def get_anisotropic_metric(self, adjoint=False):
         try:
             assert self.op.restrict == 'anisotropy'
@@ -346,8 +294,8 @@ class TracerProblem(BaseProblem):
         if self.high_order:
             adj = self.solve_high_order(adjoint=not adjoint)
         else:
-            adj = self.sol if adjoint else self.sol_adjoint
-        sol = self.sol_adjoint if adjoint else self.sol
+            adj = self.solution if adjoint else self.adjoint_solution
+        sol = self.adjoint_solution if adjoint else self.solution
         adj_diff = construct_gradient(adj)
 
         # get potential to take Hessian wrt
@@ -392,190 +340,6 @@ class TracerProblem(BaseProblem):
         # TODO: boundary contributions
 
         
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None):
-
-        # mesh adaptation strategies which do not use the adjoint
-        if self.approach == 'fixed':
-            return
-        elif self.approach == 'uniform':
-            self.mesh = iso_P2(self.mesh)
-            return
-        elif self.approach == 'hessian':
-            self.get_hessian_metric(adjoint=False)
-        elif self.approach == 'explicit':
-            self.explicit_estimation()
-            self.get_isotropic_metric()
-        else:
-
-            # mesh adaptation strategies which use the adjoint
-            if not hasattr(self, 'sol_adjoint'):
-                self.setup_adjoint_equation()
-                self.solve_adjoint()
-            if self.approach == 'hessian_adjoint':
-                self.get_hessian_metric(adjoint=True)
-            elif self.approach == 'hessian_superposed':
-                self.get_hessian_metric(adjoint=False)
-                M = self.M.copy()
-                self.get_hessian_metric(adjoint=True)
-                self.M = metric_intersection(M, self.M)
-            elif self.approach == 'explicit_adjoint':
-                self.explicit_estimation_adjoint()
-                self.get_isotropic_metric()
-            elif self.approach == 'dwp':
-                self.dwp_indication()
-                self.get_isotropic_metric()
-            elif self.approach == 'dwr':
-                self.dwr_estimation()
-                self.get_isotropic_metric()
-            elif self.approach == 'dwr_adjoint':
-                self.dwr_estimation_adjoint()
-                self.get_isotropic_metric()
-            elif self.approach == 'dwr_both':
-                self.dwr_estimation()
-                self.get_isotropic_metric()
-                i = self.indicator.copy()
-                self.dwr_estimation_adjoint()
-                self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
-                self.get_isotropic_metric()
-            elif self.approach == 'dwr_averaged':
-                self.dwr_estimation()
-                self.get_isotropic_metric()
-                i = self.indicator.copy()
-                self.dwr_estimation_adjoint()
-                self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
-                self.get_isotropic_metric()
-            elif self.approach == 'dwr_relaxed':
-                self.dwr_estimation()
-                self.get_isotropic_metric()
-                M = self.M.copy()
-                self.dwr_estimation_adjoint()
-                self.get_isotropic_metric()
-                self.M = metric_relaxation(M, self.M)
-            elif self.approach == 'dwr_superposed':
-                self.dwr_estimation()
-                self.get_isotropic_metric()
-                M = self.M.copy()
-                self.dwr_estimation_adjoint()
-                self.get_isotropic_metric()
-                self.M = metric_intersection(M, self.M)
-            elif self.approach == 'dwr_anisotropic':
-                self.get_anisotropic_metric(adjoint=False)
-            elif self.approach == 'dwr_anisotropic_adjoint':
-                self.get_anisotropic_metric(adjoint=True)
-            elif self.approach == 'dwr_anisotropic_relaxed':
-                self.get_anisotropic_metric(adjoint=False)
-                M = self.M.copy()
-                self.get_anisotropic_metric(adjoint=True)
-                self.M = metric_relaxation(M, self.M)
-            elif self.approach == 'dwr_anisotropic_superposed':
-                self.get_anisotropic_metric(adjoint=False)
-                M = self.M.copy()
-                self.get_anisotropic_metric(adjoint=True)
-                self.M = metric_intersection(M, self.M)
-            else:
-                raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
-
-        # apply metric relaxation, if requested
-        self.M_unrelaxed = self.M.copy()
-        if prev_metric is not None:
-            self.M.project(metric_relaxation(interp(self.mesh, prev_metric), self.M, relaxation_parameter))
-        # (default relaxation of 0.9 following [Power et al 2006])
-
-        # adapt mesh
-        self.mesh = AnisotropicAdaptation(self.mesh, self.M).adapted_mesh
-
-# TODO: Generalise
-
-class MeshOptimisation():
-    def __init__(self, mesh=None, n=2, rescaling=0.85, approach='hessian', stab='SUPG', high_order=False, relax=False, outdir='plots/', logmsg='', log=True):
-        self.mesh = SquareMesh(20*n, 20*n, 4, 4) if mesh is None else mesh
-        self.rescaling = rescaling
-        self.approach = approach
-        self.stab = stab
-        self.high_order = high_order
-        self.relax = relax
-        self.n = n
-        self.outdir = outdir
-        self.logmsg = logmsg
-        self.log = log
-
-        # Default tolerances etc
-        self.msg = "Mesh {:2d}: {:7d} cells, objective {:.4e}"
-        self.conv_msg = "Converged after {:d} iterations due to {:s}"
-        self.maxit = 35
-        self.maxit_flag = False
-        self.element_rtol = 0.005    # Following [Power et al 2006]
-        self.objective_rtol = 0.005
-
-        self.dat = {'elements': [], 'vertices': [], 'objective': [], 'approach': self.approach}
-
-    def optimise(self):
-        tstart = clock()
-        M_ = None
-        M = None
-
-        # create a log file and spit out parameters used
-        if self.log:
-            self.logfile = open('{:s}/{:s}/log'.format(self.outdir, self.approach), 'a+')
-            self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
-            self.logfile.write('stabilisation: {:s}\n'.format(self.stab))
-            self.logfile.write('high_order: {:b}\n'.format(self.high_order))
-            self.logfile.write('relax: {:b}\n'.format(self.relax))
-            self.logfile.write('maxit: {:d}\n'.format(self.maxit))
-            self.logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
-            self.logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
-
-        for i in range(self.maxit):
-            print('Solving on mesh {:d}'.format(i))
-            tp = TracerProblem(stab=self.stab,
-                               mesh=self.mesh if i == 0 else tp.mesh,
-                               approach=self.approach,
-                               n=self.n,
-                               high_order=self.high_order)
-
-            # Solve
-            tp.setup_equation()
-            tp.solve()
-
-            # Extract data
-            self.dat['elements'].append(tp.mesh.num_cells())
-            self.dat['vertices'].append(tp.mesh.num_vertices())
-            self.dat['objective'].append(tp.objective_functional())
-            print(self.msg.format(i, self.dat['elements'][i], self.dat['objective'][i]))
-            if self.log:
-                self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][i]))
-                self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][i]))
-                self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][i]))
-
-            # Stopping criteria
-            if i > 0:
-                out = None
-                obj_diff = abs(self.dat['objective'][i] - self.dat['objective'][i-1])
-                el_diff = abs(self.dat['elements'][i] - self.dat['elements'][i-1])
-                if obj_diff < self.objective_rtol*self.dat['objective'][i-1]:
-                    out = self.conv_msg.format(i+1, 'convergence in objective functional.')
-                elif el_diff < self.element_rtol*self.dat['elements'][i-1]:
-                    out = self.conv_msg.format(i+1, 'convergence in mesh element count.')
-                elif i >= self.maxit-1:
-                    out = self.conv_msg.format(i+1, 'maximum mesh adaptation count reached.')
-                    self.maxit_flag = True
-                if out is not None:
-                    print(out)
-                    if self.log:
-                        self.logfile.write(out+'\n')
-                    File(self.outdir + self.approach + '/mesh.pvd').write(tp.mesh.coordinates)
-                    break
-
-            # Otherwise, adapt mesh
-            tp.set_target_vertices(num_vertices=self.dat['vertices'][0], rescaling=self.rescaling)
-            tp.adapt_mesh(prev_metric=M_)
-            if self.relax:
-                M_ = tp.M_unrelaxed
-        self.dat['time'] = clock() - tstart
-        print('Time to solution: {:.1f}s'.format(self.dat['time']))
-        if self.log:
-            self.logfile.close()
-
 class OuterLoop():
     def __init__(self, approach='hessian', rescaling=0.85, iterates=4, high_order=False, maxit=35, element_rtol=0.005, objective_rtol=0.005):
         self.approach = approach

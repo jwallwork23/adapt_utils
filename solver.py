@@ -3,8 +3,18 @@ from firedrake_adjoint import *
 from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
 from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
 
+import datetime
+from time import clock
+
 from adapt_utils.adapt.options import DefaultOptions
-from adapt_utils.adapt.metric import isotropic_metric
+from adapt_utils.adapt.metric import isotropic_metric, metric_intersection, metric_relaxation
+
+
+__all__ = ["MeshOptimisation"]
+
+
+now = datetime.datetime.now()
+date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 
 class BaseProblem():
@@ -16,19 +26,44 @@ class BaseProblem():
         * solve adjoint PDE using pyadjoint;
         * adapt mesh based on some error estimator of choice.
     """
-    def __init__(self, mesh, approach, issteady=True, op=DefaultOptions()):
+    def __init__(self,
+                 mesh,
+                 finite_element,
+                 approach,
+                 stab=None,
+                 issteady=True,
+                 discrete_adjoint=False,
+                 op=DefaultOptions(),
+                 high_order=False):
         self.mesh = mesh
+        self.finite_element = finite_element
         self.approach = approach
+        self.stab = stab if stab is not None else 'no'
         self.issteady = issteady
+        self.discrete_adjoint = discrete_adjoint
+        self.high_order = high_order
         self.op = op
         self.op.approach = approach
 
-        # function spaces
+        # function spaces and mesh quantities
+        self.V = FunctionSpace(self.mesh, self.finite_element)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
         self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
+        self.n = FacetNormal(self.mesh)
+        self.h = CellSize(self.mesh)
 
-        # TODO: initialise solution and adjoint in order to name adjoint nicely
+        # prognostic fields
+        self.solution = Function(self.V)
+        self.adjoint_solution = Function(self.V)
+
+    def set_target_vertices(self, rescaling=0.85, num_vertices=None):
+        """
+        Set target number of vertices for adapted mesh by scaling the current number of vertices.
+        """
+        if num_vertices is None:
+            num_vertices = self.mesh.num_vertices()
+        self.op.target_vertices = num_vertices * rescaling
 
     def solve(self):
         """
@@ -68,11 +103,19 @@ class BaseProblem():
                 ValueError("Expected one SolveBlock, but encountered {:d}".format(len(solve_blocks)))
 
             # extract adjoint solution
-            self.adjoint_solution = Function(self.solution.function_space())
             self.adjoint_solution.assign(solve_blocks[0].adj_sol)
-            # TODO: initialise solution and adjoint in order to name adjoint nicely
+            tape.clear_tape()
         else:
             raise NotImplementedError  # TODO
+
+    def solve_adjoint(self):
+        """
+        Solve adjoint problem using specified method.
+        """
+        if self.discrete_adjoint:
+            self.solve_discrete_adjoint()
+        else:
+            self.solve_continuous_adjoint()
 
     def dwp_indication(self):
         """
@@ -97,6 +140,12 @@ class BaseProblem():
             print("WARNING: maximum norm attained")
         self.indicator.interpolate(Constant(self.op.target_vertices/scale_factor)*abs(self.indicator))
 
+    def explicit_estimation(self):
+        pass
+
+    def explicit_estimation_adjoint(self):
+        pass
+
     def plot(self):
         """
         Plot current mesh and indicator field, if available.
@@ -115,6 +164,9 @@ class BaseProblem():
 
         The resulting P0 field should be stored as `self.indicator`.
         """
+        pass
+
+    def dwr_estimation_adjoint(self):
         pass
 
     def get_hessian_metric(self, adjoint=False):
@@ -144,14 +196,10 @@ class BaseProblem():
         """
         pass
 
-    def adapt_mesh(self):
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None):
         """
         Adapt mesh according to error estimation strategy of choice.
         """
-        if not hasattr(self, 'solution'):
-            self.solve()
-
-        # Get metric (if appropriate)
         if self.approach == 'fixed_mesh':
             return
         elif self.approach == 'uniform':
@@ -159,18 +207,75 @@ class BaseProblem():
             return
         elif self.approach == 'hessian':
             self.get_hessian_metric()
+        elif self.approach == 'explicit':
+            self.explicit_estimation()
+            self.get_isotropic_metric()
+        elif self.approach == 'hessian_adjoint':
+            self.get_hessian_metric(adjoint=True)
+        if self.approach == 'hessian_adjoint':
+            self.get_hessian_metric(adjoint=False)
+            M = self.M.copy()
+            self.get_hessian_metric(adjoint=True)
+            self.M = metric_intersection(M, self.M)
+        elif self.approach == 'dwp':
+            self.dwp_indication()
+            self.get_isotropic_metric()
+        elif self.approach == 'dwr':
+            self.dwr_estimation()
+            self.get_isotropic_metric()
+        elif self.approach == 'dwr_adjoint':
+            self.dwr_estimation_adjoint()
+            self.get_isotropic_metric()
+        elif self.approach == 'dwr_both':
+            self.dwr_estimation()
+            self.get_isotropic_metric()
+            i = self.indicator.copy()
+            self.dwr_estimation_adjoint()
+            self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
+            self.get_isotropic_metric()
+        elif self.approach == 'dwr_averaged':
+            self.dwr_estimation()
+            self.get_isotropic_metric()
+            i = self.indicator.copy()
+            self.dwr_estimation_adjoint()
+            self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
+            self.get_isotropic_metric()
+        elif self.approach == 'dwr_relaxed':
+            self.dwr_estimation()
+            self.get_isotropic_metric()
+            M = self.M.copy()
+            self.dwr_estimation_adjoint()
+            self.get_isotropic_metric()
+            self.M = metric_relaxation(M, self.M)
+        elif self.approach == 'dwr_superposed':
+            self.dwr_estimation()
+            self.get_isotropic_metric()
+            M = self.M.copy()
+            self.dwr_estimation_adjoint()
+            self.get_isotropic_metric()
+            self.M = metric_intersection(M, self.M)
+        elif self.approach == 'dwr_anisotropic':
+            self.get_anisotropic_metric(adjoint=False)
+        elif self.approach == 'dwr_anisotropic_adjoint':
+            self.get_anisotropic_metric(adjoint=True)
+        elif self.approach == 'dwr_anisotropic_relaxed':
+            self.get_anisotropic_metric(adjoint=False)
+            M = self.M.copy()
+            self.get_anisotropic_metric(adjoint=True)
+            self.M = metric_relaxation(M, self.M)
+        elif self.approach == 'dwr_anisotropic_superposed':
+            self.get_anisotropic_metric(adjoint=False)
+            M = self.M.copy()
+            self.get_anisotropic_metric(adjoint=True)
+            self.M = metric_intersection(M, self.M)
         else:
-            if not hasattr(self, 'adjoint_solution'):
-                self.solve_adjoint()
+            raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
-            if self.approach == 'dwp':
-                self.dwp_indication()
-                self.get_isotropic_metric()
-            elif self.approach == 'dwr':
-                self.dwr_estimation()
-                self.get_isotropic_metric()
-            else:
-                raise NotImplementedError  # TODO
+        # Apply metric relaxation, if requested
+        self.M_unrelaxed = self.M.copy()
+        if prev_metric is not None:
+            self.M.project(metric_relaxation(interp(self.mesh, prev_metric), self.M, relaxation_parameter))
+        # (Default relaxation of 0.9 following [Power et al 2006])
 
         # Adapt mesh
         self.mesh = adapt(self.mesh, self.M)
@@ -187,8 +292,104 @@ class MeshOptimisation():
     Loop over all mesh optimisation steps in order to obtain a mesh which is optimal w.r.t. the
     given error estimator for the given PDE problem.
     """
-    def __init__(self, approach='uniform'):
+    def __init__(self,
+                 problem,
+                 mesh,
+                 rescaling=0.85,
+                 approach='hessian',
+                 stab=None,
+                 high_order=False,
+                 relax=False,
+                 outdir='plots/',
+                 logmsg='',
+                 log=True):
+
+        self.problem = problem
+        self.mesh = mesh
+        self.rescaling = rescaling
         self.approach = approach
+        self.stab = stab if stab is not None else 'no'
+        self.high_order = high_order
+        self.relax = relax
+        self.outdir = outdir
+        self.logmsg = logmsg
+        self.log = log
+
+        # Default tolerances etc
+        self.msg = "Mesh {:2d}: {:7d} cells, objective {:.4e}"
+        self.conv_msg = "Converged after {:d} iterations due to {:s}"
+        self.maxit = 35
+        self.maxit_flag = False
+        self.element_rtol = 0.005    # Following [Power et al 2006]
+        self.objective_rtol = 0.005
+
+        # Data storage
+        self.dat = {'elements': [], 'vertices': [], 'objective': [], 'approach': self.approach}
 
     def iterate(self):
-        raise NotImplementedError  # TODO
+        M_ = None
+        M = None
+
+        # create a log file and spit out parameters used
+        if self.log:
+            self.logfile = open('{:s}{:s}/optimisation_log'.format(self.outdir, self.approach), 'a+')
+            self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
+            self.logfile.write('stabilisation: {:s}\n'.format(self.stab))
+            self.logfile.write('high_order: {:b}\n'.format(self.high_order))
+            self.logfile.write('relax: {:b}\n'.format(self.relax))
+            self.logfile.write('maxit: {:d}\n'.format(self.maxit))
+            self.logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
+            self.logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
+
+        tstart = clock()
+        for i in range(self.maxit):
+            print('Solving on mesh {:d}'.format(i))
+            tp = self.problem(stab=self.stab,
+                              mesh=self.mesh if i == 0 else tp.mesh,
+                              approach=self.approach,
+                              high_order=self.high_order)
+
+            # Solve
+            tp.solve()
+            if not self.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit'):
+                tp.solve_adjoint()
+
+            # Extract data
+            self.dat['elements'].append(tp.mesh.num_cells())
+            self.dat['vertices'].append(tp.mesh.num_vertices())
+            self.dat['objective'].append(tp.objective_functional())
+            print(self.msg.format(i, self.dat['elements'][i], self.dat['objective'][i]))
+            if self.log:
+                self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][i]))
+                self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][i]))
+                self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][i]))
+
+            # Stopping criteria
+            if i > 0:
+                out = None
+                obj_diff = abs(self.dat['objective'][i] - self.dat['objective'][i-1])
+                el_diff = abs(self.dat['elements'][i] - self.dat['elements'][i-1])
+                if obj_diff < self.objective_rtol*self.dat['objective'][i-1]:
+                    out = self.conv_msg.format(i+1, 'convergence in objective functional.')
+                elif el_diff < self.element_rtol*self.dat['elements'][i-1]:
+                    out = self.conv_msg.format(i+1, 'convergence in mesh element count.')
+                elif i >= self.maxit-1:
+                    out = self.conv_msg.format(i+1, 'maximum mesh adaptation count reached.')
+                    self.maxit_flag = True
+                if out is not None:
+                    print(out)
+                    if self.log:
+                        self.logfile.write(out+'\n')
+                        tp.plot()
+                    break
+
+            # Otherwise, adapt mesh
+            tp.set_target_vertices(num_vertices=self.dat['vertices'][0], rescaling=self.rescaling)
+            tp.adapt_mesh(prev_metric=M_)
+            if self.relax:
+                M_ = tp.M_unrelaxed
+        self.dat['time'] = clock() - tstart
+        print('Time to solution: {:.1f}s'.format(self.dat['time']))
+        if self.log:
+            self.logfile.close()
+

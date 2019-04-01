@@ -16,8 +16,22 @@ class SteadyTurbineProblem(BaseProblem):
     """
     TODO: documentation
     """
-    def __init__(self, mesh=Mesh('channel.msh'), approach='fixed_mesh', op=TurbineOptions()):
-        super(SteadyTurbineProblem, self).__init__(mesh, approach, True, op)
+    def __init__(self,
+                 mesh=RectangleMesh(100, 20, 1000., 200.),
+                 finite_element=VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, 1),
+                 approach='fixed_mesh',
+                 stab=None,  # TODO
+                 discrete_adjoint=True,
+                 op=TurbineOptions(),
+                 high_order=False):  # TODO
+        super(SteadyTurbineProblem, self).__init__(mesh,
+                                                   finite_element,
+                                                   approach,
+                                                   stab,
+                                                   True,
+                                                   discrete_adjoint,
+                                                   op,
+                                                   high_order)
 
         # if we solve with PressureProjectionPicard (theta=1.0) it seems to converge (power output
         # to 7 digits) in roughly 800 timesteps of 20s with SteadyState we only do 1 timestep 
@@ -42,6 +56,9 @@ class SteadyTurbineProblem(BaseProblem):
 
         # parameters for adjoint computation
         self.gradient_field = self.bathy
+        z, zeta = self.adjoint_solution.split()
+        z.rename("Adjoint fluid velocity")
+        zeta.rename("Adjoint elevation")
 
     def setup_equation(self):
         """
@@ -105,3 +122,5 @@ class SteadyTurbineProblem(BaseProblem):
 
     def objective_functional(self):
         return self.callback.average_power
+
+    # TODO: Error estimators
