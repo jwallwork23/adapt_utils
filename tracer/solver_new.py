@@ -12,7 +12,7 @@ from adapt_utils.adapt.metric import *
 from adapt_utils.solver import BaseProblem
 
 
-__all__ = ["SteadyTracerProblem", "OuterLoop"]
+__all__ = ["SteadyTracerProblem"]
 
 
 now = datetime.datetime.now()
@@ -42,6 +42,7 @@ class SteadyTracerProblem(BaseProblem):
                        'ksp_monitor': None,
                        'ksp_converged_reason': None}
         self.gradient_field = self.nu
+        self.get_source_term()  # NOTE: this can be replaced, if so desired
 
         # solution fields
         self.solution.rename('Tracer concentration')
@@ -57,17 +58,22 @@ class SteadyTracerProblem(BaseProblem):
         self.sol_file = File(self.di + 'sol' + self.ext + '.pvd')
         self.sol_adjoint_file = File(self.di + 'sol_adjoint' + self.ext + '.pvd')
         
-    def source_term(self):  # TODO: What about other source terms?
+    def get_source_term(self):
         x, y = SpatialCoordinate(self.mesh)
         cond = And(And(gt(x, self.x0-self.r0), lt(x, self.x0+self.r0)),
                    And(gt(y, self.y0-self.r0), lt(y, self.y0+self.r0)))
-        return Function(self.P0).interpolate(conditional(cond, 1., 0.))
+        self.source = Function(self.P0).interpolate(conditional(cond, 1., 0.))
+        self.source.rename("Source term")
+
+    def get_objective_kernel(self):
+        self.kernel = Function(self.P0)
+        self.kernel.interpolate(self.op.box(self.mesh))
     
     def solve(self):
         u = self.u
         nu = self.nu
         n = self.n
-        f = self.source_term()
+        f = self.source
 
         # finite element problem
         phi = TrialFunction(self.V)
@@ -99,8 +105,7 @@ class SteadyTracerProblem(BaseProblem):
         n = self.n
         
         # Adjoint source term
-        dJdphi = Function(self.P0)
-        dJdphi.interpolate(self.op.box(self.mesh))
+        self.get_objective_kernel()
         lam = TrialFunction(self.V)
         psi = TestFunction(self.V)
         
@@ -109,7 +114,7 @@ class SteadyTracerProblem(BaseProblem):
         a += nu*inner(grad(lam), grad(psi))*dx
         a += -lam*psi*(dot(u, n))*ds(1)
         a += -nu*psi*dot(n, nabla_grad(lam))*ds(1)
-        L = dJdphi*psi*dx
+        L = self.kernel*psi*dx
         
         # Stabilisation
         if self.stab in ("SU", "SUPG"):
@@ -118,17 +123,13 @@ class SteadyTracerProblem(BaseProblem):
             R_a = -div(u*lam)             # LHS component of strong residual
             if self.stab == "SUPG":
                 R_a += -div(nu*grad(lam))
-                R_L = dJdphi              # RHS component of strong residual
+                R_L = self.kernel         # RHS component of strong residual
                 L += stab_coeff*R_L*dx
             a += stab_coeff*R_a*dx
         
         bc = DirichletBC(self.V, 0, 1)
         solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.params)
         self.sol_adjoint_file.write(self.adjoint_solution)
-
-    def objective_functional(self):
-        ks = Function(self.P0).interpolate(self.op.box(self.mesh))
-        return assemble(self.solution*ks*dx)
 
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
@@ -225,7 +226,7 @@ class SteadyTracerProblem(BaseProblem):
         u = self.u
         nu = self.nu
         n = self.n
-        f = self.source_term()
+        f = self.source
         
         if self.high_order:
             lam = self.solve_high_order(adjoint=True)
@@ -307,7 +308,7 @@ class SteadyTracerProblem(BaseProblem):
             F1 = -sol*self.u[0] - self.nu*sol.dx(0)
             F2 = -sol*self.u[1] - self.nu*sol.dx(1)
         else:
-            source = self.source_term()
+            source = self.source
             # F1 = sol*self.u[0] - self.nu*sol.dx(0) - source*x
             # F2 = sol*self.u[1] - self.nu*sol.dx(1) - source*y
             F1 = sol*self.u[0] - self.nu*sol.dx(0)
@@ -338,121 +339,3 @@ class SteadyTracerProblem(BaseProblem):
         self.M = steady_metric(None, H=self.M, op=self.op)
 
         # TODO: boundary contributions
-
-        
-class OuterLoop():
-    def __init__(self, approach='hessian', rescaling=0.85, iterates=4, high_order=False, maxit=35, element_rtol=0.005, objective_rtol=0.005):
-        self.approach = approach
-        self.rescaling = rescaling
-        self.iterates = iterates
-        self.high_order = high_order
-        self.maxit = maxit
-        self.element_rtol = element_rtol
-        self.objective_rtol = objective_rtol
-
-        self.opt = {}
-
-    def test_meshes(self):
-        logfile = open('plots/' + self.approach + '/resolution.log', 'a+')
-        logfile.write('\n' + date + '\n\n')
-        for i in range(self.iterates):
-            print("\nOuter loop {:d}/{:d} for approach '{:s}'".format(i+1, self.iterates, self.approach))
-            self.opt[i] = MeshOptimisation(n=2**i,
-                                           approach=self.approach,
-                                           rescaling=self.rescaling,
-                                           high_order=self.high_order,
-                                           log=False)
-            self.opt[i].maxit = self.maxit
-            self.opt[i].element_rtol = self.element_rtol
-            self.opt[i].objective_rtol = self.objective_rtol
-            self.opt[i].optimise()
-            if self.opt[i].maxit_flag:
-                self.opt[i].dat['objective'][-1] = np.nan
-            logfile.write("loop {:d} elements {:7d} objective {:.4e}\n".format(i, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
-        self.gather()
-        logfile.close()
-
-    def test_to_convergence(self):
-        logfile = open('plots/' + self.approach + '/full.log', 'a+')
-        logfile.write('\n' + date + '\n\n')
-        for i in range(self.maxit):
-            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
-            self.opt[i] = MeshOptimisation(n=i+1,
-                                           approach=self.approach,
-                                           rescaling=self.rescaling,
-                                           high_order=self.high_order,
-                                           log=False)
-            self.opt[i].maxit = self.maxit
-            self.opt[i].element_rtol = self.element_rtol
-            self.opt[i].objective_rtol = self.objective_rtol
-            self.opt[i].optimise()
-            if self.opt[i].maxit_flag:
-                self.opt[i].dat['objective'][-1] = np.nan
-            logfile.write("loop {:d} elements {:7d} objective {:.4e}\n".format(i, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
-
-            # convergence criterion
-            obj_diff = abs(self.opt[i].dat['objective'][-1] - self.opt[i-1].dat['objective'][-1])
-            if obj_diff < self.objective_rtol*self.opt[i-1].dat['objective'][-1]:
-                print(self.opt[i].conv_msg.format(i+1, 'convergence in objective functional.'))
-                break
-        self.gather()
-        logfile.close()
-
-    # TODO: Not sure the test_rescaling approach is particularly useful
-
-    def test_rescaling(self):
-        logfile = open('plots/' + self.approach + '/rescaling.log', 'a+')
-        logfile.write('\n' + date + '\n\n')
-        for r, i in zip(np.linspace(0.05, 1., self.iterates), range(self.iterates)):
-            self.rescaling = r
-            print("\nOuter loop {:d}/{:d} for approach '{:s}'".format(i+1, self.iterates, self.approach))
-            self.opt[i] = MeshOptimisation(approach=self.approach,
-                                           rescaling=self.rescaling,
-                                           high_order=self.high_order,
-                                           log=False)
-            self.opt[i].maxit = self.maxit
-            self.opt[i].element_rtol = self.element_rtol
-            self.opt[i].objective_rtol = self.objective_rtol
-            self.opt[i].optimise()
-            if self.opt[i].maxit_flag:
-                self.opt[i].dat['objective'][-1] = np.nan
-            logfile.write("loop {:d} elements {:7d} objective {:.4e}\n".format(i, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
-        self.gather()
-        logfile.close()
-                  
-    def scale_to_convergence(self):
-        logfile = open('plots/' + self.approach + '/scale_to_convergence.log', 'a+')
-        logfile.write('\n' + date + '\n\n')
-        logfile.write('maxit: {:d}\n'.format(self.maxit))
-        logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
-        logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
-        for i in range(self.maxit):
-            self.rescaling = float(i+1)*0.4
-            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
-            self.opt[i] = MeshOptimisation(n=3,
-                                           approach=self.approach,
-                                           rescaling=self.rescaling,
-                                           high_order=self.high_order,
-                                           log=False)
-            self.opt[i].maxit = self.maxit
-            self.opt[i].element_rtol = self.element_rtol
-            self.opt[i].objective_rtol = self.objective_rtol
-            self.opt[i].optimise()
-            if self.opt[i].maxit_flag:
-                self.opt[i].dat['objective'][-1] = np.nan
-            logfile.write("rescaling {:.2f} elements {:7d} objective {:.4e}\n".format(self.rescaling, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
-
-            # convergence criterion
-            if i > 0:
-                obj_diff = abs(self.opt[i].dat['objective'][-1] - self.opt[i-1].dat['objective'][-1])
-                if obj_diff < self.objective_rtol*self.opt[i-1].dat['objective'][-1]:
-                    print(self.opt[i].conv_msg.format(i+1, 'convergence in objective functional.'))
-                    break
-        self.gather()
-        logfile.close()
-    def gather(self):
-        N = len(self.opt.keys())
-        self.elements = [self.opt[i].dat['elements'][-1] for i in range(N)]
-        self.objective = [self.opt[i].dat['objective'][-1] for i in range(N)]
-        self.time = [self.opt[i].dat['time'] for i in range(N)]
-        self.rescaling = [self.opt[i].rescaling for i in range(N)]

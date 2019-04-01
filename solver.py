@@ -10,7 +10,7 @@ from adapt_utils.adapt.options import DefaultOptions
 from adapt_utils.adapt.metric import isotropic_metric, metric_intersection, metric_relaxation
 
 
-__all__ = ["MeshOptimisation"]
+__all__ = ["MeshOptimisation", "OuterLoop"]
 
 
 now = datetime.datetime.now()
@@ -71,12 +71,23 @@ class BaseProblem():
         """
         pass
 
+    def get_objective_kernel(self):
+        """
+        Derivative `g` of functional of interest `J`. i.e. For solution `u` we have
+            J(u) = g . u
+        """
+        pass
 
     def objective_functional(self):
         """
         Functional of interest which takes the PDE solution as input.
         """
-        pass
+        if not hasattr(self, 'kernel'):
+            self.get_objective_kernel()
+        if self.issteady:
+            return assemble(inner(self.solution, self.kernel)*dx)
+        else:
+            raise NotImplementedError  # TODO
 
     def solve_continuous_adjoint(self):
         """
@@ -203,7 +214,7 @@ class BaseProblem():
         if self.approach == 'fixed_mesh':
             return
         elif self.approach == 'uniform':
-            self.mesh = MeshHierarchy(self.mesh, 1)[0]
+            self.mesh = MeshHierarchy(self.mesh, 1)[1]
             return
         elif self.approach == 'hessian':
             self.get_hessian_metric()
@@ -212,7 +223,7 @@ class BaseProblem():
             self.get_isotropic_metric()
         elif self.approach == 'hessian_adjoint':
             self.get_hessian_metric(adjoint=True)
-        if self.approach == 'hessian_adjoint':
+        elif self.approach == 'hessian_adjoint':
             self.get_hessian_metric(adjoint=False)
             M = self.M.copy()
             self.get_hessian_metric(adjoint=True)
@@ -294,7 +305,7 @@ class MeshOptimisation():
     """
     def __init__(self,
                  problem,
-                 mesh,
+                 mesh=None,
                  rescaling=0.85,
                  approach='hessian',
                  stab=None,
@@ -393,3 +404,58 @@ class MeshOptimisation():
         if self.log:
             self.logfile.close()
 
+
+class OuterLoop():
+    def __init__(self,
+                 problem,
+                 mesh=None,
+                 approach='hessian',
+                 rescaling=0.85,
+                 iterates=4,
+                 high_order=False,
+                 maxit=35,
+                 element_rtol=0.005,
+                 objective_rtol=0.005):
+
+        self.problem = problem
+        self.mesh = mesh
+        self.approach = approach
+        self.rescaling = rescaling
+        self.iterates = iterates
+        self.high_order = high_order
+        self.maxit = maxit
+        self.element_rtol = element_rtol
+        self.objective_rtol = objective_rtol
+
+        self.opt = {}  # TODO: this datastructure is unnecessary
+
+    def scale_to_convergence(self):  # TODO: automate directory
+        logfile = open('outputs/' + self.approach + '/scale_to_convergence.log', 'a+')
+        logfile.write('\n' + date + '\n\n')
+        logfile.write('maxit: {:d}\n'.format(self.maxit))
+        logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
+        logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
+        for i in range(self.maxit):
+            self.rescaling = float(i+1)*0.4
+            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
+            self.opt[i] = MeshOptimisation(self.problem,
+                                           mesh=self.mesh,
+                                           approach=self.approach,
+                                           rescaling=self.rescaling,
+                                           high_order=self.high_order,
+                                           log=False)
+            self.opt[i].maxit = self.maxit
+            self.opt[i].element_rtol = self.element_rtol
+            self.opt[i].objective_rtol = self.objective_rtol
+            self.opt[i].iterate()
+            if self.opt[i].maxit_flag:
+                self.opt[i].dat['objective'][-1] = np.nan
+            logfile.write("rescaling {:.2f} elements {:7d} objective {:.4e}\n".format(self.rescaling, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
+
+            # convergence criterion
+            if i > 0:
+                obj_diff = abs(self.opt[i].dat['objective'][-1] - self.opt[i-1].dat['objective'][-1])
+                if obj_diff < self.objective_rtol*self.opt[i-1].dat['objective'][-1]:
+                    print(self.opt[i].conv_msg.format(i+1, 'convergence in objective functional.'))
+                    break
+        logfile.close()
