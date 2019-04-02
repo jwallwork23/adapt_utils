@@ -14,7 +14,7 @@ __all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropi
            "metric_complexity", "normalise_indicator"]
 
 
-def construct_gradient(f, mesh=None):
+def construct_gradient(f, mesh=None, op=DefaultOptions()):
     """
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
@@ -28,24 +28,23 @@ def construct_gradient(f, mesh=None):
     if mesh is None:
         mesh = f.function_space().mesh()
     P1_vec = VectorFunctionSpace(mesh, "CG", 1)
-    g = Function(P1_vec)
-    psi = TestFunction(P1_vec)
+    g = TrialFunction(P1_vec)
+    φ = TestFunction(P1_vec)
     # TODO: include an option to swap between these two: 'parts' vs 'L2'
-    #Lg = inner(g, psi)*dx - inner(grad(f), psi)*dx
-    Lg = inner(g, psi)*dx - f*dot(psi, FacetNormal(mesh))*ds + f*div(psi)*dx  # enables f to be P0
-    g_prob = NonlinearVariationalProblem(Lg, g)
-    NonlinearVariationalSolver(g_prob, solver_parameters={'snes_rtol': 1e8,
-                                                          'ksp_rtol': 1e-5,
-                                                          'ksp_gmres_restart': 20,
-                                                          'pc_type': 'sor'}).solve()
+    a = inner(g, φ)*dx
+    # L = inner(grad(f), φ)*dx
+    L = f*dot(φ, FacetNormal(mesh))*ds - f*div(φ)*dx  # enables f to be P0
+    g = Function(P1_vec)
+    solve(a == L, g, solver_parameters=op.hessian_solver_parameters)
     return g
 
 
-def construct_hessian(f, g=None, mesh=None, op=DefaultOptions()):
+def construct_hessian(f, mesh=None, op=DefaultOptions()):
     """
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all
     second derivative information has been lost. As such, the Hessian of `f` cannot be directly
-    computed. We provide two means of recovering it, as follows.
+    computed. We provide two means of recovering it, as follows. That `f` is P1 is not actually
+    a requirement.
 
     (1) "Integration by parts" ('parts'):
     This involves solving the PDE $H = \nabla^T\nabla f$ in the weak sense. Code is based on the
@@ -53,36 +52,50 @@ def construct_hessian(f, g=None, mesh=None, op=DefaultOptions()):
     https://firedrakeproject.org/demos/ma-demo.py.html.
 
     (2) "Double L2 projection" ('dL2'):
-    This involves two applications of the L2 projection operator given by `computeGradient`, above.
+    This involves two applications of the L2 projection operator. In this mode, we are permitted
+    to recover the Hessian of a P0 field, since no derivatives of `f` are required.
 
     :arg f: P1 solution field.
-    :kwarg g: gradient (if already computed).
+    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
+                 Function, but a ufl expression.
     :param op: AdaptOptions class object providing min/max cell size values.
-    :return: reconstructed Hessian associated with ``f``.
+    :return: reconstructed Hessian associated with `f`.
     """
-    # NOTE: A P1 field is not actually strictly required
     if mesh is None:
         mesh = f.function_space().mesh()
     P1_ten = TensorFunctionSpace(mesh, "CG", 1)
-    H = Function(P1_ten)
-    tau = TestFunction(P1_ten)
-    nhat = FacetNormal(mesh)  # Normal vector
+    n = FacetNormal(mesh)  # Normal vector
+
+    # Integration by parts applied to the Hessian definition
     if op.hessian_recovery == 'parts':
-        Lh = (inner(tau, H) + inner(div(tau), grad(f))) * dx
-        Lh -= (tau[0, 1] * nhat[1] * f.dx(0) + tau[1, 0] * nhat[0] * f.dx(1)) * ds
-        # Term not in Firedrake tutorial:
-        Lh -= (tau[0, 0] * nhat[1] * f.dx(0) + tau[1, 1] * nhat[0] * f.dx(1)) * ds
+        H = TrialFunction(P1_ten)
+        τ = TestFunction(P1_ten)
+        a = inner(tau, H)*dx
+        L = -inner(div(τ), grad(f))*dx
+        L += (τ[0, 1]*n[1]*f.dx(0) + τ[1, 0]*n[0]*f.dx(1))*ds
+        L += (τ[0, 0]*n[1]*f.dx(0) + τ[1, 1]*n[0]*f.dx(1))*ds
+
+        H = Function(P1_ten)
+        solve(a == L, H, solver_parameters=op.hessian_solver_parameters)
+
+    # Double L2 projection, using a mixed formulation for the gradient and Hessian
     elif op.hessian_recovery == 'dL2':
-        if g is None:
-            g = construct_gradient(f, mesh=mesh)
-        Lh = (inner(tau, H) + inner(div(tau), g)) * dx
-        Lh -= (tau[0, 1] * nhat[1] * g[0] + tau[1, 0] * nhat[0] * g[1]) * ds
-        Lh -= (tau[0, 0] * nhat[1] * g[0] + tau[1, 1] * nhat[0] * g[1]) * ds
-    H_prob = NonlinearVariationalProblem(Lh, H)
-    NonlinearVariationalSolver(H_prob, solver_parameters={'snes_rtol': 1e8,
-                                                          'ksp_rtol': 1e-5,
-                                                          'ksp_gmres_restart': 20,
-                                                          'pc_type': 'sor'}).solve()
+        P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+        V = P1_ten*P1_vec
+        H, g = TrialFunctions(V)
+        τ, φ = TestFunctions(V)
+        a = inner(τ, H)*dx
+        a += inner(φ, g)*dx
+        a += inner(div(τ), g)*dx
+        a += -(τ[0, 1]*n[1]*g[0] + τ[1, 0]*n[0]*g[1])*ds
+        a += -(τ[0, 0]*n[1]*g[0] + τ[1, 1]*n[0]*g[1])*ds
+        # L = inner(grad(f), φ)*dx
+        L = f*dot(φ, n)*ds - f*div(φ)*dx  # enables f to be P0
+
+        q = Function(V)
+        solve(a == L, q)  # TODO: Solver parameters?
+        H = q.split()[0]
+
     return H
 
 

@@ -37,6 +37,10 @@ class Options(FrozenConfigurable):
     adjoint_steps = NonNegativeInteger(1000, help="Number of adjoint steps used").tag(config=True)
     solve_adjoint = Bool(False).tag(config=True)
     objective_rtol = PositiveFloat(0.00025, help="Relative tolerance for convergence in objective value.").tag(config=True)
+    hessian_solver_parameters = PETScSolverParameters({'snes_rtol': 1e8,
+                                                       'ksp_rtol': 1e-5,
+                                                       'ksp_gmres_restart': 20,
+                                                       'pc_type': 'sor'}).tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
         self.approach = approach
