@@ -137,16 +137,64 @@ class SteadyTurbineProblem(SteadyProblem):
             self.M = metric_intersection(self.M, M)
 
     def explicit_estimation(self):
-        raise NotImplementedError
+        raise NotImplementedError  # TODO
 
     def explicit_estimation_adjoint(self):
-        raise NotImplementedError
+        raise NotImplementedError  # TODO
 
     def dwr_estimation(self):
-        raise NotImplementedError
+        raise NotImplementedError  # TODO
 
     def dwr_estimation_adjoint(self):
-        raise NotImplementedError
+        raise NotImplementedError  # TODO
 
     def get_anisotropic_metric(self, adjoint=False):
-        raise NotImplementedError
+        u, eta = self.solution.split()
+        z, zeta = self.adjoint_solution.split()
+        b = self.bathy
+        H = eta + b
+        g = 9.81
+        nu = self.viscosity
+        C_b = self.drag_coefficient
+        C_t = self.turbine_density
+        normu = sqrt(inner(u, u))
+        normu3 = normu**3
+        F1 = [0, 0, 0]
+        F2 = [0, 0, 0]
+        f = [0, 0]
+        if adjoint:
+            raise NotImplementedError  # TODO
+        else:
+            F1[0] = H*u[0]*u[0] + 0.5*g*eta*eta - nu*H*u[0].dx(0) + C_b*normu3/3.
+            F1[1] = H*u[0]*u[1] - nu*H*u[1].dx(0)
+            F1[2] = H*u[0]
+            F2[0] = H*u[0]*u[1] - nu*H*u[0].dx(1)
+            F2[1] = H*u[1]*u[1] + 0.5*g*eta*eta - nu*H*u[1].dx(1) + C_b*normu3/3.
+            F2[2] = H*u[1]
+            #f[0] = g*eta*b.dx(0) - C_t*normu*u[0]
+            #f[1] = g*eta*b.dx(1) - C_t*normu*u[1]
+            f[0] = -C_t*normu*u[0]
+            f[1] = -C_t*normu*u[1]
+
+        H1 = [0, 0, 0]
+        H2 = [0, 0, 0]
+        Hf = [0, 0]
+
+        # construct Hessians
+        for i in range(3):
+            H1[i] = construct_hessian(F1[i], mesh=self.mesh, op=self.op)
+            H2[i] = construct_hessian(F2[i], mesh=self.mesh, op=self.op)
+        # Hf[0] = construct_hessian(f[0], mesh=self.mesh, op=self.op)
+        # Hf[1] = construct_hessian(f[1], mesh=self.mesh, op=self.op)
+
+        # form metric
+        self.M = Function(H1.function_space())
+        for i in range(len(adj.dat.data)):
+            for j in range(3):
+                self.M.dat.data[i][:,:] += H1[j].dat.data[i]*adj_diff.dat.data[i][0]
+                self.M.dat.data[i][:,:] += H2[j].dat.data[i]*adj_diff.dat.data[i][1]
+        #         if j < 2:
+        #             self.M.dat.data[i][:,:] += Hf[j].dat.dat[i]*adj.dat.data[i]
+        self.M = steady_metric(None, H=self.M, op=self.op)
+
+        # TODO: boundary contributions
