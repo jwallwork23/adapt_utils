@@ -2,14 +2,15 @@ from thetis_adjoint import *
 import pyadjoint
 import math
 
+from adapt_utils.solver import SteadyProblem
 from adapt_utils.turbine.options import TurbineOptions
-from adapt_utils.solver import BaseProblem
+from adapt_utils.adapt.metric import *
 
 
 __all__ = ["SteadyTurbineProblem"]
 
 
-class SteadyTurbineProblem(BaseProblem):
+class SteadyTurbineProblem(SteadyProblem):
     """
     TODO: documentation
     """
@@ -25,7 +26,6 @@ class SteadyTurbineProblem(BaseProblem):
                                                    finite_element,
                                                    approach,
                                                    stab,
-                                                   True,
                                                    discrete_adjoint,
                                                    op,
                                                    high_order)
@@ -124,4 +124,29 @@ class SteadyTurbineProblem(BaseProblem):
     def objective_functional(self):
         return self.objective
 
-    # TODO: Error estimators
+    def get_hessian_metric(self, adjoint=False):
+        sol = self.adjoint_solution if adjoint else self.solution
+        u, eta = sol.split()
+        if self.op.adapt_field in ('fluid_speed', 'both'):
+            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
+            self.M = steady_metric(spd, op=self.op)
+        elif self.op.adapt_field == 'elevation':
+            self.M = steady_metric(eta, op=self.op)
+        if self.op.adapt_field == 'both':
+            M = steady_metric(eta, op=self.op)
+            self.M = metric_intersection(self.M, M)
+
+    def explicit_estimation(self):
+        raise NotImplementedError
+
+    def explicit_estimation_adjoint(self):
+        raise NotImplementedError
+
+    def dwr_estimation(self):
+        raise NotImplementedError
+
+    def dwr_estimation_adjoint(self):
+        raise NotImplementedError
+
+    def get_anisotropic_metric(self, adjoint=False):
+        raise NotImplementedError

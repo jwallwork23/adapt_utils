@@ -9,7 +9,7 @@ import numpy as np
 
 from adapt_utils.tracer.options import TracerOptions
 from adapt_utils.adapt.metric import *
-from adapt_utils.solver import BaseProblem
+from adapt_utils.solver import SteadyProblem
 
 
 __all__ = ["SteadyTracerProblem"]
@@ -18,7 +18,7 @@ __all__ = ["SteadyTracerProblem"]
 now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
-class SteadyTracerProblem(BaseProblem):
+class SteadyTracerProblem(SteadyProblem):
     def __init__(self,
                  op=TracerOptions(),
                  stab=None,
@@ -27,7 +27,7 @@ class SteadyTracerProblem(BaseProblem):
                  discrete_adjoint=False,
                  finite_element=FiniteElement("Lagrange", triangle, 1),
                  high_order=False):
-        super(SteadyTracerProblem, self).__init__(mesh, finite_element, approach, stab, True, discrete_adjoint, op, high_order)
+        super(SteadyTracerProblem, self).__init__(mesh, finite_element, approach, stab, discrete_adjoint, op, high_order)
         assert(finite_element.family() == 'Lagrange')  # TODO: DG option if finite_element.family() == 'DG'
 
         # parameters

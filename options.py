@@ -7,11 +7,11 @@ import numpy as np
 __all__ = ["DefaultOptions"]
 
 
-class AdaptOptions(FrozenConfigurable):
+class Options(FrozenConfigurable):
     name = 'Common parameters for mesh adaptive simulations'
 
     # Mesh adaptivity parameters
-    approach = Unicode('FixedMesh', help="Mesh adaptive approach, from {'FixedMesh', 'HessianBased', 'Vorticity', 'DWP', 'DWR'}").tag(config=True)
+    approach = Unicode('FixedMesh', help="Mesh adaptive approach.").tag(config=True)
     dwr_approach = Unicode('error_representation', help="DWR error estimation approach, from {'error_representation', 'dwr', 'cell_facet_split'}. (See [Rognes & Logg, 2010])").tag(config=True)
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
     intersect = Bool(False, help='Intersect with previous mesh.').tag(config=True)
@@ -37,11 +37,7 @@ class AdaptOptions(FrozenConfigurable):
     solve_adjoint = Bool(False).tag(config=True)
     objective_rtol = PositiveFloat(0.00025, help="Relative tolerance for convergence in objective value.").tag(config=True)
 
-    def __init__(self, approach='FixedMesh'):
-        try:
-            assert(approach in ('FixedMesh', 'HessianBased', 'Vorticity', 'DWP', 'DWR', 'AdjointOnly'))
-        except:
-            raise ValueError
+    def __init__(self, approach='fixed_mesh'):
         self.approach = approach
         self.solve_adjoint = True if self.approach in ('DWP', 'DWR') else False
 
@@ -172,7 +168,7 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
         return box
 
 
-class DefaultOptions(AdaptOptions):
+class DefaultOptions(Options):
     name = 'Parameters for the case where no mode is selected'
     mode = 'Default'
 

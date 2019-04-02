@@ -3,19 +3,18 @@ from thetis.configuration import *
 
 import numpy as np
 
-from adapt_utils.adapt.options import AdaptOptions
+from adapt_utils.options import Options
 
 
 __all__ = ["TurbineOptions"]
 
 
-class TurbineOptions(AdaptOptions):
+class TurbineOptions(Options):
     name = 'Parameters for the 2 turbine problem'
     mode = 'Turbine'
 
     # solver parameters
     dt = PositiveFloat(20.).tag(config=True)
-    north_south_bc = Unicode(None, allow_none=True, help="Set North and South boundary conditions, from {None, 'freeslip', 'noslip'}").tag(config=True)  # TODO: remove
 
     # adaptivity parameters
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
@@ -34,14 +33,10 @@ class TurbineOptions(AdaptOptions):
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
     region_of_interest = List(default_value=[(50., 100., 9.), (400., 100., 9.)]).tag(config=True)
 
-    def __init__(self, approach='FixedMesh'):
+    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
         super(TurbineOptions, self).__init__(approach)
-
+        self.adapt_field = adapt_field
         try:
             assert self.adapt_field in ('fluid_speed', 'elevation', 'both')
         except:
             raise ValueError('Field for adaptation {:s} not recognised.'.format(self.adapt_field))
-
-        # Plotting
-        self.adjoint_outfile = File(self.directory()+'Adjoint2d.pvd')  # TODO: Inconsistent
-        self.estimator_outfile = File(self.directory() + self.approach+'Estimator2d.pvd')

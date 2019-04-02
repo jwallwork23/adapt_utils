@@ -5,7 +5,7 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from adapt_utils.adapt.options import DefaultOptions
+from adapt_utils.options import DefaultOptions
 
 
 __all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric", "iso_P2",

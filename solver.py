@@ -5,8 +5,9 @@ from fenics_adjoint.projection import ProjectBlock  # Exclude projections from t
 
 import datetime
 from time import clock
+import numpy as np
 
-from adapt_utils.adapt.options import DefaultOptions
+from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.metric import isotropic_metric, metric_intersection, metric_relaxation
 
 
@@ -17,7 +18,7 @@ now = datetime.datetime.now()
 date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 
-class BaseProblem():
+class SteadyProblem():
     """
     Base class for solving PDE problems using mesh adaptivity.
 
@@ -31,7 +32,6 @@ class BaseProblem():
                  finite_element,
                  approach,
                  stab=None,
-                 issteady=True,
                  discrete_adjoint=False,
                  op=DefaultOptions(),
                  high_order=False):
@@ -39,7 +39,6 @@ class BaseProblem():
         self.finite_element = finite_element
         self.approach = approach
         self.stab = stab if stab is not None else 'no'
-        self.issteady = issteady
         self.discrete_adjoint = discrete_adjoint
         self.high_order = high_order
         self.op = op
@@ -84,10 +83,7 @@ class BaseProblem():
         """
         if not hasattr(self, 'kernel'):
             self.get_objective_kernel()
-        if self.issteady:
-            return assemble(inner(self.solution, self.kernel)*dx)
-        else:
-            raise NotImplementedError  # TODO
+        return assemble(inner(self.solution, self.kernel)*dx)
 
     def solve_continuous_adjoint(self):
         """
@@ -99,25 +95,21 @@ class BaseProblem():
         """
         Solve the adjoint PDE in the discrete sense, using pyadjoint.
         """
-        if self.issteady:
+        # compute some gradient in order to get adjoint solutions
+        J = self.objective_functional()
+        compute_gradient(J, Control(self.gradient_field))
+        tape = get_working_tape()
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
+                                                        and not isinstance(block, ProjectBlock)
+                                                        and block.adj_sol is not None]
+        try:
+            assert len(solve_blocks) == 1
+        except:
+            ValueError("Expected one SolveBlock, but encountered {:d}".format(len(solve_blocks)))
 
-            # compute some gradient in order to get adjoint solutions
-            J = self.objective_functional()
-            compute_gradient(J, Control(self.gradient_field))
-            tape = get_working_tape()
-            solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
-                                                            and not isinstance(block, ProjectBlock)
-                                                            and block.adj_sol is not None]
-            try:
-                assert len(solve_blocks) == 1
-            except:
-                ValueError("Expected one SolveBlock, but encountered {:d}".format(len(solve_blocks)))
-
-            # extract adjoint solution
-            self.adjoint_solution.assign(solve_blocks[0].adj_sol)
-            tape.clear_tape()
-        else:
-            raise NotImplementedError  # TODO
+        # extract adjoint solution
+        self.adjoint_solution.assign(solve_blocks[0].adj_sol)
+        tape.clear_tape()
 
     def solve_adjoint(self):
         """
@@ -218,15 +210,25 @@ class BaseProblem():
             return
         elif self.approach == 'hessian':
             self.get_hessian_metric()
-        elif self.approach == 'explicit':
-            self.explicit_estimation()
-            self.get_isotropic_metric()
         elif self.approach == 'hessian_adjoint':
             self.get_hessian_metric(adjoint=True)
-        elif self.approach == 'hessian_adjoint':
+        elif self.approach == 'hessian_superposed':
             self.get_hessian_metric(adjoint=False)
             M = self.M.copy()
             self.get_hessian_metric(adjoint=True)
+            self.M = metric_intersection(M, self.M)
+        elif self.approach == 'explicit':
+            self.explicit_estimation()
+            self.get_isotropic_metric()
+        elif self.approach == 'explicit_adjoint':
+            self.explicit_estimation_adjoint()
+            self.get_isotropic_metric()
+        elif self.approach == 'explicit_superposed':
+            self.explicit_estimation()
+            self.get_isotropic_metric()
+            M = self.M.copy()
+            self.explicit_estimation_adjoint()
+            self.get_isotropic_metric()
             self.M = metric_intersection(M, self.M)
         elif self.approach == 'dwp':
             self.dwp_indication()
@@ -330,7 +332,6 @@ class MeshOptimisation():
         self.msg = "Mesh {:2d}: {:7d} cells, objective {:.4e}"
         self.conv_msg = "Converged after {:d} iterations due to {:s}"
         self.maxit = 35
-        self.maxit_flag = False
         self.element_rtol = 0.005    # Following [Power et al 2006]
         self.objective_rtol = 0.005
 
@@ -341,7 +342,7 @@ class MeshOptimisation():
         M_ = None
         M = None
 
-        # create a log file and spit out parameters used
+        # Create a log file and spit out parameters
         if self.log:
             self.logfile = open('{:s}{:s}/optimisation_log'.format(self.outdir, self.approach), 'a+')
             self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
@@ -386,7 +387,6 @@ class MeshOptimisation():
                     out = self.conv_msg.format(i+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
                     out = self.conv_msg.format(i+1, 'maximum mesh adaptation count reached.')
-                    self.maxit_flag = True
                 if out is not None:
                     print(out)
                     if self.log:
@@ -401,6 +401,7 @@ class MeshOptimisation():
                 M_ = tp.M_unrelaxed
         self.dat['time'] = clock() - tstart
         print('Time to solution: {:.1f}s'.format(self.dat['time']))
+        tp.plot()
         if self.log:
             self.logfile.close()
 
@@ -424,38 +425,49 @@ class OuterLoop():
         self.iterates = iterates
         self.high_order = high_order
         self.maxit = maxit
+        self.outer_maxit = 20
         self.element_rtol = element_rtol
         self.objective_rtol = objective_rtol
+        self.di = problem(approach=approach).op.directory()
 
-        self.opt = {}  # TODO: this datastructure is unnecessary
+    def scale_to_convergence(self):
 
-    def scale_to_convergence(self):  # TODO: automate directory
-        logfile = open('outputs/' + self.approach + '/scale_to_convergence.log', 'a+')
+        # Create log file
+        logfile = open(self.di + 'scale_to_convergence.log', 'a+')
         logfile.write('\n' + date + '\n\n')
         logfile.write('maxit: {:d}\n'.format(self.maxit))
         logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
         logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
-        for i in range(self.maxit):
+
+        for i in range(self.outer_maxit):
+
+            # Iterate over increasing target vertex counts
             self.rescaling = float(i+1)*0.4
             print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
-            self.opt[i] = MeshOptimisation(self.problem,
-                                           mesh=self.mesh,
-                                           approach=self.approach,
-                                           rescaling=self.rescaling,
-                                           high_order=self.high_order,
-                                           log=False)
-            self.opt[i].maxit = self.maxit
-            self.opt[i].element_rtol = self.element_rtol
-            self.opt[i].objective_rtol = self.objective_rtol
-            self.opt[i].iterate()
-            if self.opt[i].maxit_flag:
-                self.opt[i].dat['objective'][-1] = np.nan
-            logfile.write("rescaling {:.2f} elements {:7d} objective {:.4e}\n".format(self.rescaling, self.opt[i].dat['elements'][-1], self.opt[i].dat['objective'][-1]))
+            opt = MeshOptimisation(self.problem,
+                                   mesh=self.mesh,
+                                   approach=self.approach,
+                                   rescaling=self.rescaling,
+                                   high_order=self.high_order,
+                                   log=False)
+            opt.maxit = self.maxit
+            opt.element_rtol = self.element_rtol
+            opt.objective_rtol = self.objective_rtol
+            opt.iterate()
 
-            # convergence criterion
+            # Logging
+            msg = "rescaling {:.2f} elements {:7d} iterations {:2d} time {:6.1f} objective {:.4e}\n"
+            logfile.write(msg.format(self.rescaling,
+                                     opt.dat['elements'][-1],
+                                     len(opt.dat['objective']),
+                                     opt.dat['time'],
+                                     opt.dat['objective'][-1]))
+
+            # Convergence criterion: relative tolerance for objective functional
             if i > 0:
-                obj_diff = abs(self.opt[i].dat['objective'][-1] - self.opt[i-1].dat['objective'][-1])
-                if obj_diff < self.objective_rtol*self.opt[i-1].dat['objective'][-1]:
-                    print(self.opt[i].conv_msg.format(i+1, 'convergence in objective functional.'))
+                obj_diff = abs(opt.dat['objective'][-1] - J_)
+                if obj_diff < self.objective_rtol*J_:
+                    print(opt.conv_msg.format(i+1, 'convergence in objective functional.'))
                     break
+            J_ = opt.dat['objective'][-1]
         logfile.close()
