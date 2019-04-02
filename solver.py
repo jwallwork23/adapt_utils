@@ -1,5 +1,5 @@
 from firedrake import *
-from firedrake_adjoint import *
+from firedrake_adjoint import *  # FIXME
 from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
 from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
 
@@ -34,13 +34,15 @@ class SteadyProblem():
                  stab=None,
                  discrete_adjoint=False,
                  op=DefaultOptions(),
-                 high_order=False):
+                 high_order=False,
+                 prev_solution=None):
         self.mesh = mesh
         self.finite_element = finite_element
         self.approach = approach
         self.stab = stab if stab is not None else 'no'
         self.discrete_adjoint = discrete_adjoint
         self.high_order = high_order
+        self.prev_solution = prev_solution
         self.op = op
         self.op.approach = approach
 
@@ -49,6 +51,7 @@ class SteadyProblem():
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
         self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
+        self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
 
@@ -115,6 +118,7 @@ class SteadyProblem():
         """
         Solve adjoint problem using specified method.
         """
+        print("Solving adjoint problem...")
         if self.discrete_adjoint:
             self.solve_discrete_adjoint()
         else:
@@ -136,7 +140,8 @@ class SteadyProblem():
             f := abs(f) * N / norm(f),
         subject to the imposition of minimum and maximum tolerated norms.
         """
-        scale_factor = min(max(norm(self.indicator), self.op.min_norm), self.op.max_norm)
+        #scale_factor = min(max(norm(self.indicator), self.op.min_norm), self.op.max_norm)
+        scale_factor = min(max(sqrt(assemble(self.indicator*self.indicator*dx)), self.op.min_norm), self.op.max_norm)
         if scale_factor < 1.00001*self.op.min_norm:
             print("WARNING: minimum norm attained")
         elif scale_factor > 0.99999*self.op.max_norm:
@@ -192,7 +197,7 @@ class SteadyProblem():
         self.normalise_indicator()
         self.M = isotropic_metric(self.indicator, op=self.op)
 
-    def get_anisotropic_metric(self):
+    def get_anisotropic_metric(self, adjoint=False, relax=False):
         """
         Apply the approach of [Loseille, Dervieux, Alauzet, 2009] to extract an anisotropic mesh 
         from the Dual Weighted Residual method.
@@ -293,11 +298,13 @@ class SteadyProblem():
         # Adapt mesh
         self.mesh = adapt(self.mesh, self.M)
 
-    def interpolate_fields(self):
+    def interpolate_solution(self):
         """
-        Interpolate fields onto the new mesh after a mesh adaptation.
+        Interpolate solution onto the new mesh after a mesh adaptation.
         """
-        raise NotImplementedError  # TODO
+        self.interpolated_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
+        self.interpolated_solution.project(self.solution)
+        return self.interpolated_solution
 
 
 class MeshOptimisation():
@@ -353,13 +360,15 @@ class MeshOptimisation():
             self.logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
             self.logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
 
+        prev_sol = None
         tstart = clock()
         for i in range(self.maxit):
             print('Solving on mesh {:d}'.format(i))
             tp = self.problem(stab=self.stab,
                               mesh=self.mesh if i == 0 else tp.mesh,
                               approach=self.approach,
-                              high_order=self.high_order)
+                              high_order=self.high_order,
+                              prev_solution=prev_sol)
 
             # Solve
             tp.solve()
@@ -397,11 +406,13 @@ class MeshOptimisation():
             # Otherwise, adapt mesh
             tp.set_target_vertices(num_vertices=self.dat['vertices'][0], rescaling=self.rescaling)
             tp.adapt_mesh(prev_metric=M_)
+            tp.plot()
+            if tp.nonlinear:
+                prev_sol = tp.solution
             if self.relax:
                 M_ = tp.M_unrelaxed
         self.dat['time'] = clock() - tstart
         print('Time to solution: {:.1f}s'.format(self.dat['time']))
-        tp.plot()
         if self.log:
             self.logfile.close()
 

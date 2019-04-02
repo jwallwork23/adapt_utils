@@ -1,13 +1,10 @@
 from firedrake import *
-from firedrake_adjoint import *
-from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
-from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
+#from firedrake_adjoint import *  # FIXME
 
-import datetime
 from time import clock
 import numpy as np
 
-from adapt_utils.tracer.options import TracerOptions
+from adapt_utils.tracer.options import PowerOptions
 from adapt_utils.adapt.metric import *
 from adapt_utils.solver import SteadyProblem
 
@@ -15,67 +12,50 @@ from adapt_utils.solver import SteadyProblem
 __all__ = ["SteadyTracerProblem"]
 
 
-now = datetime.datetime.now()
-date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
-
+# TODO: Generalise boundary conditions
 class SteadyTracerProblem(SteadyProblem):
+    """
+    General solver object for stationary tracer advection problems.
+    """
     def __init__(self,
-                 op=TracerOptions(),
+                 op=PowerOptions(),
                  stab=None,
                  mesh=SquareMesh(40, 40, 4, 4),
                  approach='fixed_mesh',
                  discrete_adjoint=False,
                  finite_element=FiniteElement("Lagrange", triangle, 1),
                  high_order=False):
-        super(SteadyTracerProblem, self).__init__(mesh, finite_element, approach, stab, discrete_adjoint, op, high_order)
-        assert(finite_element.family() == 'Lagrange')  # TODO: DG option if finite_element.family() == 'DG'
+        super(SteadyTracerProblem, self).__init__(mesh,
+                                                  finite_element,
+                                                  approach,
+                                                  stab,
+                                                  discrete_adjoint,
+                                                  op,
+                                                  high_order,
+                                                  None)
+        assert(finite_element.family() == 'Lagrange')  # TODO: DG option
 
-        # parameters
-        self.op.region_of_interest = [(3., 2., 0.1)]
-        self.x0 = 1.
-        self.y0 = 2.
-        self.r0 = 0.1
-        self.nu = Constant(1.)
-        self.u = Function(self.P1_vec).interpolate(as_vector((15., 0.)))
-        self.params = {'pc_type': 'lu',
-                       'mat_type': 'aij' ,
-                       'ksp_monitor': None,
-                       'ksp_converged_reason': None}
-        self.gradient_field = self.nu
-        self.get_source_term()  # NOTE: this can be replaced, if so desired
+        # Extract parameters from Options class
+        self.nu = op.set_diffusivity(self.P1)
+        self.u = op.set_velocity(self.P1_vec)
+        self.source = op.set_source(self.P0)
+        self.kernel = op.set_objective_kernel(self.P0)
+        self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
-        # solution fields
+        # Rename solution fields
         self.solution.rename('Tracer concentration')
         self.adjoint_solution.rename('Adjoint tracer concentration')
 
-        # outputting
-        self.di = 'plots/'
-        self.ext = ''
-        if self.stab == 'SU':
-            self.ext = '_su'
-        elif self.stab == 'SUPG':
-            self.ext = '_supg'
-        self.sol_file = File(self.di + 'sol' + self.ext + '.pvd')
-        self.sol_adjoint_file = File(self.di + 'sol_adjoint' + self.ext + '.pvd')
-        
-    def get_source_term(self):
-        x, y = SpatialCoordinate(self.mesh)
-        cond = And(And(gt(x, self.x0-self.r0), lt(x, self.x0+self.r0)),
-                   And(gt(y, self.y0-self.r0), lt(y, self.y0+self.r0)))
-        self.source = Function(self.P0).interpolate(conditional(cond, 1., 0.))
-        self.source.rename("Source term")
+        # Classification
+        self.nonlinear = False
 
-    def get_objective_kernel(self):
-        self.kernel = Function(self.P0)
-        self.kernel.interpolate(self.op.box(self.mesh))
-    
     def solve(self):
         u = self.u
         nu = self.nu
         n = self.n
         f = self.source
 
-        # finite element problem
+        # Finite element problem
         phi = TrialFunction(self.V)
         psi = TestFunction(self.V)
         a = psi*dot(u, grad(phi))*dx
@@ -83,7 +63,7 @@ class SteadyTracerProblem(SteadyProblem):
         a += - nu*psi*dot(n, nabla_grad(phi))*ds(1)
         L = f*psi*dx
 
-        # stabilisation
+        # Stabilisation
         if self.stab in ("SU", "SUPG"):
             tau = self.h / (2*sqrt(inner(u, u)))
             stab_coeff = tau * dot(u, grad(psi))
@@ -94,10 +74,10 @@ class SteadyTracerProblem(SteadyProblem):
                 L += stab_coeff*R_L*dx
             a += stab_coeff*R_a*dx
 
-        # solve
+        # Solve
         bc = DirichletBC(self.V, 0, 1)
-        solve(a == L, self.solution, bcs=bc, solver_parameters=self.params)
-        self.sol_file.write(self.solution)
+        solve(a == L, self.solution, bcs=bc, solver_parameters=self.op.params)
+        #self.sol_file.write(self.solution)
         
     def solve_continuous_adjoint(self):
         u = self.u
@@ -105,7 +85,6 @@ class SteadyTracerProblem(SteadyProblem):
         n = self.n
         
         # Adjoint source term
-        self.get_objective_kernel()
         lam = TrialFunction(self.V)
         psi = TestFunction(self.V)
         
@@ -128,8 +107,8 @@ class SteadyTracerProblem(SteadyProblem):
             a += stab_coeff*R_a*dx
         
         bc = DirichletBC(self.V, 0, 1)
-        solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.params)
-        self.sol_adjoint_file.write(self.adjoint_solution)
+        solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.op.params)
+        #self.sol_adjoint_file.write(self.adjoint_solution)
 
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
@@ -138,23 +117,23 @@ class SteadyTracerProblem(SteadyProblem):
         phi = self.solution
         i = TestFunction(self.P0)
         
-        # compute residuals
+        # Compute residuals
         self.cell_res = dot(self.u, grad(phi)) - div(self.nu*grad(phi))
         self.edge_res = phi*dot(self.u, self.n) - self.nu*dot(self.n, nabla_grad(phi))
         R = self.cell_res
         r = self.edge_res
 
-        # assemble cell residual
+        # Assemble cell residual
         R_norm = assemble(i*R*R*dx)
 
-        # solve auxiliary problem to assemble edge residual
+        # Solve auxiliary problem to assemble edge residual
         r_norm = TrialFunction(self.P0)
         mass_term = i*r_norm*dx
         flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS + i*r*r*ds
         r_norm = Function(self.P0)
         solve(mass_term == flux_terms, r_norm)
 
-        # form error estimator
+        # Form error estimator
         self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), self.P0)
         self.indicator.rename('explicit')
 
@@ -166,11 +145,11 @@ class SteadyTracerProblem(SteadyProblem):
         n = self.n
         i = TestFunction(self.P0)
 
-        # cell residual
+        # Cell residual
         R = -div(u*lam) - div(nu*grad(lam))
         R_norm = assemble(i*R*R*dx)
 
-        # edge residual
+        # Edge residual
         r = TrialFunction(self.P0)
         flux = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
         flux_terms = ((i*flux*flux)('+') + (i*flux*flux)('-')) * dS
@@ -180,16 +159,16 @@ class SteadyTracerProblem(SteadyProblem):
         r_norm = Function(self.P0)
         solve(mass_term == flux_terms, r_norm)
 
-        # form error estimator
+        # Form error estimator
         self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), self.P0)
         self.indicator.rename('explicit_adjoint')
  
     def solve_high_order(self, adjoint=True):  # TODO: reimplement in base class
 
-        # consider an iso-P2 refined mesh
+        # Consider an iso-P2 refined mesh
         fine_mesh = iso_P2(self.mesh)
 
-        # solve adjoint problem on fine mesh using linear elements
+        # Solve adjoint problem on fine mesh using linear elements
         tp_p1 = SteadyTracerProblem(stab=self.stab,
                               mesh=fine_mesh,
                               fe=FiniteElement('Lagrange', triangle, 1))
@@ -200,7 +179,7 @@ class SteadyTracerProblem(SteadyProblem):
             tp_p1.setup_equation()
             tp_p1.solve()
 
-        # solve adjoint problem on fine mesh using quadratic elements
+        # Solve adjoint problem on fine mesh using quadratic elements
         tp_p2 = SteadyTracerProblem(stab=self.stab,
                                     mesh=fine_mesh,
                                     fe=FiniteElement('Lagrange', triangle, 2))
@@ -211,7 +190,7 @@ class SteadyTracerProblem(SteadyProblem):
             tp_p2.setup_equation()
             tp_p2.solve()
 
-        # evaluate difference on fine mesh and project onto coarse mesh
+        # Evaluate difference on fine mesh and project onto coarse mesh
         sol_p1 = tp_p1.sol_adjoint if adjoint else tp_p1.sol
         sol_p2 = tp_p2.sol_adjoint if adjoint else tp_p2.sol
         sol = Function(tp_p2.V).interpolate(sol_p1)
@@ -234,10 +213,10 @@ class SteadyTracerProblem(SteadyProblem):
             lam = self.adjoint_solution
             
             
-        # cell residual
+        # Cell residual
         R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
 
-        # edge residual
+        # Edge residual
         r = TrialFunction(self.P0)
         flux = nu*lam*dot(n, nabla_grad(phi))
         flux_terms = ((i*flux)('+') + (i*flux)('-')) * dS + i*flux*ds(3) + i*flux*ds(4)
@@ -246,6 +225,7 @@ class SteadyTracerProblem(SteadyProblem):
         r = Function(self.P0)
         solve(mass_term == flux_terms, r)
 
+        # Sum
         self.cell_res = R
         self.edge_res = r
         self.indicator = project(R + r, self.P0)
@@ -263,13 +243,13 @@ class SteadyTracerProblem(SteadyProblem):
         else:
             phi = self.solution
             
-        # adjoint source term
+        # Adjoint source term
         dJdphi = interpolate(self.op.box(self.mesh), self.P0)
             
-        # cell residual
+        # Cell residual
         R = (dJdphi + div(u*lam) + div(nu*grad(lam)))*phi
         
-        # edge residual
+        # Edge residual
         r = TrialFunction(self.P0)
         flux = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
         flux_terms = ((i*flux)('+') + (i*flux)('-')) * dS
@@ -284,22 +264,24 @@ class SteadyTracerProblem(SteadyProblem):
         self.indicator = project(R + r, self.P0)
         self.indicator.rename('dwr_adjoint')
         
-    def get_anisotropic_metric(self, adjoint=False):
+    def get_anisotropic_metric(self, adjoint=False, relax=False, superpose=True):
+        assert not (relax and superpose)
         try:
             assert self.op.restrict == 'anisotropy'
         except:
             self.op.restrict = 'anisotropy'
             raise Warning("Setting metric restriction method to 'anisotropy'")
 
-        # solve adjoint problem
+        # Solve adjoint problem
         if self.high_order:
             adj = self.solve_high_order(adjoint=not adjoint)
         else:
             adj = self.solution if adjoint else self.adjoint_solution
         sol = self.adjoint_solution if adjoint else self.solution
-        adj_diff = construct_gradient(adj)
+        adj_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(adj)))
+        adj.interpolate(abs(adj))
 
-        # get potential to take Hessian wrt
+        # Get potential to take Hessian w.r.t.
         x, y = SpatialCoordinate(self.mesh)
         if adjoint:
             source = interpolate(self.op.box(self.mesh), self.P0)
@@ -325,17 +307,23 @@ class SteadyTracerProblem(SteadyProblem):
         #    Using these forms lead to high resolution of the boundaries of the source / receiver
         #    regions and low resolution elsewhere.
 
-        # construct Hessians
+        # Construct Hessians
         H1 = construct_hessian(F1, mesh=self.mesh, op=self.op)
         H2 = construct_hessian(F2, mesh=self.mesh, op=self.op)
-        # Hf = construct_hessian(source, mesh=self.mesh, op=self.op)
+        Hf = construct_hessian(source, mesh=self.mesh, op=self.op)
 
         # form metric
-        self.M = Function(H1.function_space())
+        self.M = Function(self.P1_ten)
         for i in range(len(adj.dat.data)):
             self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
             self.M.dat.data[i][:,:] += H2.dat.data[i]*adj_diff.dat.data[i][1]
-        #     self.M.dat.data[i][:,:] += Hf.dat.dat[i]*adj.dat.data[i]
+            if relax:
+                self.M.dat.data[i][:,:] += Hf.dat.dat[i]*adj.dat.data[i]
         self.M = steady_metric(None, H=self.M, op=self.op)
+
+        if superpose:
+            Mf = Function(self.P1_ten)
+            Mf.interpolate(Hf*adj)
+            self.M = metric_intersection(self.M, Mf)
 
         # TODO: boundary contributions

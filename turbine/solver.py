@@ -5,6 +5,7 @@ import math
 from adapt_utils.solver import SteadyProblem
 from adapt_utils.turbine.options import TurbineOptions
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.interpolation import *
 
 
 __all__ = ["SteadyTurbineProblem"]
@@ -17,10 +18,11 @@ class SteadyTurbineProblem(SteadyProblem):
     def __init__(self,
                  mesh=RectangleMesh(100, 20, 1000., 200.),
                  approach='fixed_mesh',
-                 stab=None,  # TODO
+                 stab=None,
                  discrete_adjoint=True,
                  op=TurbineOptions(),
-                 high_order=False):  # TODO
+                 high_order=False,  # TODO
+                 prev_solution=None):
         if op.family == 'dg-dg' and op.degree in (1, 2):
             finite_element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
         elif op.family == 'dg-cg':
@@ -33,8 +35,18 @@ class SteadyTurbineProblem(SteadyProblem):
                                                    stab,
                                                    discrete_adjoint,
                                                    op,
-                                                   high_order)
+                                                   high_order,
+                                                   prev_solution)
 
+        self.stab = stab
+        if stab is not None:
+            try:
+                assert stab == 'lax_friedrichs'
+            except:
+                raise NotImplementedError
+        self.prev_solution = prev_solution
+        if prev_solution is not None:
+            self.interpolate_solution()
         # TODO: Generalise below
 
         # If we solve with PressureProjectionPicard (theta=1.0) it seems to converge (power output
@@ -48,8 +60,6 @@ class SteadyTurbineProblem(SteadyProblem):
         self.viscosity = Constant(self.op.viscosity)
         self.drag_coefficient = Constant(self.op.drag_coefficient)
         self.inflow = Function(self.P1_vec).interpolate(as_vector([3., 0.]))
-
-        # TODO: interpolate previous_velocity
 
         # Correction to account for the fact that the thrust coefficient is based on an upstream
         # velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
@@ -65,6 +75,9 @@ class SteadyTurbineProblem(SteadyProblem):
         z, zeta = self.adjoint_solution.split()
         z.rename("Adjoint fluid velocity")
         zeta.rename("Adjoint elevation")
+
+        # Classification
+        self.nonlinear = True
 
     def solve(self):
         """
@@ -86,8 +99,9 @@ class SteadyTurbineProblem(SteadyProblem):
         # options.timestepper_options.implicitness_theta = 1.0
         options.horizontal_viscosity = self.viscosity
         options.quadratic_drag_coefficient = self.drag_coefficient
-        options.use_lax_friedrichs_velocity = False  # TODO
+        options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
         options.use_grad_depth_viscosity_term = False
+        options.compute_residuals = self.approach in ('dwr', 'dwr_adjoint', 'dwr_both', 'dwr_averaged', 'dwr_relaxed', 'dwr_superposed')
 
         # Assign boundary conditions
         left_tag = 1
@@ -119,13 +133,14 @@ class SteadyTurbineProblem(SteadyProblem):
         solver_obj.add_callback(cb, 'timestep')
 
         # Solve and extract data
-        if hasattr(self, self.prev_velocity):
-            solver_obj.assign_initial_conditions(uv=self.prev_velocity)
+        if self.prev_solution is not None:
+            solver_obj.assign_initial_conditions(uv=self.interpolated_solution)
         else:
             solver_obj.assign_initial_conditions(uv=self.inflow)
         solver_obj.iterate()
         self.solution = solver_obj.fields.solution_2d
         self.objective = cb.average_power
+        self.ts = solver_obj.timestepper
 
     def get_objective_kernel(self):
         self.kernel = Function(self.V)
@@ -154,13 +169,24 @@ class SteadyTurbineProblem(SteadyProblem):
     def explicit_estimation_adjoint(self):
         raise NotImplementedError  # TODO
 
-    def dwr_estimation(self):
-        raise NotImplementedError  # TODO
+    def dwr_estimation(self):  # TODO: Different flavours of DWR
+        with pyadjoint.stop_annotating():
+            cell_res = self.ts.cell_residual(self.adjoint_solution)
+            edge_res = self.ts.edge_residual(self.adjoint_solution)
+            self.indicator = Function(self.P0)
+            self.indicator.project(cell_res + edge_res)
 
     def dwr_estimation_adjoint(self):
         raise NotImplementedError  # TODO
 
-    def get_anisotropic_metric(self, adjoint=False, relax=False):
+    def get_anisotropic_metric(self, adjoint=False, relax=True, superpose=False):
+        assert not (relax and superpose)
+        try:
+            assert self.op.restrict == 'anisotropy'
+        except:
+            self.op.restrict = 'anisotropy'
+            raise Warning("Setting metric restriction method to 'anisotropy'")
+
         u, eta = self.solution.split()
         z, zeta = self.adjoint_solution.split()
         z0_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(z[0], mesh=self.mesh)))
@@ -213,12 +239,12 @@ class SteadyTurbineProblem(SteadyProblem):
             self.M.dat.data[i][:,:] += H2[1].dat.data[i]*z1_diff.dat.data[i][0]
             self.M.dat.data[i][:,:] += H2[2].dat.data[i]*zeta_diff.dat.data[i][0]
             if relax:
-                self.M.dat.data[i][:,:] += Hf[0].dat.dat[i]*z_p1.dat.data[i][0]
-                self.M.dat.data[i][:,:] += Hf[1].dat.dat[i]*z_p1.dat.data[i][1]
+                self.M.dat.data[i][:,:] += Hf[0].dat.data[i]*z_p1.dat.data[i][0]
+                self.M.dat.data[i][:,:] += Hf[1].dat.data[i]*z_p1.dat.data[i][1]
         self.M = steady_metric(None, H=self.M, op=self.op)
 
         # Source term contributions
-        if not relax:
+        if superpose:
             Mf = Function(self.P1_ten)
             for i in range(len(Mf.dat.data)):
                 Mf.dat.data[i][:,:] += Hf[0].dat.data[i]*z_p1.dat.data[i][0]
@@ -227,3 +253,12 @@ class SteadyTurbineProblem(SteadyProblem):
             self.M = metric_intersection(self.M, Mf)
 
         # TODO: boundary contributions
+
+    def interpolate_solution(self):
+        """
+        Here we only need interpolate the velocity.
+        """
+        print("Interpolating solution across meshes...")
+        #self.interpolated_solution = Function(self.V.sub(0))
+        #self.interpolated_solution.project(self.prev_solution.split()[0])
+        self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])

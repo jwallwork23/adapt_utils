@@ -28,6 +28,7 @@ class Options(FrozenConfigurable):
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
     norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used.")
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
+    degree = PositiveInteger(1, help="Order of function space").tag(config=True)
     min_norm = PositiveFloat(1e-6).tag(config=True)
     max_norm = PositiveFloat(1e9).tag(config=True)
     element_rtol = PositiveFloat(0.01, help="Relative tolerance for convergence in mesh element count").tag(config=True)
