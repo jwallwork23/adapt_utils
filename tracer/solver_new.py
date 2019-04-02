@@ -1,5 +1,5 @@
 from firedrake import *
-#from firedrake_adjoint import *  # FIXME
+from firedrake_adjoint import *
 
 from time import clock
 import numpy as np
@@ -24,7 +24,8 @@ class SteadyTracerProblem(SteadyProblem):
                  approach='fixed_mesh',
                  discrete_adjoint=False,
                  finite_element=FiniteElement("Lagrange", triangle, 1),
-                 high_order=False):
+                 high_order=False,
+                 prev_solution=None):
         super(SteadyTracerProblem, self).__init__(mesh,
                                                   finite_element,
                                                   approach,
@@ -327,3 +328,7 @@ class SteadyTracerProblem(SteadyProblem):
             self.M = metric_intersection(self.M, Mf)
 
         # TODO: boundary contributions
+        #bdy_contributions = i*(F1*n[0] + F2*n[1])*ds
+        #n = self.n
+        #Fhat = i*dot(phi, n)
+        #bdy_contributions -= Fhat*ds(2) + Fhat*ds(3) + Fhat*ds(4)

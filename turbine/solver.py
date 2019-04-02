@@ -101,7 +101,8 @@ class SteadyTurbineProblem(SteadyProblem):
         options.quadratic_drag_coefficient = self.drag_coefficient
         options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
         options.use_grad_depth_viscosity_term = False
-        options.compute_residuals = self.approach in ('dwr', 'dwr_adjoint', 'dwr_both', 'dwr_averaged', 'dwr_relaxed', 'dwr_superposed')
+        #options.compute_residuals = self.approach in ('dwr', 'dwr_adjoint', 'dwr_both', 'dwr_averaged', 'dwr_relaxed', 'dwr_superposed')
+        options.compute_residuals = True
 
         # Assign boundary conditions
         left_tag = 1
@@ -251,6 +252,8 @@ class SteadyTurbineProblem(SteadyProblem):
                 Mf.dat.data[i][:,:] += Hf[1].dat.data[i]*z_p1.dat.data[i][1]
             Mf = steady_metric(None, H=Mf, op=self.op)
             self.M = metric_intersection(self.M, Mf)
+
+        # TODO: Account for flux terms contributed by DG scheme
 
         # TODO: boundary contributions
 

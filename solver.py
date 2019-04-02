@@ -1,7 +1,8 @@
 from firedrake import *
-from firedrake_adjoint import *  # FIXME
+from firedrake_adjoint import *
 from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
 from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
+import pyadjoint
 
 import datetime
 from time import clock
@@ -208,95 +209,96 @@ class SteadyProblem():
         """
         Adapt mesh according to error estimation strategy of choice.
         """
-        if self.approach == 'fixed_mesh':
-            return
-        elif self.approach == 'uniform':
-            self.mesh = MeshHierarchy(self.mesh, 1)[1]
-            return
-        elif self.approach == 'hessian':
-            self.get_hessian_metric()
-        elif self.approach == 'hessian_adjoint':
-            self.get_hessian_metric(adjoint=True)
-        elif self.approach == 'hessian_superposed':
-            self.get_hessian_metric(adjoint=False)
-            M = self.M.copy()
-            self.get_hessian_metric(adjoint=True)
-            self.M = metric_intersection(M, self.M)
-        elif self.approach == 'explicit':
-            self.explicit_estimation()
-            self.get_isotropic_metric()
-        elif self.approach == 'explicit_adjoint':
-            self.explicit_estimation_adjoint()
-            self.get_isotropic_metric()
-        elif self.approach == 'explicit_superposed':
-            self.explicit_estimation()
-            self.get_isotropic_metric()
-            M = self.M.copy()
-            self.explicit_estimation_adjoint()
-            self.get_isotropic_metric()
-            self.M = metric_intersection(M, self.M)
-        elif self.approach == 'dwp':
-            self.dwp_indication()
-            self.get_isotropic_metric()
-        elif self.approach == 'dwr':
-            self.dwr_estimation()
-            self.get_isotropic_metric()
-        elif self.approach == 'dwr_adjoint':
-            self.dwr_estimation_adjoint()
-            self.get_isotropic_metric()
-        elif self.approach == 'dwr_both':
-            self.dwr_estimation()
-            self.get_isotropic_metric()
-            i = self.indicator.copy()
-            self.dwr_estimation_adjoint()
-            self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
-            self.get_isotropic_metric()
-        elif self.approach == 'dwr_averaged':
-            self.dwr_estimation()
-            self.get_isotropic_metric()
-            i = self.indicator.copy()
-            self.dwr_estimation_adjoint()
-            self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
-            self.get_isotropic_metric()
-        elif self.approach == 'dwr_relaxed':
-            self.dwr_estimation()
-            self.get_isotropic_metric()
-            M = self.M.copy()
-            self.dwr_estimation_adjoint()
-            self.get_isotropic_metric()
-            self.M = metric_relaxation(M, self.M)
-        elif self.approach == 'dwr_superposed':
-            self.dwr_estimation()
-            self.get_isotropic_metric()
-            M = self.M.copy()
-            self.dwr_estimation_adjoint()
-            self.get_isotropic_metric()
-            self.M = metric_intersection(M, self.M)
-        elif self.approach == 'dwr_anisotropic':
-            self.get_anisotropic_metric(adjoint=False)
-        elif self.approach == 'dwr_anisotropic_adjoint':
-            self.get_anisotropic_metric(adjoint=True)
-        elif self.approach == 'dwr_anisotropic_relaxed':
-            self.get_anisotropic_metric(adjoint=False)
-            M = self.M.copy()
-            self.get_anisotropic_metric(adjoint=True)
-            self.M = metric_relaxation(M, self.M)
-        elif self.approach == 'dwr_anisotropic_superposed':
-            self.get_anisotropic_metric(adjoint=False)
-            M = self.M.copy()
-            self.get_anisotropic_metric(adjoint=True)
-            self.M = metric_intersection(M, self.M)
-        else:
-            raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
+        with pyadjoint.stop_annotating():
+            if self.approach == 'fixed_mesh':
+                return
+            elif self.approach == 'uniform':
+                self.mesh = MeshHierarchy(self.mesh, 1)[1]
+                return
+            elif self.approach == 'hessian':
+                self.get_hessian_metric()
+            elif self.approach == 'hessian_adjoint':
+                self.get_hessian_metric(adjoint=True)
+            elif self.approach == 'hessian_superposed':
+                self.get_hessian_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_hessian_metric(adjoint=True)
+                self.M = metric_intersection(M, self.M)
+            elif self.approach == 'explicit':
+                self.explicit_estimation()
+                self.get_isotropic_metric()
+            elif self.approach == 'explicit_adjoint':
+                self.explicit_estimation_adjoint()
+                self.get_isotropic_metric()
+            elif self.approach == 'explicit_superposed':
+                self.explicit_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.explicit_estimation_adjoint()
+                self.get_isotropic_metric()
+                self.M = metric_intersection(M, self.M)
+            elif self.approach == 'dwp':
+                self.dwp_indication()
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr_adjoint':
+                self.dwr_estimation_adjoint()
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr_both':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                i = self.indicator.copy()
+                self.dwr_estimation_adjoint()
+                self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr_averaged':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                i = self.indicator.copy()
+                self.dwr_estimation_adjoint()
+                self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr_relaxed':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.dwr_estimation_adjoint()
+                self.get_isotropic_metric()
+                self.M = metric_relaxation(M, self.M)
+            elif self.approach == 'dwr_superposed':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.dwr_estimation_adjoint()
+                self.get_isotropic_metric()
+                self.M = metric_intersection(M, self.M)
+            elif self.approach == 'dwr_anisotropic':
+                self.get_anisotropic_metric(adjoint=False)
+            elif self.approach == 'dwr_anisotropic_adjoint':
+                self.get_anisotropic_metric(adjoint=True)
+            elif self.approach == 'dwr_anisotropic_relaxed':
+                self.get_anisotropic_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_anisotropic_metric(adjoint=True)
+                self.M = metric_relaxation(M, self.M)
+            elif self.approach == 'dwr_anisotropic_superposed':
+                self.get_anisotropic_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_anisotropic_metric(adjoint=True)
+                self.M = metric_intersection(M, self.M)
+            else:
+                raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
-        # Apply metric relaxation, if requested
-        self.M_unrelaxed = self.M.copy()
-        if prev_metric is not None:
-            self.M.project(metric_relaxation(interp(self.mesh, prev_metric), self.M, relaxation_parameter))
-        # (Default relaxation of 0.9 following [Power et al 2006])
+            # Apply metric relaxation, if requested
+            self.M_unrelaxed = self.M.copy()
+            if prev_metric is not None:
+                self.M.project(metric_relaxation(interp(self.mesh, prev_metric), self.M, relaxation_parameter))
+            # (Default relaxation of 0.9 following [Power et al 2006])
 
-        # Adapt mesh
-        self.mesh = adapt(self.mesh, self.M)
+            # Adapt mesh
+            self.mesh = adapt(self.mesh, self.M)
 
     def interpolate_solution(self):
         """
