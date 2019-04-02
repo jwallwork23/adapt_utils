@@ -12,16 +12,21 @@ __all__ = ["SteadyTurbineProblem"]
 
 class SteadyTurbineProblem(SteadyProblem):
     """
-    TODO: documentation
+    General solver object for stationary tidal turbine problems.
     """
     def __init__(self,
                  mesh=RectangleMesh(100, 20, 1000., 200.),
-                 finite_element=VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, 1),
                  approach='fixed_mesh',
                  stab=None,  # TODO
                  discrete_adjoint=True,
                  op=TurbineOptions(),
                  high_order=False):  # TODO
+        if op.family == 'dg-dg' and op.degree in (1, 2):
+            finite_element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
+        elif op.family == 'dg-cg':
+            finite_element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
+        else:
+            raise NotImplementedError
         super(SteadyTurbineProblem, self).__init__(mesh,
                                                    finite_element,
                                                    approach,
@@ -30,19 +35,23 @@ class SteadyTurbineProblem(SteadyProblem):
                                                    op,
                                                    high_order)
 
-        # if we solve with PressureProjectionPicard (theta=1.0) it seems to converge (power output
+        # TODO: Generalise below
+
+        # If we solve with PressureProjectionPicard (theta=1.0) it seems to converge (power output
         # to 7 digits) in roughly 800 timesteps of 20s with SteadyState we only do 1 timestep 
         # (t_end should be slightly smaller than timestep to achieve this)
         self.t_end = 0.9*op.dt
 
-        # physical fields and boundary values
+        # Physical fields and boundary values
         depth = 40.
         self.bathy = Constant(depth)
         self.viscosity = Constant(self.op.viscosity)
         self.drag_coefficient = Constant(self.op.drag_coefficient)
         self.inflow = Function(self.P1_vec).interpolate(as_vector([3., 0.]))
 
-        # correction to account for the fact that the thrust coefficient is based on an upstream
+        # TODO: interpolate previous_velocity
+
+        # Correction to account for the fact that the thrust coefficient is based on an upstream
         # velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
         # Piggott 2016, eq. (15))
         D = self.op.turbine_diameter
@@ -51,7 +60,7 @@ class SteadyTurbineProblem(SteadyProblem):
         self.op.thrust_coefficient *= self.correction
         # NOTE, that we're not yet correcting power output here, so that will be overestimated
 
-        # parameters for adjoint computation
+        # Parameters for adjoint computation
         self.gradient_field = self.bathy
         z, zeta = self.adjoint_solution.split()
         z.rename("Adjoint fluid velocity")
@@ -74,13 +83,13 @@ class SteadyTurbineProblem(SteadyProblem):
         options.timestepper_type = 'SteadyState'
         options.timestepper_options.solver_parameters['pc_factor_mat_solver_type'] = 'mumps'
         options.timestepper_options.solver_parameters['snes_monitor'] = None
-        #options.timestepper_options.implicitness_theta = 1.0
+        # options.timestepper_options.implicitness_theta = 1.0
         options.horizontal_viscosity = self.viscosity
         options.quadratic_drag_coefficient = self.drag_coefficient
         options.use_lax_friedrichs_velocity = False  # TODO
         options.use_grad_depth_viscosity_term = False
 
-        # assign boundary conditions
+        # Assign boundary conditions
         left_tag = 1
         right_tag = 2
         top_bottom_tag = 3
@@ -91,7 +100,7 @@ class SteadyTurbineProblem(SteadyProblem):
           top_bottom_tag: freeslip_bc,
         }
 
-        # we haven't meshed the turbines with separate ids, so define a farm everywhere
+        # We haven't meshed the turbines with separate ids, so define a farm everywhere
         # and make it have a density of 1/D^2 inside the two DxD squares where the turbines are
         # and 0 outside
         scaling = len(op.region_of_interest)/assemble(op.bump(self.mesh)*dx)
@@ -102,15 +111,18 @@ class SteadyTurbineProblem(SteadyProblem):
         farm_options.turbine_density = self.turbine_density
         farm_options.turbine_options.diameter = op.turbine_diameter
         farm_options.turbine_options.thrust_coefficient = op.thrust_coefficient
-        # turbine drag is applied everywhere (where the turbine density isn't zero)
+        # Turbine drag is applied everywhere (where the turbine density isn't zero)
         options.tidal_turbine_farms["everywhere"] = farm_options
 
-        # callback that computes average power
+        # Callback that computes average power
         cb = turbines.TurbineFunctionalCallback(solver_obj)
         solver_obj.add_callback(cb, 'timestep')
 
-        # solve and extract data
-        solver_obj.assign_initial_conditions(uv=as_vector((3.0, 0.0)))
+        # Solve and extract data
+        if hasattr(self, self.prev_velocity):
+            solver_obj.assign_initial_conditions(uv=self.prev_velocity)
+        else:
+            solver_obj.assign_initial_conditions(uv=self.inflow)
         solver_obj.iterate()
         self.solution = solver_obj.fields.solution_2d
         self.objective = cb.average_power
@@ -148,9 +160,13 @@ class SteadyTurbineProblem(SteadyProblem):
     def dwr_estimation_adjoint(self):
         raise NotImplementedError  # TODO
 
-    def get_anisotropic_metric(self, adjoint=False):
+    def get_anisotropic_metric(self, adjoint=False, relax=False):
         u, eta = self.solution.split()
         z, zeta = self.adjoint_solution.split()
+        z0_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(z[0], mesh=self.mesh)))
+        z1_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(z[1], mesh=self.mesh)))
+        zeta_diff = Function(self.P1_vec).interpolate(construct_gradient(zeta))
+        z_p1 = Function(self.P1_vec).interpolate(abs(z))
         b = self.bathy
         H = eta + b
         g = 9.81
@@ -171,8 +187,8 @@ class SteadyTurbineProblem(SteadyProblem):
             F2[0] = H*u[0]*u[1] - nu*H*u[0].dx(1)
             F2[1] = H*u[1]*u[1] + 0.5*g*eta*eta - nu*H*u[1].dx(1) + C_b*normu3/3.
             F2[2] = H*u[1]
-            #f[0] = g*eta*b.dx(0) - C_t*normu*u[0]
-            #f[1] = g*eta*b.dx(1) - C_t*normu*u[1]
+            # f[0] = g*eta*b.dx(0) - C_t*normu*u[0]
+            # f[1] = g*eta*b.dx(1) - C_t*normu*u[1]
             f[0] = -C_t*normu*u[0]
             f[1] = -C_t*normu*u[1]
 
@@ -180,21 +196,34 @@ class SteadyTurbineProblem(SteadyProblem):
         H2 = [0, 0, 0]
         Hf = [0, 0]
 
-        # construct Hessians
+        # Construct Hessians
         for i in range(3):
             H1[i] = construct_hessian(F1[i], mesh=self.mesh, op=self.op)
             H2[i] = construct_hessian(F2[i], mesh=self.mesh, op=self.op)
-        # Hf[0] = construct_hessian(f[0], mesh=self.mesh, op=self.op)
-        # Hf[1] = construct_hessian(f[1], mesh=self.mesh, op=self.op)
+        Hf[0] = construct_hessian(f[0], mesh=self.mesh, op=self.op)
+        Hf[1] = construct_hessian(f[1], mesh=self.mesh, op=self.op)
 
-        # form metric
-        self.M = Function(H1.function_space())
-        for i in range(len(adj.dat.data)):
-            for j in range(3):
-                self.M.dat.data[i][:,:] += H1[j].dat.data[i]*adj_diff.dat.data[i][0]
-                self.M.dat.data[i][:,:] += H2[j].dat.data[i]*adj_diff.dat.data[i][1]
-        #         if j < 2:
-        #             self.M.dat.data[i][:,:] += Hf[j].dat.dat[i]*adj.dat.data[i]
+        # Form metric
+        self.M = Function(self.P1_ten)
+        for i in range(len(self.M.dat.data)):
+            self.M.dat.data[i][:,:] += H1[0].dat.data[i]*z0_diff.dat.data[i][0]
+            self.M.dat.data[i][:,:] += H1[1].dat.data[i]*z1_diff.dat.data[i][0]
+            self.M.dat.data[i][:,:] += H1[2].dat.data[i]*zeta_diff.dat.data[i][0]
+            self.M.dat.data[i][:,:] += H2[0].dat.data[i]*z0_diff.dat.data[i][1]
+            self.M.dat.data[i][:,:] += H2[1].dat.data[i]*z1_diff.dat.data[i][0]
+            self.M.dat.data[i][:,:] += H2[2].dat.data[i]*zeta_diff.dat.data[i][0]
+            if relax:
+                self.M.dat.data[i][:,:] += Hf[0].dat.dat[i]*z_p1.dat.data[i][0]
+                self.M.dat.data[i][:,:] += Hf[1].dat.dat[i]*z_p1.dat.data[i][1]
         self.M = steady_metric(None, H=self.M, op=self.op)
+
+        # Source term contributions
+        if not relax:
+            Mf = Function(self.P1_ten)
+            for i in range(len(Mf.dat.data)):
+                Mf.dat.data[i][:,:] += Hf[0].dat.data[i]*z_p1.dat.data[i][0]
+                Mf.dat.data[i][:,:] += Hf[1].dat.data[i]*z_p1.dat.data[i][1]
+            Mf = steady_metric(None, H=Mf, op=self.op)
+            self.M = metric_intersection(self.M, Mf)
 
         # TODO: boundary contributions
