@@ -43,10 +43,13 @@ class TracerOptions(Options):
     h_min = PositiveFloat(1e-4, help="Minimum tolerated element size").tag(config=True)
     h_max = PositiveFloat(5., help="Maximum tolerated element size").tag(config=True)
 
+    boundary_conditions = PETScSolverParameters({}).tag(config=True)
+
     def __init__(self, approach='fixed_mesh'):
         super(TracerOptions, self).__init__(approach)
 
         self.end_time -= 0.5*self.dt
+        self.restrict = 'anisotropy'
 
     def set_diffusivity(self, fs):
         pass
@@ -70,6 +73,10 @@ class PowerOptions(TracerOptions):
 
         self.source_loc = [(1., 2., 0.1)]
         self.region_of_interest = [(3., 2., 0.1)]
+        self.boundary_conditions[1] = 'dirichlet_zero'
+        self.boundary_conditions[2] = None
+        self.boundary_conditions[3] = 'neumann_zero'
+        self.boundary_conditions[4] = 'neumann_zero'
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(1.)
@@ -104,14 +111,18 @@ class TelemacOptions(TracerOptions):
     def __init__(self, approach='fixed_mesh'):
         super(TelemacOptions, self).__init__(approach)
 
-        self.source_loc = [(2.5, 5., 0.457)]
-        self.region_of_interest = [(30., 7.5, 1.)]  # FIXME
+        self.source_loc = [(1., 5., 0.457)]
+        self.region_of_interest = [(20., 7.5, 0.5)]
+        self.boundary_conditions[1] = 'dirichlet_zero'
+        self.boundary_conditions[2] = 'neumann_zero'
+        self.boundary_conditions[3] = 'neumann_zero'
+        self.boundary_conditions[4] = 'neumann_zero'
 
         self.sponge_scaling = PositiveFloat(0.1, help="Scaling for quadratic sponge.").tag(config=True)
         self.sponge_start = PositiveFloat(50., help="x-coordinate where sponge starts").tag(config=True)
 
     def set_diffusivity(self, fs):
-        self.diffusivity = Constant(1.)
+        self.diffusivity = Constant(0.1)
         return self.diffusivity
 
     def set_velocity(self, fs):
@@ -120,7 +131,14 @@ class TelemacOptions(TracerOptions):
         return self.fluid_velocity
 
     def set_source(self, fs):
-        raise NotImplementedError
+        x, y = SpatialCoordinate(fs.mesh())
+        x0 = self.source_loc[0][0]
+        y0 = self.source_loc[0][1]
+        r0 = self.source_loc[0][2]
+        bell = 1 + cos(pi * min_value(sqrt(pow(x - x0, 2) + pow(y - y0, 2)) / r0, 1.0))
+        self.source = Function(fs)
+        self.source.interpolate(0. + conditional(ge(bell, 0.), bell, 0.))
+        return self.source
 
     def set_objective_kernel(self, fs):
         self.kernel = Function(fs)
