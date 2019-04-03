@@ -71,10 +71,13 @@ class PowerOptions(TracerOptions):
     def __init__(self, approach='fixed_mesh'):
         super(PowerOptions, self).__init__(approach)
 
+        # Source / receiver
         self.source_loc = [(1., 2., 0.1)]
         self.region_of_interest = [(3., 2., 0.1)]
+
+        # Boundary conditions
         self.boundary_conditions[1] = 'dirichlet_zero'
-        self.boundary_conditions[2] = None
+        self.boundary_conditions[2] = 'neumann_zero'
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
 
@@ -106,18 +109,24 @@ class TelemacOptions(TracerOptions):
     def __init__(self, approach='fixed_mesh'):
         super(TelemacOptions, self).__init__(approach)
 
+        # Source / receiver
         self.source_loc = [(1., 5., 0.457)]
         self.region_of_interest = [(20., 7.5, 0.5)]
+
+        # Boundary conditions
         self.boundary_conditions[1] = 'dirichlet_zero'
-        self.boundary_conditions[2] = 'neumann_zero'
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
 
-        self.sponge_scaling = PositiveFloat(0.1, help="Scaling for quadratic sponge.").tag(config=True)
-        self.sponge_start = PositiveFloat(50., help="x-coordinate where sponge starts").tag(config=True)
+        self.sponge_scaling = 0.1    # scaling parameter
+        self.sponge_start = 50.      # x-location of sponge start
+        self.base_diffusivity = 0.1  # background diffusivity
 
     def set_diffusivity(self, fs):
-        self.diffusivity = Constant(0.1)
+        x, y = SpatialCoordinate(fs.mesh())
+        self.diffusivity = Function(fs)
+        self.diffusivity.interpolate(self.base_diffusivity
+                                     + self.sponge_scaling*pow(max_value(0, x-self.sponge_start), 2))
         return self.diffusivity
 
     def set_velocity(self, fs):

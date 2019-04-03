@@ -8,7 +8,8 @@ from adapt_utils.adapt.metric import *
 
 # Tracer transport
 from adapt_utils.tracer.options import *
-from adapt_utils.tracer.solver import *
+from adapt_utils.tracer.solver_cg import *
+from adapt_utils.tracer.solver_dg import *
 
 # Shallow water turbine application
 from adapt_utils.turbine.options import *

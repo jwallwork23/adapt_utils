@@ -1,5 +1,4 @@
-from firedrake import *
-from firedrake_adjoint import *
+from thetis_adjoint import *
 
 from time import clock
 import numpy as np
@@ -9,23 +8,25 @@ from adapt_utils.adapt.metric import *
 from adapt_utils.solver import SteadyProblem
 
 
-__all__ = ["SteadyTracerProblem"]
+__all__ = ["SteadyTracerProblem_DG"]
 
 
-class SteadyTracerProblem(SteadyProblem):
+class SteadyTracerProblem_DG(SteadyProblem):
     """
-    General solver object for stationary tracer advection problems.
+    General discontinuous Galerkin solver object for stationary tracer advection problems of the form
+        u . grad(phi) - div(nu . grad(phi)) = f,
+    for (prescribed) velocity u, diffusivity nu>=0, source f and (prognostic) concentration phi.
     """
     def __init__(self,
                  op=PowerOptions(),
                  stab=None,
                  mesh=SquareMesh(40, 40, 4, 4),
                  approach='fixed_mesh',
-                 discrete_adjoint=False,
-                 finite_element=FiniteElement("Lagrange", triangle, 1),
+                 discrete_adjoint=True,
+                 finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1),
                  high_order=False,
                  prev_solution=None):
-        super(SteadyTracerProblem, self).__init__(mesh,
+        super(SteadyTracerProblem_DG, self).__init__(mesh,
                                                   finite_element,
                                                   approach,
                                                   stab,
@@ -33,13 +34,13 @@ class SteadyTracerProblem(SteadyProblem):
                                                   op,
                                                   high_order,
                                                   None)
-        assert(finite_element.family() == 'Lagrange')  # TODO: DG option
+        assert(finite_element.family() == "Discontinuous Lagrange")
 
         # Extract parameters from Options class
         self.nu = op.set_diffusivity(self.P1)
         self.u = op.set_velocity(self.P1_vec)
-        self.source = op.set_source(self.P0)
-        self.kernel = op.set_objective_kernel(self.P0)
+        self.source = op.set_source(self.P1)
+        self.kernel = op.set_objective_kernel(self.P1)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Rename solution fields
@@ -50,77 +51,36 @@ class SteadyTracerProblem(SteadyProblem):
         self.nonlinear = False
 
     def solve(self):
-        u = self.u
-        nu = self.nu
-        n = self.n
-        f = self.source
         bcs = self.op.boundary_conditions
-        dbcs = []
-
-        # Finite element problem
-        phi = TrialFunction(self.V)
-        psi = TestFunction(self.V)
-        a = psi*dot(u, grad(phi))*dx
-        a += nu*inner(grad(phi), grad(psi))*dx
+        BCs = {'shallow water': {}, 'tracer': {}}
         for i in bcs.keys():
-            if bcs[i] != 'neumann_zero':
-                a += - nu*psi*dot(n, nabla_grad(phi))*ds(i)
             if bcs[i] == 'dirichlet_zero':
-                dbcs.append(i)
-        L = f*psi*dx
+                bcs[i] = {'value': Constant(0.)}
+                BCs['tracer'][i] = {'value': Constant(0.)}
+            elif bcs[i] == 'neumann_zero':
+                continue
+                # TODO: Neumann conditions not currently implemented for tracers
+        b = Function(self.P1).assign(1.)
+        eta = Function(self.P1)
 
-        # Stabilisation
-        if self.stab in ("SU", "SUPG"):
-            tau = self.h / (2*sqrt(inner(u, u)))
-            stab_coeff = tau * dot(u, grad(psi))
-            R_a = dot(u, grad(phi))         # LHS component of strong residual
-            if self.stab == 'SUPG':
-                R_a += - div(nu*grad(phi))
-                R_L = f                     # RHS component of strong residual
-                L += stab_coeff*R_L*dx
-            a += stab_coeff*R_a*dx
-
-        # Solve
-        bc = DirichletBC(self.V, 0, dbcs)
-        solve(a == L, self.solution, bcs=bc, solver_parameters=self.op.params)
-        self.solution_file.write(self.solution)
+        solver_obj = solver2d.FlowSolver2d(self.mesh, b)
+        options = solver_obj.options
+        options.timestepper_type = 'SteadyState'
+        options.timestep = 20.
+        options.simulation_end_time = 0.9*options.timestep
+        options.fields_to_export = ['tracer_2d']
+        options.compute_residuals_tracer = True
+        options.solve_tracer = True
+        options.tracer_only = True
+        options.horizontal_diffusivity = self.nu
+        options.tracer_source_2d = self.source
+        solver_obj.assign_initial_conditions(elev=eta, uv=self.u)
+        solver_obj.bnd_functions = BCs
+        solver_obj.iterate()
+        self.solution = solver_obj.fields.tracer_2d
 
     def solve_continuous_adjoint(self):
-        u = self.u
-        nu = self.nu
-        n = self.n
-        bcs = self.op.boundary_conditions
-        dbcs = []
-
-        # Adjoint source term
-        lam = TrialFunction(self.V)
-        psi = TestFunction(self.V)
-
-        # Adjoint finite element problem
-        a = lam*dot(u, grad(psi))*dx
-        a += nu*inner(grad(lam), grad(psi))*dx
-        for i in bcs.keys():
-            if bcs[i] != 'neumann_zero':
-                dbcs.append(i)                              # Dirichlet BC in adjoint
-            if bcs[i] != 'dirichlet_zero':
-                a += -lam*psi*(dot(u, n))*ds(i)
-                a += -nu*psi*dot(n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
-        L = self.kernel*psi*dx
-
-        # Stabilisation
-        if self.stab in ("SU", "SUPG"):
-            tau = self.h / (2*sqrt(inner(u, u)))
-            stab_coeff = tau * -div(u*psi)
-            R_a = -div(u*lam)             # LHS component of strong residual
-            if self.stab == "SUPG":
-                R_a += -div(nu*grad(lam))
-                R_L = self.kernel         # RHS component of strong residual
-                L += stab_coeff*R_L*dx
-            a += stab_coeff*R_a*dx
-
-        bc = DirichletBC(self.V, 0, dbcs)
-        solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.op.params)
-        self.adjoint_solution_file.write(self.adjoint_solution)
+        raise NotImplementedError
 
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
@@ -148,6 +108,7 @@ class SteadyTracerProblem(SteadyProblem):
                 flux_terms += i*r*r*ds(j)
             if bcs[j] == 'dirichlet_zero':
                 flux_terms += i*phi*phi*ds(j)
+        raise NotImplementedError  # TODO: flux terms
         r_norm = Function(self.P0)
         solve(mass_term == flux_terms, r_norm)
 
@@ -178,6 +139,7 @@ class SteadyTracerProblem(SteadyProblem):
                 flux_terms += i*flux*flux*ds(j)  # Robin BC in adjoint
             if bcs[j] != 'neumann_zero':
                 flux_terms += i*lam*lam*ds(j)    # Dirichlet BC in adjoint
+        raise NotImplementedError  # TODO: flux terms
         r_norm = Function(self.P0)
         solve(mass_term == flux_terms, r_norm)
 
@@ -185,42 +147,6 @@ class SteadyTracerProblem(SteadyProblem):
         self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), self.P0)
         self.indicator.rename('explicit_adjoint')
  
-    def solve_high_order(self, adjoint=True):  # TODO: reimplement in base class
-
-        # Consider an iso-P2 refined mesh
-        fine_mesh = iso_P2(self.mesh)
-
-        # Solve adjoint problem on fine mesh using linear elements
-        tp_p1 = SteadyTracerProblem(stab=self.stab,
-                              mesh=fine_mesh,
-                              fe=FiniteElement('Lagrange', triangle, 1))
-        if adjoint:
-            tp_p1.setup_adjoint_equation()
-            tp_p1.solve_adjoint()
-        else:
-            tp_p1.setup_equation()
-            tp_p1.solve()
-
-        # Solve adjoint problem on fine mesh using quadratic elements
-        tp_p2 = SteadyTracerProblem(stab=self.stab,
-                                    mesh=fine_mesh,
-                                    fe=FiniteElement('Lagrange', triangle, 2))
-        if adjoint:
-            tp_p2.setup_adjoint_equation()
-            tp_p2.solve_adjoint()
-        else:
-            tp_p2.setup_equation()
-            tp_p2.solve()
-
-        # Evaluate difference on fine mesh and project onto coarse mesh
-        sol_p1 = tp_p1.sol_adjoint if adjoint else tp_p1.sol
-        sol_p2 = tp_p2.sol_adjoint if adjoint else tp_p2.sol
-        sol = Function(tp_p2.V).interpolate(sol_p1)
-        sol.interpolate(sol_p2 - sol)
-        coarse = Function(self.V)
-        coarse.project(sol)
-        return coarse
-
     def dwr_estimation(self):
         i = TestFunction(self.P0)
         phi = self.solution
@@ -248,6 +174,7 @@ class SteadyTracerProblem(SteadyProblem):
                 flux_terms += i*flux*ds(j)
             if bcs[j] == 'dirichlet_zero':
                 flux_terms += -i*phi*ds(j)
+        raise NotImplementedError  # TODO: flux terms
         r = Function(self.P0)
         solve(mass_term == flux_terms, r)
 
@@ -286,6 +213,7 @@ class SteadyTracerProblem(SteadyProblem):
                 flux_terms += i*flux*ds(j)  # Robin BC in adjoint
             if bcs[j] != 'neumann_zero':
                 flux_terms += -i*lam*ds(j)  # Dirichlet BC in adjoint
+        raise NotImplementedError  # TODO: flux terms
         r = Function(self.P0)
         solve(mass_term == flux_terms, r)
 
@@ -348,7 +276,7 @@ class SteadyTracerProblem(SteadyProblem):
             self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
             self.M.dat.data[i][:,:] += H2.dat.data[i]*adj_diff.dat.data[i][1]
             if relax:
-                self.M.dat.data[i][:,:] += Hf.dat.dat[i]*adj.dat.data[i]
+                self.M.dat.data[i][:,:] += Hf.dat.data[i]*adj.dat.data[i]
         self.M = steady_metric(None, H=self.M, op=self.op)
 
         if superpose:
@@ -361,3 +289,5 @@ class SteadyTracerProblem(SteadyProblem):
         # n = self.n
         # Fhat = i*dot(phi, n)
         # bdy_contributions -= Fhat*ds(2) + Fhat*ds(3) + Fhat*ds(4)
+
+        # TODO: flux terms?

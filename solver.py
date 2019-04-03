@@ -171,6 +171,47 @@ class SteadyProblem():
             self.indicator.rename(name + ' indicator')
             File(di + 'indicator.pvd').write(self.indicator)
 
+    def solve_high_order(self, adjoint=True):
+        """
+        Solve the problem using linear and quadratic approximations on a refined mesh, take the
+        difference and project back into the original space.
+        """
+        family = self.V.ufl_element().family()
+
+        # Consider an iso-P2 refined mesh
+        fine_mesh = iso_P2(self.mesh)
+
+        # Solve adjoint problem on fine mesh using linear elements
+        tp_p1 = SteadyTracerProblem(stab=self.stab,
+                              mesh=fine_mesh,
+                              fe=FiniteElement(family, triangle, 1))
+        if adjoint:
+            tp_p1.setup_adjoint_equation()
+            tp_p1.solve_adjoint()
+        else:
+            tp_p1.setup_equation()
+            tp_p1.solve()
+
+        # Solve adjoint problem on fine mesh using quadratic elements
+        tp_p2 = SteadyTracerProblem(stab=self.stab,
+                                    mesh=fine_mesh,
+                                    fe=FiniteElement(family, triangle, 2))
+        if adjoint:
+            tp_p2.setup_adjoint_equation()
+            tp_p2.solve_adjoint()
+        else:
+            tp_p2.setup_equation()
+            tp_p2.solve()
+
+        # Evaluate difference on fine mesh and project onto coarse mesh
+        sol_p1 = tp_p1.adjoint_solution if adjoint else tp_p1.solution
+        sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
+        sol = Function(tp_p2.V).interpolate(sol_p1)
+        sol.interpolate(sol_p2 - sol)
+        coarse = Function(self.V)
+        coarse.project(sol)
+        return coarse
+
     def dwr_estimation(self):
         """
         Indicate errors in the objective functional by the Dual Weighted Residual method. This is
@@ -235,6 +276,13 @@ class SteadyProblem():
             elif self.approach == 'explicit_adjoint':
                 self.explicit_estimation_adjoint()
                 self.get_isotropic_metric()
+            elif self.approach == 'explicit_relaxed':
+                self.explicit_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.explicit_estimation_adjoint()
+                self.get_isotropic_metric()
+                self.M = metric_relaxation(M, self.M)
             elif self.approach == 'explicit_superposed':
                 self.explicit_estimation()
                 self.get_isotropic_metric()
@@ -322,17 +370,20 @@ class MeshOptimisation():
     def __init__(self,
                  problem,
                  mesh=None,
+                 op=None,
                  rescaling=0.85,
                  approach='hessian',
                  stab=None,
                  high_order=False,
                  relax=False,
-                 outdir='plots/',
+                 outdir='outputs/',
                  logmsg='',
                  log=True):
 
         self.problem = problem
         self.mesh = mesh
+        assert op is not None
+        self.op = op
         self.rescaling = rescaling
         self.approach = approach
         self.stab = stab if stab is not None else 'no'
@@ -373,6 +424,7 @@ class MeshOptimisation():
             print('Solving on mesh {:d}'.format(i))
             tp = self.problem(stab=self.stab,
                               mesh=self.mesh if i == 0 else tp.mesh,
+                              op=self.op,
                               approach=self.approach,
                               high_order=self.high_order,
                               prev_solution=prev_sol)
@@ -428,6 +480,7 @@ class OuterLoop():
     def __init__(self,
                  problem,
                  mesh=None,
+                 op=None,
                  approach='hessian',
                  rescaling=0.85,
                  iterates=4,
@@ -438,6 +491,8 @@ class OuterLoop():
 
         self.problem = problem
         self.mesh = mesh
+        assert op is not None
+        self.op = op
         self.approach = approach
         self.rescaling = rescaling
         self.iterates = iterates
@@ -464,6 +519,7 @@ class OuterLoop():
             print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
             opt = MeshOptimisation(self.problem,
                                    mesh=self.mesh,
+                                   op=self.op,
                                    approach=self.approach,
                                    rescaling=self.rescaling,
                                    high_order=self.high_order,
