@@ -19,12 +19,15 @@ def construct_gradient(f, mesh=None, op=DefaultOptions()):
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
     smooth gradient, we solve an auxiliary finite element problem in P1 space. This "L2 projection"
-    gradient recovery technique makes use of the Cl\'ement interpolation operator.
+    gradient recovery technique makes use of the Cl\'ement interpolation operator. That `f` is P1
+    is not actually a requirement.
 
     :arg f: (scalar) P1 solution field.
+    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
+                 Function, but a ufl expression.
+    :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
     """
-    # NOTE: A P1 field is not actually strictly required
     if mesh is None:
         mesh = f.function_space().mesh()
     P1_vec = VectorFunctionSpace(mesh, "CG", 1)
@@ -58,7 +61,7 @@ def construct_hessian(f, mesh=None, op=DefaultOptions()):
     :arg f: P1 solution field.
     :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
                  Function, but a ufl expression.
-    :param op: AdaptOptions class object providing min/max cell size values.
+    :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed Hessian associated with `f`.
     """
     if mesh is None:
@@ -106,7 +109,7 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
 
     :arg f: P1 solution field.
     :arg H: reconstructed Hessian associated with `f` (if already computed).
-    :param op: AdaptOptions class object providing min/max cell size values.
+    :param op: `Options` class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
     # NOTE: A P1 field is not actually strictly required
@@ -205,7 +208,7 @@ def normalise_indicator(f, op=DefaultOptions()):
     Normalise error indicator `f` using procedure defined by `op`.
 
     :arg f: error indicator to normalise.
-    :param op: option parameters object.
+    :param op: `Options` parameters object.
     :return: normalised indicator.
     """
     # scale_factor = min(max(norm(abs(f)), op.min_norm), op.max_norm)
@@ -226,7 +229,7 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
 
     :arg f: function to adapt to.
     :param bdy: specify domain boundary to compute metric on.
-    :param op: AdaptOptions class object providing min/max cell size values.
+    :param op: `Options` class providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
     h_min2 = pow(op.h_min, 2)
@@ -319,7 +322,7 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
     ``DMPlexMetricGradation2d_Internal``, found in ``plex-metGradation.c``, 2017.
 
     :arg M: metric to be gradated.
-    :param op: AdaptOptions class object providing parameter values.
+    :param op: `Options` class providing parameter values.
     :return: gradated metric.
     """
     try:
@@ -483,6 +486,7 @@ def symmetric_product(A, b):
             return [bAb(A.dat.data[i], b.dat.data[i]) for i in range(len(A.dat.data))]
 
 
+# TODO: This is not really to do with metrics
 def pointwise_max(f, g):
     """
     Take the pointwise maximum (in modulus) of arrays `f` and `g`.
@@ -526,5 +530,5 @@ def metric_complexity(M):
     Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted
     based thereupon.
     """
-    return assemble(sqrt(det(M)) * dx)
+    return assemble(sqrt(det(M))*dx)
 
