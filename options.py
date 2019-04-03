@@ -101,11 +101,11 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
     def directory(self):
         return 'outputs/' + self.approach + '/'
 
-    def indicator(self, mesh, scale=1.):
+    def indicator(self, mesh, scale=1., source=False):  # TODO: Rename as 'disk'
         """Indicator function associated with region(s) of interest"""
         P1DG = FunctionSpace(mesh, "DG", 1)
         x, y = SpatialCoordinate(mesh)
-        locs = self.region_of_interest
+        locs = self.source_loc if source else self.region_of_interest
         eps = 1e-10
         for j in range(len(locs)):
             x0 = locs[j][0]
@@ -120,11 +120,11 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
         indi.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return indi
 
-    def bump(self, mesh, scale=1.):
+    def bump(self, mesh, scale=1., source=False):
         """Bump function associated with region(s) of interest"""
         P1 = FunctionSpace(mesh, "CG", 1)
         x, y = SpatialCoordinate(mesh)
-        locs = self.region_of_interest
+        locs = self.source_loc if source else self.region_of_interest
         i = 0
         for j in range(len(locs)):
             x0 = locs[j][0]
@@ -137,11 +137,11 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
         bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return bump
 
-    def gaussian(self, mesh, scale=1.):
+    def gaussian(self, mesh, scale=1., source=False):
         """Gaussian function associated with region(s) of interest"""
         P1 = FunctionSpace(mesh, "CG", 1)
         x, y = SpatialCoordinate(mesh)
-        locs = self.region_of_interest
+        locs = self.source_loc if source else self.region_of_interest
         i = 0
         for j in range(len(locs)):
             x0 = locs[j][0]
@@ -154,11 +154,11 @@ Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs
         bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return bump
 
-    def box(self, mesh, scale=1.):
+    def box(self, mesh, scale=1., source=False):
         """Box function associated with region(s) of interest"""
         P0 = FunctionSpace(mesh, "DG", 0)
         x, y = SpatialCoordinate(mesh)
-        locs = self.region_of_interest
+        locs = self.source_loc if source else self.region_of_interest
         for j in range(len(locs)):
             x0 = locs[j][0]
             y0 = locs[j][1]

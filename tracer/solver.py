@@ -83,7 +83,7 @@ class SteadyTracerProblem(SteadyProblem):
         # Solve
         bc = DirichletBC(self.V, 0, dbcs)
         solve(a == L, self.solution, bcs=bc, solver_parameters=self.op.params)
-        #self.sol_file.write(self.solution)
+        self.solution_file.write(self.solution)
 
     def solve_continuous_adjoint(self):
         u = self.u
@@ -120,7 +120,7 @@ class SteadyTracerProblem(SteadyProblem):
 
         bc = DirichletBC(self.V, 0, dbcs)
         solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.op.params)
-        #self.sol_adjoint_file.write(self.adjoint_solution)
+        self.adjoint_solution_file.write(self.adjoint_solution)
 
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)

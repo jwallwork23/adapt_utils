@@ -88,19 +88,14 @@ class PowerOptions(TracerOptions):
         return self.fluid_velocity
 
     def set_source(self, fs):
-        x, y = SpatialCoordinate(fs.mesh())
-        x0 = self.source_loc[0][0]
-        y0 = self.source_loc[0][1]
-        r0 = self.source_loc[0][2]
-        cond = And(And(gt(x, x0-r0), lt(x, x0+r0)), And(gt(y, y0-r0), lt(y, y0+r0)))
         self.source = Function(fs)
-        self.source.interpolate(conditional(cond, 1., 0.))
+        self.source.interpolate(self.bump(fs.mesh(), source=True))
         self.source.rename("Source term")
         return self.source
 
     def set_objective_kernel(self, fs):
         self.kernel = Function(fs)
-        self.kernel.interpolate(self.box(fs.mesh()))
+        self.kernel.interpolate(self.bump(fs.mesh()))
         return self.kernel
 
 
@@ -127,7 +122,7 @@ class TelemacOptions(TracerOptions):
 
     def set_velocity(self, fs):
         self.fluid_velocity = Function(fs)
-        self.fluid_velocity.interpolate(as_vector((1., 0.)))  # TODO: check
+        self.fluid_velocity.interpolate(as_vector((1., 0.)))
         return self.fluid_velocity
 
     def set_source(self, fs):
@@ -142,5 +137,5 @@ class TelemacOptions(TracerOptions):
 
     def set_objective_kernel(self, fs):
         self.kernel = Function(fs)
-        self.kernel.interpolate(self.box(fs.mesh()))
+        self.kernel.interpolate(self.bump(fs.mesh()))
         return self.kernel

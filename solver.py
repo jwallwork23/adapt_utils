@@ -60,6 +60,11 @@ class SteadyProblem():
         self.solution = Function(self.V)
         self.adjoint_solution = Function(self.V)
 
+        # outputs
+        di = self.op.directory()
+        self.solution_file = File(di + 'solution.pvd')
+        self.adjoint_solution_file = File(di + 'adjoint_solution.pvd')
+
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         """
         Set target number of vertices for adapted mesh by scaling the current number of vertices.
