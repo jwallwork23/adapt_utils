@@ -265,6 +265,11 @@ class SteadyProblem():
                 self.get_hessian_metric()
             elif self.approach == 'hessian_adjoint':
                 self.get_hessian_metric(adjoint=True)
+            elif self.approach == 'hessian_relaxed':
+                self.get_hessian_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_hessian_metric(adjoint=True)
+                self.M = metric_relaxation(M, self.M)
             elif self.approach == 'hessian_superposed':
                 self.get_hessian_metric(adjoint=False)
                 M = self.M.copy()
