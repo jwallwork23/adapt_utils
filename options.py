@@ -185,7 +185,7 @@ class DefaultOptions(Options):
 
     # Adaptivity parameters
     h_min = PositiveFloat(1e-6, help="Minimum tolerated element size").tag(config=True)
-    h_max = PositiveFloat(1., help="Maximum tolerated element size").tag(config=True)
+    h_max = PositiveFloat(1e3, help="Maximum tolerated element size").tag(config=True)
     target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)").tag(config=True)
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 

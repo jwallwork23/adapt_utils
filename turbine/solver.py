@@ -15,6 +15,7 @@ class SteadyTurbineProblem(SteadyProblem):
     """
     General solver object for stationary tidal turbine problems.
     """
+    # TODO: Documentation
     def __init__(self,
                  mesh=RectangleMesh(100, 20, 1000., 200.),
                  approach='fixed_mesh',

@@ -21,7 +21,7 @@ def supg_coefficient(u, nu, mesh=None, anisotropic=False):
     In both cases, we compute the stabilisation coefficent as
 
 ..  math::
-    \tau = \frac{h_K}{2\|\textbf u\|}
+    \tau = \frac{h_K}{2\|\textbf{u}\|}
 
     :arg u: velocity field associated with advection equation being solved.
     :arg nu: diffusivity of fluid.

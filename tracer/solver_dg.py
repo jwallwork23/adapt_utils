@@ -12,10 +12,14 @@ __all__ = ["SteadyTracerProblem_DG"]
 
 
 class SteadyTracerProblem_DG(SteadyProblem):
-    """
+    r"""
     General discontinuous Galerkin solver object for stationary tracer advection problems of the form
-        u . grad(phi) - div(nu . grad(phi)) = f,
-    for (prescribed) velocity u, diffusivity nu>=0, source f and (prognostic) concentration phi.
+
+..  math::
+    \textbf{u} \cdot \nabla(\phi) - \nabla \cdot (\nu \cdot \nabla(\phi)) = f,
+
+    for (prescribed) velocity :math:`\textbf{u}`, diffusivity :math:`\nu \geq 0`, source :math:`f`
+    and (prognostic) concentration :math:`\phi`.
     """
     def __init__(self,
                  op=PowerOptions(),

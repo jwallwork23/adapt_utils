@@ -15,7 +15,7 @@ __all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropi
 
 
 def construct_gradient(f, mesh=None, op=DefaultOptions()):
-    """
+    r"""
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
     smooth gradient, we solve an auxiliary finite element problem in P1 space. This "L2 projection"
@@ -43,7 +43,7 @@ def construct_gradient(f, mesh=None, op=DefaultOptions()):
 
 
 def construct_hessian(f, mesh=None, op=DefaultOptions()):
-    """
+    r"""
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all
     second derivative information has been lost. As such, the Hessian of `f` cannot be directly
     computed. We provide two means of recovering it, as follows. That `f` is P1 is not actually
@@ -103,7 +103,7 @@ def construct_hessian(f, mesh=None, op=DefaultOptions()):
 
 
 def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
-    """
+    r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
 
@@ -126,7 +126,6 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
     msg = "WARNING: minimum element size reached as {m:.2e}"
 
     if op.restrict == 'num_cells':
-
         f_min = 1e-6  # Minimum tolerated value for the solution field
 
         for i in range(mesh.num_vertices()):
@@ -153,8 +152,10 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
             M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
             M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
+
     elif op.restrict == 'anisotropy':
         detH = Function(FunctionSpace(mesh, "CG", 1))
+
         for i in range(mesh.num_vertices()):
 
             # Generate local Hessian
@@ -204,7 +205,7 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
 
 
 def normalise_indicator(f, op=DefaultOptions()):
-    """
+    r"""
     Normalise error indicator `f` using procedure defined by `op`.
 
     :arg f: error indicator to normalise.
@@ -224,7 +225,7 @@ def normalise_indicator(f, op=DefaultOptions()):
 
 
 def isotropic_metric(f, bdy=None, op=DefaultOptions()):
-    """
+    r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
     :arg f: function to adapt to.
@@ -286,17 +287,16 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
 
 # TODO: This is not really to do with metrics
 def iso_P2(mesh):
-    """
+    r"""
     Uniformly refine a mesh (in each canonical direction) using an iso-P2 refinement. That is, nodes
     of a quadratic element on the initial mesh become vertices of the new mesh.
     """
     return MeshHierarchy(mesh, 1).__getitem__(1)
 
 
-# TODO: Revisit this approach
-def anisotropic_refinement(M, direction=0):
-    """
-    Anisotropically refine a mesh (or, more precisely, the metric field `M` associated with a mesh)
+def anisotropic_refinement(metric, direction=0):
+    r"""
+    Anisotropically refine a mesh (or, more precisely, the metric field associated with a mesh)
     in such a way as to approximately half the element size in a canonical direction (x- or y-), by
     scaling of the corresponding eigenvalue.
 
@@ -304,6 +304,7 @@ def anisotropic_refinement(M, direction=0):
     :param direction: 0 or 1, corresponding to x- or y-direction, respectively.
     :return: anisotropically refined metric.
     """
+    M = metric.copy()
     for i in range(len(M.dat.data)):
         lam, v = la.eig(M.dat.data[i])
         v1, v2 = v[0], v[1]
@@ -316,7 +317,7 @@ def anisotropic_refinement(M, direction=0):
 
 
 def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this in pyop2
-    """
+    r"""
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear
     interpolation. Python code found here is based on the PETSc code of Nicolas Barral's function
     ``DMPlexMetricGradation2d_Internal``, found in ``plex-metGradation.c``, 2017.
@@ -417,7 +418,7 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
 
 
 def local_metric_intersection(M1, M2):
-    """
+    r"""
     Intersect two metrics `M1` and `M2` defined at a particular point in space.
     """
     # print('#### local_metric_intersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
@@ -429,7 +430,7 @@ def local_metric_intersection(M1, M2):
 
 
 def metric_intersection(M1, M2, bdy=None):
-    """
+    r"""
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
 
     :arg M1: first metric to be intersected.
@@ -439,7 +440,7 @@ def metric_intersection(M1, M2, bdy=None):
     """
     V = M1.function_space()
     assert V == M2.function_space()
-    M = Function(V).assign(M1)
+    M = M1.copy()
     for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices()):
         M.dat.data[i] = local_metric_intersection(M1.dat.data[i], M2.dat.data[i])
         # print('#### metric_intersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
@@ -447,7 +448,7 @@ def metric_intersection(M1, M2, bdy=None):
 
 
 def metric_relaxation(M1, M2, alpha=0.5):
-    """
+    r"""
     Alternatively to intersection, pointwise metric information may be combined using a convex
     combination. Whilst this method does not have as clear an interpretation as metric intersection,
     it has the benefit that the combination may be weighted towards one of the metrics in question.
@@ -463,7 +464,7 @@ def metric_relaxation(M1, M2, alpha=0.5):
 
 
 def symmetric_product(A, b):
-    """
+    r"""
     Compute the product of 2-vector `b` with itself, under the scalar product $b^T A b$ defined by
     the 2x2 matrix `A`.
     """
@@ -488,7 +489,7 @@ def symmetric_product(A, b):
 
 # TODO: This is not really to do with metrics
 def pointwise_max(f, g):
-    """
+    r"""
     Take the pointwise maximum (in modulus) of arrays `f` and `g`.
     """
     fu = f.ufl_element()
@@ -526,7 +527,7 @@ for (int i=0; i<z.dofs; i++) {
 
 
 def metric_complexity(M):
-    """
+    r"""
     Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted
     based thereupon.
     """
