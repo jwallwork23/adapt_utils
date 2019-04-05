@@ -53,6 +53,8 @@ class SteadyProblem():
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
         self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
         self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
+        self.test = TestFunction(self.V)
+        self.trial = TrialFunction(self.V)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
 
@@ -378,7 +380,7 @@ class MeshOptimisation():
                  op=None,
                  rescaling=0.85,
                  approach='hessian',
-                 stab=None,
+                 stab='SUPG',
                  high_order=False,
                  relax=False,
                  outdir='outputs/',

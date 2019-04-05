@@ -48,4 +48,4 @@ class TracerCallback(callback.AccumulatorCallback):
 
             return assemble(kt * ks * solver_obj.fields.tracer_2d * dx)
 
-        super(TracerCallback, self).__init__(objectiveAD, solver_obj, parameters, **kwargs)
+        super(TracerCallback, self).__init__(objectiveAD, solver_obj, **kwargs)

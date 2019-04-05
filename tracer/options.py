@@ -5,7 +5,7 @@ from thetis.configuration import *
 from adapt_utils.options import Options
 
 
-__all__ = ["TracerOptions", "PowerOptions"]
+__all__ = ["TracerOptions", "PowerOptions", "TelemacOptions"]
 
 
 class TracerOptions(Options):
@@ -77,7 +77,7 @@ class PowerOptions(TracerOptions):
 
         # Boundary conditions
         self.boundary_conditions[1] = 'dirichlet_zero'
-        self.boundary_conditions[2] = 'neumann_zero'
+        #self.boundary_conditions[2] = 'neumann_zero'  # FIXME
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
 
@@ -136,9 +136,7 @@ class TelemacOptions(TracerOptions):
 
     def set_source(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
-        x0 = self.source_loc[0][0]
-        y0 = self.source_loc[0][1]
-        r0 = self.source_loc[0][2]
+        x0, y0, r0 = self.source_loc[0]
         bell = 1 + cos(pi * min_value(sqrt(pow(x - x0, 2) + pow(y - y0, 2)) / r0, 1.0))
         self.source = Function(fs)
         self.source.interpolate(0. + conditional(ge(bell, 0.), bell, 0.))

@@ -5,6 +5,7 @@ from time import clock
 import numpy as np
 
 from adapt_utils.tracer.options import PowerOptions
+from adapt_utils.tracer.stabilisation import supg_coefficient
 from adapt_utils.adapt.metric import *
 from adapt_utils.solver import SteadyProblem
 
@@ -39,6 +40,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
                                                   op,
                                                   high_order,
                                                   None)
+        assert self.stab in ('no', 'SU', 'SUPG')
 
         # Extract parameters from Options class
         self.nu = op.set_diffusivity(self.P1)
@@ -46,6 +48,10 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.source = op.set_source(self.P1)
         self.kernel = op.set_objective_kernel(self.P1)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
+
+        # Stabilisation
+        if self.stab in ('SU', 'SUPG'):
+            self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
 
         # Rename solution fields
         self.solution.rename('Tracer concentration')
@@ -61,10 +67,10 @@ class SteadyTracerProblem_CG(SteadyProblem):
         f = self.source
         bcs = self.op.boundary_conditions
         dbcs = []
+        phi = self.trial
+        psi = self.test
 
         # Finite element problem
-        phi = TrialFunction(self.V)
-        psi = TestFunction(self.V)
         a = psi*dot(u, grad(phi))*dx
         a += nu*inner(grad(phi), grad(psi))*dx
         for i in bcs.keys():
@@ -76,11 +82,11 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Stabilisation
         if self.stab in ("SU", "SUPG"):
-            tau = self.h / (2*sqrt(inner(u, u)))
-            stab_coeff = tau * dot(u, grad(psi))
+            tau = self.stabilisation
+            stab_coeff = tau*dot(u, grad(psi))
             R_a = dot(u, grad(phi))         # LHS component of strong residual
             if self.stab == 'SUPG':
-                R_a += - div(nu*grad(phi))
+                R_a += -div(nu*grad(phi))
                 R_L = f                     # RHS component of strong residual
                 L += stab_coeff*R_L*dx
             a += stab_coeff*R_a*dx
@@ -96,10 +102,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
         n = self.n
         bcs = self.op.boundary_conditions
         dbcs = []
-
-        # Adjoint source term
-        lam = TrialFunction(self.V)
-        psi = TestFunction(self.V)
+        lam = self.trial
+        psi = self.test
 
         # Adjoint finite element problem
         a = lam*dot(u, grad(psi))*dx
@@ -114,8 +118,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Stabilisation
         if self.stab in ("SU", "SUPG"):
-            tau = self.h / (2*sqrt(inner(u, u)))
-            stab_coeff = tau * -div(u*psi)
+            tau = self.stabilisation
+            stab_coeff = -tau*div(u*psi)
             R_a = -div(u*lam)             # LHS component of strong residual
             if self.stab == "SUPG":
                 R_a += -div(nu*grad(lam))
@@ -198,11 +202,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         n = self.n
         f = self.source
         bcs = self.op.boundary_conditions
-
-        if self.high_order:
-            lam = self.solve_high_order(adjoint=True)
-        else:
-            lam = self.adjoint_solution
+        lam = self.solve_high_order(adjoint=True) if self.high_order else self.adjoint_solution
 
         # Cell residual
         R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
@@ -233,11 +233,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         nu = self.nu
         n = self.n
         bcs = self.op.boundary_conditions
-        
-        if self.high_order:
-            phi = self.solve_high_order(adjoint=False)
-        else:
-            phi = self.solution
+        phi = self.solve_high_order(adjoint=False) if self.high_order else self.solution
             
         # Adjoint source term
         dJdphi = interpolate(self.op.box(self.mesh), self.P0)
