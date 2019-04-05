@@ -42,6 +42,7 @@ def anisotropic_h(u, mesh=None):
     func = isinstance(u, Function)  # determine if u is a Function or a Constant
 
     # create section describing global numbering of vertices
+    dim = mesh.topological_dimension()
     entity_dofs = np.zeros(dim+1, dtype=np.int32)
     entity_dofs[0] = mesh.geometric_dimension()
     section = dmplex.create_section(mesh, entity_dofs)
