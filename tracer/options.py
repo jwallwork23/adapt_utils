@@ -116,7 +116,7 @@ class TelemacOptions(TracerOptions):
         super(TelemacOptions, self).__init__(approach)
 
         # Source / receiver
-        self.source_loc = [(1., 5., 0.457)]
+        self.source_loc = [(1., 5., 0.454)]
         self.region_of_interest = [(20., 7.5, 0.5)]
 
         # Boundary conditions
@@ -143,10 +143,11 @@ class TelemacOptions(TracerOptions):
     def set_source(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
         x0, y0, r0 = self.source_loc[0]
-        print(x0, y0, r0)
         bell = 1 + cos(pi * min_value(sqrt(pow(x - x0, 2) + pow(y - y0, 2)) / r0, 1.0))
         self.source = Function(fs)
-        self.source.interpolate(0. + conditional(ge(bell, 0.), bell, 0.))
+        #self.source.interpolate(0. + conditional(ge(bell, 0.), bell, 0.))
+        #self.source.interpolate(self.source/assemble(self.source*dx))
+        self.source.interpolate(self.bump(fs.mesh(), source=True, scale=5))
         return self.source
 
     def set_objective_kernel(self, fs):
@@ -161,9 +162,9 @@ class TelemacOptions(TracerOptions):
         x0, y0, r = self.source_loc[0]
         u = self.fluid_velocity
         nu = self.diffusivity
-        r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), 0.1)  # (Bessel fn explodes at (x0, y0))
+        r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), 0.01)  # (Bessel fn explodes at (x0, y0))
         q = 0.01  # sediment discharge of source (kg/s)
         self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*x/nu)*bessk0(0.5*u[0]*r/nu))
         outfile = File(self.directory() + 'analytic.pvd')
-        outfile.write(self.solution)  # NOTE: use 18 discretisation levels in ParaView
+        outfile.write(self.solution)  # NOTE: use 25 discretisation levels in ParaView
         return self.solution
