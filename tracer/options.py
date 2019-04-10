@@ -98,13 +98,21 @@ class PowerOptions(TracerOptions):
 
     def set_source(self, fs):
         self.source = Function(fs)
-        self.source.interpolate(self.bump(fs.mesh(), source=True))
+        #self.source.interpolate(self.bump(fs.mesh(), source=True))
+        self.source.interpolate(self.box(fs.mesh(), source=True))
+        area = assemble(self.source*dx)
+        rescaling = 0.04/area if area != 0. else 1.
+        self.source.interpolate(rescaling*self.source)
         self.source.rename("Source term")
         return self.source
 
     def set_objective_kernel(self, fs):
         self.kernel = Function(fs)
-        self.kernel.interpolate(self.bump(fs.mesh()))
+        #self.kernel.interpolate(self.bump(fs.mesh()))
+        self.kernel.interpolate(self.box(fs.mesh()))
+        area = assemble(self.kernel*dx)
+        rescaling = 0.04/area if area != 0. else 1.
+        self.kernel.interpolate(rescaling*self.kernel)
         return self.kernel
 
 
@@ -116,8 +124,10 @@ class TelemacOptions(TracerOptions):
         super(TelemacOptions, self).__init__(approach)
 
         # Source / receiver
-        self.source_loc = [(1., 5., 0.454)]
+        self.source_loc = [(1., 5., 0.1)]
         self.region_of_interest = [(20., 7.5, 0.5)]
+        self.source_value = 100.
+        self.source_discharge = 0.1
 
         # Boundary conditions
         self.boundary_conditions[1] = 'dirichlet_zero'
@@ -128,7 +138,7 @@ class TelemacOptions(TracerOptions):
         self.sponge_start = 50.      # x-location of sponge start
         self.base_diffusivity = 0.1  # background diffusivity
 
-    def set_diffusivity(self, fs):
+    def set_diffusivity(self, fs):  # TODO: this is redundant
         x, y = SpatialCoordinate(fs.mesh())
         self.diffusivity = Function(fs)
         self.diffusivity.interpolate(self.base_diffusivity
@@ -145,14 +155,15 @@ class TelemacOptions(TracerOptions):
         x0, y0, r0 = self.source_loc[0]
         bell = 1 + cos(pi * min_value(sqrt(pow(x - x0, 2) + pow(y - y0, 2)) / r0, 1.0))
         self.source = Function(fs)
-        #self.source.interpolate(0. + conditional(ge(bell, 0.), bell, 0.))
-        #self.source.interpolate(self.source/assemble(self.source*dx))
-        self.source.interpolate(self.bump(fs.mesh(), source=True, scale=5))
+        with pyadjoint.stop_annotating():
+            nrm=assemble(self.indicator(fs.mesh(), source=True)*dx)
+        scaling = 1/nrm if nrm != 0 else 1  # FIXME
+        self.source.interpolate(self.indicator(fs.mesh(), source=True, scale=scaling))
         return self.source
 
     def set_objective_kernel(self, fs):
         self.kernel = Function(fs)
-        self.kernel.interpolate(self.bump(fs.mesh()))
+        self.kernel.interpolate(self.indicator(fs.mesh()))
         return self.kernel
 
     def exact_solution(self, fs):

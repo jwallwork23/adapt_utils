@@ -56,7 +56,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Stabilisation
         if self.stab in ('SU', 'SUPG'):
-            self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
+            self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
 
         # Rename solution fields
         self.solution.rename('Tracer concentration')

@@ -131,6 +131,7 @@ class SteadyProblem():
             self.solve_discrete_adjoint()
         else:
             self.solve_continuous_adjoint()
+        self.adjoint_solution_file.write(self.adjoint_solution)
 
     def dwp_indication(self):
         """
