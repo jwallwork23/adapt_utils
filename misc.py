@@ -19,6 +19,9 @@ def subdomain_indicator(mesh, subdomain_id):
     return assemble(TestFunction(FunctionSpace(mesh, "DG", 0)) * dx(subdomain_id))
 
 def bessi0(x):
+    """
+    Modified Bessel function of the first kind. Code taken from 'Numerical recipes in C'.
+    """
     ax = abs(x)
     y1 = x/3.75
     y1 *= y1
@@ -28,6 +31,9 @@ def bessi0(x):
     return conditional(le(ax, 3.75), expr1, expr2)
 
 def bessk0(x):
+    """
+    Modified Bessel function of the second kind. Code taken from 'Numerical recipes in C'.
+    """
     y1 = x*x/4.0
     expr1 = (-ln(x/2.0)*bessi0(x)) + (-0.57721566 + y1*(0.42278420 + y1*(0.23069756 + y1*(0.3488590e-1 + y1*(0.262698e-2 + y1*(0.10750e-3 + y1*0.74e-5))))))
     y2 = 2.0/x

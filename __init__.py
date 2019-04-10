@@ -1,4 +1,5 @@
 # Base classes
+from adapt_utils.misc import *
 from adapt_utils.options import *
 from adapt_utils.solver import *
 
