@@ -517,8 +517,8 @@ class OuterLoop():
         logfile = open(self.di + 'scale_to_convergence.log', 'a+')
         logfile.write('\n' + date + '\n\n')
         logfile.write('maxit: {:d}\n'.format(self.maxit))
-        logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
-        logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
+        logfile.write('element_rtol: {:.4f}\n'.format(self.element_rtol))
+        logfile.write('objective_rtol: {:.4f}\n\n'.format(self.objective_rtol))
 
         for i in range(self.outer_maxit):
 

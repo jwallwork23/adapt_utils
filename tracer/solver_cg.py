@@ -57,6 +57,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # Stabilisation
         if self.stab in ('SU', 'SUPG'):
             self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
+            if self.stab == 'SUPG':
+                self.test = self.test + self.stabilisation*dot(self.u, grad(self.test))
 
         # Rename solution fields
         self.solution.rename('Tracer concentration')
@@ -86,14 +88,15 @@ class SteadyTracerProblem_CG(SteadyProblem):
         L = f*psi*dx
 
         # Stabilisation
-        if self.stab in ("SU", "SUPG"):
+        #if self.stab in ("SU", "SUPG"):
+        if self.stab == "SU":
             tau = self.stabilisation
             stab_coeff = tau*dot(u, grad(psi))
             R_a = dot(u, grad(phi))         # LHS component of strong residual
-            if self.stab == 'SUPG':
-                R_a += -div(nu*grad(phi))
-                R_L = f                     # RHS component of strong residual
-                L += stab_coeff*R_L*dx
+            #if self.stab == 'SUPG':
+            #    R_a += -div(nu*grad(phi))
+            #    R_L = f                     # RHS component of strong residual
+            #    L += stab_coeff*R_L*dx
             a += stab_coeff*R_a*dx
 
         # Solve
