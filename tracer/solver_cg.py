@@ -265,8 +265,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
         for j in bcs.keys():
             if bcs[j] == 'neumann_zero':
                 flux_terms += i*flux*ds(j)
-            if bcs[j] == 'dirichlet_zero':
-                flux_terms += -i*phi*ds(j)
+        #    if bcs[j] == 'dirichlet_zero':
+        #        flux_terms += -i*phi*ds(j)
         r = Function(self.P0)
         solve(mass_term == flux_terms, r)
 
@@ -284,13 +284,13 @@ class SteadyTracerProblem_CG(SteadyProblem):
         n = self.n
         bcs = self.op.boundary_conditions
         phi = self.solve_high_order(adjoint=False) if self.high_order else self.solution
-            
+
         # Adjoint source term
         dJdphi = interpolate(self.op.box(self.mesh), self.P0)
-            
+
         # Cell residual
         R = (dJdphi + div(u*lam) + div(nu*grad(lam)))*phi
-        
+
         # Edge residual
         r = TrialFunction(self.P0)
         mass_term = i*r*dx
@@ -299,8 +299,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
         for j in bcs.keys():
             if bcs[j] != 'dirichlet_zero':
                 flux_terms += i*flux*ds(j)  # Robin BC in adjoint
-            if bcs[j] != 'neumann_zero':
-                flux_terms += -i*lam*ds(j)  # Dirichlet BC in adjoint
+        #    if bcs[j] != 'neumann_zero':
+        #        flux_terms += -i*lam*ds(j)  # Dirichlet BC in adjoint
         r = Function(self.P0)
         solve(mass_term == flux_terms, r)
 

@@ -308,6 +308,12 @@ class SteadyProblem():
                 M = self.M.copy()
                 self.get_anisotropic_metric(adjoint=True)
                 self.M = metric_intersection(M, self.M)
+            elif self.approach == 'hybrid':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.get_anisotropic_metric(adjoint=False)
+                self.M = metric_intersection(M, self.M)
             else:
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
