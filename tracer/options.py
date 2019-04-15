@@ -120,11 +120,12 @@ class TelemacOptions(TracerOptions):
     """
     Parameters for the 'Point source with diffusion' TELEMAC-2D test case.
     """
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh', offset=0.):
         super(TelemacOptions, self).__init__(approach)
+        self.offset = offset
 
         # Source / receiver
-        self.source_loc = [(1., 5., 0.1)]
+        self.source_loc = [(1.+self.offset, 5., 0.1)]
         self.region_of_interest = [(20., 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
@@ -153,11 +154,11 @@ class TelemacOptions(TracerOptions):
     def set_source(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
         x0, y0, r0 = self.source_loc[0]
-        bell = 1 + cos(pi * min_value(sqrt(pow(x - x0, 2) + pow(y - y0, 2)) / r0, 1.0))
         self.source = Function(fs)
         with pyadjoint.stop_annotating():
             nrm=assemble(self.indicator(fs.mesh(), source=True)*dx)
-        scaling = 1/nrm if nrm != 0 else 1  # FIXME
+        scaling = pi*r0*r0/nrm if nrm != 0 else 1
+        scaling *= 0.5*self.source_value  # TODO: where does factor of half come from?
         self.source.interpolate(self.indicator(fs.mesh(), source=True, scale=scaling))
         return self.source
 
@@ -173,9 +174,10 @@ class TelemacOptions(TracerOptions):
         x0, y0, r = self.source_loc[0]
         u = self.fluid_velocity
         nu = self.diffusivity
-        r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), 0.01)  # (Bessel fn explodes at (x0, y0))
+        r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), 0.1)  # (Bessel fn explodes at (x0, y0))
         q = 0.01  # sediment discharge of source (kg/s)
-        self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*x/nu)*bessk0(0.5*u[0]*r/nu))
+        xc = x - self.offset
+        self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*xc/nu)*bessk0(0.5*u[0]*r/nu))
         outfile = File(self.directory() + 'analytic.pvd')
         outfile.write(self.solution)  # NOTE: use 25 discretisation levels in ParaView
         return self.solution
