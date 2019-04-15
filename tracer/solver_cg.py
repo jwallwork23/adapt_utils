@@ -125,24 +125,64 @@ class SteadyTracerProblem_CG(SteadyProblem):
         L = self.kernel*psi*dx
 
         # Stabilisation
-        if self.stab in ("SU", "SUPG"):
+        #if self.stab in ("SU", "SUPG"):
+        if self.stab == "SU":
             tau = self.stabilisation
             stab_coeff = -tau*div(u*psi)
             R_a = -div(u*lam)             # LHS component of strong residual
-            if self.stab == "SUPG":
-                R_a += -div(nu*grad(lam))
-                R_L = self.kernel         # RHS component of strong residual
-                L += stab_coeff*R_L*dx
+        #    if self.stab == "SUPG":
+        #        R_a += -div(nu*grad(lam))
+        #        R_L = self.kernel         # RHS component of strong residual
+        #        L += stab_coeff*R_L*dx
             a += stab_coeff*R_a*dx
 
         bc = DirichletBC(self.V, 0, dbcs)
         solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.op.params)
         self.adjoint_solution_file.write(self.adjoint_solution)
 
+    def solve_high_order(self, adjoint=True):
+        """
+        Solve the problem using linear and quadratic approximations on a refined mesh, take the
+        difference and project back into the original space.
+        """
+        family = self.V.ufl_element().family()
+
+        # Consider an iso-P2 refined mesh
+        fine_mesh = iso_P2(self.mesh)
+
+        # Solve adjoint problem on fine mesh using linear elements
+        tp_p1 = SteadyTracerProblem_CG(stab=self.stab,
+                                       mesh=fine_mesh,
+                                       finite_element=FiniteElement(family, triangle, 1))
+        if adjoint:
+            tp_p1.solve_adjoint()
+        else:
+            tp_p1.solve()
+
+        # Solve adjoint problem on fine mesh using quadratic elements
+        tp_p2 = SteadyTracerProblem_CG(stab=self.stab,
+                                       mesh=fine_mesh,
+                                       finite_element=FiniteElement(family, triangle, 2))
+        if adjoint:
+            tp_p2.solve_adjoint()
+        else:
+            tp_p2.solve()
+
+        # Evaluate difference on fine mesh and project onto coarse mesh
+        sol_p1 = tp_p1.adjoint_solution if adjoint else tp_p1.solution
+        sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
+        sol = Function(tp_p2.V).interpolate(sol_p1)
+        sol.interpolate(sol_p2 - sol)
+        coarse = Function(self.V)
+        coarse.project(sol)
+        return coarse
+
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
 
-    def explicit_estimation(self):
+    def explicit_estimation(self, space=None):
+        if space is None:
+            space = self.P1
         phi = self.solution
         i = TestFunction(self.P0)
         bcs = self.op.boundary_conditions
@@ -169,10 +209,12 @@ class SteadyTracerProblem_CG(SteadyProblem):
         solve(mass_term == flux_terms, r_norm)
 
         # Form error estimator
-        self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), self.P0)
+        self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), space)
         self.indicator.rename('explicit')
 
-    def explicit_estimation_adjoint(self):
+    def explicit_estimation_adjoint(self, space=None):
+        if space is None:
+            space = self.P1
         phi = self.solution
         lam = self.adjoint_solution
         u = self.u
@@ -199,7 +241,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         solve(mass_term == flux_terms, r_norm)
 
         # Form error estimator
-        self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), self.P0)
+        self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), space)
         self.indicator.rename('explicit_adjoint')
  
     def dwr_estimation(self):

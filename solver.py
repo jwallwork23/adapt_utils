@@ -174,47 +174,6 @@ class SteadyProblem():
             self.indicator.rename(name + ' indicator')
             File(di + 'indicator.pvd').write(self.indicator)
 
-    def solve_high_order(self, adjoint=True):
-        """
-        Solve the problem using linear and quadratic approximations on a refined mesh, take the
-        difference and project back into the original space.
-        """
-        family = self.V.ufl_element().family()
-
-        # Consider an iso-P2 refined mesh
-        fine_mesh = iso_P2(self.mesh)
-
-        # Solve adjoint problem on fine mesh using linear elements
-        tp_p1 = SteadyTracerProblem(stab=self.stab,
-                              mesh=fine_mesh,
-                              fe=FiniteElement(family, triangle, 1))
-        if adjoint:
-            tp_p1.setup_adjoint_equation()
-            tp_p1.solve_adjoint()
-        else:
-            tp_p1.setup_equation()
-            tp_p1.solve()
-
-        # Solve adjoint problem on fine mesh using quadratic elements
-        tp_p2 = SteadyTracerProblem(stab=self.stab,
-                                    mesh=fine_mesh,
-                                    fe=FiniteElement(family, triangle, 2))
-        if adjoint:
-            tp_p2.setup_adjoint_equation()
-            tp_p2.solve_adjoint()
-        else:
-            tp_p2.setup_equation()
-            tp_p2.solve()
-
-        # Evaluate difference on fine mesh and project onto coarse mesh
-        sol_p1 = tp_p1.adjoint_solution if adjoint else tp_p1.solution
-        sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
-        sol = Function(tp_p2.V).interpolate(sol_p1)
-        sol.interpolate(sol_p2 - sol)
-        coarse = Function(self.V)
-        coarse.project(sol)
-        return coarse
-
     def dwr_estimation(self):
         """
         Indicate errors in the objective functional by the Dual Weighted Residual method. This is

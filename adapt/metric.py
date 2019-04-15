@@ -11,7 +11,7 @@ from adapt_utils.options import DefaultOptions
 __all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric", "iso_P2",
            "pointwise_max", "anisotropic_refinement", "gradate_metric", "local_metric_intersection",
            "metric_intersection", "metric_relaxation", "symmetric_product",
-           "metric_complexity", "normalise_indicator"]
+           "metric_complexity", "normalise_indicator", "iso_P2"]
 
 
 def construct_gradient(f, mesh=None, op=DefaultOptions()):
