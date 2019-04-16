@@ -6,7 +6,7 @@ from adapt_utils.options import Options
 from adapt_utils.misc import *
 
 
-__all__ = ["TracerOptions", "PowerOptions", "TelemacOptions"]
+__all__ = ["TracerOptions", "PowerOptions", "TelemacOptions", "TelemacOptions_Centred"]
 
 
 class TracerOptions(Options):
@@ -21,7 +21,7 @@ class TracerOptions(Options):
     # Timestepping
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
     start_time = NonNegativeFloat(0., help="Start of time window of interest").tag(config=True)
-    end_time = PositiveFloat(50., help="End of time window of interest").tag(config=True)
+    end_time = PositiveFloat(60., help="End of time window of interest").tag(config=True)
     dt_per_export = PositiveFloat(10, help="Number of timesteps per export").tag(config=True)
 
     # Solver
@@ -172,12 +172,23 @@ class TelemacOptions(TracerOptions):
         mesh = fs.mesh()
         x, y = SpatialCoordinate(mesh)
         x0, y0, r = self.source_loc[0]
-        u = self.fluid_velocity
-        nu = self.diffusivity
-        r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), 0.1)  # (Bessel fn explodes at (x0, y0))
+        u = self.set_velocity(VectorFunctionSpace(fs.mesh(), fs.ufl_element()))
+        nu = self.set_diffusivity(fs)
+        r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
         q = 0.01  # sediment discharge of source (kg/s)
         xc = x - self.offset
         self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*xc/nu)*bessk0(0.5*u[0]*r/nu))
         outfile = File(self.directory() + 'analytic.pvd')
-        outfile.write(self.solution)  # NOTE: use 25 discretisation levels in ParaView
+        outfile.write(self.solution)  # NOTE: use 28 discretisation levels in ParaView
         return self.solution
+
+    def exact_objective(self, fs):
+        self.exact_solution(fs)
+        self.set_objective_kernel(fs)
+        return assemble(self.kernel*self.solution*dx)
+
+
+class TelemacOptions_Centred(TelemacOptions):
+    def __init__(self, approach='fixed_mesh', offset=0.):
+        super(TelemacOptions_Centred, self).__init__(approach, offset)
+        self.region_of_interest = [(20., 5., 0.5)]

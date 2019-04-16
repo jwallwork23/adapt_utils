@@ -484,6 +484,7 @@ class OuterLoop():
         logfile.write('maxit: {:d}\n'.format(self.maxit))
         logfile.write('element_rtol: {:.4f}\n'.format(self.element_rtol))
         logfile.write('objective_rtol: {:.4f}\n\n'.format(self.objective_rtol))
+        logfile.write('outer_maxit: {:d}\n'.format(self.outer_maxit))
 
         for i in range(self.outer_maxit):
 
@@ -495,12 +496,15 @@ class OuterLoop():
                                    op=self.op,
                                    approach=self.approach,
                                    rescaling=self.rescaling,
+                                   relax=self.relax,
                                    high_order=self.high_order,
                                    log=False)
             opt.maxit = self.maxit
             opt.element_rtol = self.element_rtol
             opt.objective_rtol = self.objective_rtol
             opt.iterate()
+            self.final_mesh = opt.mesh
+            self.final_J = opt.dat['objective'][-1]
 
             # Logging
             msg = "rescaling {:.2f} elements {:7d} iterations {:2d} time {:6.1f} objective {:.4e}\n"
