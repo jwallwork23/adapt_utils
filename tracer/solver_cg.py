@@ -5,7 +5,7 @@ from time import clock
 import numpy as np
 
 from adapt_utils.tracer.options import PowerOptions
-from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation_slow
+from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.metric import *
 from adapt_utils.solver import SteadyProblem
 
@@ -57,8 +57,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # Stabilisation
         if self.stab in ('SU', 'SUPG'):
             #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
-            #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
-            self.stabilisation = anisotropic_stabilisation_slow(self.u, mesh=self.mesh)
+            self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
+            #self.stabilisation = anisotropic_stabilisation(self.u, mesh=self.mesh)
             if self.stab == 'SUPG':
                 self.test = self.test + self.stabilisation*dot(self.u, grad(self.test))
 

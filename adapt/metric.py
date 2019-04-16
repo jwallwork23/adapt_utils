@@ -1,4 +1,5 @@
 from firedrake import *
+from firedrake.slate.slac.compiler import PETSC_DIR
 
 import numpy as np
 import numpy
@@ -447,7 +448,7 @@ def metric_intersection(M1, M2, bdy=None):
     return M
 
 
-def metric_relaxation(M1, M2, alpha=0.5):
+def metric_relaxation(M1, M2, alpha=Constant(0.5)):
     r"""
     Alternatively to intersection, pointwise metric information may be combined using a convex
     combination. Whilst this method does not have as clear an interpretation as metric intersection,
@@ -460,7 +461,20 @@ def metric_relaxation(M1, M2, alpha=0.5):
     """
     V = M1.function_space()
     assert V == M2.function_space()
-    return project(alpha*M1+(1-alpha)*M2, V)  # TODO: Should this be interpolate? Or take direct sum?
+    M = Function(V)
+    relaxation_kernel_str = """
+#include <Eigen/Dense>
+
+void relax(double M_[4], const double * A_, const double * B_, const double * alpha) {
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > M((double *)M_);
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
+
+  M = (*alpha)*A + (1.0 - *alpha)*B;
+}"""
+    kernel = op2.Kernel(relaxation_kernel_str, "relax", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+    op2.par_loop(kernel, V.node_set, M.dat(op2.RW), M1.dat(op2.RW), M2.dat(op2.READ), alpha.dat(op2.READ))
+    return M
 
 
 def symmetric_product(A, b):
