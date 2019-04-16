@@ -5,7 +5,7 @@ from time import clock
 import numpy as np
 
 from adapt_utils.tracer.options import PowerOptions
-from adapt_utils.tracer.stabilisation import supg_coefficient
+from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation_slow
 from adapt_utils.adapt.metric import *
 from adapt_utils.solver import SteadyProblem
 
@@ -56,7 +56,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Stabilisation
         if self.stab in ('SU', 'SUPG'):
-            self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
+            #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
+            #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
+            self.stabilisation = anisotropic_stabilisation_slow(self.u, mesh=self.mesh)
             if self.stab == 'SUPG':
                 self.test = self.test + self.stabilisation*dot(self.u, grad(self.test))
 
@@ -177,10 +179,13 @@ class SteadyTracerProblem_CG(SteadyProblem):
         coarse.project(sol)
         return coarse
 
+    def get_hessian(self, adjoint=False):
+        return construct_hessian(self.adjoint_solution if adjoint else self.solution, op=self.op)
+
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
 
-    def explicit_estimation(self, space=None):
+    def explicit_estimation(self, space=None, square=True):
         if space is None:
             space = self.P1
         phi = self.solution
@@ -188,31 +193,32 @@ class SteadyTracerProblem_CG(SteadyProblem):
         bcs = self.op.boundary_conditions
 
         # Compute residuals
-        self.cell_res = dot(self.u, grad(phi)) - div(self.nu*grad(phi))
-        self.edge_res = phi*dot(self.u, self.n) - self.nu*dot(self.n, nabla_grad(phi))
-        R = self.cell_res
-        r = self.edge_res
+        R = dot(self.u, grad(phi)) - div(self.nu*grad(phi))
+        r = phi*dot(self.u, self.n) - self.nu*dot(self.n, nabla_grad(phi))
 
         # Assemble cell residual
-        R_norm = assemble(i*R*R*dx)
+        R_norm = assemble(i*R*R*dx) if square else assemble(i*R*dx)
 
         # Solve auxiliary problem to assemble edge residual
         r_norm = TrialFunction(self.P0)
         mass_term = i*r_norm*dx
-        flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS
+        flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS if square else ((i*r)('+') + (i*r)('-'))*dS
         for j in bcs.keys():
             if bcs[j] == 'neumann_zero':
-                flux_terms += i*r*r*ds(j)
-            if bcs[j] == 'dirichlet_zero':
-                flux_terms += i*phi*phi*ds(j)
+                flux_terms += i*r*r*ds(j) if square else i*r*ds(j)
+        #    if bcs[j] == 'dirichlet_zero':
+        #        flux_terms += i*phi*phi*ds(j)
         r_norm = Function(self.P0)
         solve(mass_term == flux_terms, r_norm)
 
         # Form error estimator
-        self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), space)
+        if square:
+            self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), space)
+        else:
+            self.indicator = project(abs(R_norm + r_norm), space)
         self.indicator.rename('explicit')
 
-    def explicit_estimation_adjoint(self, space=None):
+    def explicit_estimation_adjoint(self, space=None, square=True):
         if space is None:
             space = self.P1
         phi = self.solution
@@ -225,23 +231,26 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Cell residual
         R = -div(u*lam) - div(nu*grad(lam))
-        R_norm = assemble(i*R*R*dx)
+        R_norm = assemble(i*R*R*dx) if square else assemble(i*R*dx)
 
         # Edge residual
         r = TrialFunction(self.P0)
         mass_term = i*r*dx
-        flux = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
-        flux_terms = ((i*flux*flux)('+') + (i*flux*flux)('-')) * dS
+        r = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
+        flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS if square else ((i*r)('+') + (i*r)('-'))*dS
         for j in bcs.keys():
             if bcs[j] != 'dirichlet_zero':
-                flux_terms += i*flux*flux*ds(j)  # Robin BC in adjoint
-            if bcs[j] != 'neumann_zero':
-                flux_terms += i*lam*lam*ds(j)    # Dirichlet BC in adjoint
+                flux_terms += i*r*r*ds(j) if square else i*r*ds(j)  # Robin BC in adjoint
+        #    if bcs[j] != 'neumann_zero':
+        #        flux_terms += i*lam*lam*ds(j)    # Dirichlet BC in adjoint
         r_norm = Function(self.P0)
         solve(mass_term == flux_terms, r_norm)
 
         # Form error estimator
-        self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), space)
+        if square:
+            self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), space)
+        else:
+            self.indicator = project(abs(R_norm + r_norm), space)
         self.indicator.rename('explicit_adjoint')
  
     def dwr_estimation(self):

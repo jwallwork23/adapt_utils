@@ -1,5 +1,6 @@
 from firedrake import *
 from firedrake_adjoint import *
+from firedrake.slate.slac.compiler import PETSC_DIR
 import firedrake.dmplex as dmplex
 import numpy as np
 
@@ -96,3 +97,49 @@ def anisotropic_h(u, mesh=None):
         h.dat.data[idx] = np.sqrt(np.dot(projected_edge, projected_edge))
 
     return h
+
+def cell_metric(domain, metric=None):
+   print("Making cell metric on %s" % domain)
+   V = TensorFunctionSpace(domain, "DG", 0)
+   J = interpolate(Jacobian(domain), V)
+   metric = metric or Function(V, name="CellMetric")
+   kernel = op2.Kernel("""
+#include <Eigen/Dense>
+void polar(double A_[9], const double * B_) {
+  Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > B((double *)B_);
+  Eigen::JacobiSVD<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > svd(B, Eigen::ComputeFullV);
+  A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
+}""", "polar", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+   op2.par_loop(kernel, V.node_set, metric.dat(op2.INC), J.dat(op2.READ))
+   return metric
+
+def anisotropic_stabilisation(u, mesh=None):
+    if mesh is None:
+        mesh = u.function_space().mesh()
+    M = cell_metric(mesh)
+    P0 = FunctionSpace(mesh, "DG", 0)
+    h = dot(u, dot(M, u))
+    tau = Function(P0)
+    tau.interpolate(0.5*h/sqrt(inner(u, u)))
+    return tau
+
+def cell_metric_slow(domain, metric=None):
+    print("Making cell metric on %s" % domain)
+    V = TensorFunctionSpace(domain, "DG", 0)
+    J = interpolate(Jacobian(domain), V)
+    metric = metric or Function(V, name="CellMetric")
+    for i in range(len(metric.dat.data)):
+        u, s, v = np.linalg.svd(J.dat.data[i], full_matrices=True)
+        metric.dat.data[i] = np.dot(v, np.dot(np.diag(s), v.transpose()))
+    return metric
+
+def anisotropic_stabilisation_slow(u, mesh=None):
+    if mesh is None:
+        mesh = u.function_space().mesh()
+    M = cell_metric_slow(mesh)
+    P0 = FunctionSpace(mesh, "DG", 0)
+    h = dot(u, dot(M, u))
+    tau = Function(P0)
+    tau.interpolate(0.5*h/sqrt(inner(u, u)))
+    return tau

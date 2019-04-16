@@ -9,7 +9,8 @@ from time import clock
 import numpy as np
 
 from adapt_utils.options import DefaultOptions
-from adapt_utils.adapt.metric import isotropic_metric, metric_intersection, metric_relaxation
+from adapt_utils.adapt.metric import isotropic_metric, metric_intersection, metric_relaxation, steady_metric
+from adapt_utils.adapt.interpolation import interp
 
 
 __all__ = ["MeshOptimisation", "OuterLoop"]
@@ -157,10 +158,10 @@ class SteadyProblem():
             print("WARNING: maximum norm attained")
         self.indicator.interpolate(Constant(self.op.target_vertices/scale_factor)*abs(self.indicator))
 
-    def explicit_estimation(self):
+    def explicit_estimation(self, space=None, square=True):
         pass
 
-    def explicit_estimation_adjoint(self):
+    def explicit_estimation_adjoint(self, space=None, square=True):
         pass
 
     def plot(self):
@@ -184,6 +185,13 @@ class SteadyProblem():
         pass
 
     def dwr_estimation_adjoint(self):
+        pass
+
+    def get_hessian(self, adjoint=False):
+        """
+        Compute an appropriate Hessian for the problem at hand. This is inherently
+        problem-dependent, since the choice of field for adaptation is not universal.
+        """
         pass
 
     def get_hessian_metric(self, adjoint=False):
@@ -313,6 +321,44 @@ class SteadyProblem():
                 self.get_isotropic_metric()
                 M = self.M.copy()
                 self.get_anisotropic_metric(adjoint=False)
+                self.M = metric_intersection(M, self.M)
+            elif self.approach == 'power':
+                self.explicit_estimation_adjoint(square=False)
+                H = self.get_hessian(adjoint=False)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
+                self.M = steady_metric(None, H=H, op=self.op)
+            elif self.approach == 'power_adjoint':
+                self.explicit_estimation(square=False)
+                H = self.get_hessian(adjoint=True)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
+                self.M = steady_metric(None, H=H, op=self.op)
+            elif self.approach == 'power_relaxed':
+                self.explicit_estimation(square=False)
+                H = self.get_hessian(adjoint=True)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
+                M = steady_metric(None, H=H, op=self.op)
+                indicator = self.indicator.copy()
+                self.explicit_estimation_adjoint(square=False)
+                H = self.get_hessian(adjoint=False)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
+                    H.dat.data[i][:,:] /= (np.abs(indicator.dat.data[i]) + np.abs(self.indicator.dat.data[i]))
+                self.M = steady_metric(None, H=H, op=self.op)
+                self.M = metric_relaxation(M, self.M)
+            elif self.approach == 'power_superposed':
+                self.explicit_estimation(square=False)
+                H = self.get_hessian(adjoint=True)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
+                M = steady_metric(None, H=H, op=self.op)
+                self.explicit_estimation_adjoint(square=False)
+                H = self.get_hessian(adjoint=False)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
+                self.M = steady_metric(None, H=H, op=self.op)
                 self.M = metric_intersection(M, self.M)
             else:
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
@@ -458,6 +504,7 @@ class OuterLoop():
                  rescaling=0.85,
                  iterates=4,
                  high_order=False,
+                 relax=False,
                  maxit=35,
                  element_rtol=0.005,
                  objective_rtol=0.005):
@@ -468,10 +515,10 @@ class OuterLoop():
         self.op = op
         self.approach = approach
         self.rescaling = rescaling
-        self.iterates = iterates
         self.high_order = high_order
         self.maxit = maxit
-        self.outer_maxit = 20
+        self.outer_maxit = iterates
+        self.relax = relax
         self.element_rtol = element_rtol
         self.objective_rtol = objective_rtol
         self.di = problem(approach=approach).op.directory()
