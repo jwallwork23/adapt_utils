@@ -366,7 +366,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         H2 = construct_hessian(F2, mesh=self.mesh, op=self.op)
         Hf = construct_hessian(source, mesh=self.mesh, op=self.op)
 
-        # form metric
+        # form metric  # TODO: use pyop2
         self.M = Function(self.P1_ten)
         for i in range(len(adj.dat.data)):
             self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]

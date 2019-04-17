@@ -10,9 +10,8 @@ from adapt_utils.options import DefaultOptions
 
 
 __all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric", "iso_P2",
-           "pointwise_max", "anisotropic_refinement", "gradate_metric", "local_metric_intersection",
-           "metric_intersection", "metric_relaxation", "symmetric_product",
-           "metric_complexity", "normalise_indicator", "iso_P2"]
+           "pointwise_max", "anisotropic_refinement", "gradate_metric", "metric_intersection",
+           "metric_relaxation", "symmetric_product", "metric_complexity", "normalise_indicator"]
 
 
 def construct_gradient(f, mesh=None, op=DefaultOptions()):
@@ -418,18 +417,6 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
     return M_grad
 
 
-def local_metric_intersection(M1, M2):
-    r"""
-    Intersect two metrics `M1` and `M2` defined at a particular point in space.
-    """
-    # print('#### local_metric_intersection DEBUG: attempting to compute sqrtm of matrix with determinant ', la.det(M1))
-    sqM1 = sla.sqrtm(M1)
-    sqiM1 = la.inv(sqM1)  # Note inverse and square root commute whenever both are defined
-    lam, v = la.eig(np.dot(np.transpose(sqiM1), np.dot(M2, sqiM1)))
-    M12 = np.dot(v, np.dot([[max(lam[0], 1), 0], [0, max(lam[1], 1)]], np.transpose(v)))
-    return np.dot(np.transpose(sqM1), np.dot(M12, sqM1))
-
-
 def metric_intersection(M1, M2, bdy=None):
     r"""
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
@@ -441,10 +428,29 @@ def metric_intersection(M1, M2, bdy=None):
     """
     V = M1.function_space()
     assert V == M2.function_space()
-    M = M1.copy()
-    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices()):
-        M.dat.data[i] = local_metric_intersection(M1.dat.data[i], M2.dat.data[i])
-        # print('#### metric_intersection DEBUG: det(Mi) = ', la.det(M1.dat.data[i]))
+    M = Function(V).assign(M1)
+    kernel_str = """
+#include <iostream>
+#include <Eigen/Dense>
+
+void intersect(double M_[4], const double * A_, const double * B_) {
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > M((double *)M_);
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
+
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver(A);
+  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Q = eigensolver.eigenvectors();
+  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> D = eigensolver.eigenvalues().array().sqrt().matrix().asDiagonal();
+  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Sq = Q * D * Q.transpose();
+  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Sqi = Q * D.inverse() * Q.transpose();
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver2(Sqi.transpose() * B * Sqi);
+  Q = eigensolver2.eigenvectors();
+  D = eigensolver2.eigenvalues().array().max(1).matrix().asDiagonal();
+  M = Sq.transpose() * Q * D * Q.transpose() * Sq;
+}
+"""
+    kernel = op2.Kernel(kernel_str, "intersect", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+    op2.par_loop(kernel, V.node_set if bdy is None else DirichletBC(V, 0, bdy).node_set, M.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
     return M
 
 
@@ -462,7 +468,7 @@ def metric_relaxation(M1, M2, alpha=Constant(0.5)):
     V = M1.function_space()
     assert V == M2.function_space()
     M = Function(V)
-    relaxation_kernel_str = """
+    kernel_str = """
 #include <Eigen/Dense>
 
 void relax(double M_[4], const double * A_, const double * B_, const double * alpha) {
@@ -472,9 +478,31 @@ void relax(double M_[4], const double * A_, const double * B_, const double * al
 
   M = (*alpha)*A + (1.0 - *alpha)*B;
 }"""
-    kernel = op2.Kernel(relaxation_kernel_str, "relax", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-    op2.par_loop(kernel, V.node_set, M.dat(op2.RW), M1.dat(op2.RW), M2.dat(op2.READ), alpha.dat(op2.READ))
+    kernel = op2.Kernel(kernel_str, "relax", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+    op2.par_loop(kernel, V.node_set, M.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ), alpha.dat(op2.READ))
     return M
+
+
+def abs_matmult(A, b):
+    V = b.function_space()
+    assert V.ufl_element().family() == A.function_space().ufl_element().family()
+    assert V.ufl_element().degree() == A.function_space().ufl_element().degree()
+    assert V.mesh() == A.function_space().mesh()
+    v = Function(V)
+    kernel_str = """
+#include <Eigen/Dense>
+
+void product(double y_[2], const double * A_, const double * b_) {
+  Eigen::Map<Eigen::Vector2d > y((double *)y_);
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Vector2d > b((double *)b_);
+
+  y = A.array().abs().matrix()*b.array().abs().matrix();
+}
+"""
+    kernel = op2.Kernel(kernel_str, "product", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+    op2.par_loop(kernel, V.node_set, v.dat(op2.RW), A.dat(op2.READ), b.dat(op2.READ))
+    return v
 
 
 def symmetric_product(A, b):
