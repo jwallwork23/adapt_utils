@@ -102,6 +102,7 @@ def construct_hessian(f, mesh=None, op=DefaultOptions()):
     return H
 
 
+# TODO: fix pyop2 version and use instead
 def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
@@ -127,11 +128,12 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
 
     if op.restrict == 'num_cells':
         f_min = 1e-6  # Minimum tolerated value for the solution field
+        scaling = op.target_vertices / max(sqrt(assemble(f*f*dx)), f_min)
 
         for i in range(mesh.num_vertices()):
 
             # Generate local Hessian, avoiding round-off error
-            H_loc = H.dat.data[i] * op.target_vertices / max(sqrt(assemble(f*f*dx)), f_min)
+            H_loc = H.dat.data[i] * scaling 
             mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
@@ -201,6 +203,124 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
             M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
     else:
         raise ValueError("Restriction by {:s} not recognised.".format(op.restrict))
+    return M
+
+
+# FIXME and test
+def steady_metric_(f, H=None, mesh=None, op=DefaultOptions()):
+    r"""
+    Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
+    ``computeSteadyMetric``, from ``adapt.py``, 2016.
+
+    :arg f: P1 solution field.
+    :arg H: reconstructed Hessian associated with `f` (if already computed).
+    :param op: `Options` class object providing min/max cell size values.
+    :return: steady metric associated with Hessian H.
+    """
+    # NOTE: A P1 field is not actually strictly required
+    if mesh is None:
+        if f is not None:
+            mesh = f.function_space().mesh()
+        elif H is not None:
+            mesh = H.function_space().mesh()
+    if H is None:
+        H = construct_hessian(f, mesh=mesh, op=op)
+    V = H.function_space()
+    M = Function(V)
+
+    ia2 = Constant(1/op.max_anisotropy**2)
+    ih_min2 = Constant(1/op.h_min**2)
+    ih_max2 = Constant(1/op.h_max**2)
+    f_min = 1e-6
+    rescale = Constant(op.target_vertices)
+
+    if op.restrict == 'num_cells':
+        rescale.assign(op.target_vertices / max(sqrt(assemble(f*f*dx)), f_min))
+        num_cells_kernel = """
+#include <Eigen/Dense>
+#include <algorithm>
+
+void metric1(double A_[4], const double * B_, const double * scaling, const double * ihmin2, const double * ihmax2, const double * ia2)
+{
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
+  A = *scaling * B;
+  double mean_diag = 0.5*(A(0,1) + A(1,0));
+  A(0,1) = mean_diag;
+  A(1,0) = mean_diag;
+
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver(A);
+  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Q = eigensolver.eigenvectors();
+  Eigen::Vector2d D = eigensolver.eigenvalues();
+  D(0) = std::min(*ihmin2, std::max(*ihmax2, std::abs(D(0))));
+  D(1) = std::min(*ihmin2, std::max(*ihmax2, std::abs(D(1))));
+  double max_eig = std::max(D(0), D(1));
+  D(0) = std::max(D(0), *ia2 * max_eig);
+  D(1) = std::max(D(1), *ia2 * max_eig);
+
+  A = Q * D.asDiagonal() * Q.transpose();
+}
+"""
+        kernel = op2.Kernel(num_cells_kernel, "metric1", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+        op2.par_loop(kernel, V.node_set, M.dat(op2.RW), H.dat(op2.READ), rescale.dat(op2.READ), ih_min2.dat(op2.READ), ih_max2.dat(op2.READ), ia2.dat(op2.READ))
+
+    elif op.restrict == 'anisotropy':
+        detH = Function(FunctionSpace(mesh, "CG", 1))
+        p = op.norm_order
+        anisotropy_kernel1 = """
+#include <Eigen/Dense>
+#include <algorithm>
+
+void metric2(double A_[4], double * f, const double * B_)
+{
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
+  double mean_diag = 0.5*(B(0,1) + B(1,0));
+  B(0,1) = mean_diag;
+  B(1,0) = mean_diag;
+
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver(B);
+  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Q = eigensolver.eigenvectors();
+  Eigen::Vector2d D = eigensolver.eigenvalues();
+  D(0) = std::max(1e-10, std::abs(D(0)));
+  D(1) = std::max(1e-10, std::abs(D(1)));
+  double det = D(0) * D(1);
+  double scaling = pow(det, -1 / (2 * %s + 2));
+
+  A = scaling * Q * D.asDiagonal() * Q.transpose();
+
+  *f = pow(det, %s / (2 * %s + 2));
+}
+""" % (p, p, p)
+        kernel = op2.Kernel(anisotropy_kernel1, "metric2", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+        op2.par_loop(kernel, V.node_set, M.dat(op2.RW), detH.dat(op2.RW), H.dat(op2.READ))
+        rescale.assign(op.target_vertices / assemble(detH*dx))
+        anisotropy_kernel2 = """
+#include <Eigen/Dense>
+#include <algorithm>
+
+void metric3(double A_[4], const double * ihmin2, const double * ihmax2, const double * ia2)
+{
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
+
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver(A);
+  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Q = eigensolver.eigenvectors();
+  Eigen::Vector2d D = eigensolver.eigenvalues();
+  D(0) = std::min(*ihmin2, std::max(*ihmax2, std::abs(D(0))));
+  D(1) = std::min(*ihmin2, std::max(*ihmax2, std::abs(D(1))));
+  double max_eig = std::max(D(0), D(1));
+  D(0) = std::max(D(0), *ia2 * max_eig);
+  D(1) = std::max(D(1), *ia2 * max_eig);
+
+  A = Q * D.asDiagonal() * Q.transpose();
+}
+"""
+        kernel = op2.Kernel(anisotropy_kernel2, "metric3", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+        op2.par_loop(kernel, V.node_set, M.dat(op2.RW), ih_min2.dat(op2.READ), ih_max2.dat(op2.READ), ia2.dat(op2.READ))
+
+    else:
+        raise ValueError("Restriction by {:s} not recognised.".format(op.restrict))
+
     return M
 
 
@@ -298,6 +418,30 @@ void anisotropic(double A_[%s]) {
     kernel = op2.Kernel(kernel_str, "anisotropic", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW))
     return M
+
+
+def symmetric_product(A, b):
+    r"""
+    Compute the product of 2-vector `b` with itself, under the scalar product $b^T A b$ defined by
+    the 2x2 matrix `A`.
+    """
+
+    # assert(isinstance(A, numpy.ndarray) | isinstance(A, Function))
+    # assert(isinstance(b, list) | isinstance(b, numpy.ndarray) | isinstance(b, Function))
+
+    def bAb(A, b):
+        return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
+
+    if isinstance(A, numpy.ndarray) | isinstance(A, list):
+        if isinstance(b, list) | isinstance(b, numpy.ndarray):
+            return bAb(A, b)
+        else:
+            return [bAb(A, b.dat.data[i]) for i in range(len(b.dat.data))]
+    else:
+        if isinstance(b, list) | isinstance(b, numpy.ndarray):
+            return [bAb(A.dat.data[i], b) for i in range(len(A.dat.data))]
+        else:
+            return [bAb(A.dat.data[i], b.dat.data[i]) for i in range(len(A.dat.data))]
 
 
 def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this in pyop2
@@ -470,30 +614,6 @@ void relax(double M_[%s], const double * A_, const double * B_, const double * a
     kernel = op2.Kernel(kernel_str, "relax", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ), alpha.dat(op2.READ))
     return M
-
-
-def symmetric_product(A, b):
-    r"""
-    Compute the product of 2-vector `b` with itself, under the scalar product $b^T A b$ defined by
-    the 2x2 matrix `A`.
-    """
-
-    # assert(isinstance(A, numpy.ndarray) | isinstance(A, Function))
-    # assert(isinstance(b, list) | isinstance(b, numpy.ndarray) | isinstance(b, Function))
-
-    def bAb(A, b):
-        return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
-
-    if isinstance(A, numpy.ndarray) | isinstance(A, list):
-        if isinstance(b, list) | isinstance(b, numpy.ndarray):
-            return bAb(A, b)
-        else:
-            return [bAb(A, b.dat.data[i]) for i in range(len(b.dat.data))]
-    else:
-        if isinstance(b, list) | isinstance(b, numpy.ndarray):
-            return [bAb(A.dat.data[i], b) for i in range(len(A.dat.data))]
-        else:
-            return [bAb(A.dat.data[i], b.dat.data[i]) for i in range(len(A.dat.data))]
 
 
 def metric_complexity(M):
