@@ -5,7 +5,49 @@ import firedrake.dmplex as dmplex
 import numpy as np
 
 
-__all__ = ["supg_coefficient"]
+__all__ = ["anisotropic_stabilisation"]
+
+
+def cell_metric(mesh, metric=None):
+    """
+    Compute cell metric associated with mesh.
+
+    Based on code by Lawrence Mitchell.
+    """
+    #print("Making cell metric on %s" % mesh)
+    dim = mesh.topological_dimension()
+    assert dim in (2, 3)
+    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
+    J = interpolate(Jacobian(mesh), P0_ten)
+    metric = metric or Function(P0_ten, name="CellMetric")
+    d = str(dim)
+    kernel_str = """
+#include <Eigen/Dense>
+
+void polar(double A_[%s], const double * B_) {
+  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > B((double *)B_);
+  Eigen::JacobiSVD<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > svd(B, Eigen::ComputeFullV);
+
+  A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
+}""" % (str(dim*dim), d, d, d, d, d, d)
+    kernel = op2.Kernel(kernel_str, "polar", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+    op2.par_loop(kernel, P0_ten.node_set, metric.dat(op2.INC), J.dat(op2.READ))
+    return metric
+
+
+def anisotropic_stabilisation(u, mesh=None):
+    """
+    Compute anisotropic stabilisation coefficient using `cell_metric` and the velocity field.
+    """
+    if mesh is None:
+        mesh = u.function_space().mesh()
+    M = cell_metric(mesh)
+    P0 = FunctionSpace(mesh, "DG", 0)
+    h = dot(u, dot(M, u))  # chosen measure of cell size which accounts for anisotropy
+    tau = Function(P0)
+    tau.interpolate(0.5*h/sqrt(inner(u, u)))
+    return tau
 
 
 def supg_coefficient(u, nu, mesh=None, anisotropic=False):
@@ -35,6 +77,7 @@ def supg_coefficient(u, nu, mesh=None, anisotropic=False):
     Pe = 0.5*sqrt(inner(u, u))*h/nu
     tau = 0.5*h/sqrt(inner(u, u))
     return tau*min_value(1, Pe/3)
+
 
 def anisotropic_h(u, mesh=None):
     if mesh is None:
@@ -97,55 +140,3 @@ def anisotropic_h(u, mesh=None):
         h.dat.data[idx] = np.sqrt(np.dot(projected_edge, projected_edge))
 
     return h
-
-def cell_metric(mesh, metric=None):
-    """
-    Compute cell metric associated with mesh.
-
-    Based on code by Lawrence Mitchell.
-    """
-    #print("Making cell metric on %s" % mesh)
-    dim = mesh.topological_dimension()
-    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
-    J = interpolate(Jacobian(mesh), P0_ten)
-    metric = metric or Function(P0_ten, name="CellMetric")
-    if dim == 2:
-        kernel_str = """
-#include <Eigen/Dense>
-
-void polar(double A_[4], const double * B_) {
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
-  Eigen::JacobiSVD<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > svd(B, Eigen::ComputeFullV);
-
-  A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
-}"""
-    elif dim == 3:
-        kernel_str = """
-#include <Eigen/Dense>
-
-void polar(double A_[9], const double * B_) {
-  Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > B((double *)B_);
-  Eigen::JacobiSVD<Eigen::Matrix<double, 3, 3, Eigen::RowMajor> > svd(B, Eigen::ComputeFullV);
-
-  A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
-}"""
-    else:
-        raise NotImplementedError
-    kernel = op2.Kernel(kernel_str, "polar", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-    op2.par_loop(kernel, P0_ten.node_set, metric.dat(op2.INC), J.dat(op2.READ))
-    return metric
-
-def anisotropic_stabilisation(u, mesh=None):
-    """
-    Compute anisotropic stabilisation coefficient using `cell_metric` and the velocity field.
-    """
-    if mesh is None:
-        mesh = u.function_space().mesh()
-    M = cell_metric(mesh)
-    P0 = FunctionSpace(mesh, "DG", 0)
-    h = dot(u, dot(M, u))  # chosen measure of cell size which accounts for anisotropy
-    tau = Function(P0)
-    tau.interpolate(0.5*h/sqrt(inner(u, u)))
-    return tau

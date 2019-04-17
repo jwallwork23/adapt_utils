@@ -9,8 +9,8 @@ from scipy import linalg as sla
 from adapt_utils.options import DefaultOptions
 
 
-__all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric", "iso_P2",
-           "pointwise_max", "anisotropic_refinement", "gradate_metric", "metric_intersection",
+__all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric",
+           "anisotropic_refinement", "gradate_metric", "metric_intersection",
            "metric_relaxation", "symmetric_product", "metric_complexity", "normalise_indicator"]
 
 
@@ -233,14 +233,12 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
     :param op: `Options` class providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
-    h_min2 = pow(op.h_min, 2)
-    h_max2 = pow(op.h_max, 2)
-    scalar = len(f.ufl_element().value_shape()) == 0
+    assert len(f.ufl_element().value_shape()) == 0
     mesh = f.function_space().mesh()
 
     # Project into P1 space (if required)
-    g = Function(FunctionSpace(mesh, "CG", 1) if scalar else VectorFunctionSpace(mesh, "CG", 1))
-    if (f.ufl_element().family() == 'Lagrange') and (f.ufl_element().degree() == 1):
+    g = Function(FunctionSpace(mesh, "CG", 1))
+    if f.ufl_element() == FiniteElement('Lagrange', triangle, 1):
         g.assign(f)
     else:
         g.project(f)
@@ -248,50 +246,24 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
     M = Function(V)
-    if bdy is not None:
-        for i in DirichletBC(V, 0, bdy).nodes:
-            if scalar:
-                alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
-                beta = alpha
-            else:
-                alpha = max(1. / h_max2, min(g.dat.data[i, 0], 1. / h_min2))
-                beta = max(1. / h_max2, min(g.dat.data[i, 1], 1. / h_min2))
-            M.dat.data[i][0, 0] = alpha
-            M.dat.data[i][1, 1] = beta
+    h_min2 = Constant(op.h_min**2)
+    h_max2 = Constant(op.h_max**2)
+    kernel_str = """
+#include <Eigen/Dense>
+#include <algorithm>
 
-            if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
-                print("WARNING: minimum element size reached!")
-    else:
-        for i in range(len(M.dat.data)):
-            if scalar:
-                alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
-                beta = alpha
-            else:
-                alpha = max(1. / h_max2, min(g.dat.data[i, 0], 1. / h_min2))
-                beta = max(1. / h_max2, min(g.dat.data[i, 1], 1. / h_min2))
-            M.dat.data[i][0, 0] = alpha
-            M.dat.data[i][1, 1] = beta
+void isotropic(double A_[4], const double * eps_, const double * hmin2_, const double * hmax2_) {
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
 
-            if (alpha >= 0.9999 / h_min2) or (beta >= 0.9999 / h_min2):
-                print("WARNING: minimum element size reached!")
-        #if scalar:  # FIXME
-        #    alpha = Max(1./h_max2, Min(g, 1./h_min2))
-        #    beta = alpha
-        #else:
-        #    alpha = Max(1./h_max2, Min(g[0], 1./h_min2))
-        #    beta = Max(1./h_max2, Min(g[1], 1./h_min2))
-        #M.interpolate(as_tensor([[alpha, 0],[0, beta]]))
+  double m = std::max(1/(*hmax2_), std::min(*eps_, 1/(*hmin2_)));
+  A(0,0) = m;
+  A(1,1) = m;
+}
+"""
+    kernel = op2.Kernel(kernel_str, "isotropic", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+    op2.par_loop(kernel, V.node_set if bdy is None else DirichletBC(V, 0, bdy).node_set, M.dat(op2.RW), g.dat(op2.READ), h_min2.dat(op2.READ), h_max2.dat(op2.READ))
 
     return M
-
-
-# TODO: This is not really to do with metrics
-def iso_P2(mesh):
-    r"""
-    Uniformly refine a mesh (in each canonical direction) using an iso-P2 refinement. That is, nodes
-    of a quadratic element on the initial mesh become vertices of the new mesh.
-    """
-    return MeshHierarchy(mesh, 1).__getitem__(1)
 
 
 def anisotropic_refinement(metric, direction=0):
@@ -305,14 +277,26 @@ def anisotropic_refinement(metric, direction=0):
     :return: anisotropically refined metric.
     """
     M = metric.copy()
-    for i in range(len(M.dat.data)):
-        lam, v = la.eig(M.dat.data[i])
-        v1, v2 = v[0], v[1]
-        lam[direction] *= 4
-        M.dat.data[i][0, 0] = lam[0] * v1[0] * v1[0] + lam[1] * v2[0] * v2[0]
-        M.dat.data[i][0, 1] = lam[0] * v1[0] * v1[1] + lam[1] * v2[0] * v2[1]
-        M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
-        M.dat.data[i][1, 1] = lam[0] * v1[1] * v1[1] + lam[1] * v2[1] * v2[1]
+    V = M.function_space()
+    assert V.ufl_element() == FiniteElement('Lagrange', triangle, 1)
+    dim = V.mesh().topological_dimension()
+    d = str(dim)
+    kernel_str = """
+#include <Eigen/Dense>
+
+void anisotropic(double A_[%s]) {
+  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > A((double *)A_);
+
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, %s, %s, Eigen::RowMajor>> eigensolver(A);
+  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> Q = eigensolver.eigenvectors();
+  Eigen::Vector%sd D = eigensolver.eigenvalues();
+  Eigen::Array%sd D_array = D.array();
+  D_array(%s) *= 4;
+  A = Q * D_array.matrix().asDiagonal() * Q.transpose();
+}
+""" % (str(dim*dim), d, d, d, d, d, d, d, d, str(direction))
+    kernel = op2.Kernel(kernel_str, "anisotropic", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+    op2.par_loop(kernel, V.node_set, M.dat(op2.RW))
     return M
 
 
@@ -428,27 +412,29 @@ def metric_intersection(M1, M2, bdy=None):
     """
     V = M1.function_space()
     assert V == M2.function_space()
+    dim = V.mesh().topological_dimension()
+    assert dim in (2, 3)
+    d = str(dim)
     M = Function(V).assign(M1)
     kernel_str = """
-#include <iostream>
 #include <Eigen/Dense>
 
-void intersect(double M_[4], const double * A_, const double * B_) {
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > M((double *)M_);
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
+void intersect(double M_[%s], const double * A_, const double * B_) {
+  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > M((double *)M_);
+  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > B((double *)B_);
 
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver(A);
-  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Q = eigensolver.eigenvectors();
-  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> D = eigensolver.eigenvalues().array().sqrt().matrix().asDiagonal();
-  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Sq = Q * D * Q.transpose();
-  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Sqi = Q * D.inverse() * Q.transpose();
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver2(Sqi.transpose() * B * Sqi);
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, %s, %s, Eigen::RowMajor>> eigensolver(A);
+  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> Q = eigensolver.eigenvectors();
+  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> D = eigensolver.eigenvalues().array().sqrt().matrix().asDiagonal();
+  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> Sq = Q * D * Q.transpose();
+  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> Sqi = Q * D.inverse() * Q.transpose();
+  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, %s, %s, Eigen::RowMajor>> eigensolver2(Sqi.transpose() * B * Sqi);
   Q = eigensolver2.eigenvectors();
   D = eigensolver2.eigenvalues().array().max(1).matrix().asDiagonal();
   M = Sq.transpose() * Q * D * Q.transpose() * Sq;
 }
-"""
+""" % (str(dim*dim), d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d)
     kernel = op2.Kernel(kernel_str, "intersect", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
     op2.par_loop(kernel, V.node_set if bdy is None else DirichletBC(V, 0, bdy).node_set, M.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
     return M
@@ -467,42 +453,23 @@ def metric_relaxation(M1, M2, alpha=Constant(0.5)):
     """
     V = M1.function_space()
     assert V == M2.function_space()
+    dim = V.mesh().topological_dimension()
+    assert dim in (2, 3)
+    d = str(dim)
     M = Function(V)
     kernel_str = """
 #include <Eigen/Dense>
 
-void relax(double M_[4], const double * A_, const double * B_, const double * alpha) {
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > M((double *)M_);
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
+void relax(double M_[%s], const double * A_, const double * B_, const double * alpha) {
+  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > M((double *)M_);
+  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > B((double *)B_);
 
   M = (*alpha)*A + (1.0 - *alpha)*B;
-}"""
+}""" % (str(dim*dim), d, d, d, d, d, d)
     kernel = op2.Kernel(kernel_str, "relax", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ), alpha.dat(op2.READ))
     return M
-
-
-def abs_matmult(A, b):
-    V = b.function_space()
-    assert V.ufl_element().family() == A.function_space().ufl_element().family()
-    assert V.ufl_element().degree() == A.function_space().ufl_element().degree()
-    assert V.mesh() == A.function_space().mesh()
-    v = Function(V)
-    kernel_str = """
-#include <Eigen/Dense>
-
-void product(double y_[2], const double * A_, const double * b_) {
-  Eigen::Map<Eigen::Vector2d > y((double *)y_);
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Vector2d > b((double *)b_);
-
-  y = A.array().abs().matrix()*b.array().abs().matrix();
-}
-"""
-    kernel = op2.Kernel(kernel_str, "product", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-    op2.par_loop(kernel, V.node_set, v.dat(op2.RW), A.dat(op2.READ), b.dat(op2.READ))
-    return v
 
 
 def symmetric_product(A, b):
@@ -527,45 +494,6 @@ def symmetric_product(A, b):
             return [bAb(A.dat.data[i], b) for i in range(len(A.dat.data))]
         else:
             return [bAb(A.dat.data[i], b.dat.data[i]) for i in range(len(A.dat.data))]
-
-
-# TODO: This is not really to do with metrics
-def pointwise_max(f, g):
-    r"""
-    Take the pointwise maximum (in modulus) of arrays `f` and `g`.
-    """
-    fu = f.ufl_element()
-    gu = g.ufl_element()
-    try:
-        assert (f.function_space() == g.function_space())
-    except:
-        msg = "Function space mismatch: {f1:s} {d1:d} vs. {f2:s} {d2:d}"
-        raise ValueError(msg.format(f1=fu.family(), d1=fu.degree(), f2=gu.family(), d2=gu.degree()))
-    try:
-        assert fu.family() == 'Lagrange' and fu.degree() == 1
-    except:
-        raise NotImplementedError
-    h = Function(f.function_space()).assign(np.finfo(0.).min)
-
-    # TODO: Test
-    max_kernel = """
-for (int i=0; i<z.dofs; i++) {
-    for (int j=0; j<3; j++) {
-        z[i][j] = fmax(x[i][j], y[i][j]);
-    }
-}
-"""
-    par_loop(max_kernel, dx, {'x': (f, READ), 'y': (g, READ), 'z': (h, WRITE)})
-
-    #for i in range(len(f.dat.data)):
-    #    if fu.value_size() == 1:
-    #        if np.abs(g.dat.data[i]) > np.abs(f.dat.data[i]):
-    #            f.dat.data[i] = g.dat.data[i]
-    #    else:
-    #        for j in range(fu.value_size()):
-    #            if np.abs(g.dat.data[i, j]) > np.abs(f.dat.data[i, j]):
-    #                f.dat.data[i, j] = g.dat.data[i, j]
-    return h
 
 
 def metric_complexity(M):

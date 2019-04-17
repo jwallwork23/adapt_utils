@@ -1,4 +1,5 @@
 from firedrake import *
+import numpy as np
 
 
 __all__ = ["index_string", "subdomain_indicator", "bessk0"]
@@ -40,3 +41,42 @@ def bessk0(x):
     expr2 = (exp(-x)/sqrt(x))*(1.25331414 + y2*(-0.7832358e-1 + y2*(0.2189568e-1 + y2*(-0.1062446e-1 + y2*(0.587872e-2 + y2*(-0.251540e-2 + y2*0.53208e-3))))))
     return conditional(ge(x, 2), expr2, expr1)
 
+
+def abs_matmult(A, b):
+    V = b.function_space()
+    assert V.ufl_element().family() == A.function_space().ufl_element().family()
+    assert V.ufl_element().degree() == A.function_space().ufl_element().degree()
+    assert V.mesh() == A.function_space().mesh()
+    v = Function(V)
+    kernel_str = """
+#include <Eigen/Dense>
+
+void product(double y_[2], const double * A_, const double * b_) {
+  Eigen::Map<Eigen::Vector2d > y((double *)y_);
+  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Vector2d > b((double *)b_);
+
+  y = A.array().abs().matrix()*b.array().abs().matrix();
+}
+"""
+    kernel = op2.Kernel(kernel_str, "product", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+    op2.par_loop(kernel, V.node_set, v.dat(op2.RW), A.dat(op2.READ), b.dat(op2.READ))
+    return v
+
+
+def pointwise_max(f, g):
+    r"""
+    Take the pointwise maximum (in modulus) of Functions `f` and `g`.
+    """
+    fu = f.ufl_element()
+    gu = g.ufl_element()
+    try:
+        assert fu == gu
+    except:
+        raise ValueError("Function space mismatch: ", fu, " vs. ", gu)
+    h = Function(f.function_space()).assign(np.finfo(0.).min)
+    kernel_str = "void maxval(double * z, double const * x, double const * y){*z = fmax(fabs(*x), fabs(*y));}"
+    kernel = op2.Kernel(kernel_str, "maxval")
+    op2.par_loop(kernel, f.function_space().node_set, h.dat(op2.RW), f.dat(op2.READ), g.dat(op2.READ))
+
+    return h
