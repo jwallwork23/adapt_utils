@@ -11,6 +11,7 @@ phi.interpolate(...)
 i = TestFunction(P0) * Constant(mesh.num_cells())  # indicator function
 area = interpolate(assemble(i*dx), P0)  # elemental areas
 
+# TODO
 # for each vertex v:
 #    * s = 0
 #    * w = 0

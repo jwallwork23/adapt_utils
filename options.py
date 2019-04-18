@@ -21,7 +21,7 @@ class Options(FrozenConfigurable):
     plot_metric = Bool(False, help='Toggle plotting of metric field.').tag(config=True)
     max_element_growth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
     max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
-    num_adapt = NonNegativeInteger(12, help="Number of mesh adaptations per remesh.").tag(config=True)
+    num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
     order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
     restrict = Unicode('anisotropy', help="Hessian restriction approach, from {'num_cells', 'anisotropy'}.").tag(config=True)
     hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
