@@ -7,99 +7,11 @@ from numpy import linalg as la
 from scipy import linalg as sla
 
 from adapt_utils.options import DefaultOptions
+from adapt_utils.adapt.recovery import construct_hessian
 
 
-__all__ = ["construct_gradient", "construct_hessian", "steady_metric", "isotropic_metric",
-           "anisotropic_refinement", "gradate_metric", "metric_intersection",
-           "metric_relaxation", "symmetric_product", "metric_complexity", "normalise_indicator"]
-
-
-def construct_gradient(f, mesh=None, op=DefaultOptions()):
-    r"""
-    Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
-    give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
-    smooth gradient, we solve an auxiliary finite element problem in P1 space. This "L2 projection"
-    gradient recovery technique makes use of the Cl\'ement interpolation operator. That `f` is P1
-    is not actually a requirement.
-
-    :arg f: (scalar) P1 solution field.
-    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
-                 Function, but a ufl expression.
-    :param op: `Options` class object providing min/max cell size values.
-    :return: reconstructed gradient associated with `f`.
-    """
-    if mesh is None:
-        mesh = f.function_space().mesh()
-    P1_vec = VectorFunctionSpace(mesh, "CG", 1)
-    g = TrialFunction(P1_vec)
-    φ = TestFunction(P1_vec)
-    # TODO: include an option to swap between these two: 'parts' vs 'L2'
-    a = inner(g, φ)*dx
-    # L = inner(grad(f), φ)*dx
-    L = f*dot(φ, FacetNormal(mesh))*ds - f*div(φ)*dx  # enables f to be P0
-    g = Function(P1_vec)
-    solve(a == L, g, solver_parameters=op.hessian_solver_parameters)
-    return g
-
-
-def construct_hessian(f, mesh=None, op=DefaultOptions()):
-    r"""
-    Assuming the smooth solution field has been approximated by a function `f` which is P1, all
-    second derivative information has been lost. As such, the Hessian of `f` cannot be directly
-    computed. We provide two means of recovering it, as follows. That `f` is P1 is not actually
-    a requirement.
-
-    (1) "Integration by parts" ('parts'):
-    This involves solving the PDE $H = \nabla^T\nabla f$ in the weak sense. Code is based on the
-    Monge-Amp\`ere tutorial provided on the Firedrake website:
-    https://firedrakeproject.org/demos/ma-demo.py.html.
-
-    (2) "Double L2 projection" ('dL2'):
-    This involves two applications of the L2 projection operator. In this mode, we are permitted
-    to recover the Hessian of a P0 field, since no derivatives of `f` are required.
-
-    :arg f: P1 solution field.
-    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
-                 Function, but a ufl expression.
-    :param op: `Options` class object providing min/max cell size values.
-    :return: reconstructed Hessian associated with `f`.
-    """
-    if mesh is None:
-        mesh = f.function_space().mesh()
-    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
-    n = FacetNormal(mesh)  # Normal vector
-
-    # Integration by parts applied to the Hessian definition
-    if op.hessian_recovery == 'parts':
-        H = TrialFunction(P1_ten)
-        τ = TestFunction(P1_ten)
-        a = inner(tau, H)*dx
-        L = -inner(div(τ), grad(f))*dx
-        L += (τ[0, 1]*n[1]*f.dx(0) + τ[1, 0]*n[0]*f.dx(1))*ds
-        L += (τ[0, 0]*n[1]*f.dx(0) + τ[1, 1]*n[0]*f.dx(1))*ds
-
-        H = Function(P1_ten)
-        solve(a == L, H, solver_parameters=op.hessian_solver_parameters)
-
-    # Double L2 projection, using a mixed formulation for the gradient and Hessian
-    elif op.hessian_recovery == 'dL2':
-        P1_vec = VectorFunctionSpace(mesh, "CG", 1)
-        V = P1_ten*P1_vec
-        H, g = TrialFunctions(V)
-        τ, φ = TestFunctions(V)
-        a = inner(τ, H)*dx
-        a += inner(φ, g)*dx
-        a += inner(div(τ), g)*dx
-        a += -(τ[0, 1]*n[1]*g[0] + τ[1, 0]*n[0]*g[1])*ds
-        a += -(τ[0, 0]*n[1]*g[0] + τ[1, 1]*n[0]*g[1])*ds
-        # L = inner(grad(f), φ)*dx
-        L = f*dot(φ, n)*ds - f*div(φ)*dx  # enables f to be P0
-
-        q = Function(V)
-        solve(a == L, q)  # TODO: Solver parameters?
-        H = q.split()[0]
-
-    return H
+__all__ = ["steady_metric", "isotropic_metric", "anisotropic_refinement", "gradate_metric",
+           "metric_intersection", "metric_relaxation", "metric_complexity", "normalise_indicator"]
 
 
 # TODO: fix pyop2 version and use instead
@@ -116,6 +28,12 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
     # NOTE: A P1 field is not actually strictly required
     if H is None:
         H = construct_hessian(f, mesh=mesh, op=op)
+    else:
+        try:
+            assert H.ufl_element().family() == 'Lagrange'
+            assert H.ufl_element().degree() == 1
+        except:
+            ValueError("Hessian must be P1.")
     V = H.function_space()
     mesh = V.mesh()
 
@@ -225,6 +143,12 @@ def steady_metric_(f, H=None, mesh=None, op=DefaultOptions()):
             mesh = H.function_space().mesh()
     if H is None:
         H = construct_hessian(f, mesh=mesh, op=op)
+    else:
+        try:
+            assert H.ufl_element().family() == 'Lagrange'
+            assert H.ufl_element().degree() == 1
+        except:
+            ValueError("Hessian must be P1.")
     V = H.function_space()
     M = Function(V)
 
@@ -398,7 +322,8 @@ def anisotropic_refinement(metric, direction=0):
     """
     M = metric.copy()
     V = M.function_space()
-    assert V.ufl_element() == FiniteElement('Lagrange', triangle, 1)
+    assert V.ufl_element().family() == 'Lagrange'
+    assert V.ufl_element().degree() == 1
     dim = V.mesh().topological_dimension()
     d = str(dim)
     kernel_str = """
@@ -420,30 +345,6 @@ void anisotropic(double A_[%s]) {
     return M
 
 
-def symmetric_product(A, b):
-    r"""
-    Compute the product of 2-vector `b` with itself, under the scalar product $b^T A b$ defined by
-    the 2x2 matrix `A`.
-    """
-
-    # assert(isinstance(A, numpy.ndarray) | isinstance(A, Function))
-    # assert(isinstance(b, list) | isinstance(b, numpy.ndarray) | isinstance(b, Function))
-
-    def bAb(A, b):
-        return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
-
-    if isinstance(A, numpy.ndarray) | isinstance(A, list):
-        if isinstance(b, list) | isinstance(b, numpy.ndarray):
-            return bAb(A, b)
-        else:
-            return [bAb(A, b.dat.data[i]) for i in range(len(b.dat.data))]
-    else:
-        if isinstance(b, list) | isinstance(b, numpy.ndarray):
-            return [bAb(A.dat.data[i], b) for i in range(len(A.dat.data))]
-        else:
-            return [bAb(A.dat.data[i], b.dat.data[i]) for i in range(len(A.dat.data))]
-
-
 def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this in pyop2
     r"""
     Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear
@@ -455,7 +356,8 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
     :return: gradated metric.
     """
     try:
-        assert(M.ufl_element().family() == 'Lagrange' and M.ufl_element().degree() == 1)
+        assert M.ufl_element().family() == 'Lagrange'
+        assert M.ufl_element().degree() == 1
     except:
         ValueError("Metric field must be P1.")
     try:
@@ -463,6 +365,9 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
     except:
         NotImplementedError('Only 2x2 metric fields considered so far.')
     ln_beta = np.log(op.max_element_growth)
+
+    def symmetric_product(A, b):
+        return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
 
     # Get vertices and edges of mesh
     V = M.function_space()

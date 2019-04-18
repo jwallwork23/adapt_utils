@@ -6,6 +6,7 @@ from adapt_utils.solver import *
 # Mesh adaptivity
 from adapt_utils.adapt.interpolation import *
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.recovery import *
 
 # Tracer transport
 from adapt_utils.tracer.options import *
