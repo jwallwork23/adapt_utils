@@ -7,6 +7,7 @@ import numpy as np
 from adapt_utils.tracer.options import PowerOptions
 from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.recovery import *
 from adapt_utils.solver import SteadyProblem
 
 

@@ -9,7 +9,8 @@ from time import clock
 import numpy as np
 
 from adapt_utils.options import DefaultOptions
-from adapt_utils.adapt.metric import isotropic_metric, metric_intersection, metric_relaxation, steady_metric
+from adapt_utils.adapt.adaptation import *
+from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.interpolation import interp
 
 
@@ -370,7 +371,8 @@ class SteadyProblem():
             # (Default relaxation of 0.9 following [Power et al 2006])
 
             # Adapt mesh
-            self.mesh = adapt(self.mesh, self.M)
+            #self.mesh = adapt(self.mesh, self.M)
+            self.mesh = multi_adapt(self.M, op=self.op)
 
     def interpolate_solution(self):
         """
