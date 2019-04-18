@@ -2,16 +2,13 @@ from firedrake import *
 from firedrake.slate.slac.compiler import PETSC_DIR
 
 import numpy as np
-import numpy
-from numpy import linalg as la
-from scipy import linalg as sla
 
 from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.recovery import construct_hessian
 
 
 __all__ = ["steady_metric", "isotropic_metric", "anisotropic_refinement", "gradate_metric",
-           "metric_intersection", "metric_relaxation", "metric_complexity", "normalise_indicator"]
+           "metric_intersection", "metric_relaxation", "metric_complexity"]
 
 
 def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
@@ -19,12 +16,11 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
 
-    :arg f: P1 solution field.
+    :arg f: field to compute Hessian w.r.t.
     :arg H: reconstructed Hessian associated with `f` (if already computed).
     :param op: `Options` class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
-    # NOTE: A P1 field is not actually strictly required
     if mesh is None:
         if f is not None:
             mesh = f.function_space().mesh()
@@ -40,20 +36,26 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
             ValueError("Hessian must be P1.")
     V = H.function_space()
     M = Function(V)
+    P1 = FunctionSpace(mesh, "CG", 1)
 
     ia2 = Constant(1/op.max_anisotropy**2)
     ih_min2 = Constant(1/op.h_min**2)
     ih_max2 = Constant(1/op.h_max**2)
-    rescale = Constant(op.target_vertices)
+    f_min = 1e-3
 
-    if op.restrict == 'num_cells':
-        f_min = 1e-6
-        rescale.assign(op.target_vertices / max(norm(f), f_min))
-        num_cells_kernel = """
+    if op.restrict in ('error', 'num_cells'):
+        if op.restrict == 'error':
+            #rescale = Constant(1/op.desired_error)
+            #rescale = interpolate(1/(op.desired_error*max_value(abs(f), f_min)), P1)
+            rescale = Constant(1/op.desired_error / max(norm(f), f_min))
+        elif op.restrict == 'num_cells':
+            rescale = Constant(op.target_vertices / max(norm(f), f_min))
+            #rescale = interpolate(op.target_vertices / max_value(abs(f), f_min), P1)
+        kernel_str = """
 #include <Eigen/Dense>
 #include <algorithm>
 
-void metric1(double A_[4], const double * B_, const double * scaling, const double * ihmin2, const double * ihmax2, const double * ia2)
+void metric(double A_[4], const double * B_, const double * scaling, const double * ihmin2, const double * ihmax2, const double * ia2)
 {
   Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
   Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
@@ -74,17 +76,17 @@ void metric1(double A_[4], const double * B_, const double * scaling, const doub
   A = Q * D.asDiagonal() * Q.transpose();
 }
 """
-        kernel = op2.Kernel(num_cells_kernel, "metric1", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+        kernel = op2.Kernel(kernel_str, "metric", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
         op2.par_loop(kernel, V.node_set, M.dat(op2.RW), H.dat(op2.READ), rescale.dat(op2.READ), ih_min2.dat(op2.READ), ih_max2.dat(op2.READ), ia2.dat(op2.READ))
 
-    elif op.restrict == 'anisotropy':
-        detH = Function(FunctionSpace(mesh, "CG", 1))
+    elif op.restrict == 'p_norm':
+        detH = Function(P1)
         p = op.norm_order
-        anisotropy_kernel1 = """
+        kernel_str = """
 #include <Eigen/Dense>
 #include <algorithm>
 
-void metric2(double A_[4], double * f, const double * B_)
+void metric1(double A_[4], double * f, const double * B_)
 {
   Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
   Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
@@ -105,14 +107,14 @@ void metric2(double A_[4], double * f, const double * B_)
   *f += pow(det, %s / (2 * %s + 2));
 }
 """ % (p, p, p)
-        kernel = op2.Kernel(anisotropy_kernel1, "metric2", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+        kernel = op2.Kernel(kernel_str, "metric1", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
         op2.par_loop(kernel, V.node_set, M.dat(op2.INC), detH.dat(op2.INC), H.dat(op2.READ))
-        rescale.assign(op.target_vertices / assemble(detH*dx))
-        anisotropy_kernel2 = """
+        rescale = Constant(op.target_vertices / assemble(detH*dx))
+        kernel_str = """
 #include <Eigen/Dense>
 #include <algorithm>
 
-void metric3(double A_[4], const double * scaling, const double * ihmin2, const double * ihmax2, const double * ia2)
+void metric2(double A_[4], const double * scaling, const double * ihmin2, const double * ihmax2, const double * ia2)
 {
   Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
 
@@ -129,33 +131,13 @@ void metric3(double A_[4], const double * scaling, const double * ihmin2, const 
   A = Q * D.asDiagonal() * Q.transpose();
 }
 """
-        kernel = op2.Kernel(anisotropy_kernel2, "metric3", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+        kernel = op2.Kernel(kernel_str, "metric2", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
         op2.par_loop(kernel, V.node_set, M.dat(op2.RW), rescale.dat(op2.READ), ih_min2.dat(op2.READ), ih_max2.dat(op2.READ), ia2.dat(op2.READ))
 
     else:
         raise ValueError("Restriction by {:s} not recognised.".format(op.restrict))
 
     return M
-
-
-def normalise_indicator(f, op=DefaultOptions()):
-    r"""
-    Normalise error indicator `f` using procedure defined by `op`.
-
-    :arg f: error indicator to normalise.
-    :param op: `Options` parameters object.
-    :return: normalised indicator.
-    """
-    # scale_factor = min(max(norm(abs(f)), op.min_norm), op.max_norm)
-    scale_factor = min(max(sqrt(assemble(f*f*dx)), op.min_norm), op.max_norm)
-    if scale_factor < 1.00001*op.min_norm:
-        print("WARNING: minimum norm attained")
-    elif scale_factor > 0.99999*op.max_norm:
-        print("WARNING: maximum norm attained")
-    f.interpolate(Constant(op.target_vertices / scale_factor) * abs(f))
-    # NOTE: If `project` is used then positivity cannot be guaranteed
-
-    return f
 
 
 def isotropic_metric(f, bdy=None, op=DefaultOptions()):
@@ -170,32 +152,29 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
     assert len(f.ufl_element().value_shape()) == 0
     mesh = f.function_space().mesh()
 
-    # Project into P1 space (if required)
-    g = Function(FunctionSpace(mesh, "CG", 1))
-    if f.ufl_element() == FiniteElement('Lagrange', triangle, 1):
-        g.assign(f)
-    else:
-        g.project(f)
+    # Normalise indicator and project into P1 space
+    f_norm = min(max(norm(f), op.min_norm), op.max_norm)
+    scaling = 1/op.desired_error if op.restrict == 'error' else op.target_vertices
+    g = project(scaling*abs(f)/f_norm, FunctionSpace(mesh, "CG", 1))
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
     M = Function(V)
-    h_min2 = Constant(op.h_min**2)
-    h_max2 = Constant(op.h_max**2)
     kernel_str = """
 #include <Eigen/Dense>
 #include <algorithm>
 
-void isotropic(double A_[4], const double * eps_, const double * hmin2_, const double * hmax2_) {
+void isotropic(double A_[4], const double * eps, const double * hmin2, const double * hmax2) {
   Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
 
-  double m = std::max(1/(*hmax2_), std::min(*eps_, 1/(*hmin2_)));
+  double m = std::max(1/(*hmax2), std::min(std::abs(*eps), 1/(*hmin2)));
   A(0,0) = m;
   A(1,1) = m;
 }
 """
     kernel = op2.Kernel(kernel_str, "isotropic", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-    op2.par_loop(kernel, V.node_set if bdy is None else DirichletBC(V, 0, bdy).node_set, M.dat(op2.RW), g.dat(op2.READ), h_min2.dat(op2.READ), h_max2.dat(op2.READ))
+    op2.par_loop(kernel,
+                 V.node_set if bdy is None else DirichletBC(V, 0, bdy).node_set, M.dat(op2.RW), g.dat(op2.READ), Constant(op.h_min**2).dat(op2.READ), Constant(op.h_max**2).dat(op2.READ))
 
     return M
 
@@ -313,7 +292,6 @@ def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this i
                 #eta2_21 = 1. / pow(1. + symmetric_product(met2, v21) * ln_beta, 2)
                 eta2_21 = 1. / pow(1. + sqrt(symmetric_product(met2, v21)) * ln_beta, 2)
                 # print('#### gradate_metric DEBUG: scale factors', eta2_12, eta2_21)
-                # print('#### gradate_metric DEBUG: determinants', la.det(met1), la.det(met2))
                 redMet1 = local_metric_intersection(met1, eta2_21 * met2)
                 redMet2 = local_metric_intersection(met2, eta2_12 * met1)
 

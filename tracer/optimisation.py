@@ -19,8 +19,9 @@ class TelemacLoop(OuterLoop):
 
     def compare_analytical_objective(self, finite_element=FiniteElement('Lagrange', triangle, 1)):
         mesh = self.final_mesh
+        P0 = FunctionSpace(mesh, "DG", 0)
         fs = FunctionSpace(mesh, finite_element)
-        J_exact = self.op.exact_objective(fs)
+        J_exact = self.op.exact_objective(fs, P0)
         err = np.abs(J_exact - self.final_J)
         r_err = err / np.abs(J_exact)
         logfile = open(self.di + 'scale_to_convergence.log', 'a+')

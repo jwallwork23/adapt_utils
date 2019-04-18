@@ -11,7 +11,6 @@ import numpy as np
 from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.interpolation import interp
 
 
 __all__ = ["MeshOptimisation", "OuterLoop"]
@@ -212,7 +211,6 @@ class SteadyProblem():
         el = self.indicator.ufl_element()
         if (el.family(), el.degree()) != ('Lagrange', 1):
             self.indicator = project(self.indicator, self.P1)
-        self.normalise_indicator()
         self.M = isotropic_metric(self.indicator, op=self.op)
 
     def get_anisotropic_metric(self, adjoint=False, relax=False):
@@ -222,7 +220,7 @@ class SteadyProblem():
         """
         pass
 
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None):
+    def adapt_mesh(self, relaxation_parameter=Constant(0.9), prev_metric=None):
         """
         Adapt mesh according to error estimation strategy of choice.
         """
@@ -327,39 +325,37 @@ class SteadyProblem():
                 self.explicit_estimation_adjoint(square=False)
                 H = self.get_hessian(adjoint=False)
                 for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                self.M = steady_metric(None, H=H, op=self.op)
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
+                self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
             elif self.approach == 'power_adjoint':
                 self.explicit_estimation(square=False)
                 H = self.get_hessian(adjoint=True)
                 for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                self.M = steady_metric(None, H=H, op=self.op)
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
+                self.M = steady_metric(self.solution, H=H, op=self.op)
             elif self.approach == 'power_relaxed':
                 self.explicit_estimation(square=False)
                 H = self.get_hessian(adjoint=True)
                 for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                M = steady_metric(None, H=H, op=self.op)
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
                 indicator = self.indicator.copy()
                 self.explicit_estimation_adjoint(square=False)
-                H = self.get_hessian(adjoint=False)
+                H2 = self.get_hessian(adjoint=False)
                 for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                    H.dat.data[i][:,:] /= (np.abs(indicator.dat.data[i]) + np.abs(self.indicator.dat.data[i]))
-                self.M = steady_metric(None, H=H, op=self.op)
-                self.M = metric_relaxation(M, self.M)
+                    H.dat.data[i][:,:] += H2.dat.data[i]*np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
+                    H.dat.data[i][:,:] /= np.abs(indicator.dat.data[i]) + np.abs(self.indicator.dat.data[i])
+                self.M = steady_metric(self.solution+self.adjoint_solution, mesh=self.mesh, H=H, op=self.op)
             elif self.approach == 'power_superposed':
                 self.explicit_estimation(square=False)
                 H = self.get_hessian(adjoint=True)
-                for i in range(len(self.indicator.dat.data)):
+                for i in range(len(self.indicator.dat.data)):                 # TODO: use pyop2
                     H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                M = steady_metric(None, H=H, op=self.op)
+                M = steady_metric(self.solution, H=H, op=self.op)
                 self.explicit_estimation_adjoint(square=False)
                 H = self.get_hessian(adjoint=False)
                 for i in range(len(self.indicator.dat.data)):
                     H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                self.M = steady_metric(None, H=H, op=self.op)
+                self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
                 self.M = metric_intersection(M, self.M)
             else:
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
@@ -367,7 +363,7 @@ class SteadyProblem():
             # Apply metric relaxation, if requested
             self.M_unrelaxed = self.M.copy()
             if prev_metric is not None:
-                self.M.project(metric_relaxation(interp(self.mesh, prev_metric), self.M, relaxation_parameter))
+                self.M.project(metric_relaxation(project(prev_metric, self.P1_ten), self.M, relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
 
             # Adapt mesh
@@ -525,6 +521,7 @@ class OuterLoop():
         self.objective_rtol = objective_rtol
         self.di = problem(approach=approach).op.directory()
 
+    # TODO: desired error loop
     def scale_to_convergence(self):
 
         # Create log file
@@ -532,8 +529,8 @@ class OuterLoop():
         logfile.write('\n' + date + '\n\n')
         logfile.write('maxit: {:d}\n'.format(self.maxit))
         logfile.write('element_rtol: {:.4f}\n'.format(self.element_rtol))
-        logfile.write('objective_rtol: {:.4f}\n\n'.format(self.objective_rtol))
-        logfile.write('outer_maxit: {:d}\n'.format(self.outer_maxit))
+        logfile.write('objective_rtol: {:.4f}\n'.format(self.objective_rtol))
+        logfile.write('outer_maxit: {:d}\n\n'.format(self.outer_maxit))
 
         for i in range(self.outer_maxit):
 

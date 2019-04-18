@@ -228,11 +228,6 @@ class SteadyTracerProblem_DG(SteadyProblem):
         
     def get_anisotropic_metric(self, adjoint=False, relax=False, superpose=True):
         assert not (relax and superpose)
-        try:
-            assert self.op.restrict == 'anisotropy'
-        except:
-            self.op.restrict = 'anisotropy'
-            raise Warning("Setting metric restriction method to 'anisotropy'")
 
         # Solve adjoint problem
         if self.high_order:

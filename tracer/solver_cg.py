@@ -52,7 +52,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.nu = op.set_diffusivity(self.P1)
         self.u = op.set_velocity(self.P1_vec)
         self.source = op.set_source(self.P1)
-        self.kernel = op.set_objective_kernel(self.P1)
+        self.kernel = op.set_objective_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Stabilisation
@@ -321,11 +321,6 @@ class SteadyTracerProblem_CG(SteadyProblem):
         
     def get_anisotropic_metric(self, adjoint=False, relax=False, superpose=True):
         assert not (relax and superpose)
-        try:
-            assert self.op.restrict == 'anisotropy'
-        except:
-            self.op.restrict = 'anisotropy'
-            raise Warning("Setting metric restriction method to 'anisotropy'")
 
         # Solve adjoint problem
         if self.high_order:

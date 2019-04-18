@@ -10,37 +10,48 @@ __all__ = ["DefaultOptions"]
 class Options(FrozenConfigurable):
     name = 'Common parameters for mesh adaptive simulations'
 
-    # Mesh adaptivity parameters
-    approach = Unicode('FixedMesh', help="Mesh adaptive approach.").tag(config=True)
+    # adapt
+    approach = Unicode('fixed_mesh', help="Mesh adaptive approach.").tag(config=True)
     dwr_approach = Unicode('error_representation', help="DWR error estimation approach, from {'error_representation', 'dwr', 'cell_facet_split'}. (See [Rognes & Logg, 2010])").tag(config=True)
+    num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
+
+    # smooth / intersect
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
+    max_element_growth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
     intersect = Bool(False, help='Intersect with previous mesh.').tag(config=True)
     intersect_boundary = Bool(False, help='Intersect with initial boundary metric.').tag(config=True)
     adapt_on_bathymetry = Bool(False, help='Toggle adaptation based on bathymetry.').tag(config=True)
+
+    # plot
     plot_pvd = Bool(False, help='Toggle plotting of fields.').tag(config=True)
     plot_metric = Bool(False, help='Toggle plotting of metric field.').tag(config=True)
-    max_element_growth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
+
+    # metric
     max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
-    num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
-    order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
-    restrict = Unicode('anisotropy', help="Hessian restriction approach, from {'num_cells', 'anisotropy'}.").tag(config=True)
-    hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
-    timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
-    norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used.")
-    family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
-    degree = PositiveInteger(1, help="Order of function space").tag(config=True)
+    restrict = Unicode('error', help="Hessian restriction approach, from {'num_cells', 'p_norm', 'error'}.").tag(config=True)
+    desired_error = PositiveFloat(1e-2, help="Desired error for 'error' restriction approach.").tag(config=True)
+    norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used in 'p_norm' restriction approach.").tag(config=True)
     min_norm = PositiveFloat(1e-6).tag(config=True)
     max_norm = PositiveFloat(1e9).tag(config=True)
-    element_rtol = PositiveFloat(0.01, help="Relative tolerance for convergence in mesh element count").tag(config=True)
 
-    # Initialisation for number of adjoint steps (always be changed by a call to `store_adjoint`)
-    adjoint_steps = NonNegativeInteger(1000, help="Number of adjoint steps used").tag(config=True)
-    solve_adjoint = Bool(False).tag(config=True)
-    objective_rtol = PositiveFloat(0.00025, help="Relative tolerance for convergence in objective value.").tag(config=True)
+    # hessian
+    hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
     hessian_solver_parameters = PETScSolverParameters({'snes_rtol': 1e8,
                                                        'ksp_rtol': 1e-5,
                                                        'ksp_gmres_restart': 20,
                                                        'pc_type': 'sor'}).tag(config=True)
+
+    # pde / optimisation
+    timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
+    family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
+    degree = PositiveInteger(1, help="Order of function space").tag(config=True)
+    element_rtol = PositiveFloat(0.01, help="Relative tolerance for convergence in mesh element count").tag(config=True)
+    objective_rtol = PositiveFloat(0.00025, help="Relative tolerance for convergence in objective value.").tag(config=True)
+
+    # adjoint
+    adjoint_steps = NonNegativeInteger(1000, help="Number of adjoint steps used").tag(config=True)
+    solve_adjoint = Bool(False).tag(config=True)
+    order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
         self.approach = approach
@@ -177,23 +188,23 @@ class DefaultOptions(Options):
     name = 'Parameters for the case where no mode is selected'
     mode = 'Default'
 
-    # Solver parameters
+    # solver
     dt = PositiveFloat(0.01, name="Timestep").tag(config=True)
     start_time = NonNegativeFloat(0., help="Start of time window of interest").tag(config=True)
     end_time = PositiveFloat(10., help="End of time window of interest (and simulation)").tag(config=True)
     dt_per_export = PositiveInteger(10, help="Number of timesteps per export").tag(config=True)
 
-    # Adaptivity parameters
+    # adapt
     h_min = PositiveFloat(1e-6, help="Minimum tolerated element size").tag(config=True)
     h_max = PositiveFloat(1e3, help="Maximum tolerated element size").tag(config=True)
     target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)").tag(config=True)
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
-    # Physical parameters
+    # physical
     viscosity = NonNegativeFloat(1e-3).tag(config=True)
     drag_coefficient = NonNegativeFloat(0.0025).tag(config=True)
 
-    # Indicator function and adjoint
+    # adjoint
     region_of_interest = List(default_value=[(0.5, 0.5, 0.1)]).tag(config=True)
     # TODO: Surely below is redundant?
     loc_x = Float(0., help="x-coordinate of centre of important region").tag(config=True)

@@ -183,11 +183,6 @@ class SteadyTurbineProblem(SteadyProblem):
 
     def get_anisotropic_metric(self, adjoint=False, relax=True, superpose=False):
         assert not (relax and superpose)
-        try:
-            assert self.op.restrict == 'anisotropy'
-        except:
-            self.op.restrict = 'anisotropy'
-            raise Warning("Setting metric restriction method to 'anisotropy'")
 
         u, eta = self.solution.split()
         z, zeta = self.adjoint_solution.split()

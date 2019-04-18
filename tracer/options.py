@@ -50,7 +50,6 @@ class TracerOptions(Options):
         super(TracerOptions, self).__init__(approach)
 
         self.end_time -= 0.5*self.dt
-        self.restrict = 'anisotropy'
 
     def set_diffusivity(self, fs):
         pass
@@ -182,9 +181,9 @@ class TelemacOptions(TracerOptions):
         outfile.write(self.solution)  # NOTE: use 28 discretisation levels in ParaView
         return self.solution
 
-    def exact_objective(self, fs):
-        self.exact_solution(fs)
-        self.set_objective_kernel(fs)
+    def exact_objective(self, fs1, fs2):
+        self.exact_solution(fs1)
+        self.set_objective_kernel(fs2)
         return assemble(self.kernel*self.solution*dx)
 
 
