@@ -1,4 +1,5 @@
 from thetis_adjoint import *
+import pyadjoint
 
 from time import clock
 import numpy as np
@@ -312,28 +313,31 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
                                                   None)
         assert(finite_element.family() == "Discontinuous Lagrange")
 
-        # Extract parameters from Options class
-        self.nu = op.set_diffusivity(self.P1DG)
-        self.u = op.set_velocity(self.P1_vec)
-        if hasattr(op, 'source'):
-            self.source = op.set_source(self.P1DG)
-        self.solution = op.set_initial_condition(self.P1DG)
-        self.kernel = op.set_objective_kernel(self.P1DG)
+        self.set_fields()
+        self.solution = self.op.set_initial_condition(self.V)
+
+        # Classification
+        self.nonlinear = False
+
+        # Adaptivity
+        self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
+
+    def set_fields(self):
+        self.nu = self.op.set_diffusivity(self.V)
+        self.u = self.op.set_velocity(self.P1_vec)
+        if hasattr(self.op, 'source'):
+            self.source = self.op.set_source(self.V)
+        self.kernel = self.op.set_objective_kernel(self.V)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Rename solution fields
         self.solution.rename('Tracer concentration')
         self.adjoint_solution.rename('Adjoint tracer concentration')
 
-        # Classification
-        self.nonlinear = False
-
-        # Adaptivity  # TODO
-        self.step_end = op.end_time
-
-    def solve(self):
-        one = Function(self.P1DG).assign(1.)
-        zero = Function(self.P1DG)
+    def solve_step(self):
+        self.set_fields()
+        one = Function(self.V).assign(1.)
+        zero = Function(self.V)
         op = self.op
 
         solver_obj = solver2d.FlowSolver2d(self.mesh, one)
@@ -341,7 +345,8 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.simulation_export_time = op.dt*op.dt_per_export
-        options.simulation_end_time = self.step_end
+        options.simulation_end_time = self.step_end-0.5*op.dt
+        options.output_directory = self.di
         options.fields_to_export = ['tracer_2d']
         #options.compute_residuals_tracer = True
         options.solve_tracer = True
@@ -350,5 +355,41 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
         if hasattr(self, 'source'):
             options.tracer_source_2d = self.source
         solver_obj.assign_initial_conditions(elev=zero, uv=self.u, tracer=self.solution)
+
+        cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
+        if hasattr(self.op, 'J_exact'):
+            cb.initial_value = self.op.J_exact
+        elif self.remesh_step != 0:
+            cb.initial_value = self.objective
+        solver_obj.add_callback(cb, 'export')
+
+        solver_obj.i_export = self.remesh_step
+        solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
+        solver_obj.iteration = self.remesh_step*op.dt_per_remesh
+        solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
+        for e in solver_obj.exporters.values():
+            e.set_next_export_ix(solver_obj.i_export)
+
         solver_obj.bnd_functions = op.boundary_conditions
         solver_obj.iterate()
+        self.solution = solver_obj.fields.tracer_2d
+        self.objective, self.objective_error = cb.__call__()
+
+    def solve(self):
+        self.remesh_step = 0
+        while self.step_end <= self.op.end_time:
+            if self.approach != 'fixed_mesh':
+                self.adapt_mesh()
+                if self.remesh_step != 0:
+                    self.interpolate_solution()
+                else:
+                    self.solution = self.op.set_initial_condition(self.V)
+                    self.adapt_mesh()  # adapt again
+                    self.solution = self.op.set_initial_condition(self.V)
+            print('J_val = {:.4e}'.format(assemble(self.solution*dx)))
+            self.solve_step()
+            self.step_end += self.op.dt*self.op.dt_per_remesh
+            self.remesh_step += 1
+
+    def get_hessian_metric(self, adjoint=False):
+        self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)

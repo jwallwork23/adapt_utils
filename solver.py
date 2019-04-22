@@ -357,14 +357,6 @@ class SteadyProblem():
             #self.mesh = adapt(self.mesh, self.M)
             self.mesh = multi_adapt(self.M, op=self.op)
 
-    def interpolate_solution(self):
-        """
-        Interpolate solution onto the new mesh after a mesh adaptation.
-        """
-        self.interpolated_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
-        self.interpolated_solution.project(self.solution)
-        return self.interpolated_solution
-
 
 class MeshOptimisation():
     """
@@ -594,9 +586,9 @@ class UnsteadyProblem():
         self.adjoint_solution = Function(self.V)
 
         # outputs
-        di = self.op.directory()
-        self.solution_file = File(di + 'solution.pvd')
-        self.adjoint_solution_file = File(di + 'adjoint_solution.pvd')
+        self.di = self.op.directory()
+        self.solution_file = File(self.di + 'solution.pvd')
+        self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
 
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         """
@@ -619,7 +611,7 @@ class UnsteadyProblem():
         """
         pass
 
-    def objective_functional(self):
+    def objective_functional(self):  # TODO: account for time integral forms
         """
         Functional of interest which takes the PDE solution as input.
         """
@@ -724,6 +716,7 @@ class UnsteadyProblem():
         """
         Adapt mesh according to error estimation strategy of choice.
         """
+        # FIXME: adjoint approaches won't work out of the box
         with pyadjoint.stop_annotating():
             if self.approach == 'fixed_mesh':
                 return
@@ -870,11 +863,25 @@ class UnsteadyProblem():
             #self.mesh = adapt(self.mesh, self.M)
             self.mesh = multi_adapt(self.M, op=self.op)
 
+            # Re-establish function spaces
+            self.V = FunctionSpace(self.mesh, self.finite_element)
+            self.P0 = FunctionSpace(self.mesh, "DG", 0)
+            self.P1 = FunctionSpace(self.mesh, "CG", 1)
+            self.P1DG = FunctionSpace(self.mesh, "DG", 1)
+            self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
+            self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
+            self.test = TestFunction(self.V)
+            self.trial = TrialFunction(self.V)
+            self.n = FacetNormal(self.mesh)
+            self.h = CellSize(self.mesh)
+
     def interpolate_solution(self):
         """
         Interpolate solution onto the new mesh after a mesh adaptation.
         """
-        self.interpolated_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
-        self.interpolated_solution.project(self.solution)
-        return self.interpolated_solution
-
+        with pyadjoint.stop_annotating():
+            interpolated_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
+            interpolated_solution.project(self.solution)
+            name = self.solution.dat.name
+            self.solution = interpolated_solution
+            self.solution.rename(name)

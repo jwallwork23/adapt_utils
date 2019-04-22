@@ -25,6 +25,7 @@ class TracerOptions(Options):
     start_time = NonNegativeFloat(0., help="Start of time window of interest").tag(config=True)
     end_time = PositiveFloat(60., help="End of time window of interest").tag(config=True)
     dt_per_export = PositiveFloat(10, help="Number of timesteps per export").tag(config=True)
+    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation").tag(config=True)
     timestepper = Unicode('CrankNicolson').tag(config=True)
 
     # Solver
@@ -200,6 +201,7 @@ class TelemacOptions_Centred(TelemacOptions):
         self.region_of_interest = [(20., 5., 0.5)]
 
 
+# TODO: Set three different tracers
 class LeVequeOptions(TracerOptions):
     """
     Parameters for test case in [LeVeque 1996].
@@ -219,7 +221,28 @@ class LeVequeOptions(TracerOptions):
         # Time integration
         self.dt = math.pi/300.0
         self.end_time = 2*math.pi
-        self.dt_per_export = 20
+        self.dt_per_export = 10
+        self.dt_per_remesh = 10
+
+        # Exact objective value
+        bell_r2 = self.source_loc[0][2]**2
+        cone_r2 = self.source_loc[1][2]**2
+        cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
+        cyl_r2 = cyl_r0**2
+        slot_left, slot_right, slot_top = self.source_loc[3]
+        slot_left -= cyl_x0
+        slot_right -= cyl_x0
+        slot_top -= cyl_y0
+        bell = math.pi*bell_r2/4
+        cone = math.pi*cone_r2/3
+        cyl = math.pi*cyl_r2
+        slot = slot_top*(slot_right-slot_left)
+        slot += -0.5*slot_right*math.sqrt(cyl_r2 - slot_right**2)
+        slot += 0.5*slot_left*math.sqrt(cyl_r2 - slot_left**2)
+        slot += -0.5*cyl_r2*math.atan(slot_right/math.sqrt(cyl_r2 - slot_right**2))
+        slot += 0.5*cyl_r2*math.atan(slot_left/math.sqrt(cyl_r2 - slot_left**2))
+        self.J_exact = 1 + bell + cone + cyl - slot
+        print("Exact objective: {:.4e}".format(self.J_exact))  # TODO: Check this
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(0.)
