@@ -1,12 +1,14 @@
 from firedrake import *
 from firedrake_adjoint import *
 from thetis.configuration import *
+import math
 
 from adapt_utils.options import Options
 from adapt_utils.misc import *
 
 
-__all__ = ["TracerOptions", "PowerOptions", "TelemacOptions", "TelemacOptions_Centred"]
+__all__ = ["TracerOptions", "PowerOptions", "TelemacOptions", "TelemacOptions_Centred",
+           "LeVequeOptions"]
 
 
 class TracerOptions(Options):
@@ -23,6 +25,7 @@ class TracerOptions(Options):
     start_time = NonNegativeFloat(0., help="Start of time window of interest").tag(config=True)
     end_time = PositiveFloat(60., help="End of time window of interest").tag(config=True)
     dt_per_export = PositiveFloat(10, help="Number of timesteps per export").tag(config=True)
+    timestepper = Unicode('CrankNicolson').tag(config=True)
 
     # Solver
     params = PETScSolverParameters({'pc_type': 'lu',
@@ -50,6 +53,7 @@ class TracerOptions(Options):
         super(TracerOptions, self).__init__(approach)
 
         self.end_time -= 0.5*self.dt
+        self.di = self.directory()  # TODO: surely this should be in __init__ anyway
 
     def set_diffusivity(self, fs):
         pass
@@ -58,6 +62,9 @@ class TracerOptions(Options):
         pass
 
     def set_source(self, fs):
+        pass
+
+    def set_initial_condition(self, fs):
         pass
 
     def set_kernel(self, fs):
@@ -191,3 +198,60 @@ class TelemacOptions_Centred(TelemacOptions):
     def __init__(self, approach='fixed_mesh', offset=0.):
         super(TelemacOptions_Centred, self).__init__(approach, offset)
         self.region_of_interest = [(20., 5., 0.5)]
+
+
+class LeVequeOptions(TracerOptions):
+    """
+    Parameters for test case in [LeVeque 1996].
+    """
+    def __init__(self, approach='fixed_mesh'):
+        super(LeVequeOptions, self).__init__(approach)
+
+        # Source / receiver
+        self.source_loc = [(0.25, 0.5, 0.15), (0.5, 0.25, 0.15), (0.5, 0.75, 0.15), (0.475, 0.525, 0.85)]
+        self.region_of_interest = [(0.5, 0.75, 0.15)]
+
+        # Boundary conditions
+        q_in = Constant(1.0)
+        for i in range(4):
+            self.boundary_conditions[i] = {i: {'value': q_in}}
+
+        # Time integration
+        self.dt = math.pi/300.0
+        self.end_time = 2*math.pi
+        self.dt_per_export = 20
+
+    def set_diffusivity(self, fs):
+        self.diffusivity = Constant(0.)
+        return self.diffusivity
+
+    def set_velocity(self, fs):
+        x, y = SpatialCoordinate(fs.mesh())
+        self.fluid_velocity = Function(fs)
+        self.fluid_velocity.interpolate(as_vector((0.5 - y, x - 0.5)))
+        return self.fluid_velocity
+
+    def set_initial_condition(self, fs):
+        x, y = SpatialCoordinate(fs.mesh())
+        bell_x0, bell_y0, bell_r0 = self.source_loc[0]
+        cone_x0, cone_y0, cone_r0 = self.source_loc[1]
+        cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
+        slot_left, slot_right, slot_top = self.source_loc[3]
+        bell = 0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0)))
+        cone = 1.0 - min_value(sqrt(pow(x-cone_x0, 2) + pow(y-cone_y0, 2))/cyl_r0, 1.0)
+        slot_cyl = conditional(sqrt(pow(x-cyl_x0, 2) + pow(y-cyl_y0, 2)) < cyl_r0,
+                     conditional(And(And(x > slot_left, x < slot_right), y < slot_top),
+                       0.0, 1.0), 0.0)
+
+        self.initial_value = Function(fs)
+        self.initial_value.interpolate(1.0 + bell + cone + slot_cyl)
+        return self.initial_value
+
+    def set_objective_kernel(self, fs):
+        self.kernel = Function(fs)
+        self.kernel.interpolate(self.indicator(fs.mesh()))
+        area = assemble(self.kernel*dx)
+        area_exact = math.pi*self.region_of_interest[0][2]**2
+        rescaling = area_exact/area if area != 0. else 1
+        self.kernel.interpolate(rescaling*self.kernel)
+        return self.kernel

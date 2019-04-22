@@ -3,12 +3,12 @@ from thetis_adjoint import *
 from time import clock
 import numpy as np
 
-from adapt_utils.tracer.options import PowerOptions
+from adapt_utils.tracer.options import *
 from adapt_utils.adapt.metric import *
-from adapt_utils.solver import SteadyProblem
+from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
 
-__all__ = ["SteadyTracerProblem_DG"]
+__all__ = ["SteadyTracerProblem_DG", "UnsteadyTracerProblem_DG"]
 
 
 class SteadyTracerProblem_DG(SteadyProblem):
@@ -290,3 +290,65 @@ class SteadyTracerProblem_DG(SteadyProblem):
         # bdy_contributions -= Fhat*ds(2) + Fhat*ds(3) + Fhat*ds(4)
 
         # TODO: flux terms?
+
+
+class UnsteadyTracerProblem_DG(UnsteadyProblem):
+    def __init__(self,
+                 op=LeVequeOptions(),
+                 stab=None,
+                 mesh=UnitSquareMesh(40, 40),
+                 approach='fixed_mesh',
+                 discrete_adjoint=True,
+                 finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1),
+                 high_order=False,
+                 prev_solution=None):
+        super(UnsteadyTracerProblem_DG, self).__init__(mesh,
+                                                  finite_element,
+                                                  approach,
+                                                  stab,
+                                                  discrete_adjoint,
+                                                  op,
+                                                  high_order,
+                                                  None)
+        assert(finite_element.family() == "Discontinuous Lagrange")
+
+        # Extract parameters from Options class
+        self.nu = op.set_diffusivity(self.P1DG)
+        self.u = op.set_velocity(self.P1_vec)
+        if hasattr(op, 'source'):
+            self.source = op.set_source(self.P1DG)
+        self.solution = op.set_initial_condition(self.P1DG)
+        self.kernel = op.set_objective_kernel(self.P1DG)
+        self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
+
+        # Rename solution fields
+        self.solution.rename('Tracer concentration')
+        self.adjoint_solution.rename('Adjoint tracer concentration')
+
+        # Classification
+        self.nonlinear = False
+
+        # Adaptivity  # TODO
+        self.step_end = op.end_time
+
+    def solve(self):
+        one = Function(self.P1DG).assign(1.)
+        zero = Function(self.P1DG)
+        op = self.op
+
+        solver_obj = solver2d.FlowSolver2d(self.mesh, one)
+        options = solver_obj.options
+        options.timestepper_type = op.timestepper
+        options.timestep = op.dt
+        options.simulation_export_time = op.dt*op.dt_per_export
+        options.simulation_end_time = self.step_end
+        options.fields_to_export = ['tracer_2d']
+        #options.compute_residuals_tracer = True
+        options.solve_tracer = True
+        options.tracer_only = True
+        options.horizontal_diffusivity = self.nu
+        if hasattr(self, 'source'):
+            options.tracer_source_2d = self.source
+        solver_obj.assign_initial_conditions(elev=zero, uv=self.u, tracer=self.solution)
+        solver_obj.bnd_functions = op.boundary_conditions
+        solver_obj.iterate()
