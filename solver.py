@@ -9,6 +9,7 @@ from time import clock
 import numpy as np
 
 from adapt_utils.options import DefaultOptions
+from adapt_utils.misc import index_string
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 
@@ -629,18 +630,35 @@ class UnsteadyProblem():
         """
         Solve the adjoint PDE in the discrete sense, using pyadjoint.
         """
-        raise NotImplementedError  # TODO
+        J = self.objective_functional()
+        compute_gradient(J, Control(self.gradient_field))
+        tape = get_working_tape()
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
+                                                        and not isinstance(block, ProjectBlock)
+                                                        and block.adj_sol is not None]
+
+        N = len(solve_blocks)
+        try:
+            assert N == int(self.end_time/self.dt)
+        except:
+            ValueError("Expected one SolveBlock, but encountered {:d}".format(N))
+        for i in range(0, N, self.op.dt_per_remesh):  # TODO: is a remainder needed?
+            self.adjoint_solution.assign(solve_blocks[i].adj_sol)
+            with DumbCheckpoint('outputs/hdf5/Adjoint2d_' + index_string(i), mode=FILE_CREATE) as sa:
+                sa.store(self.adjoint_solution)
+                sa.close()
+            self.adjoint_solution_file.write(self.adjoint_solution, t=float(i))
+        tape.clear_tape()
 
     def solve_adjoint(self):
         """
         Solve adjoint problem using specified method.
         """
         print("Solving adjoint problem...")
-        if self.discrete_adjoint:
+        if self.discrete_adjoint:  # TODO: Option for loading from HDF5
             self.solve_discrete_adjoint()
         else:
             self.solve_continuous_adjoint()
-        #self.adjoint_solution_file.write(self.adjoint_solution)  # FIXME
 
     def dwp_indication(self):
         """

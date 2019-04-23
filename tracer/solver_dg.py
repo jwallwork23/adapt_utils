@@ -340,6 +340,7 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
         zero = Function(self.V)
         op = self.op
 
+        # create solver and pass parameters, etc.
         solver_obj = solver2d.FlowSolver2d(self.mesh, one)
         options = solver_obj.options
         options.timestepper_type = op.timestepper
@@ -356,13 +357,15 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
             options.tracer_source_2d = self.source
         solver_obj.assign_initial_conditions(elev=zero, uv=self.u, tracer=self.solution)
 
-        cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
+        # set up callbacks
+        self.cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
         if hasattr(self.op, 'J_exact'):
-            cb.initial_value = self.op.J_exact
+            self.cb.initial_value = self.op.J_exact
         elif self.remesh_step != 0:
-            cb.initial_value = self.objective
-        solver_obj.add_callback(cb, 'export')
+            self.cb.initial_value = self.objective
+        solver_obj.add_callback(self.cb, 'export')
 
+        # ensure correct iteration count
         solver_obj.i_export = self.remesh_step
         solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
         solver_obj.iteration = self.remesh_step*op.dt_per_remesh
@@ -370,10 +373,10 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
         for e in solver_obj.exporters.values():
             e.set_next_export_ix(solver_obj.i_export)
 
+        # solve
         solver_obj.bnd_functions = op.boundary_conditions
         solver_obj.iterate()
         self.solution = solver_obj.fields.tracer_2d
-        self.objective, self.objective_error = cb.__call__()
 
     def solve(self):
         self.remesh_step = 0
@@ -386,10 +389,14 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
                     self.solution = self.op.set_initial_condition(self.V)
                     self.adapt_mesh()  # adapt again
                     self.solution = self.op.set_initial_condition(self.V)
-            print('J_val = {:.4e}'.format(assemble(self.solution*dx)))
+            #print('J_val = {:.4e}'.format(assemble(self.solution*dx)))
             self.solve_step()
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
+
+    def objective_functional(self):  # TODO: Put in particular instance
+        self.objective, self.objective_error = self.cb.__call__()
+        return self.objective
 
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
