@@ -40,3 +40,4 @@ class TurbineOptions(Options):
             assert self.adapt_field in ('fluid_speed', 'elevation', 'both')
         except:
             raise ValueError('Field for adaptation {:s} not recognised.'.format(self.adapt_field))
+        self.default_mesh = RectangleMesh(100, 20, 1000., 200.)

@@ -359,7 +359,8 @@ class SteadyProblem():
 
             # Adapt mesh
             #self.mesh = adapt(self.mesh, self.M)
-            self.mesh = multi_adapt(self.M, op=self.op)  # FIXME for turbine!
+            self.mesh = multi_adapt(self.M, op=self.op)
+            self.plot()
 
 
 class MeshOptimisation():

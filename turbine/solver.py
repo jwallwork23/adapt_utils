@@ -18,7 +18,7 @@ class SteadyTurbineProblem(SteadyProblem):
     """
     # TODO: Documentation
     def __init__(self,
-                 mesh=RectangleMesh(100, 20, 1000., 200.),
+                 mesh=None,
                  approach='fixed_mesh',
                  stab=None,
                  discrete_adjoint=True,
@@ -31,6 +31,8 @@ class SteadyTurbineProblem(SteadyProblem):
             finite_element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
         else:
             raise NotImplementedError
+        if mesh is None:
+            mesh = op.default_mesh
         super(SteadyTurbineProblem, self).__init__(mesh,
                                                    finite_element,
                                                    approach,
@@ -167,7 +169,11 @@ class SteadyTurbineProblem(SteadyProblem):
             self.M = metric_intersection(self.M, M)
 
     def explicit_estimation(self):
-        raise NotImplementedError  # TODO
+        with pyadjoint.stop_annotating():
+            cell_res = self.ts.cell_residual()
+            edge_res = self.ts.edge_residual()
+            self.indicator = Function(self.P0)
+            self.indicator.project(cell_res + edge_res)
 
     def explicit_estimation_adjoint(self):
         raise NotImplementedError  # TODO
