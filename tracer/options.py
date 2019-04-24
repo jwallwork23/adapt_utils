@@ -83,12 +83,13 @@ class PowerOptions(TracerOptions):
     """
     def __init__(self, approach='fixed_mesh'):
         super(PowerOptions, self).__init__(approach)
+        self.default_mesh = SquareMesh(40, 40, 4, 4)
 
         # Source / receiver
         self.source_loc = [(1., 2., 0.1)]
         self.region_of_interest = [(3., 2., 0.1)]
 
-        # Boundary conditions
+        # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
         #self.boundary_conditions[2] = 'neumann_zero'  # FIXME
         self.boundary_conditions[3] = 'neumann_zero'
@@ -129,6 +130,7 @@ class TelemacOptions(TracerOptions):
     """
     def __init__(self, approach='fixed_mesh', offset=0.):
         super(TelemacOptions, self).__init__(approach)
+        self.default_mesh = RectangleMesh(100, 20, 50, 10)
         self.offset = offset
 
         # Source / receiver
@@ -137,20 +139,19 @@ class TelemacOptions(TracerOptions):
         self.source_value = 100.
         self.source_discharge = 0.1
 
-        # Boundary conditions
+        # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
 
-        self.sponge_scaling = 0.1    # scaling parameter
-        self.sponge_start = 50.      # x-location of sponge start
-        self.base_diffusivity = 0.1  # background diffusivity
+        # Time integration
+        self.dt = 0.1
+        self.end_time = 60.
+        self.dt_per_export = 10
+        self.dt_per_remesh = 20
 
-    def set_diffusivity(self, fs):  # TODO: this is redundant
-        x, y = SpatialCoordinate(fs.mesh())
-        self.diffusivity = Function(fs)
-        self.diffusivity.interpolate(self.base_diffusivity
-                                     + self.sponge_scaling*pow(max_value(0, x-self.sponge_start), 2))
+    def set_diffusivity(self, fs):
+        self.diffusivity = Constant(0.1)
         return self.diffusivity
 
     def set_velocity(self, fs):
@@ -168,6 +169,10 @@ class TelemacOptions(TracerOptions):
         scaling *= 0.5*self.source_value  # TODO: where does factor of half come from?
         self.source.interpolate(self.indicator(fs.mesh(), source=True, scale=scaling))
         return self.source
+
+    def set_initial_condition(self, fs):
+        self.initial_value = Function(fs)
+        return self.initial_value
 
     def set_objective_kernel(self, fs):
         self.kernel = Function(fs)
@@ -201,17 +206,18 @@ class TelemacOptions_Centred(TelemacOptions):
         self.region_of_interest = [(20., 5., 0.5)]
 
 
-# TODO: Set three different tracers
+# TODO: Set three different tracers?
 class LeVequeOptions(TracerOptions):
     """
     Parameters for test case in [LeVeque 1996].
     """
     def __init__(self, approach='fixed_mesh'):
         super(LeVequeOptions, self).__init__(approach)
+        self.default_mesh = UnitSquareMesh(40, 40)
 
         # Source / receiver
         self.source_loc = [(0.25, 0.5, 0.15), (0.5, 0.25, 0.15), (0.5, 0.75, 0.15), (0.475, 0.525, 0.85)]
-        self.region_of_interest = [(0.5, 0.75, 0.15)]
+        self.region_of_interest = [(0.5, 0.75, 0.18)]
 
         # Boundary conditions
         q_in = Constant(1.0)
@@ -225,27 +231,28 @@ class LeVequeOptions(TracerOptions):
         self.dt_per_remesh = 10
 
         # Exact objective value
-        bell_r2 = self.source_loc[0][2]**2
-        cone_r2 = self.source_loc[1][2]**2
+        #bell_r2 = self.source_loc[0][2]**2
+        #cone_r2 = self.source_loc[1][2]**2
         cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
         cyl_r2 = cyl_r0**2
         slot_left, slot_right, slot_top = self.source_loc[3]
         slot_left -= cyl_x0
         slot_right -= cyl_x0
         slot_top -= cyl_y0
-        bell = math.pi*bell_r2/4
-        cone = math.pi*cone_r2/3
+        #bell = math.pi*bell_r2/4
+        #cone = math.pi*cone_r2/3
         cyl = math.pi*cyl_r2
         slot = slot_top*(slot_right-slot_left)
         slot += -0.5*slot_right*math.sqrt(cyl_r2 - slot_right**2)
         slot += 0.5*slot_left*math.sqrt(cyl_r2 - slot_left**2)
         slot += -0.5*cyl_r2*math.atan(slot_right/math.sqrt(cyl_r2 - slot_right**2))
         slot += 0.5*cyl_r2*math.atan(slot_left/math.sqrt(cyl_r2 - slot_left**2))
-        self.J_exact = 1 + bell + cone + cyl - slot
+        #self.J_exact = 1 + bell + cone + cyl - slot
+        self.J_exact = 1 + cyl - slot
         print("Exact objective: {:.4e}".format(self.J_exact))  # TODO: Check this
 
     def set_diffusivity(self, fs):
-        self.diffusivity = Constant(0.)
+        self.diffusivity = Constant(0.)  # TODO: could use None?
         return self.diffusivity
 
     def set_velocity(self, fs):

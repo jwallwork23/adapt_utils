@@ -4,6 +4,7 @@ import math
 
 from adapt_utils.solver import SteadyProblem
 from adapt_utils.turbine.options import TurbineOptions
+from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.interpolation import *
 
@@ -140,7 +141,7 @@ class SteadyTurbineProblem(SteadyProblem):
         else:
             solver_obj.assign_initial_conditions(uv=self.inflow)
         solver_obj.iterate()
-        self.solution = solver_obj.fields.solution_2d
+        self.solution.assign(solver_obj.fields.solution_2d)
         self.objective = cb.average_power
         self.ts = solver_obj.timestepper
 
@@ -252,6 +253,12 @@ class SteadyTurbineProblem(SteadyProblem):
         # TODO: Account for flux terms contributed by DG scheme
 
         # TODO: boundary contributions
+
+    def custom_adapt(self):
+        if self.approach == 'vorticity':
+            self.indicator = Function(self.P1, name='vorticity')
+            self.indicator.interpolate(curl(self.solution.split()[0]))
+            self.get_isotropic_metric()
 
     def interpolate_solution(self):
         """

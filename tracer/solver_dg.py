@@ -28,9 +28,16 @@ class SteadyTracerProblem_DG(SteadyProblem):
                  mesh=SquareMesh(40, 40, 4, 4),
                  approach='fixed_mesh',
                  discrete_adjoint=True,
-                 finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1),
                  high_order=False,
                  prev_solution=None):
+        if op.family == 'dg':
+             finite_element = FiniteElement("Discontinuous Lagrange", triangle, 1)
+        elif op.family == 'cg':
+             finite_element = FiniteElement("Lagrange", triangle, 1)
+        else:
+             raise NotImplementedError
+        if mesh is None:
+            mesh = op.default_mesh
         super(SteadyTracerProblem_DG, self).__init__(mesh,
                                                   finite_element,
                                                   approach,
@@ -349,7 +356,7 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
         options.simulation_end_time = self.step_end-0.5*op.dt
         options.output_directory = self.di
         options.fields_to_export = ['tracer_2d']
-        #options.compute_residuals_tracer = True
+        options.compute_residuals_tracer = True
         options.solve_tracer = True
         options.tracer_only = True
         options.horizontal_diffusivity = self.nu
@@ -358,12 +365,12 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
         solver_obj.assign_initial_conditions(elev=zero, uv=self.u, tracer=self.solution)
 
         # set up callbacks
-        self.cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
-        if hasattr(self.op, 'J_exact'):
-            self.cb.initial_value = self.op.J_exact
-        elif self.remesh_step != 0:
-            self.cb.initial_value = self.objective
-        solver_obj.add_callback(self.cb, 'export')
+        #cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
+        #if self.remesh_step == 0:
+        #    self.init_norm = cb.initial_value
+        #else:
+        #    cb.initial_value = self.init_norm
+        #solver_obj.add_callback(cb, 'export')
 
         # ensure correct iteration count
         solver_obj.i_export = self.remesh_step
@@ -374,13 +381,56 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
             e.set_next_export_ix(solver_obj.i_export)
 
         # solve
-        solver_obj.bnd_functions = op.boundary_conditions
+        solver_obj.bnd_functions['tracer'] = op.boundary_conditions
         solver_obj.iterate()
         self.solution = solver_obj.fields.tracer_2d
+        self.ts = solver_obj.timestepper.timesteppers.tracer
 
-    def objective_functional(self):  # TODO: Put in particular instance
-        self.objective, self.objective_error = self.cb.__call__()
-        return self.objective
+    def get_timestepper(self):
+        self.set_fields()
+        one = Function(self.V).assign(1.)
+        zero = Function(self.V)
+        op = self.op
+
+        # create solver and pass parameters, etc.
+        solver_obj = solver2d.FlowSolver2d(self.mesh, one)
+        options = solver_obj.options
+        options.timestepper_type = op.timestepper
+        options.timestep = op.dt
+        options.simulation_end_time = 0.9*op.dt
+        options.fields_to_export = []
+        options.compute_residuals_tracer = True
+        options.solve_tracer = True
+        options.tracer_only = True
+        options.horizontal_diffusivity = self.nu
+        if hasattr(self, 'source'):
+            options.tracer_source_2d = self.source
+        solver_obj.assign_initial_conditions(elev=zero, uv=self.u, tracer=self.solution)
+
+        # ensure correct iteration count
+        solver_obj.i_export = self.remesh_step
+        solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
+        solver_obj.iteration = self.remesh_step*op.dt_per_remesh
+        solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
+        for e in solver_obj.exporters.values():
+            e.set_next_export_ix(solver_obj.i_export)
+
+        # solve
+        solver_obj.bnd_functions['tracer'] = op.boundary_conditions
+        solver_obj.create_timestepper()
+        self.ts = solver_obj.timestepper.timesteppers.tracer
 
     def get_hessian_metric(self, adjoint=False):
-        self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
+        field_for_adapt = self.adjoint_solution if adjoint else self.solution
+        if norm(field_for_adapt) > 1e-8:
+            self.M = steady_metric(field_for_adapt, op=self.op)
+        else:
+            self.M = None
+
+    def dwr_estimation(self):
+        if self.remesh_step == 0:
+            self.get_timestepper()
+        cell_res = self.ts.cell_residual(adjoint=self.interpolated_adjoint_solution)
+        edge_res = self.ts.edge_residual(adjoint=self.interpolated_adjoint_solution)
+        self.indicator = Function(self.P0, name='dwr')
+        self.indicator.interpolate(cell_res + edge_res)

@@ -23,7 +23,9 @@ def multi_adapt(metric, op=DefaultOptions()):
     """
     for i in range(op.num_adapt):
         mesh = metric.function_space().mesh()
+        print('    DEBUG: before')
         newmesh = adapt(mesh, metric)
+        print('    DEBUG: after')
         if i < op.num_adapt-1:
             V = TensorFunctionSpace(newmesh, "CG", 1)
             metric = project(metric, V)

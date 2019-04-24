@@ -134,7 +134,6 @@ class SteadyProblem():
             self.solve_discrete_adjoint()
         else:
             self.solve_continuous_adjoint()
-        self.adjoint_solution_file.write(self.adjoint_solution)
 
     def dwp_indication(self):
         """
@@ -208,7 +207,7 @@ class SteadyProblem():
         """
         pass
 
-    def adapt_mesh(self, relaxation_parameter=Constant(0.9), prev_metric=None):
+    def adapt_mesh(self, relaxation_parameter=Constant(0.9), prev_metric=None, custom_adapt=None):
         """
         Adapt mesh according to error estimation strategy of choice.
         """
@@ -346,17 +345,21 @@ class SteadyProblem():
                 self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
                 self.M = metric_intersection(M, self.M)
             else:
-                raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
+                #try:
+                assert hasattr(self, 'custom_adapt')
+                self.custom_adapt()
+                #except:
+                #    raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
             # Apply metric relaxation, if requested
-            self.M_unrelaxed = self.M.copy()
             if prev_metric is not None:
+                self.M_unrelaxed = self.M.copy()
                 self.M.project(metric_relaxation(project(prev_metric, self.P1_ten), self.M, relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
 
             # Adapt mesh
             #self.mesh = adapt(self.mesh, self.M)
-            self.mesh = multi_adapt(self.M, op=self.op)
+            self.mesh = multi_adapt(self.M, op=self.op)  # FIXME for turbine!
 
 
 class MeshOptimisation():
@@ -590,6 +593,7 @@ class UnsteadyProblem():
         self.di = self.op.directory()
         self.solution_file = File(self.di + 'solution.pvd')
         self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
+        self.indicator_file = File(self.di + 'indicator.pvd')
 
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         """
@@ -613,16 +617,17 @@ class UnsteadyProblem():
         while self.step_end <= self.op.end_time:
             if self.approach != 'fixed_mesh':
                 if not self.approach in ('uniform', 'hessian', 'explicit'):
+                    self.get_adjoint_state()
                     self.interpolate_adjoint_solution()
-                self.adapt_mesh()  # TODO: Plot indicators
+                self.adapt_mesh()
                 if self.remesh_step != 0:
                     self.interpolate_solution()
                 else:
                     self.solution = self.op.set_initial_condition(self.V)
-                    if not self.approach in ('uniform', 'hessian', 'explicit'):
-                        self.interpolate_adjoint_solution()
-                    self.adapt_mesh()  # adapt again for the first iteration
-                    self.solution = self.op.set_initial_condition(self.V)
+                #    if not self.approach in ('uniform', 'hessian', 'explicit'):
+                #        self.interpolate_adjoint_solution()
+                #    self.adapt_mesh()  # adapt again for the first iteration
+                #    self.solution = self.op.set_initial_condition(self.V)
             self.solve_step()
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
@@ -664,12 +669,12 @@ class UnsteadyProblem():
             assert N == int(self.end_time/self.dt)
         except:
             ValueError("Expected one SolveBlock, but encountered {:d}".format(N))
-        for i, j in zip(range(N-1, -1, -self.op.dt_per_remesh), range(0, N, self.op.dt_per_remesh)):
+        for i in range(0, N, self.op.dt_per_remesh):
             self.adjoint_solution.assign(solve_blocks[i].adj_sol)
-            with DumbCheckpoint('outputs/hdf5/Adjoint2d_' + index_string(j), mode=FILE_CREATE) as sa:
+            with DumbCheckpoint('outputs/hdf5/Adjoint2d_' + index_string(i), mode=FILE_CREATE) as sa:
                 sa.store(self.adjoint_solution)
                 sa.close()
-            self.adjoint_solution_file.write(self.adjoint_solution, t=self.op.dt*j)
+            self.adjoint_solution_file.write(self.adjoint_solution, t=self.op.dt*i)
         tape.clear_tape()
 
     def solve_adjoint(self):
@@ -690,6 +695,7 @@ class UnsteadyProblem():
         with DumbCheckpoint('outputs/hdf5/Adjoint2d_' + index_string(i), mode=FILE_READ) as la:
             la.load(self.adjoint_solution)
             la.close()
+        self.adjoint_solution_file.write(self.adjoint_solution, t=self.op.dt*i)
 
     def dwp_indication(self):
         """
@@ -712,9 +718,8 @@ class UnsteadyProblem():
         Plot current mesh and indicator field, if available.
         """
         if hasattr(self, 'indicator'):
-            name = self.indicator.dat.name
-            self.indicator.rename(name + ' indicator')
-            File(self.di + 'indicator.pvd').write(self.indicator, t=self.remesh_step*self.op.dt)
+            self.indicator.rename(self.approach + ' indicator')
+            self.indicator_file.write(self.indicator, t=self.remesh_step*self.op.dt)
 
     def dwr_estimation(self):
         """
@@ -750,8 +755,10 @@ class UnsteadyProblem():
         isotropic mesh refinement.
         """
         el = self.indicator.ufl_element()
+        name = self.indicator.dat.name
         if (el.family(), el.degree()) != ('Lagrange', 1):
             self.indicator = project(self.indicator, self.P1)
+            self.indicator.rename(name)
         self.M = isotropic_metric(self.indicator, op=self.op)
 
     def get_anisotropic_metric(self, adjoint=False, relax=False):
@@ -773,157 +780,159 @@ class UnsteadyProblem():
                 return
             elif self.approach == 'hessian':
                 self.get_hessian_metric()
+            elif self.approach == 'hessian_adjoint':
+                self.get_hessian_metric(adjoint=True)
+            elif self.approach == 'hessian_relaxed':
+                self.get_hessian_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_hessian_metric(adjoint=True)
+                self.M = metric_relaxation(M, self.M)
+            elif self.approach == 'hessian_superposed':
+                self.get_hessian_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_hessian_metric(adjoint=True)
+                self.M = metric_intersection(M, self.M)
             elif self.approach == 'explicit':
                 self.explicit_estimation()
                 self.get_isotropic_metric()
+            elif self.approach == 'explicit_adjoint':
+                self.explicit_estimation_adjoint()
+                self.get_isotropic_metric()
+            elif self.approach == 'explicit_relaxed':
+                self.explicit_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.explicit_estimation_adjoint()
+                self.get_isotropic_metric()
+                self.M = metric_relaxation(M, self.M)
+            elif self.approach == 'explicit_superposed':
+                self.explicit_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.explicit_estimation_adjoint()
+                self.get_isotropic_metric()
+                self.M = metric_intersection(M, self.M)
+            elif self.approach == 'dwp':
+                self.dwp_indication()
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr_adjoint':
+                self.dwr_estimation_adjoint()
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr_both':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                i = self.indicator.copy()
+                self.dwr_estimation_adjoint()
+                self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr_averaged':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                i = self.indicator.copy()
+                self.dwr_estimation_adjoint()
+                self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
+                self.get_isotropic_metric()
+            elif self.approach == 'dwr_relaxed':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.dwr_estimation_adjoint()
+                self.get_isotropic_metric()
+                self.M = metric_relaxation(M, self.M)
+            elif self.approach == 'dwr_superposed':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.dwr_estimation_adjoint()
+                self.get_isotropic_metric()
+                self.M = metric_intersection(M, self.M)
+            elif self.approach == 'dwr_anisotropic':
+                self.get_anisotropic_metric(adjoint=False)
+            elif self.approach == 'dwr_anisotropic_adjoint':
+                self.get_anisotropic_metric(adjoint=True)
+            elif self.approach == 'dwr_anisotropic_relaxed':
+                self.get_anisotropic_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_anisotropic_metric(adjoint=True)
+                self.M = metric_relaxation(M, self.M)
+            elif self.approach == 'dwr_anisotropic_superposed':
+                self.get_anisotropic_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_anisotropic_metric(adjoint=True)
+                self.M = metric_intersection(M, self.M)
+            elif self.approach == 'hybrid':
+                self.dwr_estimation()
+                self.get_isotropic_metric()
+                M = self.M.copy()
+                self.get_anisotropic_metric(adjoint=False)
+                self.M = metric_intersection(M, self.M)
+            elif self.approach == 'power':
+                self.explicit_estimation_adjoint(square=False)
+                H = self.get_hessian(adjoint=False)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
+                self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+            elif self.approach == 'power_adjoint':
+                self.explicit_estimation(square=False)
+                H = self.get_hessian(adjoint=True)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
+                self.M = steady_metric(self.solution, H=H, op=self.op)
+            elif self.approach == 'power_relaxed':
+                self.explicit_estimation(square=False)
+                H = self.get_hessian(adjoint=True)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
+                indicator = self.indicator.copy()
+                self.explicit_estimation_adjoint(square=False)
+                H2 = self.get_hessian(adjoint=False)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] += H2.dat.data[i]*np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
+                    H.dat.data[i][:,:] /= np.abs(indicator.dat.data[i]) + np.abs(self.indicator.dat.data[i])
+                self.M = steady_metric(self.solution+self.adjoint_solution, mesh=self.mesh, H=H, op=self.op)
+            elif self.approach == 'power_superposed':
+                self.explicit_estimation(square=False)
+                H = self.get_hessian(adjoint=True)
+                for i in range(len(self.indicator.dat.data)):                 # TODO: use pyop2
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
+                M = steady_metric(self.solution, H=H, op=self.op)
+                self.explicit_estimation_adjoint(square=False)
+                H = self.get_hessian(adjoint=False)
+                for i in range(len(self.indicator.dat.data)):
+                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
+                self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+                self.M = metric_intersection(M, self.M)
             else:
-                self.get_adjoint_state()
-                if self.approach == 'hessian_adjoint':
-                    self.get_hessian_metric(adjoint=True)
-                elif self.approach == 'hessian_relaxed':
-                    self.get_hessian_metric(adjoint=False)
-                    M = self.M.copy()
-                    self.get_hessian_metric(adjoint=True)
-                    self.M = metric_relaxation(M, self.M)
-                elif self.approach == 'hessian_superposed':
-                    self.get_hessian_metric(adjoint=False)
-                    M = self.M.copy()
-                    self.get_hessian_metric(adjoint=True)
-                    self.M = metric_intersection(M, self.M)
-                elif self.approach == 'explicit_adjoint':
-                    self.explicit_estimation_adjoint()
-                    self.get_isotropic_metric()
-                elif self.approach == 'explicit_relaxed':
-                    self.explicit_estimation()
-                    self.get_isotropic_metric()
-                    M = self.M.copy()
-                    self.explicit_estimation_adjoint()
-                    self.get_isotropic_metric()
-                    self.M = metric_relaxation(M, self.M)
-                elif self.approach == 'explicit_superposed':
-                    self.explicit_estimation()
-                    self.get_isotropic_metric()
-                    M = self.M.copy()
-                    self.explicit_estimation_adjoint()
-                    self.get_isotropic_metric()
-                    self.M = metric_intersection(M, self.M)
-                elif self.approach == 'dwp':
-                    self.dwp_indication()
-                    self.get_isotropic_metric()
-                elif self.approach == 'dwr':
-                    self.dwr_estimation()
-                    self.get_isotropic_metric()
-                elif self.approach == 'dwr_adjoint':
-                    self.dwr_estimation_adjoint()
-                    self.get_isotropic_metric()
-                elif self.approach == 'dwr_both':
-                    self.dwr_estimation()
-                    self.get_isotropic_metric()
-                    i = self.indicator.copy()
-                    self.dwr_estimation_adjoint()
-                    self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
-                    self.get_isotropic_metric()
-                elif self.approach == 'dwr_averaged':
-                    self.dwr_estimation()
-                    self.get_isotropic_metric()
-                    i = self.indicator.copy()
-                    self.dwr_estimation_adjoint()
-                    self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
-                    self.get_isotropic_metric()
-                elif self.approach == 'dwr_relaxed':
-                    self.dwr_estimation()
-                    self.get_isotropic_metric()
-                    M = self.M.copy()
-                    self.dwr_estimation_adjoint()
-                    self.get_isotropic_metric()
-                    self.M = metric_relaxation(M, self.M)
-                elif self.approach == 'dwr_superposed':
-                    self.dwr_estimation()
-                    self.get_isotropic_metric()
-                    M = self.M.copy()
-                    self.dwr_estimation_adjoint()
-                    self.get_isotropic_metric()
-                    self.M = metric_intersection(M, self.M)
-                elif self.approach == 'dwr_anisotropic':
-                    self.get_anisotropic_metric(adjoint=False)
-                elif self.approach == 'dwr_anisotropic_adjoint':
-                    self.get_anisotropic_metric(adjoint=True)
-                elif self.approach == 'dwr_anisotropic_relaxed':
-                    self.get_anisotropic_metric(adjoint=False)
-                    M = self.M.copy()
-                    self.get_anisotropic_metric(adjoint=True)
-                    self.M = metric_relaxation(M, self.M)
-                elif self.approach == 'dwr_anisotropic_superposed':
-                    self.get_anisotropic_metric(adjoint=False)
-                    M = self.M.copy()
-                    self.get_anisotropic_metric(adjoint=True)
-                    self.M = metric_intersection(M, self.M)
-                elif self.approach == 'hybrid':
-                    self.dwr_estimation()
-                    self.get_isotropic_metric()
-                    M = self.M.copy()
-                    self.get_anisotropic_metric(adjoint=False)
-                    self.M = metric_intersection(M, self.M)
-                elif self.approach == 'power':
-                    self.explicit_estimation_adjoint(square=False)
-                    H = self.get_hessian(adjoint=False)
-                    for i in range(len(self.indicator.dat.data)):
-                        H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                    self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
-                elif self.approach == 'power_adjoint':
-                    self.explicit_estimation(square=False)
-                    H = self.get_hessian(adjoint=True)
-                    for i in range(len(self.indicator.dat.data)):
-                        H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                    self.M = steady_metric(self.solution, H=H, op=self.op)
-                elif self.approach == 'power_relaxed':
-                    self.explicit_estimation(square=False)
-                    H = self.get_hessian(adjoint=True)
-                    for i in range(len(self.indicator.dat.data)):
-                        H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                    indicator = self.indicator.copy()
-                    self.explicit_estimation_adjoint(square=False)
-                    H2 = self.get_hessian(adjoint=False)
-                    for i in range(len(self.indicator.dat.data)):
-                        H.dat.data[i][:,:] += H2.dat.data[i]*np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                        H.dat.data[i][:,:] /= np.abs(indicator.dat.data[i]) + np.abs(self.indicator.dat.data[i])
-                    self.M = steady_metric(self.solution+self.adjoint_solution, mesh=self.mesh, H=H, op=self.op)
-                elif self.approach == 'power_superposed':
-                    self.explicit_estimation(square=False)
-                    H = self.get_hessian(adjoint=True)
-                    for i in range(len(self.indicator.dat.data)):                 # TODO: use pyop2
-                        H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                    M = steady_metric(self.solution, H=H, op=self.op)
-                    self.explicit_estimation_adjoint(square=False)
-                    H = self.get_hessian(adjoint=False)
-                    for i in range(len(self.indicator.dat.data)):
-                        H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                    self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
-                    self.M = metric_intersection(M, self.M)
-                else:
-                    raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
+                raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
             # Apply metric relaxation, if requested
-            self.M_unrelaxed = self.M.copy()
             if prev_metric is not None:
-                self.M.project(metric_relaxation(project(prev_metric, self.P1_ten), self.M, relaxation_parameter))
+                if self.M is None:
+                    self.M.project(project(prev_metric, self.P1_ten))
+                else:
+                    self.M_unrelaxed = self.M.copy()
+                    self.M.project(metric_relaxation(project(prev_metric, self.P1_ten), self.M, relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
 
             # Adapt mesh
-            #self.mesh = adapt(self.mesh, self.M)
-            self.mesh = multi_adapt(self.M, op=self.op)
+            if self.M is not None:
+                #self.mesh = adapt(self.mesh, self.M)
+                self.mesh = multi_adapt(self.M, op=self.op)
 
-            # Re-establish function spaces
-            self.V = FunctionSpace(self.mesh, self.finite_element)
-            self.P0 = FunctionSpace(self.mesh, "DG", 0)
-            self.P1 = FunctionSpace(self.mesh, "CG", 1)
-            self.P1DG = FunctionSpace(self.mesh, "DG", 1)
-            self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
-            self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
-            self.test = TestFunction(self.V)
-            self.trial = TrialFunction(self.V)
-            self.n = FacetNormal(self.mesh)
-            self.h = CellSize(self.mesh)
+                # Re-establish function spaces
+                self.V = FunctionSpace(self.mesh, self.finite_element)
+                self.P0 = FunctionSpace(self.mesh, "DG", 0)
+                self.P1 = FunctionSpace(self.mesh, "CG", 1)
+                self.P1DG = FunctionSpace(self.mesh, "DG", 1)
+                self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
+                self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
+                self.test = TestFunction(self.V)
+                self.trial = TrialFunction(self.V)
+                self.n = FacetNormal(self.mesh)
+                self.h = CellSize(self.mesh)
 
             # Plot results
             self.plot()

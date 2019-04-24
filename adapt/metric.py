@@ -45,11 +45,16 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
 
     if op.restrict in ('error', 'num_cells'):
         if op.restrict == 'error':
-            #rescale = Constant(1/op.desired_error)
             #rescale = interpolate(1/(op.desired_error*max_value(abs(f), f_min)), P1)
-            rescale = Constant(1/op.desired_error / max(norm(f), f_min))
+            if f is None:
+                rescale = Constant(1/op.desired_error)
+            else:
+                rescale = Constant(1/op.desired_error / max(norm(f), f_min))
         elif op.restrict == 'num_cells':
-            rescale = Constant(op.target_vertices / max(norm(f), f_min))
+            if f is None:
+                rescale = Constant(op.target_vertices)
+            else:
+                rescale = Constant(op.target_vertices / max(norm(f), f_min))
             #rescale = interpolate(op.target_vertices / max_value(abs(f), f_min), P1)
         kernel_str = """
 #include <Eigen/Dense>
@@ -155,7 +160,9 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
     # Normalise indicator and project into P1 space
     f_norm = min(max(norm(f), op.min_norm), op.max_norm)
     scaling = 1/op.desired_error if op.restrict == 'error' else op.target_vertices
+    #g = project(scaling*f/f_norm, FunctionSpace(mesh, "CG", 1))
     g = project(scaling*abs(f)/f_norm, FunctionSpace(mesh, "CG", 1))
+    #g = interpolate(scaling*abs(f)/f_norm, FunctionSpace(mesh, "CG", 1))
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
