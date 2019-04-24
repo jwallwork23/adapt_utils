@@ -378,22 +378,6 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
         solver_obj.iterate()
         self.solution = solver_obj.fields.tracer_2d
 
-    def solve(self):
-        self.remesh_step = 0
-        while self.step_end <= self.op.end_time:
-            if self.approach != 'fixed_mesh':
-                self.adapt_mesh()
-                if self.remesh_step != 0:
-                    self.interpolate_solution()
-                else:
-                    self.solution = self.op.set_initial_condition(self.V)
-                    self.adapt_mesh()  # adapt again
-                    self.solution = self.op.set_initial_condition(self.V)
-            #print('J_val = {:.4e}'.format(assemble(self.solution*dx)))
-            self.solve_step()
-            self.step_end += self.op.dt*self.op.dt_per_remesh
-            self.remesh_step += 1
-
     def objective_functional(self):  # TODO: Put in particular instance
         self.objective, self.objective_error = self.cb.__call__()
         return self.objective
