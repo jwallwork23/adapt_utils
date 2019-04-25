@@ -7,7 +7,7 @@ import numpy as np
 from adapt_utils.options import Options
 
 
-__all__ = ["TwoTurbineOptions"]
+__all__ = ["TwoTurbineOptions", "UnsteadyTwoTurbineOptions"]
 
 
 class TwoTurbineOptions(Options):
@@ -76,15 +76,36 @@ class UnsteadyTwoTurbineOptions(TwoTurbineOptions):
         self.dt = 3
         #self.T_tide = 1.24*3600 
         self.T_tide = 1.24*60 
-        self.T_ramp = 1*T_tide
-        self.end_time = T_ramp+2*T_tide
+        self.T_ramp = 1*self.T_tide
+        self.end_time = self.T_ramp+2*self.T_tide
         self.dt_per_export = 10
         self.dt_per_remesh = 20
         self.t_const = Constant(0.)
         self.hmax = Constant(0.5)
         self.omega = Constant(2*math.pi/self.T_tide)
+        self.timestepper = 'CrankNicolson'
+        self.di = self.directory()  # FIXME
 
-    def update_forcings(self, t):
-        self.t_const.assign(t)
-        self.elev_func_in.assign(self.hmax*math.cos(self.omega*(t_const-self.T_ramp)))
-        self.elev_func_out.assign(self.hmax*math.cos(self.omega*(t_const-self.T_ramp)+math.pi))
+    def set_initial_velocity(self, fs):
+        self.uv_init = Function(fs).interpolate(as_vector([1e-8, 0.]))
+        return self.uv_init
+
+    def set_initial_surface(self, fs):
+        x, y = SpatialCoordinate(fs.mesh())
+        self.elev_init = Function(fs).interpolate(-1/3000*x)
+        return self.elev_init
+
+    def set_boundary_surface(self, fs):
+        self.elev_in = Function(fs)
+        self.elev_out = Function(fs)
+
+    def set_bcs(self):
+        left_tag = 1
+        right_tag = 2
+        top_bottom_tag = 3
+        freeslip_bc = {'un': Constant(0.)}
+        self.boundary_conditions = {
+          left_tag: {'elev': self.elev_in},
+          right_tag: {'elev': self.elev_out},
+          top_bottom_tag: freeslip_bc,
+        }

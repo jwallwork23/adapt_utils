@@ -14,7 +14,7 @@ from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 
 
-__all__ = ["MeshOptimisation", "OuterLoop"]
+__all__ = ["SteadyProblem", "UnsteadyProblem", "MeshOptimisation", "OuterLoop"]
 
 
 now = datetime.datetime.now()
@@ -608,7 +608,7 @@ class UnsteadyProblem():
                  discrete_adjoint=False,
                  op=DefaultOptions(),
                  high_order=False,
-                 prev_solution=None):
+                 prev_solution=None):   # TODO: This is redundant
         self.mesh = mesh
         self.finite_element = finite_element
         self.approach = approach
@@ -640,6 +640,9 @@ class UnsteadyProblem():
         self.solution_file = File(self.di + 'solution.pvd')
         self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
         self.indicator_file = File(self.di + 'indicator.pvd')
+
+        # Adaptivity
+        self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
 
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         """

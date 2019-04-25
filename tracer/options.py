@@ -2,6 +2,7 @@ from firedrake import *
 from firedrake_adjoint import *
 from thetis.configuration import *
 import math
+from scipy.special import kn
 
 from adapt_utils.options import Options
 from adapt_utils.misc import *
@@ -186,12 +187,15 @@ class TelemacOptions(TracerOptions):
         x0, y0, r = self.source_loc[0]
         u = self.set_velocity(VectorFunctionSpace(fs.mesh(), fs.ufl_element()))
         nu = self.set_diffusivity(fs)
+        #q = 0.01  # sediment discharge of source (kg/s)
+        q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
-        q = 0.01  # sediment discharge of source (kg/s)
-        xc = x - self.offset
-        self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*xc/nu)*bessk0(0.5*u[0]*r/nu))
+        self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
+        #self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu))
+        #tmp = Function(fs).interpolate(0.5*u[0]*r/nu)
+        #self.solution.dat.data[:] *= kn(0, tmp.dat.data)
         outfile = File(self.directory() + 'analytic.pvd')
-        outfile.write(self.solution)  # NOTE: use 28 discretisation levels in ParaView
+        outfile.write(self.solution)  # NOTE: use 40 discretisation levels in ParaView
         return self.solution
 
     def exact_objective(self, fs1, fs2):
@@ -249,7 +253,7 @@ class LeVequeOptions(TracerOptions):
         slot += 0.5*cyl_r2*math.atan(slot_left/math.sqrt(cyl_r2 - slot_left**2))
         #self.J_exact = 1 + bell + cone + cyl - slot
         self.J_exact = 1 + cyl - slot
-        print("Exact objective: {:.4e}".format(self.J_exact))  # TODO: Check this
+        #print("Exact objective: {:.4e}".format(self.J_exact))  # TODO: Check this
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(0.)  # TODO: could use None?

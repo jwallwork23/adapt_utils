@@ -326,9 +326,6 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
         # Classification
         self.nonlinear = False
 
-        # Adaptivity
-        self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
-
     def set_fields(self):
         self.nu = self.op.set_diffusivity(self.V)
         self.u = self.op.set_velocity(self.P1_vec)

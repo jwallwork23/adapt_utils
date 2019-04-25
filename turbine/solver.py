@@ -2,14 +2,14 @@ from thetis_adjoint import *
 import pyadjoint
 import math
 
-from adapt_utils.solver import SteadyProblem
-from adapt_utils.turbine.options import TwoTurbineOptions
+from adapt_utils.solver import *
+from adapt_utils.turbine.options import *
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.interpolation import *
 
 
-__all__ = ["SteadyTurbineProblem"]
+__all__ = ["SteadyTurbineProblem", "UnsteadyTurbineProblem"]
 
 
 class SteadyTurbineProblem(SteadyProblem):
@@ -51,9 +51,8 @@ class SteadyTurbineProblem(SteadyProblem):
         self.prev_solution = prev_solution
         if prev_solution is not None:
             self.interpolate_solution()
-        # TODO: Generalise below
 
-        # Physical fields and boundary values
+        # Physical fields and boundary values  TODO: set in options
         self.viscosity = Constant(self.op.viscosity)
         self.drag_coefficient = Constant(self.op.drag_coefficient)
         self.op.set_inflow(self.P1_vec)
@@ -142,7 +141,7 @@ class SteadyTurbineProblem(SteadyProblem):
             M = steady_metric(eta, op=self.op)
             self.M = metric_intersection(self.M, M)
 
-    def explicit_estimation(self):  # TODO: test
+    def explicit_estimation(self):
         with pyadjoint.stop_annotating():
             cell_res = self.ts.cell_residual()
             #edge_res = self.ts.edge_residual()
@@ -243,7 +242,7 @@ class SteadyTurbineProblem(SteadyProblem):
 
         # TODO: boundary contributions
 
-    def custom_adapt(self):  # FIXME
+    def custom_adapt(self):
         if self.approach == 'vorticity':
             self.indicator = Function(self.P1, name='vorticity')
             self.indicator.interpolate(curl(self.solution.split()[0]))
@@ -275,3 +274,190 @@ class SteadyTurbineProblem(SteadyProblem):
         #self.interpolated_solution = Function(self.V.sub(0))
         #self.interpolated_solution.project(self.prev_solution.split()[0])
         self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
+
+
+class UnsteadyTurbineProblem(UnsteadyProblem):
+    # TODO: doc
+    def __init__(self,
+                 mesh=None,
+                 approach='fixed_mesh',
+                 stab=None,
+                 discrete_adjoint=True,
+                 op=UnsteadyTwoTurbineOptions(),
+                 high_order=False):  # TODO
+        if op.family == 'dg-dg' and op.degree in (1, 2):
+            finite_element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
+        elif op.family == 'dg-cg':
+            finite_element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
+        else:
+            raise NotImplementedError
+        if mesh is None:
+            mesh = op.default_mesh
+        super(UnsteadyTurbineProblem, self).__init__(mesh,
+                                                     finite_element,
+                                                     approach,
+                                                     stab,
+                                                     discrete_adjoint,
+                                                     op,
+                                                     high_order)
+
+        # Physical fields and boundary values  TODO: set in options
+        self.viscosity = Constant(self.op.viscosity)
+        self.drag_coefficient = Constant(self.op.drag_coefficient)
+        self.op.set_inflow(self.P1_vec)
+
+        # Parameters for adjoint computation
+        self.gradient_field = self.op.bathymetry
+        z, zeta = self.adjoint_solution.split()
+        z.rename("Adjoint fluid velocity")
+        zeta.rename("Adjoint elevation")
+
+        # Classification
+        self.nonlinear = True
+
+        # Set ICs
+        self.uv = op.set_initial_velocity(self.P1_vec)
+        self.elev = op.set_initial_surface(self.P1DG)
+        op.set_boundary_surface(self.P1DG)
+
+    def set_fields(self):
+        raise NotImplementedError
+
+    def solve_step(self):
+        #self.set_fields()
+        op = self.op
+        solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
+        options = solver_obj.options
+        options.timestepper_type = op.timestepper
+        options.timestep = op.dt
+        options.simulation_export_time = op.dt*op.dt_per_export
+        options.simulation_end_time = self.step_end-0.5*op.dt
+        options.output_directory = op.di
+        options.check_volume_conservation_2d = True
+        options.use_grad_div_viscosity_term = op.symmetric_viscosity
+        options.element_family = op.family
+        #options.timestepper_options.solver_parameters['pc_factor_mat_solver_type'] = 'mumps'
+        #options.timestepper_options.solver_parameters['snes_monitor'] = None
+        #options.timestepper_options.implicitness_theta = 1.0
+        options.horizontal_viscosity = self.viscosity
+        options.quadratic_drag_coefficient = self.drag_coefficient
+        options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
+        options.use_grad_depth_viscosity_term = False
+        options.compute_residuals = True
+        op.set_bcs()
+        solver_obj.bnd_functions['shallow_water'] = op.boundary_conditions
+
+        # We haven't meshed the turbines with separate ids, so define a farm everywhere
+        # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
+        # and 0 outside
+        scaling = len(op.region_of_interest)/assemble(op.bump(self.mesh)*dx)
+        self.turbine_density = op.bump(self.mesh, scale=scaling)
+        #File(op.directory()+'Bump.pvd').write(turbine_density)
+
+        farm_options = TidalTurbineFarmOptions()
+        farm_options.turbine_density = self.turbine_density
+        farm_options.turbine_options.diameter = op.turbine_diameter
+        farm_options.turbine_options.thrust_coefficient = op.thrust_coefficient
+        # Turbine drag is applied everywhere (where the turbine density isn't zero)
+        options.tidal_turbine_farms["everywhere"] = farm_options
+
+        # Callback that computes average power
+        cb = turbines.TurbineFunctionalCallback(solver_obj)
+        solver_obj.add_callback(cb, 'timestep')
+
+        # Solve and extract data
+        solver_obj.assign_initial_conditions(uv=self.uv, elev=self.elev)
+
+        # ensure correct iteration count
+        solver_obj.i_export = self.remesh_step
+        solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
+        solver_obj.iteration = self.remesh_step*op.dt_per_remesh
+        solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
+        for e in solver_obj.exporters.values():
+            e.set_next_export_ix(solver_obj.i_export)
+
+        def update_forcings(t):  # FIXME
+            op.t_const.assign(t)
+            op.elev_in.assign(op.hmax*cos(op.omega*(op.t_const-op.T_ramp)))
+            op.elev_out.assign(op.hmax*cos(op.omega*(op.t_const-op.T_ramp)+pi))
+        update_forcings(0.)
+
+        solver_obj.iterate(update_forcings=update_forcings)
+        self.solution.assign(solver_obj.fields.solution_2d)
+        uv, elev = self.solution.split()
+        self.uv.assign(uv)
+        self.elev.assign(elev)
+        self.objective = cb.average_power
+        self.ts = solver_obj.timestepper
+
+    def objective_functional(self):
+        raise NotImplementedError  # TODO
+
+    def get_hessian_metric(self, adjoint=False):
+        sol = self.adjoint_solution if adjoint else self.solution
+        u, eta = sol.split()
+        if self.op.adapt_field in ('fluid_speed', 'both'):
+            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
+            self.M = steady_metric(spd, op=self.op)
+        elif self.op.adapt_field == 'elevation':
+            self.M = steady_metric(eta, op=self.op)
+        if self.op.adapt_field == 'both':
+            M = steady_metric(eta, op=self.op)
+            self.M = metric_intersection(self.M, M)
+
+    def explicit_estimation(self):
+        with pyadjoint.stop_annotating():
+            cell_res = self.ts.cell_residual()
+            #edge_res = self.ts.edge_residual()
+            self.residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
+            self.residuals[0].project(abs(cell_res[0]))
+            self.residuals[1].project(abs(cell_res[1]))
+            self.residuals[2].project(abs(cell_res[2]))
+            if self.approach == 'explicit':
+                self.indicator = Function(self.P1)
+                res_dot = self.residuals[0]*self.residuals[0]
+                res_dot += self.residuals[1]*self.residuals[1]
+                res_dot += self.residuals[2]*self.residuals[2]
+                self.indicator.interpolate(res_dot)
+            #self.indicator.project(cell_res + edge_res)
+
+    def explicit_estimation_adjoint(self):
+        raise NotImplementedError  # TODO
+
+    def dwr_estimation(self):  # TODO: Different flavours of DWR
+        with pyadjoint.stop_annotating():
+            cell_res = self.ts.cell_residual(self.adjoint_solution)
+            edge_res = self.ts.edge_residual(self.adjoint_solution)
+            self.indicator = Function(self.P0)
+            self.indicator.project(cell_res + edge_res)
+
+    def dwr_estimation_adjoint(self):
+        raise NotImplementedError  # TODO
+
+    def get_anisotropic_metric(self, adjoint=False, relax=True, superpose=False):
+        raise NotImplementedError  # TODO
+
+    def custom_adapt(self):
+        if self.approach == 'vorticity':
+            self.indicator = Function(self.P1, name='vorticity')
+            self.indicator.interpolate(curl(self.solution.split()[0]))
+            self.get_isotropic_metric()
+        elif self.approach == 'Power':
+            self.explicit_estimation()
+            self.indicator = Function(self.P0)
+            self.indicator.interpolate(sqrt(self.residuals[0]*self.residuals[0]+self.residuals[1]*self.residuals[1]))
+            z, zeta = self.adjoint_solution.split()
+            #spd = sqrt(inner(z,z))
+            #H1 = construct_hessian(spd, mesh=self.mesh, op=self.op)
+            H1 = construct_hessian(z[0], mesh=self.mesh, op=self.op)  # TODO: should take abs
+            H2 = construct_hessian(z[1], mesh=self.mesh, op=self.op)
+            H3 = construct_hessian(zeta, mesh=self.mesh, op=self.op)
+            self.M = Function(self.P1_ten)
+            for i in range(self.mesh.num_vertices()):
+                #self.M.dat.data[i][:, :] += self.indicator.dat.data[i]*H1.dat.data[i]
+                self.M.dat.data[i][:, :] += self.residuals[0].dat.data[i]*H1.dat.data[i]
+                self.M.dat.data[i][:, :] += self.residuals[1].dat.data[i]*H2.dat.data[i]
+                self.M.dat.data[i][:, :] += self.residuals[2].dat.data[i]*H3.dat.data[i]
+            self.M = steady_metric(None, H=self.M, mesh=self.mesh, op=self.op)
+
+
