@@ -11,7 +11,7 @@ __all__ = ["steady_metric", "isotropic_metric", "anisotropic_refinement", "grada
            "metric_intersection", "metric_relaxation", "metric_complexity"]
 
 
-def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
+def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
@@ -43,8 +43,10 @@ def steady_metric(f, H=None, mesh=None, op=DefaultOptions()):
     ih_max2 = Constant(1/op.h_max**2)
     f_min = 1e-3
 
-    if op.restrict in ('error', 'num_cells'):
-        if op.restrict == 'error':
+    if op.restrict in ('error', 'num_cells') or noscale:
+        if noscale:
+            rescale = Constant(1)
+        elif op.restrict == 'error':
             #rescale = interpolate(1/(op.desired_error*max_value(abs(f), f_min)), P1)
             if f is None:
                 rescale = Constant(1/op.desired_error)
