@@ -3,7 +3,7 @@ import pyadjoint
 import math
 
 from adapt_utils.solver import SteadyProblem
-from adapt_utils.turbine.options import TurbineOptions
+from adapt_utils.turbine.options import TwoTurbineOptions
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.interpolation import *
@@ -22,7 +22,7 @@ class SteadyTurbineProblem(SteadyProblem):
                  approach='fixed_mesh',
                  stab=None,
                  discrete_adjoint=True,
-                 op=TurbineOptions(),
+                 op=TwoTurbineOptions(),
                  high_order=False,  # TODO
                  prev_solution=None):
         if op.family == 'dg-dg' and op.degree in (1, 2):
@@ -53,29 +53,13 @@ class SteadyTurbineProblem(SteadyProblem):
             self.interpolate_solution()
         # TODO: Generalise below
 
-        # If we solve with PressureProjectionPicard (theta=1.0) it seems to converge (power output
-        # to 7 digits) in roughly 800 timesteps of 20s with SteadyState we only do 1 timestep 
-        # (t_end should be slightly smaller than timestep to achieve this)
-        self.t_end = 0.9*op.dt
-
         # Physical fields and boundary values
-        depth = 40.
-        self.bathy = Constant(depth)
         self.viscosity = Constant(self.op.viscosity)
         self.drag_coefficient = Constant(self.op.drag_coefficient)
-        self.inflow = Function(self.P1_vec).interpolate(as_vector([3., 0.]))
-
-        # Correction to account for the fact that the thrust coefficient is based on an upstream
-        # velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
-        # Piggott 2016, eq. (15))
-        D = self.op.turbine_diameter
-        A_T = math.pi*(D/2)**2
-        self.correction = 4/(1+math.sqrt(1-A_T/(depth*D)))**2
-        self.op.thrust_coefficient *= self.correction
-        # NOTE, that we're not yet correcting power output here, so that will be overestimated
+        self.op.set_inflow(self.P1_vec)
 
         # Parameters for adjoint computation
-        self.gradient_field = self.bathy
+        self.gradient_field = self.op.bathymetry
         z, zeta = self.adjoint_solution.split()
         z.rename("Adjoint fluid velocity")
         zeta.rename("Adjoint elevation")
@@ -87,12 +71,12 @@ class SteadyTurbineProblem(SteadyProblem):
         """
         Create a Thetis FlowSolver2d object for solving the (modified) shallow water equations and solve.
         """
-        solver_obj = solver2d.FlowSolver2d(self.mesh, self.bathy)
-        options = solver_obj.options
         op = self.op
+        solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
+        options = solver_obj.options
         options.timestep = op.dt
         options.simulation_export_time = op.dt
-        options.simulation_end_time = self.t_end
+        options.simulation_end_time = op.end_time
         options.output_directory = op.directory()
         options.check_volume_conservation_2d = True
         options.use_grad_div_viscosity_term = op.symmetric_viscosity
@@ -105,22 +89,12 @@ class SteadyTurbineProblem(SteadyProblem):
         options.quadratic_drag_coefficient = self.drag_coefficient
         options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
         options.use_grad_depth_viscosity_term = False
-        #options.compute_residuals = self.approach in ('dwr', 'dwr_adjoint', 'dwr_both', 'dwr_averaged', 'dwr_relaxed', 'dwr_superposed')
         options.compute_residuals = True
-
-        # Assign boundary conditions
-        left_tag = 1
-        right_tag = 2
-        top_bottom_tag = 3
-        freeslip_bc = {'un': Constant(0.)}
-        solver_obj.bnd_functions['shallow_water'] = {
-          left_tag: {'uv': self.inflow},
-          right_tag: {'elev': Constant(0.)},
-          top_bottom_tag: freeslip_bc,
-        }
+        op.set_bcs()
+        solver_obj.bnd_functions['shallow_water'] = op.boundary_conditions
 
         # We haven't meshed the turbines with separate ids, so define a farm everywhere
-        # and make it have a density of 1/D^2 inside the two DxD squares where the turbines are
+        # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
         # and 0 outside
         scaling = len(op.region_of_interest)/assemble(op.bump(self.mesh)*dx)
         self.turbine_density = op.bump(self.mesh, scale=scaling)
@@ -141,7 +115,7 @@ class SteadyTurbineProblem(SteadyProblem):
         if self.prev_solution is not None:
             solver_obj.assign_initial_conditions(uv=self.interpolated_solution)
         else:
-            solver_obj.assign_initial_conditions(uv=self.inflow)
+            solver_obj.assign_initial_conditions(uv=self.op.inflow)
         solver_obj.iterate()
         self.solution.assign(solver_obj.fields.solution_2d)
         self.objective = cb.average_power
@@ -168,12 +142,21 @@ class SteadyTurbineProblem(SteadyProblem):
             M = steady_metric(eta, op=self.op)
             self.M = metric_intersection(self.M, M)
 
-    def explicit_estimation(self):
+    def explicit_estimation(self):  # TODO: test
         with pyadjoint.stop_annotating():
             cell_res = self.ts.cell_residual()
-            edge_res = self.ts.edge_residual()
-            self.indicator = Function(self.P0)
-            self.indicator.project(cell_res + edge_res)
+            #edge_res = self.ts.edge_residual()
+            self.residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
+            self.residuals[0].project(abs(cell_res[0]))
+            self.residuals[1].project(abs(cell_res[1]))
+            self.residuals[2].project(abs(cell_res[2]))
+            if self.approach == 'explicit':
+                self.indicator = Function(self.P1)
+                res_dot = self.residuals[0]*self.residuals[0]
+                res_dot += self.residuals[1]*self.residuals[1]
+                res_dot += self.residuals[2]*self.residuals[2]
+                self.indicator.interpolate(res_dot)
+            #self.indicator.project(cell_res + edge_res)
 
     def explicit_estimation_adjoint(self):
         raise NotImplementedError  # TODO
@@ -197,7 +180,7 @@ class SteadyTurbineProblem(SteadyProblem):
         z1_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(z[1], mesh=self.mesh)))
         zeta_diff = Function(self.P1_vec).interpolate(construct_gradient(zeta))
         z_p1 = Function(self.P1_vec).interpolate(abs(z))
-        b = self.bathy
+        b = self.op.bathymetry
         H = eta + b
         g = 9.81
         nu = self.viscosity
@@ -260,11 +243,29 @@ class SteadyTurbineProblem(SteadyProblem):
 
         # TODO: boundary contributions
 
-    def custom_adapt(self):
+    def custom_adapt(self):  # FIXME
         if self.approach == 'vorticity':
             self.indicator = Function(self.P1, name='vorticity')
             self.indicator.interpolate(curl(self.solution.split()[0]))
             self.get_isotropic_metric()
+        elif self.approach == 'Power':
+            self.explicit_estimation()
+            self.indicator = Function(self.P0)
+            self.indicator.interpolate(sqrt(self.residuals[0]*self.residuals[0]+self.residuals[1]*self.residuals[1]))
+            z, zeta = self.adjoint_solution.split()
+            #spd = sqrt(inner(z,z))
+            #H1 = construct_hessian(spd, mesh=self.mesh, op=self.op)
+            H1 = construct_hessian(z[0], mesh=self.mesh, op=self.op)  # TODO: should take abs
+            H2 = construct_hessian(z[1], mesh=self.mesh, op=self.op)
+            H3 = construct_hessian(zeta, mesh=self.mesh, op=self.op)
+            self.M = Function(self.P1_ten)
+            for i in range(self.mesh.num_vertices()):
+                #self.M.dat.data[i][:, :] += self.indicator.dat.data[i]*H1.dat.data[i]
+                self.M.dat.data[i][:, :] += self.residuals[0].dat.data[i]*H1.dat.data[i]
+                self.M.dat.data[i][:, :] += self.residuals[1].dat.data[i]*H2.dat.data[i]
+                self.M.dat.data[i][:, :] += self.residuals[2].dat.data[i]*H3.dat.data[i]
+            self.M = steady_metric(None, H=self.M, mesh=self.mesh, op=self.op)
+            File('outputs/test.pvd').write(self.M)
 
     def interpolate_solution(self):
         """
