@@ -17,6 +17,14 @@ class TwoTurbineOptions(Options):
     # solver parameters
     dt = PositiveFloat(20.).tag(config=True)
     end_time = PositiveFloat(18.).tag(config=True)
+    params = PETScSolverParameters({
+             'mat_type': 'aij',
+             'ksp_type': 'preonly',
+             'pc_type': 'lu',
+             'pc_factor_mat_solver_type': 'mumps',
+             'snes_type': 'newtonls',
+             'snes_monitor': None,
+             }).tag(config=True)
 
     # adaptivity parameters
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
@@ -26,7 +34,7 @@ class TwoTurbineOptions(Options):
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
     # physical parameters
-    viscosity = NonNegativeFloat(1.).tag(config=True)
+    base_viscosity = NonNegativeFloat(1.).tag(config=True)
     symmetric_viscosity = Bool(False, help="Symmetrise viscosity term").tag(config=True)
     drag_coefficient = NonNegativeFloat(0.0025).tag(config=True)
 
@@ -44,6 +52,7 @@ class TwoTurbineOptions(Options):
             raise ValueError('Field for adaptation {:s} not recognised.'.format(self.adapt_field))
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
         self.bathymetry = Constant(40.)
+        self.viscosity = Constant(self.base_viscosity)
 
         # Correction to account for the fact that the thrust coefficient is based on an upstream
         # velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
@@ -53,6 +62,10 @@ class TwoTurbineOptions(Options):
         correction = 4/(1+math.sqrt(1-A_T/(40.*D)))**2
         self.thrust_coefficient *= correction
         # NOTE, that we're not yet correcting power output here, so that will be overestimated
+
+    def set_viscosity(self):
+        self.viscosity.assign(self.base_viscosity)
+        return self.viscosity
 
     def set_bcs(self):
         left_tag = 1
@@ -73,18 +86,36 @@ class TwoTurbineOptions(Options):
 class UnsteadyTwoTurbineOptions(TwoTurbineOptions):
     def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
         super(UnsteadyTwoTurbineOptions, self).__init__(approach)
+
+        # Solver
+        #self.params = {'ksp_type': 'gmres',
+        #               'pc_type': 'fieldsplit',
+        #               'pc_fieldsplit_type': 'multiplicative',
+        #               'snes_type': 'newtonls',
+        #               #'snes_rtol': 1e-5,
+        #               'snes_monitor': None,}
+        #self.params = {'ksp_type': 'gmres',
+        #               'pc_type': 'lu',
+        #               'pc_factor_mat_solver_type': 'mumps',
+        #               'snes_type': 'newtonls',
+        #               'snes_monitor': None,}
+
+        # Time period and discretisation
         self.dt = 3
+        self.timestepper = 'CrankNicolson'
         self.T_tide = 1.24*3600
         self.T_ramp = 1*self.T_tide
         self.end_time = self.T_ramp+2*self.T_tide
-        self.dt_per_export = 5
+        self.dt_per_export = 10
         self.dt_per_remesh = 20
-        #self.t_const = Constant(0.)
+
+        # Boundary forcing
         self.hmax = 0.5
         self.omega = 2*math.pi/self.T_tide
-        self.timestepper = 'CrankNicolson'
-        self.di = self.directory()  # FIXME
 
+        # Turbines
+        self.viscosity = 3.
+        self.thrust_coefficient = 7.6
         self.region_of_interest = [(325., 100., 9.), (675., 100., 9.)]  # Centred
 
     def set_initial_velocity(self, fs):

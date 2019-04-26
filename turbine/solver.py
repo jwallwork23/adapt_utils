@@ -52,10 +52,8 @@ class SteadyTurbineProblem(SteadyProblem):
         if prev_solution is not None:
             self.interpolate_solution()
 
-        # Physical fields and boundary values  TODO: set in options
-        self.viscosity = Constant(self.op.viscosity)
-        self.drag_coefficient = Constant(self.op.drag_coefficient)
-        self.op.set_inflow(self.P1_vec)
+        # Physical fields
+        self.set_fields()
 
         # Parameters for adjoint computation
         self.gradient_field = self.op.bathymetry
@@ -65,6 +63,11 @@ class SteadyTurbineProblem(SteadyProblem):
 
         # Classification
         self.nonlinear = True
+
+    def set_fields(self):
+        self.viscosity = self.op.set_viscosity()
+        self.inflow = self.op.set_inflow(self.P1_vec)
+        self.drag_coefficient = Constant(self.op.drag_coefficient)
 
     def solve(self):
         """
@@ -76,13 +79,13 @@ class SteadyTurbineProblem(SteadyProblem):
         options.timestep = op.dt
         options.simulation_export_time = op.dt
         options.simulation_end_time = op.end_time
-        options.output_directory = op.directory()
+        options.output_directory = op.di
         options.check_volume_conservation_2d = True
         options.use_grad_div_viscosity_term = op.symmetric_viscosity
         options.element_family = op.family
         options.timestepper_type = 'SteadyState'
-        options.timestepper_options.solver_parameters['pc_factor_mat_solver_type'] = 'mumps'
-        options.timestepper_options.solver_parameters['snes_monitor'] = None
+        options.timestepper_options.solver_parameters = op.params
+        print(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
         options.horizontal_viscosity = self.viscosity
         options.quadratic_drag_coefficient = self.drag_coefficient
@@ -97,7 +100,7 @@ class SteadyTurbineProblem(SteadyProblem):
         # and 0 outside
         scaling = len(op.region_of_interest)/assemble(op.bump(self.mesh)*dx)
         self.turbine_density = op.bump(self.mesh, scale=scaling)
-        #File(op.directory()+'Bump.pvd').write(turbine_density)
+        #File(op.di+'Bump.pvd').write(turbine_density)
 
         farm_options = TidalTurbineFarmOptions()
         farm_options.turbine_density = self.turbine_density
@@ -114,7 +117,7 @@ class SteadyTurbineProblem(SteadyProblem):
         if self.prev_solution is not None:
             solver_obj.assign_initial_conditions(uv=self.interpolated_solution)
         else:
-            solver_obj.assign_initial_conditions(uv=self.op.inflow)
+            solver_obj.assign_initial_conditions(uv=self.inflow)
         solver_obj.iterate()
         self.solution.assign(solver_obj.fields.solution_2d)
         self.objective = cb.average_power
@@ -144,17 +147,26 @@ class SteadyTurbineProblem(SteadyProblem):
     def explicit_estimation(self):
         with pyadjoint.stop_annotating():
             cell_res = self.ts.cell_residual()
-            #edge_res = self.ts.edge_residual()
-            self.residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
-            self.residuals[0].project(abs(cell_res[0]))
-            self.residuals[1].project(abs(cell_res[1]))
-            self.residuals[2].project(abs(cell_res[2]))
+            self.cell_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
+            self.cell_residuals[0].project(abs(cell_res[0]))
+            self.cell_residuals[1].project(abs(cell_res[1]))
+            self.cell_residuals[2].project(abs(cell_res[2]))
             if self.approach == 'explicit':
                 self.indicator = Function(self.P1)
-                res_dot = self.residuals[0]*self.residuals[0]
-                res_dot += self.residuals[1]*self.residuals[1]
-                res_dot += self.residuals[2]*self.residuals[2]
-                self.indicator.interpolate(res_dot)
+                cell_res_dot = self.cell_residuals[0]*self.cell_residuals[0]
+                cell_res_dot += self.cell_residuals[1]*self.cell_residuals[1]
+                cell_res_dot += self.cell_residuals[2]*self.cell_residuals[2]
+                self.indicator.interpolate(cell_res_dot)
+            #edge_res = self.ts.edge_residual()  # TODO
+            #self.edge_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
+            #self.edge_residuals[0].project(abs(cell_res[0]))
+            #self.edge_residuals[1].project(abs(cell_res[1]))
+            #self.edge_residuals[2].project(abs(cell_res[2]))
+            #if self.approach == 'explicit':
+            #    self.indicator = Function(self.P1)
+            #    edge_res_dot = self.edge_residuals[0]*self.edge_residuals[0]
+            #    edge_res_dot += self.edge_residuals[1]*self.edge_residuals[1]
+            #    edge_res_dot += self.edge_residuals[2]*self.edge_residuals[2]
             #self.indicator.project(cell_res + edge_res)
 
     def explicit_estimation_adjoint(self):
@@ -165,7 +177,12 @@ class SteadyTurbineProblem(SteadyProblem):
             cell_res = self.ts.cell_residual(self.adjoint_solution)
             edge_res = self.ts.edge_residual(self.adjoint_solution)
             self.indicator = Function(self.P0)
-            self.indicator.project(cell_res + edge_res)
+            if self.op.dwr_approach == 'error_representation':
+                self.indicator.project(cell_res + edge_res)
+            elif self.op.dwr_approach == 'AO97':
+                self.indicator.project(self.h*cell_res + 0.5*self.h*self.h*edge_res)
+            else:
+                raise NotImplementedError  # TODO
 
     def dwr_estimation_adjoint(self):
         raise NotImplementedError  # TODO
@@ -249,8 +266,6 @@ class SteadyTurbineProblem(SteadyProblem):
             self.get_isotropic_metric()
         elif self.approach == 'Power':
             self.explicit_estimation()
-            self.indicator = Function(self.P0)
-            self.indicator.interpolate(sqrt(self.residuals[0]*self.residuals[0]+self.residuals[1]*self.residuals[1]))
             z, zeta = self.adjoint_solution.split()
             #spd = sqrt(inner(z,z))
             #H1 = construct_hessian(spd, mesh=self.mesh, op=self.op)
@@ -258,11 +273,12 @@ class SteadyTurbineProblem(SteadyProblem):
             H2 = construct_hessian(z[1], mesh=self.mesh, op=self.op)
             H3 = construct_hessian(zeta, mesh=self.mesh, op=self.op)
             self.M = Function(self.P1_ten)
-            for i in range(self.mesh.num_vertices()):
+            for i in range(self.mesh.num_vertices()):  # TODO: use pyop2
                 #self.M.dat.data[i][:, :] += self.indicator.dat.data[i]*H1.dat.data[i]
-                self.M.dat.data[i][:, :] += self.residuals[0].dat.data[i]*H1.dat.data[i]
-                self.M.dat.data[i][:, :] += self.residuals[1].dat.data[i]*H2.dat.data[i]
-                self.M.dat.data[i][:, :] += self.residuals[2].dat.data[i]*H3.dat.data[i]
+                self.M.dat.data[i][:, :] += self.cell_residuals[0].dat.data[i]*H1.dat.data[i]
+                self.M.dat.data[i][:, :] += self.cell_residuals[1].dat.data[i]*H2.dat.data[i]
+                self.M.dat.data[i][:, :] += self.cell_residuals[2].dat.data[i]*H3.dat.data[i]
+            # TODO: What about edge residuals?
             self.M = steady_metric(None, H=self.M, mesh=self.mesh, op=self.op)
             File('outputs/test.pvd').write(self.M)
 
@@ -301,10 +317,8 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
                                                      op,
                                                      high_order)
 
-        # Physical fields and boundary values  TODO: set in options
-        self.viscosity = Constant(self.op.viscosity)
-        self.drag_coefficient = Constant(self.op.drag_coefficient)
-        self.op.set_inflow(self.P1_vec)
+        # Physical fields
+        self.set_fields()
 
         # Parameters for adjoint computation
         self.gradient_field = self.op.bathymetry
@@ -316,19 +330,22 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         self.nonlinear = True
 
         # Set ICs
-        self.uv = op.set_initial_velocity(self.P1_vec)
-        self.elev = op.set_initial_surface(self.P1DG)
-        op.set_boundary_surface(self.P1DG)
+        self.uv = op.set_initial_velocity(self.V.sub(0))
+        self.elev = op.set_initial_surface(self.V.sub(1))
 
     def set_fields(self):
-        raise NotImplementedError
+        self.viscosity = self.op.set_viscosity()
+        self.drag_coefficient = Constant(self.op.drag_coefficient)
+        self.op.set_boundary_surface(self.V.sub(1))
 
     def solve_step(self):
-        #self.set_fields()
+        self.set_fields()
         op = self.op
         solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
         options = solver_obj.options
         options.timestepper_type = op.timestepper
+        options.timestepper_options.solver_parameters = op.params
+        print(options.timestepper_options.solver_parameters)
         options.timestep = op.dt
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end-0.5*op.dt
@@ -336,23 +353,25 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         options.check_volume_conservation_2d = True
         options.use_grad_div_viscosity_term = op.symmetric_viscosity
         options.element_family = op.family
-        #options.timestepper_options.solver_parameters['pc_factor_mat_solver_type'] = 'mumps'
-        #options.timestepper_options.solver_parameters['snes_monitor'] = None
-        #options.timestepper_options.implicitness_theta = 1.0
-        options.horizontal_viscosity = self.viscosity
+        options.horizontal_viscosity = op.viscosity
         options.quadratic_drag_coefficient = self.drag_coefficient
         options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
         options.use_grad_depth_viscosity_term = False
         options.compute_residuals = True
+
         op.set_bcs()
         solver_obj.bnd_functions['shallow_water'] = op.boundary_conditions
+        def update_forcings(t):
+            op.elev_in.assign(op.hmax*cos(op.omega*(t-op.T_ramp)))
+            op.elev_out.assign(op.hmax*cos(op.omega*(t-op.T_ramp)+pi))
+        update_forcings(0.)
 
         # We haven't meshed the turbines with separate ids, so define a farm everywhere
         # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
         # and 0 outside
         scaling = len(op.region_of_interest)/assemble(op.bump(self.mesh)*dx)
         self.turbine_density = op.bump(self.mesh, scale=scaling)
-        #File(op.directory()+'Bump.pvd').write(turbine_density)
+        #File(op.di+'Bump.pvd').write(turbine_density)
 
         farm_options = TidalTurbineFarmOptions()
         farm_options.turbine_density = self.turbine_density
@@ -365,14 +384,8 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         cb = turbines.TurbineFunctionalCallback(solver_obj)
         solver_obj.add_callback(cb, 'timestep')
 
-        def update_forcings(t):  # FIXME
-            #op.t_const.assign(t)
-            op.elev_in.assign(op.hmax*cos(op.omega*(t-op.T_ramp)))
-            op.elev_out.assign(op.hmax*cos(op.omega*(t-op.T_ramp)+pi))
-        update_forcings(0.)
-
-        # Solve and extract data
         solver_obj.assign_initial_conditions(uv=self.uv, elev=self.elev)
+        #options.timestepper_options.implicitness_theta = 1.0
 
         # ensure correct iteration count
         solver_obj.i_export = self.remesh_step
@@ -391,7 +404,7 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         self.ts = solver_obj.timestepper
 
     def objective_functional(self):
-        raise NotImplementedError  # TODO
+        return self.objective
 
     def get_hessian_metric(self, adjoint=False):
         sol = self.adjoint_solution if adjoint else self.solution
