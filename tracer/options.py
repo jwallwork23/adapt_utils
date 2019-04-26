@@ -55,7 +55,6 @@ class TracerOptions(Options):
         super(TracerOptions, self).__init__(approach)
 
         self.end_time -= 0.5*self.dt
-        self.di = self.directory()  # TODO: surely this should be in __init__ anyway
 
     def set_diffusivity(self, fs):
         pass
@@ -194,7 +193,7 @@ class TelemacOptions(TracerOptions):
         #self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu))
         #tmp = Function(fs).interpolate(0.5*u[0]*r/nu)
         #self.solution.dat.data[:] *= kn(0, tmp.dat.data)
-        outfile = File(self.directory() + 'analytic.pvd')
+        outfile = File(self.di + 'analytic.pvd')
         outfile.write(self.solution)  # NOTE: use 40 discretisation levels in ParaView
         return self.solution
 

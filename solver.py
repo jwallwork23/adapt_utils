@@ -66,9 +66,8 @@ class SteadyProblem():
         self.adjoint_solution = Function(self.V)
 
         # outputs
-        di = self.op.directory()
-        self.solution_file = File(di + 'solution.pvd')
-        self.adjoint_solution_file = File(di + 'adjoint_solution.pvd')
+        self.solution_file = File(self.op.di + 'solution.pvd')
+        self.adjoint_solution_file = File(self.op.di + 'adjoint_solution.pvd')
 
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         """
@@ -155,12 +154,11 @@ class SteadyProblem():
         """
         Plot current mesh and indicator field, if available.
         """
-        di = self.op.directory()
-        File(di + 'mesh.pvd').write(self.mesh.coordinates)
+        File(self.op.di + 'mesh.pvd').write(self.mesh.coordinates)
         if hasattr(self, 'indicator'):
             name = self.indicator.dat.name
             self.indicator.rename(name + ' indicator')
-            File(di + 'indicator.pvd').write(self.indicator)
+            File(self.op.di + 'indicator.pvd').write(self.indicator)
 
     def dwr_estimation(self):
         """
@@ -502,7 +500,7 @@ class OuterLoop():
         self.relax = relax
         self.element_rtol = element_rtol
         self.objective_rtol = objective_rtol
-        self.di = problem(approach=approach).op.directory()
+        self.di = problem(approach=approach).op.di
 
     # TODO: desired error loop
     def scale_to_convergence(self):
@@ -636,7 +634,7 @@ class UnsteadyProblem():
         self.adjoint_solution = Function(self.V)
 
         # outputs
-        self.di = self.op.directory()
+        self.di = self.op.di
         self.solution_file = File(self.di + 'solution.pvd')
         self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
         self.indicator_file = File(self.di + 'indicator.pvd')
