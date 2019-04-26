@@ -53,9 +53,10 @@ class Options(FrozenConfigurable):
     solve_adjoint = Bool(False).tag(config=True)
     order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
 
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh'):  # TODO: always initialise approach
         self.approach = approach
-        self.solve_adjoint = True if self.approach in ('DWP', 'DWR') else False
+        self.solve_adjoint = True if self.approach in ('DWP', 'DWR') else False  # TODO: redundant
+        self.di = 'outputs/' + self.approach + '/'
 
     def final_index(self):
         """Final timestep index"""
@@ -77,40 +78,6 @@ class Options(FrozenConfigurable):
         """Number of exports per mesh adaptation"""
         assert self.dt_per_remesh % self.dt_per_export == 0
         return int(self.dt_per_remesh / self.dt_per_export)
-
-    def mixed_space(self, mesh, enrich=False):
-        """
-        :param mesh: mesh upon which to build mixed space.
-        :return: mixed VectorFunctionSpace x FunctionSpace as specified by ``self.family``.
-        """
-        d1 = 1
-        d2 = 2 if self.family == 'dg-cg' else 1
-        if enrich:
-            d1 += self.order_increase
-            d2 += self.order_increase
-        dgdg = self.family == 'dg-dg'
-        return VectorFunctionSpace(mesh, "DG", d1) * FunctionSpace(mesh, "DG" if dgdg else "CG", d2)
-
-    def adaptation_stats(self, mn, adaptTimer, solverTime, nEle, Sn, mM, t):
-        """
-        :arg mn: mesh number.
-        :arg adaptTimer: time taken for mesh adaption.
-        :arg solverTime: time taken for solver.
-        :arg nEle: current number of elements.
-        :arg Sn: sum over #Elements.
-        :arg mM: tuple of min and max #Elements.
-        :arg t: current simuation time.
-        :return: mean element count.
-        """
-        av = Sn / mn
-        print("""\n************************** Adaption step %d ****************************
-Percent complete  : %4.1f%%    Adapt time : %4.2fs Solver time : %4.2fs     
-#Elements... Current : %d  Mean : %d  Minimum : %s  Maximum : %s\n""" %
-              (mn, 100 * t / self.end_time, adaptTimer, solverTime, nEle, av, mM[0], mM[1]))
-        return av
-
-    def directory(self):
-        return 'outputs/' + self.approach + '/'
 
     def indicator(self, mesh, scale=1., source=False):  # TODO: Rename as 'disk'
         """Indicator function associated with region(s) of interest"""
