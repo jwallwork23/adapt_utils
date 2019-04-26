@@ -74,17 +74,18 @@ class UnsteadyTwoTurbineOptions(TwoTurbineOptions):
     def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
         super(UnsteadyTwoTurbineOptions, self).__init__(approach)
         self.dt = 3
-        #self.T_tide = 1.24*3600 
-        self.T_tide = 1.24*60 
+        self.T_tide = 1.24*3600
         self.T_ramp = 1*self.T_tide
         self.end_time = self.T_ramp+2*self.T_tide
-        self.dt_per_export = 10
+        self.dt_per_export = 5
         self.dt_per_remesh = 20
-        self.t_const = Constant(0.)
-        self.hmax = Constant(0.5)
-        self.omega = Constant(2*math.pi/self.T_tide)
+        #self.t_const = Constant(0.)
+        self.hmax = 0.5
+        self.omega = 2*math.pi/self.T_tide
         self.timestepper = 'CrankNicolson'
         self.di = self.directory()  # FIXME
+
+        self.region_of_interest = [(325., 100., 9.), (675., 100., 9.)]  # Centred
 
     def set_initial_velocity(self, fs):
         self.uv_init = Function(fs).interpolate(as_vector([1e-8, 0.]))
@@ -92,7 +93,7 @@ class UnsteadyTwoTurbineOptions(TwoTurbineOptions):
 
     def set_initial_surface(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
-        self.elev_init = Function(fs).interpolate(-1/3000*x)
+        self.elev_init = Function(fs).interpolate(-1/1000*(x-500))  # linear from -1 to 1
         return self.elev_init
 
     def set_boundary_surface(self, fs):

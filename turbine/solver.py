@@ -365,6 +365,12 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         cb = turbines.TurbineFunctionalCallback(solver_obj)
         solver_obj.add_callback(cb, 'timestep')
 
+        def update_forcings(t):  # FIXME
+            #op.t_const.assign(t)
+            op.elev_in.assign(op.hmax*cos(op.omega*(t-op.T_ramp)))
+            op.elev_out.assign(op.hmax*cos(op.omega*(t-op.T_ramp)+pi))
+        update_forcings(0.)
+
         # Solve and extract data
         solver_obj.assign_initial_conditions(uv=self.uv, elev=self.elev)
 
@@ -375,12 +381,6 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
         for e in solver_obj.exporters.values():
             e.set_next_export_ix(solver_obj.i_export)
-
-        def update_forcings(t):  # FIXME
-            op.t_const.assign(t)
-            op.elev_in.assign(op.hmax*cos(op.omega*(op.t_const-op.T_ramp)))
-            op.elev_out.assign(op.hmax*cos(op.omega*(op.t_const-op.T_ramp)+pi))
-        update_forcings(0.)
 
         solver_obj.iterate(update_forcings=update_forcings)
         self.solution.assign(solver_obj.fields.solution_2d)
