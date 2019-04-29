@@ -494,4 +494,29 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
                 self.M.dat.data[i][:, :] += self.residuals[2].dat.data[i]*H3.dat.data[i]
             self.M = steady_metric(None, H=self.M, mesh=self.mesh, op=self.op)
 
+    def interpolate_solution(self):
+        """
+        Interpolate solution onto the new mesh after a mesh adaptation.
+        """
+        with pyadjoint.stop_annotating():
+            interpolated_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
+            uv_i, elev_i = interpolated_solution.split()
+            uv, elev = self.solution.split()
+            uv_i.project(uv)
+            name = uv.dat.name
+            uv_i.rename(name)
+            elev_i.project(elev)
+            name = elev.dat.name
+            elev_i.rename(name)
+            self.solution = interpolated_solution
 
+    def interpolate_adjoint_solution(self):
+        """
+        Interpolate adjoint solution onto the new mesh after a mesh adaptation.
+        """
+        with pyadjoint.stop_annotating():
+            self.interpolated_adjoint_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
+            z_i, zeta_i = self.interpolated_adjoint_solution.split()
+            z, zeta = self.adjoint_solution
+            z_i.project(z)
+            zeta_i.project(zeta)
