@@ -19,7 +19,6 @@ class SteadyTurbineProblem(SteadyProblem):
     # TODO: Documentation
     def __init__(self,
                  mesh=None,
-                 approach='fixed_mesh',
                  stab=None,
                  discrete_adjoint=True,
                  op=TwoTurbineOptions(),
@@ -35,7 +34,6 @@ class SteadyTurbineProblem(SteadyProblem):
             mesh = op.default_mesh
         super(SteadyTurbineProblem, self).__init__(mesh,
                                                    finite_element,
-                                                   approach,
                                                    stab,
                                                    discrete_adjoint,
                                                    op,
@@ -113,11 +111,13 @@ class SteadyTurbineProblem(SteadyProblem):
         cb = turbines.TurbineFunctionalCallback(solver_obj)
         solver_obj.add_callback(cb, 'timestep')
 
-        # Solve and extract data
+        # Initial conditions
         if self.prev_solution is not None:
             solver_obj.assign_initial_conditions(uv=self.interpolated_solution)
         else:
             solver_obj.assign_initial_conditions(uv=self.inflow)
+
+        # Solve
         solver_obj.iterate()
         self.solution.assign(solver_obj.fields.solution_2d)
         self.objective = cb.average_power
@@ -296,7 +296,6 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
     # TODO: doc
     def __init__(self,
                  mesh=None,
-                 approach='fixed_mesh',
                  stab=None,
                  discrete_adjoint=True,
                  op=UnsteadyTwoTurbineOptions(),
@@ -311,7 +310,6 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
             mesh = op.default_mesh
         super(UnsteadyTurbineProblem, self).__init__(mesh,
                                                      finite_element,
-                                                     approach,
                                                      stab,
                                                      discrete_adjoint,
                                                      op,
@@ -330,8 +328,7 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         self.nonlinear = True
 
         # Set ICs
-        self.uv = op.set_initial_velocity(self.V.sub(0))
-        self.elev = op.set_initial_surface(self.V.sub(1))
+        self.solution = op.set_initial_condition(self.V)
 
     def set_fields(self):
         self.viscosity = self.op.set_viscosity()

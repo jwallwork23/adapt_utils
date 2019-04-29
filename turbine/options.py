@@ -107,25 +107,24 @@ class UnsteadyTwoTurbineOptions(TwoTurbineOptions):
         self.T_ramp = 1*self.T_tide
         self.end_time = self.T_ramp+2*self.T_tide
         self.dt_per_export = 10
-        self.dt_per_remesh = 20
+        self.dt_per_remesh = 10
 
         # Boundary forcing
         self.hmax = 0.5
         self.omega = 2*math.pi/self.T_tide
 
         # Turbines
-        self.viscosity = 3.
+        self.base_viscosity = 3.
         self.thrust_coefficient = 7.6
         self.region_of_interest = [(325., 100., 9.), (675., 100., 9.)]  # Centred
 
-    def set_initial_velocity(self, fs):
-        self.uv_init = Function(fs).interpolate(as_vector([1e-8, 0.]))
-        return self.uv_init
-
-    def set_initial_surface(self, fs):
+    def set_initial_condition(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
-        self.elev_init = Function(fs).interpolate(-1/1000*(x-500))  # linear from -1 to 1
-        return self.elev_init
+        q_init = Function(fs)
+        self.uv_init, self.elev_init = q_init.split()
+        self.uv_init.interpolate(as_vector([1e-8, 0.]))
+        self.elev_init.interpolate(-1/1000*(x-500))  # linear from -1 to 1
+        return q_init
 
     def set_boundary_surface(self, fs):
         self.elev_in = Function(fs)

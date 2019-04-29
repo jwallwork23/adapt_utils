@@ -26,7 +26,6 @@ class SteadyTracerProblem_DG(SteadyProblem):
                  op=PowerOptions(),
                  stab=None,
                  mesh=SquareMesh(40, 40, 4, 4),
-                 approach='fixed_mesh',
                  discrete_adjoint=True,
                  high_order=False,
                  prev_solution=None):
@@ -40,7 +39,6 @@ class SteadyTracerProblem_DG(SteadyProblem):
             mesh = op.default_mesh
         super(SteadyTracerProblem_DG, self).__init__(mesh,
                                                   finite_element,
-                                                  approach,
                                                   stab,
                                                   discrete_adjoint,
                                                   op,
@@ -305,14 +303,12 @@ class UnsteadyTracerProblem_DG(UnsteadyProblem):
                  op=LeVequeOptions(),
                  stab=None,
                  mesh=UnitSquareMesh(40, 40),
-                 approach='fixed_mesh',
                  discrete_adjoint=True,
                  finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1),
                  high_order=False,
                  prev_solution=None):
         super(UnsteadyTracerProblem_DG, self).__init__(mesh,
                                                   finite_element,
-                                                  approach,
                                                   stab,
                                                   discrete_adjoint,
                                                   op,

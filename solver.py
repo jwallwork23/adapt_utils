@@ -1,5 +1,4 @@
-from firedrake import *
-from firedrake_adjoint import *
+from thetis_adjoint import *
 from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
 from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
 import pyadjoint
@@ -33,7 +32,6 @@ class SteadyProblem():
     def __init__(self,
                  mesh,
                  finite_element,
-                 approach,
                  stab=None,
                  discrete_adjoint=False,
                  op=DefaultOptions(),
@@ -41,13 +39,12 @@ class SteadyProblem():
                  prev_solution=None):
         self.mesh = mesh
         self.finite_element = finite_element
-        self.approach = approach
         self.stab = stab if stab is not None else 'no'
         self.discrete_adjoint = discrete_adjoint
         self.high_order = high_order
         self.prev_solution = prev_solution
         self.op = op
-        self.op.approach = approach
+        self.approach = op.approach
 
         # function spaces and mesh quantities
         self.V = FunctionSpace(self.mesh, self.finite_element)
@@ -66,8 +63,9 @@ class SteadyProblem():
         self.adjoint_solution = Function(self.V)
 
         # outputs
-        self.solution_file = File(self.op.di + 'solution.pvd')
-        self.adjoint_solution_file = File(self.op.di + 'adjoint_solution.pvd')
+        self.di = create_directory(self.op.di)
+        self.solution_file = File(self.di + 'solution.pvd')
+        self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
 
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         """
@@ -154,11 +152,11 @@ class SteadyProblem():
         """
         Plot current mesh and indicator field, if available.
         """
-        File(self.op.di + 'mesh.pvd').write(self.mesh.coordinates)
+        File(self.di + 'mesh.pvd').write(self.mesh.coordinates)
         if hasattr(self, 'indicator'):
             name = self.indicator.dat.name
             self.indicator.rename(name + ' indicator')
-            File(self.op.di + 'indicator.pvd').write(self.indicator)
+            File(self.di + 'indicator.pvd').write(self.indicator)
 
     def dwr_estimation(self):
         """
@@ -343,11 +341,11 @@ class SteadyProblem():
                 self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
                 self.M = metric_intersection(M, self.M)
             else:
-                #try:
-                assert hasattr(self, 'custom_adapt')
-                self.custom_adapt()
-                #except:
-                #    raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
+                try:
+                    assert hasattr(self, 'custom_adapt')
+                    self.custom_adapt()
+                except:
+                    raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
             # Apply metric relaxation, if requested
             if prev_metric is not None:
@@ -371,7 +369,6 @@ class MeshOptimisation():
                  mesh=None,
                  op=None,
                  rescaling=0.85,
-                 approach='hessian',
                  stab='SUPG',
                  high_order=False,
                  relax=False,
@@ -480,7 +477,6 @@ class OuterLoop():
                  problem,
                  op,
                  mesh=None,
-                 approach='hessian',
                  rescaling=0.85,
                  iterates=4,
                  high_order=False,
@@ -500,7 +496,7 @@ class OuterLoop():
         self.relax = relax
         self.element_rtol = element_rtol
         self.objective_rtol = objective_rtol
-        self.di = problem(approach=approach).op.di
+        self.di = problem(approach=approach).di
 
     # TODO: desired error loop
     def scale_to_convergence(self):
@@ -601,21 +597,17 @@ class UnsteadyProblem():
     def __init__(self,
                  mesh,
                  finite_element,
-                 approach,
                  stab=None,
                  discrete_adjoint=False,
                  op=DefaultOptions(),
-                 high_order=False,
-                 prev_solution=None):   # TODO: This is redundant
+                 high_order=False):
         self.mesh = mesh
         self.finite_element = finite_element
-        self.approach = approach
         self.stab = stab if stab is not None else 'no'
         self.discrete_adjoint = discrete_adjoint
         self.high_order = high_order
-        self.prev_solution = prev_solution
         self.op = op
-        self.op.approach = approach
+        self.approach = op.approach
 
         # function spaces and mesh quantities
         self.V = FunctionSpace(self.mesh, self.finite_element)
@@ -634,7 +626,7 @@ class UnsteadyProblem():
         self.adjoint_solution = Function(self.V)
 
         # outputs
-        self.di = self.op.di
+        self.di = create_directory(self.op.di)
         self.solution_file = File(self.di + 'solution.pvd')
         self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
         self.indicator_file = File(self.di + 'indicator.pvd')
@@ -663,7 +655,7 @@ class UnsteadyProblem():
         self.remesh_step = 0
         while self.step_end <= self.op.end_time:
             if self.approach != 'fixed_mesh':
-                if not self.approach in ('uniform', 'hessian', 'explicit'):
+                if not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity'):
                     self.get_adjoint_state()
                     self.interpolate_adjoint_solution()
                 self.adapt_mesh()
@@ -953,7 +945,11 @@ class UnsteadyProblem():
                 self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
                 self.M = metric_intersection(M, self.M)
             else:
-                raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
+                try:
+                    assert hasattr(self, 'custom_adapt')
+                    self.custom_adapt()
+                except:
+                    raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
             # Apply metric relaxation, if requested
             if prev_metric is not None:
