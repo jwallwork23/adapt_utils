@@ -74,32 +74,43 @@ class SteadyTurbineProblem(SteadyProblem):
         op = self.op
         solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
         options = solver_obj.options
+        options.use_nonlinear_equations = True
+        options.check_volume_conservation_2d = True
+
+        # Timestepping
         options.timestep = op.dt
         options.simulation_export_time = op.dt
         options.simulation_end_time = op.end_time
-        options.output_directory = op.di
-        options.check_volume_conservation_2d = True
-        options.use_grad_div_viscosity_term = op.symmetric_viscosity
-        options.element_family = op.family
         options.timestepper_type = 'SteadyState'
         options.timestepper_options.solver_parameters = op.params
         print(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
+
+        # Outputs
+        options.output_directory = self.di
+        options.fields_to_export = ['uv_2d', 'elev_2d']
+
+        # Parameters
+        options.use_grad_div_viscosity_term = op.symmetric_viscosity
+        options.element_family = op.family
         options.horizontal_viscosity = self.viscosity
         options.quadratic_drag_coefficient = self.drag_coefficient
         options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
-        options.use_grad_depth_viscosity_term = False
+        #options.use_grad_depth_viscosity_term = False
+        options.use_grad_depth_viscosity_term = True
         options.compute_residuals = True
+
+        # Boundary conditions
         op.set_bcs()
         solver_obj.bnd_functions['shallow_water'] = op.boundary_conditions
 
         # We haven't meshed the turbines with separate ids, so define a farm everywhere
         # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
         # and 0 outside
-        scaling = len(op.region_of_interest)/assemble(op.bump(self.mesh)*dx)
+        num_turbines = len(op.region_of_interest)
+        scaling = num_turbines/assemble(op.bump(self.mesh)*dx)
         self.turbine_density = op.bump(self.mesh, scale=scaling)
-        #File(op.di+'Bump.pvd').write(turbine_density)
-
+        #File(self.di+'Bump.pvd').write(turbine_density)
         farm_options = TidalTurbineFarmOptions()
         farm_options.turbine_density = self.turbine_density
         farm_options.turbine_options.diameter = op.turbine_diameter
@@ -340,22 +351,33 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         op = self.op
         solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
         options = solver_obj.options
-        options.timestepper_type = op.timestepper
-        options.timestepper_options.solver_parameters = op.params
-        print(options.timestepper_options.solver_parameters)
+        options.use_nonlinear_equations = True
+        options.check_volume_conservation_2d = True
+
+        # Timestepping
         options.timestep = op.dt
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end-0.5*op.dt
-        options.output_directory = op.di
-        options.check_volume_conservation_2d = True
+        options.timestepper_type = op.timestepper
+        options.timestepper_options.solver_parameters = op.params
+        print(options.timestepper_options.solver_parameters)
+        #options.timestepper_options.implicitness_theta = 1.0
+
+        # Outputs
+        options.output_directory = self.di
+        options.fields_to_export = ['uv_2d', 'elev_2d']
+
+        # Parameters
         options.use_grad_div_viscosity_term = op.symmetric_viscosity
         options.element_family = op.family
         options.horizontal_viscosity = op.viscosity
         options.quadratic_drag_coefficient = self.drag_coefficient
         options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
-        options.use_grad_depth_viscosity_term = False
+        #options.use_grad_depth_viscosity_term = False
+        options.use_grad_depth_viscosity_term = True
         options.compute_residuals = True
 
+        # Boundary conditions
         op.set_bcs()
         solver_obj.bnd_functions['shallow_water'] = op.boundary_conditions
         def update_forcings(t):
@@ -363,28 +385,31 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
             op.elev_out.assign(op.hmax*cos(op.omega*(t-op.T_ramp)+pi))
         update_forcings(0.)
 
-        # We haven't meshed the turbines with separate ids, so define a farm everywhere
-        # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
-        # and 0 outside
-        scaling = len(op.region_of_interest)/assemble(op.bump(self.mesh)*dx)
-        self.turbine_density = op.bump(self.mesh, scale=scaling)
-        #File(op.di+'Bump.pvd').write(turbine_density)
+        # Tidal farm
+        num_turbines = len(op.region_of_interest)
+        if num_turbines > 0:
+            # We haven't meshed the turbines with separate ids, so define a farm everywhere
+            # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
+            # and 0 outside
+            scaling = num_turbines/assemble(op.bump(self.mesh)*dx)
+            self.turbine_density = op.bump(self.mesh, scale=scaling)
+            #File(self.di+'Bump.pvd').write(turbine_density)
+            farm_options = TidalTurbineFarmOptions()
+            farm_options.turbine_density = self.turbine_density
+            farm_options.turbine_options.diameter = op.turbine_diameter
+            farm_options.turbine_options.thrust_coefficient = op.thrust_coefficient
+            # Turbine drag is applied everywhere (where the turbine density isn't zero)
+            options.tidal_turbine_farms["everywhere"] = farm_options
 
-        farm_options = TidalTurbineFarmOptions()
-        farm_options.turbine_density = self.turbine_density
-        farm_options.turbine_options.diameter = op.turbine_diameter
-        farm_options.turbine_options.thrust_coefficient = op.thrust_coefficient
-        # Turbine drag is applied everywhere (where the turbine density isn't zero)
-        options.tidal_turbine_farms["everywhere"] = farm_options
+            # Callback that computes average power
+            cb = turbines.TurbineFunctionalCallback(solver_obj)
+            solver_obj.add_callback(cb, 'timestep')
 
-        # Callback that computes average power
-        cb = turbines.TurbineFunctionalCallback(solver_obj)
-        solver_obj.add_callback(cb, 'timestep')
+        # Initial conditions
+        uv, elev = self.solution.split()
+        solver_obj.assign_initial_conditions(uv=uv, elev=elev)
 
-        solver_obj.assign_initial_conditions(uv=self.uv, elev=self.elev)
-        #options.timestepper_options.implicitness_theta = 1.0
-
-        # ensure correct iteration count
+        # Ensure correct iteration count
         solver_obj.i_export = self.remesh_step
         solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
         solver_obj.iteration = self.remesh_step*op.dt_per_remesh
@@ -392,12 +417,11 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         for e in solver_obj.exporters.values():
             e.set_next_export_ix(solver_obj.i_export)
 
+        # Solve
         solver_obj.iterate(update_forcings=update_forcings)
         self.solution.assign(solver_obj.fields.solution_2d)
-        uv, elev = self.solution.split()
-        self.uv.assign(uv)
-        self.elev.assign(elev)
-        self.objective = cb.average_power
+        if num_turbines > 0:
+            self.objective = cb.average_power
         self.ts = solver_obj.timestepper
 
     def objective_functional(self):
