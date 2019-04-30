@@ -11,32 +11,37 @@ from adapt_utils.solver import *
 __all__ = ["TelemacLoop"]
 
 
+# TODO: Generalise to allow unsteady DG version
 class TelemacLoop(OuterLoop):
-    def __init__(self, centred=False, **kwargs):
-        super(TelemacLoop, self).__init__(SteadyTracerProblem_CG,
-                                          op=TelemacOptions_Centred() if centred else TelemacOptions(),
-                                          **kwargs)
+    def __init__(self, centred=False, approach='hessian', **kwargs):
+        op = TelemacOptions_Centred(approach=approach) if centred else TelemacOptions(approach=approach)
+        super(TelemacLoop, self).__init__(SteadyTracerProblem_CG, op=op, **kwargs)
 
     def compare_analytical_objective(self, finite_element=FiniteElement('Lagrange', triangle, 1)):
         mesh = self.final_mesh
         P0 = FunctionSpace(mesh, "DG", 0)
         fs = FunctionSpace(mesh, finite_element)
+        region = self.op.region_of_interest[0]
+        self.op.region_of_interest = [(region[0], region[1], 0.01*region[2])]
         J_exact = self.op.exact_objective(fs, P0)
         err = np.abs(J_exact - self.final_J)
         r_err = err / np.abs(J_exact)
-        logfile = open(self.di + 'scale_to_convergence.log', 'a+')
+        logfile = open(self.di + 'desired_error_test.log', 'a+')  # FIXME: this is not the only mode
         logfile.write('on this mesh: exact {:.4e} abs {:.4e} rel {:.4e}'.format(J_exact, err, r_err))
         print("Exact solution on this mesh: {:.4e}".format(J_exact))
         logfile.close()
 
-    def compare_slices(self):  # TODO: exact sol
+    def compare_slices(self):  # FIXME: these plots do not agree with J analysis
         eps = 1e-5
 
         approx = []
+        analytic = []
         X = np.linspace(eps, 50-eps, 100)
         for x in X:
-            approx.append(self.op.solution.at([x, 5]))
+            approx.append(self.solution.at([x, 5]))
+            analytic.append(self.op.solution.at([x, 5]))
         plt.plot(X, approx, label='Numerical')
+        plt.plot(X, analytic, label='Analytic')
         plt.title('Adaptive approach: {:s}'.format(self.approach))
         plt.xlabel('x-coordinate [m]')
         plt.ylabel('Tracer concentration [g/L]')
@@ -46,10 +51,13 @@ class TelemacLoop(OuterLoop):
         plt.clf()
 
         approx = []
+        analytic = []
         Y = np.linspace(eps, 10-eps, 20)
         for y in Y:
-            approx.append(self.op.solution.at([30, y]))
+            approx.append(self.solution.at([20, y]))
+            analytic.append(self.op.solution.at([20, y]))  # NOTE: originally x=30 was used
         plt.plot(Y, approx, label='Numerical')
+        plt.plot(Y, analytic, label='Analytic')
         plt.title('Adaptive approach: {:s}'.format(self.approach))
         plt.xlabel('y-coordinate [m]')
         plt.ylabel('Tracer concentration [g/L]')

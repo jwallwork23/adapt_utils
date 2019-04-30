@@ -1,4 +1,6 @@
-from thetis_adjoint import *
+from firedrake import *
+from firedrake_adjoint import *
+from thetis import create_directory
 from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
 from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
 import pyadjoint
@@ -381,7 +383,7 @@ class MeshOptimisation():
         assert op is not None
         self.op = op
         self.rescaling = rescaling
-        self.approach = approach
+        self.approach = op.approach
         self.stab = stab if stab is not None else 'no'
         self.high_order = high_order
         self.relax = relax
@@ -421,7 +423,6 @@ class MeshOptimisation():
             tp = self.problem(stab=self.stab,
                               mesh=self.mesh if i == 0 else tp.mesh,
                               op=self.op,
-                              approach=self.approach,
                               high_order=self.high_order,
                               prev_solution=prev_sol)
 
@@ -429,6 +430,7 @@ class MeshOptimisation():
             tp.solve()
             if not self.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit'):
                 tp.solve_adjoint()
+            self.solution = tp.solution
 
             # Extract data
             self.dat['elements'].append(tp.mesh.num_cells())
@@ -488,7 +490,7 @@ class OuterLoop():
         self.problem = problem
         self.op = op
         self.mesh = mesh
-        self.approach = approach
+        self.approach = op.approach
         self.rescaling = rescaling
         self.high_order = high_order
         self.maxit = maxit
@@ -496,9 +498,8 @@ class OuterLoop():
         self.relax = relax
         self.element_rtol = element_rtol
         self.objective_rtol = objective_rtol
-        self.di = problem(approach=approach).di
+        self.di = self.op.di
 
-    # TODO: desired error loop
     def scale_to_convergence(self):
 
         # Create log file
@@ -517,7 +518,6 @@ class OuterLoop():
             opt = MeshOptimisation(self.problem,
                                    mesh=self.mesh,
                                    op=self.op,
-                                   approach=self.approach,
                                    rescaling=self.rescaling,
                                    relax=self.relax,
                                    high_order=self.high_order,
@@ -564,7 +564,6 @@ class OuterLoop():
             opt = MeshOptimisation(self.problem,
                                    mesh=self.mesh,
                                    op=self.op,
-                                   approach=self.approach,
                                    relax=self.relax,
                                    high_order=self.high_order,
                                    log=False)
@@ -573,6 +572,7 @@ class OuterLoop():
             opt.objective_rtol = self.objective_rtol
             opt.iterate()
             self.final_mesh = opt.mesh
+            self.solution = opt.solution
             self.final_J = opt.dat['objective'][-1]
 
             # Logging
@@ -961,7 +961,8 @@ class UnsteadyProblem():
             # (Default relaxation of 0.9 following [Power et al 2006])
 
             # Adapt mesh
-            if self.M is not None:
+            if self.M is not None and norm(self.M) > 0.1*norm(Constant(1, domain=self.mesh)):
+                # FIXME: The 0.1 factor seems pretty arbitrary
                 #self.mesh = adapt(self.mesh, self.M)
                 self.mesh = multi_adapt(self.M, op=self.op)
 
