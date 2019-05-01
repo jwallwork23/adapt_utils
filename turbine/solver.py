@@ -20,7 +20,7 @@ class SteadyTurbineProblem(SteadyProblem):
     def __init__(self,
                  mesh=None,
                  discrete_adjoint=True,
-                 op=TwoTurbineOptions(),
+                 op=Steady2TurbineOptions(),
                  prev_solution=None):
         if op.family == 'dg-dg' and op.degree in (1, 2):
             element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
@@ -298,7 +298,7 @@ class SteadyTurbineProblem(SteadyProblem):
 class UnsteadyTurbineProblem(UnsteadyProblem):
     # TODO: doc
     def __init__(self,
-                 op=UnsteadyTwoTurbineOptions(),
+                 op=Unsteady2TurbineOptions(),
                  mesh=None,
                  discrete_adjoint=True):
         if op.family == 'dg-dg' and op.degree in (1, 2):
