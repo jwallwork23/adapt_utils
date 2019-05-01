@@ -30,21 +30,12 @@ class SteadyTracerProblem_CG(SteadyProblem):
         * outflow.
     """
     def __init__(self,
-                 op=PowerOptions(),
-                 stab=None,
                  mesh=SquareMesh(40, 40, 4, 4),
+                 op=PowerOptions(),
                  discrete_adjoint=False,
                  finite_element=FiniteElement("Lagrange", triangle, 1),
-                 high_order=False,
                  prev_solution=None):
-        super(SteadyTracerProblem_CG, self).__init__(mesh,
-                                                  finite_element,
-                                                  stab,
-                                                  discrete_adjoint,
-                                                  op,
-                                                  high_order,
-                                                  None)
-        assert self.stab in ('no', 'SU', 'SUPG')
+        super(SteadyTracerProblem_CG, self).__init__(mesh, op, finite_element, discrete_adjoint, None)
 
         # Extract parameters from Options class
         self.nu = op.set_diffusivity(self.P1)
@@ -54,6 +45,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Stabilisation
+        if self.stab is None:
+            self.stab = 'SUPG'
+        assert self.stab in ('no', 'SU', 'SUPG')
         if self.stab in ('SU', 'SUPG'):
             #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
             self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
@@ -260,7 +254,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         n = self.n
         f = self.source
         bcs = self.op.boundary_conditions
-        lam = self.solve_high_order(adjoint=True) if self.high_order else self.adjoint_solution
+        lam = self.solve_high_order(adjoint=True) if self.op.order_increase else self.adjoint_solution
 
         # Cell residual
         R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
@@ -291,7 +285,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         nu = self.nu
         n = self.n
         bcs = self.op.boundary_conditions
-        phi = self.solve_high_order(adjoint=False) if self.high_order else self.solution
+        phi = self.solve_high_order(adjoint=False) if self.op.order_increase else self.solution
 
         # Adjoint source term
         dJdphi = interpolate(self.op.box(self.mesh), self.P0)
@@ -321,7 +315,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         assert not (relax and superpose)
 
         # Solve adjoint problem
-        if self.high_order:
+        if self.op.order_increase:
             adj = self.solve_high_order(adjoint=not adjoint)
         else:
             adj = self.solution if adjoint else self.adjoint_solution

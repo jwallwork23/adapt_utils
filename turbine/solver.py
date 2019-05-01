@@ -19,31 +19,23 @@ class SteadyTurbineProblem(SteadyProblem):
     # TODO: Documentation
     def __init__(self,
                  mesh=None,
-                 stab=None,
                  discrete_adjoint=True,
                  op=TwoTurbineOptions(),
-                 high_order=False,  # TODO
                  prev_solution=None):
         if op.family == 'dg-dg' and op.degree in (1, 2):
-            finite_element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
+            element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
         elif op.family == 'dg-cg':
-            finite_element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
+            element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
         else:
             raise NotImplementedError
         if mesh is None:
             mesh = op.default_mesh
-        super(SteadyTurbineProblem, self).__init__(mesh,
-                                                   finite_element,
-                                                   stab,
-                                                   discrete_adjoint,
-                                                   op,
-                                                   high_order,
-                                                   prev_solution)
+        super(SteadyTurbineProblem, self).__init__(mesh, op, element, discrete_adjoint, prev_solution)
 
-        self.stab = stab
-        if stab is not None:
+        # Stabilisation
+        if self.stab is not None:
             try:
-                assert stab == 'lax_friedrichs'
+                assert self.stab == 'lax_friedrichs'
             except:
                 raise NotImplementedError
         self.prev_solution = prev_solution
@@ -306,25 +298,25 @@ class SteadyTurbineProblem(SteadyProblem):
 class UnsteadyTurbineProblem(UnsteadyProblem):
     # TODO: doc
     def __init__(self,
-                 mesh=None,
-                 stab=None,
-                 discrete_adjoint=True,
                  op=UnsteadyTwoTurbineOptions(),
-                 high_order=False):  # TODO
+                 mesh=None,
+                 discrete_adjoint=True):
         if op.family == 'dg-dg' and op.degree in (1, 2):
-            finite_element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
+            element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
         elif op.family == 'dg-cg':
-            finite_element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
+            element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
         else:
             raise NotImplementedError
         if mesh is None:
             mesh = op.default_mesh
-        super(UnsteadyTurbineProblem, self).__init__(mesh,
-                                                     finite_element,
-                                                     stab,
-                                                     discrete_adjoint,
-                                                     op,
-                                                     high_order)
+        super(UnsteadyTurbineProblem, self).__init__(mesh, op, element, discrete_adjoint)
+
+        # Stabilisation
+        if self.stab is not None:
+            try:
+                assert self.stab == 'lax_friedrichs'
+            except:
+                raise NotImplementedError
 
         # Physical fields
         self.set_fields()

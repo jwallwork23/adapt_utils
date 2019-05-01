@@ -13,9 +13,9 @@ __all__ = ["TelemacLoop"]
 
 # TODO: Generalise to allow unsteady DG version
 class TelemacLoop(OuterLoop):
-    def __init__(self, centred=False, approach='hessian', **kwargs):
-        op = TelemacOptions_Centred(approach=approach) if centred else TelemacOptions(approach=approach)
-        super(TelemacLoop, self).__init__(SteadyTracerProblem_CG, op=op, **kwargs)
+    # TODO: doc
+    def __init__(self, op, mesh=None):
+        super(TelemacLoop, self).__init__(SteadyTracerProblem_CG, op, mesh)
 
     def compare_analytical_objective(self, finite_element=FiniteElement('Lagrange', triangle, 1)):
         mesh = self.final_mesh
@@ -34,6 +34,7 @@ class TelemacLoop(OuterLoop):
     def compare_slices(self):  # FIXME: these plots do not agree with J analysis
         eps = 1e-5
 
+        # Plot slice in x-direction along y=5
         approx = []
         analytic = []
         X = np.linspace(eps, 50-eps, 100)
@@ -42,7 +43,7 @@ class TelemacLoop(OuterLoop):
             analytic.append(self.op.solution.at([x, 5]))
         plt.plot(X, approx, label='Numerical')
         plt.plot(X, analytic, label='Analytic')
-        plt.title('Adaptive approach: {:s}'.format(self.approach))
+        plt.title('Adaptive approach: {:s}'.format(self.op.approach))
         plt.xlabel('x-coordinate [m]')
         plt.ylabel('Tracer concentration [g/L]')
         plt.ylim([0, 2.5])
@@ -50,15 +51,16 @@ class TelemacLoop(OuterLoop):
         plt.savefig(self.di + 'xslice.pdf')
         plt.clf()
 
+        # Plot slice in y-direction along x=20  NOTE: originally x=30 was used
         approx = []
         analytic = []
         Y = np.linspace(eps, 10-eps, 20)
         for y in Y:
             approx.append(self.solution.at([20, y]))
-            analytic.append(self.op.solution.at([20, y]))  # NOTE: originally x=30 was used
+            analytic.append(self.op.solution.at([20, y]))
         plt.plot(Y, approx, label='Numerical')
         plt.plot(Y, analytic, label='Analytic')
-        plt.title('Adaptive approach: {:s}'.format(self.approach))
+        plt.title('Adaptive approach: {:s}'.format(self.op.approach))
         plt.xlabel('y-coordinate [m]')
         plt.ylabel('Tracer concentration [g/L]')
         plt.ylim([0, 0.35])

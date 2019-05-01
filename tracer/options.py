@@ -53,8 +53,8 @@ class TracerOptions(Options):
 
     def __init__(self, approach='fixed_mesh'):
         super(TracerOptions, self).__init__(approach)
-
         self.end_time -= 0.5*self.dt
+        self.stabilisation = 'SUPG'
 
     def set_diffusivity(self, fs):
         pass

@@ -10,23 +10,28 @@ __all__ = ["DefaultOptions"]
 class Options(FrozenConfigurable):
     name = 'Common parameters for mesh adaptive simulations'
 
-    # adapt
+    # Adapt
     approach = Unicode('fixed_mesh', help="Mesh adaptive approach.").tag(config=True)
     dwr_approach = Unicode('error_representation', help="DWR error estimation approach, from {'error_representation', 'dwr', 'cell_facet_split'}. (See [Rognes & Logg, 2010])").tag(config=True)
     num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
+    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
-    # smooth / intersect
+    # Smooth / intersect
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
-    max_element_growth = PositiveFloat(1.4, help="Metric gradation scaling parameter.").tag(config=True)
+    max_element_growth = PositiveFloat(1.4, help="Gradation scaling parameter.").tag(config=True)
     intersect = Bool(False, help='Intersect with previous mesh.').tag(config=True)
+    relax = Bool(False, help='Take metric relaxation with previous mesh.').tag(config=True)
     intersect_boundary = Bool(False, help='Intersect with initial boundary metric.').tag(config=True)
     adapt_on_bathymetry = Bool(False, help='Toggle adaptation based on bathymetry.').tag(config=True)
 
-    # plot
+    # Stabilisation
+    stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach.").tag(config=True)
+
+    # Plotting
     plot_pvd = Bool(False, help='Toggle plotting of fields.').tag(config=True)
     plot_metric = Bool(False, help='Toggle plotting of metric field.').tag(config=True)
 
-    # metric
+    # Metric
     max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
     restrict = Unicode('error', help="Hessian restriction approach, from {'num_cells', 'p_norm', 'error'}.").tag(config=True)
     desired_error = PositiveFloat(1e-2, help="Desired error for 'error' restriction approach.").tag(config=True)
@@ -34,21 +39,21 @@ class Options(FrozenConfigurable):
     min_norm = PositiveFloat(1e-6).tag(config=True)
     max_norm = PositiveFloat(1e9).tag(config=True)
 
-    # hessian
+    # Hessian
     hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
     hessian_solver_parameters = PETScSolverParameters({'snes_rtol': 1e8,
                                                        'ksp_rtol': 1e-5,
                                                        'ksp_gmres_restart': 20,
                                                        'pc_type': 'sor'}).tag(config=True)
 
-    # pde / optimisation
+    # PDE / optimisation
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
     degree = PositiveInteger(1, help="Order of function space").tag(config=True)
     element_rtol = PositiveFloat(0.01, help="Relative tolerance for convergence in mesh element count").tag(config=True)
     objective_rtol = PositiveFloat(0.00025, help="Relative tolerance for convergence in objective value.").tag(config=True)
 
-    # adjoint
+    # Adjoint
     adjoint_steps = NonNegativeInteger(1000, help="Number of adjoint steps used").tag(config=True)
     solve_adjoint = Bool(False).tag(config=True)
     order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
@@ -165,7 +170,6 @@ class DefaultOptions(Options):
     h_min = PositiveFloat(1e-6, help="Minimum tolerated element size").tag(config=True)
     h_max = PositiveFloat(1e3, help="Maximum tolerated element size").tag(config=True)
     target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)").tag(config=True)
-    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
     # physical
     viscosity = NonNegativeFloat(1e-3).tag(config=True)

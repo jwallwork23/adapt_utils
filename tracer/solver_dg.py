@@ -38,12 +38,11 @@ class SteadyTracerProblem_DG(SteadyProblem):
         if mesh is None:
             mesh = op.default_mesh
         super(SteadyTracerProblem_DG, self).__init__(mesh,
-                                                  finite_element,
-                                                  stab,
-                                                  discrete_adjoint,
-                                                  op,
-                                                  high_order,
-                                                  None)
+                                                     op,
+                                                     finite_element,
+                                                     stab,
+                                                     discrete_adjoint,
+                                                     None)
         assert(finite_element.family() == "Discontinuous Lagrange")
 
         # Extract parameters from Options class
@@ -300,20 +299,11 @@ class SteadyTracerProblem_DG(SteadyProblem):
 
 class UnsteadyTracerProblem_DG(UnsteadyProblem):
     def __init__(self,
-                 op=LeVequeOptions(),
-                 stab=None,
-                 mesh=UnitSquareMesh(40, 40),
+                 op,
+                 mesh=None,
                  discrete_adjoint=True,
-                 finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1),
-                 high_order=False,
-                 prev_solution=None):
-        super(UnsteadyTracerProblem_DG, self).__init__(mesh,
-                                                  finite_element,
-                                                  stab,
-                                                  discrete_adjoint,
-                                                  op,
-                                                  high_order,
-                                                  None)
+                 finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1)):
+        super(UnsteadyTracerProblem_DG, self).__init__(mesh, op, finite_element, discrete_adjoint)
         assert(finite_element.family() == "Discontinuous Lagrange")
 
         self.set_fields()

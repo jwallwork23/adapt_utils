@@ -31,19 +31,11 @@ class SteadyProblem():
         * solve adjoint PDE using pyadjoint;
         * adapt mesh based on some error estimator of choice.
     """
-    def __init__(self,
-                 mesh,
-                 finite_element,
-                 stab=None,
-                 discrete_adjoint=False,
-                 op=DefaultOptions(),
-                 high_order=False,
-                 prev_solution=None):
+    def __init__(self, mesh, op, finite_element, discrete_adjoint=False, prev_solution=None):
         self.mesh = mesh
         self.finite_element = finite_element
-        self.stab = stab if stab is not None else 'no'
+        self.stab = op.stabilisation
         self.discrete_adjoint = discrete_adjoint
-        self.high_order = high_order
         self.prev_solution = prev_solution
         self.op = op
         self.approach = op.approach
@@ -366,15 +358,11 @@ class MeshOptimisation():
     Loop over all mesh optimisation steps in order to obtain a mesh which is optimal w.r.t. the
     given error estimator for the given PDE problem.
     """
-    def __init__(self, problem, mesh=None, op=None, stab='SUPG', high_order=False, relax=False):
+    def __init__(self, problem, op, mesh=None):
         self.problem = problem
         self.mesh = mesh
         assert op is not None
         self.op = op
-        self.approach = op.approach
-        self.stab = stab if stab is not None else 'no'
-        self.high_order = high_order
-        self.relax = relax
         self.di = create_directory(op.di)
 
         # Default tolerances etc
@@ -389,7 +377,7 @@ class MeshOptimisation():
         self.log = True
 
         # Data storage
-        self.dat = {'elements': [], 'vertices': [], 'objective': [], 'approach': self.approach}
+        self.dat = {'elements': [], 'vertices': [], 'objective': [], 'approach': self.op.approach}
 
     def iterate(self):
         M_ = None
@@ -399,9 +387,9 @@ class MeshOptimisation():
         if self.log:
             self.logfile = open('{:s}/optimisation_log'.format(self.di), 'a+')
             self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
-            self.logfile.write('stabilisation: {:s}\n'.format(self.stab))
-            self.logfile.write('high_order: {:b}\n'.format(self.high_order))
-            self.logfile.write('relax: {:b}\n'.format(self.relax))
+            self.logfile.write('stabilisation: {:s}\n'.format(self.op.stabilisation))
+            self.logfile.write('high_order: {:b}\n'.format(self.op.order_increase))
+            self.logfile.write('relax: {:b}\n'.format(self.op.relax))
             self.logfile.write('maxit: {:d}\n'.format(self.maxit))
             self.logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
             self.logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
@@ -410,15 +398,13 @@ class MeshOptimisation():
         tstart = clock()
         for i in range(self.maxit):
             print('Solving on mesh {:d}'.format(i))
-            tp = self.problem(stab=self.stab,
-                              mesh=self.mesh if i == 0 else tp.mesh,
+            tp = self.problem(mesh=self.mesh if i == 0 else tp.mesh,
                               op=self.op,
-                              high_order=self.high_order,
                               prev_solution=prev_sol)
 
             # Solve
             tp.solve()
-            if not self.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit'):
+            if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit'):
                 tp.solve_adjoint()
             self.solution = tp.solution
 
@@ -456,7 +442,7 @@ class MeshOptimisation():
             tp.plot()
             if tp.nonlinear:
                 prev_sol = tp.solution
-            if self.relax:
+            if self.op.relax:
                 M_ = tp.M_unrelaxed
         self.dat['time'] = clock() - tstart
         print('Time to solution: {:.1f}s'.format(self.dat['time']))
@@ -465,13 +451,10 @@ class MeshOptimisation():
 
 
 class OuterLoop():
-    def __init__(self, problem, op, mesh=None, high_order=False, relax=False):
+    def __init__(self, problem, op, mesh=None):
         self.problem = problem
         self.op = op
         self.mesh = mesh
-        self.approach = op.approach
-        self.high_order = high_order
-        self.relax = relax
         self.di = create_directory(self.op.di)
 
         # Default tolerances etc
@@ -497,12 +480,8 @@ class OuterLoop():
 
             # Iterate over increasing target vertex counts
             self.op.rescaling = float(i+1)*0.4
-            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
-            opt = MeshOptimisation(self.problem,
-                                   mesh=self.mesh,
-                                   op=self.op,
-                                   relax=self.relax,
-                                   high_order=self.high_order)
+            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.op.approach))
+            opt = MeshOptimisation(self.problem, mesh=self.mesh, op=self.op)
             opt.log = self.log
             opt.maxit = self.maxit
             opt.element_rtol = self.element_rtol
@@ -542,15 +521,9 @@ class OuterLoop():
         for i in range(self.outer_maxit):
 
             # Iterate over increasing target vertex counts
-            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
+            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.op.approach))
             self.op.desired_error = pow(10, -i)
-            opt = MeshOptimisation(mode,
-                                   self.problem,
-                                   mesh=self.mesh,
-                                   op=self.op,
-                                   relax=self.relax,
-                                   high_order=self.high_order,
-                                   log=False)
+            opt = MeshOptimisation(self.problem, mesh=self.mesh, op=self.op)
             opt.maxit = self.maxit
             opt.element_rtol = self.element_rtol
             opt.objective_rtol = self.objective_rtol
@@ -560,7 +533,8 @@ class OuterLoop():
             self.final_J = opt.dat['objective'][-1]
 
             # Logging
-            logfile.write(self.msg.format(self.op.desired_error,
+            logfile.write(self.msg.format(mode,
+                                          self.op.desired_error,
                                           opt.dat['elements'][-1],
                                           len(opt.dat['objective']),
                                           opt.dat['time'],
@@ -577,19 +551,12 @@ class OuterLoop():
 
 
 class UnsteadyProblem():
-    def __init__(self,
-                 mesh,
-                 finite_element,
-                 stab=None,
-                 discrete_adjoint=False,
-                 op=DefaultOptions(),
-                 high_order=False):
-        self.mesh = mesh
+    def __init__(self, mesh, op, finite_element, discrete_adjoint=False):
         self.finite_element = finite_element
-        self.stab = stab if stab is not None else 'no'
         self.discrete_adjoint = discrete_adjoint
-        self.high_order = high_order
         self.op = op
+        self.mesh = op.default_mesh if mesh is None else mesh
+        self.stab = op.stabilisation
         self.approach = op.approach
 
         # function spaces and mesh quantities

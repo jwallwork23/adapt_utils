@@ -31,7 +31,6 @@ class TwoTurbineOptions(Options):
     adapt_field = Unicode('fluid_speed', help="Adaptation field of interest, from {'fluid_speed', 'elevation', 'both'}.").tag(config=True)
     h_min = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
     h_max = PositiveFloat(10., help="Maximum element size").tag(config=True)
-    rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
 
     # physical parameters
     base_viscosity = NonNegativeFloat(1.).tag(config=True)
@@ -53,6 +52,7 @@ class TwoTurbineOptions(Options):
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
         self.bathymetry = Constant(40.)
         self.viscosity = Constant(self.base_viscosity)
+        self.stabilisation = 'lax_friedrichs'
 
         # Correction to account for the fact that the thrust coefficient is based on an upstream
         # velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
