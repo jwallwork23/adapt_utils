@@ -366,30 +366,16 @@ class MeshOptimisation():
     Loop over all mesh optimisation steps in order to obtain a mesh which is optimal w.r.t. the
     given error estimator for the given PDE problem.
     """
-    def __init__(self,
-                 problem,
-                 mesh=None,
-                 op=None,
-                 rescaling=0.85,
-                 stab='SUPG',
-                 high_order=False,
-                 relax=False,
-                 outdir='outputs/',
-                 logmsg='',
-                 log=True):
-
+    def __init__(self, problem, mesh=None, op=None, stab='SUPG', high_order=False, relax=False):
         self.problem = problem
         self.mesh = mesh
         assert op is not None
         self.op = op
-        self.rescaling = rescaling
         self.approach = op.approach
         self.stab = stab if stab is not None else 'no'
         self.high_order = high_order
         self.relax = relax
-        self.outdir = outdir
-        self.logmsg = logmsg
-        self.log = log
+        self.di = create_directory(op.di)
 
         # Default tolerances etc
         self.msg = "Mesh {:2d}: {:7d} cells, objective {:.4e}"
@@ -397,6 +383,10 @@ class MeshOptimisation():
         self.maxit = 35
         self.element_rtol = 0.005    # Following [Power et al 2006]
         self.objective_rtol = 0.005
+
+        # Logging
+        self.logmsg = ''
+        self.log = True
 
         # Data storage
         self.dat = {'elements': [], 'vertices': [], 'objective': [], 'approach': self.approach}
@@ -407,7 +397,7 @@ class MeshOptimisation():
 
         # Create a log file and spit out parameters
         if self.log:
-            self.logfile = open('{:s}{:s}/optimisation_log'.format(self.outdir, self.approach), 'a+')
+            self.logfile = open('{:s}/optimisation_log'.format(self.di), 'a+')
             self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
             self.logfile.write('stabilisation: {:s}\n'.format(self.stab))
             self.logfile.write('high_order: {:b}\n'.format(self.high_order))
@@ -461,7 +451,7 @@ class MeshOptimisation():
                     break
 
             # Otherwise, adapt mesh
-            tp.set_target_vertices(num_vertices=self.dat['vertices'][0], rescaling=self.rescaling)
+            tp.set_target_vertices(num_vertices=self.dat['vertices'][0], rescaling=self.op.rescaling)
             tp.adapt_mesh(prev_metric=M_)
             tp.plot()
             if tp.nonlinear:
@@ -475,32 +465,25 @@ class MeshOptimisation():
 
 
 class OuterLoop():
-    def __init__(self,
-                 problem,
-                 op,
-                 mesh=None,
-                 rescaling=0.85,
-                 iterates=4,
-                 high_order=False,
-                 relax=False,
-                 maxit=35,
-                 element_rtol=0.005,
-                 objective_rtol=0.005):
-
+    def __init__(self, problem, op, mesh=None, high_order=False, relax=False):
         self.problem = problem
         self.op = op
         self.mesh = mesh
         self.approach = op.approach
-        self.rescaling = rescaling
         self.high_order = high_order
-        self.maxit = maxit
-        self.outer_maxit = iterates
         self.relax = relax
-        self.element_rtol = element_rtol
-        self.objective_rtol = objective_rtol
-        self.di = self.op.di
+        self.di = create_directory(self.op.di)
+
+        # Default tolerances etc
+        self.msg = "{:s} {:.2e} elements {:7d} iter {:2d} time {:6.1f} objective {:.4e}\n"
+        self.maxit = 35
+        self.element_rtol = 0.005    # Following [Power et al 2006]
+        self.objective_rtol = 0.005
+        self.outer_maxit = 4
+        self.log = False
 
     def scale_to_convergence(self):
+        mode = 'rescaling'
 
         # Create log file
         logfile = open(self.di + 'scale_to_convergence.log', 'a+')
@@ -513,15 +496,14 @@ class OuterLoop():
         for i in range(self.outer_maxit):
 
             # Iterate over increasing target vertex counts
-            self.rescaling = float(i+1)*0.4
+            self.op.rescaling = float(i+1)*0.4
             print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
             opt = MeshOptimisation(self.problem,
                                    mesh=self.mesh,
                                    op=self.op,
-                                   rescaling=self.rescaling,
                                    relax=self.relax,
-                                   high_order=self.high_order,
-                                   log=False)
+                                   high_order=self.high_order)
+            opt.log = self.log
             opt.maxit = self.maxit
             opt.element_rtol = self.element_rtol
             opt.objective_rtol = self.objective_rtol
@@ -530,12 +512,12 @@ class OuterLoop():
             self.final_J = opt.dat['objective'][-1]
 
             # Logging
-            msg = "rescaling {:.2f} elements {:7d} iterations {:2d} time {:6.1f} objective {:.4e}\n"
-            logfile.write(msg.format(self.rescaling,
-                                     opt.dat['elements'][-1],
-                                     len(opt.dat['objective']),
-                                     opt.dat['time'],
-                                     opt.dat['objective'][-1]))
+            logfile.write(self.msg.format(mode,
+                                          self.op.rescaling,
+                                          opt.dat['elements'][-1],
+                                          len(opt.dat['objective']),
+                                          opt.dat['time'],
+                                          opt.dat['objective'][-1]))
 
             # Convergence criterion: relative tolerance for objective functional
             if i > 0:
@@ -547,6 +529,7 @@ class OuterLoop():
         logfile.close()
 
     def desired_error_loop(self):
+        mode = 'desired_error'
 
         # Create log file
         logfile = open(self.di + 'desired_error_test.log', 'a+')
@@ -561,7 +544,8 @@ class OuterLoop():
             # Iterate over increasing target vertex counts
             print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.approach))
             self.op.desired_error = pow(10, -i)
-            opt = MeshOptimisation(self.problem,
+            opt = MeshOptimisation(mode,
+                                   self.problem,
                                    mesh=self.mesh,
                                    op=self.op,
                                    relax=self.relax,
@@ -576,12 +560,11 @@ class OuterLoop():
             self.final_J = opt.dat['objective'][-1]
 
             # Logging
-            msg = "desired error {:.1e} elements {:7d} iterations {:2d} time {:6.1f} objective {:.4e}\n"
-            logfile.write(msg.format(self.op.desired_error,
-                                     opt.dat['elements'][-1],
-                                     len(opt.dat['objective']),
-                                     opt.dat['time'],
-                                     opt.dat['objective'][-1]))
+            logfile.write(self.msg.format(self.op.desired_error,
+                                          opt.dat['elements'][-1],
+                                          len(opt.dat['objective']),
+                                          opt.dat['time'],
+                                          opt.dat['objective'][-1]))
 
             # Convergence criterion: relative tolerance for objective functional
             if i > 0:
