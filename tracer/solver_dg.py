@@ -207,7 +207,7 @@ class SteadyTracerProblem_DG(SteadyProblem):
             phi = self.solution
             
         # Adjoint source term
-        dJdphi = interpolate(self.op.box(self.mesh), self.P0)
+        dJdphi = self.op.box(self.P0)
             
         # Cell residual
         R = (dJdphi + div(u*lam) + div(nu*grad(lam)))*phi
@@ -246,7 +246,7 @@ class SteadyTracerProblem_DG(SteadyProblem):
         # Get potential to take Hessian w.r.t.
         x, y = SpatialCoordinate(self.mesh)
         if adjoint:
-            source = interpolate(self.op.box(self.mesh), self.P0)
+            source = self.op.box(self.P0)
             # F1 = -sol*self.u[0] - self.nu*sol.dx(0) - source*x
             # F2 = -sol*self.u[1] - self.nu*sol.dx(1) - source*y
             F1 = -sol*self.u[0] - self.nu*sol.dx(0)

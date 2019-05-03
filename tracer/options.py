@@ -106,8 +106,8 @@ class PowerOptions(TracerOptions):
 
     def set_source(self, fs):
         self.source = Function(fs)
-        #self.source.interpolate(self.bump(fs.mesh(), source=True))
-        self.source.interpolate(self.box(fs.mesh(), source=True))
+        #self.source.interpolate(self.bump(fs, source=True))
+        self.source.interpolate(self.box(fs, source=True))
         area = assemble(self.source*dx)
         rescaling = 0.04/area if area != 0. else 1.
         self.source.interpolate(rescaling*self.source)
@@ -116,8 +116,8 @@ class PowerOptions(TracerOptions):
 
     def set_objective_kernel(self, fs):
         self.kernel = Function(fs)
-        #self.kernel.interpolate(self.bump(fs.mesh()))
-        self.kernel.interpolate(self.box(fs.mesh()))
+        #self.kernel.interpolate(self.bump(fs))
+        self.kernel.interpolate(self.box(fs))
         area = assemble(self.kernel*dx)
         rescaling = 0.04/area if area != 0. else 1.
         self.kernel.interpolate(rescaling*self.kernel)
@@ -134,7 +134,7 @@ class TelemacOptions(TracerOptions):
         self.offset = offset
 
         # Source / receiver
-        self.source_loc = [(1.+self.offset, 5., 0.1)]
+        self.source_loc = [(1.+self.offset, 5., 0.08)]
         self.region_of_interest = [(20., 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
@@ -164,10 +164,10 @@ class TelemacOptions(TracerOptions):
         x0, y0, r0 = self.source_loc[0]
         self.source = Function(fs)
         with pyadjoint.stop_annotating():
-            nrm=assemble(self.indicator(fs.mesh(), source=True)*dx)
+            nrm=assemble(self.disk(fs, source=True)*dx)
         scaling = pi*r0*r0/nrm if nrm != 0 else 1
         scaling *= 0.5*self.source_value  # TODO: where does factor of half come from?
-        self.source.interpolate(self.indicator(fs.mesh(), source=True, scale=scaling))
+        self.source.interpolate(self.disk(fs, source=True, scale=scaling))
         return self.source
 
     def set_initial_condition(self, fs):
@@ -176,7 +176,7 @@ class TelemacOptions(TracerOptions):
 
     def set_objective_kernel(self, fs):
         self.kernel = Function(fs)
-        self.kernel.interpolate(self.indicator(fs.mesh()))
+        self.kernel.interpolate(self.disk(fs))
         return self.kernel
 
     def exact_solution(self, fs):
@@ -282,7 +282,7 @@ class LeVequeOptions(TracerOptions):
 
     def set_objective_kernel(self, fs):
         self.kernel = Function(fs)
-        self.kernel.interpolate(self.indicator(fs.mesh()))
+        self.kernel.interpolate(self.disk(fs))
         area = assemble(self.kernel*dx)
         area_exact = math.pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1

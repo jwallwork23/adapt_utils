@@ -100,8 +100,8 @@ class SteadyTurbineProblem(SteadyProblem):
         # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
         # and 0 outside
         num_turbines = len(op.region_of_interest)
-        scaling = num_turbines/assemble(op.bump(self.mesh)*dx)
-        self.turbine_density = op.bump(self.mesh, scale=scaling)
+        scaling = num_turbines/assemble(op.bump(self.P1)*dx)
+        self.turbine_density = op.bump(self.P1, scale=scaling)
         #File(self.di+'Bump.pvd').write(turbine_density)
         farm_options = TidalTurbineFarmOptions()
         farm_options.turbine_density = self.turbine_density
@@ -383,8 +383,8 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
             # We haven't meshed the turbines with separate ids, so define a farm everywhere
             # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
             # and 0 outside
-            scaling = num_turbines/assemble(op.bump(self.mesh)*dx)
-            self.turbine_density = op.bump(self.mesh, scale=scaling)
+            scaling = num_turbines/assemble(op.bump(self.P1)*dx)
+            self.turbine_density = op.bump(self.P1, scale=scaling)
             #File(self.di+'Bump.pvd').write(turbine_density)
             farm_options = TidalTurbineFarmOptions()
             farm_options.turbine_density = self.turbine_density

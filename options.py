@@ -84,10 +84,9 @@ class Options(FrozenConfigurable):
         assert self.dt_per_remesh % self.dt_per_export == 0
         return int(self.dt_per_remesh / self.dt_per_export)
 
-    def indicator(self, mesh, scale=1., source=False):  # TODO: Rename as 'disk'
-        """Indicator function associated with region(s) of interest"""
-        P1DG = FunctionSpace(mesh, "DG", 1)
-        x, y = SpatialCoordinate(mesh)
+    def disk(self, fs, scale=1., source=False):
+        """Disk indicator function associated with region(s) of interest"""
+        x, y = SpatialCoordinate(fs.mesh())
         locs = self.source_loc if source else self.region_of_interest
         eps = 1e-10
         for j in range(len(locs)):
@@ -99,14 +98,13 @@ class Options(FrozenConfigurable):
             else:
                 b = Or(b, lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps))
         expr = conditional(b, scale, 0.)
-        indi = Function(P1DG)
+        indi = Function(fs)
         indi.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return indi
 
-    def bump(self, mesh, scale=1., source=False):
+    def bump(self, fs, scale=1., source=False):
         """Bump function associated with region(s) of interest"""
-        P1 = FunctionSpace(mesh, "CG", 1)
-        x, y = SpatialCoordinate(mesh)
+        x, y = SpatialCoordinate(fs.mesh())
         locs = self.source_loc if source else self.region_of_interest
         i = 0
         for j in range(len(locs)):
@@ -116,14 +114,13 @@ class Options(FrozenConfigurable):
             i += conditional(lt(((x-x0)*(x-x0) + (y-y0)*(y-y0)), r*r),
                              scale*exp(1.-1./(1.-(x-x0)*(x-x0)/r**2))*exp(1.-1./(1.-(y-y0)*(y-y0)/r**2)),
                              0.)
-        bump = Function(P1)
+        bump = Function(fs)
         bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return bump
 
-    def gaussian(self, mesh, scale=1., source=False):
+    def gaussian(self, fs, scale=1., source=False):
         """Gaussian function associated with region(s) of interest"""
-        P1 = FunctionSpace(mesh, "CG", 1)
-        x, y = SpatialCoordinate(mesh)
+        x, y = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
         i = 0
         for j in range(len(locs)):
@@ -133,14 +130,13 @@ class Options(FrozenConfigurable):
             i += conditional(lt(((x-x0)*(x-x0) + (y-y0)*(y-y0)), r*r),
                              scale*exp(1. - 1. / (1. - ((x-x0)*(x-x0) + (y-y0)*(y-y0)) / r ** 2)),
                              0.)
-        bump = Function(P1)
+        bump = Function(fs)
         bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return bump
 
-    def box(self, mesh, scale=1., source=False):
+    def box(self, fs, scale=1., source=False):
         """Box function associated with region(s) of interest"""
-        P0 = FunctionSpace(mesh, "DG", 0)
-        x, y = SpatialCoordinate(mesh)
+        x, y = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
         for j in range(len(locs)):
             x0 = locs[j][0]
@@ -151,7 +147,7 @@ class Options(FrozenConfigurable):
             else:
                 b = Or(b, And(And(gt(x, x0-r), lt(x, x0+r)), And(gt(y, y0-r), lt(y, y0+r))))
         expr = conditional(b, scale, 0.)
-        box = Function(P0)
+        box = Function(fs)
         box.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return box
 
