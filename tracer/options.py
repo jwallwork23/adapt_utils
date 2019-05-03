@@ -209,7 +209,7 @@ class TelemacOptions_Centred(TelemacOptions):
         self.region_of_interest = [(20., 5., 0.5)]
 
 
-# TODO: Set three different tracers?
+# NOTE: Could set three different tracers?
 class LeVequeOptions(TracerOptions):
     """
     Parameters for test case in [LeVeque 1996].
@@ -255,7 +255,7 @@ class LeVequeOptions(TracerOptions):
         #print("Exact objective: {:.4e}".format(self.J_exact))  # TODO: Check this
 
     def set_diffusivity(self, fs):
-        self.diffusivity = Constant(0.)  # TODO: could use None?
+        self.diffusivity = Constant(0.)
         return self.diffusivity
 
     def set_velocity(self, fs):

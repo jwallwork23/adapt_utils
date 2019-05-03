@@ -30,8 +30,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
         * outflow.
     """
     def __init__(self,
-                 mesh=SquareMesh(40, 40, 4, 4),
-                 op=PowerOptions(),
+                 op,
+                 mesh=None,
                  discrete_adjoint=False,
                  finite_element=FiniteElement("Lagrange", triangle, 1),
                  prev_solution=None):
@@ -190,7 +190,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         r = phi*dot(self.u, self.n) - self.nu*dot(self.n, nabla_grad(phi))
 
         # Assemble cell residual
-        R_norm = assemble(i*R*R*dx) if square else assemble(i*R*dx)
+        self.cell_res = assemble(i*R*R*dx) if square else assemble(i*R*dx)
 
         # Solve auxiliary problem to assemble edge residual
         r_norm = TrialFunction(self.P0)
@@ -201,14 +201,14 @@ class SteadyTracerProblem_CG(SteadyProblem):
                 flux_terms += i*r*r*ds(j) if square else i*r*ds(j)
         #    if bcs[j] == 'dirichlet_zero':
         #        flux_terms += i*phi*phi*ds(j)
-        r_norm = Function(self.P0)
-        solve(mass_term == flux_terms, r_norm)
+        self.edge_res = Function(self.P0)
+        solve(mass_term == flux_terms, self.edge_res)
 
         # Form error estimator
         if square:
-            self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), space)
+            self.indicator = project(sqrt(self.h*self.h*self.cell_res + 0.5*self.h*self.edge_res), space)
         else:
-            self.indicator = project(abs(R_norm + r_norm), space)
+            self.indicator = project(abs(self.cell_res + self.edge_res), space)
         self.indicator.rename('explicit')
 
     def explicit_estimation_adjoint(self, space=None, square=True):
@@ -224,7 +224,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Cell residual
         R = -div(u*lam) - div(nu*grad(lam))
-        R_norm = assemble(i*R*R*dx) if square else assemble(i*R*dx)
+        self.cell_res_adjoint = assemble(i*R*R*dx) if square else assemble(i*R*dx)
 
         # Edge residual
         r = TrialFunction(self.P0)
@@ -236,14 +236,14 @@ class SteadyTracerProblem_CG(SteadyProblem):
                 flux_terms += i*r*r*ds(j) if square else i*r*ds(j)  # Robin BC in adjoint
         #    if bcs[j] != 'neumann_zero':
         #        flux_terms += i*lam*lam*ds(j)    # Dirichlet BC in adjoint
-        r_norm = Function(self.P0)
-        solve(mass_term == flux_terms, r_norm)
+        self.edge_res_adjoint = Function(self.P0)
+        solve(mass_term == flux_terms, self.edge_res_adjoint)
 
         # Form error estimator
         if square:
-            self.indicator = project(sqrt(self.h*self.h*R_norm + 0.5*self.h*r_norm), space)
+            self.indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), space)
         else:
-            self.indicator = project(abs(R_norm + r_norm), space)
+            self.indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), space)
         self.indicator.rename('explicit_adjoint')
  
     def dwr_estimation(self):
@@ -262,20 +262,23 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # Edge residual
         r = TrialFunction(self.P0)
         mass_term = i*r*dx
-        flux = nu*lam*dot(n, nabla_grad(phi))
+        flux = -nu*lam*dot(n, nabla_grad(phi))
         flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
         for j in bcs.keys():
-            if bcs[j] == 'neumann_zero':
-                flux_terms += i*flux*ds(j)
-        #    if bcs[j] == 'dirichlet_zero':
-        #        flux_terms += -i*phi*ds(j)
+            if bcs[j] != 'neumann_zero':
+                flux_terms += -i*flux*ds(j)
         r = Function(self.P0)
         solve(mass_term == flux_terms, r)
 
         # Sum
         self.cell_res = R
         self.edge_res = r
-        self.indicator = project(R + r, self.P0)
+        if self.op.dwr_approach == 'error_representation':
+            self.indicator = project(R + r, self.P1)
+        elif self.op.dwr_approach == 'ainsworth_oden':
+            self.indicator = project(self.h*self.h*R + self.h*r, P1)
+        else:
+            raise NotImplementedError
         self.indicator.rename('dwr')
         
     def dwr_estimation_adjoint(self):
@@ -299,16 +302,19 @@ class SteadyTracerProblem_CG(SteadyProblem):
         flux = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
         flux_terms = ((i*flux)('+') + (i*flux)('-')) * dS
         for j in bcs.keys():
-            if bcs[j] != 'dirichlet_zero':
+            if bcs[j] == 'dirichlet_zero':
                 flux_terms += i*flux*ds(j)  # Robin BC in adjoint
-        #    if bcs[j] != 'neumann_zero':
-        #        flux_terms += -i*lam*ds(j)  # Dirichlet BC in adjoint
         r = Function(self.P0)
         solve(mass_term == flux_terms, r)
 
         self.cell_res_adjoint = R
         self.edge_res_adjoint = r
-        self.indicator = project(R + r, self.P0)
+        if self.op.dwr_approach == 'error_representation':
+            self.indicator = project(R + r, self.P1)
+        elif self.op.dwr_approach == 'ainsworth_oden':
+            self.indicator = project(self.h*self.h*R + self.h*r, P1)
+        else:
+            raise NotImplementedError
         self.indicator.rename('dwr_adjoint')
         
     def get_anisotropic_metric(self, adjoint=False, relax=False, superpose=True):

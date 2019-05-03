@@ -32,12 +32,12 @@ class SteadyProblem():
         * adapt mesh based on some error estimator of choice.
     """
     def __init__(self, mesh, op, finite_element, discrete_adjoint=False, prev_solution=None):
-        self.mesh = mesh
+        self.mesh = op.default_mesh if mesh is None else mesh
+        self.op = op
         self.finite_element = finite_element
         self.stab = op.stabilisation
         self.discrete_adjoint = discrete_adjoint
         self.prev_solution = prev_solution
-        self.op = op
         self.approach = op.approach
 
         # function spaces and mesh quantities
@@ -61,13 +61,13 @@ class SteadyProblem():
         self.solution_file = File(self.di + 'solution.pvd')
         self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
 
-    def set_target_vertices(self, rescaling=0.85, num_vertices=None):
+    def set_target_vertices(self, num_vertices=None):
         """
         Set target number of vertices for adapted mesh by scaling the current number of vertices.
         """
         if num_vertices is None:
             num_vertices = self.mesh.num_vertices()
-        self.op.target_vertices = num_vertices * rescaling
+        self.op.target_vertices = num_vertices * self.op.rescaling
 
     def solve(self):
         """
@@ -437,7 +437,7 @@ class MeshOptimisation():
                     break
 
             # Otherwise, adapt mesh
-            tp.set_target_vertices(num_vertices=self.dat['vertices'][0], rescaling=self.op.rescaling)
+            tp.set_target_vertices(num_vertices=self.dat['vertices'][0])
             tp.adapt_mesh(prev_metric=M_)
             tp.plot()
             if tp.nonlinear:
@@ -646,6 +646,7 @@ class UnsteadyProblem():
         """
         Solve the adjoint PDE in the discrete sense, using pyadjoint.
         """
+        create_directory('outputs/hdf5/')
         J = self.objective_functional()
         compute_gradient(J, Control(self.gradient_field))
         tape = get_working_tape()
