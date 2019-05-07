@@ -190,7 +190,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         r = phi*dot(self.u, self.n) - self.nu*dot(self.n, nabla_grad(phi))
 
         # Assemble cell residual
-        self.cell_res = assemble(i*R*R*dx) if square else assemble(i*R*dx)
+        self.cell_res = R*R if square else R
 
         # Solve auxiliary problem to assemble edge residual
         r_norm = TrialFunction(self.P0)
@@ -258,25 +258,30 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Cell residual
         R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
+        self.cell_res = R*R if self.op.dwr_approach == 'ainsworth_oden' else R
 
         # Edge residual
         r = TrialFunction(self.P0)
         mass_term = i*r*dx
         flux = -nu*lam*dot(n, nabla_grad(phi))
-        flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
-        for j in bcs.keys():
-            if bcs[j] != 'neumann_zero':
-                flux_terms += -i*flux*ds(j)
-        r = Function(self.P0)
-        solve(mass_term == flux_terms, r)
+        if self.op.dwr_approach == 'ainsworth_oden':
+            flux_terms = ((i*flux*flux)('+') + (i*flux*flux)('-'))*dS
+            for j in bcs.keys():
+                if bcs[j] != 'neumann_zero':
+                    flux_terms += i*flux*flux*ds(j)
+        else:
+            flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+            for j in bcs.keys():
+                if bcs[j] != 'neumann_zero':
+                    flux_terms += -i*flux*ds(j)
+        self.edge_res = Function(self.P0)
+        solve(mass_term == flux_terms, self.edge_res)
 
         # Sum
-        self.cell_res = R
-        self.edge_res = r
         if self.op.dwr_approach == 'error_representation':
-            self.indicator = project(R + r, self.P1)
+            self.indicator = project(self.cell_res + self.edge_res, self.P1)
         elif self.op.dwr_approach == 'ainsworth_oden':
-            self.indicator = project(self.h*self.h*R + self.h*r, P1)
+            self.indicator = project(sqrt(self.h*self.h*self.cell_res + 0.5*self.h*self.edge_res), self.P1)
         else:
             raise NotImplementedError
         self.indicator.rename('dwr')
@@ -290,29 +295,32 @@ class SteadyTracerProblem_CG(SteadyProblem):
         bcs = self.op.boundary_conditions
         phi = self.solve_high_order(adjoint=False) if self.op.order_increase else self.solution
 
-        # Adjoint source term
-        dJdphi = self.op.box(self.P0)
-
         # Cell residual
+        dJdphi = self.op.box(self.P0)  # Adjoint source term
         R = (dJdphi + div(u*lam) + div(nu*grad(lam)))*phi
+        self.cell_res_adjoint = R*R if self.op.dwr_approach == 'ainsworth_oden' else R
 
         # Edge residual
         r = TrialFunction(self.P0)
         mass_term = i*r*dx
-        flux = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
-        flux_terms = ((i*flux)('+') + (i*flux)('-')) * dS
-        for j in bcs.keys():
-            if bcs[j] == 'dirichlet_zero':
-                flux_terms += i*flux*ds(j)  # Robin BC in adjoint
-        r = Function(self.P0)
-        solve(mass_term == flux_terms, r)
+        flux = -lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
+        if self.op.dwr_approach == 'ainsworth_oden':
+            flux_terms = ((i*flux*flux)('+') + (i*flux*flux)('-'))*dS
+            for j in bcs.keys():
+                if bcs[j] != 'neumann_zero':
+                    flux_terms += i*flux*flux*ds(j)
+        else:
+            flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+            for j in bcs.keys():
+                if bcs[j] != 'neumann_zero':
+                    flux_terms += -i*flux*ds(j)
+        self.edge_res_adjoint = Function(self.P0)
+        solve(mass_term == flux_terms, self.edge_res_adjoint)
 
-        self.cell_res_adjoint = R
-        self.edge_res_adjoint = r
         if self.op.dwr_approach == 'error_representation':
             self.indicator = project(R + r, self.P1)
         elif self.op.dwr_approach == 'ainsworth_oden':
-            self.indicator = project(self.h*self.h*R + self.h*r, P1)
+            self.indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + self.h*self.edge_res_adjoint), self.P1)
         else:
             raise NotImplementedError
         self.indicator.rename('dwr_adjoint')
