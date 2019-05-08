@@ -7,8 +7,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 op = DefaultOptions()
-#op.restrict = 'num_cells'
-#op.restrict = 'anisotropy'
+#op.restrict = 'num_vertices'
+#op.restrict = 'p_norm'
 op.restrict = 'error'
 op.desired_error = 1
 op.h_min = 1e-4

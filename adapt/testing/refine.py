@@ -3,7 +3,7 @@ from adapt_utils import *
 import numpy as np
 
 op = DefaultOptions()
-#op.restrict = 'num_cells'
+#op.restrict = 'num_vertices'
 #op.desired_error = 1
 
 # simple mesh of two right angled triangles
@@ -23,7 +23,7 @@ assert np.max(mesh.coordinates.dat.data - mesh2.coordinates.dat.data) < 1e-8
 # check isotropic metric does the same thing
 print('Testing isotropic metric')
 f.assign(1/np.sqrt(2))
-M = isotropic_metric(f)
+M = isotropic_metric(f, noscale=True)
 mesh2 = AnisotropicAdaptation(mesh, M).adapted_mesh
 assert np.max(mesh.coordinates.dat.data - mesh2.coordinates.dat.data) < 1e-8
 
