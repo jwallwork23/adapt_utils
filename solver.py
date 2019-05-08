@@ -404,7 +404,7 @@ class MeshOptimisation():
 
             # Solve
             tp.solve()
-            if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit'):
+            if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
                 tp.solve_adjoint()
             self.solution = tp.solution
 
