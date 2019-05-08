@@ -271,7 +271,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         solve(mass_term == flux_terms, r)
 
         # Sum
-        self.cell_res = R
+        self.cell_res = assemble(i*R*dx)
         self.edge_res = r
         if self.op.dwr_approach == 'error_representation':
             self.indicator = project(R + r, self.P1)
@@ -307,7 +307,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         r = Function(self.P0)
         solve(mass_term == flux_terms, r)
 
-        self.cell_res_adjoint = R
+        self.cell_res = assemble(i*R*dx)
         self.edge_res_adjoint = r
         if self.op.dwr_approach == 'error_representation':
             self.indicator = project(R + r, self.P1)

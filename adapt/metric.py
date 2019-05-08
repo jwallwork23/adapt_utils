@@ -158,13 +158,13 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
     """
     assert len(f.ufl_element().value_shape()) == 0
     mesh = f.function_space().mesh()
+    P1 = FunctionSpace(mesh, "CG", 1)
 
     # Normalise indicator and project into P1 space
     f_norm = min(max(norm(f), op.min_norm), op.max_norm)
     scaling = 1/op.desired_error if op.restrict == 'error' else op.target_vertices
-    #g = project(scaling*f/f_norm, FunctionSpace(mesh, "CG", 1))
-    g = project(scaling*abs(f)/f_norm, FunctionSpace(mesh, "CG", 1))
-    #g = interpolate(scaling*abs(f)/f_norm, FunctionSpace(mesh, "CG", 1))
+    g = project(Constant(scaling/f_norm)*abs(f), P1)
+    #g = interpolate(Constant(scaling/f_norm)*abs(f), P1)
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
@@ -183,7 +183,11 @@ void isotropic(double A_[4], const double * eps, const double * hmin2, const dou
 """
     kernel = op2.Kernel(kernel_str, "isotropic", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
     op2.par_loop(kernel,
-                 V.node_set if bdy is None else DirichletBC(V, 0, bdy).node_set, M.dat(op2.RW), g.dat(op2.READ), Constant(op.h_min**2).dat(op2.READ), Constant(op.h_max**2).dat(op2.READ))
+                 V.node_set if bdy is None else DirichletBC(V, 0, bdy).node_set,
+                 M.dat(op2.RW),
+                 g.dat(op2.READ),
+                 Constant(op.h_min**2).dat(op2.READ),
+                 Constant(op.h_max**2).dat(op2.READ))
 
     return M
 
