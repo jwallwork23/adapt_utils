@@ -37,6 +37,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     msg = "WARNING: minimum element size reached as {m:.2e}"
 
     if op.restrict in ('num_vertices', 'error') or noscale:
+        f_min = 1e-6  # Minimum tolerated value for the solution field
         if noscale:
             rescale = Constant(1)
         elif op.restrict == 'error':
@@ -51,7 +52,6 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             else:
                 rescale = op.target_vertices / max(norm(f), f_min)
             #rescale = interpolate(op.target_vertices / max_value(abs(f), f_min), P1)
-        f_min = 1e-6  # Minimum tolerated value for the solution field
 
         for i in range(mesh.num_vertices()):
 
