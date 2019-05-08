@@ -1,7 +1,9 @@
 from firedrake import *
-from firedrake.slate.slac.compiler import PETSC_DIR
 
 import numpy as np
+import numpy
+from numpy import linalg as la
+from scipy import linalg as sla
 
 from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.recovery import construct_hessian
