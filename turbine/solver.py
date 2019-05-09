@@ -285,6 +285,19 @@ class SteadyTurbineProblem(SteadyProblem):
             self.M = steady_metric(None, H=self.M, mesh=self.mesh, op=self.op)
             File('outputs/test.pvd').write(self.M)
 
+    def plot(self):
+        """
+        Plot current mesh and indicator field, if available.
+        """
+        File(self.di + 'mesh.pvd').write(self.mesh.coordinates)
+        if hasattr(self, 'indicator'):
+            name = self.indicator.dat.name
+            self.indicator.rename(name + ' indicator')
+            File(self.di + 'indicator.pvd').write(self.indicator)
+        if hasattr(self, 'adjoint_solution'):
+            z, zeta = self.adjoint_solution.split()
+            self.adjoint_solution_file.write(z, zeta)
+
     def interpolate_solution(self):
         """
         Here we only need interpolate the velocity.

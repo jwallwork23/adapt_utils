@@ -519,7 +519,7 @@ class OuterLoop():
         logfile.write('objective_rtol: {:.4f}\n'.format(self.objective_rtol))
         logfile.write('outer_maxit: {:d}\n\n'.format(self.outer_maxit))
 
-        for i in range(self.outer_maxit):
+        for i in range(self.outer_maxit):  # TODO: lower range bound too?
 
             # Iterate over increasing target vertex counts
             print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.op.approach))
