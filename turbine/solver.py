@@ -179,7 +179,7 @@ class SteadyTurbineProblem(SteadyProblem):
         with pyadjoint.stop_annotating():
             cell_res = self.ts.cell_residual(self.adjoint_solution)
             edge_res = self.ts.edge_residual(self.adjoint_solution)
-            self.indicator = Function(self.P0)
+            self.indicator = Function(self.P1)  # project straight into P1
             if self.op.dwr_approach == 'error_representation':
                 self.indicator.project(cell_res + edge_res)
             elif self.op.dwr_approach == 'AO97':

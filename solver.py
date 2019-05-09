@@ -188,6 +188,7 @@ class SteadyProblem():
         el = self.indicator.ufl_element()
         if (el.family(), el.degree()) != ('Lagrange', 1):
             self.indicator = project(self.indicator, self.P1)
+        self.indicator.interpolate(abs(self.indicator))  # project doesn't guarantee non-negativity
         self.M = isotropic_metric(self.indicator, op=self.op)
 
     def get_anisotropic_metric(self, adjoint=False, relax=False):
@@ -454,7 +455,7 @@ class OuterLoop():
     def __init__(self, problem, op, mesh=None):
         self.problem = problem
         self.op = op
-        self.mesh = mesh
+        self.mesh = op.default_mesh if mesh is None else mesh
         self.di = create_directory(self.op.di)
 
         # Default tolerances etc

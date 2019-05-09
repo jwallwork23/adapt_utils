@@ -29,8 +29,8 @@ class SteadyTurbineOptions(Options):
     # Adaptivity parameters
     target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     adapt_field = Unicode('fluid_speed', help="Adaptation field of interest, from {'fluid_speed', 'elevation', 'both'}.").tag(config=True)
-    h_min = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
-    h_max = PositiveFloat(10., help="Maximum element size").tag(config=True)
+    h_min = PositiveFloat(1e-5, help="Minimum element size").tag(config=True)
+    h_max = PositiveFloat(50., help="Maximum element size").tag(config=True)
 
     # Physical parameters
     symmetric_viscosity = Bool(False, help="Symmetrise viscosity term").tag(config=True)

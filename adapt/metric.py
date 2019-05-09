@@ -45,7 +45,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             if f is None:
                 rescale = 1/op.desired_error
             else:
-                rescale = 1/op.desired_error / max(norm(f), f_min)
+                rescale = 1/op.desired_error / max(norm(f), f_min)  # TODO: not sure about this rescaling
         elif op.restrict == 'num_vertices':
             if f is None:
                 rescale = op.target_vertices
@@ -151,32 +151,28 @@ def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
         rescale /= op.desired_error
     elif op.restrict == 'num_vertices':
         rescale *= op.target_vertices
+    elif op.restrict == 'p_norm':
+        raise ValueError("'p_norm' restriction not available for isotropic metric.")
     else:
-        raise ValueError
+        raise NotImplementedError
 
     # Project into P1 space and scale
     g = Function(FunctionSpace(mesh, "CG", 1))
-    g.project(rescale*abs(f))
+    #g.project(rescale*abs(f))
+    g.project(0.5*rescale*abs(f))
+    #g.project(0.5*rescale*sqrt(abs(f)))
+    #g.project(0.5*rescale*f*f)
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
     M = Function(V)
-    if bdy is not None:
-        for i in DirichletBC(V, 0, bdy).nodes:
-            alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
-            M.dat.data[i][0, 0] = alpha
-            M.dat.data[i][1, 1] = alpha
-
-            if alpha >= 0.9999 / h_min2:
-                print("WARNING: minimum element size reached!")
-    else:
-        for i in range(len(M.dat.data)):
-            alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
-            M.dat.data[i][0, 0] = alpha
-            M.dat.data[i][1, 1] = alpha
-
-            if alpha >= 0.9999 / h_min2:
-                print("WARNING: minimum element size reached!")
+    node_set = range(mesh.num_vertices()) if bdy is None else DirichletBC(V, 0, bdy).nodes
+    for i in node_set:
+        alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
+        M.dat.data[i][0, 0] = alpha
+        M.dat.data[i][1, 1] = alpha
+        if alpha >= 0.9999 / h_min2:
+            print("WARNING: minimum element size reached!")
     return M
 
 
