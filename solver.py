@@ -463,6 +463,7 @@ class OuterLoop():
         self.maxit = 35
         self.element_rtol = 0.005    # Following [Power et al 2006]
         self.objective_rtol = 0.005
+        self.outer_startit = 0
         self.outer_maxit = 4
         self.log = False
 
@@ -477,7 +478,7 @@ class OuterLoop():
         logfile.write('objective_rtol: {:.4f}\n'.format(self.objective_rtol))
         logfile.write('outer_maxit: {:d}\n\n'.format(self.outer_maxit))
 
-        for i in range(self.outer_maxit):
+        for i in range(self.outer_startit, self.outer_maxit):
 
             # Iterate over increasing target vertex counts
             self.op.rescaling = float(i+1)*0.4
