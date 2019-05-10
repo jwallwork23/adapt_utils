@@ -501,7 +501,7 @@ class OuterLoop():
                                           opt.dat['objective'][-1]))
 
             # Convergence criterion: relative tolerance for objective functional
-            if i > 0:
+            if i > self.outer_startit:
                 obj_diff = abs(opt.dat['objective'][-1] - J_)
                 if obj_diff < self.objective_rtol*J_:
                     print(opt.conv_msg.format(i+1, 'convergence in objective functional.'))
@@ -520,7 +520,7 @@ class OuterLoop():
         logfile.write('objective_rtol: {:.4f}\n'.format(self.objective_rtol))
         logfile.write('outer_maxit: {:d}\n\n'.format(self.outer_maxit))
 
-        for i in range(self.outer_maxit):  # TODO: lower range bound too?
+        for i in range(self.outer_startit, self.outer_maxit):
 
             # Iterate over increasing target vertex counts
             print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.op.approach))
@@ -543,7 +543,7 @@ class OuterLoop():
                                           opt.dat['objective'][-1]))
 
             # Convergence criterion: relative tolerance for objective functional
-            if i > 0:
+            if i > self.outer_startit:
                 obj_diff = abs(opt.dat['objective'][-1] - J_)
                 if obj_diff < self.objective_rtol*J_:
                     print(opt.conv_msg.format(i+1, 'convergence in objective functional.'))
@@ -662,10 +662,11 @@ class UnsteadyProblem():
         except:
             ValueError("Expected one SolveBlock, but encountered {:d}".format(N))
         for i in range(0, N, self.op.dt_per_remesh):
-            self.adjoint_solution.assign(solve_blocks[i].adj_sol)
+            self.adjoint_solution.assign(solve_blocks[i].adj_sol)  # TODO: annotate in pyadjoint to track progress
             with DumbCheckpoint('outputs/hdf5/Adjoint2d_' + index_string(i), mode=FILE_CREATE) as sa:
                 sa.store(self.adjoint_solution)
                 sa.close()
+            print("Storing adjoint solution {:d}".format(i))
             self.adjoint_solution_file.write(self.adjoint_solution, t=self.op.dt*i)
         tape.clear_tape()
 
