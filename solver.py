@@ -369,6 +369,7 @@ class MeshOptimisation():
         # Default tolerances etc
         self.msg = "Mesh {:2d}: {:7d} cells, objective {:.4e}"
         self.conv_msg = "Converged after {:d} iterations due to {:s}"
+        self.startit = 0
         self.maxit = 35
         self.element_rtol = 0.005    # Following [Power et al 2006]
         self.objective_rtol = 0.005
@@ -397,7 +398,7 @@ class MeshOptimisation():
 
         prev_sol = None
         tstart = clock()
-        for i in range(self.maxit):
+        for i in range(self.startit, self.maxit):
             print('Solving on mesh {:d}'.format(i))
             tp = self.problem(mesh=self.mesh if i == 0 else tp.mesh,
                               op=self.op,

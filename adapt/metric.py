@@ -39,7 +39,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     if op.restrict == 'target' or noscale:
         f_min = 1e-6  # Minimum tolerated value for the solution field  # FIXME: seems arbitrary
         if noscale:
-            rescale = Constant(1)
+            rescale = 1
         else:
             if f is None:
                 rescale = op.target
@@ -50,8 +50,8 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
         for i in range(mesh.num_vertices()):
 
             # Generate local Hessian, avoiding round-off error
-            H_loc = H.dat.data[i] * rescale / max(sqrt(assemble(f*f*dx)), f_min)
-            mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
+            H_loc = rescale*H.dat.data[i]
+            mean_diag = 0.5*(H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
 
@@ -158,7 +158,7 @@ def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
     if op.restrict == 'p_norm':
         detM = Function(P1)
         for i in node_set:
-            alpha = max(g.dat.data[i], 1e-10)  # avoid round-off error
+            alpha = max(g.dat.data[i], 1e-8)
             det = alpha*alpha
             g.dat.data[i] *= pow(det, -1 / 2*op.norm_order + 2)
             detM.dat.data[i] = pow(det, op.norm_order/(2*op.norm_order + 2))

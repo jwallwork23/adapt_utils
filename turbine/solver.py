@@ -151,9 +151,9 @@ class SteadyTurbineProblem(SteadyProblem):
         with pyadjoint.stop_annotating():
             cell_res = self.ts.cell_residual()
             self.cell_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
-            self.cell_residuals[0].project(abs(cell_res[0]))
-            self.cell_residuals[1].project(abs(cell_res[1]))
-            self.cell_residuals[2].project(abs(cell_res[2]))
+            self.cell_residuals[0].project(cell_res[0])
+            self.cell_residuals[1].project(cell_res[1])
+            self.cell_residuals[2].project(cell_res[2])
             if self.approach == 'explicit':
                 self.indicator = Function(self.P1)
                 cell_res_dot = self.cell_residuals[0]*self.cell_residuals[0]
@@ -221,8 +221,8 @@ class SteadyTurbineProblem(SteadyProblem):
             F2[2] = H*u[1]
             # f[0] = g*eta*b.dx(0) - C_t*normu*u[0]
             # f[1] = g*eta*b.dx(1) - C_t*normu*u[1]
-            f[0] = -C_t*normu*u[0]
-            f[1] = -C_t*normu*u[1]
+            f[0] = -C_t*normu*u[0]  # TODO: what about viscous term?
+            f[1] = -C_t*normu*u[1]  # TODO: --"--
 
         H1 = [0, 0, 0]
         H2 = [0, 0, 0]
@@ -230,10 +230,10 @@ class SteadyTurbineProblem(SteadyProblem):
 
         # Construct Hessians
         for i in range(3):
-            H1[i] = construct_hessian(F1[i], mesh=self.mesh, op=self.op)
-            H2[i] = construct_hessian(F2[i], mesh=self.mesh, op=self.op)
-        Hf[0] = construct_hessian(f[0], mesh=self.mesh, op=self.op)
-        Hf[1] = construct_hessian(f[1], mesh=self.mesh, op=self.op)
+            H1[i] = steady_metric(F1[i], mesh=self.mesh, noscale=True, op=self.op)
+            H2[i] = steady_metric(F2[i], mesh=self.mesh, noscale=True, op=self.op)
+        Hf[0] = steady_metric(f[0], mesh=self.mesh, noscale=True, op=self.op)
+        Hf[1] = steady_metric(f[1], mesh=self.mesh, noscale=True, op=self.op)
 
         # Form metric
         self.M = Function(self.P1_ten)
@@ -271,10 +271,10 @@ class SteadyTurbineProblem(SteadyProblem):
             self.explicit_estimation()
             z, zeta = self.adjoint_solution.split()
             #spd = sqrt(inner(z,z))
-            #H1 = construct_hessian(spd, mesh=self.mesh, op=self.op)
-            H1 = construct_hessian(z[0], mesh=self.mesh, op=self.op)  # TODO: should take abs
-            H2 = construct_hessian(z[1], mesh=self.mesh, op=self.op)
-            H3 = construct_hessian(zeta, mesh=self.mesh, op=self.op)
+            #H1 = construct_hessian(spd, mesh=self.mesh, noscale=True, op=self.op)
+            H1 = steady_metric(z[0], mesh=self.mesh, noscale=True, op=self.op)
+            H2 = steady_metric(z[1], mesh=self.mesh, noscale=True, op=self.op)
+            H3 = steady_metric(zeta, mesh=self.mesh, noscale=True, op=self.op)
             self.M = Function(self.P1_ten)
             for i in range(self.mesh.num_vertices()):  # TODO: use pyop2
                 #self.M.dat.data[i][:, :] += self.indicator.dat.data[i]*H1.dat.data[i]
