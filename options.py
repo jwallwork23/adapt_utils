@@ -34,7 +34,7 @@ class Options(FrozenConfigurable):
     # Metric
     max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
     restrict = Unicode('error', help="Hessian restriction approach, from {'num_vertices', 'p_norm', 'error'}.").tag(config=True)
-    desired_error = PositiveFloat(1e-2, help="Desired error for 'error' restriction approach.").tag(config=True)
+    target = PositiveFloat(1e+3, help="Target number of vertices / inverse desired error for 'target' restriction approach.").tag(config=True)
     norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used in 'p_norm' restriction approach.").tag(config=True)
     min_norm = PositiveFloat(1e-6).tag(config=True)
     max_norm = PositiveFloat(1e9).tag(config=True)
@@ -165,7 +165,6 @@ class DefaultOptions(Options):
     # adapt
     h_min = PositiveFloat(1e-6, help="Minimum tolerated element size").tag(config=True)
     h_max = PositiveFloat(1e3, help="Maximum tolerated element size").tag(config=True)
-    target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)").tag(config=True)
 
     # physical
     viscosity = NonNegativeFloat(1e-3).tag(config=True)

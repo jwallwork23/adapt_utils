@@ -67,7 +67,7 @@ class SteadyProblem():
         """
         if num_vertices is None:
             num_vertices = self.mesh.num_vertices()
-        self.op.target_vertices = num_vertices * self.op.rescaling
+        self.op.target = num_vertices * self.op.rescaling
 
     def solve(self):
         """
@@ -438,7 +438,7 @@ class MeshOptimisation():
                     break
 
             # Otherwise, adapt mesh
-            tp.set_target_vertices(num_vertices=self.dat['vertices'][0])
+            #tp.set_target_vertices(num_vertices=self.dat['vertices'][0])  # FIXME
             tp.adapt_mesh(prev_metric=M_)
             tp.plot()
             if tp.nonlinear:
@@ -524,7 +524,7 @@ class OuterLoop():
 
             # Iterate over increasing target vertex counts
             print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.op.approach))
-            self.op.desired_error = pow(10, -i)
+            self.op.target = pow(10, i)
             opt = MeshOptimisation(self.problem, mesh=self.mesh, op=self.op)
             opt.maxit = self.maxit
             opt.element_rtol = self.element_rtol
@@ -536,7 +536,7 @@ class OuterLoop():
 
             # Logging
             logfile.write(self.msg.format(mode,
-                                          self.op.desired_error,
+                                          1/self.op.target,
                                           opt.dat['elements'][-1],
                                           len(opt.dat['objective']),
                                           opt.dat['time'],
@@ -592,7 +592,7 @@ class UnsteadyProblem():
         """
         if num_vertices is None:
             num_vertices = self.mesh.num_vertices()
-        self.op.target_vertices = num_vertices * rescaling
+        self.op.target = num_vertices * rescaling
 
     def solve_step(self):
         """

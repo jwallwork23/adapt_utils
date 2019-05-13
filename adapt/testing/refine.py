@@ -3,8 +3,6 @@ from adapt_utils import *
 import numpy as np
 
 op = DefaultOptions()
-#op.restrict = 'num_vertices'
-#op.desired_error = 1
 
 # simple mesh of two right angled triangles
 mesh = UnitSquareMesh(1, 1)

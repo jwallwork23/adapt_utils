@@ -36,22 +36,16 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
 
     msg = "WARNING: minimum element size reached as {m:.2e}"
 
-    if op.restrict in ('num_vertices', 'error') or noscale:
-        f_min = 1e-6  # Minimum tolerated value for the solution field
+    if op.restrict == 'target' or noscale:
+        f_min = 1e-6  # Minimum tolerated value for the solution field  # FIXME: seems arbitrary
         if noscale:
             rescale = Constant(1)
-        elif op.restrict == 'error':
-            #rescale = interpolate(1/(op.desired_error*max_value(abs(f), f_min)), P1)
+        else:
             if f is None:
-                rescale = 1/op.desired_error
+                rescale = op.target
             else:
-                rescale = 1/op.desired_error / max(norm(f), f_min)  # TODO: not sure about this rescaling
-        elif op.restrict == 'num_vertices':
-            if f is None:
-                rescale = op.target_vertices
-            else:
-                rescale = op.target_vertices / max(norm(f), f_min)
-            #rescale = interpolate(op.target_vertices / max_value(abs(f), f_min), P1)
+                rescale = op.target / max(norm(f), f_min)
+            #rescale = interpolate(op.target / max_value(abs(f), f_min), P1)
 
         for i in range(mesh.num_vertices()):
 
@@ -105,7 +99,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             detH.dat.data[i] = pow(det, op.norm_order / (2. * op.norm_order + 2))
 
         # Scale by the target number of vertices and Hessian complexity
-        M *= op.target_vertices / assemble(detH * dx)
+        M *= op.target / assemble(detH * dx)
 
         for i in range(mesh.num_vertices()):
             # Find eigenpairs of metric and truncate eigenvalues
@@ -138,41 +132,47 @@ def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
     :param op: `Options` class providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
+    a2 = pow(op.max_anisotropy, 2)
     h_min2 = pow(op.h_min, 2)
     h_max2 = pow(op.h_max, 2)
     assert len(f.ufl_element().value_shape()) == 0
     mesh = f.function_space().mesh()
+    P1 = FunctionSpace(mesh, "CG", 1)
 
     # Scale metric according to restriction strategy
-    rescale = 1/min(max(norm(f), op.min_norm), op.max_norm)
-    if noscale:
+    if noscale or op.restrict == 'p_norm':
         rescale = 1
-    elif op.restrict == 'error':
-        rescale /= op.desired_error
-    elif op.restrict == 'num_vertices':
-        rescale *= op.target_vertices
-    elif op.restrict == 'p_norm':
-        raise ValueError("'p_norm' restriction not available for isotropic metric.")
     else:
-        raise NotImplementedError
+        rescale = op.target/min(max(norm(f), op.min_norm), op.max_norm)
 
     # Project into P1 space and scale
-    g = Function(FunctionSpace(mesh, "CG", 1))
-    #g.project(rescale*abs(f))
-    g.project(0.5*rescale*abs(f))
-    #g.project(0.5*rescale*sqrt(abs(f)))
-    #g.project(0.5*rescale*f*f)
+    g = Function(P1)
+    g.project(0.5*rescale*f)
+    g.interpolate(abs(g))  # ensure non-negative
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
     M = Function(V)
     node_set = range(mesh.num_vertices()) if bdy is None else DirichletBC(V, 0, bdy).nodes
+
+    if op.restrict == 'p_norm':
+        detM = Function(P1)
+        for i in node_set:
+            alpha = max(g.dat.data[i], 1e-10)  # avoid round-off error
+            det = alpha*alpha
+            g.dat.data[i] *= pow(det, -1 / 2*op.norm_order + 2)
+            detM.dat.data[i] = pow(det, op.norm_order/(2*op.norm_order + 2))
+        g *= op.target / assemble(detM*dx)
+
     for i in node_set:
         alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
+        alpha = max(alpha, alpha/a2)
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = alpha
         if alpha >= 0.9999 / h_min2:
             print("WARNING: minimum element size reached!")
+        g.dat.data[i] = alpha
+
     return M
 
 
