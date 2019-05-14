@@ -15,6 +15,7 @@ from adapt_utils.solver import SteadyProblem
 __all__ = ["SteadyTracerProblem_CG"]
 
 
+# FIXME: continuous adjoint
 class SteadyTracerProblem_CG(SteadyProblem):
     r"""
     General continuous Galerkin solver object for stationary tracer advection problems of the form
@@ -33,7 +34,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
     def __init__(self,
                  op,
                  mesh=None,
-                 discrete_adjoint=False,
+                 #discrete_adjoint=False,  # FIXME
+                 discrete_adjoint=True,
                  finite_element=FiniteElement("Lagrange", triangle, 1),
                  prev_solution=None):
         super(SteadyTracerProblem_CG, self).__init__(mesh, op, finite_element, discrete_adjoint, None)
@@ -53,8 +55,6 @@ class SteadyTracerProblem_CG(SteadyProblem):
             #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
             self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
             #self.stabilisation = anisotropic_stabilisation(self.u, mesh=self.mesh)
-            if self.stab == 'SUPG':
-                self.test = self.test + self.stabilisation*dot(self.u, grad(self.test))
 
         # Rename solution fields
         self.solution.rename('Tracer concentration')
@@ -71,29 +71,32 @@ class SteadyTracerProblem_CG(SteadyProblem):
         bcs = self.op.boundary_conditions
         dbcs = []
         phi = self.trial
+
+        # SUPG stabilisation
+        # if self.stab == 'SUPG':
+        #    psi = self.test + self.stabilisation*dot(self.u, grad(self.test))
+        #else:
+        #    psi = self.test
         psi = self.test
 
         # Finite element problem
         a = psi*dot(u, grad(phi))*dx
         a += nu*inner(grad(phi), grad(psi))*dx
         for i in bcs.keys():
-            if bcs[i] != 'neumann_zero':
+            if bcs[i] != 'neumann_zero':  # TODO: make consistent with Thetis
                 a += - nu*psi*dot(n, nabla_grad(phi))*ds(i)
             if bcs[i] == 'dirichlet_zero':
                 dbcs.append(i)
         L = f*psi*dx
 
-        # Stabilisation
-        #if self.stab in ("SU", "SUPG"):
+        # SU stabilisation
         if self.stab == "SU":
-            tau = self.stabilisation
-            stab_coeff = tau*dot(u, grad(psi))
-            R_a = dot(u, grad(phi))         # LHS component of strong residual
-            #if self.stab == 'SUPG':
-            #    R_a += -div(nu*grad(phi))
-            #    R_L = f                     # RHS component of strong residual
-            #    L += stab_coeff*R_L*dx
-            a += stab_coeff*R_a*dx
+            a += self.stabilisation*dot(u, grad(psi))*dot(u, grad(phi))*dx
+        elif self.stab == "SUPG":
+            coeff = self.stabilisation*dot(u, grad(psi))
+            a += coeff*dot(u, grad(phi))*dx
+            a += coeff*-div(nu*grad(phi))*dx
+            L += coeff*f*dx
 
         # Solve
         bc = DirichletBC(self.V, 0, dbcs)
@@ -107,31 +110,37 @@ class SteadyTracerProblem_CG(SteadyProblem):
         bcs = self.op.boundary_conditions
         dbcs = []
         lam = self.trial
+
+        # SUPG stabilisation  # FIXME!!!
+        #if self.stab == 'SUPG':
+        #    psi = self.test + self.stabilisation*dot(self.u, grad(self.test))
+        #else:
+        #    psi = self.test
         psi = self.test
 
         # Adjoint finite element problem
         a = lam*dot(u, grad(psi))*dx
         a += nu*inner(grad(lam), grad(psi))*dx
         for i in bcs.keys():
-            if bcs[i] != 'neumann_zero':
+            if bcs[i] != 'neumann_zero':  # TODO: make consistent with Thetis
                 dbcs.append(i)                              # Dirichlet BC in adjoint
             if bcs[i] != 'dirichlet_zero':
                 a += -lam*psi*(dot(u, n))*ds(i)
                 a += -nu*psi*dot(n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
+            #if bcs[i] == 'neumann_zero':
+            #    a += -lam*psi*(dot(u, n))*ds(i)
         L = self.kernel*psi*dx
 
-        # Stabilisation
-        #if self.stab in ("SU", "SUPG"):
-        if self.stab == "SU":
-            tau = self.stabilisation
-            stab_coeff = -tau*div(u*psi)
-            R_a = -div(u*lam)             # LHS component of strong residual
-        #    if self.stab == "SUPG":
-        #        R_a += -div(nu*grad(lam))
-        #        R_L = self.kernel         # RHS component of strong residual
-        #        L += stab_coeff*R_L*dx
-            a += stab_coeff*R_a*dx
+        # SU stabilisation
+        if self.stab == 'SU':
+            a += self.stabilisation*div(u*psi)*div(u*lam)*dx
+        elif self.stab == "SUPG":
+            coeff = -self.stabilisation*dot(u, grad(psi))
+            a += coeff*-div(u*lam)*dx
+            a += coeff*-div(nu*grad(lam))*dx
+            L += coeff*self.kernel*dx
 
+        # Solve
         bc = DirichletBC(self.V, 0, dbcs)
         solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.op.params)
         self.adjoint_solution_file.write(self.adjoint_solution)
@@ -287,6 +296,10 @@ class SteadyTracerProblem_CG(SteadyProblem):
         n = self.n
         bcs = self.op.boundary_conditions
         phi = self.solve_high_order(adjoint=False) if self.op.order_increase else self.solution
+
+        # Account for stabilisation error  # TODO: SU, too
+        if self.stab == 'SUPG':
+            phi = phi - self.stabilisation*dot(u, grad(phi))
 
         # Adjoint source term
         dJdphi = self.op.box(self.P0)
