@@ -49,6 +49,8 @@ class SteadyProblem():
         self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
         self.test = TestFunction(self.V)
         self.trial = TrialFunction(self.V)
+        self.p0test = TestFunction(self.P0)
+        self.p0trial = TrialFunction(self.P0)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
 
