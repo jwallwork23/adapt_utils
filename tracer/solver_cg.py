@@ -6,6 +6,7 @@ import numpy as np
 
 from adapt_utils.tracer.options import PowerOptions
 from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
+from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.recovery import *
 from adapt_utils.solver import SteadyProblem
@@ -173,7 +174,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
         return coarse
 
     def get_hessian(self, adjoint=False):
-        return construct_hessian(self.adjoint_solution if adjoint else self.solution, op=self.op)
+        f = self.adjoint_solution if adjoint else self.solution
+        return steady_metric(f, mesh=self.mesh, noscale=True, op=self.op)
 
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
@@ -356,9 +358,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
         #    regions and low resolution elsewhere.
 
         # Construct Hessians
-        H1 = construct_hessian(F1, mesh=self.mesh, op=self.op)
-        H2 = construct_hessian(F2, mesh=self.mesh, op=self.op)
-        Hf = construct_hessian(source, mesh=self.mesh, op=self.op)
+        H1 = steady_metric(F1, mesh=self.mesh, noscale=True, op=self.op)
+        H2 = steady_metric(F2, mesh=self.mesh, noscale=True, op=self.op)
+        Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
 
         # form metric  # TODO: use pyop2
         self.M = Function(self.P1_ten)

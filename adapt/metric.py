@@ -240,7 +240,9 @@ def metric_relaxation(M1, M2, alpha=0.5):
     V = M1.function_space()
     assert V == M2.function_space()
     M = Function(V)
-    M.dat.data[:] = alpha*M1.dat.data + (1-alpha)*M2.dat.data
+    for i in range(V.mesh().num_vertices()):
+        M.dat.data[i] += alpha*M1.dat.data[i] + (1-alpha)*M2.dat.data[i]
+    return M
 
 
 def metric_complexity(M):
