@@ -15,7 +15,6 @@ from adapt_utils.solver import SteadyProblem
 __all__ = ["SteadyTracerProblem_CG"]
 
 
-# FIXME: continuous adjoint
 class SteadyTracerProblem_CG(SteadyProblem):
     r"""
     General continuous Galerkin solver object for stationary tracer advection problems of the form
@@ -34,7 +33,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
     def __init__(self,
                  op,
                  mesh=None,
-                 #discrete_adjoint=False,  # FIXME
+                 #discrete_adjoint=False,
                  discrete_adjoint=True,
                  finite_element=FiniteElement("Lagrange", triangle, 1),
                  prev_solution=None):
@@ -71,12 +70,6 @@ class SteadyTracerProblem_CG(SteadyProblem):
         bcs = self.op.boundary_conditions
         dbcs = []
         phi = self.trial
-
-        # SUPG stabilisation
-        # if self.stab == 'SUPG':
-        #    psi = self.test + self.stabilisation*dot(self.u, grad(self.test))
-        #else:
-        #    psi = self.test
         psi = self.test
 
         # Finite element problem
@@ -89,7 +82,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
                 dbcs.append(i)
         L = f*psi*dx
 
-        # SU stabilisation
+        # Stabilisation
         if self.stab == "SU":
             a += self.stabilisation*dot(u, grad(psi))*dot(u, grad(phi))*dx
         elif self.stab == "SUPG":
@@ -110,12 +103,6 @@ class SteadyTracerProblem_CG(SteadyProblem):
         bcs = self.op.boundary_conditions
         dbcs = []
         lam = self.trial
-
-        # SUPG stabilisation  # FIXME!!!
-        #if self.stab == 'SUPG':
-        #    psi = self.test + self.stabilisation*dot(self.u, grad(self.test))
-        #else:
-        #    psi = self.test
         psi = self.test
 
         # Adjoint finite element problem
@@ -124,18 +111,16 @@ class SteadyTracerProblem_CG(SteadyProblem):
         for i in bcs.keys():
             if bcs[i] != 'neumann_zero':  # TODO: make consistent with Thetis
                 dbcs.append(i)                              # Dirichlet BC in adjoint
-            if bcs[i] != 'dirichlet_zero':
+            if bcs[i] == 'dirichlet_zero':
                 a += -lam*psi*(dot(u, n))*ds(i)
                 a += -nu*psi*dot(n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
-            #if bcs[i] == 'neumann_zero':
-            #    a += -lam*psi*(dot(u, n))*ds(i)
         L = self.kernel*psi*dx
 
-        # SU stabilisation
+        # Stabilisation
         if self.stab == 'SU':
             a += self.stabilisation*div(u*psi)*div(u*lam)*dx
-        elif self.stab == "SUPG":
-            coeff = -self.stabilisation*dot(u, grad(psi))
+        elif self.stab == "SUPG":  # NOTE: this is not equivalent to discrete adjoint
+            coeff = -self.stabilisation*div(u*psi)
             a += coeff*-div(u*lam)*dx
             a += coeff*-div(nu*grad(lam))*dx
             L += coeff*self.kernel*dx
@@ -239,7 +224,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         r = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
         flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS if square else ((i*r)('+') + (i*r)('-'))*dS
         for j in bcs.keys():
-            if bcs[j] != 'dirichlet_zero':
+            if bcs[j] == 'dirichlet_zero':
                 flux_terms += i*r*r*ds(j) if square else i*r*ds(j)  # Robin BC in adjoint
         self.edge_res_adjoint = Function(self.P0)
         solve(mass_term == flux_terms, self.edge_res_adjoint)
@@ -261,10 +246,6 @@ class SteadyTracerProblem_CG(SteadyProblem):
         bcs = self.op.boundary_conditions
         lam = self.solve_high_order(adjoint=True) if self.op.order_increase else self.adjoint_solution
 
-        # Account for stabilisation error  # TODO: SU, too
-        if self.stab == 'SUPG':
-            lam = lam + self.stabilisation*dot(u, grad(lam))
-
         # Residual
         R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
 
@@ -277,6 +258,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
                 flux_terms += -i*flux*ds(j)
         self.edge_res = Function(self.P0)
         solve(mass_term == flux_terms, self.edge_res)
+
+        # TODO: Account for stabilisation error
 
         # Sum
         self.cell_res = assemble(i*R*dx)
@@ -297,10 +280,6 @@ class SteadyTracerProblem_CG(SteadyProblem):
         bcs = self.op.boundary_conditions
         phi = self.solve_high_order(adjoint=False) if self.op.order_increase else self.solution
 
-        # Account for stabilisation error  # TODO: SU, too
-        if self.stab == 'SUPG':
-            phi = phi - self.stabilisation*dot(u, grad(phi))
-
         # Adjoint source term
         dJdphi = self.op.box(self.P0)
 
@@ -316,6 +295,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
                 flux_terms += i*flux*ds(j)  # Robin BC in adjoint
         self.edge_res_adjoint = Function(self.P0)
         solve(mass_term == flux_terms, self.edge_res_adjoint)
+
+        # TODO: Account for stabilisation error
 
         # Sum
         self.cell_res = assemble(i*R*dx)
