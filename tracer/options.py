@@ -91,6 +91,7 @@ class PowerOptions(TracerOptions):
         # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
         #self.boundary_conditions[2] = 'neumann_zero'  # FIXME
+        self.boundary_conditions[2] = 'none'
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
 
@@ -140,6 +141,7 @@ class TelemacOptions(TracerOptions):
 
         # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
+        self.boundary_conditions[2] = 'none'
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
 

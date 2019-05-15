@@ -158,8 +158,8 @@ def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
     if op.restrict == 'p_norm':
         detM = Function(P1)
         for i in node_set:
-            alpha = max(g.dat.data[i], 1e-8)
-            det = alpha*alpha
+            g.dat.data[i] = max(g.dat.data[i], 1e-8)
+            det = g.dat.data[i]**2
             g.dat.data[i] *= pow(det, -1 / 2*op.norm_order + 2)
             detM.dat.data[i] = pow(det, op.norm_order/(2*op.norm_order + 2))
         g *= op.target / assemble(detM*dx)
