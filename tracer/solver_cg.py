@@ -269,7 +269,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         if self.op.dwr_approach == 'error_representation':
             self.indicator = project(R + self.edge_res, self.P1)
         elif self.op.dwr_approach == 'ainsworth_oden':
-            self.indicator = project(self.h*self.h*self.cell_res + self.h*self.edge_res, P1)
+            self.indicator = project(self.h*self.h*R + self.h*self.edge_res, P1)
         else:
             raise NotImplementedError
         self.indicator.rename('dwr')
@@ -304,9 +304,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # Sum
         self.cell_res_adjoint = assemble(i*R*dx)
         if self.op.dwr_approach == 'error_representation':
-            self.indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P1)
+            self.indicator = project(R + self.edge_res_adjoint, self.P1)
         elif self.op.dwr_approach == 'ainsworth_oden':
-            self.indicator = project(self.h*self.h*self.cell_res_adjoint + self.h*self.edge_res_adjoint, P1)
+            self.indicator = project(self.h*self.h*R + self.h*self.edge_res_adjoint, P1)
         else:
             raise NotImplementedError
         self.indicator.rename('dwr_adjoint')
