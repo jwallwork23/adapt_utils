@@ -401,8 +401,9 @@ class MeshOptimisation():
         prev_sol = None
         tstart = clock()
         for i in range(self.startit, self.maxit):
+            j = i - self.startit
             print('Solving on mesh {:d}'.format(i))
-            tp = self.problem(mesh=self.mesh if i == 0 else tp.mesh,
+            tp = self.problem(mesh=self.mesh if j == 0 else tp.mesh,
                               op=self.op,
                               prev_solution=prev_sol)
 
@@ -416,23 +417,23 @@ class MeshOptimisation():
             self.dat['elements'].append(tp.mesh.num_cells())
             self.dat['vertices'].append(tp.mesh.num_vertices())
             self.dat['objective'].append(tp.objective_functional())
-            print(self.msg.format(i, self.dat['elements'][i], self.dat['objective'][i]))
+            print(self.msg.format(j, self.dat['elements'][j], self.dat['objective'][j]))
             if self.log:
-                self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][i]))
-                self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][i]))
-                self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][i]))
+                self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(j, self.dat['elements'][j]))
+                self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(j, self.dat['vertices'][j]))
+                self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(j, self.dat['objective'][j]))
 
             # Stopping criteria
             if i > 0:
                 out = None
-                obj_diff = abs(self.dat['objective'][i] - self.dat['objective'][i-1])
-                el_diff = abs(self.dat['elements'][i] - self.dat['elements'][i-1])
-                if obj_diff < self.objective_rtol*self.dat['objective'][i-1]:
-                    out = self.conv_msg.format(i+1, 'convergence in objective functional.')
-                elif el_diff < self.element_rtol*self.dat['elements'][i-1]:
-                    out = self.conv_msg.format(i+1, 'convergence in mesh element count.')
+                obj_diff = abs(self.dat['objective'][j] - self.dat['objective'][j-1])
+                el_diff = abs(self.dat['elements'][j] - self.dat['elements'][j-1])
+                if obj_diff < self.objective_rtol*self.dat['objective'][j-1]:
+                    out = self.conv_msg.format(j+1, 'convergence in objective functional.')
+                elif el_diff < self.element_rtol*self.dat['elements'][j-1]:
+                    out = self.conv_msg.format(j+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
-                    out = self.conv_msg.format(i+1, 'maximum mesh adaptation count reached.')
+                    out = self.conv_msg.format(j+1, 'maximum mesh adaptation count reached.')
                 if out is not None:
                     print(out)
                     if self.log:
