@@ -178,11 +178,17 @@ class SteadyTurbineProblem(SteadyProblem):
 
     def dwr_estimation(self):  # TODO: Different flavours of DWR
         with pyadjoint.stop_annotating():
-            cell_res = self.ts.cell_residual(self.adjoint_solution)
-            edge_res = self.ts.edge_residual(self.adjoint_solution)
+            if self.op.dwr_approach != 'flux_only':
+                cell_res = self.ts.cell_residual(self.adjoint_solution)
+            if self.op.dwr_approach != 'cell_only':
+                edge_res = self.ts.edge_residual(self.adjoint_solution)
             self.indicator = Function(self.P1)  # project straight into P1
             if self.op.dwr_approach == 'error_representation':
                 self.indicator.project(cell_res + edge_res)
+            elif self.op.dwr_approach == 'cell_only':
+                self.indicator.project(cell_res)
+            elif self.op.dwr_approach == 'flux_only':
+                self.indicator.project(edge_res)
             elif self.op.dwr_approach == 'AO97':
                 self.indicator.project(self.h*cell_res + 0.5*self.h*self.h*edge_res)
             else:
