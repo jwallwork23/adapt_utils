@@ -402,8 +402,9 @@ class MeshOptimisation():
         prev_sol = None
         tstart = clock()
         for i in range(self.startit, self.maxit):
+            j = i - self.startit
             PETSc.Sys.Print('Solving on mesh %d' % i)
-            tp = self.problem(mesh=self.mesh if i == 0 else tp.mesh,
+            tp = self.problem(mesh=self.mesh if j == 0 else tp.mesh,
                               op=self.op,
                               prev_solution=prev_sol)
 
@@ -419,18 +420,18 @@ class MeshOptimisation():
             self.dat['objective'].append(tp.objective_functional())
             PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['objective'][i]))
             if self.log:  # TODO: parallelise
-                self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][i]))
-                self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][i]))
-                self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][i]))
+                self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][j]))
+                self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][j]))
+                self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][j]))
 
             # Stopping criteria
             if i > self.startit:
                 out = None
-                obj_diff = abs(self.dat['objective'][i] - self.dat['objective'][i-1])
-                el_diff = abs(self.dat['elements'][i] - self.dat['elements'][i-1])
-                if obj_diff < self.objective_rtol*self.dat['objective'][i-1]:
+                obj_diff = abs(self.dat['objective'][j] - self.dat['objective'][j-1])
+                el_diff = abs(self.dat['elements'][j] - self.dat['elements'][j-1])
+                if obj_diff < self.objective_rtol*self.dat['objective'][j-1]:
                     out = self.conv_msg % (i+1, 'convergence in objective functional.')
-                elif el_diff < self.element_rtol*self.dat['elements'][i-1]:
+                elif el_diff < self.element_rtol*self.dat['elements'][j-1]:
                     out = self.conv_msg % (i+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
                     out = self.conv_msg % (i+1, 'maximum mesh adaptation count reached.')
