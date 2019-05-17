@@ -101,11 +101,11 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         right_tag = 2
         top_bottom_tag = 3
         freeslip_bc = {'un': Constant(0.)}
-        self.boundary_conditions = {
-          left_tag: {'uv': self.inflow},
-          right_tag: {'elev': Constant(0.)},
-          top_bottom_tag: freeslip_bc,
-        }
+        if not hasattr(self, 'boundary_conditions'):
+            self.boundary_conditions = {}
+        self.boundary_conditions[left_tag] = {'uv': self.inflow}
+        self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
+        self.boundary_conditions[top_bottom_tag] = freeslip_bc
 
 
 class Steady15TurbineOptions(SteadyTurbineOptions):
@@ -132,7 +132,7 @@ class Steady15TurbineOptions(SteadyTurbineOptions):
                 self.region_of_interest.append((i*delta_x, j*delta_y, D/2))
         self.thrust_coefficient_correction()
 
-    def set_bcs(self):
+    def set_bcs(self):  # TODO: standardise with above
         bottom_tag = 1
         right_tag = 2
         top_tag = 3
@@ -210,7 +210,7 @@ class Unsteady2TurbineOptions(UnsteadyTurbineOptions):
         self.elev_init.interpolate(-1/1000*(x-500))  # linear from -1 to 1
         return q_init
 
-    def set_bcs(self):
+    def set_bcs(self):  # TODO: standardise with above
         left_tag = 1
         right_tag = 2
         top_bottom_tag = 3
@@ -254,7 +254,7 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         self.elev_init.interpolate(-1/3000*x)  # linear from -1 to 1
         return q_init
 
-    def set_bcs(self):
+    def set_bcs(self):  # TODO: standardise with above
         bottom_tag = 1
         right_tag = 2
         top_tag = 3
