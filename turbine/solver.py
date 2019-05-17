@@ -1,4 +1,5 @@
 from thetis_adjoint import *
+from firedrake.petsc import PETSc
 import pyadjoint
 import math
 
@@ -75,7 +76,7 @@ class SteadyTurbineProblem(SteadyProblem):
         options.simulation_end_time = op.end_time
         options.timestepper_type = 'SteadyState'
         options.timestepper_options.solver_parameters = op.params
-        print(options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs
@@ -302,7 +303,7 @@ class SteadyTurbineProblem(SteadyProblem):
         """
         Here we only need interpolate the velocity.
         """
-        print("Interpolating solution across meshes...")
+        PETSc.Sys.Print("Interpolating solution across meshes...")
         #self.interpolated_solution = Function(self.V.sub(0))
         #self.interpolated_solution.project(self.prev_solution.split()[0])
         self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
@@ -365,7 +366,7 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         options.simulation_end_time = self.step_end-0.5*op.dt
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters = op.params
-        print(options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print(options.timestepper_options.solver_parameters)
         #options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs

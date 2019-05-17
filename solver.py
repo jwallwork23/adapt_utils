@@ -1,5 +1,6 @@
 from firedrake import *
 from firedrake_adjoint import *
+from firedrake.petsc import PETSc
 from thetis import create_directory
 from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
 from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
@@ -122,7 +123,7 @@ class SteadyProblem():
         """
         Solve adjoint problem using specified method.
         """
-        print("Solving adjoint problem...")
+        PETSc.Sys.Print("Solving adjoint problem...")
         if self.discrete_adjoint:
             self.solve_discrete_adjoint()
         else:
@@ -369,8 +370,8 @@ class MeshOptimisation():
         self.di = create_directory(op.di)
 
         # Default tolerances etc
-        self.msg = "Mesh {:2d}: {:7d} cells, objective {:.4e}"
-        self.conv_msg = "Converged after {:d} iterations due to {:s}"
+        self.msg = "Mesh %2d: %7d cells, objective %.4e"
+        self.conv_msg = "Converged after %d iterations due to %s"
         self.startit = 0
         self.maxit = 35
         self.element_rtol = 0.005    # Following [Power et al 2006]
@@ -401,7 +402,7 @@ class MeshOptimisation():
         prev_sol = None
         tstart = clock()
         for i in range(self.startit, self.maxit):
-            print('Solving on mesh {:d}'.format(i))
+            PETSc.Sys.Print('Solving on mesh %d' % i)
             tp = self.problem(mesh=self.mesh if i == 0 else tp.mesh,
                               op=self.op,
                               prev_solution=prev_sol)
@@ -416,25 +417,25 @@ class MeshOptimisation():
             self.dat['elements'].append(tp.mesh.num_cells())
             self.dat['vertices'].append(tp.mesh.num_vertices())
             self.dat['objective'].append(tp.objective_functional())
-            print(self.msg.format(i, self.dat['elements'][i], self.dat['objective'][i]))
-            if self.log:
+            PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['objective'][i]))
+            if self.log:  # TODO: parallelise
                 self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][i]))
                 self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][i]))
                 self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['objective'][i]))
 
             # Stopping criteria
-            if i > 0:
+            if i > self.startit:
                 out = None
                 obj_diff = abs(self.dat['objective'][i] - self.dat['objective'][i-1])
                 el_diff = abs(self.dat['elements'][i] - self.dat['elements'][i-1])
                 if obj_diff < self.objective_rtol*self.dat['objective'][i-1]:
-                    out = self.conv_msg.format(i+1, 'convergence in objective functional.')
+                    out = self.conv_msg % (i+1, 'convergence in objective functional.')
                 elif el_diff < self.element_rtol*self.dat['elements'][i-1]:
-                    out = self.conv_msg.format(i+1, 'convergence in mesh element count.')
+                    out = self.conv_msg % (i+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
-                    out = self.conv_msg.format(i+1, 'maximum mesh adaptation count reached.')
+                    out = self.conv_msg % (i+1, 'maximum mesh adaptation count reached.')
                 if out is not None:
-                    print(out)
+                    PETSc.Sys.Print(out)
                     if self.log:
                         self.logfile.write(out+'\n')
                         tp.plot()
@@ -449,7 +450,7 @@ class MeshOptimisation():
             if self.op.relax:
                 M_ = tp.M_unrelaxed
         self.dat['time'] = clock() - tstart
-        print('Time to solution: {:.1f}s'.format(self.dat['time']))
+        PETSc.Sys.Print('Time to solution: %.1fs' % (self.dat['time']))
         if self.log:
             self.logfile.close()
 
@@ -473,7 +474,7 @@ class OuterLoop():
     def scale_to_convergence(self):
         mode = 'rescaling'
 
-        # Create log file
+        # Create log file  # TODO: parallelise
         logfile = open(self.di + 'scale_to_convergence.log', 'a+')
         logfile.write('\n' + date + '\n\n')
         logfile.write('maxit: {:d}\n'.format(self.maxit))
@@ -485,7 +486,7 @@ class OuterLoop():
 
             # Iterate over increasing target vertex counts
             self.op.rescaling = float(i+1)*0.4
-            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.op.approach))
+            PETSc.Sys.Print("\nOuter loop %d for approach '%s'" % (i+1, self.op.approach))
             opt = MeshOptimisation(self.problem, mesh=self.mesh, op=self.op)
             opt.log = self.log
             opt.maxit = self.maxit
@@ -507,7 +508,7 @@ class OuterLoop():
             if i > self.outer_startit:
                 obj_diff = abs(opt.dat['objective'][-1] - J_)
                 if obj_diff < self.objective_rtol*J_:
-                    print(opt.conv_msg.format(i+1, 'convergence in objective functional.'))
+                    PETSc.Sys.Print(opt.conv_msg % (i+1, 'convergence in objective functional.'))
                     break
             J_ = opt.dat['objective'][-1]
         logfile.close()
@@ -526,7 +527,7 @@ class OuterLoop():
         for i in range(self.outer_startit, self.outer_maxit):
 
             # Iterate over increasing target vertex counts
-            print("\nOuter loop {:d} for approach '{:s}'".format(i+1, self.op.approach))
+            PETSc.Sys.Print("\nOuter loop %d for approach '%s'" % (i+1, self.op.approach))
             self.op.target = pow(10, i)
             opt = MeshOptimisation(self.problem, mesh=self.mesh, op=self.op)
             opt.maxit = self.maxit
@@ -549,7 +550,7 @@ class OuterLoop():
             if i > self.outer_startit:
                 obj_diff = abs(opt.dat['objective'][-1] - J_)
                 if obj_diff < self.objective_rtol*J_:
-                    print(opt.conv_msg.format(i+1, 'convergence in objective functional.'))
+                    PETSc.Sys.Print(opt.conv_msg % (i+1, 'convergence in objective functional.'))
                     break
             J_ = opt.dat['objective'][-1]
         logfile.close()
@@ -669,7 +670,7 @@ class UnsteadyProblem():
             with DumbCheckpoint('outputs/hdf5/Adjoint2d_' + index_string(i), mode=FILE_CREATE) as sa:
                 sa.store(self.adjoint_solution)
                 sa.close()
-            print("Storing adjoint solution {:d}".format(i))
+            PETSc.Sys.Print("Storing adjoint solution %d" % i)
             self.adjoint_solution_file.write(self.adjoint_solution, t=self.op.dt*i)
         tape.clear_tape()
 
@@ -677,7 +678,7 @@ class UnsteadyProblem():
         """
         Solve adjoint problem using specified method.
         """
-        print("Solving adjoint problem...")
+        PETSc.Sys.Print("Solving adjoint problem...")
         if self.discrete_adjoint:
             self.solve_discrete_adjoint()
         else:
