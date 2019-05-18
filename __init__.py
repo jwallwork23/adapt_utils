@@ -17,3 +17,4 @@ from adapt_utils.tracer.optimisation import *
 # Shallow water turbine application
 from adapt_utils.turbine.options import *
 from adapt_utils.turbine.solver import *
+from adapt_utils.turbine.meshgen import *
