@@ -222,7 +222,7 @@ def metric_intersection(M1, M2, bdy=None):
     assert V == M2.function_space()
     M = M1.copy()
     for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices()):
-        M.dat.data[i] = local_metric_intersection(M1.dat.data[i], M2.dat.data[i])
+        M.dat.data[i][:,:] = local_metric_intersection(M1.dat.data[i], M2.dat.data[i])
     return M
 
 
@@ -241,7 +241,7 @@ def metric_relaxation(M1, M2, alpha=0.5):
     assert V == M2.function_space()
     M = Function(V)
     for i in range(V.mesh().num_vertices()):
-        M.dat.data[i] += alpha*M1.dat.data[i] + (1-alpha)*M2.dat.data[i]
+        M.dat.data[i][:,:] = alpha*M1.dat.data[i] + (1-alpha)*M2.dat.data[i]
     return M
 
 

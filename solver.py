@@ -201,7 +201,7 @@ class SteadyProblem():
         """
         pass
 
-    def adapt_mesh(self, relaxation_parameter=Constant(0.9), prev_metric=None, custom_adapt=None):
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         """
         Adapt mesh according to error estimation strategy of choice.
         """
@@ -346,8 +346,8 @@ class SteadyProblem():
                     raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
             # Apply metric relaxation, if requested
+            self.M_unrelaxed = self.M.copy()
             if prev_metric is not None:
-                self.M_unrelaxed = self.M.copy()
                 self.M.project(metric_relaxation(project(prev_metric, self.P1_ten), self.M, relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
 
