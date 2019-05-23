@@ -410,8 +410,6 @@ class MeshOptimisation():
 
             # Solve
             tp.solve()
-            if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
-                tp.solve_adjoint()
             self.solution = tp.solution
 
             # Extract data
@@ -443,6 +441,8 @@ class MeshOptimisation():
                     break
 
             # Otherwise, adapt mesh
+            if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
+                tp.solve_adjoint()
             #tp.set_target_vertices(num_vertices=self.dat['vertices'][0])  # FIXME
             tp.adapt_mesh(prev_metric=M_)
             tp.plot()

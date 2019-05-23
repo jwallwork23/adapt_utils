@@ -189,7 +189,7 @@ class SteadyTurbineProblem(SteadyProblem):
                 self.indicator.project(cell_res)
             elif self.op.dwr_approach == 'flux_only':
                 self.indicator.project(edge_res)
-            elif self.op.dwr_approach == 'AO97':
+            elif self.op.dwr_approach == 'ainsworth_oden':
                 self.indicator.project(self.h*cell_res + 0.5*self.h*self.h*edge_res)
             else:
                 raise NotImplementedError  # TODO
