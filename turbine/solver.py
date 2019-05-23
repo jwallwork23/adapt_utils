@@ -309,10 +309,11 @@ class SteadyTurbineProblem(SteadyProblem):
         """
         Here we only need interpolate the velocity.
         """
-        PETSc.Sys.Print("Interpolating solution across meshes...")
-        #self.interpolated_solution = Function(self.V.sub(0))
-        #self.interpolated_solution.project(self.prev_solution.split()[0])
-        self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
+        with pyadjoint.stop_annotating():
+            PETSc.Sys.Print("Interpolating solution across meshes...")
+            self.interpolated_solution = Function(self.V.sub(0))
+            self.interpolated_solution.project(self.prev_solution.split()[0])
+            #self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
 
 
 class UnsteadyTurbineProblem(UnsteadyProblem):
