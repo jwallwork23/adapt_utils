@@ -207,7 +207,6 @@ class SteadyTracerProblem_CG(SteadyProblem):
     def explicit_estimation_adjoint(self, space=None, square=True):
         if space is None:
             space = self.P1
-        phi = self.solution
         lam = self.adjoint_solution
         u = self.u
         nu = self.nu
@@ -221,7 +220,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Edge residual
         mass_term = i*self.p0trial*dx
-        r = - lam*phi*dot(u, n) - nu*phi*dot(n, nabla_grad(lam))
+        r = - lam*dot(u, n) - nu*dot(n, nabla_grad(lam))
         flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS if square else ((i*r)('+') + (i*r)('-'))*dS
         for j in bcs.keys():
             if bcs[j] == 'dirichlet_zero':
