@@ -134,7 +134,7 @@ class TelemacOptions(TracerOptions):
         self.offset = offset
 
         # Source / receiver
-        self.source_loc = [(1.+self.offset, 5., 0.08)]
+        self.source_loc = [(1.+self.offset, 5., 0.0798)]
         self.region_of_interest = [(20., 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
