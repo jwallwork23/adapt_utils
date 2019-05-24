@@ -5,7 +5,7 @@ __all__ = ["generate_geo_file"]
 
 
 def generate_geo_file(op, coarse=True, filepath='.'):
-    label = 'coarse' if coarse else fine
+    label = 'coarse' if coarse else 'fine'
     locs = op.region_of_interest
     n = len(locs)
     assert n > 0
