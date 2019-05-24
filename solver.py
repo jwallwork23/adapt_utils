@@ -201,6 +201,13 @@ class SteadyProblem():
         """
         pass
 
+    def get_power_metric(self, adjoint=False):
+        self.explicit_estimation_adjoint(square=False)
+        H = self.get_hessian(adjoint=adjoint)
+        for i in range(len(self.indicator.dat.data)):
+            H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
+        self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+
     def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         """
         Adapt mesh according to error estimation strategy of choice.
@@ -303,17 +310,9 @@ class SteadyProblem():
                 self.get_anisotropic_metric(adjoint=False)
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'power':
-                self.explicit_estimation_adjoint(square=False)
-                H = self.get_hessian(adjoint=False)
-                for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+                self.get_power_metric(adjoint=False)
             elif self.approach == 'power_adjoint':
-                self.explicit_estimation(square=False)
-                H = self.get_hessian(adjoint=True)
-                for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                self.M = steady_metric(self.solution, H=H, op=self.op)
+                self.get_power_metric(adjoint=True)
             elif self.approach == 'power_relaxed':
                 self.explicit_estimation(square=False)
                 H = self.get_hessian(adjoint=True)
@@ -327,16 +326,9 @@ class SteadyProblem():
                     H.dat.data[i][:,:] /= np.abs(indicator.dat.data[i]) + np.abs(self.indicator.dat.data[i])
                 self.M = steady_metric(self.solution+self.adjoint_solution, mesh=self.mesh, H=H, op=self.op)
             elif self.approach == 'power_superposed':
-                self.explicit_estimation(square=False)
-                H = self.get_hessian(adjoint=True)
-                for i in range(len(self.indicator.dat.data)):                 # TODO: use pyop2
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                M = steady_metric(self.solution, H=H, op=self.op)
-                self.explicit_estimation_adjoint(square=False)
-                H = self.get_hessian(adjoint=False)
-                for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+                self.get_power_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_power_metric(adjoint=True)
                 self.M = metric_intersection(M, self.M)
             else:
                 try:
