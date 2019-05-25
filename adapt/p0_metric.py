@@ -12,13 +12,10 @@ __all__ = ["AnisotropicMetricDriver"]
 
 
 class AnisotropicMetricDriver():
-    def __init__(self, mesh, hessian=None, indicator=None, tol=1e-2, op=DefaultOptions()):
+    def __init__(self, mesh, hessian=None, indicator=None, op=DefaultOptions()):
         self.mesh = mesh
         self.H = hessian
         self.eta = indicator
-        self.alpha = 6
-        self.tol = tol  # TODO: link this with op.target
-        self.eta_min = 1e-6
         self.op = op
 
         # Spaces
@@ -49,7 +46,7 @@ class AnisotropicMetricDriver():
         h_ref = Function(self.P0)
         h_ref.interpolate(self.h/abs(det(self.J))/sqrt(0.5*self.ne))
         #h_ref.interpolate(self.h/abs(det(self.J))))
-        assert np.var(h_ref.dat.data) < 1e-10
+        #assert np.var(h_ref.dat.data) < 1e-10  # FIXME
         self.h_ref = h_ref.dat.data[0]
 
     def get_eigenpair(self):
@@ -83,9 +80,11 @@ class AnisotropicMetricDriver():
 
     def get_optimal_element_size(self):
         assert self.eta is not None
-        self.h_opt.interpolate(max_value(self.eta**(1/(self.alpha+1)), self.eta_min))
+        alpha = self.op.convergence_rate
+        self.h_opt.interpolate(max_value(self.eta**(1/(alpha+1)), self.op.min_norm))
         Sum = np.sum(self.h_opt.dat.data)
-        self.h_opt.interpolate(self.h*(self.tol/Sum)**(1/self.alpha)*self.h_opt**(-1))
+        scaling = (pow(self.op.target, -self.op.convergence_rate)/Sum)**(1/alpha)
+        self.h_opt.interpolate(self.h*scaling*self.h_opt**(-1))
 
     def get_optimised_eigenpair(self):
         s = Function(self.P0)
