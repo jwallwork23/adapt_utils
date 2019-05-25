@@ -4,164 +4,158 @@ import numpy as np
 import numpy
 from numpy import linalg as la
 
-from adapt_utils.adapt.metric import steady_metric
+from adapt_utils.adapt.adaptation import multi_adapt
 from adapt_utils.options import DefaultOptions
 
 
-__all__ = ["get_reference_element_size", "get_eigenpair", "get_hessian_eigenpair",
-           "get_optimised_eigenpair", "get_optimal_element_size", "scale_optimised_eigenvalues",
-           "build_metric", "cell_interpolation_error", "gradient_interpolation_error",
-           "edge_interpolation_error"]
+__all__ = ["AnisotropicMetricDriver"]
 
 
-def get_reference_element_size(mesh):
-    P0 = FunctionSpace(mesh, "DG", 0)
-    K_ref = Function(P0)
-    K_ref.interpolate(CellSize(mesh)/abs(det(Jacobian(mesh)))/sqrt(0.5*mesh.num_cells()))
-    #K_ref.interpolate(CellSize(mesh)/abs(det(Jacobian(mesh)))))
-    assert np.var(K_ref.dat.data) < 1e-10
-    return K_ref.dat.data[0]
+class AnisotropicMetricDriver():
+    def __init__(self, mesh, hessian=None, indicator=None, tol=1e-2, op=DefaultOptions()):
+        self.mesh = mesh
+        self.H = hessian
+        self.eta = indicator
+        self.alpha = 6
+        self.tol = tol  # TODO: link this with op.target
+        self.eta_min = 1e-6
+        self.op = op
 
-def get_eigenpair(mesh):
-    P0 = FunctionSpace(mesh, "DG", 0)
-    P0_vec = VectorFunctionSpace(mesh, "DG", 0)
-    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
-    lam0 = Function(P0)
-    lam1 = Function(P0)
-    v0 = Function(P0_vec)
-    v1 = Function(P0_vec)
-    JJt = Function(P0_ten)
-    JJt.interpolate(Jacobian(mesh)*transpose(Jacobian(mesh)))
+        # Spaces
+        self.P0 = FunctionSpace(mesh, "DG", 0)
+        self.P0_vec = VectorFunctionSpace(mesh, "DG", 0)
+        self.P0_ten = TensorFunctionSpace(mesh, "DG", 0)
+        self.P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+        self.p0test = TestFunction(self.P0)
 
-    for i in range(mesh.num_cells()):
-        lam, v = la.eig(JJt.dat.data[i])
-        lam0.dat.data[i] = lam[0]
-        lam1.dat.data[i] = lam[1]
-        v0.dat.data[i][:] = v[0]
-        v1.dat.data[i][:] = v[1]
+        # Fields related to mesh
+        self.h = CellSize(mesh)    # current element size
+        self.J = Jacobian(mesh)
+        self.ne = mesh.num_cells()
+        self.h_opt = Function(self.P0)  # optimal element size
 
-    return [lam0, lam1], [v0, v1]
+        # Eigenvalues and eigenvectors
+        self.eval0 = Function(self.P0)
+        self.eval1 = Function(self.P0)
+        self.evec0 = Function(self.P0_vec)
+        self.evec1 = Function(self.P0_vec)
 
-def get_hessian_eigenpair(H, mesh=None):
-    if mesh is None:
-        mesh = H.function_space().mesh()
-    P0 = FunctionSpace(mesh, "DG", 0)
-    P0_vec = VectorFunctionSpace(mesh, "DG", 0)
-    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
-    lam0 = Function(P0)
-    lam1 = Function(P0)
-    v0 = Function(P0_vec)
-    v1 = Function(P0_vec)
-    H_avg = Function(P0_ten)
-    H_avg.interpolate(H)
+        # Metrics and error estimators
+        self.p0metric = Function(self.P0_ten)
+        self.p1metric = Function(self.P1_ten)
+        self.estimator = Function(self.P0)
 
-    for i in range(mesh.num_cells()):
-        lam, v = la.eig(H_avg.dat.data[i])
-        if np.abs(lam[0]) > np.abs(lam[1]):
-            lam0.dat.data[i] = lam[0]
-            lam1.dat.data[i] = lam[1]
-            v0.dat.data[i][:] = v[0]
-            v1.dat.data[i][:] = v[1]
-        else:
-            lam0.dat.data[i] = lam[1]
-            lam1.dat.data[i] = lam[0]
-            v0.dat.data[i][:] = v[1]
-            v1.dat.data[i][:] = v[0]
+    def get_reference_element_size(self):
+        h_ref = Function(self.P0)
+        h_ref.interpolate(self.h/abs(det(self.J))/sqrt(0.5*self.ne))
+        #h_ref.interpolate(self.h/abs(det(self.J))))
+        assert np.var(h_ref.dat.data) < 1e-10
+        self.h_ref = h_ref.dat.data[0]
 
-    return [lam0, lam1], [v0, v1]
+    def get_eigenpair(self):
+        JJt = Function(self.P0_ten)
+        JJt.interpolate(self.J*transpose(self.J))
 
-def get_optimised_eigenpair(eigenvalues, eigenvectors):
-    s = Function(eigenvalues[0].function_space())  # (function in P0 space)
-    s.interpolate(sqrt(abs(eigenvalues[0]/eigenvalues[1])))
-    return s, [eigenvectors[1], eigenvectors[0]]
+        for i in range(self.ne):
+            lam, v = la.eig(JJt.dat.data[i])
+            self.eval0.dat.data[i] = lam[0]
+            self.eval1.dat.data[i] = lam[1]
+            self.evec0.dat.data[i][:] = v[0]
+            self.evec1.dat.data[i][:] = v[1]
 
-def get_optimal_element_size(indicator, alpha=6, tol=1e-2):
-    P0 = indicator.function_space()
-    indicator_ = Function(P0)
-    indicator_.interpolate(max_value(indicator**(1/(alpha+1)), 1e-6))
-    Sum = np.sum(indicator_.dat.data)
-    indicator_.interpolate(CellSize(P0.mesh())*(tol/Sum)**(1/alpha)*indicator_**(-1))
-    return indicator_
+    def get_hessian_eigenpair(self):
+        assert self.H is not None
+        H_avg = Function(self.P0_ten)
+        H_avg.interpolate(self.H)
 
-def scale_optimised_eigenvalues(eigenvalue_opt, K_opt):
-    P0 = eigenvalue_opt.function_space()
-    K_ref = get_reference_element_size(P0.mesh())
-    lam0_opt = Function(P0)
-    lam1_opt = Function(P0)
-    lam0_opt.interpolate(K_opt/K_ref*eigenvalue_opt)
-    lam1_opt.interpolate(K_opt/K_ref/eigenvalue_opt)
-    return [lam0_opt, lam1_opt]
+        for i in range(self.ne):
+            lam, v = la.eig(H_avg.dat.data[i])
+            if np.abs(lam[0]) > np.abs(lam[1]):
+                self.eval0.dat.data[i] = lam[0]
+                self.eval1.dat.data[i] = lam[1]
+                self.evec0.dat.data[i][:] = v[0]
+                self.evec1.dat.data[i][:] = v[1]
+            else:
+                self.eval0.dat.data[i] = lam[1]
+                self.eval1.dat.data[i] = lam[0]
+                self.evec0.dat.data[i][:] = v[1]
+                self.evec1.dat.data[i][:] = v[0]
 
-def build_metric(eigenvalues, eigenvectors, mesh=None):
-    """
-    NOTE: Assumes eigevalues are already squared.
-    """
-    if mesh is None:
-        mesh = eigenvalues[0].function_space().mesh()
-    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
-    M = Function(P0_ten)
+    def get_optimal_element_size(self):
+        assert self.eta is not None
+        self.h_opt.interpolate(max_value(self.eta**(1/(self.alpha+1)), self.eta_min))
+        Sum = np.sum(self.h_opt.dat.data)
+        self.h_opt.interpolate(self.h*(self.tol/Sum)**(1/self.alpha)*self.h_opt**(-1))
 
-    for i in range(mesh.num_cells()):
-        lam0 = 1/eigenvalues[0].dat.data[i]
-        lam1 = 1/eigenvalues[1].dat.data[i]
-        v0 = eigenvectors[0].dat.data[i]
-        v1 = eigenvectors[1].dat.data[i]
-        M.dat.data[i][0, 0] = lam0*v0[0]*v0[0] + lam1*v1[0]*v1[0]
-        M.dat.data[i][0, 1] = lam0*v0[0]*v0[1] + lam1*v1[0]*v1[1]
-        M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
-        M.dat.data[i][1, 1] = lam0*v0[1]*v0[1] + lam1*v1[1]*v1[1]
+    def get_optimised_eigenpair(self):
+        s = Function(self.P0)
+        s.interpolate(sqrt(abs(self.eval0/self.eval1)))
+        tmp = Function(self.P0_vec)
+        tmp.assign(self.evec0)
+        self.evec0.assign(self.evec1)
+        self.evec1.assign(tmp)
+        self.eval0.interpolate(self.h_opt/self.h_ref*s)
+        self.eval1.interpolate(self.h_opt/self.h_ref/s)
 
-    return M
+    def build_metric(self):
+        """
+        NOTE: Assumes eigevalues are already squared.
+        """
+        for i in range(self.ne):
+            lam0 = 1/self.eval0.dat.data[i]
+            lam1 = 1/self.eval1.dat.data[i]
+            v0 = self.evec0.dat.data[i]
+            v1 = self.evec1.dat.data[i]
+            self.p0metric.dat.data[i][0, 0] = lam0*v0[0]*v0[0] + lam1*v1[0]*v1[0]
+            self.p0metric.dat.data[i][0, 1] = lam0*v0[0]*v0[1] + lam1*v1[0]*v1[1]
+            self.p0metric.dat.data[i][1, 0] = self.p0metric.dat.data[i][0, 1]
+            self.p0metric.dat.data[i][1, 1] = lam0*v0[1]*v0[1] + lam1*v1[1]*v1[1]
 
-def Lij(field, eigenvectors, i, j, mesh=None, op=DefaultOptions()):
-    """
-    See SIAM paper
-    """
-    if mesh is None:
-        mesh = field.function_space().mesh()
-    P0 = FunctionSpace(mesh, "DG", 0)
-    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
-    I = TestFunction(P0)
-    H = project(steady_metric(field, mesh=mesh, noscale=True, op=op), P0_ten)
-    triple_product = dot(eigenvectors[i], dot(H, eigenvectors[j]))
-    return assemble(I*triple_product*triple_product*dx)
+    def project_metric(self):
+        self.p1metric.project(self.p0metric)
 
-# TODO: test this
-def L_matrix(field, eigenvalues, eigenvectors, mesh=None, op=DefaultOptions()):
-    if mesh is None:
-        mesh = field.function_space().mesh()
-    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
-    M = Function(P0_ten)
-    vals = eigenvalues
-    vecs = eigenvectors
-    M.interpolate(as_matrix([[vals[0]*vals[0]*Lij(field, vecs, 0, 0, mesh=mesh, op=op),
-                               vals[0]*vals[1]*Lij(field, vecs, 0, 1, mesh=mesh, op=op)],
-                              [vals[1]*vals[0]*Lij(field, vecs, 1, 0, mesh=mesh, op=op),
-                               vals[1]*vals[1]*Lij(field, vecs, 1, 1, mesh=mesh, op=op)]]))
-    return M
+    def get_identity_metric(self):
+        self.get_eigenpair()
+        self.build_metric()
+        self.project_metric()
 
-def cell_interpolation_error(field, eigenvalues, eigenvectors, mesh=None, op=DefaultOptions()):
-    if mesh is None:
-        mesh = field.function_space().mesh()
-    P0 = FunctionSpace(mesh, "DG", 0)
-    estimator = Function(P0)
-    l = 0
-    for i in range(2):
-        for j in range(2):
-            l = eigenvalues[i]*eigenvalues[j]*Lij(field, eigenvectors, i, j, mesh=mesh, op=op)
-    estimator.interpolate(sqrt(l))
-    return estimator
+    def get_anisotropic_metric(self):
+        self.get_hessian_eigenpair()
+        self.get_reference_element_size()
+        self.get_optimal_element_size()
+        self.get_optimised_eigenpair()
+        self.build_metric()
+        self.project_metric()
 
-def gradient_interpolation_error(field, eigenvalues, eigenvectors, mesh=None, op=DefaultOptions()):
-    cell_estimator = cell_interpolation_error(field, eigenvalues, eigenvectors, mesh=mesh, op=op)
-    gradient_estimator = Function(cell_estimator.function_space())
-    coeff = pow(min_value(eigenvalues[0], eigenvalues[1]), -0.5)
-    gradient_estimator.interpolate(coeff*cell_estimator)
-    return gradient_estimator
+    def adapt_mesh(self):
+        self.mesh = multi_adapt(self.p1metric, op=self.op)
 
-def edge_interpolation_error(field, eigenvalues, eigenvectors, mesh=None, op=DefaultOptions()):
-    cell_estimator = cell_interpolation_error(field, eigenvalues, eigenvectors, mesh=mesh, op=op)
-    edge_estimator = Function(cell_estimator.function_space())
-    coeff = sqrt((eigenvalues[0]+eigenvalues[1])*pow(min_value(eigenvalues[0], eigenvalues[1]), 1.5))
-    edge_estimator.interpolate(coeff*cell_estimator)
-    return edge_estimator
+    def Lij(self, i, j):
+        eigenvectors = [self.evec0, self.evec1]
+        H = project(self.H, self.P0_ten)  # TODO: call this somewhere else
+        triple_product = dot(eigenvectors[i], dot(H, eigenvectors[j]))
+        return assemble(self.p0test*triple_product*triple_product*dx)
+
+    # TODO: test this
+    def L_matrix(self):
+        self.p0metric.interpolate(as_matrix([[self.eval0*self.eval0*self.Lij(0, 0),
+                                              self.eval0*self.eval1*self.Lij(0, 1)],
+                                             [self.eval1*self.eval0*self.Lij(1, 0),
+                                              self.eval1*self.eval1*self.Lij(1, 1)]]))
+
+    def cell_interpolation_error(self):
+        l = self.eval0*self.eval0*self.Lij(0, 0)
+        l += self.eval0*self.eval1*self.Lij(0, 1)
+        l += self.eval1*self.eval0*self.Lij(1, 0)
+        l += self.eval1*self.eval1*self.Lij(1, 1)
+        self.estimator.interpolate(sqrt(l))
+
+    def gradient_interpolation_error(self):
+        self.cell_interpolation_error()
+        coeff = pow(min_value(self.eval0, self.eval1), -0.5)
+        self.estimator.interpolate(coeff*self.estimator)
+
+    def edge_interpolation_error(self):
+        self.cell_interpolation_error()
+        coeff = sqrt((self.eval0+self.eval1)*pow(min_value(self.eval0, self.eval1), 1.5))
+        self.estimator.interpolate(coeff*self.estimator)
