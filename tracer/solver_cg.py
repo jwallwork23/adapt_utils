@@ -9,6 +9,7 @@ from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabi
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.recovery import *
+from adapt_utils.adapt.p0_metric import *
 from adapt_utils.solver import SteadyProblem
 
 
@@ -372,3 +373,16 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # n = self.n
         # Fhat = i*dot(phi, n)
         # bdy_contributions -= Fhat*ds(2) + Fhat*ds(3) + Fhat*ds(4)
+
+    def custom_adapt(self):  # TODO: also consider seperate forward / adjoint versions
+        if self.approach == 'Carpio':
+            H = self.get_hessian(adjoint=False)
+            H_adj = self.get_hessian(adjoint=True)
+            M = metric_intersection(H, H_adj)
+            self.dwr_estimation()
+            i = self.indicator.copy()
+            self.dwr_estimation_adjoint()
+            self.indicator.interpolate(i + self.indicator)
+            amd = AnisotropicMetricDriver(self.mesh, hessian=M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric
