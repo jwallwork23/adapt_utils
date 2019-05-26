@@ -340,7 +340,7 @@ class SteadyProblem():
             # Apply metric relaxation, if requested
             self.M_unrelaxed = self.M.copy()
             if prev_metric is not None:
-                self.M.project(metric_relaxation(project(prev_metric, self.P1_ten), self.M, relaxation_parameter))
+                self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
 
             # Adapt mesh
