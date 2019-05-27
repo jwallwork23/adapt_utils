@@ -164,8 +164,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
         sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
         sol = Function(tp_p2.V).interpolate(sol_p1)
         sol.interpolate(sol_p2 - sol)
-        self.errorterm = Function(self.V)
-        self.errorterm.project(sol)
+        with pyadjoint.stop_annotating():  # TODO: temp
+            self.errorterm = Function(self.V)
+            self.errorterm.project(sol)
         return self.errorterm
 
     def get_hessian(self, adjoint=False):
@@ -200,10 +201,10 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Form error estimator
         if square:
-            self.indicator = project(sqrt(self.h*self.h*self.cell_res + 0.5*self.h*self.edge_res), space)
+            self.p0indicator = project(sqrt(self.h*self.h*self.cell_res + 0.5*self.h*self.edge_res), space)
         else:
-            self.indicator = project(abs(self.cell_res + self.edge_res), space)
-        self.indicator.rename('explicit')
+            self.p0indicator = project(abs(self.cell_res + self.edge_res), space)
+        self.p0indicator.rename('explicit')
 
     def explicit_estimation_adjoint(self, space=None, square=True):
         if space is None:
@@ -231,10 +232,10 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Form error estimator
         if square:
-            self.indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), space)
+            self.p0indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), space)
         else:
-            self.indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), space)
-        self.indicator.rename('explicit_adjoint')
+            self.p0indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), space)
+        self.p0indicator.rename('explicit_adjoint')
  
     def dwr_estimation(self):
         i = self.p0test
@@ -267,12 +268,15 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # Sum
         self.cell_res = assemble(i*R*dx)  # TODO: not sure this is necessary / the right thing to do
         if self.op.dwr_approach == 'error_representation':
-            self.indicator = project(R + self.edge_res, self.P1)
+            self.p0indicator = project(R + self.edge_res, self.P0)
+            self.p1indicator = project(R + self.edge_res, self.P1)
         elif self.op.dwr_approach == 'ainsworth_oden':
-            self.indicator = project(self.h*self.h*R + self.h*self.edge_res, P1)
+            self.p0indicator = project(self.h*self.h*R + self.h*self.edge_res, P0)
+            self.p1indicator = project(self.h*self.h*R + self.h*self.edge_res, P1)
         else:
             raise NotImplementedError
-        self.indicator.rename('dwr')
+        self.p0indicator.rename('dwr')
+        self.p1indicator.rename('dwr')
         
     def dwr_estimation_adjoint(self):
         i = self.p0test
@@ -304,12 +308,15 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # Sum
         self.cell_res_adjoint = assemble(i*R*dx)
         if self.op.dwr_approach == 'error_representation':
-            self.indicator = project(R + self.edge_res_adjoint, self.P1)
+            self.p0indicator = project(R + self.edge_res_adjoint, self.P0)
+            self.p1indicator = project(R + self.edge_res_adjoint, self.P1)
         elif self.op.dwr_approach == 'ainsworth_oden':
-            self.indicator = project(self.h*self.h*R + self.h*self.edge_res_adjoint, P1)
+            self.p0indicator = project(self.h*self.h*R + self.h*self.edge_res_adjoint, P0)
+            self.p1indicator = project(self.h*self.h*R + self.h*self.edge_res_adjoint, P1)
         else:
             raise NotImplementedError
-        self.indicator.rename('dwr_adjoint')
+        self.p0indicator.rename('dwr_adjoint')
+        self.p1indicator.rename('dwr_adjoint')
         
     def get_anisotropic_metric(self, adjoint=False, relax=False, superpose=True):
         assert not (relax and superpose)
@@ -380,9 +387,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
             H_adj = self.get_hessian(adjoint=True)
             M = metric_intersection(H, H_adj)
             self.dwr_estimation()
-            i = self.indicator.copy()
+            i = self.p1indicator.copy()
             self.dwr_estimation_adjoint()
-            self.indicator.interpolate(i + self.indicator)
-            amd = AnisotropicMetricDriver(self.mesh, hessian=M, indicator=self.indicator, op=self.op)
+            self.p1indicator.interpolate(i + self.p1indicator)
+            amd = AnisotropicMetricDriver(self.mesh, hessian=M, indicator=self.p1indicator, op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric
