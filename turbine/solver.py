@@ -183,6 +183,7 @@ class SteadyTurbineProblem(SteadyProblem):
             if self.op.dwr_approach != 'cell_only':
                 edge_res = self.ts.edge_residual(self.adjoint_solution)
             self.indicator = Function(self.P1)  # project straight into P1
+            #self.indicator = Function(self.P0)
             if self.op.dwr_approach == 'error_representation':
                 self.indicator.project(cell_res + edge_res)
             elif self.op.dwr_approach == 'cell_only':

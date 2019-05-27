@@ -202,11 +202,24 @@ class SteadyProblem():
         pass
 
     def get_power_metric(self, adjoint=False):
+        """
+        TO DO
+        """
+        # TODO: doc
         self.explicit_estimation_adjoint(square=False)
         H = self.get_hessian(adjoint=adjoint)
         for i in range(len(self.indicator.dat.data)):
             H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
         self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+
+    def effectivity_index(self, J_exact):
+        """
+        TO DO
+        """
+        # TODO: doc
+        estimator = assemble(self.indicator*dx)  # TODO: have p0 and p1 versions!
+        objective_error = self.objective_functional() - J_exact
+        return np.abs(estimator/objective_error)
 
     def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         """
