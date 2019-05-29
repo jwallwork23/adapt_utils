@@ -216,19 +216,25 @@ class SteadyProblem():
             H.dat.data[i][:,:] *= np.abs(self.p1indicator.dat.data[i])  # TODO: use pyop2
         self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
 
+    def store_estimator(self):
+        if hasattr(self, 'p0indicator'):
+           self.p0estimator = np.abs(assemble(self.p0indicator*dx))
+        if hasattr(self, 'p1indicator'):
+           self.p1estimator = np.abs(assemble(self.p1indicator*dx))
+
     def effectivity_index(self, J_exact=None):
         """
         TO DO
         """
         # TODO: doc
         if J_exact is not None:
-            self.estimator = np.abs(assemble(self.p0indicator*dx))
-            objective_error = np.abs(self.objective_functional() - J_exact)
-            return self.estimator/objective_error
+            self.store_estimator()
+            self.objective_error = np.abs(self.objective_functional() - J_exact)
+            return self.p0estimator/self.objective_error
 
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
+    def estimate_error(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         """
-        Adapt mesh according to error estimation strategy of choice.
+        Evaluate error estimation strategy of choice.
         """
         with pyadjoint.stop_annotating():
             if self.approach == 'fixed_mesh':
@@ -361,10 +367,14 @@ class SteadyProblem():
                 self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
 
-            # Adapt mesh
-            #self.mesh = adapt(self.mesh, self.M)
-            self.mesh = multi_adapt(self.M, op=self.op)
-            self.plot()
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
+        if not hasattr(self, 'p1indicator'):
+            self.estimate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, custom_adapt=custom_adapt)
+
+        # Adapt mesh
+        #self.mesh = adapt(self.mesh, self.M)
+        self.mesh = multi_adapt(self.M, op=self.op)
+        self.plot()
 
 
 class MeshOptimisation():
@@ -385,14 +395,20 @@ class MeshOptimisation():
         self.startit = 0
         self.maxit = 35
         self.element_rtol = 0.005    # Following [Power et al 2006]
-        self.objective_rtol = 0.005
+        self.objective_rtol = 0.005  # TODO: Use tighter tolerances
 
         # Logging
         self.logmsg = ''
         self.log = True
 
         # Data storage
-        self.dat = {'elements': [], 'vertices': [], 'objective': [], 'estimator': [], 'effectivity': [], 'approach': self.op.approach}
+        self.dat = {'elements': [],
+                    'vertices': [],
+                    'objective': [],
+                    'p0estimator': [],
+                    'p1estimator': [],
+                    'effectivity': [],
+                    'approach': self.op.approach}
 
         # Effectivity index
         self.J_exact = None
@@ -411,6 +427,8 @@ class MeshOptimisation():
             self.logfile.write('maxit: {:d}\n'.format(self.maxit))
             self.logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
             self.logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
+            # TODO: more details
+            # TODO: parallelise using Thetis format
 
         prev_sol = None
         tstart = clock()
@@ -439,26 +457,35 @@ class MeshOptimisation():
             if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
                 tp.solve_adjoint()
 
-            # Measure effectivity / record estimator
-            if self.op.approach == 'dwr':
-                tp.dwr_estimation()
-            else:
-                raise NotImplementedError  # TODO!!!! Generalise this!
+            # Estimate and record error
+            tp.estimate_error()
+            tp.store_estimator()
+            self.dat['p0estimator'].append(tp.p0estimator)
+            self.dat['p1estimator'].append(tp.p1estimator)
+            PETSc.Sys.Print('P0 error estimator : %.4e' % tp.p0estimator)
+            PETSc.Sys.Print('P1 error estimator : %.4e' % tp.p1estimator)
+            if self.log:  # TODO: parallelise
+                self.logfile.write('Mesh  {:2d}: P0 estimator = {:.4e}\n'.format(i, tp.p0estimator))
+                self.logfile.write('Mesh  {:2d}: P1 estimator = {:.4e}\n'.format(i, tp.p1estimator))
             ei = tp.effectivity_index(self.J_exact)  # FIXME
             if ei is not None:
                 if self.log:  # TODO: parallelise
                     self.logfile.write('Mesh  {:2d}: effectivity = {:.4e}\n'.format(i, ei))
+                    self.logfile.write('Mesh  {:2d}: objective error = {:.4e}\n'.format(i, tp.objective_error))
                 PETSc.Sys.Print('Effectivity index : %.4e' % ei)
+                PETSc.Sys.Print('Objective error : %.4e' % tp.objective_error)
                 self.dat['effectivity'].append(ei)
-                self.dat['estimator'].append(tp.estimator)  # TODO: Move this out of this if statement
 
             # Stopping criteria
             if i > self.startit:
                 out = None
                 obj_diff = abs(self.dat['objective'][j] - self.dat['objective'][j-1])
+                est_diff = abs(self.dat['p0estimator'][j] - self.dat['p0estimator'][j-1])
                 el_diff = abs(self.dat['elements'][j] - self.dat['elements'][j-1])
                 if obj_diff < self.objective_rtol*self.dat['objective'][j-1]:
                     out = self.conv_msg % (i+1, 'convergence in objective functional.')
+                elif est_diff < self.objective_rtol*self.dat['p0estimator'][j-1]:
+                    out = self.conv_msg % (i+1, 'convergence in error estimator.')
                 elif el_diff < self.element_rtol*self.dat['elements'][j-1]:
                     out = self.conv_msg % (i+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
