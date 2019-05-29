@@ -226,8 +226,72 @@ class SteadyTracerProblem_CG(SteadyProblem):
         else:
             self.p0indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), space)
         self.p0indicator.rename('explicit_adjoint')
+
+    def dwr_indication(self):  # TODO: check
+        i = self.p0test
+        u = self.u
+        nu = self.nu
+        n = self.n
+        f = self.source
+        bcs = self.op.boundary_conditions
+        phi = self.solution
+        lam = self.solve_high_order(adjoint=True) if self.op.order_increase else self.adjoint_solution
+        # TODO: Do not solve adjoint on V when high order chosen
+
+        # Finite element problem
+        a = i*lam*dot(u, grad(phi))*dx
+        a += i*nu*inner(grad(phi), grad(lam))*dx
+        for j in bcs.keys():
+            if bcs[j] == 'none':  # TODO: make consistent with Thetis
+                a += -i*nu*lam*dot(n, nabla_grad(phi))*ds(j)
+        L = i*f*lam*dx
+
+        # Stabilisation
+        if self.stab == "SU":
+            a += i*self.stabilisation*dot(u, grad(lam))*dot(u, grad(phi))*dx
+        elif self.stab == "SUPG":
+            coeff = self.stabilisation*dot(u, grad(lam))
+            a += i*coeff*dot(u, grad(phi))*dx
+            a += i*coeff*-div(nu*grad(phi))*dx
+            L += i*coeff*f*dx
+
+        # Get values on each element
+        mass_term = i*self.p0trial*dx
+        self.p0indicator = Function(self.P0)
+        solve(mass_term == L-a, self.p0indicator)
+        self.p0indicator.interpolate(abs(self.p0indicator))
  
     def dwr_estimation(self):
+        u = self.u
+        nu = self.nu
+        n = self.n
+        f = self.source
+        bcs = self.op.boundary_conditions
+        phi = self.solution
+        lam = self.solve_high_order(adjoint=True) if self.op.order_increase else self.adjoint_solution
+        # TODO: Do not solve adjoint on V when high order chosen
+
+        # Finite element problem
+        a = lam*dot(u, grad(phi))*dx
+        a += nu*inner(grad(phi), grad(lam))*dx
+        for j in bcs.keys():
+            if bcs[j] == 'none':  # TODO: make consistent with Thetis
+                a += -nu*lam*dot(n, nabla_grad(phi))*ds(j)
+        L = f*lam*dx
+
+        # Stabilisation
+        if self.stab == "SU":
+            a += self.stabilisation*dot(u, grad(lam))*dot(u, grad(phi))*dx
+        elif self.stab == "SUPG":
+            coeff = self.stabilisation*dot(u, grad(lam))
+            a += coeff*dot(u, grad(phi))*dx
+            a += coeff*-div(nu*grad(phi))*dx
+            L += coeff*f*dx
+
+        # Evaluate error estimator
+        self.estimator = assemble(L-a)
+
+    def dwr_indication_(self):
         i = self.p0test
         phi = self.solution
         u = self.u
@@ -270,7 +334,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.p0indicator.rename('dwr')
         self.p1indicator.rename('dwr')
         
-    def dwr_estimation_adjoint(self):
+    def dwr_indication_adjoint(self):
         i = self.p0test
         lam = self.adjoint_solution
         u = self.u
@@ -380,9 +444,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
             H = self.get_hessian(adjoint=False)
             H_adj = self.get_hessian(adjoint=True)
             M = metric_intersection(H, H_adj)
-            self.dwr_estimation()
+            self.dwr_indication()
             i = self.p1indicator.copy()
-            self.dwr_estimation_adjoint()
+            self.dwr_indication_adjoint()
             self.p1indicator.interpolate(i + self.p1indicator)
             amd = AnisotropicMetricDriver(self.mesh, hessian=M, indicator=self.p1indicator, op=self.op)
             amd.get_anisotropic_metric()

@@ -160,7 +160,7 @@ class SteadyProblem():
             self.p0indicator.rename(name + ' p0indicator')
             File(self.di + 'p0indicator.pvd').write(self.p0indicator)
 
-    def dwr_estimation(self):
+    def dwr_indication(self):
         """
         Indicate errors in the objective functional by the Dual Weighted Residual method. This is
         inherently problem-dependent.
@@ -169,7 +169,7 @@ class SteadyProblem():
         """
         pass
 
-    def dwr_estimation_adjoint(self):
+    def dwr_indication_adjoint(self):
         pass
 
     def get_hessian(self, adjoint=False):
@@ -217,26 +217,27 @@ class SteadyProblem():
             H.dat.data[i][:,:] *= np.abs(self.p1indicator.dat.data[i])  # TODO: use pyop2
         self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
 
-    def store_estimator(self):
-        if hasattr(self, 'p0indicator'):
-           self.p0estimator = np.abs(assemble(self.p0indicator*dx))
-        if hasattr(self, 'p1indicator'):
-           self.p1estimator = np.abs(assemble(self.p1indicator*dx))
-
     def effectivity_index(self, J_exact=None):
         """
         TO DO
         """
         # TODO: doc
         if J_exact is not None:
-            self.store_estimator()
+            self.estimate_error()
             self.objective_error = np.abs(self.objective_functional() - J_exact)
-            return self.p0estimator/self.objective_error
+            return self.estimator/self.objective_error
 
     def estimate_error(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         """
         Evaluate error estimation strategy of choice.
         """
+        if not hasattr(self, 'estimator'):
+            if self.approach == 'dwr':
+                self.dwr_estimation()
+            else:
+                raise NotImplementedError  # TODO
+
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         with pyadjoint.stop_annotating():
             if self.approach == 'fixed_mesh':
                 return
@@ -281,37 +282,37 @@ class SteadyProblem():
                 self.dwp_indication()
                 self.get_isotropic_metric()
             elif self.approach == 'dwr':
-                self.dwr_estimation()
+                self.dwp_indication()
                 self.get_isotropic_metric()
             elif self.approach == 'dwr_adjoint':
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.get_isotropic_metric()
             elif self.approach == 'dwr_both':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 i = self.p1indicator.copy()
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.p1indicator.interpolate(Constant(0.5)*(i+self.p1indicator))
                 self.get_isotropic_metric()
             elif self.approach == 'dwr_averaged':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 i = self.p1indicator.copy()
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.p1indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.p1indicator)))
                 self.get_isotropic_metric()
             elif self.approach == 'dwr_relaxed':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 M = self.M.copy()
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.get_isotropic_metric()
                 self.M = metric_relaxation(M, self.M)
             elif self.approach == 'dwr_superposed':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 M = self.M.copy()
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.get_isotropic_metric()
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'dwr_anisotropic':
@@ -329,7 +330,7 @@ class SteadyProblem():
                 self.get_anisotropic_metric(adjoint=True)
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'hybrid':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 M = self.M.copy()
                 self.get_anisotropic_metric(adjoint=False)
@@ -368,14 +369,10 @@ class SteadyProblem():
                 self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
 
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
-        if not hasattr(self, 'p1indicator'):
-            self.estimate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, custom_adapt=custom_adapt)
-
-        # Adapt mesh
-        #self.mesh = adapt(self.mesh, self.M)
-        self.mesh = multi_adapt(self.M, op=self.op)
-        self.plot()
+            # Adapt mesh
+            #self.mesh = adapt(self.mesh, self.M)
+            self.mesh = multi_adapt(self.M, op=self.op)
+            self.plot()
 
 
 class MeshOptimisation():
@@ -395,8 +392,9 @@ class MeshOptimisation():
         self.conv_msg = "Converged after %d iterations due to %s"
         self.startit = 0
         self.maxit = 35
-        self.element_rtol = 0.005    # Following [Power et al 2006]
-        self.objective_rtol = 0.005  # TODO: Use tighter tolerances
+        self.element_rtol = 0.001    # Following [Power et al 2006]
+        self.objective_rtol = 0.001  # TODO: experiment with these tighter tolerances
+        self.estimator_atol = 1e-8
 
         # Logging
         self.logmsg = ''
@@ -406,8 +404,7 @@ class MeshOptimisation():
         self.dat = {'elements': [],
                     'vertices': [],
                     'objective': [],
-                    'p0estimator': [],
-                    'p1estimator': [],
+                    'estimator': [],
                     'effectivity': [],
                     'approach': self.op.approach}
 
@@ -423,12 +420,13 @@ class MeshOptimisation():
             self.logfile = open('{:s}/optimisation_log'.format(self.di), 'a+')
             self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
             self.logfile.write('stabilisation: {:s}\n'.format(self.op.stabilisation))
+            self.logfile.write('dwr_approach: {:s}\n'.format(self.op.dwr_approach))
             self.logfile.write('high_order: {:b}\n'.format(self.op.order_increase))
             self.logfile.write('relax: {:b}\n'.format(self.op.relax))
             self.logfile.write('maxit: {:d}\n'.format(self.maxit))
-            self.logfile.write('element_rtol: {:.3f}\n'.format(self.element_rtol))
-            self.logfile.write('objective_rtol: {:.3f}\n\n'.format(self.objective_rtol))
-            # TODO: more details
+            self.logfile.write('element_rtol: {:f}\n'.format(self.element_rtol))
+            self.logfile.write('objective_rtol: {:f}\n\n'.format(self.objective_rtol))
+            self.logfile.write('estimator_atol: {:f}\n\n'.format(self.estimator_atol))
             # TODO: parallelise using Thetis format
 
         prev_sol = None
@@ -460,14 +458,10 @@ class MeshOptimisation():
 
             # Estimate and record error
             tp.estimate_error()
-            tp.store_estimator()
-            self.dat['p0estimator'].append(tp.p0estimator)
-            self.dat['p1estimator'].append(tp.p1estimator)
-            PETSc.Sys.Print('P0 error estimator : %.4e' % tp.p0estimator)
-            PETSc.Sys.Print('P1 error estimator : %.4e' % tp.p1estimator)
+            self.dat['estimator'].append(tp.estimator)
+            PETSc.Sys.Print('error estimator : %.4e' % tp.estimator)
             if self.log:  # TODO: parallelise
-                self.logfile.write('Mesh  {:2d}: P0 estimator = {:.4e}\n'.format(i, tp.p0estimator))
-                self.logfile.write('Mesh  {:2d}: P1 estimator = {:.4e}\n'.format(i, tp.p1estimator))
+                self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
             ei = tp.effectivity_index(self.J_exact)  # FIXME
             if ei is not None:
                 if self.log:  # TODO: parallelise
@@ -481,11 +475,10 @@ class MeshOptimisation():
             if i > self.startit:
                 out = None
                 obj_diff = abs(self.dat['objective'][j] - self.dat['objective'][j-1])
-                est_diff = abs(self.dat['p0estimator'][j] - self.dat['p0estimator'][j-1])
                 el_diff = abs(self.dat['elements'][j] - self.dat['elements'][j-1])
                 if obj_diff < self.objective_rtol*self.dat['objective'][j-1]:
                     out = self.conv_msg % (i+1, 'convergence in objective functional.')
-                elif est_diff < self.objective_rtol*self.dat['p0estimator'][j-1]:
+                elif self.dat['estimator'][j] < self.estimator_atol:
                     out = self.conv_msg % (i+1, 'convergence in error estimator.')
                 elif el_diff < self.element_rtol*self.dat['elements'][j-1]:
                     out = self.conv_msg % (i+1, 'convergence in mesh element count.')
@@ -767,7 +760,7 @@ class UnsteadyProblem():
         self.indicator.project(inner(self.solution, self.interpolated_adjoint_solution))
         self.indicator.rename('dwp')
 
-    def explicit_estimation(self, space=None, square=True):
+    def explicit_estimation(self, space=None, square=True):  # TODO: change notation to indication
         pass
 
     def explicit_estimation_adjoint(self, space=None, square=True):
@@ -781,7 +774,7 @@ class UnsteadyProblem():
             self.indicator.rename(self.approach + ' indicator')
             self.indicator_file.write(self.indicator, t=self.remesh_step*self.op.dt)
 
-    def dwr_estimation(self):
+    def dwr_indication(self):
         """
         Indicate errors in the objective functional by the Dual Weighted Residual method. This is
         inherently problem-dependent.
@@ -790,7 +783,7 @@ class UnsteadyProblem():
         """
         pass
 
-    def dwr_estimation_adjoint(self):
+    def dwr_indication_adjoint(self):
         pass
 
     def get_hessian(self, adjoint=False):
@@ -876,37 +869,37 @@ class UnsteadyProblem():
                 self.dwp_indication()
                 self.get_isotropic_metric()
             elif self.approach == 'dwr':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
             elif self.approach == 'dwr_adjoint':
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.get_isotropic_metric()
             elif self.approach == 'dwr_both':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 i = self.indicator.copy()
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
                 self.get_isotropic_metric()
             elif self.approach == 'dwr_averaged':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 i = self.indicator.copy()
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
                 self.get_isotropic_metric()
             elif self.approach == 'dwr_relaxed':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 M = self.M.copy()
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.get_isotropic_metric()
                 self.M = metric_relaxation(M, self.M)
             elif self.approach == 'dwr_superposed':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 M = self.M.copy()
-                self.dwr_estimation_adjoint()
+                self.dwr_indication_adjoint()
                 self.get_isotropic_metric()
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'dwr_anisotropic':
@@ -924,7 +917,7 @@ class UnsteadyProblem():
                 self.get_anisotropic_metric(adjoint=True)
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'hybrid':
-                self.dwr_estimation()
+                self.dwr_indication()
                 self.get_isotropic_metric()
                 M = self.M.copy()
                 self.get_anisotropic_metric(adjoint=False)
