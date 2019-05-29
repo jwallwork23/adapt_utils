@@ -256,7 +256,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
             R -= (f - dot(u, grad(phi)) + div(nu*grad(phi)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
 
         # Sum
-        self.cell_res = assemble(i*R*dx)  # TODO: not sure this is necessary / the right thing to do
+        self.cell_res = assemble(i*R*dx)  # NOTE: We don't use this because interplay is important
         if self.op.dwr_approach == 'error_representation':
             self.p0indicator = project(R + self.edge_res, self.P0)
             self.p1indicator = project(R + self.edge_res, self.P1)
@@ -265,6 +265,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
             self.p1indicator = project(self.h*self.h*R + self.h*self.edge_res, P1)
         else:
             raise NotImplementedError
+        self.p0indicator.interpolate(abs(self.p0indicator))
+        self.p1indicator.interpolate(abs(self.p1indicator))
         self.p0indicator.rename('dwr')
         self.p1indicator.rename('dwr')
         
@@ -305,6 +307,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
             self.p1indicator = project(self.h*self.h*R + self.h*self.edge_res_adjoint, P1)
         else:
             raise NotImplementedError
+        self.p0indicator.interpolate(abs(self.p0indicator))
+        self.p1indicator.interpolate(abs(self.p1indicator))
         self.p0indicator.rename('dwr_adjoint')
         self.p1indicator.rename('dwr_adjoint')
         

@@ -193,8 +193,8 @@ class SteadyProblem():
         Scale an identity matrix by the indicator field in order to drive
         isotropic mesh refinement.
         """
-        el = self.p0indicator.ufl_element()
-        if (el.family(), el.degree()) != ('Lagrange', 1):
+        #self.p0indicator.interpolate(abs(self.p0indicator))
+        if not hasattr(self, 'p1indicator'):
             self.p1indicator = project(self.p0indicator, self.P1)
         self.p1indicator.interpolate(abs(self.p1indicator))  # project doesn't guarantee non-negativity
         self.M = isotropic_metric(self.p1indicator, op=self.op)
