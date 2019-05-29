@@ -138,34 +138,24 @@ class SteadyTracerProblem_CG(SteadyProblem):
         """
         family = self.V.ufl_element().family()
 
-        # Consider an iso-P2 refined mesh
-        fine_mesh = iso_P2(self.mesh)
-
-        # Solve adjoint problem on fine mesh using linear elements
-        tp_p1 = SteadyTracerProblem_CG(self.op,
-                                       mesh=fine_mesh,
-                                       finite_element=FiniteElement(family, triangle, 1))
-        if adjoint:
-            tp_p1.solve_adjoint()
-        else:
-            tp_p1.solve()
-
         # Solve adjoint problem on fine mesh using quadratic elements
         tp_p2 = SteadyTracerProblem_CG(self.op,
-                                       mesh=fine_mesh,
+                                       mesh=iso_P2(self.mesh),
                                        finite_element=FiniteElement(family, triangle, 2))
+        sol_p1 = Function(tp_p2.P1)  # Project into P1 to get linear approximation, too
         if adjoint:
             tp_p2.solve_adjoint()
+            sol_p1.project(tp_p2.adjoint_solution)
         else:
             tp_p2.solve()
+            sol_p1.project(tp_p2.solution)
 
         # Evaluate difference on fine mesh and project onto coarse mesh
-        sol_p1 = tp_p1.adjoint_solution if adjoint else tp_p1.solution
         sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
-        sol = Function(tp_p2.V).interpolate(sol_p1)
+        sol = Function(tp_p2.V)
         sol.interpolate(sol_p2 - sol)
         with pyadjoint.stop_annotating():  # TODO: temp
-            self.errorterm = Function(self.V)
+            self.errorterm = Function(self.P2)
             self.errorterm.project(sol)
         return self.errorterm
 

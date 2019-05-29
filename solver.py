@@ -45,6 +45,7 @@ class SteadyProblem():
         self.V = FunctionSpace(self.mesh, self.finite_element)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
+        self.P2 = FunctionSpace(self.mesh, "CG", 2)
         self.P1DG = FunctionSpace(self.mesh, "DG", 1)
         self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
         self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
