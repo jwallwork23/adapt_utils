@@ -196,7 +196,7 @@ class SteadyProblem():
         #self.p0indicator.interpolate(abs(self.p0indicator))
         if not hasattr(self, 'p1indicator'):
             self.p1indicator = project(self.p0indicator, self.P1)
-        self.p1indicator.interpolate(abs(self.p1indicator))  # project doesn't guarantee non-negativity
+            self.p1indicator.interpolate(abs(self.p1indicator))  # ensure non-negativity
         self.M = isotropic_metric(self.p1indicator, op=self.op)
 
     def get_anisotropic_metric(self, adjoint=False, relax=False):
@@ -425,7 +425,7 @@ class MeshOptimisation():
             self.logfile.write('relax: {:b}\n'.format(self.op.relax))
             self.logfile.write('maxit: {:d}\n'.format(self.maxit))
             self.logfile.write('element_rtol: {:f}\n'.format(self.element_rtol))
-            self.logfile.write('objective_rtol: {:f}\n\n'.format(self.objective_rtol))
+            self.logfile.write('objective_rtol: {:f}\n'.format(self.objective_rtol))
             self.logfile.write('estimator_atol: {:f}\n\n'.format(self.estimator_atol))
             # TODO: parallelise using Thetis format
 
@@ -454,7 +454,7 @@ class MeshOptimisation():
 
             # Solve adjoint
             if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
-                tp.solve_adjoint()
+                tp.solve_adjoint()  # TODO: This is not always necessary
 
             # Estimate and record error
             tp.estimate_error()
@@ -462,14 +462,16 @@ class MeshOptimisation():
             PETSc.Sys.Print('error estimator : %.4e' % tp.estimator)
             if self.log:  # TODO: parallelise
                 self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
-            ei = tp.effectivity_index(self.J_exact)  # FIXME
+            ei = tp.effectivity_index(self.J_exact)
             if ei is not None:
                 if self.log:  # TODO: parallelise
                     self.logfile.write('Mesh  {:2d}: effectivity = {:.4e}\n'.format(i, ei))
                     self.logfile.write('Mesh  {:2d}: objective error = {:.4e}\n'.format(i, tp.objective_error))
-                PETSc.Sys.Print('Effectivity index : %.4e' % ei)
                 PETSc.Sys.Print('Objective error : %.4e' % tp.objective_error)
+                PETSc.Sys.Print('Effectivity index : %.4e' % ei)
                 self.dat['effectivity'].append(ei)
+            else:
+                self.dat['effectivity'].append('n/a')
 
             # Stopping criteria
             if i > self.startit:
@@ -513,7 +515,7 @@ class OuterLoop():
         self.di = create_directory(self.op.di)
 
         # Default tolerances etc
-        self.msg = "{:s} {:.2e} elements {:7d} iter {:2d} time {:6.1f} objective {:.4e}\n"
+        self.msg = "{:s} {:.2e} elements {:7d} iter {:2d} time {:6.1f} objective {:.4e} estimator {:.4e} ei {}\n"
         self.maxit = 35
         self.element_rtol = 0.005    # Following [Power et al 2006]
         self.objective_rtol = 0.005
@@ -521,52 +523,11 @@ class OuterLoop():
         self.outer_maxit = 4
         #self.log = False
         self.log = True
+        self.base = 10
+        self.start_error = 1
 
         # Effectivity index
         self.J_exact = None
-
-    def scale_to_convergence(self):
-        mode = 'rescaling'
-
-        # Create log file  # TODO: parallelise
-        logfile = open(self.di + 'scale_to_convergence.log', 'a+')
-        logfile.write('\n' + date + '\n\n')
-        logfile.write('maxit: {:d}\n'.format(self.maxit))
-        logfile.write('element_rtol: {:.4f}\n'.format(self.element_rtol))
-        logfile.write('objective_rtol: {:.4f}\n'.format(self.objective_rtol))
-        logfile.write('outer_maxit: {:d}\n\n'.format(self.outer_maxit))
-
-        for i in range(self.outer_startit, self.outer_maxit):
-
-            # Iterate over increasing target vertex counts
-            self.op.rescaling = float(i+1)*0.4
-            PETSc.Sys.Print("\nOuter loop %d for approach '%s'" % (i+1, self.op.approach))
-            opt = MeshOptimisation(self.problem, mesh=self.mesh, op=self.op)
-            opt.log = self.log
-            opt.maxit = self.maxit
-            opt.element_rtol = self.element_rtol
-            opt.objective_rtol = self.objective_rtol
-            opt.J_exact = self.J_exact
-            opt.iterate()
-            self.final_mesh = opt.mesh
-            self.final_J = opt.dat['objective'][-1]
-
-            # Logging
-            logfile.write(self.msg.format(mode,
-                                          self.op.rescaling,
-                                          opt.dat['elements'][-1],
-                                          len(opt.dat['objective']),
-                                          opt.dat['time'],
-                                          opt.dat['objective'][-1]))
-
-            # Convergence criterion: relative tolerance for objective functional
-            if i > self.outer_startit:
-                obj_diff = abs(opt.dat['objective'][-1] - J_)
-                if obj_diff < self.objective_rtol*J_:
-                    PETSc.Sys.Print(opt.conv_msg % (i+1, 'convergence in objective functional.'))
-                    break
-            J_ = opt.dat['objective'][-1]
-        logfile.close()
 
     def desired_error_loop(self):
         mode = 'desired_error'
@@ -583,7 +544,7 @@ class OuterLoop():
 
             # Iterate over increasing target vertex counts
             PETSc.Sys.Print("\nOuter loop %d for approach '%s'" % (i+1, self.op.approach))
-            self.op.target = pow(10, i)
+            self.op.target = self.start_target*pow(self.base, i)
             opt = MeshOptimisation(self.problem, mesh=self.mesh, op=self.op)
             opt.maxit = self.maxit
             opt.element_rtol = self.element_rtol
@@ -600,7 +561,13 @@ class OuterLoop():
                                           opt.dat['elements'][-1],
                                           len(opt.dat['objective']),
                                           opt.dat['time'],
-                                          opt.dat['objective'][-1]))
+                                          opt.dat['objective'][-1],
+                                          opt.dat['estimator'][-1],
+                                          opt.dat['effectivity']))
+            PETSc.Sys.Print("%d %.4e %.4e %a" % (opt.dat['elements'][-1],
+                                                 opt.dat['objective'][-1],
+                                                 opt.dat['estimator'][-1],
+                                                 opt.dat['effectivity'][-1]))
 
             # Convergence criterion: relative tolerance for objective functional
             if i > self.outer_startit:

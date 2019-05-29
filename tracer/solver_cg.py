@@ -227,7 +227,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
             self.p0indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), space)
         self.p0indicator.rename('explicit_adjoint')
 
-    def dwr_indication(self):  # TODO: check
+    def dwr_indication_(self):  # TODO: check
         i = self.p0test
         u = self.u
         nu = self.nu
@@ -235,8 +235,10 @@ class SteadyTracerProblem_CG(SteadyProblem):
         f = self.source
         bcs = self.op.boundary_conditions
         phi = self.solution
-        lam = self.solve_high_order(adjoint=True) if self.op.order_increase else self.adjoint_solution
-        # TODO: Do not solve adjoint on V when high order chosen
+        if self.op.order_increase:
+            lam = self.solve_high_order(adjoint=True) if not hasattr(self, 'errorterm') else self.errorterm
+        else:
+            self.adjoint_solution
 
         # Finite element problem
         a = i*lam*dot(u, grad(phi))*dx
@@ -268,8 +270,10 @@ class SteadyTracerProblem_CG(SteadyProblem):
         f = self.source
         bcs = self.op.boundary_conditions
         phi = self.solution
-        lam = self.solve_high_order(adjoint=True) if self.op.order_increase else self.adjoint_solution
-        # TODO: Do not solve adjoint on V when high order chosen
+        if self.op.order_increase:
+            lam = self.solve_high_order(adjoint=True) if not hasattr(self, 'errorterm') else self.errorterm
+        else:
+            lam = self.adjoint_solution
 
         # Finite element problem
         a = lam*dot(u, grad(phi))*dx
@@ -291,7 +295,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # Evaluate error estimator
         self.estimator = assemble(L-a)
 
-    def dwr_indication_(self):
+    def dwr_indication(self):
         i = self.p0test
         phi = self.solution
         u = self.u
@@ -299,7 +303,10 @@ class SteadyTracerProblem_CG(SteadyProblem):
         n = self.n
         f = self.source
         bcs = self.op.boundary_conditions
-        lam = self.solve_high_order(adjoint=True) if self.op.order_increase else self.adjoint_solution
+        if self.op.order_increase:
+            lam = self.solve_high_order(adjoint=True) if not hasattr(self, 'errorterm') else self.errorterm
+        else:
+            self.adjoint_solution
 
         # Residual
         R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
