@@ -238,10 +238,9 @@ class SteadyProblem():
             elif self.approach in ('dwr_adjoint', 'power_adjoint', 'carpio_adjoint'):
                 self.dwr_estimation_adjoint()
             elif self.approach in ('dwr_both', 'dwr_relaxed', 'dwr_superposed', 'power_relaxed', 'power_superposed', 'carpio_relaxed', 'carpio_superposed'):
-                with pyadjoint.stop_annotating():  # TODO: temp
-                    forward = float(self.dwr_estimation())
-                    adjoint = float(self.dwr_estimation_adjoint())
-                    self.estimator = 0.5*(forward+adjoint)
+                forward = self.dwr_estimation()
+                adjoint = self.dwr_estimation_adjoint()
+                self.estimator = 0.5*(forward+adjoint)
             else:
                 raise NotImplementedError  # TODO
 
@@ -355,7 +354,7 @@ class SteadyProblem():
                 indicator = self.p1indicator.copy()
                 self.explicit_estimation_adjoint(square=False)
                 H2 = self.get_hessian(adjoint=False)
-                for i in range(self.p1indicator):
+                for i in range(self.mesh_num_vertices()):
                     H.dat.data[i][:,:] += H2.dat.data[i]*np.abs(self.p1indicator.dat.data[i])  # TODO: use pyop2
                     H.dat.data[i][:,:] /= np.abs(indicator.dat.data[i]) + np.abs(self.p1indicator.dat.data[i])
                 self.M = steady_metric(self.solution+self.adjoint_solution, mesh=self.mesh, H=H, op=self.op)
