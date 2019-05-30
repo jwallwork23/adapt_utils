@@ -166,9 +166,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
 
-    def explicit_estimation(self, space=None, square=True):
-        if space is None:
-            space = self.P1
+    def explicit_estimation(self, square=True):
         phi = self.solution
         i = self.p0test
         bcs = self.op.boundary_conditions
@@ -191,10 +189,13 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Form error estimator
         if square:
-            self.p0indicator = project(sqrt(self.h*self.h*self.cell_res + 0.5*self.h*self.edge_res), space)
+            self.p0indicator = project(sqrt(self.h*self.h*self.cell_res + 0.5*self.h*self.edge_res), self.P0)
+            self.p1indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), self.P1)
         else:
-            self.p0indicator = project(abs(self.cell_res + self.edge_res), space)
+            self.p0indicator = project(abs(self.cell_res + self.edge_res), self.P0)
+            self.p1indicator = project(abs(self.cell_res + self.edge_res), self.P1)
         self.p0indicator.rename('explicit')
+        self.p1indicator.rename('explicit')
 
     def explicit_estimation_adjoint(self, square=True):
         lam = self.adjoint_solution
@@ -400,7 +401,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.edge_res_adjoint = Function(self.P0)
         solve(mass_term == flux_terms, self.edge_res_adjoint)
 
-        # TODO: Account for stabilisation error
+        # Account for stabilisation error
+        if self.op.order_increase and self.stab == 'SUPG':
+            R -= (dJdphi + div(u*lam) + div(nu*grad(lam)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
 
         # Sum
         self.cell_res_adjoint = assemble(i*R*dx)
