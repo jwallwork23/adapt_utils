@@ -213,7 +213,7 @@ class SteadyProblem():
         # TODO: doc
         self.explicit_estimation_adjoint(square=False)
         H = self.get_hessian(adjoint=adjoint)
-        for i in range(self.mesh.num_cells()):
+        for i in range(self.mesh.num_vertices()):
             H.dat.data[i][:,:] *= np.abs(self.p1indicator.dat.data[i])  # TODO: use pyop2
         self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
 
@@ -232,8 +232,11 @@ class SteadyProblem():
         Evaluate error estimation strategy of choice.
         """
         if not hasattr(self, 'estimator'):
-            if self.approach == 'dwr':
+            #if self.approach == 'dwr':
+            if self.approach in ('dwr', 'power', 'carpio'):
                 self.dwr_estimation()
+            elif self.approach in ('dwr_adjoint', 'power_adjoint', 'carpio_adjoint'):
+                self.dwr_estimation_adjoint()
             else:
                 raise NotImplementedError  # TODO
 
@@ -315,16 +318,16 @@ class SteadyProblem():
                 self.dwr_indication_adjoint()
                 self.get_isotropic_metric()
                 self.M = metric_intersection(M, self.M)
-            elif self.approach == 'dwr_anisotropic':
+            elif self.approach == 'loseille':
                 self.get_anisotropic_metric(adjoint=False)
-            elif self.approach == 'dwr_anisotropic_adjoint':
+            elif self.approach == 'loseille_adjoint':
                 self.get_anisotropic_metric(adjoint=True)
-            elif self.approach == 'dwr_anisotropic_relaxed':
+            elif self.approach == 'loseille_relaxed':
                 self.get_anisotropic_metric(adjoint=False)
                 M = self.M.copy()
                 self.get_anisotropic_metric(adjoint=True)
                 self.M = metric_relaxation(M, self.M)
-            elif self.approach == 'dwr_anisotropic_superposed':
+            elif self.approach == 'loseille_superposed':
                 self.get_anisotropic_metric(adjoint=False)
                 M = self.M.copy()
                 self.get_anisotropic_metric(adjoint=True)
@@ -342,7 +345,7 @@ class SteadyProblem():
             elif self.approach == 'power_relaxed':
                 self.explicit_estimation(square=False)
                 H = self.get_hessian(adjoint=True)
-                for i in range(self.mesh.num_cells()):
+                for i in range(self.mesh.num_vertices()):
                     H.dat.data[i][:,:] *= np.abs(self.p1indicator.dat.data[i])  # TODO: use pyop2
                 indicator = self.p1indicator.copy()
                 self.explicit_estimation_adjoint(square=False)
@@ -869,25 +872,19 @@ class UnsteadyProblem():
                 self.dwr_indication_adjoint()
                 self.get_isotropic_metric()
                 self.M = metric_intersection(M, self.M)
-            elif self.approach == 'dwr_anisotropic':
+            elif self.approach == 'loseille':
                 self.get_anisotropic_metric(adjoint=False)
-            elif self.approach == 'dwr_anisotropic_adjoint':
+            elif self.approach == 'loseille_adjoint':
                 self.get_anisotropic_metric(adjoint=True)
-            elif self.approach == 'dwr_anisotropic_relaxed':
+            elif self.approach == 'loseille_relaxed':
                 self.get_anisotropic_metric(adjoint=False)
                 M = self.M.copy()
                 self.get_anisotropic_metric(adjoint=True)
                 self.M = metric_relaxation(M, self.M)
-            elif self.approach == 'dwr_anisotropic_superposed':
+            elif self.approach == 'loseille_superposed':
                 self.get_anisotropic_metric(adjoint=False)
                 M = self.M.copy()
                 self.get_anisotropic_metric(adjoint=True)
-                self.M = metric_intersection(M, self.M)
-            elif self.approach == 'hybrid':
-                self.dwr_indication()
-                self.get_isotropic_metric()
-                M = self.M.copy()
-                self.get_anisotropic_metric(adjoint=False)
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'power':
                 self.explicit_estimation_adjoint(square=False)

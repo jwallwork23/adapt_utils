@@ -196,9 +196,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
             self.p0indicator = project(abs(self.cell_res + self.edge_res), space)
         self.p0indicator.rename('explicit')
 
-    def explicit_estimation_adjoint(self, space=None, square=True):
-        if space is None:
-            space = self.P1
+    def explicit_estimation_adjoint(self, square=True):
         lam = self.adjoint_solution
         u = self.u
         nu = self.nu
@@ -222,10 +220,13 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Form error estimator
         if square:
-            self.p0indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), space)
+            self.p0indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), self.P0)
+            self.p1indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), self.P1)
         else:
-            self.p0indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), space)
+            self.p0indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), self.P0)
+            self.p1indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), self.P1)
         self.p0indicator.rename('explicit_adjoint')
+        self.p1indicator.rename('explicit_adjoint')
 
     def dwr_indication_(self):  # TODO: check
         i = self.p0test
@@ -291,6 +292,38 @@ class SteadyTracerProblem_CG(SteadyProblem):
             a += coeff*dot(u, grad(phi))*dx
             a += coeff*-div(nu*grad(phi))*dx
             L += coeff*f*dx
+
+        # Evaluate error estimator
+        self.estimator = assemble(L-a)
+
+    def dwr_estimation_adjoint(self):
+        u = self.u
+        nu = self.nu
+        n = self.n
+        bcs = self.op.boundary_conditions
+        lam = self.adjoint_solution
+        if self.op.order_increase:
+            phi = self.solve_high_order(adjoint=False) if not hasattr(self, 'errorterm') else self.errorterm
+        else:
+            phi = self.solution
+
+        # Adjoint finite element problem
+        a = lam*dot(u, grad(phi))*dx
+        a += nu*inner(grad(lam), grad(phi))*dx
+        for i in bcs.keys():
+            if bcs[i] == 'dirichlet_zero':
+                a += -lam*phi*(dot(u, n))*ds(i)
+                a += -nu*phi*dot(n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
+        L = self.kernel*phi*dx
+
+        # Stabilisation
+        if self.stab == 'SU':
+            a += self.stabilisation*div(u*phi)*div(u*lam)*dx
+        elif self.stab == "SUPG":  # NOTE: this is not equivalent to discrete adjoint
+            coeff = -self.stabilisation*div(u*phi)
+            a += coeff*-div(u*lam)*dx
+            a += coeff*-div(nu*grad(lam))*dx
+            L += coeff*self.kernel*dx
 
         # Evaluate error estimator
         self.estimator = assemble(L-a)
@@ -447,7 +480,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # bdy_contributions -= Fhat*ds(2) + Fhat*ds(3) + Fhat*ds(4)
 
     def custom_adapt(self):  # TODO: also consider seperate forward / adjoint versions
-        if self.approach == 'Carpio':
+        if self.approach == 'carpio':
             H = self.get_hessian(adjoint=False)
             H_adj = self.get_hessian(adjoint=True)
             M = metric_intersection(H, H_adj)
