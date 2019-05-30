@@ -354,7 +354,7 @@ class SteadyProblem():
                 indicator = self.p1indicator.copy()
                 self.explicit_estimation_adjoint(square=False)
                 H2 = self.get_hessian(adjoint=False)
-                for i in range(self.mesh_num_vertices()):
+                for i in range(self.mesh.num_vertices()):
                     H.dat.data[i][:,:] += H2.dat.data[i]*np.abs(self.p1indicator.dat.data[i])  # TODO: use pyop2
                     H.dat.data[i][:,:] /= np.abs(indicator.dat.data[i]) + np.abs(self.p1indicator.dat.data[i])
                 self.M = steady_metric(self.solution+self.adjoint_solution, mesh=self.mesh, H=H, op=self.op)
