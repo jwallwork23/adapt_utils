@@ -237,6 +237,10 @@ class SteadyProblem():
                 self.dwr_estimation()
             elif self.approach in ('dwr_adjoint', 'power_adjoint', 'carpio_adjoint'):
                 self.dwr_estimation_adjoint()
+            elif self.approach in ('dwr_both', 'dwr_relaxed', 'dwr_superposed', 'power_relaxed', 'power_superposed', 'carpio_relaxed', 'carpio_superposed'):
+                forward = self.dwr_estimation()
+                adjoint = self.dwr_estimation_adjoint()
+                self.estimator = 0.5*(forward+adjoint)
             else:
                 raise NotImplementedError  # TODO
 

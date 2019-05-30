@@ -295,6 +295,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # Evaluate error estimator
         self.estimator = assemble(L-a)
+        return self.estimator
 
     def dwr_estimation_adjoint(self):
         u = self.u
