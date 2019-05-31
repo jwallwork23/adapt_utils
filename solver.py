@@ -354,7 +354,8 @@ class SteadyProblem():
             if prev_metric is not None:
                 self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
-        
+
+        # FIXME!
         if hasattr(self, 'p0indicator'):
             self.estimator = sum(self.p0indicator.dat.data)
 
@@ -443,12 +444,12 @@ class MeshOptimisation():
             if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
                 tp.solve_adjoint()  # TODO: This is not always necessary
 
-            # Estimate and record error
-            tp.estimate_error()
-            self.dat['estimator'].append(tp.estimator)
-            PETSc.Sys.Print('error estimator : %.4e' % tp.estimator)
-            if self.log:  # TODO: parallelise
-                self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
+            ## Estimate and record error  # FIXME
+            #tp.estimate_error()
+            #self.dat['estimator'].append(tp.estimator)
+            #PETSc.Sys.Print('error estimator : %.4e' % tp.estimator)
+            #if self.log:  # TODO: parallelise
+            #    self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
 
             # Stopping criteria
             if i > self.startit:
@@ -457,8 +458,8 @@ class MeshOptimisation():
                 el_diff = abs(self.dat['elements'][j] - self.dat['elements'][j-1])
                 if obj_diff < self.objective_rtol*self.dat['objective'][j-1]:
                     out = self.conv_msg % (i+1, 'convergence in objective functional.')
-                elif self.dat['estimator'][j] < self.estimator_atol:
-                    out = self.conv_msg % (i+1, 'convergence in error estimator.')
+                #elif self.dat['estimator'][j] < self.estimator_atol:  # FIXME
+                #    out = self.conv_msg % (i+1, 'convergence in error estimator.')
                 elif el_diff < self.element_rtol*self.dat['elements'][j-1]:
                     out = self.conv_msg % (i+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
