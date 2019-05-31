@@ -336,11 +336,12 @@ class SteadyProblem():
                 for i in range(self.mesh.num_vertices()):
                     H.dat.data[i][:,:] += H2.dat.data[i]*self.p1indicator.dat.data[i]  # TODO: use pyop2
                     H.dat.data[i][:,:] /= indicator.dat.data[i] + self.p1indicator.dat.data[i]
-                self.M = steady_metric(self.solution+self.adjoint_solution, mesh=self.mesh, H=H, op=self.op)
+                self.M = steady_metric(None, mesh=self.mesh, H=H, op=self.op)
             elif self.approach == 'power_superposed':
                 self.get_power_metric(adjoint=False)
                 M = self.M.copy()
                 self.get_power_metric(adjoint=True)
+                #self.M = metric_intersection(self.M, M)
                 self.M = metric_intersection(M, self.M)
             else:
                 try:
