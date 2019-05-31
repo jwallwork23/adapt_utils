@@ -192,8 +192,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
             self.p0indicator = project(sqrt(self.h*self.h*self.cell_res + 0.5*self.h*self.edge_res), self.P0)
             self.p1indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), self.P1)
         else:
-            self.p0indicator = project(abs(self.cell_res + self.edge_res), self.P0)
-            self.p1indicator = project(abs(self.cell_res + self.edge_res), self.P1)
+            self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
+            self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
         self.p0indicator.rename('explicit')
         self.p1indicator.rename('explicit')
 
@@ -224,8 +224,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
             self.p0indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), self.P0)
             self.p1indicator = project(sqrt(self.h*self.h*self.cell_res_adjoint + 0.5*self.h*self.edge_res_adjoint), self.P1)
         else:
-            self.p0indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), self.P0)
-            self.p1indicator = project(abs(self.cell_res_adjoint + self.edge_res_adjoint), self.P1)
+            self.p0indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P0)
+            self.p1indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P1)
         self.p0indicator.rename('explicit_adjoint')
         self.p1indicator.rename('explicit_adjoint')
 
@@ -402,9 +402,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.edge_res_adjoint = Function(self.P0)
         solve(mass_term == flux_terms, self.edge_res_adjoint)
 
-        # Account for stabilisation error
-        if self.op.order_increase and self.stab == 'SUPG':
-            R -= (dJdphi + div(u*lam) + div(nu*grad(lam)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
+        ## Account for stabilisation error
+        #if self.op.order_increase and self.stab == 'SUPG':
+        #    R -= -(dJdphi + div(u*lam) + div(nu*grad(lam)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
 
         # Sum
         self.cell_res_adjoint = assemble(i*R*dx)
@@ -431,7 +431,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
             adj = self.solution if adjoint else self.adjoint_solution
         sol = self.adjoint_solution if adjoint else self.solution
         adj_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(adj)))
-        adj.interpolate(abs(adj))
+        adj = Function(self.P1).interpolate(abs(adj))
 
         # Get potential to take Hessian w.r.t.
         x, y = SpatialCoordinate(self.mesh)
@@ -466,7 +466,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
 
         # form metric  # TODO: use pyop2
         self.M = Function(self.P1_ten)
-        for i in range(len(adj.dat.data)):
+        for i in range(self.mesh.num_vertices()):
             self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
             self.M.dat.data[i][:,:] += H2.dat.data[i]*adj_diff.dat.data[i][1]
             if relax:

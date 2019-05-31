@@ -212,39 +212,16 @@ class SteadyProblem():
         """
         # TODO: doc
         self.explicit_estimation_adjoint(square=False)
+        self.p1indicator.interpolate(abs(self.p1indicator))
         H = self.get_hessian(adjoint=adjoint)
         for i in range(self.mesh.num_vertices()):
-            H.dat.data[i][:,:] *= np.abs(self.p1indicator.dat.data[i])  # TODO: use pyop2
+            H.dat.data[i][:,:] *= self.p1indicator.dat.data[i]  # TODO: use pyop2
         self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
-
-    def effectivity_index(self, J_exact=None):
-        """
-        TO DO
-        """
-        # TODO: doc
-        if J_exact is not None:
-            self.estimate_error()
-            self.objective_error = np.abs(self.objective_functional() - J_exact)
-            return self.estimator/self.objective_error
 
     def estimate_error(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         """
         Evaluate error estimation strategy of choice.
         """
-        if not hasattr(self, 'estimator'):
-            #if self.approach == 'dwr':
-            if self.approach in ('dwr', 'power', 'carpio'):
-                self.dwr_estimation()
-            elif self.approach in ('dwr_adjoint', 'power_adjoint', 'carpio_adjoint'):
-                self.dwr_estimation_adjoint()
-            elif self.approach in ('dwr_both', 'dwr_relaxed', 'dwr_superposed', 'power_relaxed', 'power_superposed', 'carpio_relaxed', 'carpio_superposed'):
-                forward = self.dwr_estimation()
-                adjoint = self.dwr_estimation_adjoint()
-                self.estimator = 0.5*(forward+adjoint)
-            else:
-                raise NotImplementedError  # TODO
-
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         with pyadjoint.stop_annotating():
             if self.approach == 'fixed_mesh':
                 return
@@ -289,7 +266,7 @@ class SteadyProblem():
                 self.dwp_indication()
                 self.get_isotropic_metric()
             elif self.approach == 'dwr':
-                self.dwp_indication()
+                self.dwr_indication()
                 self.get_isotropic_metric()
             elif self.approach == 'dwr_adjoint':
                 self.dwr_indication_adjoint()
@@ -348,15 +325,17 @@ class SteadyProblem():
                 self.get_power_metric(adjoint=True)
             elif self.approach == 'power_relaxed':
                 self.explicit_estimation(square=False)
+                self.p1indicator.interpolate(abs(self.p1indicator))
                 H = self.get_hessian(adjoint=True)
                 for i in range(self.mesh.num_vertices()):
-                    H.dat.data[i][:,:] *= np.abs(self.p1indicator.dat.data[i])  # TODO: use pyop2
+                    H.dat.data[i][:,:] *= self.p1indicator.dat.data[i]  # TODO: use pyop2
                 indicator = self.p1indicator.copy()
                 self.explicit_estimation_adjoint(square=False)
+                self.p1indicator.interpolate(abs(self.p1indicator))
                 H2 = self.get_hessian(adjoint=False)
                 for i in range(self.mesh.num_vertices()):
-                    H.dat.data[i][:,:] += H2.dat.data[i]*np.abs(self.p1indicator.dat.data[i])  # TODO: use pyop2
-                    H.dat.data[i][:,:] /= np.abs(indicator.dat.data[i]) + np.abs(self.p1indicator.dat.data[i])
+                    H.dat.data[i][:,:] += H2.dat.data[i]*self.p1indicator.dat.data[i]  # TODO: use pyop2
+                    H.dat.data[i][:,:] /= indicator.dat.data[i] + self.p1indicator.dat.data[i]
                 self.M = steady_metric(self.solution+self.adjoint_solution, mesh=self.mesh, H=H, op=self.op)
             elif self.approach == 'power_superposed':
                 self.get_power_metric(adjoint=False)
@@ -375,11 +354,15 @@ class SteadyProblem():
             if prev_metric is not None:
                 self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
+        
+        if hasattr(self, 'p0indicator'):
+            self.estimator = sum(self.p0indicator.dat.data)
 
-            # Adapt mesh
-            #self.mesh = adapt(self.mesh, self.M)
-            self.mesh = multi_adapt(self.M, op=self.op)
-            self.plot()
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
+        if not hasattr(self, 'M'):
+            self.estimate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, custom_adapt=custom_adapt)
+        self.mesh = multi_adapt(self.M, op=self.op)
+        self.plot()
 
 
 class MeshOptimisation():
@@ -414,9 +397,6 @@ class MeshOptimisation():
                     'estimator': [],
                     'effectivity': [],
                     'approach': self.op.approach}
-
-        # Effectivity index
-        self.J_exact = None
 
     def iterate(self):
         M_ = None
@@ -469,16 +449,6 @@ class MeshOptimisation():
             PETSc.Sys.Print('error estimator : %.4e' % tp.estimator)
             if self.log:  # TODO: parallelise
                 self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
-            ei = tp.effectivity_index(self.J_exact)
-            if ei is not None:
-                if self.log:  # TODO: parallelise
-                    self.logfile.write('Mesh  {:2d}: effectivity = {:.4e}\n'.format(i, ei))
-                    self.logfile.write('Mesh  {:2d}: objective error = {:.4e}\n'.format(i, tp.objective_error))
-                PETSc.Sys.Print('Objective error : %.4e' % tp.objective_error)
-                PETSc.Sys.Print('Effectivity index : %.4e' % ei)
-                self.dat['effectivity'].append(ei)
-            else:
-                self.dat['effectivity'].append('n/a')
 
             # Stopping criteria
             if i > self.startit:
@@ -533,9 +503,6 @@ class OuterLoop():
         self.base = 10
         self.start_error = 1
 
-        # Effectivity index
-        self.J_exact = None
-
     def desired_error_loop(self):
         mode = 'desired_error'
 
@@ -556,7 +523,6 @@ class OuterLoop():
             opt.maxit = self.maxit
             opt.element_rtol = self.element_rtol
             opt.objective_rtol = self.objective_rtol
-            opt.J_exact = self.J_exact
             opt.iterate()
             self.final_mesh = opt.mesh
             self.solution = opt.solution
