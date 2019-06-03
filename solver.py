@@ -211,12 +211,19 @@ class SteadyProblem():
         TO DO
         """
         # TODO: doc
-        self.explicit_estimation_adjoint(square=False)
-        self.p1indicator.interpolate(abs(self.p1indicator))
-        H = self.get_hessian(adjoint=adjoint)
+        if adjoint:
+            self.explicit_estimation_adjoint(square=False)
+            self.p1indicator.interpolate(abs(self.p1cell_res_adjoint))
+        else:
+            self.explicit_estimation(square=False)
+            self.p1indicator.interpolate(abs(self.p1cell_res))
+        H = self.get_hessian(adjoint=not adjoint)
         for i in range(self.mesh.num_vertices()):
             H.dat.data[i][:,:] *= self.p1indicator.dat.data[i]  # TODO: use pyop2
-        self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+        if adjoint:
+            self.M = steady_metric(self.solution, H=H, op=self.op)
+        else:
+            self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
 
     def estimate_error(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         """
