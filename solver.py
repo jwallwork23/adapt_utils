@@ -361,9 +361,15 @@ class SteadyProblem():
                 self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
             # (Default relaxation of 0.9 following [Power et al 2006])
 
-        # FIXME!
-        if hasattr(self, 'p0indicator'):
-            self.estimator = sum(self.p0indicator.dat.data)
+        ## FIXME!
+        #if hasattr(self, 'p0indicator'):
+        #    self.estimator = sum(self.p0indicator.dat.data)
+        if self.approach in ('dwr', 'power', 'loseille'):
+            self.dwr_estimation()
+        elif self.approach in ('dwr_relaxed', 'dwr_superposed', 'power_relaxed', 'power_superposed', 'loseille_relaxed', 'loseille_superposed'):
+            self.estimator = 0.5*(self.dwr_estimation() + self.dwr_estimation_adjoint())
+        else:
+            raise NotImplementedError  # TODO
 
     def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None):
         if not hasattr(self, 'M'):
@@ -450,12 +456,12 @@ class MeshOptimisation():
             if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
                 tp.solve_adjoint()  # TODO: This is not always necessary
 
-            ## Estimate and record error  # FIXME
-            #tp.estimate_error()
-            #self.dat['estimator'].append(tp.estimator)
-            #PETSc.Sys.Print('error estimator : %.4e' % tp.estimator)
-            #if self.log:  # TODO: parallelise
-            #    self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
+            # Estimate and record error  # FIXME
+            tp.estimate_error()
+            self.dat['estimator'].append(tp.estimator)
+            PETSc.Sys.Print('error estimator : %.4e' % tp.estimator)
+            if self.log:  # TODO: parallelise
+                self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
 
             # Stopping criteria
             if i > self.startit:

@@ -276,10 +276,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         f = self.source
         bcs = self.op.boundary_conditions
         phi = self.solution
-        if self.op.order_increase:
-            lam = self.solve_high_order(adjoint=True) if not hasattr(self, 'errorterm') else self.errorterm
-        else:
-            lam = self.adjoint_solution
+        lam = self.solve_high_order(adjoint=True) if not hasattr(self, 'errorterm') else self.errorterm
 
         # Finite element problem
         a = lam*dot(u, grad(phi))*dx
@@ -308,10 +305,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         n = self.n
         bcs = self.op.boundary_conditions
         lam = self.adjoint_solution
-        if self.op.order_increase:
-            phi = self.solve_high_order(adjoint=False) if not hasattr(self, 'errorterm') else self.errorterm
-        else:
-            phi = self.solution
+        phi = self.solve_high_order(adjoint=False) if not hasattr(self, 'errorterm') else self.errorterm
 
         # Adjoint finite element problem
         a = lam*dot(u, grad(phi))*dx
@@ -367,9 +361,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
             R -= (f - dot(u, grad(phi)) + div(nu*grad(phi)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
 
         # Sum
-        self.cell_res = assemble(i*R*dx)  # NOTE: We don't use this because interplay is important
+        self.cell_res = assemble(i*R*dx)
         if self.op.dwr_approach == 'error_representation':
-            self.p0indicator = project(R + self.edge_res, self.P0)
+            self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
             #self.p1indicator = project(R + self.edge_res, self.P1)
             self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
         elif self.op.dwr_approach == 'ainsworth_oden':
@@ -414,9 +408,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # Sum
         self.cell_res_adjoint = assemble(i*R*dx)
         if self.op.dwr_approach == 'error_representation':
-            self.p0indicator = project(R + self.edge_res_adjoint, self.P0)
+            self.p0indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P0)
             #self.p1indicator = project(R + self.edge_res_adjoint, self.P1)
-            self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
+            self.p1indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P1)
         elif self.op.dwr_approach == 'ainsworth_oden':
             self.p0indicator = project(self.h*self.h*R + self.h*self.edge_res_adjoint, P0)
             self.p1indicator = project(self.h*self.h*R + self.h*self.edge_res_adjoint, P1)
