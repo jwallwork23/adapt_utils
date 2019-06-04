@@ -366,6 +366,8 @@ class SteadyProblem():
         #    self.estimator = sum(self.p0indicator.dat.data)
         if self.approach in ('dwr', 'power', 'loseille'):
             self.dwr_estimation()
+        elif self.approach in ('dwr_adjoint', 'power_adjoint', 'loseille_adjoint'):
+            self.dwr_estimation_adjoint()
         elif self.approach in ('dwr_relaxed', 'dwr_superposed', 'power_relaxed', 'power_superposed', 'loseille_relaxed', 'loseille_superposed'):
             self.estimator = 0.5*(self.dwr_estimation() + self.dwr_estimation_adjoint())
         else:
@@ -472,7 +474,7 @@ class MeshOptimisation():
                     out = self.conv_msg % (i+1, 'convergence in objective functional.')
                 #elif self.dat['estimator'][j] < self.estimator_atol:  # FIXME
                 #    out = self.conv_msg % (i+1, 'convergence in error estimator.')
-                elif el_diff < self.element_rtol*self.dat['elements'][j-1]:
+                elif el_diff < self.element_rtol*self.dat['elements'][j-1] and i > self.startit+1:
                     out = self.conv_msg % (i+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
                     out = self.conv_msg % (i+1, 'maximum mesh adaptation count reached.')
