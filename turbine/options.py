@@ -7,8 +7,8 @@ import numpy as np
 from adapt_utils.options import Options
 
 
-__all__ = ["Steady2TurbineOptions", "Unsteady2TurbineOptions", "Steady15TurbineOptions",
-           "Unsteady15TurbineOptions"]
+__all__ = ["Steady1TurbineOptions", "Steady2TurbineOptions", "Steady15TurbineOptions",
+           "Unsteady2TurbineOptions", "Unsteady15TurbineOptions"]
 
 
 class SteadyTurbineOptions(Options):
@@ -27,10 +27,9 @@ class SteadyTurbineOptions(Options):
              }).tag(config=True)
 
     # Adaptivity parameters
-    target_vertices = PositiveFloat(1000, help="Target number of vertices").tag(config=True)
     adapt_field = Unicode('fluid_speed', help="Adaptation field of interest, from {'fluid_speed', 'elevation', 'both'}.").tag(config=True)
-    h_min = PositiveFloat(1e-4, help="Minimum element size").tag(config=True)
-    h_max = PositiveFloat(10., help="Maximum element size").tag(config=True)
+    h_min = PositiveFloat(1e-5, help="Minimum element size").tag(config=True)
+    h_max = PositiveFloat(20., help="Maximum element size").tag(config=True)
 
     # Physical parameters
     symmetric_viscosity = Bool(False, help="Symmetrise viscosity term").tag(config=True)
@@ -79,6 +78,36 @@ class SteadyTurbineOptions(Options):
         # NOTE, that we're not yet correcting power output here, so that will be overestimated
 
 
+class Steady1TurbineOptions(SteadyTurbineOptions):
+    """Parameters for the steady 1 turbine problem"""
+
+    # Turbine parameters
+    turbine_diameter = PositiveFloat(18.).tag(config=True)
+    thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
+    base_viscosity = NonNegativeFloat(1., help="Fluid viscosity (assumed constant).").tag(config=True)
+    depth = PositiveFloat(40., help="Water depth (assumes flat bathymetry).").tag(config=True)
+
+    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
+        super(Steady1TurbineOptions, self).__init__(approach, adapt_field)
+        self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
+
+        # Tidal farm
+        D = self.turbine_diameter
+        self.region_of_interest = [(500, 100, D/2)]
+        self.thrust_coefficient_correction()
+
+    def set_bcs(self):
+        left_tag = 1
+        right_tag = 2
+        top_bottom_tag = 3
+        freeslip_bc = {'un': Constant(0.)}
+        if not hasattr(self, 'boundary_conditions'):
+            self.boundary_conditions = {}
+        self.boundary_conditions[left_tag] = {'uv': self.inflow}
+        self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
+        self.boundary_conditions[top_bottom_tag] = freeslip_bc
+
+
 class Steady2TurbineOptions(SteadyTurbineOptions):
     """Parameters for the steady 2 turbine problem"""
 
@@ -102,12 +131,11 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         right_tag = 2
         top_bottom_tag = 3
         freeslip_bc = {'un': Constant(0.)}
-        self.boundary_conditions = {
-          left_tag: {'uv': self.inflow},
-          right_tag: {'elev': Constant(0.)},
-          top_bottom_tag: freeslip_bc,
-        }
-
+        if not hasattr(self, 'boundary_conditions'):
+            self.boundary_conditions = {}
+        self.boundary_conditions[left_tag] = {'uv': self.inflow}
+        self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
+        self.boundary_conditions[top_bottom_tag] = freeslip_bc
 
 class Steady15TurbineOptions(SteadyTurbineOptions):
     """Parameters for the steady 15 turbine problem"""
@@ -133,7 +161,7 @@ class Steady15TurbineOptions(SteadyTurbineOptions):
                 self.region_of_interest.append((i*delta_x, j*delta_y, D/2))
         self.thrust_coefficient_correction()
 
-    def set_bcs(self):
+    def set_bcs(self):  # TODO: standardise with above
         bottom_tag = 1
         right_tag = 2
         top_tag = 3
@@ -211,7 +239,7 @@ class Unsteady2TurbineOptions(UnsteadyTurbineOptions):
         self.elev_init.interpolate(-1/1000*(x-500))  # linear from -1 to 1
         return q_init
 
-    def set_bcs(self):
+    def set_bcs(self):  # TODO: standardise with above
         left_tag = 1
         right_tag = 2
         top_bottom_tag = 3
@@ -255,7 +283,7 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         self.elev_init.interpolate(-1/3000*x)  # linear from -1 to 1
         return q_init
 
-    def set_bcs(self):
+    def set_bcs(self):  # TODO: standardise with above
         bottom_tag = 1
         right_tag = 2
         top_tag = 3

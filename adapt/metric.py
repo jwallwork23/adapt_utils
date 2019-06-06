@@ -1,13 +1,15 @@
 from firedrake import *
-from firedrake.slate.slac.compiler import PETSC_DIR
 
 import numpy as np
+import numpy
+from numpy import linalg as la
+from scipy import linalg as sla
 
 from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.recovery import construct_hessian
 
 
-__all__ = ["steady_metric", "isotropic_metric", "anisotropic_refinement", "gradate_metric",
+__all__ = ["steady_metric", "isotropic_metric", "anisotropic_refinement",
            "metric_intersection", "metric_relaxation", "metric_complexity"]
 
 
@@ -16,138 +18,112 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
 
-    :arg f: field to compute Hessian w.r.t.
+    :arg f: P1 solution field.
     :arg H: reconstructed Hessian associated with `f` (if already computed).
     :param op: `Options` class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
-    if mesh is None:
-        if f is not None:
-            mesh = f.function_space().mesh()
-        elif H is not None:
-            mesh = H.function_space().mesh()
+    # NOTE: A P1 field is not actually strictly required
     if H is None:
         H = construct_hessian(f, mesh=mesh, op=op)
-    else:
-        try:
-            assert H.ufl_element().family() == 'Lagrange'
-            assert H.ufl_element().degree() == 1
-        except:
-            ValueError("Hessian must be P1.")
     V = H.function_space()
+    mesh = V.mesh()
+
+    ia2 = 1. / pow(op.max_anisotropy, 2)  # Inverse square max aspect ratio
+    ih_min2 = 1. / pow(op.h_min, 2)  # Inverse square minimal side-length
+    ih_max2 = 1. / pow(op.h_max, 2)  # Inverse square maximal side-length
     M = Function(V)
-    P1 = FunctionSpace(mesh, "CG", 1)
 
-    ia2 = Constant(1/op.max_anisotropy**2)
-    ih_min2 = Constant(1/op.h_min**2)
-    ih_max2 = Constant(1/op.h_max**2)
-    f_min = 1e-3
+    msg = "WARNING: minimum element size reached as {m:.2e}"
 
-    if op.restrict in ('error', 'num_cells') or noscale:
+    if op.restrict == 'target' or noscale:
+        f_min = 1e-6  # Minimum tolerated value for the solution field  # FIXME: seems arbitrary
         if noscale:
-            rescale = Constant(1)
-        elif op.restrict == 'error':
-            #rescale = interpolate(1/(op.desired_error*max_value(abs(f), f_min)), P1)
+            rescale = 1
+        else:
             if f is None:
-                rescale = Constant(1/op.desired_error)
+                rescale = op.target
             else:
-                rescale = Constant(1/op.desired_error / max(norm(f), f_min))
-        elif op.restrict == 'num_cells':
-            if f is None:
-                rescale = Constant(op.target_vertices)
-            else:
-                rescale = Constant(op.target_vertices / max(norm(f), f_min))
-            #rescale = interpolate(op.target_vertices / max_value(abs(f), f_min), P1)
-        kernel_str = """
-#include <Eigen/Dense>
-#include <algorithm>
+                rescale = op.target / max(norm(f), f_min)
+            #rescale = interpolate(op.target / max_value(abs(f), f_min), P1)
 
-void metric(double A_[4], const double * B_, const double * scaling, const double * ihmin2, const double * ihmax2, const double * ia2)
-{
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
-  A = *scaling * B;
-  double mean_diag = 0.5*(A(0,1) + A(1,0));
-  A(0,1) = mean_diag;
-  A(1,0) = mean_diag;
+        for i in range(mesh.num_vertices()):
 
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver(A);
-  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Q = eigensolver.eigenvectors();
-  Eigen::Vector2d D = eigensolver.eigenvalues();
-  D(0) = std::min(*ihmin2, std::max(*ihmax2, std::abs(D(0))));
-  D(1) = std::min(*ihmin2, std::max(*ihmax2, std::abs(D(1))));
-  double max_eig = std::max(D(0), D(1));
-  D(0) = std::max(D(0), *ia2 * max_eig);
-  D(1) = std::max(D(1), *ia2 * max_eig);
+            # Generate local Hessian, avoiding round-off error
+            H_loc = rescale*H.dat.data[i]
+            mean_diag = 0.5*(H_loc[0][1] + H_loc[1][0])
+            H_loc[0][1] = mean_diag
+            H_loc[1][0] = mean_diag
 
-  A = Q * D.asDiagonal() * Q.transpose();
-}
-"""
-        kernel = op2.Kernel(kernel_str, "metric", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-        op2.par_loop(kernel, V.node_set, M.dat(op2.RW), H.dat(op2.READ), rescale.dat(op2.READ), ih_min2.dat(op2.READ), ih_max2.dat(op2.READ), ia2.dat(op2.READ))
+            # Find eigenpairs and truncate eigenvalues
+            lam, v = la.eig(H_loc)
+            v1, v2 = v[0], v[1]
+            lam1 = min(ih_min2, max(ih_max2, abs(lam[0])))
+            lam2 = min(ih_min2, max(ih_max2, abs(lam[1])))
+            lam_max = max(lam1, lam2)
+            lam1 = max(lam1, ia2 * lam_max)
+            lam2 = max(lam2, ia2 * lam_max)
+            if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
+                print(msg.format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
+
+            # Reconstruct edited Hessian
+            M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
+            M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
+            M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
+            M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
 
     elif op.restrict == 'p_norm':
-        detH = Function(P1)
-        p = op.norm_order
-        kernel_str = """
-#include <Eigen/Dense>
-#include <algorithm>
+        detH = Function(FunctionSpace(mesh, "CG", 1))
 
-void metric1(double A_[4], double * f, const double * B_)
-{
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > B((double *)B_);
-  double mean_diag = 0.5*(B(0,1) + B(1,0));
-  B(0,1) = mean_diag;
-  B(1,0) = mean_diag;
+        for i in range(mesh.num_vertices()):
 
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver(B);
-  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Q = eigensolver.eigenvectors();
-  Eigen::Vector2d D = eigensolver.eigenvalues();
-  D(0) = std::max(1e-10, std::abs(D(0)));
-  D(1) = std::max(1e-10, std::abs(D(1)));
-  double det = D(0) * D(1);
-  double scaling = pow(det, -1 / (2 * %s + 2));
+            # Generate local Hessian
+            H_loc = H.dat.data[i]
+            mean_diag = 0.5 * (H_loc[0][1] + H_loc[1][0])
+            H_loc[0][1] = mean_diag
+            H_loc[1][0] = mean_diag
 
-  A += scaling * Q * D.asDiagonal() * Q.transpose();
+            # Find eigenpairs of Hessian and truncate eigenvalues
+            lam, v = la.eig(H_loc)
+            v1, v2 = v[0], v[1]
+            lam1 = max(abs(lam[0]), 1e-10)  # \ To avoid round-off error
+            lam2 = max(abs(lam[1]), 1e-10)  # /
+            det = lam1 * lam2
 
-  *f += pow(det, %s / (2 * %s + 2));
-}
-""" % (p, p, p)
-        kernel = op2.Kernel(kernel_str, "metric1", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-        op2.par_loop(kernel, V.node_set, M.dat(op2.INC), detH.dat(op2.INC), H.dat(op2.READ))
-        rescale = Constant(op.target_vertices / assemble(detH*dx))
-        kernel_str = """
-#include <Eigen/Dense>
-#include <algorithm>
+            # Reconstruct edited Hessian and rescale
+            M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
+            M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
+            M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
+            M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
+            M.dat.data[i] *= pow(det, -1. / (2 * op.norm_order + 2))
+            detH.dat.data[i] = pow(det, op.norm_order / (2. * op.norm_order + 2))
 
-void metric2(double A_[4], const double * scaling, const double * ihmin2, const double * ihmax2, const double * ia2)
-{
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
+        # Scale by the target number of vertices and Hessian complexity
+        M *= op.target / assemble(detH * dx)
 
-  A *= *scaling;
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, 2, 2, Eigen::RowMajor>> eigensolver(A);
-  Eigen::Matrix<double, 2, 2, Eigen::RowMajor> Q = eigensolver.eigenvectors();
-  Eigen::Vector2d D = eigensolver.eigenvalues();
-  D(0) = std::min(*ihmin2, std::max(*ihmax2, std::abs(D(0))));
-  D(1) = std::min(*ihmin2, std::max(*ihmax2, std::abs(D(1))));
-  double max_eig = std::max(D(0), D(1));
-  D(0) = std::max(D(0), *ia2 * max_eig);
-  D(1) = std::max(D(1), *ia2 * max_eig);
+        for i in range(mesh.num_vertices()):
+            # Find eigenpairs of metric and truncate eigenvalues
+            lam, v = la.eig(M.dat.data[i])
+            v1, v2 = v[0], v[1]
+            lam1 = min(ih_min2, max(ih_max2, abs(lam[0])))
+            lam2 = min(ih_min2, max(ih_max2, abs(lam[1])))
+            lam_max = max(lam1, lam2)
+            lam1 = max(lam1, ia2 * lam_max)
+            lam2 = max(lam2, ia2 * lam_max)
+            if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
+                print(msg.format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
 
-  A = Q * D.asDiagonal() * Q.transpose();
-}
-"""
-        kernel = op2.Kernel(kernel_str, "metric2", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-        op2.par_loop(kernel, V.node_set, M.dat(op2.RW), rescale.dat(op2.READ), ih_min2.dat(op2.READ), ih_max2.dat(op2.READ), ia2.dat(op2.READ))
-
+            # Reconstruct edited Hessian
+            M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
+            M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
+            M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
+            M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
     else:
         raise ValueError("Restriction by {:s} not recognised.".format(op.restrict))
-
     return M
 
 
-def isotropic_metric(f, bdy=None, op=DefaultOptions()):
+def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
@@ -156,34 +132,46 @@ def isotropic_metric(f, bdy=None, op=DefaultOptions()):
     :param op: `Options` class providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
+    a2 = pow(op.max_anisotropy, 2)
+    h_min2 = pow(op.h_min, 2)
+    h_max2 = pow(op.h_max, 2)
     assert len(f.ufl_element().value_shape()) == 0
     mesh = f.function_space().mesh()
+    P1 = FunctionSpace(mesh, "CG", 1)
 
-    # Normalise indicator and project into P1 space
-    f_norm = min(max(norm(f), op.min_norm), op.max_norm)
-    scaling = 1/op.desired_error if op.restrict == 'error' else op.target_vertices
-    #g = project(scaling*f/f_norm, FunctionSpace(mesh, "CG", 1))
-    g = project(scaling*abs(f)/f_norm, FunctionSpace(mesh, "CG", 1))
-    #g = interpolate(scaling*abs(f)/f_norm, FunctionSpace(mesh, "CG", 1))
+    # Scale metric according to restriction strategy
+    if noscale or op.restrict == 'p_norm':
+        rescale = 1
+    else:
+        rescale = op.target/min(max(norm(f), op.min_norm), op.max_norm)
+
+    # Project into P1 space and scale
+    g = Function(P1)
+    g.project(0.5*rescale*f)
+    g.interpolate(abs(g))  # ensure non-negative
 
     # Establish metric
     V = TensorFunctionSpace(mesh, "CG", 1)
     M = Function(V)
-    kernel_str = """
-#include <Eigen/Dense>
-#include <algorithm>
+    node_set = range(mesh.num_vertices()) if bdy is None else DirichletBC(V, 0, bdy).nodes
 
-void isotropic(double A_[4], const double * eps, const double * hmin2, const double * hmax2) {
-  Eigen::Map<Eigen::Matrix<double, 2, 2, Eigen::RowMajor> > A((double *)A_);
+    if op.restrict == 'p_norm':
+        detM = Function(P1)
+        for i in node_set:
+            g.dat.data[i] = max(g.dat.data[i], 1e-8)
+            det = g.dat.data[i]**2
+            g.dat.data[i] *= pow(det, -1 / 2*op.norm_order + 2)
+            detM.dat.data[i] = pow(det, op.norm_order/(2*op.norm_order + 2))
+        g *= op.target / assemble(detM*dx)
 
-  double m = std::max(1/(*hmax2), std::min(std::abs(*eps), 1/(*hmin2)));
-  A(0,0) = m;
-  A(1,1) = m;
-}
-"""
-    kernel = op2.Kernel(kernel_str, "isotropic", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-    op2.par_loop(kernel,
-                 V.node_set if bdy is None else DirichletBC(V, 0, bdy).node_set, M.dat(op2.RW), g.dat(op2.READ), Constant(op.h_min**2).dat(op2.READ), Constant(op.h_max**2).dat(op2.READ))
+    for i in node_set:
+        alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
+        alpha = max(alpha, alpha/a2)
+        M.dat.data[i][0, 0] = alpha
+        M.dat.data[i][1, 1] = alpha
+        if alpha >= 0.9999 / h_min2:
+            print("WARNING: minimum element size reached!")
+        g.dat.data[i] = alpha
 
     return M
 
@@ -199,132 +187,26 @@ def anisotropic_refinement(metric, direction=0):
     :return: anisotropically refined metric.
     """
     M = metric.copy()
-    V = M.function_space()
-    assert V.ufl_element().family() == 'Lagrange'
-    assert V.ufl_element().degree() == 1
-    dim = V.mesh().topological_dimension()
-    d = str(dim)
-    kernel_str = """
-#include <Eigen/Dense>
-
-void anisotropic(double A_[%s]) {
-  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > A((double *)A_);
-
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, %s, %s, Eigen::RowMajor>> eigensolver(A);
-  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> Q = eigensolver.eigenvectors();
-  Eigen::Vector%sd D = eigensolver.eigenvalues();
-  Eigen::Array%sd D_array = D.array();
-  D_array(%s) *= 4;
-  A = Q * D_array.matrix().asDiagonal() * Q.transpose();
-}
-""" % (str(dim*dim), d, d, d, d, d, d, d, d, str(direction))
-    kernel = op2.Kernel(kernel_str, "anisotropic", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-    op2.par_loop(kernel, V.node_set, M.dat(op2.RW))
+    for i in range(len(M.dat.data)):
+        lam, v = la.eig(M.dat.data[i])
+        v1, v2 = v[0], v[1]
+        lam[direction] *= 4
+        M.dat.data[i][0, 0] = lam[0] * v1[0] * v1[0] + lam[1] * v2[0] * v2[0]
+        M.dat.data[i][0, 1] = lam[0] * v1[0] * v1[1] + lam[1] * v2[0] * v2[1]
+        M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
+        M.dat.data[i][1, 1] = lam[0] * v1[1] * v1[1] + lam[1] * v2[1] * v2[1]
     return M
 
 
-def gradate_metric(M, iso=False, op=DefaultOptions()):  # TODO: Implement this in pyop2
+def local_metric_intersection(M1, M2):
     r"""
-    Perform anisotropic metric gradation in the method described in Alauzet 2010, using linear
-    interpolation. Python code found here is based on the PETSc code of Nicolas Barral's function
-    ``DMPlexMetricGradation2d_Internal``, found in ``plex-metGradation.c``, 2017.
-
-    :arg M: metric to be gradated.
-    :param op: `Options` class providing parameter values.
-    :return: gradated metric.
+    Intersect two metrics `M1` and `M2` defined at a particular point in space.
     """
-    try:
-        assert M.ufl_element().family() == 'Lagrange'
-        assert M.ufl_element().degree() == 1
-    except:
-        ValueError("Metric field must be P1.")
-    try:
-        assert(M.ufl_element().value_shape() == (2, 2))
-    except:
-        NotImplementedError('Only 2x2 metric fields considered so far.')
-    ln_beta = np.log(op.max_element_growth)
-
-    def symmetric_product(A, b):
-        return b[0] * A[0, 0] * b[0] + 2 * b[0] * A[0, 1] * b[1] + b[1] * A[1, 1] * b[1]
-
-    # Get vertices and edges of mesh
-    V = M.function_space()
-    M_grad = Function(V).assign(M)
-    mesh = V.mesh()
-    plex = mesh._plex
-    vStart, vEnd = plex.getDepthStratum(0)  # Vertices
-    eStart, eEnd = plex.getDepthStratum(1)  # Edges
-    numVer = vEnd - vStart
-    xy = mesh.coordinates.dat.data
-
-    # Establish arrays for storage and a list of tags for vertices
-    v12 = np.zeros(2)
-    v21 = np.zeros(2)  # Could work only with the upper triangular part for speed
-    verTag = np.zeros(numVer) + 1
-    correction = True
-    i = 0
-
-    while correction and (i < 500):
-        i += 1
-        correction = False
-
-        # Loop over edges of mesh
-        for e in range(eStart, eEnd):
-            cone = plex.getCone(e)  # Get vertices associated with edge e
-            iVer1 = cone[0] - vStart  # Vertex 1 index
-            iVer2 = cone[1] - vStart  # Vertex 2 index
-            if (verTag[iVer1] < i) and (verTag[iVer2] < i):
-                continue
-
-            # Assemble local metrics and calculate edge lengths
-            met1 = M_grad.dat.data[iVer1]
-            met2 = M_grad.dat.data[iVer2]
-            v12[0] = xy[iVer2][0] - xy[iVer1][0]
-            v12[1] = xy[iVer2][1] - xy[iVer1][1]
-            v21[0] = - v12[0]
-            v21[1] = - v12[1]
-
-            if iso:  # TODO: This does not currently work
-                # eta2_12 = 1. / pow(1. + (v12[0] * v12[0] + v12[1] * v12[1]) * ln_beta / met1[0, 0], 2)
-                eta2_12 = 1. / pow(1. + sqrt(symmetric_product(met1, v12)) * ln_beta, 2)
-                # eta2_21 = 1. / pow(1. + (v21[0] * v21[0] + v21[1] * v21[1]) * ln_beta / met2[0, 0], 2)
-                eta2_21 = 1. / pow(1. + sqrt(symmetric_product(met2, v21)) * ln_beta, 2)
-                # print('#### gradate_metric DEBUG: 1,1 entries ', met1[0, 0], met2[0, 0])
-                # print('#### gradate_metric DEBUG: scale factors', eta2_12, eta2_21)
-                redMet1 = eta2_21 * met2
-                redMet2 = eta2_12 * met1
-            else:
-
-                # Intersect metric with a scaled 'grown' metric to get reduced metric
-                # eta2_12 = 1. / pow(1. + symmetric_product(met1, v12) * ln_beta, 2)
-                eta2_12 = 1. / pow(1. + sqrt(symmetric_product(met1, v12)) * ln_beta, 2)
-                #eta2_21 = 1. / pow(1. + symmetric_product(met2, v21) * ln_beta, 2)
-                eta2_21 = 1. / pow(1. + sqrt(symmetric_product(met2, v21)) * ln_beta, 2)
-                # print('#### gradate_metric DEBUG: scale factors', eta2_12, eta2_21)
-                redMet1 = local_metric_intersection(met1, eta2_21 * met2)
-                redMet2 = local_metric_intersection(met2, eta2_12 * met1)
-
-            # Calculate difference in order to ascertain whether the metric is modified
-            diff = abs(met1[0, 0] - redMet1[0, 0])
-            diff += abs(met1[0, 1] - redMet1[0, 1])
-            diff += abs(met1[1, 1] - redMet1[1, 1])
-            diff /= (abs(met1[0, 0]) + abs(met1[0, 1]) + abs(met1[1, 1]))
-            if diff > 1e-3:
-                M_grad.dat.data[iVer1] = redMet1
-                verTag[iVer1] = i + 1
-                correction = True
-
-            # Repeat above process using other reduced metric
-            diff = abs(met2[0, 0] - redMet2[0, 0])
-            diff += abs(met2[0, 1] - redMet2[0, 1])
-            diff += abs(met2[1, 1] - redMet2[1, 1])
-            diff /= (abs(met2[0, 0]) + abs(met2[0, 1]) + abs(met2[1, 1]))
-            if diff > 1e-3:
-                M_grad.dat.data[iVer2] = redMet2
-                verTag[iVer2] = i + 1
-                correction = True
-
-    return M_grad
+    sqM1 = sla.sqrtm(M1)
+    sqiM1 = la.inv(sqM1)  # Note inverse and square root commute whenever both are defined
+    lam, v = la.eig(np.dot(np.transpose(sqiM1), np.dot(M2, sqiM1)))
+    M12 = np.dot(v, np.dot([[max(lam[0], 1), 0], [0, max(lam[1], 1)]], np.transpose(v)))
+    return np.dot(np.transpose(sqM1), np.dot(M12, sqM1))
 
 
 def metric_intersection(M1, M2, bdy=None):
@@ -338,35 +220,13 @@ def metric_intersection(M1, M2, bdy=None):
     """
     V = M1.function_space()
     assert V == M2.function_space()
-    dim = V.mesh().topological_dimension()
-    assert dim in (2, 3)
-    d = str(dim)
-    M = Function(V).assign(M1)
-    kernel_str = """
-#include <Eigen/Dense>
-
-void intersect(double M_[%s], const double * A_, const double * B_) {
-  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > M((double *)M_);
-  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > B((double *)B_);
-
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, %s, %s, Eigen::RowMajor>> eigensolver(A);
-  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> Q = eigensolver.eigenvectors();
-  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> D = eigensolver.eigenvalues().array().sqrt().matrix().asDiagonal();
-  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> Sq = Q * D * Q.transpose();
-  Eigen::Matrix<double, %s, %s, Eigen::RowMajor> Sqi = Q * D.inverse() * Q.transpose();
-  Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double, %s, %s, Eigen::RowMajor>> eigensolver2(Sqi.transpose() * B * Sqi);
-  Q = eigensolver2.eigenvectors();
-  D = eigensolver2.eigenvalues().array().max(1).matrix().asDiagonal();
-  M = Sq.transpose() * Q * D * Q.transpose() * Sq;
-}
-""" % (str(dim*dim), d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d)
-    kernel = op2.Kernel(kernel_str, "intersect", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-    op2.par_loop(kernel, V.node_set if bdy is None else DirichletBC(V, 0, bdy).node_set, M.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
+    M = M1.copy()
+    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices()):
+        M.dat.data[i][:,:] = local_metric_intersection(M1.dat.data[i], M2.dat.data[i])
     return M
 
 
-def metric_relaxation(M1, M2, alpha=Constant(0.5)):
+def metric_relaxation(M1, M2, alpha=0.5):
     r"""
     Alternatively to intersection, pointwise metric information may be combined using a convex
     combination. Whilst this method does not have as clear an interpretation as metric intersection,
@@ -379,22 +239,9 @@ def metric_relaxation(M1, M2, alpha=Constant(0.5)):
     """
     V = M1.function_space()
     assert V == M2.function_space()
-    dim = V.mesh().topological_dimension()
-    assert dim in (2, 3)
-    d = str(dim)
     M = Function(V)
-    kernel_str = """
-#include <Eigen/Dense>
-
-void relax(double M_[%s], const double * A_, const double * B_, const double * alpha) {
-  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > M((double *)M_);
-  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > B((double *)B_);
-
-  M = (*alpha)*A + (1.0 - *alpha)*B;
-}""" % (str(dim*dim), d, d, d, d, d, d)
-    kernel = op2.Kernel(kernel_str, "relax", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
-    op2.par_loop(kernel, V.node_set, M.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ), alpha.dat(op2.READ))
+    for i in range(V.mesh().num_vertices()):
+        M.dat.data[i][:,:] = alpha*M1.dat.data[i] + (1-alpha)*M2.dat.data[i]
     return M
 
 

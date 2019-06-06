@@ -1,4 +1,5 @@
 from thetis_adjoint import *
+from firedrake.petsc import PETSc
 import pyadjoint
 import math
 
@@ -75,7 +76,7 @@ class SteadyTurbineProblem(SteadyProblem):
         options.simulation_end_time = op.end_time
         options.timestepper_type = 'SteadyState'
         options.timestepper_options.solver_parameters = op.params
-        print(options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs
@@ -151,9 +152,9 @@ class SteadyTurbineProblem(SteadyProblem):
         with pyadjoint.stop_annotating():
             cell_res = self.ts.cell_residual()
             self.cell_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
-            self.cell_residuals[0].project(abs(cell_res[0]))
-            self.cell_residuals[1].project(abs(cell_res[1]))
-            self.cell_residuals[2].project(abs(cell_res[2]))
+            self.cell_residuals[0].project(cell_res[0])
+            self.cell_residuals[1].project(cell_res[1])
+            self.cell_residuals[2].project(cell_res[2])
             if self.approach == 'explicit':
                 self.indicator = Function(self.P1)
                 cell_res_dot = self.cell_residuals[0]*self.cell_residuals[0]
@@ -177,12 +178,19 @@ class SteadyTurbineProblem(SteadyProblem):
 
     def dwr_estimation(self):  # TODO: Different flavours of DWR
         with pyadjoint.stop_annotating():
-            cell_res = self.ts.cell_residual(self.adjoint_solution)
-            edge_res = self.ts.edge_residual(self.adjoint_solution)
-            self.indicator = Function(self.P0)
+            if self.op.dwr_approach != 'flux_only':
+                cell_res = self.ts.cell_residual(self.adjoint_solution)
+            if self.op.dwr_approach != 'cell_only':
+                edge_res = self.ts.edge_residual(self.adjoint_solution)
+            self.indicator = Function(self.P1)  # project straight into P1
+            #self.indicator = Function(self.P0)
             if self.op.dwr_approach == 'error_representation':
                 self.indicator.project(cell_res + edge_res)
-            elif self.op.dwr_approach == 'AO97':
+            elif self.op.dwr_approach == 'cell_only':
+                self.indicator.project(cell_res)
+            elif self.op.dwr_approach == 'flux_only':
+                self.indicator.project(edge_res)
+            elif self.op.dwr_approach == 'ainsworth_oden':
                 self.indicator.project(self.h*cell_res + 0.5*self.h*self.h*edge_res)
             else:
                 raise NotImplementedError  # TODO
@@ -221,8 +229,8 @@ class SteadyTurbineProblem(SteadyProblem):
             F2[2] = H*u[1]
             # f[0] = g*eta*b.dx(0) - C_t*normu*u[0]
             # f[1] = g*eta*b.dx(1) - C_t*normu*u[1]
-            f[0] = -C_t*normu*u[0]
-            f[1] = -C_t*normu*u[1]
+            f[0] = -C_t*normu*u[0]  # TODO: what about viscous term?
+            f[1] = -C_t*normu*u[1]  # TODO: --"--
 
         H1 = [0, 0, 0]
         H2 = [0, 0, 0]
@@ -230,10 +238,10 @@ class SteadyTurbineProblem(SteadyProblem):
 
         # Construct Hessians
         for i in range(3):
-            H1[i] = construct_hessian(F1[i], mesh=self.mesh, op=self.op)
-            H2[i] = construct_hessian(F2[i], mesh=self.mesh, op=self.op)
-        Hf[0] = construct_hessian(f[0], mesh=self.mesh, op=self.op)
-        Hf[1] = construct_hessian(f[1], mesh=self.mesh, op=self.op)
+            H1[i] = steady_metric(F1[i], mesh=self.mesh, noscale=True, op=self.op)
+            H2[i] = steady_metric(F2[i], mesh=self.mesh, noscale=True, op=self.op)
+        Hf[0] = steady_metric(f[0], mesh=self.mesh, noscale=True, op=self.op)
+        Hf[1] = steady_metric(f[1], mesh=self.mesh, noscale=True, op=self.op)
 
         # Form metric
         self.M = Function(self.P1_ten)
@@ -271,10 +279,10 @@ class SteadyTurbineProblem(SteadyProblem):
             self.explicit_estimation()
             z, zeta = self.adjoint_solution.split()
             #spd = sqrt(inner(z,z))
-            #H1 = construct_hessian(spd, mesh=self.mesh, op=self.op)
-            H1 = construct_hessian(z[0], mesh=self.mesh, op=self.op)  # TODO: should take abs
-            H2 = construct_hessian(z[1], mesh=self.mesh, op=self.op)
-            H3 = construct_hessian(zeta, mesh=self.mesh, op=self.op)
+            #H1 = construct_hessian(spd, mesh=self.mesh, noscale=True, op=self.op)
+            H1 = steady_metric(z[0], mesh=self.mesh, noscale=True, op=self.op)
+            H2 = steady_metric(z[1], mesh=self.mesh, noscale=True, op=self.op)
+            H3 = steady_metric(zeta, mesh=self.mesh, noscale=True, op=self.op)
             self.M = Function(self.P1_ten)
             for i in range(self.mesh.num_vertices()):  # TODO: use pyop2
                 #self.M.dat.data[i][:, :] += self.indicator.dat.data[i]*H1.dat.data[i]
@@ -285,14 +293,28 @@ class SteadyTurbineProblem(SteadyProblem):
             self.M = steady_metric(None, H=self.M, mesh=self.mesh, op=self.op)
             File('outputs/test.pvd').write(self.M)
 
+    def plot(self):
+        """
+        Plot current mesh and indicator field, if available.
+        """
+        File(self.di + 'mesh.pvd').write(self.mesh.coordinates)
+        if hasattr(self, 'indicator'):
+            name = self.indicator.dat.name
+            self.indicator.rename(name + ' indicator')
+            File(self.di + 'indicator.pvd').write(self.indicator)
+        if hasattr(self, 'adjoint_solution'):
+            z, zeta = self.adjoint_solution.split()
+            self.adjoint_solution_file.write(z, zeta)
+
     def interpolate_solution(self):
         """
         Here we only need interpolate the velocity.
         """
-        print("Interpolating solution across meshes...")
-        #self.interpolated_solution = Function(self.V.sub(0))
-        #self.interpolated_solution.project(self.prev_solution.split()[0])
-        self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
+        with pyadjoint.stop_annotating():
+            PETSc.Sys.Print("Interpolating solution across meshes...")
+            self.interpolated_solution = Function(self.V.sub(0))
+            self.interpolated_solution.project(self.prev_solution.split()[0])
+            #self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
 
 
 class UnsteadyTurbineProblem(UnsteadyProblem):
@@ -352,7 +374,7 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         options.simulation_end_time = self.step_end-0.5*op.dt
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters = op.params
-        print(options.timestepper_options.solver_parameters)
+        PETSc.Sys.Print(options.timestepper_options.solver_parameters)
         #options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs

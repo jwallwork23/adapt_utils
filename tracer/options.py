@@ -19,7 +19,6 @@ class TracerOptions(Options):
 
     # Domain
     nx = PositiveInteger(4, help="Mesh resolution in x- and y-directions.").tag(config=True)
-    target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)")
 
     # Timestepping
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
@@ -92,6 +91,7 @@ class PowerOptions(TracerOptions):
         # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
         #self.boundary_conditions[2] = 'neumann_zero'  # FIXME
+        self.boundary_conditions[2] = 'none'
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
 
@@ -134,13 +134,14 @@ class TelemacOptions(TracerOptions):
         self.offset = offset
 
         # Source / receiver
-        self.source_loc = [(1.+self.offset, 5., 0.08)]
+        self.source_loc = [(1.+self.offset, 5., 0.0798)]
         self.region_of_interest = [(20., 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
 
         # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
+        self.boundary_conditions[2] = 'none'
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
 
@@ -190,17 +191,23 @@ class TelemacOptions(TracerOptions):
         q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
         self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
-        #self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu))
-        #tmp = Function(fs).interpolate(0.5*u[0]*r/nu)
-        #self.solution.dat.data[:] *= kn(0, tmp.dat.data)
+        self.solution.rename('Analytic tracer concentration')
         outfile = File(self.di + 'analytic.pvd')
         outfile.write(self.solution)  # NOTE: use 40 discretisation levels in ParaView
         return self.solution
 
     def exact_objective(self, fs1, fs2):
-        self.exact_solution(fs1)
+        mesh = fs1.mesh()
+        x, y = SpatialCoordinate(mesh)
+        x0, y0, r = self.source_loc[0]
+        u = self.set_velocity(VectorFunctionSpace(fs1.mesh(), fs1.ufl_element()))
+        nu = self.set_diffusivity(fs1)
+        #q = 0.01  # sediment discharge of source (kg/s)
+        q = 1
+        r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
+        sol = 0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu)
         self.set_objective_kernel(fs2)
-        return assemble(self.kernel*self.solution*dx)
+        return assemble(self.kernel*sol*dx(degree=12))
 
 
 class TelemacOptions_Centred(TelemacOptions):

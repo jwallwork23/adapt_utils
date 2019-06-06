@@ -16,7 +16,7 @@ def adapt_mesh(solver_obj, error_indicator=None, op=DefaultOptions()):
     :return: adapted mesh.
     """
     mesh2d = solver_obj.mesh2d()
-    op.target_vertices = mesh2d.num_vertices() * op.rescaling
+    op.target = mesh2d.num_vertices() * op.rescaling
     P1 = FunctionSpace(mesh2d, "CG", 1)
 
     if op.approach == 'HessianBased':

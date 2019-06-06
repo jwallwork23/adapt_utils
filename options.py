@@ -15,6 +15,7 @@ class Options(FrozenConfigurable):
     dwr_approach = Unicode('error_representation', help="DWR error estimation approach, from {'error_representation', 'dwr', 'cell_facet_split'}. (See [Rognes & Logg, 2010])").tag(config=True)
     num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
+    convergence_rate = PositiveInteger(6).tag(config=True)  # TODO: docs
 
     # Smooth / intersect
     gradate = Bool(False, help='Toggle metric gradation.').tag(config=True)
@@ -33,8 +34,8 @@ class Options(FrozenConfigurable):
 
     # Metric
     max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
-    restrict = Unicode('error', help="Hessian restriction approach, from {'num_cells', 'p_norm', 'error'}.").tag(config=True)
-    desired_error = PositiveFloat(1e-2, help="Desired error for 'error' restriction approach.").tag(config=True)
+    restrict = Unicode('target', help="Hessian restriction approach, from {'num_vertices', 'p_norm', 'error'}.").tag(config=True)
+    target = PositiveFloat(1e+2, help="Target number of vertices / inverse desired error for 'target' restriction approach.").tag(config=True)
     norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used in 'p_norm' restriction approach.").tag(config=True)
     min_norm = PositiveFloat(1e-6).tag(config=True)
     max_norm = PositiveFloat(1e9).tag(config=True)
@@ -165,7 +166,6 @@ class DefaultOptions(Options):
     # adapt
     h_min = PositiveFloat(1e-6, help="Minimum tolerated element size").tag(config=True)
     h_max = PositiveFloat(1e3, help="Maximum tolerated element size").tag(config=True)
-    target_vertices = PositiveFloat(1000., help="Target number of vertices (not an integer!)").tag(config=True)
 
     # physical
     viscosity = NonNegativeFloat(1e-3).tag(config=True)
