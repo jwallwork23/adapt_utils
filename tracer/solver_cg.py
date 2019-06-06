@@ -196,6 +196,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
         else:
             self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
             self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
+        self.p0indicator.interpolate(abs(self.p0indicator))
+        self.p1indicator.interpolate(abs(self.p1indicator))
         self.p0indicator.rename('explicit')
         self.p1indicator.rename('explicit')
 
@@ -230,6 +232,8 @@ class SteadyTracerProblem_CG(SteadyProblem):
         else:
             self.p0indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P0)
             self.p1indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P1)
+        self.p0indicator.interpolate(abs(self.p0indicator))
+        self.p1indicator.interpolate(abs(self.p1indicator))
         self.p0indicator.rename('explicit_adjoint')
         self.p1indicator.rename('explicit_adjoint')
 

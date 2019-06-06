@@ -456,7 +456,7 @@ class MeshOptimisation():
 
             # Solve adjoint
             if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
-                tp.solve_adjoint()  # TODO: This is not always necessary
+                tp.solve_adjoint()
 
             # Estimate and record error  # FIXME
             tp.estimate_error()
