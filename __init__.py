@@ -10,8 +10,8 @@ from adapt_utils.adapt.recovery import *
 
 # Tracer transport
 from adapt_utils.tracer.options import *
-from adapt_utils.tracer.solver_cg import *
-from adapt_utils.tracer.solver_dg import *
+from adapt_utils.tracer.solver2d import *
+from adapt_utils.tracer.solver2d_thetis import *
 from adapt_utils.tracer.optimisation import *
 
 # Shallow water turbine application

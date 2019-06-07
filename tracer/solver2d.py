@@ -1,10 +1,9 @@
 from firedrake import *
 from firedrake_adjoint import *
 
-from time import clock
 import numpy as np
 
-from adapt_utils.tracer.options import PowerOptions
+from adapt_utils.tracer.options import *
 from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
@@ -16,6 +15,7 @@ from adapt_utils.solver import SteadyProblem
 __all__ = ["SteadyTracerProblem_CG"]
 
 
+# TODO: Generalise to consider spaces other than CG
 class SteadyTracerProblem_CG(SteadyProblem):
     r"""
     General continuous Galerkin solver object for stationary tracer advection problems of the form
@@ -166,7 +166,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
 
-    def explicit_estimation(self, square=True):
+    def explicit_indication(self, square=True):
         phi = self.solution
         i = self.p0test
         bcs = self.op.boundary_conditions
@@ -178,7 +178,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         # Assemble cell residual
         self.cell_res = assemble(i*R*R*dx) if square else assemble(i*R*dx)
         if not square:
-            self.p1cell_res = interpolate(R, self.P1)
+            self.p1cell_res = interpolate(R, self.P1)  # FIXME: clarify difference with above
 
         # Solve auxiliary problem to assemble edge residual
         mass_term = i*self.p0trial*dx
@@ -201,7 +201,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.p0indicator.rename('explicit')
         self.p1indicator.rename('explicit')
 
-    def explicit_estimation_adjoint(self, square=True):
+    def explicit_indication_adjoint(self, square=True):
         lam = self.adjoint_solution
         u = self.u
         nu = self.nu
@@ -380,7 +380,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.p1indicator.interpolate(abs(self.p1indicator))
         self.p0indicator.rename('dwr')
         self.p1indicator.rename('dwr')
-        
+
     def dwr_indication_adjoint(self):
         i = self.p0test
         lam = self.adjoint_solution
