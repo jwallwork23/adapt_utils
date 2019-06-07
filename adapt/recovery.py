@@ -61,7 +61,7 @@ def construct_hessian(f, mesh=None, op=DefaultOptions()):
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
     P1_ten = TensorFunctionSpace(mesh, "CG", 1)
-    n = FacetNormal(mesh)  # Normal vector
+    n = FacetNormal(mesh)
 
     # Integration by parts applied to the Hessian definition
     if op.hessian_recovery == 'parts':
@@ -69,13 +69,9 @@ def construct_hessian(f, mesh=None, op=DefaultOptions()):
         τ = TestFunction(P1_ten)
         a = inner(tau, H)*dx
         L = -inner(div(τ), grad(f))*dx
-        if dim == 2:
-            L += (τ[0, 0]*n[0]*f.dx(0) + τ[0, 1]*n[1]*f.dx(0))*ds
-            L += (τ[1, 0]*n[0]*f.dx(1) + τ[1, 1]*n[1]*f.dx(1))*ds
-        else:
-            L += (τ[0, 0]*n[0]*f.dx(0) + τ[0, 1]*n[1]*f.dx(0) + τ[0, 2]*n[2]*f.dx(0))*ds
-            L += (τ[1, 0]*n[0]*f.dx(1) + τ[0, 1]*n[1]*f.dx(0) + τ[0, 2]*n[2]*f.dx(0))*ds
-            L += (τ[2, 0]*n[0]*f.dx(2) + τ[0, 1]*n[1]*f.dx(0) + τ[0, 2]*n[2]*f.dx(0))*ds
+        for i in range(dim):
+            for j in range(dim):
+                a += τ[i, j]*n[j]*dx(i)
 
         H = Function(P1_ten)
         solve(a == L, H, solver_parameters=op.hessian_solver_parameters)
@@ -89,13 +85,9 @@ def construct_hessian(f, mesh=None, op=DefaultOptions()):
         a = inner(τ, H)*dx
         a += inner(φ, g)*dx
         a += inner(div(τ), g)*dx
-        if dim == 2:
-            a += -(g[0]*τ[0, 0]*n[0] + g[0]*τ[0, 1]*n[1])*ds
-            a += -(g[1]*τ[1, 0]*n[0] + g[1]*τ[1, 1]*n[1])*ds
-        else:
-            a += -(g[0]*τ[0, 0]*n[0] + g[0]*τ[0, 1]*n[1] + g[0]*τ[0, 2]*n[2])*ds
-            a += -(g[1]*τ[1, 0]*n[0] + g[1]*τ[1, 1]*n[1] + g[1]*τ[1, 2]*n[2])*ds
-            a += -(g[2]*τ[2, 0]*n[0] + g[2]*τ[2, 1]*n[1] + g[2]*τ[2, 2]*n[2])*ds
+        for i in range(dim):
+            for j in range(dim):
+                a += -g[i]*τ[i, j]*n[j]*ds
 
         # L = inner(grad(f), φ)*dx
         L = f*dot(φ, n)*ds - f*div(φ)*dx  # enables f to be P0

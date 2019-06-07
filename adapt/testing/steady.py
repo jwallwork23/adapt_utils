@@ -6,6 +6,8 @@ import numpy as np
 
 import matplotlib.pyplot as plt
 
+# Two of the sensor tests considered in [Olivier 2011]
+
 op = DefaultOptions()
 #op.restrict = 'p_norm'
 op.restrict = 'target'
@@ -21,8 +23,10 @@ for i in range(2):
                 mesh.coordinates.dat.data[:] -= [1,1]
             P1 = FunctionSpace(mesh, "CG", 1)
             x, y = SpatialCoordinate(mesh)
-            f = interpolate([x*x+y*y, atan(0.1/(sin(5*y)-2*x))+atan(0.5/(sin(3*y)-7*x))][i], P1)
-            H = construct_hessian(f)
-            M = steady_metric(f, H=H, op=op)  # TODO: could use noscale option
+            M = steady_metric([x*x+y*y,
+                               conditional(ge(abs(x*y), 2*pi/50), 0.01*sin(50*x*y), sin(50*x*y)),
+                               0.1*sin(50*x) + atan(0.1/(sin(5*y) - 2*x)),
+                               atan(0.1/(sin(5*y)-2*x))+atan(0.5/(sin(3*y)-7*x))][i],
+                              op=op)  # NOTE: could use noscale option
             mesh = adapt(mesh, M)
             File('plots/mesh{:d}_{:d}.pvd'.format(i, k)).write(mesh.coordinates)

@@ -4,6 +4,10 @@ from thetis import *
 __all__ = ["interp", "mixed_pair_interp"]
 
 
+# NOTE: This is currently redundant. Firedrake's projection operator has been linked with
+#       libsupermesh so that it can project across meshes.
+
+
 def interp(mesh, *fields):
     """
     Transfer solution fields from the old mesh to the new mesh. Based around the function

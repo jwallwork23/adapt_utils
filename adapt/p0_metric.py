@@ -12,6 +12,9 @@ __all__ = ["AnisotropicMetricDriver"]
 
 
 class AnisotropicMetricDriver():
+    """
+    Driver for anisotropic mesh adaptation using an approach inspired by [Carpio et al. 2013].
+    """
     def __init__(self, mesh, hessian=None, indicator=None, op=DefaultOptions()):
         self.mesh = mesh
         self.H = hessian
@@ -24,6 +27,8 @@ class AnisotropicMetricDriver():
         self.P0_ten = TensorFunctionSpace(mesh, "DG", 0)
         self.P1_ten = TensorFunctionSpace(mesh, "CG", 1)
         self.p0test = TestFunction(self.P0)
+        if hessian is not None:
+            self.p0hessian = project(hessian, self.P0_ten)
 
         # Fields related to mesh
         self.h = CellSize(mesh)    # current element size
@@ -131,16 +136,8 @@ class AnisotropicMetricDriver():
 
     def Lij(self, i, j):
         eigenvectors = [self.evec0, self.evec1]
-        H = project(self.H, self.P0_ten)  # TODO: call this somewhere else
-        triple_product = dot(eigenvectors[i], dot(H, eigenvectors[j]))
+        triple_product = dot(eigenvectors[i], dot(self.p0hessian, eigenvectors[j]))
         return assemble(self.p0test*triple_product*triple_product*dx)
-
-    # TODO: test this
-    def L_matrix(self):
-        self.p0metric.interpolate(as_matrix([[self.eval0*self.eval0*self.Lij(0, 0),
-                                              self.eval0*self.eval1*self.Lij(0, 1)],
-                                             [self.eval1*self.eval0*self.Lij(1, 0),
-                                              self.eval1*self.eval1*self.Lij(1, 1)]]))
 
     def cell_interpolation_error(self):
         l = self.eval0*self.eval0*self.Lij(0, 0)

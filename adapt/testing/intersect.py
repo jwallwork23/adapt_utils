@@ -33,3 +33,5 @@ for i in range(len(M.dat.data)):
     else:
         assert np.abs(M.dat.data[i][0, 0] - 2) < 1e-8
         assert np.abs(M.dat.data[i][1, 1] - 2) < 1e-8
+
+# TODO: test 3d intersection

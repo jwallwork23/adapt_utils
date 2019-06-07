@@ -46,3 +46,5 @@ print('Testing metric intersection')
 M4 = metric_intersection(M2, M3)
 mesh2 = AnisotropicAdaptation(mesh, M4).adapted_mesh
 assert len(mesh2.coordinates.dat.data) == 9
+
+# TODO: 3d tests
