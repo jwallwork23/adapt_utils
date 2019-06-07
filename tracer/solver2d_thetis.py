@@ -9,10 +9,10 @@ from adapt_utils.adapt.metric import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
 
-__all__ = ["SteadyTracerProblem_DG", "UnsteadyTracerProblem_DG"]
+__all__ = ["SteadyTracerProblem2d_Thetis", "UnsteadyTracerProblem2d_Thetis"]
 
 
-class SteadyTracerProblem_DG(SteadyProblem):
+class SteadyTracerProblem2d_Thetis(SteadyProblem):
     r"""
     General discontinuous Galerkin solver object for stationary tracer advection problems of the form
 
@@ -37,7 +37,7 @@ class SteadyTracerProblem_DG(SteadyProblem):
              raise NotImplementedError
         if mesh is None:
             mesh = op.default_mesh
-        super(SteadyTracerProblem_DG, self).__init__(mesh,
+        super(SteadyTracerProblem2d_Thetis, self).__init__(mesh,
                                                      op,
                                                      finite_element,
                                                      stab,
@@ -297,13 +297,13 @@ class SteadyTracerProblem_DG(SteadyProblem):
         # TODO: flux terms?
 
 
-class UnsteadyTracerProblem_DG(UnsteadyProblem):
+class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
     def __init__(self,
                  op,
                  mesh=None,
                  discrete_adjoint=True,
                  finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1)):
-        super(UnsteadyTracerProblem_DG, self).__init__(mesh, op, finite_element, discrete_adjoint)
+        super(UnsteadyTracerProblem2d_Thetis, self).__init__(mesh, op, finite_element, discrete_adjoint)
         assert(finite_element.family() == "Discontinuous Lagrange")
 
         self.set_fields()

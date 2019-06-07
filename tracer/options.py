@@ -8,13 +8,12 @@ from adapt_utils.options import Options
 from adapt_utils.misc import *
 
 
-__all__ = ["TracerOptions", "PowerOptions", "TelemacOptions", "TelemacOptions_Centred", "Telemac3dOptions",
-           "Telemac3dOptions_Centred", "LeVequeOptions"]
+__all__ = ["TracerOptions", "PowerOptions", "TelemacOptions", "Telemac3dOptions", "LeVequeOptions"]
 
 
 class TracerOptions(Options):
     """
-    Default parameter class for TracerProblems.
+    Default parameter class for `TracerProblem`s.
     """
 
     # Domain
@@ -26,7 +25,7 @@ class TracerOptions(Options):
     end_time = PositiveFloat(60., help="End of time window of interest").tag(config=True)
     dt_per_export = PositiveFloat(10, help="Number of timesteps per export").tag(config=True)
     dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation").tag(config=True)
-    timestepper = Unicode('CrankNicolson').tag(config=True)
+    timestepper = Unicode('CrankNicolson', help="Time integration scheme").tag(config=True)
 
     # Solver
     params = PETScSolverParameters({'pc_type': 'lu',
@@ -35,20 +34,19 @@ class TracerOptions(Options):
                                     'ksp_converged_reason': None}).tag(config=True)
 
     # Physical 
-    source_loc = List(default_value=None, allow_none=True).tag(config=True)
-    source = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    source_loc = List(default_value=None, allow_none=True, help="Location of source term (if any)").tag(config=True)
+    source = FiredrakeScalarExpression(None, allow_none=True, help="").tag(config=True)
     diffusivity = FiredrakeScalarExpression(Constant(1e-1)).tag(config=True)
     fluid_velocity = FiredrakeVectorExpression(None, allow_none=True).tag(config=True)
 
-    # Adjoint
-    solve_adjoint = Bool(False).tag(config=True)
-    region_of_interest = List(default_value=[(20., 7.5, 0.5)]).tag(config=True)
+    # QoI
+    region_of_interest = List(default_value=[(20., 7.5, 0.5)], help="Spatial region related to quantity of interest").tag(config=True)
 
     # Adaptivity
     h_min = PositiveFloat(1e-4, help="Minimum tolerated element size").tag(config=True)
     h_max = PositiveFloat(5., help="Maximum tolerated element size").tag(config=True)
 
-    boundary_conditions = PETScSolverParameters({}).tag(config=True)
+    boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary").tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
         super(TracerOptions, self).__init__(approach)
@@ -90,7 +88,7 @@ class PowerOptions(TracerOptions):
 
         # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
-        #self.boundary_conditions[2] = 'neumann_zero'  # FIXME
+        #self.boundary_conditions[2] = 'neumann_zero'
         self.boundary_conditions[2] = 'none'
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
@@ -126,16 +124,20 @@ class PowerOptions(TracerOptions):
 
 class TelemacOptions(TracerOptions):
     """
-    Parameters for the 'Point source with diffusion' TELEMAC-2D test case.
+    Parameters for the 'Point source with diffusion' test case from TELEMAC-2D validation document version 7.0.
+
+    :kwarg approach: mesh adaptation strategy
+    :kwarg offset: shift in x-direction for source location
+    :kwarg centred: toggle whether region of interest is positioned in the centre of the flow or not
     """
-    def __init__(self, approach='fixed_mesh', offset=0.):
+    def __init__(self, approach='fixed_mesh', offset=0., centred=False):
         super(TelemacOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(100, 20, 50, 10)
         self.offset = offset
 
         # Source / receiver
         self.source_loc = [(1.+self.offset, 5., 0.0798)]
-        self.region_of_interest = [(20., 7.5, 0.5)]
+        self.region_of_interest = [(20., 5., 0.5)] if centred else [(20., 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
 
@@ -209,24 +211,22 @@ class TelemacOptions(TracerOptions):
         return assemble(self.kernel*sol*dx(degree=12))
 
 
-class TelemacOptions_Centred(TelemacOptions):
-    def __init__(self, approach='fixed_mesh', offset=0.):
-        super(TelemacOptions_Centred, self).__init__(approach, offset)
-        self.region_of_interest = [(20., 5., 0.5)]
-
-
 class Telemac3dOptions(TracerOptions):
     """
-    Parameters for a 3D estension to the 'Point source with diffusion' TELEMAC-2D test case.
+    Parameters for a 3D extension of the 'Point source with diffusion' test case from TELEMAC-2D validation document version 7.0.
+
+    :kwarg approach: mesh adaptation strategy
+    :kwarg offset: shift in x-direction for source location
+    :kwarg centred: toggle whether region of interest is positioned in the centre of the flow or not
     """
-    def __init__(self, approach='fixed_mesh', offset=0.):
+    def __init__(self, approach='fixed_mesh', offset=0., centred=False):
         super(Telemac3dOptions, self).__init__(approach)
         self.default_mesh = BoxMesh(100, 20, 20, 50, 10, 10)
         self.offset = offset
 
         # Source / receiver
         self.source_loc = [(1.+self.offset, 5., 5., 0.0798)]
-        self.region_of_interest = [(20., 7.5, 7.5, 0.5)]
+        self.region_of_interest = [(20., 5., 5., 0.5)] if centred else [(20., 7.5, 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
 
@@ -259,7 +259,7 @@ class Telemac3dOptions(TracerOptions):
         with pyadjoint.stop_annotating():
             nrm=assemble(self.ball(fs, source=True)*dx)
         scaling = pi*r0*r0/nrm if nrm != 0 else 1
-        scaling *= 0.5*self.source_value  # TODO: where does factor of half come from?
+        scaling *= 0.5*self.source_value
         self.source.interpolate(self.ball(fs, source=True, scale=scaling))
         return self.source
 
@@ -271,11 +271,6 @@ class Telemac3dOptions(TracerOptions):
         self.kernel = Function(fs)
         self.kernel.interpolate(self.ball(fs))
         return self.kernel
-
-class Telemac3dOptions_Centred(Telemac3dOptions):
-    def __init__(self, approach='fixed_mesh', offset=0.):
-        super(Telemac3dOptions_Centred, self).__init__(approach, offset)
-        self.region_of_interest = [(20., 5., 5., 0.5)]
 
 
 # NOTE: Could set three different tracers?

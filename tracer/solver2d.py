@@ -12,13 +12,13 @@ from adapt_utils.adapt.p0_metric import *
 from adapt_utils.solver import SteadyProblem
 
 
-__all__ = ["SteadyTracerProblem_CG"]
+__all__ = ["SteadyTracerProblem2d"]
 
 
 # TODO: Generalise to consider spaces other than CG
-class SteadyTracerProblem_CG(SteadyProblem):
+class SteadyTracerProblem2d(SteadyProblem):
     r"""
-    General continuous Galerkin solver object for stationary tracer advection problems of the form
+    General continuous Galerkin solver object for 2D stationary tracer advection problems of the form
 
 ..  math::
     \textbf{u} \cdot \nabla(\phi) - \nabla \cdot (\nu \cdot \nabla(\phi)) = f,
@@ -38,7 +38,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
                  #discrete_adjoint=True,
                  finite_element=FiniteElement("Lagrange", triangle, 1),
                  prev_solution=None):
-        super(SteadyTracerProblem_CG, self).__init__(mesh, op, finite_element, discrete_adjoint, None)
+        super(SteadyTracerProblem2d, self).__init__(mesh, op, finite_element, discrete_adjoint, None)
 
         # Extract parameters from Options class
         self.nu = op.set_diffusivity(self.P1)
@@ -139,9 +139,9 @@ class SteadyTracerProblem_CG(SteadyProblem):
         family = self.V.ufl_element().family()
 
         # Solve adjoint problem on fine mesh using quadratic elements
-        tp_p2 = SteadyTracerProblem_CG(self.op,
-                                       mesh=iso_P2(self.mesh),
-                                       finite_element=FiniteElement(family, triangle, 2))
+        tp_p2 = SteadyTracerProblem2d(self.op,
+                                      mesh=iso_P2(self.mesh),
+                                      finite_element=FiniteElement(family, triangle, 2))
         sol_p1 = Function(tp_p2.P1)  # Project into P1 to get linear approximation, too
         if adjoint:
             tp_p2.solve_adjoint()
@@ -237,42 +237,6 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.p0indicator.rename('explicit_adjoint')
         self.p1indicator.rename('explicit_adjoint')
 
-    def dwr_indication_(self):  # TODO: check
-        i = self.p0test
-        u = self.u
-        nu = self.nu
-        n = self.n
-        f = self.source
-        bcs = self.op.boundary_conditions
-        phi = self.solution
-        if self.op.order_increase:
-            lam = self.solve_high_order(adjoint=True) if not hasattr(self, 'errorterm') else self.errorterm
-        else:
-            self.adjoint_solution
-
-        # Finite element problem
-        a = i*lam*dot(u, grad(phi))*dx
-        a += i*nu*inner(grad(phi), grad(lam))*dx
-        for j in bcs.keys():
-            if bcs[j] == 'none':  # TODO: make consistent with Thetis
-                a += -i*nu*lam*dot(n, nabla_grad(phi))*ds(j)
-        L = i*f*lam*dx
-
-        # Stabilisation
-        if self.stab == "SU":
-            a += i*self.stabilisation*dot(u, grad(lam))*dot(u, grad(phi))*dx
-        elif self.stab == "SUPG":
-            coeff = self.stabilisation*dot(u, grad(lam))
-            a += i*coeff*dot(u, grad(phi))*dx
-            a += i*coeff*-div(nu*grad(phi))*dx
-            L += i*coeff*f*dx
-
-        # Get values on each element
-        mass_term = i*self.p0trial*dx
-        self.p0indicator = Function(self.P0)
-        solve(mass_term == L-a, self.p0indicator)
-        self.p0indicator.interpolate(abs(self.p0indicator))
- 
     def dwr_estimation(self):
         u = self.u
         nu = self.nu
@@ -425,7 +389,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.p0indicator.rename('dwr_adjoint')
         self.p1indicator.rename('dwr_adjoint')
         
-    def get_anisotropic_metric(self, adjoint=False, relax=False, superpose=True):
+    def get_loseille_metric(self, adjoint=False, relax=False, superpose=True):
         assert not (relax and superpose)
 
         # Solve adjoint problem
@@ -498,5 +462,5 @@ class SteadyTracerProblem_CG(SteadyProblem):
             self.dwr_indication_adjoint()
             self.p1indicator.interpolate(i + self.p1indicator)
             amd = AnisotropicMetricDriver(self.mesh, hessian=M, indicator=self.p1indicator, op=self.op)
-            amd.get_anisotropic_metric()
+            amd.get_loseille_metric()
             self.M = amd.p1metric

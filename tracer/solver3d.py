@@ -17,8 +17,20 @@ __all__ = ["SteadyTracerProblem3d"]
 
 # TODO: Combine 2d and 3d solvers
 class SteadyTracerProblem3d(SteadyProblem):
-    # TODO: doc
+    r"""
+    General continuous Galerkin solver object for 3D stationary tracer advection problems of the form
 
+..  math::
+    \textbf{u} \cdot \nabla(\phi) - \nabla \cdot (\nu \cdot \nabla(\phi)) = f,
+
+    for (prescribed) velocity :math:`\textbf{u}`, diffusivity :math:`\nu \geq 0`, source :math:`f`
+    and (prognostic) concentration :math:`\phi`.
+
+    Implemented boundary conditions:
+        * Neumann zero;
+        * Dirichlet zero;
+        * outflow.
+    """
     def __init__(self,
                  op,
                  mesh=None,
