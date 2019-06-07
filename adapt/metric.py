@@ -70,7 +70,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             # Reconstruct edited Hessian
             for l in range(dim):
                 for i in range(dim):
-                    for j in range(i, 3):
+                    for j in range(i, dim):
                         M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
             for i in range(1, dim):
                 for j in range(i):
@@ -99,7 +99,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             # Reconstruct edited Hessian and rescale
             for l in range(dim):
                 for i in range(dim):
-                    for j in range(i, 3):
+                    for j in range(i, dim):
                         M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
             for i in range(1, dim):
                 for j in range(i):
@@ -126,7 +126,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             # Reconstruct edited Hessian
             for l in range(dim):
                 for i in range(dim):
-                    for j in range(i, 3):
+                    for j in range(i, dim):
                         M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
             for i in range(1, dim):
                 for j in range(i):
