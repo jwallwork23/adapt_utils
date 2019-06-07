@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from adapt_utils.tracer.options import *
-from adapt_utils.tracer.solver_cg import *
+from adapt_utils.tracer.solver2d import *
 from adapt_utils.solver import *
 
 

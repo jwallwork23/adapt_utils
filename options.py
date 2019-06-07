@@ -103,6 +103,25 @@ class Options(FrozenConfigurable):
         indi.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return indi
 
+    def ball(self, fs, scale=1., source=False):
+        """Ball indicator function associated with region(s) of interest"""
+        x, y, z = SpatialCoordinate(fs.mesh())
+        locs = self.source_loc if source else self.region_of_interest
+        eps = 1e-10
+        for j in range(len(locs)):
+            x0 = locs[j][0]
+            y0 = locs[j][1]
+            z0 = locs[j][2]
+            r = locs[j][3]
+            if j == 0:
+                b = lt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0), r*r + eps)
+            else:
+                b = Or(b, lt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0), r*r + eps))
+        expr = conditional(b, scale, 0.)
+        indi = Function(fs)
+        indi.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        return indi
+
     def bump(self, fs, scale=1., source=False):
         """Bump function associated with region(s) of interest"""
         x, y = SpatialCoordinate(fs.mesh())

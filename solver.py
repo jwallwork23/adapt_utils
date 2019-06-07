@@ -325,19 +325,6 @@ class SteadyProblem():
             elif self.approach == 'power_adjoint':
                 self.get_power_metric(adjoint=True)
             elif self.approach == 'power_relaxed':
-                #self.explicit_estimation(square=False)
-                #self.p1indicator.interpolate(abs(self.p1indicator))
-                #H = self.get_hessian(adjoint=True)
-                #for i in range(self.mesh.num_vertices()):
-                #    H.dat.data[i][:,:] *= self.p1indicator.dat.data[i]  # TODO: use pyop2
-                #indicator = self.p1indicator.copy()
-                #self.explicit_estimation_adjoint(square=False)
-                #self.p1indicator.interpolate(abs(self.p1indicator))
-                #H2 = self.get_hessian(adjoint=False)
-                #for i in range(self.mesh.num_vertices()):
-                #    H.dat.data[i][:,:] += H2.dat.data[i]*self.p1indicator.dat.data[i]  # TODO: use pyop2
-                #    H.dat.data[i][:,:] /= indicator.dat.data[i] + self.p1indicator.dat.data[i]
-                #self.M = steady_metric(None, mesh=self.mesh, H=H, op=self.op)
                 self.get_power_metric(adjoint=False)
                 M = self.M.copy()
                 self.get_power_metric(adjoint=True)
@@ -397,8 +384,8 @@ class MeshOptimisation():
         self.conv_msg = "Converged after %d iterations due to %s"
         self.startit = 0
         self.maxit = 35
-        self.element_rtol = 0.001    # Following [Power et al 2006]
-        self.objective_rtol = 0.001  # TODO: experiment with these tighter tolerances
+        self.element_rtol = 0.005    # Following [Power et al 2006]
+        self.objective_rtol = 0.005
         self.estimator_atol = 1e-8
 
         # Logging

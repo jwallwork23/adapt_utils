@@ -8,8 +8,8 @@ from adapt_utils.options import Options
 from adapt_utils.misc import *
 
 
-__all__ = ["TracerOptions", "PowerOptions", "TelemacOptions", "TelemacOptions_Centred",
-           "LeVequeOptions"]
+__all__ = ["TracerOptions", "PowerOptions", "TelemacOptions", "TelemacOptions_Centred", "Telemac3dOptions",
+           "Telemac3dOptions_Centred", "LeVequeOptions"]
 
 
 class TracerOptions(Options):
@@ -161,7 +161,6 @@ class TelemacOptions(TracerOptions):
         return self.fluid_velocity
 
     def set_source(self, fs):
-        x, y = SpatialCoordinate(fs.mesh())
         x0, y0, r0 = self.source_loc[0]
         self.source = Function(fs)
         with pyadjoint.stop_annotating():
@@ -214,6 +213,69 @@ class TelemacOptions_Centred(TelemacOptions):
     def __init__(self, approach='fixed_mesh', offset=0.):
         super(TelemacOptions_Centred, self).__init__(approach, offset)
         self.region_of_interest = [(20., 5., 0.5)]
+
+
+class Telemac3dOptions(TracerOptions):
+    """
+    Parameters for a 3D estension to the 'Point source with diffusion' TELEMAC-2D test case.
+    """
+    def __init__(self, approach='fixed_mesh', offset=0.):
+        super(Telemac3dOptions, self).__init__(approach)
+        self.default_mesh = BoxMesh(100, 20, 20, 50, 10, 10)
+        self.offset = offset
+
+        # Source / receiver
+        self.source_loc = [(1.+self.offset, 5., 5., 0.0798)]
+        self.region_of_interest = [(20., 7.5, 7.5, 0.5)]
+        self.source_value = 100.
+        self.source_discharge = 0.1
+
+        # Boundary conditions  # TODO: make Thetis-conforming
+        self.boundary_conditions[1] = 'dirichlet_zero'
+        self.boundary_conditions[2] = 'none'
+        self.boundary_conditions[3] = 'neumann_zero'
+        self.boundary_conditions[4] = 'neumann_zero'
+        self.boundary_conditions[5] = 'neumann_zero'
+        self.boundary_conditions[6] = 'neumann_zero'
+
+        # Time integration
+        self.dt = 0.1
+        self.end_time = 60.
+        self.dt_per_export = 10
+        self.dt_per_remesh = 20
+
+    def set_diffusivity(self, fs):
+        self.diffusivity = Constant(0.01)  # Use smaller diffusivity due to dimensionality
+        return self.diffusivity
+
+    def set_velocity(self, fs):
+        self.fluid_velocity = Function(fs)
+        self.fluid_velocity.interpolate(as_vector((1., 0., 0.)))
+        return self.fluid_velocity
+
+    def set_source(self, fs):
+        x0, y0, z0, r0 = self.source_loc[0]
+        self.source = Function(fs)
+        with pyadjoint.stop_annotating():
+            nrm=assemble(self.ball(fs, source=True)*dx)
+        scaling = pi*r0*r0/nrm if nrm != 0 else 1
+        scaling *= 0.5*self.source_value  # TODO: where does factor of half come from?
+        self.source.interpolate(self.ball(fs, source=True, scale=scaling))
+        return self.source
+
+    def set_initial_condition(self, fs):
+        self.initial_value = Function(fs)
+        return self.initial_value
+
+    def set_objective_kernel(self, fs):
+        self.kernel = Function(fs)
+        self.kernel.interpolate(self.ball(fs))
+        return self.kernel
+
+class Telemac3dOptions_Centred(Telemac3dOptions):
+    def __init__(self, approach='fixed_mesh', offset=0.):
+        super(Telemac3dOptions_Centred, self).__init__(approach, offset)
+        self.region_of_interest = [(20., 5., 5., 0.5)]
 
 
 # NOTE: Could set three different tracers?
