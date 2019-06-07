@@ -39,6 +39,7 @@ class Options(FrozenConfigurable):
     norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used in 'p_norm' restriction approach.").tag(config=True)
     min_norm = PositiveFloat(1e-6, help="Minimum norm tolerated in metric rescaling.").tag(config=True)
     max_norm = PositiveFloat(1e9, help="Maximum norm tolerated in metric rescaling.").tag(config=True)
+    f_min = PositiveFloat(1e-6, help="Minimum function value tolerated for metric constructed using its Hessian.").tag(config=True)
 
     # Hessian
     hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
