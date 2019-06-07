@@ -28,6 +28,8 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
         H = construct_hessian(f, mesh=mesh, op=op)
     V = H.function_space()
     mesh = V.mesh()
+    dim = mesh.topological_dimension()
+    assert dim in (2, 3)
 
     ia2 = 1. / pow(op.max_anisotropy, 2)  # Inverse square max aspect ratio
     ih_min2 = 1. / pow(op.h_min, 2)  # Inverse square minimal side-length
@@ -54,25 +56,52 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             mean_diag = 0.5*(H_loc[0][1] + H_loc[1][0])
             H_loc[0][1] = mean_diag
             H_loc[1][0] = mean_diag
+            if dim == 3:
+                mean_diag = 0.5*(H_loc[0][2] + H_loc[2][0])
+                H_loc[0][2] = mean_diag
+                H_loc[2][0] = mean_diag
+                mean_diag = 0.5*(H_loc[1][2] + H_loc[2][1])
+                H_loc[1][2] = mean_diag
+                H_loc[2][1] = mean_diag
 
             # Find eigenpairs and truncate eigenvalues
             lam, v = la.eig(H_loc)
-            v1, v2 = v[0], v[1]
+            if dim == 2:
+                v1, v2 = v[0], v[1]
+            else:
+                v1, v2, v3 = v[0], v[1], v[2]
             lam1 = min(ih_min2, max(ih_max2, abs(lam[0])))
             lam2 = min(ih_min2, max(ih_max2, abs(lam[1])))
-            lam_max = max(lam1, lam2)
+            if dim == 2:
+                lam_max = max(lam1, lam2)
+            else:
+                lam3 = min(ih_min2, max(ih_max2, abs(lam[2])))
+                lam_max = max(lam1, lam2, lam3)
+                lam3 = max(lam3, ia2 * lam_max)
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
-            if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2):
+            if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2) or (dim == 3 and (lam[1] >= 0.9999 * ih_min2)):
                 print(msg.format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
 
-            # Reconstruct edited Hessian
-            M.dat.data[i][0, 0] = lam1 * v1[0] * v1[0] + lam2 * v2[0] * v2[0]
-            M.dat.data[i][0, 1] = lam1 * v1[0] * v1[1] + lam2 * v2[0] * v2[1]
-            M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
-            M.dat.data[i][1, 1] = lam1 * v1[1] * v1[1] + lam2 * v2[1] * v2[1]
+            # Reconstruct edited Hessian  TODO: condense and generalise notation
+            if dim == 2:
+                M.dat.data[i][0, 0] = lam1*v1[0]*v1[0] + lam2*v2[0]*v2[0]
+                M.dat.data[i][0, 1] = lam1*v1[0]*v1[1] + lam2*v2[0]*v2[1]
+                M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
+                M.dat.data[i][1, 1] = lam1*v1[1]*v1[1] + lam2*v2[1]*v2[1]
+            else:
+                M.dat.data[i][0, 0] = lam1*v1[0]*v1[0] + lam2*v2[0]*v2[0] + lam3*v3[0]*v3[0]
+                M.dat.data[i][0, 1] = lam1*v1[0]*v1[1] + lam2*v2[0]*v2[1] + lam3*v3[0]*v3[1]
+                M.dat.data[i][0, 2] = lam1*v1[0]*v1[2] + lam2*v2[0]*v2[2] + lam3*v3[0]*v3[2]
+                M.dat.data[i][1, 0] = M.dat.data[i][0, 1]
+                M.dat.data[i][1, 1] = lam1*v1[1]*v1[1] + lam2*v2[1]*v2[1] + lam3*v3[1]*v3[1]
+                M.dat.data[i][1, 2] = lam1*v1[1]*v1[2] + lam2*v2[1]*v2[2] + lam3*v3[1]*v3[2]
+                M.dat.data[i][2, 0] = M.dat.data[i][0, 2]
+                M.dat.data[i][2, 1] = M.dat.data[i][1, 2]
+                M.dat.data[i][2, 2] = lam1*v1[2]*v1[2] + lam2*v2[2]*v2[2] + lam3*v3[2]*v3[2]
 
     elif op.restrict == 'p_norm':
+        assert dim == 2  # TODO: 3d
         detH = Function(FunctionSpace(mesh, "CG", 1))
 
         for i in range(mesh.num_vertices()):
@@ -132,12 +161,15 @@ def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
     :param op: `Options` class providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
-    a2 = pow(op.max_anisotropy, 2)
-    h_min2 = pow(op.h_min, 2)
-    h_max2 = pow(op.h_max, 2)
     assert len(f.ufl_element().value_shape()) == 0
     mesh = f.function_space().mesh()
     P1 = FunctionSpace(mesh, "CG", 1)
+    dim = mesh.topological_dimension()
+    assert dim in (2, 3)
+
+    a2 = pow(op.max_anisotropy, 2)
+    h_min2 = pow(op.h_min, 2)
+    h_max2 = pow(op.h_max, 2)
 
     # Scale metric according to restriction strategy
     if noscale or op.restrict == 'p_norm':
@@ -156,6 +188,7 @@ def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
     node_set = range(mesh.num_vertices()) if bdy is None else DirichletBC(V, 0, bdy).nodes
 
     if op.restrict == 'p_norm':
+        assert dim == 2  # TODO: 3d case
         detM = Function(P1)
         for i in node_set:
             g.dat.data[i] = max(g.dat.data[i], 1e-8)
@@ -169,13 +202,15 @@ def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
         alpha = max(alpha, alpha/a2)
         M.dat.data[i][0, 0] = alpha
         M.dat.data[i][1, 1] = alpha
+        if dim == 3:
+            M.dat.data[i][2, 2] = alpha
         if alpha >= 0.9999 / h_min2:
             print("WARNING: minimum element size reached!")
-        g.dat.data[i] = alpha
 
     return M
 
 
+# TODO: 3d
 def anisotropic_refinement(metric, direction=0):
     r"""
     Anisotropically refine a mesh (or, more precisely, the metric field associated with a mesh)
@@ -198,6 +233,7 @@ def anisotropic_refinement(metric, direction=0):
     return M
 
 
+# TODO: 3d
 def local_metric_intersection(M1, M2):
     r"""
     Intersect two metrics `M1` and `M2` defined at a particular point in space.
