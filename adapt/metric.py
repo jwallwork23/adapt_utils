@@ -30,9 +30,9 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
 
-    ia2 = 1. / pow(op.max_anisotropy, 2)  # Inverse square max aspect ratio
-    ih_min2 = 1. / pow(op.h_min, 2)  # Inverse square minimal side-length
-    ih_max2 = 1. / pow(op.h_max, 2)  # Inverse square maximal side-length
+    ia2 = pow(op.max_anisotropy, -2)  # Inverse square max aspect ratio
+    ih_min2 = pow(op.h_min, -2)  # Inverse square minimal side-length
+    ih_max2 = pow(op.h_max, -2)  # Inverse square maximal side-length
     M = Function(V)
 
     msg = "WARNING: minimum element size reached as {m:.2e}"
@@ -201,18 +201,19 @@ def anisotropic_refinement(metric, direction=0):
     :param direction: 0 or 1, corresponding to x- or y-direction, respectively.
     :return: anisotropically refined metric.
     """
-    fs = M.function_space()
+    fs = metric.function_space()
     M = Function(fs)
     mesh = fs.mesh()
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
     scale = 4 if dim == 2 else 8  # TODO: check this
     for k in range(mesh.num_vertices()):
-        lam, v = la.eig(M.dat.data[k])
+        lam, v = la.eig(metric.dat.data[k])
         lam[direction] *= scale
+        # TODO: these loops could be done more efficiently by just adding extra terms in the skew direction
         for l in range(dim):
             for i in range(dim):
-                for j in range(i, 3):
+                for j in range(i, dim):
                     M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
         for i in range(1, dim):
             for j in range(i):
