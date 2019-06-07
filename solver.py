@@ -25,7 +25,7 @@ date = str(now.day) + '-' + str(now.month) + '-' + str(now.year % 2000)
 
 class SteadyProblem():
     """
-    Base class for solving PDE problems using mesh adaptivity.
+    Base class for solving steady-state PDE problems using mesh adaptivity.
 
     There are three main functionalities:
         * solve PDE;
@@ -202,18 +202,20 @@ class SteadyProblem():
             self.p1indicator.interpolate(abs(self.p1indicator))  # ensure non-negativity
         self.M = isotropic_metric(self.p1indicator, op=self.op)
 
-    def get_anisotropic_metric(self, adjoint=False, relax=False):
+    def get_loseille_metric(self, adjoint=False, relax=False):
         """
-        Apply the approach of [Loseille, Dervieux, Alauzet, 2009] to extract an anisotropic mesh 
-        from the Dual Weighted Residual method.
+        Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
         """
         pass
 
     def get_power_metric(self, adjoint=False):
         """
-        TO DO
+        Construct an anisotropic metric using an approach inspired by [Power et al. 2006].
+
+        If `adjoint` mode is turned off, we weight the Hessian of the adjoint solution with a residual
+        for the forward PDE. Otherwise, we weight the Hessian of the forward solution with a residual
+        for the adjoint PDE.
         """
-        # TODO: doc
         if adjoint:
             self.explicit_indication_adjoint(square=False)
             self.p1indicator.interpolate(abs(self.p1cell_res_adjoint))
@@ -228,9 +230,17 @@ class SteadyProblem():
         else:
             self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
 
-    def indicate_error(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None, estimate_error=True):
+    def indicate_error(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=True):
         """
-        Evaluate error estimation strategy of choice.
+        Evaluate error estimation strategy of choice in order to obtain a metric field for mesh
+        adaptation.
+
+        NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
+
+        :kwarg relaxation_parameter: Scalar in the range [0, 1] used to take a weighted average
+        between metrics at the current and previous steps.
+        :kwarg prev_metric: Metric from previous step. If unprovided, metric relaxation cannot be applied.
+        :kwarg estimate_error: Toggle computation of global error estimate.
         """
         with pyadjoint.stop_annotating():
             if self.approach == 'fixed_mesh':
@@ -310,18 +320,18 @@ class SteadyProblem():
                 self.get_isotropic_metric()
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'loseille':
-                self.get_anisotropic_metric(adjoint=False)
+                self.get_loseille_metric(adjoint=False)
             elif self.approach == 'loseille_adjoint':
-                self.get_anisotropic_metric(adjoint=True)
+                self.get_loseille_metric(adjoint=True)
             elif self.approach == 'loseille_relaxed':
-                self.get_anisotropic_metric(adjoint=False)
+                self.get_loseille_metric(adjoint=False)
                 M = self.M.copy()
-                self.get_anisotropic_metric(adjoint=True)
+                self.get_loseille_metric(adjoint=True)
                 self.M = metric_relaxation(M, self.M)
             elif self.approach == 'loseille_superposed':
-                self.get_anisotropic_metric(adjoint=False)
+                self.get_loseille_metric(adjoint=False)
                 M = self.M.copy()
-                self.get_anisotropic_metric(adjoint=True)
+                self.get_loseille_metric(adjoint=True)
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'power':
                 self.get_power_metric(adjoint=False)
@@ -346,12 +356,13 @@ class SteadyProblem():
                     raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
             # Apply metric relaxation, if requested
+            assert relaxation_parameter >= 0
+            assert relaxation_parameter <= 1
             self.M_unrelaxed = self.M.copy()
             if prev_metric is not None:
                 self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
-            # (Default relaxation of 0.9 following [Power et al 2006])
 
-        ## FIXME!
+        ## FIXME
         #if hasattr(self, 'p0indicator'):
         #    self.estimator = sum(self.p0indicator.dat.data)
         if estimate_error:
@@ -366,9 +377,19 @@ class SteadyProblem():
             else:
                 raise NotImplementedError  # TODO
 
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, custom_adapt=None, estimate_error=True):
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=True):
+        """
+        Adapt mesh using metric constructed in error estimation step.
+
+        NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
+
+        :kwarg relaxation_parameter: Scalar in the range [0, 1] used to take a weighted average
+        between metrics at the current and previous steps.
+        :kwarg prev_metric: Metric from previous step. If unprovided, metric relaxation cannot be applied.
+        :kwarg estimate_error: Toggle computation of global error estimate.
+        """
         if not hasattr(self, 'M'):
-            self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, custom_adapt=custom_adapt, estimate_error=estimate_error)
+            self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
         self.mesh = multi_adapt(self.M, op=self.op)
         print('Done adapting.')
         self.plot()
@@ -480,7 +501,7 @@ class MeshOptimisation():
                     break
 
             # Adapt mesh
-            #tp.set_target_vertices(num_vertices=self.dat['vertices'][0])  # FIXME
+            #tp.set_target_vertices(num_vertices=self.dat['vertices'][0])
             tp.adapt_mesh(prev_metric=M_)
             tp.plot()
             if tp.nonlinear:
@@ -494,6 +515,14 @@ class MeshOptimisation():
 
 
 class OuterLoop():
+    """
+    Iterate over a range of tolerated errors for a given (steady) problem setup and mesh adaptation strategy,
+    seeking convergence of the quantity of interest.
+
+    :arg problem: Problem type to consider.
+    :arg op: Parameter class.
+    :arg mesh: Initial mesh.
+    """
     def __init__(self, problem, op, mesh=None):
         self.problem = problem
         self.op = op
@@ -562,6 +591,14 @@ class OuterLoop():
 
 
 class UnsteadyProblem():
+    """
+    Base class for solving time-dependent PDE problems using mesh adaptivity.
+
+    There are three main functionalities:
+        * solve PDE;
+        * solve adjoint PDE;
+        * adapt mesh based on some error estimator of choice.
+    """
     def __init__(self, mesh, op, finite_element, discrete_adjoint=False):
         self.finite_element = finite_element
         self.discrete_adjoint = discrete_adjoint
@@ -618,14 +655,14 @@ class UnsteadyProblem():
             if self.approach != 'fixed_mesh':
                 if not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity'):
                     self.get_adjoint_state()
-                    self.interpolate_adjoint_solution()
+                    self.project_adjoint_solution()
                 self.adapt_mesh()
                 if self.remesh_step != 0:
-                    self.interpolate_solution()
+                    self.project_solution()
                 else:
                     self.solution = self.op.set_initial_condition(self.V)
                 #    if not self.approach in ('uniform', 'hessian', 'explicit'):
-                #        self.interpolate_adjoint_solution()
+                #        self.project_adjoint_solution()
                 #    self.adapt_mesh()  # adapt again for the first iteration
                 #    self.solution = self.op.set_initial_condition(self.V)
             self.solve_step()
@@ -709,7 +746,7 @@ class UnsteadyProblem():
         self.indicator.project(inner(self.solution, self.interpolated_adjoint_solution))
         self.indicator.rename('dwp')
 
-    def explicit_indication(self, space=None, square=True):  # TODO: change notation to indication
+    def explicit_indication(self, space=None, square=True):
         pass
 
     def explicit_indication_adjoint(self, space=None, square=True):
@@ -763,16 +800,45 @@ class UnsteadyProblem():
             self.indicator.rename(name)
         self.M = isotropic_metric(self.indicator, op=self.op)
 
-    def get_anisotropic_metric(self, adjoint=False, relax=False):
+    def get_loseille_metric(self, adjoint=False, relax=False):
         """
-        Apply the approach of [Loseille, Dervieux, Alauzet, 2009] to extract an anisotropic mesh 
-        from the Dual Weighted Residual method.
+        Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
         """
         pass
 
-    def adapt_mesh(self, relaxation_parameter=Constant(0.9), prev_metric=None):
+    def get_power_metric(self, adjoint=False):
+        """
+        Construct an anisotropic metric using an approach inspired by [Power et al. 2006].
+
+        If `adjoint` mode is turned off, we weight the Hessian of the adjoint solution with a residual
+        for the forward PDE. Otherwise, we weight the Hessian of the forward solution with a residual
+        for the adjoint PDE.
+        """
+        if adjoint:
+            self.explicit_indication_adjoint(square=False)
+            self.p1indicator.interpolate(abs(self.p1cell_res_adjoint))
+        else:
+            self.explicit_indication(square=False)
+            self.p1indicator.interpolate(abs(self.p1cell_res))
+        H = self.get_hessian(adjoint=not adjoint)
+        for i in range(self.mesh.num_vertices()):
+            H.dat.data[i][:,:] *= self.p1indicator.dat.data[i]  # TODO: use pyop2
+        if adjoint:
+            self.M = steady_metric(self.solution, H=H, op=self.op)
+        else:
+            self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+
+
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None):
         """
         Adapt mesh according to error estimation strategy of choice.
+
+        NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
+
+        :kwarg relaxation_parameter: Scalar in the range [0, 1] used to take a weighted average
+        between metrics at the current and previous steps.
+        :kwarg prev_metric: Metric from previous step. If unprovided, metric relaxation cannot be applied.
+        :kwarg estimate_error: Toggle computation of global error estimate.
         """
         with pyadjoint.stop_annotating():
             if self.approach == 'fixed_mesh':
@@ -852,54 +918,33 @@ class UnsteadyProblem():
                 self.get_isotropic_metric()
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'loseille':
-                self.get_anisotropic_metric(adjoint=False)
+                self.get_loseille_metric(adjoint=False)
             elif self.approach == 'loseille_adjoint':
-                self.get_anisotropic_metric(adjoint=True)
+                self.get_loseille_metric(adjoint=True)
             elif self.approach == 'loseille_relaxed':
-                self.get_anisotropic_metric(adjoint=False)
+                self.get_loseille_metric(adjoint=False)
                 M = self.M.copy()
-                self.get_anisotropic_metric(adjoint=True)
+                self.get_loseille_metric(adjoint=True)
                 self.M = metric_relaxation(M, self.M)
             elif self.approach == 'loseille_superposed':
-                self.get_anisotropic_metric(adjoint=False)
+                self.get_loseille_metric(adjoint=False)
                 M = self.M.copy()
-                self.get_anisotropic_metric(adjoint=True)
+                self.get_loseille_metric(adjoint=True)
                 self.M = metric_intersection(M, self.M)
             elif self.approach == 'power':
-                self.explicit_indication_adjoint(square=False)
-                H = self.get_hessian(adjoint=False)
-                for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+                self.get_power_metric(adjoint=False)
             elif self.approach == 'power_adjoint':
-                self.explicit_indication(square=False)
-                H = self.get_hessian(adjoint=True)
-                for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                self.M = steady_metric(self.solution, H=H, op=self.op)
+                self.get_power_metric(adjoint=True)
             elif self.approach == 'power_relaxed':
-                self.explicit_indication(square=False)
-                H = self.get_hessian(adjoint=True)
-                for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                indicator = self.indicator.copy()
-                self.explicit_indication_adjoint(square=False)
-                H2 = self.get_hessian(adjoint=False)
-                for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] += H2.dat.data[i]*np.abs(self.indicator.dat.data[i])  # TODO: use pyop2
-                    H.dat.data[i][:,:] /= np.abs(indicator.dat.data[i]) + np.abs(self.indicator.dat.data[i])
-                self.M = steady_metric(self.solution+self.adjoint_solution, mesh=self.mesh, H=H, op=self.op)
+                self.get_power_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_power_metric(adjoint=True)
+                self.M = metric_relaxation(M, self.M)
             elif self.approach == 'power_superposed':
-                self.explicit_indication(square=False)
-                H = self.get_hessian(adjoint=True)
-                for i in range(len(self.indicator.dat.data)):                 # TODO: use pyop2
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                M = steady_metric(self.solution, H=H, op=self.op)
-                self.explicit_indication_adjoint(square=False)
-                H = self.get_hessian(adjoint=False)
-                for i in range(len(self.indicator.dat.data)):
-                    H.dat.data[i][:,:] *= np.abs(self.indicator.dat.data[i])
-                self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
+                self.get_power_metric(adjoint=False)
+                M = self.M.copy()
+                self.get_power_metric(adjoint=True)
+                #self.M = metric_intersection(self.M, M)
                 self.M = metric_intersection(M, self.M)
             else:
                 try:
@@ -915,7 +960,6 @@ class UnsteadyProblem():
                 else:
                     self.M_unrelaxed = self.M.copy()
                     self.M.project(metric_relaxation(project(prev_metric, self.P1_ten), self.M, relaxation_parameter))
-            # (Default relaxation of 0.9 following [Power et al 2006])
 
             # Adapt mesh
             if self.M is not None and norm(self.M) > 0.1*norm(Constant(1, domain=self.mesh)):
@@ -938,9 +982,9 @@ class UnsteadyProblem():
             # Plot results
             self.plot()
 
-    def interpolate_solution(self):
+    def project_solution(self):
         """
-        Interpolate solution onto the new mesh after a mesh adaptation.
+        Project solution onto the new mesh after a mesh adaptation.
         """
         with pyadjoint.stop_annotating():
             interpolated_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
@@ -949,9 +993,9 @@ class UnsteadyProblem():
             self.solution = interpolated_solution
             self.solution.rename(name)
 
-    def interpolate_adjoint_solution(self):
+    def project_adjoint_solution(self):
         """
-        Interpolate adjoint solution onto the new mesh after a mesh adaptation.
+        Project adjoint solution onto the new mesh after a mesh adaptation.
         """
         with pyadjoint.stop_annotating():
             self.interpolated_adjoint_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))

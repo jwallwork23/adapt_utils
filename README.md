@@ -1,9 +1,11 @@
-### Mesh adaptivity in Firedrake
+### Mesh adaptation in Firedrake
 
 In this code, anisotropic mesh adaptivity is applied to solving the nonlinear shallow water equations and advection-diffusion equations in the coastal, estuarine and ocean modelling solver provided by [Thetis][2]. The Thetis project is built upon the [Firedrake][1] project, which enables efficient FEM solution in Python by automatic generation of C code. Anisotropic mesh adaptivity is achieved using [PRAgMaTIc][3]. This is research of the Applied Modelling and Computation Group ([AMCG][4]) at
 Imperial College London.
 
 ### User instructions
+
+__[TODO: Use Zenodo instead of the below]__
 
 * Download the [Firedrake][1] install script, set
     * ``export PETSC_CONFIGURE_OPTIONS="--download-pragmatic --with-cxx-dialect=C++11"``
