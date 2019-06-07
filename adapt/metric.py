@@ -80,8 +80,11 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
                 lam3 = max(lam3, ia2 * lam_max)
             lam1 = max(lam1, ia2 * lam_max)
             lam2 = max(lam2, ia2 * lam_max)
-            if (lam[0] >= 0.9999 * ih_min2) or (lam[1] >= 0.9999 * ih_min2) or (dim == 3 and (lam[1] >= 0.9999 * ih_min2)):
-                print(msg.format(m=np.sqrt(min(1. / lam[0], 1. / lam[1]))))
+            tol = 0.9999 * ih_min2
+            if dim == 2 and (lam[0] >= tol or lam[1] >= tol):
+                print(msg.format(m=np.sqrt(min(1./lam[0], 1./lam[1]))))
+            elif dim == 3 and (lam[0] >= tol or lam[1] >= tol or lam[2] >= tol):
+                print(msg.format(m=np.sqrt(min(1./lam[0], 1./lam[1], 1./lam[2]))))
 
             # Reconstruct edited Hessian  TODO: condense and generalise notation
             if dim == 2:

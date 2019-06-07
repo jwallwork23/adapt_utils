@@ -166,7 +166,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
 
-    def explicit_estimation(self, square=True):
+    def explicit_indication(self, square=True):
         phi = self.solution
         i = self.p0test
         bcs = self.op.boundary_conditions
@@ -201,7 +201,7 @@ class SteadyTracerProblem_CG(SteadyProblem):
         self.p0indicator.rename('explicit')
         self.p1indicator.rename('explicit')
 
-    def explicit_estimation_adjoint(self, square=True):
+    def explicit_indication_adjoint(self, square=True):
         lam = self.adjoint_solution
         u = self.u
         nu = self.nu
