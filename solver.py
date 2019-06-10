@@ -390,7 +390,8 @@ class SteadyProblem():
         """
         if not hasattr(self, 'M'):
             self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
-        self.mesh = multi_adapt(self.M, op=self.op)
+        #self.mesh = multi_adapt(self.M, op=self.op)
+        self.mesh = adapt(self.mesh, self.M)
         print('Done adapting.')
         self.plot()
 
@@ -474,7 +475,7 @@ class MeshOptimisation():
                 tp.solve_adjoint()
 
             # Estimate and record error  # FIXME
-            tp.estimate_error()
+            tp.indicate_error()
             self.dat['estimator'].append(tp.estimator)
             PETSc.Sys.Print('error estimator : %.4e' % tp.estimator)
             if self.log:  # TODO: parallelise
@@ -964,8 +965,8 @@ class UnsteadyProblem():
             # Adapt mesh
             if self.M is not None and norm(self.M) > 0.1*norm(Constant(1, domain=self.mesh)):
                 # FIXME: The 0.1 factor seems pretty arbitrary
-                #self.mesh = adapt(self.mesh, self.M)
-                self.mesh = multi_adapt(self.M, op=self.op)
+                self.mesh = adapt(self.mesh, self.M)
+                #self.mesh = multi_adapt(self.M, op=self.op)
 
                 # Re-establish function spaces
                 self.V = FunctionSpace(self.mesh, self.finite_element)
