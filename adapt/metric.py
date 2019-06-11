@@ -17,12 +17,11 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
 
-    :arg f: P1 solution field.
+    :arg f: field to compute the Hessian of.
     :arg H: reconstructed Hessian associated with `f` (if already computed).
     :param op: `Options` class object providing min/max cell size values.
     :return: steady metric associated with Hessian H.
     """
-    # NOTE: A P1 field is not actually strictly required
     if H is None:
         H = construct_hessian(f, mesh=mesh, op=op)
     V = H.function_space()
@@ -37,7 +36,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
 
     msg = "WARNING: minimum element size reached as {m:.2e}"
 
-    if op.restrict == 'target' or noscale:
+    if op.normalisation == 'target' or noscale:
         if noscale:
             rescale = 1
         else:
@@ -76,7 +75,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
                 for j in range(i):
                     M.dat.data[k][i, j] = M.dat.data[k][j, i]
 
-    elif op.restrict == 'p_norm':
+    elif op.normalisation == 'p_norm':
         detH = Function(FunctionSpace(mesh, "CG", 1))
 
         for k in range(mesh.num_vertices()):
@@ -135,7 +134,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
                 for j in range(i):
                     M.dat.data[k][i, j] = M.dat.data[k][j, i]
     else:
-        raise ValueError("Restriction by {:s} not recognised.".format(op.restrict))
+        raise ValueError("Restriction by {:s} not recognised.".format(op.normalisation))
     return M
 
 def isotropic_metric(f, noscale=False, op=DefaultOptions()):
@@ -167,14 +166,14 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
         g.assign(f)
 
     # Scale metric according to normalisation strategy
-    if noscale or op.restrict == 'p_norm':
+    if noscale or op.normalisation == 'p_norm':
         rescale = 1
     else:
         rescale = op.target/min(max(norm(f), op.min_norm), op.max_norm)
     g *= 0.5*rescale
 
     # Normalise using p-norm (if requested)
-    if op.restrict == 'p_norm':
+    if op.normalisation == 'p_norm':
         g.interpolate(max_value(g, 1e-8))
         detM = Function(P1)
         detM.assign(g)
