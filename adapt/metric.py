@@ -93,7 +93,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             lam, v = la.eig(H_loc)
             det = 1.
             for i in range(dim):
-                lam[i] = max(abs(lam[i]), 1e-10)  # \ To avoid round-off error
+                lam[i] = max(abs(lam[i]), 1e-10)  # To avoid round-off error
                 det *= lam[i]
 
             # Reconstruct edited Hessian and rescale
@@ -104,8 +104,11 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             for i in range(1, dim):
                 for j in range(i):
                     M.dat.data[k][i, j] = M.dat.data[k][j, i]
-            M.dat.data[k] *= pow(det, -1./(2*op.norm_order + dim))
-            detH.dat.data[k] = pow(det, op.norm_order/(2.*op.norm_order + dim))
+            if op.norm_order is None:
+                detH.dat.data[k] = np.sqrt(det)
+            else:
+                M.dat.data[k] *= pow(det, -1./(2*op.norm_order + dim))
+                detH.dat.data[k] = pow(det, op.norm_order/(2.*op.norm_order + dim))
 
         # Scale by the target number of vertices and Hessian complexity
         M *= pow(op.target/assemble(detH*dx), 2/dim)
@@ -149,45 +152,46 @@ def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
     P1 = FunctionSpace(mesh, "CG", 1)
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
+    M = Function(TensorFunctionSpace(mesh, "CG", 1))
 
     a2 = pow(op.max_anisotropy, 2)
     h_min2 = pow(op.h_min, 2)
     h_max2 = pow(op.h_max, 2)
 
-    # Scale metric according to restriction strategy
+    # Project into P1 space (if required)
+    g = Function(P1)
+    #g.project(0.5*rescale*f)
+    #g.interpolate(abs(g))  # ensure non-negative
+    if f.function_space() != P1:
+        g.project(f)
+    else:
+        g.assign(f)
+
+    # Scale metric according to normalisation strategy
     if noscale or op.restrict == 'p_norm':
         rescale = 1
     else:
         rescale = op.target/min(max(norm(f), op.min_norm), op.max_norm)
+    g *= 0.5*rescale
 
-    # Project into P1 space and scale
-    g = Function(P1)
-    g.project(0.5*rescale*f)
-    g.interpolate(abs(g))  # ensure non-negative
-
-    # Establish metric
-    V = TensorFunctionSpace(mesh, "CG", 1)
-    M = Function(V)
-    node_set = range(mesh.num_vertices()) if bdy is None else DirichletBC(V, 0, bdy).nodes
-
-    # Restrict elements using p-norm (if requested)
+    # Normalise using p-norm (if requested)
     if op.restrict == 'p_norm':
+        g.interpolate(max_value(g, 1e-8))
         detM = Function(P1)
-        for i in node_set:
-            g.dat.data[i] = max(g.dat.data[i], 1e-8)
-            det = g.dat.data[i]**2
-            g.dat.data[i] *= pow(det, -1/2*op.norm_order + dim)
-            detM.dat.data[i] = pow(det, op.norm_order/(2*op.norm_order + dim))
+        detM.assign(g)
+        if op.norm_order is not None:
+            detM *= g
+            g *= pow(detM, -1/(2*op.norm_order + dim))
+            detM.interpolate(pow(detM, op.norm_order/(2*op.norm_order + dim)))
         g *= pow(op.target/assemble(detM*dx), 2/dim)
 
     # Construct metric
-    for i in node_set:
-        alpha = max(1. / h_max2, min(g.dat.data[i], 1. / h_min2))
-        alpha = max(alpha, alpha/a2)
-        for j in range(dim):
-            M.dat.data[i][j, j] = alpha
-        if alpha >= 0.9999 / h_min2:
-            print("WARNING: minimum element size reached!")
+    alpha = max_value(1/h_max2, min_value(g, 1/h_min2))
+    alpha = max_value(alpha, alpha/a2)
+    if dim == 2:
+        M.interpolate(as_matrix([[alpha, 0], [0, alpha]]))
+    else:
+        M.interpolate(as_matrix([[alpha, 0, 0], [0, alpha, 0], [0, 0, alpha]]))
 
     return M
 

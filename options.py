@@ -36,7 +36,7 @@ class Options(FrozenConfigurable):
     max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
     restrict = Unicode('target', help="Hessian restriction approach, from {'num_vertices', 'p_norm', 'error'}.").tag(config=True)
     target = PositiveFloat(1e+2, help="Target number of vertices / inverse desired error for 'target' restriction approach.").tag(config=True)
-    norm_order = NonNegativeInteger(2, help="Degree p of Lp norm used in 'p_norm' restriction approach.").tag(config=True)
+    norm_order = NonNegativeInteger(2, allow_none=True, help="Degree p of Lp norm used in 'p_norm' restriction approach. Use 'None' to specify infinity norm.").tag(config=True)
     min_norm = PositiveFloat(1e-6, help="Minimum norm tolerated in metric rescaling.").tag(config=True)
     max_norm = PositiveFloat(1e9, help="Maximum norm tolerated in metric rescaling.").tag(config=True)
     f_min = PositiveFloat(1e-6, help="Minimum function value tolerated for metric constructed using its Hessian.").tag(config=True)
