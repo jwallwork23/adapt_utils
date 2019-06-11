@@ -30,8 +30,10 @@ class TracerOptions(Options):
     # Solver
     params = PETScSolverParameters({'pc_type': 'lu',
                                     'mat_type': 'aij' ,
+                                    'pc_factor_mat_solver_type': 'mumps',
                                     'ksp_monitor': None,
                                     'ksp_converged_reason': None}).tag(config=True)
+    # TODO: For problems bigger than ~1e6 dofs in 2d, we want to use a scalable iterative solver
 
     # Physical 
     source_loc = List(default_value=None, allow_none=True, help="Location of source term (if any)").tag(config=True)
@@ -43,7 +45,7 @@ class TracerOptions(Options):
     region_of_interest = List(default_value=[(20., 7.5, 0.5)], help="Spatial region related to quantity of interest").tag(config=True)
 
     # Adaptivity
-    h_min = PositiveFloat(1e-4, help="Minimum tolerated element size").tag(config=True)
+    h_min = PositiveFloat(1e-8, help="Minimum tolerated element size").tag(config=True)
     h_max = PositiveFloat(5., help="Maximum tolerated element size").tag(config=True)
 
     boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary").tag(config=True)

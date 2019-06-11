@@ -412,6 +412,7 @@ class MeshOptimisation():
         self.msg = "Mesh %2d: %7d cells, objective %.4e"
         self.conv_msg = "Converged after %d iterations due to %s"
         self.startit = 0
+        self.minit = 1
         self.maxit = 35
         self.element_rtol = 0.005    # Following [Power et al 2006]
         self.objective_rtol = 0.005
@@ -430,6 +431,7 @@ class MeshOptimisation():
                     'approach': self.op.approach}
 
     def iterate(self):
+        assert self.minit >= self.startit
         M_ = None
         M = None
 
@@ -482,7 +484,7 @@ class MeshOptimisation():
                 self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
 
             # Stopping criteria
-            if i > self.startit:
+            if i >= self.minit and i > self.startit:
                 out = None
                 obj_diff = abs(self.dat['objective'][j] - self.dat['objective'][j-1])
                 el_diff = abs(self.dat['elements'][j] - self.dat['elements'][j-1])
