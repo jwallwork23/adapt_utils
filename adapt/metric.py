@@ -138,12 +138,11 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
         raise ValueError("Restriction by {:s} not recognised.".format(op.restrict))
     return M
 
-def isotropic_metric(f, bdy=None, noscale=False, op=DefaultOptions()):
+def isotropic_metric(f, noscale=False, op=DefaultOptions()):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
     :arg f: function to adapt to.
-    :param bdy: specify domain boundary to compute metric on.
     :param op: `Options` class providing min/max cell size values.
     :return: isotropic metric corresponding to `f`.
     """
@@ -274,8 +273,7 @@ def metric_relaxation(M1, M2, alpha=0.5):
     V = M1.function_space()
     assert V == M2.function_space()
     M = Function(V)
-    for i in range(V.mesh().num_vertices()):
-        M.dat.data[i][:,:] = alpha*M1.dat.data[i] + (1-alpha)*M2.dat.data[i]
+    M += alpha*M1 + (1-alpha)*M2
     return M
 
 def metric_complexity(M):
