@@ -14,6 +14,16 @@ __all__ = ["TracerOptions", "PowerOptions", "TelemacOptions", "Telemac3dOptions"
 class TracerOptions(Options):
     """
     Default parameter class for `TracerProblem`s.
+
+    This class specifies parameters relating to:
+      * the tracer transport PDE and associated initial and boundary conditions;
+      * the initial spatial discretisation used;
+      * underlying linear solver and preconditioning;
+      * mesh adaptation;
+      * the quantity of interest;
+      * the time integration scheme used (in the unsteady case).
+
+    For some problems, particular class instances additionally define analytical solutions.
     """
 
     # Domain
@@ -21,11 +31,11 @@ class TracerOptions(Options):
 
     # Timestepping
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
-    start_time = NonNegativeFloat(0., help="Start of time window of interest").tag(config=True)
-    end_time = PositiveFloat(60., help="End of time window of interest").tag(config=True)
-    dt_per_export = PositiveFloat(10, help="Number of timesteps per export").tag(config=True)
-    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation").tag(config=True)
-    timestepper = Unicode('CrankNicolson', help="Time integration scheme").tag(config=True)
+    start_time = NonNegativeFloat(0., help="Start of time window of interest.").tag(config=True)
+    end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
+    dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
+    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation.").tag(config=True)
+    timestepper = Unicode('CrankNicolson', help="Time integration scheme.").tag(config=True)
 
     # Solver
     params = PETScSolverParameters({'pc_type': 'lu',
@@ -36,19 +46,19 @@ class TracerOptions(Options):
     # TODO: For problems bigger than ~1e6 dofs in 2d, we want to use a scalable iterative solver
 
     # Physical 
-    source_loc = List(default_value=None, allow_none=True, help="Location of source term (if any)").tag(config=True)
-    source = FiredrakeScalarExpression(None, allow_none=True, help="").tag(config=True)
-    diffusivity = FiredrakeScalarExpression(Constant(1e-1)).tag(config=True)
-    fluid_velocity = FiredrakeVectorExpression(None, allow_none=True).tag(config=True)
+    source_loc = List(default_value=None, allow_none=True, help="Location of source term (if any).").tag(config=True)
+    source = FiredrakeScalarExpression(None, allow_none=True, help="Scalar source term for tracer problem.").tag(config=True)
+    diffusivity = FiredrakeScalarExpression(Constant(1e-1), help="(Scalar) diffusivity field for tracer problem.").tag(config=True)
+    fluid_velocity = FiredrakeVectorExpression(None, allow_none=True, help="Vector fluid velocity field for tracer problem.").tag(config=True)
 
     # QoI
-    region_of_interest = List(default_value=[(20., 7.5, 0.5)], help="Spatial region related to quantity of interest").tag(config=True)
+    region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
 
     # Adaptivity
-    h_min = PositiveFloat(1e-8, help="Minimum tolerated element size").tag(config=True)
-    h_max = PositiveFloat(5., help="Maximum tolerated element size").tag(config=True)
+    h_min = PositiveFloat(1e-8, help="Minimum tolerated element size.").tag(config=True)
+    h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
 
-    boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary").tag(config=True)
+    boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
         super(TracerOptions, self).__init__(approach)
@@ -78,15 +88,23 @@ class TracerOptions(Options):
 
 class PowerOptions(TracerOptions):
     """
-    Parameters for test case in [Power et al 2006].
+    Parameters for test case in [Power et al. 2006].
+
+    We consider a quantity of interest (QoI) :math:`J` of the form
+
+..  math:: J(\phi) = \int_A \phi \;\mathrm{d}x,
+
+    where :math:`A` is a square 'receiver' region.
+
+    :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh', centred=True):
         super(PowerOptions, self).__init__(approach)
         self.default_mesh = SquareMesh(40, 40, 4, 4)
 
         # Source / receiver
-        self.source_loc = [(1., 2., 0.1)]
-        self.region_of_interest = [(3., 2., 0.1)]
+        self.source_loc = [(1., 2., 0.1)] if centred else [(1., 1.5, 0.1)]
+        self.region_of_interest = [(3., 2., 0.1)] if centred else [(3., 2.5, 0.1)]
 
         # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
@@ -125,12 +143,19 @@ class PowerOptions(TracerOptions):
 
 
 class TelemacOptions(TracerOptions):
-    """
-    Parameters for the 'Point source with diffusion' test case from TELEMAC-2D validation document version 7.0.
+    r"""
+    Parameters for the 'Point source with diffusion' test case from TELEMAC-2D validation document
+    version 7.0.
 
-    :kwarg approach: mesh adaptation strategy
-    :kwarg offset: shift in x-direction for source location
-    :kwarg centred: toggle whether region of interest is positioned in the centre of the flow or not
+    We consider a quantity of interest (QoI) :math:`J` of the form
+
+..  math:: J(\phi) = \int_A \phi \;\mathrm{d}x,
+
+    where :math:`A` is a circular 'receiver' region.
+
+    :kwarg approach: Mesh adaptation strategy.
+    :kwarg offset: Shift in x-direction for source location.
+    :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
     def __init__(self, approach='fixed_mesh', offset=0., centred=False):
         super(TelemacOptions, self).__init__(approach)
@@ -215,11 +240,18 @@ class TelemacOptions(TracerOptions):
 
 class Telemac3dOptions(TracerOptions):
     """
-    Parameters for a 3D extension of the 'Point source with diffusion' test case from TELEMAC-2D validation document version 7.0.
+    Parameters for a 3D extension of the 'Point source with diffusion' test case from TELEMAC-2D
+    validation document version 7.0.
 
-    :kwarg approach: mesh adaptation strategy
-    :kwarg offset: shift in x-direction for source location
-    :kwarg centred: toggle whether region of interest is positioned in the centre of the flow or not
+    We consider a quantity of interest (QoI) :math:`J` of the form
+
+..  math:: J(\phi) = \int_A \phi \;\mathrm{d}x,
+
+    where :math:`A` is a spherical 'receiver' region.
+
+    :kwarg approach: Mesh adaptation strategy,
+    :kwarg offset: Shift in x-direction for source location.
+    :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
     def __init__(self, approach='fixed_mesh', offset=0., centred=False):
         super(Telemac3dOptions, self).__init__(approach)
@@ -304,10 +336,23 @@ class Telemac3dOptions(TracerOptions):
         return assemble(self.kernel*sol*dx(degree=12))
 
 
-# NOTE: Could set three different tracers?
+# NOTE: Could set three different tracers in Thetis implementation
 class LeVequeOptions(TracerOptions):
-    """
-    Parameters for test case in [LeVeque 1996].
+    r"""
+    Parameters for test case in [LeVeque 1996]. The analytical final time solution is the initial
+    condition, since there is no diffusivity.
+
+    We consider a quantity of interest (QoI) :math:`J` of the form
+
+..  math:: J(\phi) = \int_A \phi(T) \;\mathrm{d}x,
+
+    where :math:`A` is a circular region surrounding the slotted cylinder. That is, we seek to
+    accurately resolve the slotted cylinder at the final time.
+
+    The discontinuity of both source and QoI motivates utilising DG methods.
+
+    The QoI considered in this test case may be viewed as an extension of the QoI considered in the
+    [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
     def __init__(self, approach='fixed_mesh'):
         super(LeVequeOptions, self).__init__(approach)
@@ -383,3 +428,24 @@ class LeVequeOptions(TracerOptions):
         rescaling = area_exact/area if area != 0. else 1
         self.kernel.interpolate(rescaling*self.kernel)
         return self.kernel
+
+    def exact_solution(self, fs):
+        if not hasattr(self, 'initial_value'):
+            self.set_initial_condition(fs)
+        return self.initial_value
+
+    def exact_objective(self, fs1, fs2):
+        x, y = SpatialCoordinate(fs1.mesh())
+        bell_x0, bell_y0, bell_r0 = self.source_loc[0]
+        cone_x0, cone_y0, cone_r0 = self.source_loc[1]
+        cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
+        slot_left, slot_right, slot_top = self.source_loc[3]
+        bell = 0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0)))
+        cone = 1.0 - min_value(sqrt(pow(x-cone_x0, 2) + pow(y-cone_y0, 2))/cyl_r0, 1.0)
+        slot_cyl = conditional(sqrt(pow(x-cyl_x0, 2) + pow(y-cyl_y0, 2)) < cyl_r0,
+                     conditional(And(And(x > slot_left, x < slot_right), y < slot_top),
+                       0.0, 1.0), 0.0)
+
+        sol = 1.0 + bell + cone + slot_cyl
+        self.set_objective_kernel(fs2)
+        return assemble(self.kernel*sol*dx(degree=12))
