@@ -37,6 +37,9 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     msg = "WARNING: minimum element size reached as {m:.2e}"
     assert op.normalisation in ('complexity', 'error')
     rescale = 1 if noscale else op.target
+    if f is not None:
+        rescale /= max(norm(f), op.f_min)
+        #rescale = interpolate(rescale/max_value(abs(f), op.f_min))
     p = op.norm_order
 
     detH = Function(FunctionSpace(mesh, "CG", 1))
@@ -68,19 +71,21 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
                 M.dat.data[k][i, j] = M.dat.data[k][j, i]
 
         # Apply Lp normalisation
-        if p is None and op.normalisation == 'complexity':
-            detH.dat.data[k] = np.sqrt(det)
-        elif p >= 1:
-            M.dat.data[k] *= pow(det, -1./(2*p + dim))
-            detH.dat.data[k] = pow(det, p/(2.*p + dim))
+        if not noscale:
+            if p is None and op.normalisation == 'complexity':
+                detH.dat.data[k] = np.sqrt(det)
+            elif p >= 1:
+                M.dat.data[k] *= pow(det, -1./(2*p + dim))
+                detH.dat.data[k] = pow(det, p/(2.*p + dim))
 
     # Scale by target complexity / desired error
-    if op.normalisation == 'complexity':
-        M *= pow(op.target/assemble(detH*dx), 2/dim)
-    else:
-        M *= dim/op.target
-        if p is not None:
-            M *= pow(assemble(detH*dx), 1/p)
+    if not noscale:
+        if op.normalisation == 'complexity':
+            M *= pow(op.target/assemble(detH*dx), 2/dim)
+        else:
+            M *= dim/op.target
+            if p is not None:
+                M *= pow(assemble(detH*dx), 1/p)
 
     for k in range(mesh.num_vertices()):
 
@@ -133,14 +138,14 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
     else:
         g.assign(f)
 
-    # Scale metric according to normalisation strategy
+    # Scale metric according to normalisation strategy  # TODO: make consistent
     if noscale or op.normalisation == 'p_norm':
         rescale = 1
     else:
         rescale = op.target/min(max(norm(f), op.min_norm), op.max_norm)
     g *= 0.5*rescale
 
-    # Normalise using p-norm (if requested)
+    # Normalise using p-norm (if requested)  # TODO: make this standard
     if op.normalisation == 'p_norm':
         g.interpolate(max_value(g, 1e-8))
         detM = Function(P1)
