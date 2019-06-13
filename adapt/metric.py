@@ -35,106 +35,71 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     M = Function(V)
 
     msg = "WARNING: minimum element size reached as {m:.2e}"
+    assert op.normalisation in ('complexity', 'error')
+    rescale = 1 if noscale else op.target
+    p = op.norm_order
 
-    if op.normalisation == 'target' or noscale:
-        if noscale:
-            rescale = 1
+    detH = Function(FunctionSpace(mesh, "CG", 1))
+
+    for k in range(mesh.num_vertices()):
+
+        # Generate local Hessian
+        H_loc = H.dat.data[k]
+        for i in range(dim-1):
+            for j in range(i+1, dim):
+                mean_diag = 0.5*(H_loc[i][j] + H_loc[j][i])
+                H_loc[i][j] = mean_diag
+                H_loc[j][i] = mean_diag
+
+        # Find eigenpairs of Hessian and truncate eigenvalues
+        lam, v = la.eig(H_loc)
+        det = 1.
+        for i in range(dim):
+            lam[i] = max(abs(lam[i]), 1e-10)  # To avoid round-off error
+            det *= lam[i]
+
+        # Reconstruct edited Hessian and rescale
+        for l in range(dim):
+            for i in range(dim):
+                for j in range(i, dim):
+                    M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
+        for i in range(1, dim):
+            for j in range(i):
+                M.dat.data[k][i, j] = M.dat.data[k][j, i]
+        if p is None and op.normalisation == 'complexity':
+            detH.dat.data[k] = np.sqrt(det)
         else:
-            if f is None:
-                rescale = op.target
-            else:
-                rescale = op.target / max(norm(f), op.f_min)
-            #rescale = interpolate(op.target / max_value(abs(f), op.f_min), P1)
+            M.dat.data[k] *= pow(det, -1./(2*p + dim))
+            detH.dat.data[k] = pow(det, p/(2.*p + dim))
 
-        for k in range(mesh.num_vertices()):
-
-            # Generate local Hessian, avoiding round-off error
-            H_loc = rescale*H.dat.data[k]
-            for i in range(dim-1):
-                for j in range(i+1, dim):
-                    mean_diag = 0.5*(H_loc[i][j] + H_loc[j][i])
-                    H_loc[i][j] = mean_diag
-                    H_loc[j][i] = mean_diag
-
-            # Find eigenpairs and truncate eigenvalues
-            lam, v = la.eig(H_loc)
-            for l in range(dim):
-                 lam[l] = min(ih_min2, max(ih_max2, abs(lam[l])))
-            lam_max = max(lam)
-            for l in range(dim):
-                lam[l] = max(lam[l], ia2*lam_max)
-            if lam_max >= 0.9999*ih_min2:
-                print(msg.format(m=np.sqrt(min(1./lam))))
-
-            # Reconstruct edited Hessian
-            for l in range(dim):
-                for i in range(dim):
-                    for j in range(i, dim):
-                        M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
-            for i in range(1, dim):
-                for j in range(i):
-                    M.dat.data[k][i, j] = M.dat.data[k][j, i]
-
-    elif op.normalisation == 'p_norm':
-        detH = Function(FunctionSpace(mesh, "CG", 1))
-
-        for k in range(mesh.num_vertices()):
-
-            # Generate local Hessian
-            H_loc = H.dat.data[k]
-            for i in range(dim-1):
-                for j in range(i+1, dim):
-                    mean_diag = 0.5*(H_loc[i][j] + H_loc[j][i])
-                    H_loc[i][j] = mean_diag
-                    H_loc[j][i] = mean_diag
-
-            # Find eigenpairs of Hessian and truncate eigenvalues
-            lam, v = la.eig(H_loc)
-            det = 1.
-            for i in range(dim):
-                lam[i] = max(abs(lam[i]), 1e-10)  # To avoid round-off error
-                det *= lam[i]
-
-            # Reconstruct edited Hessian and rescale
-            for l in range(dim):
-                for i in range(dim):
-                    for j in range(i, dim):
-                        M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
-            for i in range(1, dim):
-                for j in range(i):
-                    M.dat.data[k][i, j] = M.dat.data[k][j, i]
-            if op.norm_order is None:
-                detH.dat.data[k] = np.sqrt(det)
-            else:
-                M.dat.data[k] *= pow(det, -1./(2*op.norm_order + dim))
-                detH.dat.data[k] = pow(det, op.norm_order/(2.*op.norm_order + dim))
-
-        # Scale by the target number of vertices and Hessian complexity
+    if op.normalisation == 'complexity':
         M *= pow(op.target/assemble(detH*dx), 2/dim)
-
-        for k in range(mesh.num_vertices()):
-
-            # Find eigenpairs of metric and truncate eigenvalues
-            lam, v = la.eig(M.dat.data[k])
-            det = 1.
-            for i in range(dim):
-                lam[i] = min(ih_min2, max(ih_max2, abs(lam[i])))
-            lam_max = max(lam)
-            for i in range(dim):
-                lam[i] = max(lam[i], ia2*lam_max)
-            if lam_max >= 0.9999*ih_min2:
-                print(msg.format(m=np.sqrt(min(1./lam))))
-
-            # Reconstruct edited Hessian
-            for l in range(dim):
-                for i in range(dim):
-                    for j in range(i, dim):
-                        M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
-            for i in range(1, dim):
-                for j in range(i):
-                    M.dat.data[k][i, j] = M.dat.data[k][j, i]
     else:
-        raise ValueError("Restriction by {:s} not recognised.".format(op.normalisation))
+        M *= dim/op.target
+        if p is not None:
+            M *= pow(assemble(detH*dx), 1/p)
+
+    for k in range(mesh.num_vertices()):
+
+        # Find eigenpairs of metric and truncate eigenvalues
+        lam, v = la.eig(M.dat.data[k])
+        det = 1.
+        for i in range(dim):
+            lam[i] = min(ih_min2, max(ih_max2, abs(lam[i])))
+        lam_max = max(lam)
+        for i in range(dim):
+            lam[i] = max(lam[i], ia2*lam_max)
+        if lam_max >= 0.9999*ih_min2:
+            print(msg.format(m=np.sqrt(min(1./lam))))
+
+        # Reconstruct edited Hessian
+        for l in range(dim):
+            for i in range(dim):
+                for j in range(i, dim):
+                    M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
+        for i in range(1, dim):
+            for j in range(i):
+                M.dat.data[k][i, j] = M.dat.data[k][j, i]
     return M
 
 def isotropic_metric(f, noscale=False, op=DefaultOptions()):
