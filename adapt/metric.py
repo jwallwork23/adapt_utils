@@ -72,8 +72,9 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
 
         # Apply Lp normalisation
         if not noscale:
-            if p is None and op.normalisation == 'complexity':
-                detH.dat.data[k] = np.sqrt(det)
+            if p is None:
+                if op.normalisation == 'complexity':
+                    detH.dat.data[k] = np.sqrt(det)
             elif p >= 1:
                 M.dat.data[k] *= pow(det, -1./(2*p + dim))
                 detH.dat.data[k] = pow(det, p/(2.*p + dim))
@@ -83,7 +84,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
         if op.normalisation == 'complexity':
             M *= pow(op.target/assemble(detH*dx), 2/dim)
         else:
-            M *= dim/op.target
+            M *= dim*op.target  # NOTE in the 'error' case this is the inverse thereof
             if p is not None:
                 M *= pow(assemble(detH*dx), 1/p)
 
