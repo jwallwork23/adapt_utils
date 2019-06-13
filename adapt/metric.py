@@ -66,12 +66,15 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
         for i in range(1, dim):
             for j in range(i):
                 M.dat.data[k][i, j] = M.dat.data[k][j, i]
+
+        # Apply Lp normalisation
         if p is None and op.normalisation == 'complexity':
             detH.dat.data[k] = np.sqrt(det)
-        else:
+        elif p >= 1:
             M.dat.data[k] *= pow(det, -1./(2*p + dim))
             detH.dat.data[k] = pow(det, p/(2.*p + dim))
 
+    # Scale by target complexity / desired error
     if op.normalisation == 'complexity':
         M *= pow(op.target/assemble(detH*dx), 2/dim)
     else:
