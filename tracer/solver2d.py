@@ -389,7 +389,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.p0indicator.rename('dwr_adjoint')
         self.p1indicator.rename('dwr_adjoint')
         
-    def get_loseille_metric(self, adjoint=False, relax=False, superpose=True):
+    def get_loseille_metric(self, adjoint=False, relax=True, superpose=False):
         assert not (relax and superpose)
 
         # Solve adjoint problem
@@ -402,7 +402,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         adj = Function(self.P1).interpolate(abs(adj))
 
         # Get potential to take Hessian w.r.t.
-        x, y = SpatialCoordinate(self.mesh)
+        # x, y = SpatialCoordinate(self.mesh)
         if adjoint:
             source = self.op.box(self.P0)
             # F1 = -sol*self.u[0] - self.nu*sol.dx(0) - source*x
@@ -443,7 +443,8 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         if superpose:
             Mf = Function(self.P1_ten)
-            Mf.interpolate(Hf*adj)
+            for i in range(self.mesh.num_vertices()):
+                Mf.dat.data[i][:,:] += Hf.dat.data[i]*adj.dat.data[i]
             self.M = metric_intersection(self.M, Mf)
 
         # TODO: boundary contributions
