@@ -34,9 +34,9 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     detH = Function(FunctionSpace(mesh, "CG", 1))
 
     # Set parameters
-    ia2 = pow(op.max_anisotropy, -2)  # Inverse square max aspect ratio
-    ih_min2 = pow(op.h_min, -2)  # Inverse square minimal side-length
-    ih_max2 = pow(op.h_max, -2)  # Inverse square maximal side-length
+    ia2 = pow(op.max_anisotropy, -2)
+    ih_min2 = pow(op.h_min, -2)
+    ih_max2 = pow(op.h_max, -2)
     assert op.normalisation in ('complexity', 'error')
     rescale = 1 if noscale else op.target
     if f is not None:
