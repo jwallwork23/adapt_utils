@@ -21,22 +21,22 @@ __all__ = ["create_dict", "plot_objective", "plot_error", "plot_estimate", "plot
 def create_dict(centred=True, second_order=False):
     dat = {}
     dat['Uniform'] = {}
-    dat['Uniform']['mesh'] = [4000, 16000, 64000, 256000, 1024000]
+    dat['Uniform']['elements'] = [4000, 16000, 64000, 256000, 1024000]
     if centred:
-        dat['Uniform']['objective'] = [2.0547e-01, 1.6873e-01, 1.6259e-01, 1.6343e-01, 1.6345e-01]
+        dat['Uniform']['qoi'] = [2.0547e-01, 1.6873e-01, 1.6259e-01, 1.6343e-01, 1.6345e-01]
     else:
-        dat['Uniform']['objective'] = [8.9190e-02, 7.2197e-02, 6.9363e-02, 6.9720e-02, 6.9722e-02]
+        dat['Uniform']['qoi'] = [8.9190e-02, 7.2197e-02, 6.9363e-02, 6.9720e-02, 6.9722e-02]
     if not second_order:
-        dat['Isotropic'] = {'mesh': [], 'objective': [], 'estimator': [], 'iterations': []}
-        dat['A posteriori'] = {'mesh': [], 'objective': [], 'estimator': [], 'iterations': []}
-        dat['A priori'] = {'mesh': [], 'objective': [], 'estimator': [], 'iterations': []} 
+        dat['Isotropic'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []}
+        dat['A posteriori'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []}
+        dat['A priori'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []} 
     else:
-        dat['Isotropic (av.)'] = {'mesh': [], 'objective': [], 'estimator': [], 'iterations': []}
-        dat['Isotropic (sup.)'] = {'mesh': [], 'objective': [], 'estimator': [], 'iterations': []}
-        dat['A posteriori (av.)'] = {'mesh': [], 'objective': [], 'estimator': [], 'iterations': []}
-        dat['A posteriori (sup.)'] = {'mesh': [], 'objective': [], 'estimator': [], 'iterations': []}
-        dat['A priori (av.)'] = {'mesh': [], 'objective': [], 'estimator': [], 'iterations': []} 
-        dat['A priori (sup.)'] = {'mesh': [], 'objective': [], 'estimator': [], 'iterations': []} 
+        dat['Isotropic (av.)'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []}
+        dat['Isotropic (sup.)'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []}
+        dat['A posteriori (av.)'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []}
+        dat['A posteriori (sup.)'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []}
+        dat['A priori (av.)'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []} 
+        dat['A priori (sup.)'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []} 
     return dat
 
 def plot_objective(dat, centred=True, title=None, filename=None, filepath='plots', err=1):
@@ -44,7 +44,7 @@ def plot_objective(dat, centred=True, title=None, filename=None, filepath='plots
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for approach, i in zip(dat.keys(), range(len(dat.keys()))):
-        ax.semilogx(dat[approach]['mesh'], dat[approach]['objective'], markers[approach], color=colours[approach], label=approach)
+        ax.semilogx(dat[approach]['elements'], dat[approach]['qoi'], markers[approach], color=colours[approach], label=approach)
     ax.tick_params(axis='both', which='major', labelsize=12)
     if title is not None:
         plt.title(title)
@@ -66,10 +66,10 @@ def plot_error(dat, centred=True, title=None, filename=None, filepath='plots', e
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for approach, i in zip(dat.keys(), range(len(dat.keys()))):
-        J_err = np.array(dat[approach]['objective']) - J
+        J_err = np.array(dat[approach]['qoi']) - J
         J_err = np.abs(J_err)
         J_err /= np.abs(J)
-        ax.semilogx(dat[approach]['mesh'], J_err, markers[approach], color=colours[approach], label=approach)
+        ax.semilogx(dat[approach]['elements'], J_err, markers[approach], color=colours[approach], label=approach)
 #     ax.set_aspect(aspect=0.5)
     ax.tick_params(axis='both', which='major', labelsize=12)
 #     ax.tick_params(axis='both', which='minor', labelsize=16)
@@ -94,7 +94,7 @@ def plot_estimate(dat, title=None, filename=None, filepath='plots', second_order
     ax = fig.add_subplot(111)
     for approach, i in zip(dat.keys(), range(len(dat.keys()))):
         if approach  != 'Uniform':
-            ax.loglog(dat[approach]['mesh'], dat[approach]['estimator'], markers[approach], color=colours[approach], label=approach)
+            ax.loglog(dat[approach]['elements'], dat[approach]['estimator'], markers[approach], color=colours[approach], label=approach)
     ax.tick_params(axis='both', which='major', labelsize=12)
     if title is not None:
         plt.title(title)
@@ -120,9 +120,9 @@ def plot_effectivity(dat, centred=True, title=None, filename=None, filepath='plo
     for approach, i in zip(dat.keys(), range(len(dat.keys()))):
         if approach  != 'Uniform':
             estimator = np.array(dat[approach]['estimator'])
-            J_err = np.array(dat[approach]['objective']) - J
+            J_err = np.array(dat[approach]['qoi']) - J
             effectivity = np.abs(J_err/estimator)
-            ax.loglog(dat[approach]['mesh'], effectivity, markers[approach], color=colours[approach], label=approach)
+            ax.loglog(dat[approach]['elements'], effectivity, markers[approach], color=colours[approach], label=approach)
     ax.tick_params(axis='both', which='major', labelsize=12)
     if title is not None:
         plt.title(title)
