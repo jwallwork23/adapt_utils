@@ -33,7 +33,7 @@ class Options(FrozenConfigurable):
     plot_metric = Bool(False, help="Toggle plotting of metric field.").tag(config=True)
 
     # Metric
-    max_anisotropy = PositiveFloat(100., help="Maximum tolerated anisotropy.").tag(config=True)
+    max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
     normalisation = Unicode('complexity', help="Metric normalisation approach, from {'complexity', 'error'}.").tag(config=True)
     target = PositiveFloat(1e+2, help="Target complexity / inverse desired error for normalisation, as appropriate.").tag(config=True)
     norm_order = NonNegativeInteger(None, allow_none=True, help="Degree p of Lp norm used in 'p_norm' normalisation approach. Use 'None' to specify infinity norm.").tag(config=True)

@@ -55,7 +55,7 @@ class TracerOptions(Options):
     region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
 
     # Adaptivity
-    h_min = PositiveFloat(1e-8, help="Minimum tolerated element size.").tag(config=True)
+    h_min = PositiveFloat(1e-10, help="Minimum tolerated element size.").tag(config=True)
     h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
 
     boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)

@@ -29,12 +29,14 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
 
+    # Functions to hold metric and its determinant
+    M = Function(V)
+    detH = Function(FunctionSpace(mesh, "CG", 1))
+
+    # Set parameters
     ia2 = pow(op.max_anisotropy, -2)  # Inverse square max aspect ratio
     ih_min2 = pow(op.h_min, -2)  # Inverse square minimal side-length
     ih_max2 = pow(op.h_max, -2)  # Inverse square maximal side-length
-    M = Function(V)
-
-    msg = "WARNING: minimum element size reached as {m:.2e}"
     assert op.normalisation in ('complexity', 'error')
     rescale = 1 if noscale else op.target
     if f is not None:
@@ -42,8 +44,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
         #rescale = interpolate(rescale/max_value(abs(f), op.f_min))
     p = op.norm_order
 
-    detH = Function(FunctionSpace(mesh, "CG", 1))
-
+    msg = "WARNING: minimum element size reached as {m:.2e}"
     for k in range(mesh.num_vertices()):
 
         # Generate local Hessian
@@ -98,6 +99,9 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
         lam_max = max(lam)
         for i in range(dim):
             lam[i] = max(lam[i], ia2*lam_max)
+            if lam[i] < ia2*lam_max:
+                lam[i] = ia2*lam_max
+                print("WARNING: Maximum anisotropy reached")
         if lam_max >= 0.9999*ih_min2:
             print(msg.format(m=np.sqrt(min(1./lam))))
 
@@ -124,38 +128,38 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
     P1 = FunctionSpace(mesh, "CG", 1)
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
-    M = Function(TensorFunctionSpace(mesh, "CG", 1))
 
+    # Functions to hold metric and its diagonal entry
+    M = Function(TensorFunctionSpace(mesh, "CG", 1))
+    g = Function(P1)
+
+    # Set parameters
     a2 = pow(op.max_anisotropy, 2)
     h_min2 = pow(op.h_min, 2)
     h_max2 = pow(op.h_max, 2)
+    assert op.normalisation in ('complexity', 'error')
+    rescale = 1 if noscale else op.target
+    if f is not None:
+        rescale /= max(norm(f), op.f_min)
+    p = op.norm_order
 
-    # Project into P1 space (if required)
-    g = Function(P1)
-    #g.project(0.5*rescale*f)
-    #g.interpolate(abs(g))  # ensure non-negative
-    if f.function_space() != P1:
-        g.project(f)
-    else:
-        g.assign(f)
+    # Project into P1 space
+    g.project(max_value(abs(rescale*f), 1e-10))
+    g.interpolate(abs(g))  # ensure positivity
 
-    # Scale metric according to normalisation strategy  # TODO: make consistent
-    if noscale or op.normalisation == 'p_norm':
-        rescale = 1
-    else:
-        rescale = op.target/min(max(norm(f), op.min_norm), op.max_norm)
-    g *= 0.5*rescale
-
-    # Normalise using p-norm (if requested)  # TODO: make this standard
-    if op.normalisation == 'p_norm':
-        g.interpolate(max_value(g, 1e-8))
+    # Normalise
+    if not noscale:
         detM = Function(P1)
         detM.assign(g)
         if op.norm_order is not None:
+            assert p >= 1
             detM *= g
-            g *= pow(detM, -1/(2*op.norm_order + dim))
-            detM.interpolate(pow(detM, op.norm_order/(2*op.norm_order + dim)))
-        g *= pow(op.target/assemble(detM*dx), 2/dim)
+            g *= pow(detM, -1/(2*p + dim))
+            detM.interpolate(pow(detM, p/(2*p + dim)))
+        if op.normalisation == 'complexity':
+            g *= pow(op.target/assemble(detM*dx), 2/dim)
+        else:
+            g *= pow(assemble(detM*dx), 1/p)
 
     # Construct metric
     alpha = max_value(1/h_max2, min_value(g, 1/h_min2))
