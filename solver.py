@@ -166,7 +166,7 @@ class SteadyProblem():
 
     def dwr_indication(self):
         """
-        Indicate errors in the objective functional by the Dual Weighted Residual method. This is
+        Indicate errors in the quantity of interest by the Dual Weighted Residual method. This is
         inherently problem-dependent.
 
         The resulting P0 field should be stored as `self.p0indicator`.
@@ -410,7 +410,7 @@ class MeshOptimisation():
         self.di = create_directory(op.di)
 
         # Default tolerances etc
-        self.msg = "Mesh %2d: %7d cells, objective %.4e"
+        self.msg = "Mesh %2d: %7d cells, qoi %.4e"
         self.conv_msg = "Converged after %d iterations due to %s"
         self.startit = 0
         self.minit = 1
@@ -489,7 +489,7 @@ class MeshOptimisation():
                 obj_diff = abs(self.dat['qoi'][j] - self.dat['qoi'][j-1])
                 el_diff = abs(self.dat['elements'][j] - self.dat['elements'][j-1])
                 if obj_diff < self.qoi_rtol*self.dat['qoi'][j-1]:
-                    out = self.conv_msg % (i+1, 'convergence in objective functional.')
+                    out = self.conv_msg % (i+1, 'convergence in quantity of interest.')
                 #elif self.dat['estimator'][j] < self.estimator_atol:  # FIXME
                 #    out = self.conv_msg % (i+1, 'convergence in error estimator.')
                 elif el_diff < self.element_rtol*self.dat['elements'][j-1] and i > self.startit+1:
@@ -533,7 +533,7 @@ class OuterLoop():
         self.di = create_directory(self.op.di)
 
         # Default tolerances etc
-        self.msg = "{:s} {:.2e} elements {:7d} iter {:2d} time {:6.1f} objective {:.4e} estimator {:.4e}\n"
+        self.msg = "{:s} {:.2e} elements {:7d} iter {:2d} time {:6.1f} qoi {:.4e} estimator {:.4e}\n"
         self.maxit = 35
         self.element_rtol = 0.005    # Following [Power et al 2006]
         self.qoi_rtol = 0.005
@@ -556,6 +556,7 @@ class OuterLoop():
         logfile.write('element_rtol: {:.4f}\n'.format(self.element_rtol))
         logfile.write('qoi_rtol: {:.4f}\n'.format(self.qoi_rtol))
         logfile.write('outer_maxit: {:d}\n\n'.format(self.outer_maxit))
+        logfile.close()
 
         for i in range(self.outer_startit, self.outer_maxit):
 
@@ -572,6 +573,7 @@ class OuterLoop():
             self.final_J = opt.dat['qoi'][-1]
 
             # Logging
+            logfile = open(self.di + 'desired_error_test.log', 'a+')
             logfile.write(self.msg.format(mode,
                                           1/self.op.target,
                                           opt.dat['elements'][-1],
@@ -579,23 +581,25 @@ class OuterLoop():
                                           opt.dat['time'],
                                           opt.dat['qoi'][-1],
                                           opt.dat['estimator'][-1]))
+            logfile.close()
             dat['elements'].append(opt.dat['elements'][-1])
             dat['qoi'].append(opt.dat['qoi'][-1])
             dat['time'].append(opt.dat['time'][-1])
             dat['estimator'].append(opt.dat['estimator'][-1])
-            # TODO: pickle this!
             PETSc.Sys.Print("%d %.4e %.4e %a" % (opt.dat['elements'][-1],
                                                  opt.dat['qoi'][-1],
                                                  opt.dat['estimator'][-1]))
 
-            # Convergence criterion: relative tolerance for objective functional
+            # Convergence criterion: relative tolerance for QoI
             if i > self.outer_startit:
                 obj_diff = abs(opt.dat['qoi'][-1] - J_)
                 if obj_diff < self.qoi_rtol*J_:
-                    PETSc.Sys.Print(opt.conv_msg % (i+1, 'convergence in objective functional.'))
+                    PETSc.Sys.Print(opt.conv_msg % (i+1, 'convergence in quantity of interest.'))
                     break
             J_ = opt.dat['qoi'][-1]
-        logfile.close()
+        picklefile = open(self.di + 'desired_error.pickle', 'wb')
+        pickle.dump(dat, picklefile)
+        picklefile.close()
 
 
 class UnsteadyProblem():
@@ -770,7 +774,7 @@ class UnsteadyProblem():
 
     def dwr_indication(self):
         """
-        Indicate errors in the objective functional by the Dual Weighted Residual method. This is
+        Indicate errors in the quantity of interest by the Dual Weighted Residual method. This is
         inherently problem-dependent.
 
         The resulting P0 field should be stored as `self.indicator`.

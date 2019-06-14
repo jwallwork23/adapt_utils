@@ -52,8 +52,8 @@ class Options(FrozenConfigurable):
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
     degree = PositiveInteger(1, help="Order of function space").tag(config=True)
-    element_rtol = PositiveFloat(0.01, help="Relative tolerance for convergence in mesh element count").tag(config=True)
-    objective_rtol = PositiveFloat(0.00025, help="Relative tolerance for convergence in objective value.").tag(config=True)
+    element_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in mesh element count").tag(config=True)
+    qoi_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in objective value.").tag(config=True)
 
     # Adjoint
     adjoint_steps = NonNegativeInteger(1000, help="Number of adjoint steps used").tag(config=True)
