@@ -1,5 +1,4 @@
 from firedrake import *
-from firedrake_adjoint import *
 
 import numpy as np
 
@@ -153,9 +152,8 @@ class SteadyTracerProblem3d(SteadyProblem):
         sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
         sol = Function(tp_p2.V)
         sol.interpolate(sol_p2 - sol)
-        with pyadjoint.stop_annotating():  # TODO: temp
-            self.errorterm = Function(self.P2)
-            self.errorterm.project(sol)
+        self.errorterm = Function(self.P2)
+        self.errorterm.project(sol)
         return self.errorterm
 
     def get_hessian(self, adjoint=False):
@@ -276,20 +274,19 @@ class SteadyTracerProblem3d(SteadyProblem):
             R -= (f - dot(u, grad(phi)) + div(nu*grad(phi)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
 
         # Sum
-        with pyadjoint.stop_annotating():  # TODO: temp
-            self.cell_res = assemble(i*R*dx)
-            if self.op.dwr_approach == 'error_representation':
-                self.p0indicator = Function(self.P0)
-                self.p0indicator += self.cell_res + self.edge_res
-                #self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
-                #self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
-                self.p1indicator = project(self.p0indicator, self.P1)
-            else:
-                raise NotImplementedError
-            self.p0indicator.interpolate(abs(self.p0indicator))
-            self.p1indicator.interpolate(abs(self.p1indicator))
-            self.p0indicator.rename('dwr')
-            self.p1indicator.rename('dwr')
+        self.cell_res = assemble(i*R*dx)
+        if self.op.dwr_approach == 'error_representation':
+            self.p0indicator = Function(self.P0)
+            self.p0indicator += self.cell_res + self.edge_res
+            #self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
+            #self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
+            self.p1indicator = project(self.p0indicator, self.P1)
+        else:
+            raise NotImplementedError
+        self.p0indicator.interpolate(abs(self.p0indicator))
+        self.p1indicator.interpolate(abs(self.p1indicator))
+        self.p0indicator.rename('dwr')
+        self.p1indicator.rename('dwr')
 
     def dwr_estimation(self):
         u = self.u

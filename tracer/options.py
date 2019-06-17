@@ -1,5 +1,4 @@
 from firedrake import *
-from firedrake_adjoint import *
 from thetis.configuration import *
 import math
 from scipy.special import kn
@@ -192,8 +191,7 @@ class TelemacOptions(TracerOptions):
     def set_source(self, fs):
         x0, y0, r0 = self.source_loc[0]
         self.source = Function(fs)
-        with pyadjoint.stop_annotating():
-            nrm=assemble(self.disk(fs, source=True)*dx)
+        nrm=assemble(self.disk(fs, source=True)*dx)
         scaling = pi*r0*r0/nrm if nrm != 0 else 1
         scaling *= 0.5*self.source_value  # TODO: where does factor of half come from?
         self.source.interpolate(self.disk(fs, source=True, scale=scaling))
@@ -290,8 +288,7 @@ class Telemac3dOptions(TracerOptions):
     def set_source(self, fs):
         x0, y0, z0, r0 = self.source_loc[0]
         self.source = Function(fs)
-        with pyadjoint.stop_annotating():
-            nrm=assemble(self.ball(fs, source=True)*dx)
+        nrm=assemble(self.ball(fs, source=True)*dx)
         scaling = pi*r0*r0/nrm if nrm != 0 else 1
         scaling *= 0.5*self.source_value
         self.source.interpolate(self.ball(fs, source=True, scale=scaling))

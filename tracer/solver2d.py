@@ -1,5 +1,4 @@
 from firedrake import *
-from firedrake_adjoint import *
 
 import numpy as np
 
@@ -35,7 +34,6 @@ class SteadyTracerProblem2d(SteadyProblem):
                  op,
                  mesh=None,
                  discrete_adjoint=False,
-                 #discrete_adjoint=True,
                  finite_element=FiniteElement("Lagrange", triangle, 1),
                  prev_solution=None):
         super(SteadyTracerProblem2d, self).__init__(mesh, op, finite_element, discrete_adjoint, None)
@@ -154,9 +152,8 @@ class SteadyTracerProblem2d(SteadyProblem):
         sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
         sol = Function(tp_p2.V)
         sol.interpolate(sol_p2 - sol)
-        with pyadjoint.stop_annotating():  # TODO: temp
-            self.errorterm = Function(self.P2)
-            self.errorterm.project(sol)
+        self.errorterm = Function(self.P2)
+        self.errorterm.project(sol)
         return self.errorterm
 
     def get_hessian(self, adjoint=False):
