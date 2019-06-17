@@ -268,7 +268,7 @@ class SteadyTracerProblem2d(SteadyProblem):
             L += coeff*f*dx
 
         # Evaluate error estimator
-        self.estimator = assemble(L-a)
+        self.estimator = np.abs(assemble(L-a))
         return self.estimator
 
     def dwr_estimation_adjoint(self):
@@ -298,7 +298,7 @@ class SteadyTracerProblem2d(SteadyProblem):
             L += coeff*self.kernel*dx
 
         # Evaluate error estimator
-        self.estimator = assemble(L-a)
+        self.estimator = np.abs(assemble(L-a))
         return self.estimator
 
     def dwr_indication(self):
