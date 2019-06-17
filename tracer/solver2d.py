@@ -372,9 +372,9 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.edge_res_adjoint = Function(self.P0)
         solve(mass_term == flux_terms, self.edge_res_adjoint)
 
-        ## Account for stabilisation error  # TODO
-        #if self.op.order_increase and self.stab == 'SUPG':
-        #    R -= -(dJdphi + div(u*lam) + div(nu*grad(lam)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
+        # Account for stabilisation error
+        if self.op.order_increase and self.stab == 'SUPG':
+            R -= -(dJdphi + div(u*lam) + div(nu*grad(lam)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
 
         # Sum
         self.cell_res_adjoint = assemble(i*R*dx)
