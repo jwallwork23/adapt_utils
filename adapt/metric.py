@@ -151,7 +151,7 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
     if not noscale:
         detM = Function(P1)
         detM.assign(g)
-        if op.norm_order is not None:
+        if p is not None:
             assert p >= 1
             detM *= g
             g *= pow(detM, -1/(2*p + dim))
@@ -159,7 +159,8 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
         if op.normalisation == 'complexity':
             g *= pow(op.target/assemble(detM*dx), 2/dim)
         else:
-            g *= pow(assemble(detM*dx), 1/p)
+            if p is not None:
+                g *= pow(assemble(detM*dx), 1/p)
 
     # Construct metric
     alpha = max_value(1/h_max2, min_value(g, 1/h_min2))

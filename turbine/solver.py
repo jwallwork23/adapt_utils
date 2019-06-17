@@ -133,7 +133,7 @@ class SteadyTurbineProblem(SteadyProblem):
         k_u = self.kernel.split()[0]
         k_u.interpolate(Constant(1/3)*self.turbine_density*sqrt(inner(u, u))*u)
 
-    def objective_functional(self):
+    def quantity_of_interest(self):
         return self.objective
 
     def get_hessian_metric(self, adjoint=False):
@@ -435,11 +435,11 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         solver_obj.iterate(update_forcings=update_forcings)
         self.solution.assign(solver_obj.fields.solution_2d)
         if num_turbines > 0:
-            self.objective = cb.average_power
+            self.qoi = cb.average_power
         self.ts = solver_obj.timestepper
 
-    def objective_functional(self):
-        return self.objective
+    def quantity_of_interest(self):
+        return self.qoi
 
     def get_hessian_metric(self, adjoint=False):
         sol = self.adjoint_solution if adjoint else self.solution

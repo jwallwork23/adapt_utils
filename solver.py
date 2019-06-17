@@ -87,7 +87,7 @@ class SteadyProblem():
         """
         pass
 
-    def objective_functional(self):
+    def quantity_of_interest(self):
         """
         Functional of interest which takes the PDE solution as input.
         """
@@ -106,7 +106,7 @@ class SteadyProblem():
         Solve the adjoint PDE in the discrete sense, using pyadjoint.
         """
         # compute some gradient in order to get adjoint solutions
-        J = self.objective_functional()
+        J = self.quantity_of_interest()
         compute_gradient(J, Control(self.gradient_field))
         tape = get_working_tape()
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
@@ -465,7 +465,7 @@ class MeshOptimisation():
             # Extract data
             self.dat['elements'].append(tp.mesh.num_cells())
             self.dat['vertices'].append(tp.mesh.num_vertices())
-            self.dat['qoi'].append(tp.objective_functional())
+            self.dat['qoi'].append(tp.quantity_of_interest())
             PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i]))
             if self.log:  # TODO: parallelise
                 self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][j]))
@@ -544,10 +544,10 @@ class OuterLoop():
         self.base = 10
         self.start_error = 1
 
-        dat = {'elements': [], 'qoi': [], 'time': [], 'estimator': []}
 
     def desired_error_loop(self):
         mode = 'desired_error'
+        dat = {'elements': [], 'qoi': [], 'time': [], 'estimator': []}
 
         # Create log file
         logfile = open(self.di + 'desired_error_test.log', 'a+')
@@ -584,11 +584,11 @@ class OuterLoop():
             logfile.close()
             dat['elements'].append(opt.dat['elements'][-1])
             dat['qoi'].append(opt.dat['qoi'][-1])
-            dat['time'].append(opt.dat['time'][-1])
+            dat['time'].append(opt.dat['time'])
             dat['estimator'].append(opt.dat['estimator'][-1])
-            PETSc.Sys.Print("%d %.4e %.4e %a" % (opt.dat['elements'][-1],
-                                                 opt.dat['qoi'][-1],
-                                                 opt.dat['estimator'][-1]))
+            PETSc.Sys.Print("Elements %d QoI %.4e Estimator %.4e" % (opt.dat['elements'][-1],
+                                                                     opt.dat['qoi'][-1],
+                                                                     opt.dat['estimator'][-1]))
 
             # Convergence criterion: relative tolerance for QoI
             if i > self.outer_startit:
@@ -688,7 +688,7 @@ class UnsteadyProblem():
         """
         pass
 
-    def objective_functional(self):  # TODO: account for time integral forms
+    def quantity_of_interest(self):  # TODO: account for time integral forms
         """
         Functional of interest which takes the PDE solution as input.
         """
@@ -707,7 +707,7 @@ class UnsteadyProblem():
         Solve the adjoint PDE in the discrete sense, using pyadjoint.
         """
         create_directory('outputs/hdf5/')
-        J = self.objective_functional()
+        J = self.quantity_of_interest()
         compute_gradient(J, Control(self.gradient_field))
         tape = get_working_tape()
         solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
