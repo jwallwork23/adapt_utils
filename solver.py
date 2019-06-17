@@ -410,7 +410,7 @@ class MeshOptimisation():
         self.di = create_directory(op.di)
 
         # Default tolerances etc
-        self.msg = "Mesh %2d: %7d cells, qoi %.4e"
+        self.msg = "Mesh %2d: %7d cells, qoi %.4e, estimator %.4e"
         self.conv_msg = "Converged after %d iterations due to %s"
         self.startit = 0
         self.minit = 1
@@ -466,7 +466,6 @@ class MeshOptimisation():
             self.dat['elements'].append(tp.mesh.num_cells())
             self.dat['vertices'].append(tp.mesh.num_vertices())
             self.dat['qoi'].append(tp.quantity_of_interest())
-            PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i]))
             if self.log:  # TODO: parallelise
                 self.logfile.write('Mesh  {:2d}: elements = {:10d}\n'.format(i, self.dat['elements'][j]))
                 self.logfile.write('Mesh  {:2d}: vertices = {:10d}\n'.format(i, self.dat['vertices'][j]))
@@ -479,7 +478,7 @@ class MeshOptimisation():
             # Estimate and record error  # FIXME
             tp.indicate_error()
             self.dat['estimator'].append(tp.estimator)
-            PETSc.Sys.Print('error estimator : %.4e' % tp.estimator)
+            PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i], tp.estimator))
             if self.log:  # TODO: parallelise
                 self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
 
