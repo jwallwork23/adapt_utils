@@ -63,7 +63,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             else:
                 raise ValueError("Complex eigenvalues encountered:\n", lam)
         if np.any(np.iscomplex(v)):
-            if np.all(np.isclose(np.imag(v), np.zeros(dim, dim))):
+            if np.all(np.isclose(np.imag(v), np.zeros((dim, dim)))):
                 v = np.real(v)
             else:
                 raise ValueError("Complex eigenvectors encountered:\n", v)
@@ -111,7 +111,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             else:
                 raise ValueError("Complex eigenvalues encountered:\n", lam)
         if np.any(np.iscomplex(v)):
-            if np.all(np.isclose(np.imag(v), np.zeros(dim, dim))):
+            if np.all(np.isclose(np.imag(v), np.zeros((dim, dim)))):
                 v = np.real(v)
             else:
                 raise ValueError("Complex eigenvectors encountered:\n", v)
