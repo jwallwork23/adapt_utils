@@ -57,9 +57,21 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
 
         # Find eigenpairs of Hessian and truncate eigenvalues
         lam, v = la.eig(H_loc)
+        if np.any(np.iscomplex(lam)):
+            if np.all(np.isclose(np.imag(lam), np.zeros(dim))):
+                lam = np.real(lam)
+            else:
+                raise ValueError("Complex eigenvalues encountered:\n", lam)
+        if np.any(np.iscomplex(v)):
+            if np.all(np.isclose(np.imag(v), np.zeros(dim, dim))):
+                v = np.real(v)
+            else:
+                raise ValueError("Complex eigenvectors encountered:\n", v)
+
+        # Truncate eigenvalues to avoid round-off error
         det = 1.
         for i in range(dim):
-            lam[i] = max(abs(lam[i]), 1e-10)  # To avoid round-off error
+            lam[i] = max(abs(lam[i]), 1e-10)
             det *= lam[i]
 
         # Reconstruct edited Hessian and rescale
@@ -91,8 +103,20 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
 
     for k in range(mesh.num_vertices()):
 
-        # Find eigenpairs of metric and truncate eigenvalues
+        # Find eigenpairs of metric
         lam, v = la.eig(M.dat.data[k])
+        if np.any(np.iscomplex(lam)):
+            if np.all(np.isclose(np.imag(lam), np.zeros(dim))):
+                lam = np.real(lam)
+            else:
+                raise ValueError("Complex eigenvalues encountered:\n", lam)
+        if np.any(np.iscomplex(v)):
+            if np.all(np.isclose(np.imag(v), np.zeros(dim, dim))):
+                v = np.real(v)
+            else:
+                raise ValueError("Complex eigenvectors encountered:\n", v)
+
+        # Impose maximum and minimum element sizes and maximum anisotropy
         det = 1.
         for i in range(dim):
             lam[i] = min(ih_min2, max(ih_max2, abs(lam[i])))
@@ -101,7 +125,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
             lam[i] = max(lam[i], ia2*lam_max)
             if lam[i] < ia2*lam_max:
                 lam[i] = ia2*lam_max
-                print("WARNING: Maximum anisotropy reached")
+                raise Warning("Maximum anisotropy reached")
         if lam_max >= 0.9999*ih_min2:
             print(msg.format(m=np.sqrt(min(1./lam))))
 
