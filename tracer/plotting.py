@@ -43,7 +43,7 @@ def plot_objective(dat, centred=True, title=None, filename=None, filepath='plots
     J = 0.16344 if centred else 0.06959
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    for approach, i in zip(dat.keys(), range(len(dat.keys()))):
+    for approach in dat.keys():
         ax.semilogx(dat[approach]['elements'], dat[approach]['qoi'], markers[approach], color=colours[approach], label=approach)
     ax.tick_params(axis='both', which='major', labelsize=12)
     if title is not None:
@@ -65,10 +65,11 @@ def plot_error(dat, centred=True, title=None, filename=None, filepath='plots', e
     J = 0.16344 if centred else 0.06959
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    for approach, i in zip(dat.keys(), range(len(dat.keys()))):
+    for approach in dat.keys():
         J_err = np.array(dat[approach]['qoi']) - J
         J_err = np.abs(J_err)
         J_err /= np.abs(J)
+        dat[approach]['qoi_error'] = J_err
         ax.semilogx(dat[approach]['elements'], J_err, markers[approach], color=colours[approach], label=approach)
 #     ax.set_aspect(aspect=0.5)
     ax.tick_params(axis='both', which='major', labelsize=12)
@@ -92,7 +93,7 @@ def plot_error(dat, centred=True, title=None, filename=None, filepath='plots', e
 def plot_estimate(dat, title=None, filename=None, filepath='plots', second_order=False):
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    for approach, i in zip(dat.keys(), range(len(dat.keys()))):
+    for approach in dat.keys():
         if approach  != 'Uniform':
             ax.loglog(dat[approach]['elements'], dat[approach]['estimator'], markers[approach], color=colours[approach], label=approach)
     ax.tick_params(axis='both', which='major', labelsize=12)
@@ -117,8 +118,8 @@ def plot_effectivity(dat, centred=True, title=None, filename=None, filepath='plo
     J = 0.16344 if centred else 0.06959
     fig = plt.figure()
     ax = fig.add_subplot(111)
-    for approach, i in zip(dat.keys(), range(len(dat.keys()))):
-        if approach  != 'Uniform':
+    for approach in dat.keys():
+        if approach != 'Uniform':
             estimator = np.array(dat[approach]['estimator'])
             J_err = np.array(dat[approach]['qoi']) - J
             effectivity = np.abs(J_err/estimator)
