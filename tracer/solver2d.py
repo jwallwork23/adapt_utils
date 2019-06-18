@@ -316,7 +316,6 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         # Residual
         R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
-        self.cell_res = R*R if self.op.dwr_approach == 'ainsworth_oden' else R
 
         # Flux terms (arising from integration by parts)
         mass_term = i*self.p0trial*dx
@@ -331,7 +330,8 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         # Account for stabilisation error
         if self.op.order_increase and self.stab == 'SUPG':
-            R -= (f - dot(u, grad(phi)) + div(nu*grad(phi)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
+            R += (f - dot(u, grad(phi)) + div(nu*grad(phi)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
+        self.cell_res = R*R if self.op.dwr_approach == 'ainsworth_oden' else R
 
         # Sum
         self.cell_res = assemble(i*R*dx)
@@ -360,12 +360,11 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Cell residual
         dJdphi = self.op.box(self.P0)  # Adjoint source term
         R = (dJdphi + div(u*lam) + div(nu*grad(lam)))*phi
-        self.cell_res_adjoint = R*R if self.op.dwr_approach == 'ainsworth_oden' else R
 
         # Edge residual
         mass_term = i*self.p0trial*dx
         flux = -(lam*dot(u, n) + nu*dot(n, nabla_grad(lam)))*phi
-        flux_terms = ((i*flux)('+') + (i*flux)('-')) * dS
+        flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
         for j in bcs.keys():
             if bcs[j] == 'neumann_zero':
                 flux_terms += i*flux*ds(j)  # Robin BC in adjoint
@@ -374,7 +373,8 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         # Account for stabilisation error
         if self.op.order_increase and self.stab == 'SUPG':
-            R -= -(dJdphi + div(u*lam) + div(nu*grad(lam)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
+            R += (dJdphi + div(u*lam) + div(nu*grad(lam)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
+        self.cell_res_adjoint = R*R if self.op.dwr_approach == 'ainsworth_oden' else R
 
         # Sum
         self.cell_res_adjoint = assemble(i*R*dx)
