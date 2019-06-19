@@ -321,3 +321,49 @@ class SteadyTracerProblem3d(SteadyProblem):
         self.estimator = assemble(L-a)
         return self.estimator
 
+    def get_loseille_metric(self, adjoint=False, relax=True, superpose=False):
+        assert not (relax and superpose)
+
+        # Solve adjoint problem
+        if self.op.order_increase:
+            adj = self.solve_high_order(adjoint=not adjoint)
+        else:
+            adj = self.solution if adjoint else self.adjoint_solution
+        sol = self.adjoint_solution if adjoint else self.solution
+        adj_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(adj)))
+        adj = Function(seld.P1).interpolate(abs(adj))
+
+        if adjoint:
+            source = self.op.box(self.P0)
+            F1 = -sol*self.u[0] - self.nu*sol.dx(0)
+            F2 = -sol*self.u[1] - self.nu*sol.dx(1)
+            F3 = -sol*self.u[2] - self.nu*sol.dx(2)
+        else:
+            source = self.source
+            F1 = sol*self.u[0] - self.nu*sol.dx(0)
+            F2 = sol*self.u[1] - self.nu*sol.dx(1)
+            F3 = sol*self.u[2] - self.nu*sol.dx(2)
+
+        # Construct Hessians
+        H1 = steady_metric(F1, mesh=self.mesh, noscale=True, op=self.op)
+        H2 = steady_metric(F2, mesh=self.mesh, noscale=True, op=self.op)
+        H3 = steady_metric(F3, mesh=self.mesh, noscale=True, op=self.op)
+        Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
+
+        # form metric  # TODO: use pyop2
+        self.M = Function(self.P1_ten)
+        for i in range(self.mesh.num_vertices()):
+            self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
+            self.M.dat.data[i][:,:] += H2.dat.data[i]*adj_diff.dat.data[i][1]
+            self.M.dat.data[i][:,:] += H3.dat.data[i]*adj_diff.dat.data[i][2]
+            if relax:
+                self.M.dat.data[i][:,:] += Hf.dat.data[i]*adj.dat.data[i]
+        self.M = steady_metric(None, H=self.M, op=self.op)
+
+        if superpose:
+            Mf = Function(self.P1_ten)
+            for i in range(self.mesh.num_vertices()):
+                Mf.dat.data[i][:,:] += Hf.dat.data[i]*adj.dat.data[i]
+            self.M = metric_intersection(self.M, Mf)
+
+        # TODO: boundary contributions

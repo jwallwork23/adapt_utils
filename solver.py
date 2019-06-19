@@ -12,7 +12,7 @@ import numpy as np
 import pickle
 
 from adapt_utils.options import DefaultOptions
-from adapt_utils.misc import index_string
+from adapt_utils.misc.misc import index_string
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 

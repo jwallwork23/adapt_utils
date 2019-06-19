@@ -7,6 +7,8 @@ Imperial College London.
 
 __[TODO: Use Zenodo instead of the below]__
 
+* Clone this repository and make it accessible to the PYTHONPATH environment variable.
+
 * Download the [Firedrake][1] install script, set
     * ``export PETSC_CONFIGURE_OPTIONS="--download-pragmatic --with-cxx-dialect=C++11"``
 
@@ -17,7 +19,6 @@ __[TODO: Use Zenodo instead of the below]__
     * ``https://github.com/thetisproject/thetis/tree/joe`` for thetis;
     * ``https://github.com/taupalosaurus/firedrake`` for firedrake, fork ``barral/meshadapt``
     and call ``make`` in ``firedrake/src/firedrake`` to enable pragmatic drivers.
-    * ``https://github.com/jwallwork23/adapt_utils`` and add this to ``PYTHONPATH`` environment variable.
 
 * Apply ``misc/keep_params.patch`` to pyadjoint, for an update to the ``linear-solver`` branch.
 
