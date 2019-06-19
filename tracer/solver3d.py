@@ -331,7 +331,7 @@ class SteadyTracerProblem3d(SteadyProblem):
         adj = Function(seld.P1).interpolate(abs(adj))
 
         if adjoint:
-            source = self.op.box(self.P0)
+            source = self.kernel
             F1 = -sol*self.u[0] - self.nu*sol.dx(0)
             F2 = -sol*self.u[1] - self.nu*sol.dx(1)
             F3 = -sol*self.u[2] - self.nu*sol.dx(2)
@@ -347,7 +347,7 @@ class SteadyTracerProblem3d(SteadyProblem):
         H3 = steady_metric(F3, mesh=self.mesh, noscale=True, op=self.op)
         Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
 
-        # form metric  # TODO: use pyop2
+        # Form metric  # TODO: use pyop2
         self.M = Function(self.P1_ten)
         for i in range(self.mesh.num_vertices()):
             self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
