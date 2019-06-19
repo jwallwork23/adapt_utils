@@ -328,7 +328,7 @@ class SteadyTracerProblem3d(SteadyProblem):
             adj = self.solution if adjoint else self.adjoint_solution
         sol = self.adjoint_solution if adjoint else self.solution
         adj_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(adj)))
-        adj = Function(seld.P1).interpolate(abs(adj))
+        adj = Function(self.P1).interpolate(abs(adj))
 
         if adjoint:
             source = self.kernel
