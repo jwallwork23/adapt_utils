@@ -123,17 +123,17 @@ class SteadyTurbineProblem(SteadyProblem):
         # Solve
         solver_obj.iterate()
         self.solution.assign(solver_obj.fields.solution_2d)
-        self.objective = cb.average_power
+        self.qoi = cb.average_power
         self.ts = solver_obj.timestepper
 
-    def get_objective_kernel(self):
+    def get_qoi_kernel(self):
         self.kernel = Function(self.V)
         u = self.solution.split()[0]
         k_u = self.kernel.split()[0]
         k_u.interpolate(Constant(1/3)*self.turbine_density*sqrt(inner(u, u))*u)
 
     def quantity_of_interest(self):
-        return self.objective
+        return self.qoi
 
     def get_hessian_metric(self, adjoint=False):
         sol = self.adjoint_solution if adjoint else self.solution

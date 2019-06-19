@@ -42,7 +42,7 @@ class SteadyTracerProblem3d(SteadyProblem):
         self.nu = op.set_diffusivity(self.P1)
         self.u = op.set_velocity(self.P1_vec)
         self.source = op.set_source(self.P1)
-        self.kernel = op.set_objective_kernel(self.P0)
+        self.kernel = op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Stabilisation
@@ -192,8 +192,6 @@ class SteadyTracerProblem3d(SteadyProblem):
         if self.op.dwr_approach == 'error_representation':
             self.p0indicator = Function(self.P0)
             self.p0indicator += self.cell_res + self.edge_res
-            #self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
-            #self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
             self.p1indicator = project(self.p0indicator, self.P1)
         else:
             raise NotImplementedError
@@ -232,8 +230,6 @@ class SteadyTracerProblem3d(SteadyProblem):
         if self.op.dwr_approach == 'error_representation':
             self.p0indicator = Function(self.P0)
             self.p0indicator += self.cell_res_adjoint + self.edge_res_adjoint
-            #self.p0indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P0)
-            #self.p1indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P1)
             self.p1indicator = project(self.p0indicator, self.P1)
         else:
             raise NotImplementedError
@@ -278,8 +274,6 @@ class SteadyTracerProblem3d(SteadyProblem):
         if self.op.dwr_approach == 'error_representation':
             self.p0indicator = Function(self.P0)
             self.p0indicator += self.cell_res + self.edge_res
-            #self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
-            #self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
             self.p1indicator = project(self.p0indicator, self.P1)
         else:
             raise NotImplementedError

@@ -82,7 +82,7 @@ class TracerOptions(Options):
     def exact_solution(self, fs):
         pass
 
-    def exact_objective(self):
+    def exact_qoi(self):
         return assemble(inner(self.kernel, self.solution)*dx)
 
 class PowerOptions(TracerOptions):
@@ -131,7 +131,7 @@ class PowerOptions(TracerOptions):
         self.source.rename("Source term")
         return self.source
 
-    def set_objective_kernel(self, fs):
+    def set_qoi_kernel(self, fs):
         self.kernel = Function(fs)
         #self.kernel.interpolate(self.bump(fs))
         self.kernel.interpolate(self.box(fs))
@@ -201,7 +201,7 @@ class TelemacOptions(TracerOptions):
         self.initial_value = Function(fs)
         return self.initial_value
 
-    def set_objective_kernel(self, fs):
+    def set_qoi_kernel(self, fs):
         self.kernel = Function(fs)
         self.kernel.interpolate(self.ball(fs))
         return self.kernel
@@ -222,7 +222,7 @@ class TelemacOptions(TracerOptions):
         outfile.write(self.solution)  # NOTE: use 40 discretisation levels in ParaView
         return self.solution
 
-    def exact_objective(self, fs1, fs2):
+    def exact_qoi(self, fs1, fs2):
         mesh = fs1.mesh()
         x, y = SpatialCoordinate(mesh)
         x0, y0, r = self.source_loc[0]
@@ -232,7 +232,7 @@ class TelemacOptions(TracerOptions):
         q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
         sol = 0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu)
-        self.set_objective_kernel(fs2)
+        self.set_qoi_kernel(fs2)
         return assemble(self.kernel*sol*dx(degree=12))
 
 
@@ -298,7 +298,7 @@ class Telemac3dOptions(TracerOptions):
         self.initial_value = Function(fs)
         return self.initial_value
 
-    def set_objective_kernel(self, fs):
+    def set_qoi_kernel(self, fs):
         self.kernel = Function(fs)
         self.kernel.interpolate(self.ball(fs))
         return self.kernel
@@ -319,7 +319,7 @@ class Telemac3dOptions(TracerOptions):
         outfile.write(self.solution)  # NOTE: use 40 discretisation levels in ParaView
         return self.solution
 
-    def exact_objective(self, fs1, fs2):
+    def exact_qoi(self, fs1, fs2):
         mesh = fs1.mesh()
         x, y, z = SpatialCoordinate(mesh)
         x0, y0, z0, r = self.source_loc[0]
@@ -329,7 +329,7 @@ class Telemac3dOptions(TracerOptions):
         q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0)), r)  # (Bessel fn explodes at (x0, y0, z0))
         sol = 0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu)
-        self.set_objective_kernel(fs2)
+        self.set_qoi_kernel(fs2)
         return assemble(self.kernel*sol*dx(degree=12))
 
 
@@ -370,7 +370,7 @@ class LeVequeOptions(TracerOptions):
         self.dt_per_export = 10
         self.dt_per_remesh = 10
 
-        # Exact objective value
+        # Exact QoI
         #bell_r2 = self.source_loc[0][2]**2
         #cone_r2 = self.source_loc[1][2]**2
         cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
@@ -389,7 +389,7 @@ class LeVequeOptions(TracerOptions):
         slot += 0.5*cyl_r2*math.atan(slot_left/math.sqrt(cyl_r2 - slot_left**2))
         #self.J_exact = 1 + bell + cone + cyl - slot
         self.J_exact = 1 + cyl - slot
-        #print("Exact objective: {:.4e}".format(self.J_exact))  # TODO: Check this
+        #print("Exact QoI: {:.4e}".format(self.J_exact))  # TODO: Check this
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(0.)
@@ -417,7 +417,7 @@ class LeVequeOptions(TracerOptions):
         self.initial_value.interpolate(1.0 + bell + cone + slot_cyl)
         return self.initial_value
 
-    def set_objective_kernel(self, fs):
+    def set_qoi_kernel(self, fs):
         self.kernel = Function(fs)
         self.kernel.interpolate(self.ball(fs))
         area = assemble(self.kernel*dx)
@@ -431,7 +431,7 @@ class LeVequeOptions(TracerOptions):
             self.set_initial_condition(fs)
         return self.initial_value
 
-    def exact_objective(self, fs1, fs2):
+    def exact_qoi(self, fs1, fs2):
         x, y = SpatialCoordinate(fs1.mesh())
         bell_x0, bell_y0, bell_r0 = self.source_loc[0]
         cone_x0, cone_y0, cone_r0 = self.source_loc[1]
@@ -444,5 +444,5 @@ class LeVequeOptions(TracerOptions):
                        0.0, 1.0), 0.0)
 
         sol = 1.0 + bell + cone + slot_cyl
-        self.set_objective_kernel(fs2)
+        self.set_qoi_kernel(fs2)
         return assemble(self.kernel*sol*dx(degree=12))

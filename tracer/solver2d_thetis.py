@@ -47,7 +47,7 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         self.nu = op.set_diffusivity(self.P1)
         self.u = op.set_velocity(self.P1_vec)
         self.source = op.set_source(self.P1)
-        self.kernel = op.set_objective_kernel(self.P1)
+        self.kernel = op.set_qoi_kernel(self.P1)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Rename solution fields
@@ -315,7 +315,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         self.u = self.op.set_velocity(self.P1_vec)
         if hasattr(self.op, 'source'):
             self.source = self.op.set_source(self.V)
-        self.kernel = self.op.set_objective_kernel(self.V)
+        self.kernel = self.op.set_qoi_kernel(self.V)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Rename solution fields
