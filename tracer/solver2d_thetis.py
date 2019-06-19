@@ -25,7 +25,7 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
     def __init__(self,
                  op=PowerOptions(),
                  stab=None,
-                 mesh=SquareMesh(40, 40, 4, 4),
+                 mesh=None,
                  discrete_adjoint=True,
                  high_order=False,
                  prev_solution=None):
@@ -38,12 +38,11 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         if mesh is None:
             mesh = op.default_mesh
         super(SteadyTracerProblem2d_Thetis, self).__init__(mesh,
-                                                     op,
-                                                     finite_element,
-                                                     stab,
-                                                     discrete_adjoint,
-                                                     None)
-        assert(finite_element.family() == "Discontinuous Lagrange")
+                                                           op,
+                                                           finite_element,
+                                                           discrete_adjoint,
+                                                           None)
+        assert(finite_element.family() == "Discontinuous Lagrange")  # TODO
 
         # Extract parameters from Options class
         self.nu = op.set_diffusivity(self.P1)
@@ -68,7 +67,7 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
                 BCs['tracer'][i] = {'value': Constant(0.)}
             elif bcs[i] == 'neumann_zero':
                 continue
-                # TODO: Neumann conditions not currently implemented for tracers
+                # TODO: Neumann conditions are currently default
         b = Function(self.P1).assign(1.)
         eta = Function(self.P1)
 
