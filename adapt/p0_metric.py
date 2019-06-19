@@ -59,7 +59,7 @@ class AnisotropicMetricDriver():
         JJt.interpolate(self.J*transpose(self.J))
 
         for i in range(self.ne):
-            lam, v = la.eig(JJt.dat.data[i])
+            lam, v = la.eigh(JJt.dat.data[i])
             self.eval0.dat.data[i] = lam[0]
             self.eval1.dat.data[i] = lam[1]
             self.evec0.dat.data[i][:] = v[0]
@@ -71,7 +71,7 @@ class AnisotropicMetricDriver():
         H_avg.interpolate(self.H)
 
         for i in range(self.ne):
-            lam, v = la.eig(H_avg.dat.data[i])
+            lam, v = la.eigh(H_avg.dat.data[i])
             if np.abs(lam[0]) > np.abs(lam[1]):
                 self.eval0.dat.data[i] = lam[0]
                 self.eval1.dat.data[i] = lam[1]
