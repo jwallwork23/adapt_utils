@@ -56,17 +56,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
                 H_loc[j][i] = mean_diag
 
         # Find eigenpairs of Hessian and truncate eigenvalues
-        lam, v = la.eig(H_loc)
-        if np.any(np.iscomplex(lam)):
-            if np.all(np.isclose(np.imag(lam), np.zeros(dim))):
-                lam = np.real(lam)
-            else:
-                raise ValueError("Complex eigenvalues encountered:\n", lam)
-        if np.any(np.iscomplex(v)):
-            if np.all(np.isclose(np.imag(v), np.zeros((dim, dim)))):
-                v = np.real(v)
-            else:
-                raise ValueError("Complex eigenvectors encountered:\n", v)
+        lam, v = la.eigh(H_loc)
 
         # Truncate eigenvalues to avoid round-off error
         det = 1.
@@ -104,17 +94,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     for k in range(mesh.num_vertices()):
 
         # Find eigenpairs of metric
-        lam, v = la.eig(M.dat.data[k])
-        if np.any(np.iscomplex(lam)):
-            if np.all(np.isclose(np.imag(lam), np.zeros(dim))):
-                lam = np.real(lam)
-            else:
-                raise ValueError("Complex eigenvalues encountered:\n", lam)
-        if np.any(np.iscomplex(v)):
-            if np.all(np.isclose(np.imag(v), np.zeros((dim, dim)))):
-                v = np.real(v)
-            else:
-                raise ValueError("Complex eigenvectors encountered:\n", v)
+        lam, v = la.eigh(M.dat.data[k])
 
         # Impose maximum and minimum element sizes and maximum anisotropy
         det = 1.
@@ -213,7 +193,7 @@ def anisotropic_refinement(metric, direction=0):
     assert dim in (2, 3)
     scale = 4 if dim == 2 else 8  # TODO: check this
     for k in range(mesh.num_vertices()):
-        lam, v = la.eig(metric.dat.data[k])
+        lam, v = la.eigh(metric.dat.data[k])
         lam[direction] *= scale
         # TODO: these loops could be done more efficiently by just adding extra terms in the skew direction
         for l in range(dim):
@@ -235,7 +215,7 @@ def local_metric_intersection(M1, M2, dim=2):
     """
     sqM1 = sla.sqrtm(M1)
     sqiM1 = la.inv(sqM1)  # Note inverse and square root commute whenever both are defined
-    lam, v = la.eig(np.dot(np.transpose(sqiM1), np.dot(M2, sqiM1)))
+    lam, v = la.eigh(np.dot(np.transpose(sqiM1), np.dot(M2, sqiM1)))
     M12hat = np.zeros((dim, dim))
     for i in range(dim):
         M12hat[i, i] = max(lam[i], 1)
