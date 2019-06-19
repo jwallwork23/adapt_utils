@@ -1,4 +1,5 @@
 from thetis import *
+from firedrake import assemble
 
 
 __all__ = ["TracerCallback"]
@@ -18,10 +19,6 @@ class TracerCallback(callback.AccumulatorCallback):
             self.parameters = TracerOptions()
         else:
             self.parameters = parameters
-        if self.parameters.solve_adjoint:
-            from firedrake_adjoint import assemble
-        else:
-            from firedrake import assemble
 
         def objectiveAD():
             """
@@ -30,7 +27,7 @@ class TracerCallback(callback.AccumulatorCallback):
             """
             Q_2d = solver_obj.function_spaces.Q_2d
             ks = Function(Q_2d)
-            iA = self.parameters.disk(Q_2d)
+            iA = self.parameters.ball(Q_2d)
             t = solver_obj.simulation_time
             dt = solver_obj.options.timestep
             ks.assign(iA)

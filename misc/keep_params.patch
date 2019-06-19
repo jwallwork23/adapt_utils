@@ -1,0 +1,13 @@
+diff --git a/fenics_adjoint/solving.py b/fenics_adjoint/solving.py
+index c8bc0f0..6bf2552 100644
+--- a/fenics_adjoint/solving.py
++++ b/fenics_adjoint/solving.py
+@@ -162,7 +162,7 @@ class SolveBlock(Block):
+             bc.apply(dFdu, dJdu)
+
+         adj_sol = Function(self.function_space)
+-        backend.solve(dFdu, adj_sol.vector(), dJdu)
++        backend.solve(dFdu, adj_sol.vector(), dJdu, **self.kwargs)
+
+         adj_sol_bdy = compat.function_from_vector(self.function_space, dJdu_copy - compat.assemble_adjoint_value(
+             backend.action(dFdu_form, adj_sol)))
