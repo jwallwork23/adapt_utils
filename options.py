@@ -113,32 +113,50 @@ class Options(FrozenConfigurable):
 
     def bump(self, fs, scale=1., source=False):
         """Bump function associated with region(s) of interest"""
-        x, y = SpatialCoordinate(fs.mesh())
+        mesh = fs.mesh()
+        dim = mesh.topological_dimension()
+        assert dim in (2, 3)
+        if dim == 2:
+            x, y = SpatialCoordinate(fs)
+        else:
+            x, y, z = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
         i = 0
         for j in range(len(locs)):
             x0 = locs[j][0]
             y0 = locs[j][1]
-            r = locs[j][2]
-            i += conditional(lt(((x-x0)*(x-x0) + (y-y0)*(y-y0)), r*r),
-                             scale*exp(1.-1./(1.-(x-x0)*(x-x0)/r**2))*exp(1.-1./(1.-(y-y0)*(y-y0)/r**2)),
-                             0.)
+            r = locs[j][2] if dim == 2 else locs[j][3]
+            expr1 = (x-x0)*(x-x0) + (y-y0)*(y-y0)
+            expr2 = scale*exp(1 -1/(1 - (x-x0)*(x-x0)/r**2))*exp(1 - 1/(1 - (y-y0)*(y-y0)/r**2))
+            if dim == 3:
+                z0 = locs[j][2]
+                expr1 += (z-z0)*(z-z0)
+                expr2 *= exp(1 - 1/(1 - (z-z0)*(z-z0)/r**2))
+            i += conditional(lt(expr1, r*r), expr2, 0)
         bump = Function(fs)
         bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return bump
 
     def gaussian(self, fs, scale=1., source=False):
         """Gaussian function associated with region(s) of interest"""
-        x, y = SpatialCoordinate(fs)
+        mesh = fs.mesh()
+        dim = mesh.topological_dimension()
+        assert dim in (2, 3)
+        if dim == 2:
+            x, y = SpatialCoordinate(fs)
+        else:
+            x, y, z = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
         i = 0
         for j in range(len(locs)):
             x0 = locs[j][0]
             y0 = locs[j][1]
-            r = locs[j][2]
-            i += conditional(lt(((x-x0)*(x-x0) + (y-y0)*(y-y0)), r*r),
-                             scale*exp(1. - 1. / (1. - ((x-x0)*(x-x0) + (y-y0)*(y-y0)) / r ** 2)),
-                             0.)
+            r = locs[j][2] if dim == 2 else locs[j][3]
+            expr = (x-x0)*(x-x0) + (y-y0)*(y-y0)
+            if dim == 3:
+                z0 = locs[j][2]
+                expr += (z-z0)*(z-z0)
+            i += conditional(lt(expr, r*r), scale*exp(1 - 1/(1 - expr/r**2)), 0)
         bump = Function(fs)
         bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
         return bump
