@@ -85,38 +85,27 @@ class Options(FrozenConfigurable):
         assert self.dt_per_remesh % self.dt_per_export == 0
         return int(self.dt_per_remesh / self.dt_per_export)
 
-    def disk(self, fs, scale=1., source=False):
-        """Disk indicator function associated with region(s) of interest"""
-        x, y = SpatialCoordinate(fs.mesh())
-        locs = self.source_loc if source else self.region_of_interest
-        eps = 1e-10
-        for j in range(len(locs)):
-            x0 = locs[j][0]
-            y0 = locs[j][1]
-            r = locs[j][2]
-            if j == 0:
-                b = lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps)
-            else:
-                b = Or(b, lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps))
-        expr = conditional(b, scale, 0.)
-        indi = Function(fs)
-        indi.interpolate(expr)
-        return indi
-
     def ball(self, fs, scale=1., source=False):
         """Ball indicator function associated with region(s) of interest"""
-        x, y, z = SpatialCoordinate(fs.mesh())
+        mesh = fs.mesh()
+        dim = mesh.topological_dimension()
+        assert dim in (2, 3)
+        if dim == 2:
+            x, y = SpatialCoordinate(fs)
+        else:
+            x, y, z = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
         eps = 1e-10
         for j in range(len(locs)):
             x0 = locs[j][0]
             y0 = locs[j][1]
-            z0 = locs[j][2]
-            r = locs[j][3]
-            if j == 0:
-                b = lt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0), r*r + eps)
+            r = locs[j][2] if dim == 2 else locs[j][3]
+            if dim == 3:
+                z0 = locs[j][2]
+                expr = lt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0), r*r + eps)
             else:
-                b = Or(b, lt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0), r*r + eps))
+                expr = lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps)
+            b = expr if j == 0 else Or(b, expr)
         expr = conditional(b, scale, 0.)
         indi = Function(fs)
         indi.interpolate(expr)
@@ -156,16 +145,23 @@ class Options(FrozenConfigurable):
 
     def box(self, fs, scale=1., source=False):
         """Box function associated with region(s) of interest"""
-        x, y = SpatialCoordinate(fs)
+        mesh = fs.mesh()
+        dim = mesh.topological_dimension()
+        assert dim in (2, 3)
+        if dim == 2:
+            x, y = SpatialCoordinate(fs)
+        else:
+            x, y, z = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
         for j in range(len(locs)):
             x0 = locs[j][0]
             y0 = locs[j][1]
-            r = locs[j][2]
-            if j == 0:
-                b = And(And(gt(x, x0-r), lt(x, x0+r)), And(gt(y, y0-r), lt(y, y0+r)))
-            else:
-                b = Or(b, And(And(gt(x, x0-r), lt(x, x0+r)), And(gt(y, y0-r), lt(y, y0+r))))
+            r = locs[j][2] if dim == 2 else locs[j][3]
+            expr = And(And(gt(x, x0-r), lt(x, x0+r)), And(gt(y, y0-r), lt(y, y0+r)))
+            if dim == 3:
+                z0 = locs[j][2]
+                expr = And(expr, And(gt(z, z0-r), lt(z, z0+r)))
+            b = expr if j == 0 else Or(b, expr)
         expr = conditional(b, scale, 0.)
         box = Function(fs)
         box.interpolate(expr)
