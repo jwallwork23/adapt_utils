@@ -4,7 +4,7 @@ import math
 from scipy.special import kn
 
 from adapt_utils.options import Options
-from adapt_utils.misc import *
+from adapt_utils.misc.misc import *
 
 
 __all__ = ["TracerOptions", "PowerOptions", "TelemacOptions", "Telemac3dOptions", "LeVequeOptions"]

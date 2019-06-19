@@ -1,5 +1,4 @@
 # Base classes
-from adapt_utils.misc import *
 from adapt_utils.options import *
 from adapt_utils.solver import *
 
@@ -18,3 +17,6 @@ from adapt_utils.tracer.solver3d import *
 from adapt_utils.turbine.options import *
 from adapt_utils.turbine.solver import *
 from adapt_utils.turbine.meshgen import *
+
+# Other
+from adapt_utils.misc.misc import *
