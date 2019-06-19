@@ -153,7 +153,7 @@ class SteadyTracerProblem3d(SteadyProblem):
         sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
         sol = Function(tp_p2.V)
         sol.interpolate(sol_p2 - sol)
-        with pyadjoint.stop_annotating():  # TODO: temp
+        with pyadjoint.stop_annotating():  # TODO: temporary
             self.errorterm = Function(self.P2)
             self.errorterm.project(sol)
         return self.errorterm
@@ -194,8 +194,6 @@ class SteadyTracerProblem3d(SteadyProblem):
         if self.op.dwr_approach == 'error_representation':
             self.p0indicator = Function(self.P0)
             self.p0indicator += self.cell_res + self.edge_res
-            #self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
-            #self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
             self.p1indicator = project(self.p0indicator, self.P1)
         else:
             raise NotImplementedError
@@ -234,8 +232,6 @@ class SteadyTracerProblem3d(SteadyProblem):
         if self.op.dwr_approach == 'error_representation':
             self.p0indicator = Function(self.P0)
             self.p0indicator += self.cell_res_adjoint + self.edge_res_adjoint
-            #self.p0indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P0)
-            #self.p1indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P1)
             self.p1indicator = project(self.p0indicator, self.P1)
         else:
             raise NotImplementedError
@@ -276,13 +272,11 @@ class SteadyTracerProblem3d(SteadyProblem):
             R -= (f - dot(u, grad(phi)) + div(nu*grad(phi)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
 
         # Sum
-        with pyadjoint.stop_annotating():  # TODO: temp
+        with pyadjoint.stop_annotating():  # TODO: Temporary
             self.cell_res = assemble(i*R*dx)
             if self.op.dwr_approach == 'error_representation':
                 self.p0indicator = Function(self.P0)
                 self.p0indicator += self.cell_res + self.edge_res
-                #self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
-                #self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
                 self.p1indicator = project(self.p0indicator, self.P1)
             else:
                 raise NotImplementedError

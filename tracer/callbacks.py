@@ -37,15 +37,15 @@ class TracerCallback(callback.AccumulatorCallback):
             kt = Constant(0.)
 
             # Slightly smooth transition
-            if self.parameters.start_time - 0.5 * dt < t < self.parameters.start_time + 0.5 * dt:
+            if self.parameters.start_time - 0.5*dt < t < self.parameters.start_time + 0.5*dt:
                 kt.assign(0.5)
-            elif self.parameters.start_time + 0.5 * dt < t < self.parameters.end_time - 0.5 * dt:
+            elif self.parameters.start_time + 0.5*dt < t < self.parameters.end_time - 0.5*dt:
                 kt.assign(1.)
-            elif self.parameters.end_time - 0.5 * dt < t < self.parameters.end_time + 0.5 * dt:
+            elif self.parameters.end_time - 0.5*dt < t < self.parameters.end_time + 0.5*dt:
                 kt.assign(0.5)
             else:
                 kt.assign(0.)
 
-            return assemble(kt * ks * solver_obj.fields.tracer_2d * dx)
+            return assemble(kt*ks*solver_obj.fields.tracer_2d*dx)
 
         super(TracerCallback, self).__init__(qoi, solver_obj, **kwargs)

@@ -1,6 +1,8 @@
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import rc
+
+
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)
 plt.rc('text', usetex=True)
@@ -19,6 +21,13 @@ __all__ = ["create_dict", "plot_qoi", "plot_error", "plot_estimate", "plot_effec
 
 
 def create_dict(centred=True, second_order=False):
+    """
+    Create a dictionary for containing data relating to the TELEMAC-2D convergence plots.
+    Analytic and uniform mesh runs are already entered.
+
+    :kwarg centred: Toggle whether to consider a region of interest which is centred or offset from the flow.
+    :kwarg second_order: Toggle whether combined metrics are used.
+    """
     dat = {}
     dat['Uniform'] = {}
     dat['Uniform']['elements'] = [4000, 16000, 64000, 256000, 1024000]
@@ -40,6 +49,13 @@ def create_dict(centred=True, second_order=False):
     return dat
 
 def plot_qoi(dat, centred=True, title=None, filename=None, filepath='plots', err=1):
+    """
+    Plot QoI values for the TELEMAC-2D numerical experiments.
+
+    :arg dat: Dictionary containing data to plot.
+    :kwarg centred: Toggle whether to consider a region of interest which is centred or offset from the flow.
+    :kwarg err: Relative error level of note. (Default 1%.)
+    """
     J = 0.16344 if centred else 0.06959
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -62,6 +78,14 @@ def plot_qoi(dat, centred=True, title=None, filename=None, filepath='plots', err
         plt.savefig('{:s}/{:s}.pdf'.format(filepath, filename))
 
 def plot_error(dat, centred=True, title=None, filename=None, filepath='plots', err=1):
+    """
+    Plot relative error in QoI values for the TELEMAC-2D numerical experiments.
+    Errors are computed relative to the converged analytical value.
+
+    :arg dat: Dictionary containing data to plot.
+    :kwarg centred: Toggle whether to consider a region of interest which is centred or offset from the flow.
+    :kwarg err: Relative error level of note. (Default 1%.)
+    """
     J = 0.16344 if centred else 0.06959
     fig = plt.figure()
     ax = fig.add_subplot(111)
@@ -91,6 +115,12 @@ def plot_error(dat, centred=True, title=None, filename=None, filepath='plots', e
         plt.savefig('{:s}/{:s}.pdf'.format(filepath, filename))
     
 def plot_estimate(dat, title=None, filename=None, filepath='plots', second_order=False):
+    """
+    Plot error estimator values for the TELEMAC-2D numerical experiments.
+
+    :arg dat: Dictionary containing data to plot.
+    :kwarg second_order: Toggle whether combined metrics are used.
+    """
     fig = plt.figure()
     ax = fig.add_subplot(111)
     for approach in dat.keys():
@@ -101,7 +131,6 @@ def plot_estimate(dat, title=None, filename=None, filepath='plots', second_order
         plt.title(title)
     plt.xlabel(r'Number of mesh elements', fontsize=12)
     plt.xlim([700, 1.1e6])
-#     plt.ylim([1e-6, 1e-2])
 #     plt.ylabel(r'Error estimator, $\eta$', fontsize=14)
     if second_order:
         plt.ylabel(r'Dual Weighted Residual,\\ $\frac12\rho(\phi_h,\phi^*-\phi^*_h)+\frac12\rho^*(\phi_h^*,\phi-\phi_h)$', fontsize=14)
@@ -115,6 +144,11 @@ def plot_estimate(dat, title=None, filename=None, filepath='plots', second_order
         plt.savefig('{:s}/{:s}.pdf'.format(filepath, filename))
     
 def plot_effectivity(dat, centred=True, title=None, filename=None, filepath='plots'):
+    """
+    Plot error estimator effectivity for the TELEMAC-2D numerical experiments.
+
+    :arg dat: Dictionary containing data to plot.
+    """
     J = 0.16344 if centred else 0.06959
     fig = plt.figure()
     ax = fig.add_subplot(111)
