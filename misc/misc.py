@@ -2,7 +2,7 @@ from firedrake import *
 import numpy as np
 
 
-__all__ = ["index_string", "subdomain_indicator", "bessk0"]
+__all__ = ["index_string", "subdomain_indicator", "bessi0", "bessk0"]
 
 
 def index_string(index):
