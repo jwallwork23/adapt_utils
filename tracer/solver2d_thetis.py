@@ -1,5 +1,4 @@
-from thetis_adjoint import *
-import pyadjoint
+from thetis import *
 
 from time import clock
 import numpy as np
@@ -26,7 +25,7 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
                  op=PowerOptions(),
                  stab=None,
                  mesh=None,
-                 discrete_adjoint=True,
+                 discrete_adjoint=False,
                  high_order=False,
                  prev_solution=None):
         if op.family == 'dg':
@@ -300,7 +299,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
     def __init__(self,
                  op,
                  mesh=None,
-                 discrete_adjoint=True,
+                 discrete_adjoint=False,
                  finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1)):
         super(UnsteadyTracerProblem2d_Thetis, self).__init__(mesh, op, finite_element, discrete_adjoint)
         assert(finite_element.family() == "Discontinuous Lagrange")

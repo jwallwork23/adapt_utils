@@ -100,7 +100,7 @@ class Options(FrozenConfigurable):
                 b = Or(b, lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps))
         expr = conditional(b, scale, 0.)
         indi = Function(fs)
-        indi.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        indi.interpolate(expr)
         return indi
 
     def ball(self, fs, scale=1., source=False):
@@ -119,7 +119,7 @@ class Options(FrozenConfigurable):
                 b = Or(b, lt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0), r*r + eps))
         expr = conditional(b, scale, 0.)
         indi = Function(fs)
-        indi.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        indi.interpolate(expr)
         return indi
 
     def bump(self, fs, scale=1., source=False):
@@ -135,7 +135,7 @@ class Options(FrozenConfigurable):
                              scale*exp(1.-1./(1.-(x-x0)*(x-x0)/r**2))*exp(1.-1./(1.-(y-y0)*(y-y0)/r**2)),
                              0.)
         bump = Function(fs)
-        bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        bump.interpolate(i)
         return bump
 
     def gaussian(self, fs, scale=1., source=False):
@@ -151,7 +151,7 @@ class Options(FrozenConfigurable):
                              scale*exp(1. - 1. / (1. - ((x-x0)*(x-x0) + (y-y0)*(y-y0)) / r ** 2)),
                              0.)
         bump = Function(fs)
-        bump.interpolate(i)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        bump.interpolate(i)
         return bump
 
     def box(self, fs, scale=1., source=False):
@@ -168,7 +168,7 @@ class Options(FrozenConfigurable):
                 b = Or(b, And(And(gt(x, x0-r), lt(x, x0+r)), And(gt(y, y0-r), lt(y, y0+r))))
         expr = conditional(b, scale, 0.)
         box = Function(fs)
-        box.interpolate(expr)  # NOTE: Pyadjoint can't deal with coordinateless functions
+        box.interpolate(expr)
         return box
 
 

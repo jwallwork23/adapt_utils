@@ -10,16 +10,13 @@ __[TODO: Use Zenodo instead of the below]__
 * Download the [Firedrake][1] install script, set
     * ``export PETSC_CONFIGURE_OPTIONS="--download-pragmatic --with-cxx-dialect=C++11"``
 
-    and install with option parameters ``--install pyadjoint`` and ``--install thetis``.
+    and install with option parameter ``--install thetis``.
 
 * Fetch and checkout the remote branches
-    * ``https://bitbucket.org/dolfin-adjoint/pyadjoint/branch/linear-solver`` for pyadjoint;
     * ``https://github.com/thetisproject/thetis/tree/joe`` for thetis;
     * ``https://github.com/taupalosaurus/firedrake`` for firedrake, fork ``barral/meshadapt``
     and call ``make`` in ``firedrake/src/firedrake`` to enable pragmatic drivers.
     * ``https://github.com/jwallwork23/adapt_utils`` and add this to ``PYTHONPATH`` environment variable.
-
-* Apply ``misc/keep_params.patch`` to pyadjoint, for an update to the ``linear-solver`` branch.
 
 
 #### For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.

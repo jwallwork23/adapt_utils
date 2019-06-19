@@ -1,4 +1,5 @@
 from thetis import *
+from firedrake import assemble
 
 
 __all__ = ["TracerCallback"]
@@ -18,10 +19,6 @@ class TracerCallback(callback.AccumulatorCallback):
             self.parameters = TracerOptions()
         else:
             self.parameters = parameters
-        if self.parameters.solve_adjoint:
-            from firedrake_adjoint import assemble
-        else:
-            from firedrake import assemble
 
         def objectiveAD():
             """

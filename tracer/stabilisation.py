@@ -1,5 +1,4 @@
 from firedrake import *
-from firedrake_adjoint import *
 from firedrake.slate.slac.compiler import PETSC_DIR
 import firedrake.dmplex as dmplex
 import numpy as np

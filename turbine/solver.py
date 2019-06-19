@@ -1,6 +1,5 @@
-from thetis_adjoint import *
+from thetis import *
 from firedrake.petsc import PETSc
-import pyadjoint
 import math
 
 from adapt_utils.solver import *
@@ -149,51 +148,49 @@ class SteadyTurbineProblem(SteadyProblem):
             self.M = metric_intersection(self.M, M)
 
     def explicit_estimation(self):
-        with pyadjoint.stop_annotating():
-            cell_res = self.ts.cell_residual()
-            self.cell_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
-            self.cell_residuals[0].project(cell_res[0])
-            self.cell_residuals[1].project(cell_res[1])
-            self.cell_residuals[2].project(cell_res[2])
-            if self.approach == 'explicit':
-                self.indicator = Function(self.P1)
-                cell_res_dot = self.cell_residuals[0]*self.cell_residuals[0]
-                cell_res_dot += self.cell_residuals[1]*self.cell_residuals[1]
-                cell_res_dot += self.cell_residuals[2]*self.cell_residuals[2]
-                self.indicator.interpolate(cell_res_dot)
-            #edge_res = self.ts.edge_residual()  # TODO
-            #self.edge_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
-            #self.edge_residuals[0].project(abs(cell_res[0]))
-            #self.edge_residuals[1].project(abs(cell_res[1]))
-            #self.edge_residuals[2].project(abs(cell_res[2]))
-            #if self.approach == 'explicit':
-            #    self.indicator = Function(self.P1)
-            #    edge_res_dot = self.edge_residuals[0]*self.edge_residuals[0]
-            #    edge_res_dot += self.edge_residuals[1]*self.edge_residuals[1]
-            #    edge_res_dot += self.edge_residuals[2]*self.edge_residuals[2]
-            #self.indicator.project(cell_res + edge_res)
+        cell_res = self.ts.cell_residual()
+        self.cell_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
+        self.cell_residuals[0].project(cell_res[0])
+        self.cell_residuals[1].project(cell_res[1])
+        self.cell_residuals[2].project(cell_res[2])
+        if self.approach == 'explicit':
+            self.indicator = Function(self.P1)
+            cell_res_dot = self.cell_residuals[0]*self.cell_residuals[0]
+            cell_res_dot += self.cell_residuals[1]*self.cell_residuals[1]
+            cell_res_dot += self.cell_residuals[2]*self.cell_residuals[2]
+            self.indicator.interpolate(cell_res_dot)
+        #edge_res = self.ts.edge_residual()  # TODO
+        #self.edge_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
+        #self.edge_residuals[0].project(abs(cell_res[0]))
+        #self.edge_residuals[1].project(abs(cell_res[1]))
+        #self.edge_residuals[2].project(abs(cell_res[2]))
+        #if self.approach == 'explicit':
+        #    self.indicator = Function(self.P1)
+        #    edge_res_dot = self.edge_residuals[0]*self.edge_residuals[0]
+        #    edge_res_dot += self.edge_residuals[1]*self.edge_residuals[1]
+        #    edge_res_dot += self.edge_residuals[2]*self.edge_residuals[2]
+        #self.indicator.project(cell_res + edge_res)
 
     def explicit_estimation_adjoint(self):
         raise NotImplementedError  # TODO
 
     def dwr_estimation(self):  # TODO: Different flavours of DWR
-        with pyadjoint.stop_annotating():
-            if self.op.dwr_approach != 'flux_only':
-                cell_res = self.ts.cell_residual(self.adjoint_solution)
-            if self.op.dwr_approach != 'cell_only':
-                edge_res = self.ts.edge_residual(self.adjoint_solution)
-            self.indicator = Function(self.P1)  # project straight into P1
-            #self.indicator = Function(self.P0)
-            if self.op.dwr_approach == 'error_representation':
-                self.indicator.project(cell_res + edge_res)
-            elif self.op.dwr_approach == 'cell_only':
-                self.indicator.project(cell_res)
-            elif self.op.dwr_approach == 'flux_only':
-                self.indicator.project(edge_res)
-            elif self.op.dwr_approach == 'ainsworth_oden':
-                self.indicator.project(self.h*cell_res + 0.5*self.h*self.h*edge_res)
-            else:
-                raise NotImplementedError  # TODO
+        if self.op.dwr_approach != 'flux_only':
+            cell_res = self.ts.cell_residual(self.adjoint_solution)
+        if self.op.dwr_approach != 'cell_only':
+            edge_res = self.ts.edge_residual(self.adjoint_solution)
+        self.indicator = Function(self.P1)  # project straight into P1
+        #self.indicator = Function(self.P0)
+        if self.op.dwr_approach == 'error_representation':
+            self.indicator.project(cell_res + edge_res)
+        elif self.op.dwr_approach == 'cell_only':
+            self.indicator.project(cell_res)
+        elif self.op.dwr_approach == 'flux_only':
+            self.indicator.project(edge_res)
+        elif self.op.dwr_approach == 'ainsworth_oden':
+            self.indicator.project(self.h*cell_res + 0.5*self.h*self.h*edge_res)
+        else:
+            raise NotImplementedError  # TODO
 
     def dwr_estimation_adjoint(self):
         raise NotImplementedError  # TODO
@@ -310,11 +307,10 @@ class SteadyTurbineProblem(SteadyProblem):
         """
         Here we only need interpolate the velocity.
         """
-        with pyadjoint.stop_annotating():
-            PETSc.Sys.Print("Interpolating solution across meshes...")
-            self.interpolated_solution = Function(self.V.sub(0))
-            self.interpolated_solution.project(self.prev_solution.split()[0])
-            #self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
+        PETSc.Sys.Print("Interpolating solution across meshes...")
+        self.interpolated_solution = Function(self.V.sub(0))
+        self.interpolated_solution.project(self.prev_solution.split()[0])
+        #self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
 
 
 class UnsteadyTurbineProblem(UnsteadyProblem):
@@ -454,30 +450,28 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
             self.M = metric_intersection(self.M, M)
 
     def explicit_estimation(self):
-        with pyadjoint.stop_annotating():
-            cell_res = self.ts.cell_residual()
-            #edge_res = self.ts.edge_residual()
-            self.residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
-            self.residuals[0].project(abs(cell_res[0]))
-            self.residuals[1].project(abs(cell_res[1]))
-            self.residuals[2].project(abs(cell_res[2]))
-            if self.approach == 'explicit':
-                self.indicator = Function(self.P1)
-                res_dot = self.residuals[0]*self.residuals[0]
-                res_dot += self.residuals[1]*self.residuals[1]
-                res_dot += self.residuals[2]*self.residuals[2]
-                self.indicator.interpolate(res_dot)
-            #self.indicator.project(cell_res + edge_res)
+        cell_res = self.ts.cell_residual()
+        #edge_res = self.ts.edge_residual()
+        self.residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
+        self.residuals[0].project(abs(cell_res[0]))
+        self.residuals[1].project(abs(cell_res[1]))
+        self.residuals[2].project(abs(cell_res[2]))
+        if self.approach == 'explicit':
+            self.indicator = Function(self.P1)
+            res_dot = self.residuals[0]*self.residuals[0]
+            res_dot += self.residuals[1]*self.residuals[1]
+            res_dot += self.residuals[2]*self.residuals[2]
+            self.indicator.interpolate(res_dot)
+        #self.indicator.project(cell_res + edge_res)
 
     def explicit_estimation_adjoint(self):
         raise NotImplementedError  # TODO
 
     def dwr_estimation(self):  # TODO: Different flavours of DWR
-        with pyadjoint.stop_annotating():
-            cell_res = self.ts.cell_residual(self.adjoint_solution)
-            edge_res = self.ts.edge_residual(self.adjoint_solution)
-            self.indicator = Function(self.P0)
-            self.indicator.project(cell_res + edge_res)
+        cell_res = self.ts.cell_residual(self.adjoint_solution)
+        edge_res = self.ts.edge_residual(self.adjoint_solution)
+        self.indicator = Function(self.P0)
+        self.indicator.project(cell_res + edge_res)
 
     def dwr_estimation_adjoint(self):
         raise NotImplementedError  # TODO
@@ -512,25 +506,23 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         """
         Interpolate solution onto the new mesh after a mesh adaptation.
         """
-        with pyadjoint.stop_annotating():
-            interpolated_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
-            uv_i, elev_i = interpolated_solution.split()
-            uv, elev = self.solution.split()
-            uv_i.project(uv)
-            name = uv.dat.name
-            uv_i.rename(name)
-            elev_i.project(elev)
-            name = elev.dat.name
-            elev_i.rename(name)
-            self.solution = interpolated_solution
+        interpolated_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
+        uv_i, elev_i = interpolated_solution.split()
+        uv, elev = self.solution.split()
+        uv_i.project(uv)
+        name = uv.dat.name
+        uv_i.rename(name)
+        elev_i.project(elev)
+        name = elev.dat.name
+        elev_i.rename(name)
+        self.solution = interpolated_solution
 
     def interpolate_adjoint_solution(self):
         """
         Interpolate adjoint solution onto the new mesh after a mesh adaptation.
         """
-        with pyadjoint.stop_annotating():
-            self.interpolated_adjoint_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
-            z_i, zeta_i = self.interpolated_adjoint_solution.split()
-            z, zeta = self.adjoint_solution
-            z_i.project(z)
-            zeta_i.project(zeta)
+        self.interpolated_adjoint_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
+        z_i, zeta_i = self.interpolated_adjoint_solution.split()
+        z, zeta = self.adjoint_solution
+        z_i.project(z)
+        zeta_i.project(zeta)
