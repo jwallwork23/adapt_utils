@@ -53,7 +53,7 @@ class Options(FrozenConfigurable):
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
     degree = PositiveInteger(1, help="Order of function space").tag(config=True)
     element_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in mesh element count").tag(config=True)
-    qoi_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in objective value.").tag(config=True)
+    qoi_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in quantity of interest.").tag(config=True)
 
     # Adjoint
     adjoint_steps = NonNegativeInteger(1000, help="Number of adjoint steps used").tag(config=True)

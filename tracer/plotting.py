@@ -15,7 +15,7 @@ colours = {'Uniform': 'b',
            'A posteriori': 'tab:orange', 'A posteriori (av.)': 'tab:orange', 'A posteriori (sup.)': 'tab:orange',
            'A priori': 'm', 'A priori (av.)': 'm', 'A priori (sup.)': 'm'}
 
-__all__ = ["create_dict", "plot_objective", "plot_error", "plot_estimate", "plot_effectivity"]
+__all__ = ["create_dict", "plot_qoi", "plot_error", "plot_estimate", "plot_effectivity"]
 
 
 def create_dict(centred=True, second_order=False):
@@ -39,7 +39,7 @@ def create_dict(centred=True, second_order=False):
         dat['A priori (sup.)'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []} 
     return dat
 
-def plot_objective(dat, centred=True, title=None, filename=None, filepath='plots', err=1):
+def plot_qoi(dat, centred=True, title=None, filename=None, filepath='plots', err=1):
     J = 0.16344 if centred else 0.06959
     fig = plt.figure()
     ax = fig.add_subplot(111)

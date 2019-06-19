@@ -5,8 +5,8 @@ __all__ = ["TracerCallback"]
 
 
 class TracerCallback(callback.AccumulatorCallback):
-    """Integrates objective functional for advection diffusion problem."""
-    name = 'advection objective functional'
+    """Evaluates quantity of interest for advection diffusion problem."""
+    name = 'tracer QoI'
 
     def __init__(self, solver_obj, parameters=None, **kwargs):
         """
@@ -23,10 +23,10 @@ class TracerCallback(callback.AccumulatorCallback):
         else:
             from firedrake import assemble
 
-        def objectiveAD():
+        def qoi():
             """
             :param solver_obj: FlowSolver2d object.
-            :return: objective functional value for callbacks.
+            :return: quantity of interest for callbacks.
             """
             Q_2d = solver_obj.function_spaces.Q_2d
             ks = Function(Q_2d)
@@ -48,4 +48,4 @@ class TracerCallback(callback.AccumulatorCallback):
 
             return assemble(kt * ks * solver_obj.fields.tracer_2d * dx)
 
-        super(TracerCallback, self).__init__(objectiveAD, solver_obj, **kwargs)
+        super(TracerCallback, self).__init__(qoi, solver_obj, **kwargs)

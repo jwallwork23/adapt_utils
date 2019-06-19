@@ -44,7 +44,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.nu = op.set_diffusivity(self.P1)
         self.u = op.set_velocity(self.P1_vec)
         self.source = op.set_source(self.P1)
-        self.kernel = op.set_objective_kernel(self.P0)
+        self.kernel = op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Stabilisation
