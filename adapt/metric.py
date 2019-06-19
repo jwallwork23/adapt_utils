@@ -17,10 +17,11 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
 
-    :arg f: field to compute the Hessian of.
-    :arg H: reconstructed Hessian associated with `f` (if already computed).
-    :param op: `Options` class object providing min/max cell size values.
-    :return: steady metric associated with Hessian H.
+    :arg f: Field to compute the Hessian of.
+    :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
+    :kwarg noscale: If `noscale == True` then we simply take the Hessian with eigenvalues in modulus.
+    :kwarg op: `Options` class object providing min/max cell size values.
+    :return: Steady metric associated with Hessian H.
     """
     if H is None:
         H = construct_hessian(f, mesh=mesh, op=op)
@@ -47,7 +48,7 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     msg = "WARNING: minimum element size reached as {m:.2e}"
     for k in range(mesh.num_vertices()):
 
-        # Generate local Hessian
+        # Ensure local Hessian is symmetric
         H_loc = H.dat.data[k]
         for i in range(dim-1):
             for j in range(i+1, dim):
@@ -55,16 +56,16 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
                 H_loc[i][j] = mean_diag
                 H_loc[j][i] = mean_diag
 
-        # Find eigenpairs of Hessian and truncate eigenvalues
+        # Find eigenpairs of Hessian
         lam, v = la.eigh(H_loc)
 
-        # Truncate eigenvalues to avoid round-off error
+        # Take eigenvalues in modulus, so that the metric is SPD
         det = 1.
         for i in range(dim):
-            lam[i] = max(abs(lam[i]), 1e-10)
+            lam[i] = max(abs(lam[i]), 1e-10)  # Truncate eigenvalues to avoid round-off error
             det *= lam[i]
 
-        # Reconstruct edited Hessian and rescale
+        # Reconstruct edited Hessian
         for l in range(dim):
             for i in range(dim):
                 for j in range(i, dim):
@@ -82,14 +83,16 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
                 M.dat.data[k] *= pow(det, -1./(2*p + dim))
                 detH.dat.data[k] = pow(det, p/(2.*p + dim))
 
+    if noscale:
+        return M
+
     # Scale by target complexity / desired error
-    if not noscale:
-        if op.normalisation == 'complexity':
-            M *= pow(op.target/assemble(detH*dx), 2/dim)
-        else:
-            M *= dim*op.target  # NOTE in the 'error' case this is the inverse thereof
-            if p is not None:
-                M *= pow(assemble(detH*dx), 1/p)
+    if op.normalisation == 'complexity':
+        M *= pow(op.target/assemble(detH*dx), 2/dim)
+    else:
+        M *= dim*op.target  # NOTE in the 'error' case this is the inverse thereof
+        if p is not None:
+            M *= pow(assemble(detH*dx), 1/p)
 
     for k in range(mesh.num_vertices()):
 
@@ -123,9 +126,10 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
-    :arg f: function to adapt to.
-    :param op: `Options` class providing min/max cell size values.
-    :return: isotropic metric corresponding to `f`.
+    :arg f: Function to adapt to.
+    :kwarg noscale: If `noscale == True` then we simply take the diagonal matrix with `f` in modulus.
+    :kwarg op: `Options` class providing min/max cell size values.
+    :return: Isotropic metric corresponding to `f`.
     """
     assert len(f.ufl_element().value_shape()) == 0
     mesh = f.function_space().mesh()
@@ -166,13 +170,14 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
             if p is not None:
                 g *= pow(assemble(detM*dx), 1/p)
 
+        g = max_value(1/h_max2, min_value(g, 1/h_min2))
+        g = max_value(g, g/a2)
+
     # Construct metric
-    alpha = max_value(1/h_max2, min_value(g, 1/h_min2))
-    alpha = max_value(alpha, alpha/a2)
     if dim == 2:
-        M.interpolate(as_matrix([[alpha, 0], [0, alpha]]))
+        M.interpolate(as_matrix([[g, 0], [0, g]]))
     else:
-        M.interpolate(as_matrix([[alpha, 0, 0], [0, alpha, 0], [0, 0, alpha]]))
+        M.interpolate(as_matrix([[g, 0, 0], [0, g, 0], [0, 0, g]]))
 
     return M
 
@@ -191,11 +196,11 @@ def anisotropic_refinement(metric, direction=0):
     mesh = fs.mesh()
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
-    scale = 4 if dim == 2 else 8  # TODO: check this
+    scale = 4 if dim == 2 else 8  # TODO: Check this extension to 3d
     for k in range(mesh.num_vertices()):
         lam, v = la.eigh(metric.dat.data[k])
         lam[direction] *= scale
-        # TODO: these loops could be done more efficiently by just adding extra terms in the skew direction
+        # TODO: These loops could be done more efficiently by just adding extra terms in the skew direction
         for l in range(dim):
             for i in range(dim):
                 for j in range(i, dim):
@@ -243,7 +248,7 @@ def metric_intersection(M1, M2, bdy=None):
 
 def metric_relaxation(M1, M2, alpha=0.5):
     r"""
-    Alternatively to intersection, pointwise metric information may be combined using a convex
+    As an alternative to intersection, pointwise metric information may be combined using a convex
     combination. Whilst this method does not have as clear an interpretation as metric intersection,
     it has the benefit that the combination may be weighted towards one of the metrics in question.
 
