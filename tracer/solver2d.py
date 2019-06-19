@@ -406,7 +406,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Get potential to take Hessian w.r.t.
         # x, y = SpatialCoordinate(self.mesh)
         if adjoint:
-            source = self.op.box(self.P0)
+            source = self.kernel
             # F1 = -sol*self.u[0] - self.nu*sol.dx(0) - source*x
             # F2 = -sol*self.u[1] - self.nu*sol.dx(1) - source*y
             F1 = -sol*self.u[0] - self.nu*sol.dx(0)
@@ -434,7 +434,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         H2 = steady_metric(F2, mesh=self.mesh, noscale=True, op=self.op)
         Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
 
-        # form metric  # TODO: use pyop2
+        # Form metric  # TODO: use pyop2
         self.M = Function(self.P1_ten)
         for i in range(self.mesh.num_vertices()):
             self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
