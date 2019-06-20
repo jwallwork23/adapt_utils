@@ -34,7 +34,8 @@ def create_dict(centred=True, second_order=False):
     if centred:
         dat['Uniform']['qoi'] = [2.0547e-01, 1.6873e-01, 1.6259e-01, 1.6343e-01, 1.6345e-01]
     else:
-        dat['Uniform']['qoi'] = [8.9190e-02, 7.2197e-02, 6.9363e-02, 6.9720e-02, 6.9722e-02]
+        #dat['Uniform']['qoi'] = [8.9190e-02, 7.2197e-02, 6.9363e-02, 6.9720e-02, 6.9722e-02]
+        dat['Uniform']['qoi'] = [8.9011e-02, 7.2053e-02, 6.9224e-02, 6.9580e-02, 6.9582e-02]
     if not second_order:
         dat['Isotropic'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []}
         dat['A posteriori'] = {'elements': [], 'qoi': [], 'estimator': [], 'iterations': []}
