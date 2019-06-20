@@ -163,7 +163,8 @@ class TelemacOptions(TracerOptions):
         self.offset = offset
 
         # Source / receiver
-        self.source_loc = [(1.+self.offset, 5., 0.0798)]
+        calibrated_r = 0.07980 if centred else 0.07972
+        self.source_loc = [(1.+self.offset, 5., calibrated_r)]
         self.region_of_interest = [(20., 5., 0.5)] if centred else [(20., 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
@@ -259,7 +260,8 @@ class Telemac3dOptions(TracerOptions):
         self.offset = offset
 
         # Source / receiver
-        self.source_loc = [(1.+self.offset, 5., 5., 0.0798)]
+        calibrated_r = 0.07980 if centred else 0.07972
+        self.source_loc = [(1.+self.offset, 5., 5., calibrated_r)]
         self.region_of_interest = [(20., 5., 5., 0.5)] if centred else [(20., 7.5, 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
