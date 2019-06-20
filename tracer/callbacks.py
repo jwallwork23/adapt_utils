@@ -5,8 +5,8 @@ __all__ = ["TracerCallback"]
 
 
 class TracerCallback(callback.AccumulatorCallback):
-    """Integrates objective functional for advection diffusion problem."""
-    name = 'advection objective functional'
+    """Evaluates quantity of interest for advection diffusion problem."""
+    name = 'tracer QoI'
 
     def __init__(self, solver_obj, parameters=None, **kwargs):
         """
@@ -23,10 +23,10 @@ class TracerCallback(callback.AccumulatorCallback):
         else:
             from firedrake import assemble
 
-        def objectiveAD():
+        def qoi():
             """
             :param solver_obj: FlowSolver2d object.
-            :return: objective functional value for callbacks.
+            :return: quantity of interest for callbacks.
             """
             Q_2d = solver_obj.function_spaces.Q_2d
             ks = Function(Q_2d)
@@ -37,15 +37,15 @@ class TracerCallback(callback.AccumulatorCallback):
             kt = Constant(0.)
 
             # Slightly smooth transition
-            if self.parameters.start_time - 0.5 * dt < t < self.parameters.start_time + 0.5 * dt:
+            if self.parameters.start_time - 0.5*dt < t < self.parameters.start_time + 0.5*dt:
                 kt.assign(0.5)
-            elif self.parameters.start_time + 0.5 * dt < t < self.parameters.end_time - 0.5 * dt:
+            elif self.parameters.start_time + 0.5*dt < t < self.parameters.end_time - 0.5*dt:
                 kt.assign(1.)
-            elif self.parameters.end_time - 0.5 * dt < t < self.parameters.end_time + 0.5 * dt:
+            elif self.parameters.end_time - 0.5*dt < t < self.parameters.end_time + 0.5*dt:
                 kt.assign(0.5)
             else:
                 kt.assign(0.)
 
-            return assemble(kt * ks * solver_obj.fields.tracer_2d * dx)
+            return assemble(kt*ks*solver_obj.fields.tracer_2d*dx)
 
-        super(TracerCallback, self).__init__(objectiveAD, solver_obj, **kwargs)
+        super(TracerCallback, self).__init__(qoi, solver_obj, **kwargs)

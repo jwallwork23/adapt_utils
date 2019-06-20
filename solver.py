@@ -80,7 +80,7 @@ class SteadyProblem():
         """
         pass
 
-    def get_objective_kernel(self):
+    def get_qoi_kernel(self):
         """
         Derivative `g` of functional of interest `J`. i.e. For solution `u` we have
             J(u) = g . u
@@ -92,7 +92,7 @@ class SteadyProblem():
         Functional of interest which takes the PDE solution as input.
         """
         if not hasattr(self, 'kernel'):
-            self.get_objective_kernel()
+            self.get_qoi_kernel()
         return assemble(inner(self.solution, self.kernel)*dx)
 
     def solve_continuous_adjoint(self):
@@ -680,7 +680,7 @@ class UnsteadyProblem():
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
 
-    def get_objective_kernel(self):
+    def get_qoi_kernel(self):
         """
         Derivative `g` of functional of interest `J`. i.e. For solution `u` we have
             J(u) = g . u
@@ -692,7 +692,7 @@ class UnsteadyProblem():
         Functional of interest which takes the PDE solution as input.
         """
         if not hasattr(self, 'kernel'):
-            self.get_objective_kernel()
+            self.get_qoi_kernel()
         return assemble(inner(self.solution, self.kernel)*dx)
 
     def solve_continuous_adjoint(self):  # NOTE: this should save to HDF5

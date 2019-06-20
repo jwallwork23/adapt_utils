@@ -43,7 +43,7 @@ class SteadyTracerProblem3d(SteadyProblem):
         self.nu = op.set_diffusivity(self.P1)
         self.u = op.set_velocity(self.P1_vec)
         self.source = op.set_source(self.P1)
-        self.kernel = op.set_objective_kernel(self.P0)
+        self.kernel = op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Stabilisation
@@ -153,7 +153,7 @@ class SteadyTracerProblem3d(SteadyProblem):
         sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
         sol = Function(tp_p2.V)
         sol.interpolate(sol_p2 - sol)
-        with pyadjoint.stop_annotating():  # TODO: temp
+        with pyadjoint.stop_annotating():  # TODO: temporary
             self.errorterm = Function(self.P2)
             self.errorterm.project(sol)
         return self.errorterm
@@ -194,8 +194,6 @@ class SteadyTracerProblem3d(SteadyProblem):
         if self.op.dwr_approach == 'error_representation':
             self.p0indicator = Function(self.P0)
             self.p0indicator += self.cell_res + self.edge_res
-            #self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
-            #self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
             self.p1indicator = project(self.p0indicator, self.P1)
         else:
             raise NotImplementedError
@@ -234,8 +232,6 @@ class SteadyTracerProblem3d(SteadyProblem):
         if self.op.dwr_approach == 'error_representation':
             self.p0indicator = Function(self.P0)
             self.p0indicator += self.cell_res_adjoint + self.edge_res_adjoint
-            #self.p0indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P0)
-            #self.p1indicator = project(self.cell_res_adjoint + self.edge_res_adjoint, self.P1)
             self.p1indicator = project(self.p0indicator, self.P1)
         else:
             raise NotImplementedError
@@ -276,13 +272,11 @@ class SteadyTracerProblem3d(SteadyProblem):
             R -= (f - dot(u, grad(phi)) + div(nu*grad(phi)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
 
         # Sum
-        with pyadjoint.stop_annotating():  # TODO: temp
+        with pyadjoint.stop_annotating():  # TODO: Temporary
             self.cell_res = assemble(i*R*dx)
             if self.op.dwr_approach == 'error_representation':
                 self.p0indicator = Function(self.P0)
                 self.p0indicator += self.cell_res + self.edge_res
-                #self.p0indicator = project(self.cell_res + self.edge_res, self.P0)
-                #self.p1indicator = project(self.cell_res + self.edge_res, self.P1)
                 self.p1indicator = project(self.p0indicator, self.P1)
             else:
                 raise NotImplementedError
@@ -331,10 +325,10 @@ class SteadyTracerProblem3d(SteadyProblem):
             adj = self.solution if adjoint else self.adjoint_solution
         sol = self.adjoint_solution if adjoint else self.solution
         adj_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(adj)))
-        adj = Function(seld.P1).interpolate(abs(adj))
+        adj = Function(self.P1).interpolate(abs(adj))
 
         if adjoint:
-            source = self.op.box(self.P0)
+            source = self.kernel
             F1 = -sol*self.u[0] - self.nu*sol.dx(0)
             F2 = -sol*self.u[1] - self.nu*sol.dx(1)
             F3 = -sol*self.u[2] - self.nu*sol.dx(2)
@@ -350,7 +344,7 @@ class SteadyTracerProblem3d(SteadyProblem):
         H3 = steady_metric(F3, mesh=self.mesh, noscale=True, op=self.op)
         Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
 
-        # form metric  # TODO: use pyop2
+        # Form metric  # TODO: use pyop2
         self.M = Function(self.P1_ten)
         for i in range(self.mesh.num_vertices()):
             self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
