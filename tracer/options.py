@@ -105,6 +105,7 @@ class PowerOptions(TracerOptions):
         # Source / receiver
         self.source_loc = [(1., 2., 0.1)] if centred else [(1., 1.5, 0.1)]
         self.region_of_interest = [(3., 2., 0.1)] if centred else [(3., 2.5, 0.1)]
+        self.base_diffusivity = 1.
 
         # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
@@ -114,7 +115,7 @@ class PowerOptions(TracerOptions):
         self.boundary_conditions[4] = 'neumann_zero'
 
     def set_diffusivity(self, fs):
-        self.diffusivity = Constant(1.)
+        self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity
 
     def set_velocity(self, fs):
@@ -168,6 +169,7 @@ class TelemacOptions(TracerOptions):
         self.region_of_interest = [(20., 5., 0.5)] if centred else [(20., 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
+        self.base_diffusivity = 0.1
 
         # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
@@ -182,7 +184,7 @@ class TelemacOptions(TracerOptions):
         self.dt_per_remesh = 20
 
     def set_diffusivity(self, fs):
-        self.diffusivity = Constant(0.1)
+        self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity
 
     def set_velocity(self, fs):
@@ -265,6 +267,7 @@ class Telemac3dOptions(TracerOptions):
         self.region_of_interest = [(20., 5., 5., 0.5)] if centred else [(20., 7.5, 7.5, 0.5)]
         self.source_value = 100.
         self.source_discharge = 0.1
+        self.base_diffusivity = 0.1
 
         # Boundary conditions  # TODO: make Thetis-conforming
         self.boundary_conditions[1] = 'dirichlet_zero'
@@ -281,7 +284,7 @@ class Telemac3dOptions(TracerOptions):
         self.dt_per_remesh = 20
 
     def set_diffusivity(self, fs):
-        self.diffusivity = Constant(0.01)  # Use smaller diffusivity due to dimensionality
+        self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity
 
     def set_velocity(self, fs):
@@ -363,6 +366,7 @@ class LeVequeOptions(TracerOptions):
         # Source / receiver
         self.source_loc = [(0.25, 0.5, 0.15), (0.5, 0.25, 0.15), (0.5, 0.75, 0.15), (0.475, 0.525, 0.85)]
         self.region_of_interest = [(0.5, 0.75, 0.18)]
+        self.base_diffusivity = 0.
 
         # Boundary conditions
         q_in = Constant(1.0)
@@ -397,7 +401,7 @@ class LeVequeOptions(TracerOptions):
         #print("Exact QoI: {:.4e}".format(self.J_exact))  # TODO: Check this
 
     def set_diffusivity(self, fs):
-        self.diffusivity = Constant(0.)
+        self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity
 
     def set_velocity(self, fs):
