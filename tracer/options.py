@@ -29,14 +29,6 @@ class TracerOptions(Options):
     # Domain
     nx = PositiveInteger(4, help="Mesh resolution in x- and y-directions.").tag(config=True)
 
-    # Timestepping
-    dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
-    start_time = NonNegativeFloat(0., help="Start of time window of interest.").tag(config=True)
-    end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
-    dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
-    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation.").tag(config=True)
-    timestepper = Unicode('CrankNicolson', help="Time integration scheme.").tag(config=True)
-
     # Solver
     params = PETScSolverParameters({'pc_type': 'lu',
                                     'mat_type': 'aij' ,
@@ -51,18 +43,13 @@ class TracerOptions(Options):
     diffusivity = FiredrakeScalarExpression(Constant(1e-1), help="(Scalar) diffusivity field for tracer problem.").tag(config=True)
     fluid_velocity = FiredrakeVectorExpression(None, allow_none=True, help="Vector fluid velocity field for tracer problem.").tag(config=True)
 
-    # QoI
-    region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
-
-    # Adaptivity
-    h_min = PositiveFloat(1e-10, help="Minimum tolerated element size.").tag(config=True)
-    h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
-
-    boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)
-
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh', dt=0.1):
         super(TracerOptions, self).__init__(approach)
-        self.end_time -= 0.5*self.dt
+        self.dt = dt
+        self.start_time = 0.
+        self.end_time = 60. - 0.5*self.dt
+        self.dt_per_export = 10
+        self.dt_per_remesh = 20
         self.stabilisation = 'SUPG'
 
     def set_diffusivity(self, fs):

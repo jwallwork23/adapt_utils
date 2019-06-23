@@ -15,8 +15,6 @@ class SteadyTurbineOptions(Options):
     # TODO: doc
 
     # Solver parameters
-    dt = PositiveFloat(20.).tag(config=True)
-    end_time = PositiveFloat(18.).tag(config=True)
     params = PETScSolverParameters({
              'mat_type': 'aij',
              'ksp_type': 'preonly',
@@ -28,8 +26,6 @@ class SteadyTurbineOptions(Options):
 
     # Adaptivity parameters
     adapt_field = Unicode('fluid_speed', help="Adaptation field of interest, from {'fluid_speed', 'elevation', 'both'}.").tag(config=True)
-    h_min = PositiveFloat(1e-5, help="Minimum element size").tag(config=True)
-    h_max = PositiveFloat(20., help="Maximum element size").tag(config=True)
 
     # Physical parameters
     symmetric_viscosity = Bool(False, help="Symmetrise viscosity term").tag(config=True)
@@ -37,13 +33,15 @@ class SteadyTurbineOptions(Options):
 
     region_of_interest = List(default_value=[]).tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
+    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed', dt=20.):
         super(SteadyTurbineOptions, self).__init__(approach)
         self.adapt_field = adapt_field
         try:
             assert self.adapt_field in ('fluid_speed', 'elevation', 'both')
         except:
             raise ValueError('Field for adaptation {:s} not recognised.'.format(self.adapt_field))
+        self.dt = dt
+        self.end_time = 18.
         self.bathymetry = Constant(self.depth)
         self.viscosity = Constant(self.base_viscosity)
         self.stabilisation = 'lax_friedrichs'
@@ -56,6 +54,10 @@ class SteadyTurbineOptions(Options):
         correction = 4/(1+math.sqrt(1-A_T/(40.*D)))**2
         self.thrust_coefficient *= correction
         # NOTE, that we're not yet correcting power output here, so that will be overestimated
+
+        # Adaptivity
+        self.h_min = 1e-5
+        self.h_max = 20.
 
     def set_viscosity(self):
         self.viscosity.assign(self.base_viscosity)
