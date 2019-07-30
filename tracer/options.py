@@ -346,13 +346,19 @@ class LeVequeOptions(TracerOptions):
     The QoI considered in this test case may be viewed as an extension of the QoI considered in the
     [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh', shape=0):
         super(LeVequeOptions, self).__init__(approach)
         self.default_mesh = UnitSquareMesh(40, 40)
 
         # Source / receiver
         self.source_loc = [(0.25, 0.5, 0.15), (0.5, 0.25, 0.15), (0.5, 0.75, 0.15), (0.475, 0.525, 0.85)]
-        self.region_of_interest = [(0.5, 0.75, 0.18)]
+        assert shape in (0, 1, 2)
+        if shape == 0:
+            self.region_of_interest = [(0.25, 0.5, 0.175)]
+        elif shape == 1:
+            self.region_of_interest = [(0.5, 0.25, 0.175)]
+        else:
+            self.region_of_interest = [(0.5, 0.75, 0.175)]
         self.base_diffusivity = 0.
 
         # Boundary conditions
@@ -362,11 +368,11 @@ class LeVequeOptions(TracerOptions):
 
         # Time integration
         self.dt = math.pi/300.0
-        self.end_time = 2*math.pi
+        self.end_time = 2*math.pi + self.dt
         self.dt_per_export = 10
         self.dt_per_remesh = 10
 
-        # Exact QoI
+        # Exact QoI  # TODO: update for 3 qois
         #bell_r2 = self.source_loc[0][2]**2
         #cone_r2 = self.source_loc[1][2]**2
         cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
@@ -410,10 +416,11 @@ class LeVequeOptions(TracerOptions):
                        0.0, 1.0), 0.0)
 
         self.initial_value = Function(fs)
-        self.initial_value.interpolate(1.0 + bell + cone + slot_cyl)
+        #self.initial_value.interpolate(1.0 + bell + cone + slot_cyl)
+        self.initial_value.interpolate(bell + cone + slot_cyl)
         return self.initial_value
 
-    def set_qoi_kernel(self, fs):
+    def set_qoi_kernel(self, fs):  # TODO: update for 3 qois
         self.kernel = Function(fs)
         self.kernel.interpolate(self.ball(fs))
         area = assemble(self.kernel*dx)
@@ -427,7 +434,7 @@ class LeVequeOptions(TracerOptions):
             self.set_initial_condition(fs)
         return self.initial_value
 
-    def exact_qoi(self, fs1, fs2):
+    def exact_qoi(self, fs1, fs2):  # TODO: update for 3 qois
         x, y = SpatialCoordinate(fs1.mesh())
         bell_x0, bell_y0, bell_r0 = self.source_loc[0]
         cone_x0, cone_y0, cone_r0 = self.source_loc[1]
