@@ -311,6 +311,9 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         # Classification
         self.nonlinear = False
 
+    def get_qoi_kernel(self):
+        self.kernel = self.op.set_qoi_kernel(self.P0)
+
     def set_fields(self):
         self.nu = self.op.set_diffusivity(self.V)
         self.u = self.op.set_velocity(self.P1_vec)

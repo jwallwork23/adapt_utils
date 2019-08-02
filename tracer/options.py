@@ -434,7 +434,7 @@ class LeVequeOptions(TracerOptions):
         # Cone
         elif self.shape == 1:
             r = self.source_loc[1][2]
-            return h*math.pi*r*r/2
+            return h*math.pi*r*r/3
         # Slotted cylinder
         else:
             l = self.source_loc[3][1] - self.source_loc[2][0]  # width of slot to left
