@@ -151,6 +151,12 @@ class TelemacOptions(TracerOptions):
         self.offset = offset
 
         # Source / receiver
+        # NOTE: It isn't obvious how to represent a delta function on a finite element mesh. The
+        #       idea here is to use a disc with a very small radius. In the context of desalination
+        #       outfall, this makes sense, because the source is from a pipe. However, in the context
+        #       of analytical solutions, it is not quite right. As such, we have calibrated the
+        #       radius so that solving on a sequence of increasingly refined uniform meshes leads to
+        #       convergence of the uniform mesh solution to the analytical solution.
         calibrated_r = 0.07980 if centred else 0.07972
         self.source_loc = [(1.+self.offset, 5., calibrated_r)]
         self.region_of_interest = [(20., 5., 0.5)] if centred else [(20., 7.5, 0.5)]
@@ -185,7 +191,7 @@ class TelemacOptions(TracerOptions):
         with pyadjoint.stop_annotating():
             nrm=assemble(self.ball(fs, source=True)*dx)
         scaling = pi*r0*r0/nrm if nrm != 0 else 1
-        scaling *= 0.5*self.source_value  # TODO: where does factor of half come from?
+        scaling *= 0.5*self.source_value
         self.source.interpolate(self.ball(fs, source=True, scale=scaling))
         return self.source
 
@@ -249,7 +255,7 @@ class Telemac3dOptions(TracerOptions):
         self.offset = offset
 
         # Source / receiver
-        calibrated_r = 0.07980 if centred else 0.07972
+        calibrated_r = 0.07980 if centred else 0.07972  # TODO: calibrate for 3d case
         self.source_loc = [(1.+self.offset, 5., 5., calibrated_r)]
         self.region_of_interest = [(20., 5., 5., 0.5)] if centred else [(20., 7.5, 7.5, 0.5)]
         self.source_value = 100.
@@ -311,7 +317,7 @@ class Telemac3dOptions(TracerOptions):
         self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
         self.solution.rename('Analytic tracer concentration')
         outfile = File(self.di + 'analytic.pvd')
-        outfile.write(self.solution)  # NOTE: use 40 discretisation levels in ParaView
+        outfile.write(self.solution)
         return self.solution
 
     def exact_qoi(self, fs1, fs2):
