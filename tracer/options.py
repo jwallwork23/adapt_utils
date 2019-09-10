@@ -120,7 +120,7 @@ class PowerOptions(TracerOptions):
         self.source.rename("Source term")
         return self.source
 
-    def set_qoi_kernel(self, fs):
+    def set_qoi_kernel(self, fs):  # FIXME: update
         self.kernel = Function(fs)
         #self.kernel.interpolate(self.bump(fs))
         self.kernel.interpolate(self.box(fs))
@@ -200,8 +200,11 @@ class TelemacOptions(TracerOptions):
         return self.initial_value
 
     def set_qoi_kernel(self, fs):
-        self.kernel = Function(fs)
-        self.kernel.interpolate(self.ball(fs))
+        b = self.ball(fs, source=False)
+        area = assemble(b*dx)
+        area_exact = math.pi*self.region_of_interest[0][2]**2
+        rescaling = area_exact/area if area != 0. else 1
+        self.kernel = rescaling*b
         return self.kernel
 
     def exact_solution(self, fs):
@@ -300,8 +303,11 @@ class Telemac3dOptions(TracerOptions):
         return self.initial_value
 
     def set_qoi_kernel(self, fs):
-        self.kernel = Function(fs)
-        self.kernel.interpolate(self.ball(fs))
+        b = self.ball(fs, source=False)
+        area = assemble(b*dx)
+        area_exact = math.pi*self.region_of_interest[0][2]**2
+        rescaling = area_exact/area if area != 0. else 1
+        self.kernel = rescaling*b
         return self.kernel
 
     def exact_solution(self, fs):
@@ -359,6 +365,7 @@ class LeVequeOptions(TracerOptions):
         # Source / receiver
         self.source_loc = [(0.25, 0.5, 0.15), (0.5, 0.25, 0.15), (0.5, 0.75, 0.15), (0.475, 0.525, 0.85)]
         assert shape in (0, 1, 2)
+        self.shape = shape
         if shape == 0:
             self.region_of_interest = [(0.25, 0.5, 0.175)]
         elif shape == 1:
@@ -377,27 +384,6 @@ class LeVequeOptions(TracerOptions):
         self.end_time = 2*math.pi + self.dt
         self.dt_per_export = 10
         self.dt_per_remesh = 10
-
-        # Exact QoI  # TODO: update for 3 qois
-        #bell_r2 = self.source_loc[0][2]**2
-        #cone_r2 = self.source_loc[1][2]**2
-        cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
-        cyl_r2 = cyl_r0**2
-        slot_left, slot_right, slot_top = self.source_loc[3]
-        slot_left -= cyl_x0
-        slot_right -= cyl_x0
-        slot_top -= cyl_y0
-        #bell = math.pi*bell_r2/4
-        #cone = math.pi*cone_r2/3
-        cyl = math.pi*cyl_r2
-        slot = slot_top*(slot_right-slot_left)
-        slot += -0.5*slot_right*math.sqrt(cyl_r2 - slot_right**2)
-        slot += 0.5*slot_left*math.sqrt(cyl_r2 - slot_left**2)
-        slot += -0.5*cyl_r2*math.atan(slot_right/math.sqrt(cyl_r2 - slot_right**2))
-        slot += 0.5*cyl_r2*math.atan(slot_left/math.sqrt(cyl_r2 - slot_left**2))
-        #self.J_exact = 1 + bell + cone + cyl - slot
-        self.J_exact = 1 + cyl - slot
-        #print("Exact QoI: {:.4e}".format(self.J_exact))  # TODO: Check this
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)
@@ -426,13 +412,12 @@ class LeVequeOptions(TracerOptions):
         self.initial_value.interpolate(bell + cone + slot_cyl)
         return self.initial_value
 
-    def set_qoi_kernel(self, fs):  # TODO: update for 3 qois
-        self.kernel = Function(fs)
-        self.kernel.interpolate(self.ball(fs))
-        area = assemble(self.kernel*dx)
+    def set_qoi_kernel(self, fs):
+        b = self.ball(fs, source=False)
+        area = assemble(b*dx)
         area_exact = math.pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
-        self.kernel.interpolate(rescaling*self.kernel)
+        self.kernel = rescaling*b
         return self.kernel
 
     def exact_solution(self, fs):
@@ -440,18 +425,37 @@ class LeVequeOptions(TracerOptions):
             self.set_initial_condition(fs)
         return self.initial_value
 
-    def exact_qoi(self, fs1, fs2):  # TODO: update for 3 qois
-        x, y = SpatialCoordinate(fs1.mesh())
+    def exact_qoi(self):
+        h = 1
+        # Gaussian
+        if self.shape == 0:
+            r = self.source_loc[0][2]
+            return (math.pi/4-1/math.pi)*r*r
+        # Cone
+        elif self.shape == 1:
+            r = self.source_loc[1][2]
+            return h*math.pi*r*r/2
+        # Slotted cylinder
+        else:
+            l = self.source_loc[3][1] - self.source_loc[2][0]  # width of slot to left
+            t = self.source_loc[3][2] - self.source_loc[2][1]  # height of slot to top
+            r = self.source_loc[2][2]                          # cylinder radius
+            return h*(math.pi*r*r - 2*t*l - r*r*math.asin(l/r) - r*r*math.sin(2*math.asin(l/r))/2)
+
+    def quadrature_qoi(self, fs):
+        x, y = SpatialCoordinate(fs.mesh())
         bell_x0, bell_y0, bell_r0 = self.source_loc[0]
         cone_x0, cone_y0, cone_r0 = self.source_loc[1]
         cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
         slot_left, slot_right, slot_top = self.source_loc[3]
+
         bell = 0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0)))
         cone = 1.0 - min_value(sqrt(pow(x-cone_x0, 2) + pow(y-cone_y0, 2))/cyl_r0, 1.0)
         slot_cyl = conditional(sqrt(pow(x-cyl_x0, 2) + pow(y-cyl_y0, 2)) < cyl_r0,
                      conditional(And(And(x > slot_left, x < slot_right), y < slot_top),
                        0.0, 1.0), 0.0)
 
-        sol = 1.0 + bell + cone + slot_cyl
-        self.set_qoi_kernel(fs2)
+        sol = bell + cone + slot_cyl
+        #sol = 1.0 + bell + cone + slot_cyl
+        self.set_qoi_kernel(fs)
         return assemble(self.kernel*sol*dx(degree=12))
