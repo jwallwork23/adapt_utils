@@ -16,6 +16,8 @@ class Options(FrozenConfigurable):
     num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     convergence_rate = PositiveInteger(6, help="Convergence rate parameter used in approach of [Carpio et al. 2013].").tag(config=True)
+    h_min = PositiveFloat(1e-10, help="Minimum tolerated element size.").tag(config=True)
+    h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
 
     # Smooth / intersect
     gradate = Bool(False, help="Toggle metric gradation.").tag(config=True)
@@ -48,10 +50,21 @@ class Options(FrozenConfigurable):
                                                        'ksp_gmres_restart': 20,
                                                        'pc_type': 'sor'}).tag(config=True)
 
-    # PDE / optimisation
+    # Time discretisation
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
+    dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
+    start_time = NonNegativeFloat(0., help="Start of time window of interest.").tag(config=True)
+    end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
+    dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
+    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation.").tag(config=True)
+
+    # Finite element space  # TODO: use a notation which is more general
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
+
+    # PDE / optimisation
+    boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)
     degree = PositiveInteger(1, help="Order of function space").tag(config=True)
+    region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
     element_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in mesh element count").tag(config=True)
     qoi_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in quantity of interest.").tag(config=True)
 
@@ -186,23 +199,17 @@ class Options(FrozenConfigurable):
         return box
 
 
+# TODO: does this really need to exist? It is pretty arbitrary
 class DefaultOptions(Options):
     name = 'Parameters for the case where no mode is selected'
     mode = 'Default'
 
-    # solver
-    dt = PositiveFloat(0.01, help="Timestep").tag(config=True)
-    start_time = NonNegativeFloat(0., help="Start of time window of interest").tag(config=True)
-    end_time = PositiveFloat(10., help="End of time window of interest (and simulation)").tag(config=True)
-    dt_per_export = PositiveInteger(10, help="Number of timesteps per export").tag(config=True)
-
-    # adapt
-    h_min = PositiveFloat(1e-6, help="Minimum tolerated element size").tag(config=True)
-    h_max = PositiveFloat(1e3, help="Maximum tolerated element size").tag(config=True)
-
-    # QoI
-    region_of_interest = List(default_value=[(0.5, 0.5, 0.1)]).tag(config=True)
-
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh', dt=0.01):
         super(DefaultOptions, self).__init__(approach)
+        self.dt = dt
+        self.start_time = 0.
+        self.end_time = 10.
+        self.dt_per_export = 10
         self.end_time -= 0.5*self.dt
+        self.h_min = 1e-6
+        self.h_max = 1e3

@@ -28,14 +28,6 @@ class TracerOptions(Options):
     # Domain
     nx = PositiveInteger(4, help="Mesh resolution in x- and y-directions.").tag(config=True)
 
-    # Timestepping
-    dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
-    start_time = NonNegativeFloat(0., help="Start of time window of interest.").tag(config=True)
-    end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
-    dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
-    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation.").tag(config=True)
-    timestepper = Unicode('CrankNicolson', help="Time integration scheme.").tag(config=True)
-
     # Solver
     params = PETScSolverParameters({'pc_type': 'lu',
                                     'mat_type': 'aij' ,
@@ -50,18 +42,13 @@ class TracerOptions(Options):
     diffusivity = FiredrakeScalarExpression(Constant(1e-1), help="(Scalar) diffusivity field for tracer problem.").tag(config=True)
     fluid_velocity = FiredrakeVectorExpression(None, allow_none=True, help="Vector fluid velocity field for tracer problem.").tag(config=True)
 
-    # QoI
-    region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
-
-    # Adaptivity
-    h_min = PositiveFloat(1e-10, help="Minimum tolerated element size.").tag(config=True)
-    h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
-
-    boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)
-
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh', dt=0.1):
         super(TracerOptions, self).__init__(approach)
-        self.end_time -= 0.5*self.dt
+        self.dt = dt
+        self.start_time = 0.
+        self.end_time = 60. - 0.5*self.dt
+        self.dt_per_export = 10
+        self.dt_per_remesh = 20
         self.stabilisation = 'SUPG'
 
     def set_diffusivity(self, fs):
@@ -132,7 +119,7 @@ class PowerOptions(TracerOptions):
         self.source.rename("Source term")
         return self.source
 
-    def set_qoi_kernel(self, fs):
+    def set_qoi_kernel(self, fs):  # FIXME: update
         self.kernel = Function(fs)
         #self.kernel.interpolate(self.bump(fs))
         self.kernel.interpolate(self.box(fs))
@@ -163,6 +150,12 @@ class TelemacOptions(TracerOptions):
         self.offset = offset
 
         # Source / receiver
+        # NOTE: It isn't obvious how to represent a delta function on a finite element mesh. The
+        #       idea here is to use a disc with a very small radius. In the context of desalination
+        #       outfall, this makes sense, because the source is from a pipe. However, in the context
+        #       of analytical solutions, it is not quite right. As such, we have calibrated the
+        #       radius so that solving on a sequence of increasingly refined uniform meshes leads to
+        #       convergence of the uniform mesh solution to the analytical solution.
         calibrated_r = 0.07980 if centred else 0.07972
         self.source_loc = [(1.+self.offset, 5., calibrated_r)]
         self.region_of_interest = [(20., 5., 0.5)] if centred else [(20., 7.5, 0.5)]
@@ -196,7 +189,7 @@ class TelemacOptions(TracerOptions):
         self.source = Function(fs)
         nrm=assemble(self.ball(fs, source=True)*dx)
         scaling = pi*r0*r0/nrm if nrm != 0 else 1
-        scaling *= 0.5*self.source_value  # TODO: where does factor of half come from?
+        scaling *= 0.5*self.source_value
         self.source.interpolate(self.ball(fs, source=True, scale=scaling))
         return self.source
 
@@ -205,8 +198,11 @@ class TelemacOptions(TracerOptions):
         return self.initial_value
 
     def set_qoi_kernel(self, fs):
-        self.kernel = Function(fs)
-        self.kernel.interpolate(self.ball(fs))
+        b = self.ball(fs, source=False)
+        area = assemble(b*dx)
+        area_exact = math.pi*self.region_of_interest[0][2]**2
+        rescaling = area_exact/area if area != 0. else 1
+        self.kernel = rescaling*b
         return self.kernel
 
     def exact_solution(self, fs):
@@ -260,7 +256,7 @@ class Telemac3dOptions(TracerOptions):
         self.offset = offset
 
         # Source / receiver
-        calibrated_r = 0.07980 if centred else 0.07972
+        calibrated_r = 0.07980 if centred else 0.07972  # TODO: calibrate for 3d case
         self.source_loc = [(1.+self.offset, 5., 5., calibrated_r)]
         self.region_of_interest = [(20., 5., 5., 0.5)] if centred else [(20., 7.5, 7.5, 0.5)]
         self.source_value = 100.
@@ -304,8 +300,11 @@ class Telemac3dOptions(TracerOptions):
         return self.initial_value
 
     def set_qoi_kernel(self, fs):
-        self.kernel = Function(fs)
-        self.kernel.interpolate(self.ball(fs))
+        b = self.ball(fs, source=False)
+        area = assemble(b*dx)
+        area_exact = math.pi*self.region_of_interest[0][2]**2
+        rescaling = area_exact/area if area != 0. else 1
+        self.kernel = rescaling*b
         return self.kernel
 
     def exact_solution(self, fs):
@@ -321,7 +320,7 @@ class Telemac3dOptions(TracerOptions):
         self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
         self.solution.rename('Analytic tracer concentration')
         outfile = File(self.di + 'analytic.pvd')
-        outfile.write(self.solution)  # NOTE: use 40 discretisation levels in ParaView
+        outfile.write(self.solution)
         return self.solution
 
     def exact_qoi(self, fs1, fs2):
@@ -356,13 +355,20 @@ class LeVequeOptions(TracerOptions):
     The QoI considered in this test case may be viewed as an extension of the QoI considered in the
     [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh', shape=0):
         super(LeVequeOptions, self).__init__(approach)
         self.default_mesh = UnitSquareMesh(40, 40)
 
         # Source / receiver
         self.source_loc = [(0.25, 0.5, 0.15), (0.5, 0.25, 0.15), (0.5, 0.75, 0.15), (0.475, 0.525, 0.85)]
-        self.region_of_interest = [(0.5, 0.75, 0.18)]
+        assert shape in (0, 1, 2)
+        self.shape = shape
+        if shape == 0:
+            self.region_of_interest = [(0.25, 0.5, 0.175)]
+        elif shape == 1:
+            self.region_of_interest = [(0.5, 0.25, 0.175)]
+        else:
+            self.region_of_interest = [(0.5, 0.75, 0.175)]
         self.base_diffusivity = 0.
 
         # Boundary conditions
@@ -372,30 +378,9 @@ class LeVequeOptions(TracerOptions):
 
         # Time integration
         self.dt = math.pi/300.0
-        self.end_time = 2*math.pi
+        self.end_time = 2*math.pi + self.dt
         self.dt_per_export = 10
         self.dt_per_remesh = 10
-
-        # Exact QoI
-        #bell_r2 = self.source_loc[0][2]**2
-        #cone_r2 = self.source_loc[1][2]**2
-        cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
-        cyl_r2 = cyl_r0**2
-        slot_left, slot_right, slot_top = self.source_loc[3]
-        slot_left -= cyl_x0
-        slot_right -= cyl_x0
-        slot_top -= cyl_y0
-        #bell = math.pi*bell_r2/4
-        #cone = math.pi*cone_r2/3
-        cyl = math.pi*cyl_r2
-        slot = slot_top*(slot_right-slot_left)
-        slot += -0.5*slot_right*math.sqrt(cyl_r2 - slot_right**2)
-        slot += 0.5*slot_left*math.sqrt(cyl_r2 - slot_left**2)
-        slot += -0.5*cyl_r2*math.atan(slot_right/math.sqrt(cyl_r2 - slot_right**2))
-        slot += 0.5*cyl_r2*math.atan(slot_left/math.sqrt(cyl_r2 - slot_left**2))
-        #self.J_exact = 1 + bell + cone + cyl - slot
-        self.J_exact = 1 + cyl - slot
-        #print("Exact QoI: {:.4e}".format(self.J_exact))  # TODO: Check this
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)
@@ -420,16 +405,16 @@ class LeVequeOptions(TracerOptions):
                        0.0, 1.0), 0.0)
 
         self.initial_value = Function(fs)
-        self.initial_value.interpolate(1.0 + bell + cone + slot_cyl)
+        #self.initial_value.interpolate(1.0 + bell + cone + slot_cyl)
+        self.initial_value.interpolate(bell + cone + slot_cyl)
         return self.initial_value
 
     def set_qoi_kernel(self, fs):
-        self.kernel = Function(fs)
-        self.kernel.interpolate(self.ball(fs))
-        area = assemble(self.kernel*dx)
+        b = self.ball(fs, source=False)
+        area = assemble(b*dx)
         area_exact = math.pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
-        self.kernel.interpolate(rescaling*self.kernel)
+        self.kernel = rescaling*b
         return self.kernel
 
     def exact_solution(self, fs):
@@ -437,18 +422,37 @@ class LeVequeOptions(TracerOptions):
             self.set_initial_condition(fs)
         return self.initial_value
 
-    def exact_qoi(self, fs1, fs2):
-        x, y = SpatialCoordinate(fs1.mesh())
+    def exact_qoi(self):
+        h = 1
+        # Gaussian
+        if self.shape == 0:
+            r = self.source_loc[0][2]
+            return (math.pi/4-1/math.pi)*r*r
+        # Cone
+        elif self.shape == 1:
+            r = self.source_loc[1][2]
+            return h*math.pi*r*r/3
+        # Slotted cylinder
+        else:
+            l = self.source_loc[3][1] - self.source_loc[2][0]  # width of slot to left
+            t = self.source_loc[3][2] - self.source_loc[2][1]  # height of slot to top
+            r = self.source_loc[2][2]                          # cylinder radius
+            return h*(math.pi*r*r - 2*t*l - r*r*math.asin(l/r) - r*r*math.sin(2*math.asin(l/r))/2)
+
+    def quadrature_qoi(self, fs):
+        x, y = SpatialCoordinate(fs.mesh())
         bell_x0, bell_y0, bell_r0 = self.source_loc[0]
         cone_x0, cone_y0, cone_r0 = self.source_loc[1]
         cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
         slot_left, slot_right, slot_top = self.source_loc[3]
+
         bell = 0.25*(1+cos(math.pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0)))
         cone = 1.0 - min_value(sqrt(pow(x-cone_x0, 2) + pow(y-cone_y0, 2))/cyl_r0, 1.0)
         slot_cyl = conditional(sqrt(pow(x-cyl_x0, 2) + pow(y-cyl_y0, 2)) < cyl_r0,
                      conditional(And(And(x > slot_left, x < slot_right), y < slot_top),
                        0.0, 1.0), 0.0)
 
-        sol = 1.0 + bell + cone + slot_cyl
-        self.set_qoi_kernel(fs2)
+        sol = bell + cone + slot_cyl
+        #sol = 1.0 + bell + cone + slot_cyl
+        self.set_qoi_kernel(fs)
         return assemble(self.kernel*sol*dx(degree=12))
