@@ -305,7 +305,6 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         assert(finite_element.family() == "Discontinuous Lagrange")
 
         self.set_fields()
-        self.solution = self.op.set_initial_condition(self.V)
 
         # Classification
         self.nonlinear = False

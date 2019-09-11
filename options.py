@@ -20,7 +20,7 @@ class Options(FrozenConfigurable):
     h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
 
     # Smooth / intersect
-    gradate = Bool(False, help="Toggle metric gradation.").tag(config=True)
+    gradate = Bool(False, help="Toggle metric gradation.").tag(config=True)  # TODO: deprecated
     max_element_growth = PositiveFloat(1.4, help="Gradation scaling parameter.").tag(config=True)
     intersect = Bool(False, help="Intersect with previous mesh.").tag(config=True)
     relax = Bool(False, help="Take metric relaxation with previous mesh.").tag(config=True)
@@ -38,7 +38,7 @@ class Options(FrozenConfigurable):
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
     normalisation = Unicode('complexity', help="Metric normalisation approach, from {'complexity', 'error'}.").tag(config=True)
     target = PositiveFloat(1e+2, help="Target complexity / inverse desired error for normalisation, as appropriate.").tag(config=True)
-    norm_order = NonNegativeInteger(None, allow_none=True, help="Degree p of Lp norm used in 'p_norm' normalisation approach. Use 'None' to specify infinity norm.").tag(config=True)
+    norm_order = NonNegativeInteger(None, allow_none=True, help="Degree p of Lp norm used in 'error' normalisation approach. Use 'None' to specify infinity norm.").tag(config=True)
     min_norm = PositiveFloat(1e-6, help="Minimum norm tolerated in metric rescaling.").tag(config=True)
     max_norm = PositiveFloat(1e9, help="Maximum norm tolerated in metric rescaling.").tag(config=True)
     f_min = PositiveFloat(1e-6, help="Minimum function value tolerated for metric constructed using its Hessian.").tag(config=True)
