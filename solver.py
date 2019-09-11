@@ -93,7 +93,7 @@ class SteadyProblem():
         """
         if not hasattr(self, 'kernel'):
             self.get_qoi_kernel()
-        return assemble(inner(self.solution, self.kernel)*dx)
+        return assemble(inner(self.solution, self.kernel)*dx(degree=12))
 
     def solve_continuous_adjoint(self):
         """
@@ -632,6 +632,7 @@ class UnsteadyProblem():
 
         # prognostic fields
         self.solution = Function(self.V)
+        self.set_initial_condition()
         self.adjoint_solution = Function(self.V)
 
         # outputs
@@ -657,26 +658,42 @@ class UnsteadyProblem():
         """
         pass
 
+    def set_initial_condition(self):
+        self.solution = self.op.set_initial_condition(self.V)
+
     def solve(self):
         """
         Solve PDE using mesh adaptivity.
         """
         self.remesh_step = 0
+        adj = not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity')  # FIXME
+        if self.approach != 'fixed_mesh':
+            self.adapt_mesh()
+            self.set_initial_condition()
+            self.adapt_mesh()
+            self.set_initial_condition()
         while self.step_end <= self.op.end_time:
-            if self.approach != 'fixed_mesh':
-                if not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity'):
-                    self.get_adjoint_state()
-                    self.project_adjoint_solution()
+            if self.approach == 'fixed_mesh':
+                self.solve_step()
+                break
+            solution_chk = self.solution.copy()
+            if adj:
+                self.get_adjoint_state()
+                solution_adjoint_chk = self.adjoint_solution.copy()
+            for i in range(self.op.num_adapt):
+                if adj:
+                    with pyadjoint.stop_annotating():
+                        self.adjoint_solution = Function(self.V)
+                        self.adjoint_solution.project(adjoint_solution_chk)
                 self.adapt_mesh()
-                if self.remesh_step != 0:
-                    self.project_solution()
+                PETSc.Sys.Print("Number of elements: %d" % self.mesh.num_cells())
+                if self.remesh_step == 0:
+                    self.set_initial_condition()
                 else:
-                    self.solution = self.op.set_initial_condition(self.V)
-                #    if not self.approach in ('uniform', 'hessian', 'explicit'):
-                #        self.project_adjoint_solution()
-                #    self.adapt_mesh()  # adapt again for the first iteration
-                #    self.solution = self.op.set_initial_condition(self.V)
-            self.solve_step()
+                    with pyadjoint.stop_annotating():
+                        self.solution = Function(self.V)
+                        self.solution.project(solution_chk)
+                self.solve_step()
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
 
@@ -693,7 +710,7 @@ class UnsteadyProblem():
         """
         if not hasattr(self, 'kernel'):
             self.get_qoi_kernel()
-        return assemble(inner(self.solution, self.kernel)*dx)
+        return assemble(inner(self.solution, self.kernel)*dx(degree=12))
 
     def solve_continuous_adjoint(self):  # NOTE: this should save to HDF5
         """
@@ -754,7 +771,7 @@ class UnsteadyProblem():
         to stand for Dual Weighted Primal.
         """
         self.indicator = Function(self.P1)
-        self.indicator.project(inner(self.solution, self.interpolated_adjoint_solution))
+        self.indicator.project(inner(self.solution, self.adjoint_solution))
         self.indicator.rename('dwp')
 
     def explicit_indication(self, space=None, square=True):
@@ -992,22 +1009,3 @@ class UnsteadyProblem():
 
             # Plot results
             self.plot()
-
-    def project_solution(self):
-        """
-        Project solution onto the new mesh after a mesh adaptation.
-        """
-        with pyadjoint.stop_annotating():
-            interpolated_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
-            interpolated_solution.project(self.solution)
-            name = self.solution.dat.name
-            self.solution = interpolated_solution
-            self.solution.rename(name)
-
-    def project_adjoint_solution(self):
-        """
-        Project adjoint solution onto the new mesh after a mesh adaptation.
-        """
-        with pyadjoint.stop_annotating():
-            self.interpolated_adjoint_solution = Function(FunctionSpace(self.mesh, self.V.ufl_element()))
-            self.interpolated_adjoint_solution.project(self.adjoint_solution)
