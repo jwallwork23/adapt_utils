@@ -374,8 +374,9 @@ class LeVequeOptions(TracerOptions):
             self.region_of_interest = [(0.5, 0.75, 0.175)]
         self.base_diffusivity = 0.
 
-        # Boundary conditions
-        q_in = Constant(1.0)
+        # Boundary conditions  # FIXME: Doesn't currently do anything in Thetis
+        #q_in = Constant(1.0)
+        q_in = Constant(0.0)
         for i in range(4):
             self.boundary_conditions[i] = {i: {'value': q_in}}
 
@@ -440,7 +441,7 @@ class LeVequeOptions(TracerOptions):
             l = self.source_loc[3][1] - self.source_loc[2][0]  # width of slot to left
             t = self.source_loc[3][2] - self.source_loc[2][1]  # height of slot to top
             r = self.source_loc[2][2]                          # cylinder radius
-            return h*(math.pi*r*r - 2*t*l - r*r*math.asin(l/r) - r*r*math.sin(2*math.asin(l/r))/2)
+            return h*(math.pi*r*r - 2*t*l - r*r*math.asin(l/r) - l*math.sqrt(r*r-l*l))
 
     def quadrature_qoi(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
@@ -459,3 +460,25 @@ class LeVequeOptions(TracerOptions):
         #sol = 1.0 + bell + cone + slot_cyl
         self.set_qoi_kernel(fs)
         return assemble(self.kernel*sol*dx(degree=12))
+
+    def lp_errors(self, sol):
+        if not hasattr(self, 'initial_value'):
+            self.set_initial_condition(fs)
+        exact = self.initial_value.copy()
+
+        L1_err = assemble(abs(sol - exact)*dx)/assemble(abs(exact)*dx)
+        L2_err = sqrt(assemble((sol - exact)*(sol - exact)*dx))/sqrt(assemble(exact*exact*dx))
+        with exact.dat.vec_ro as v_exact:
+            L_inf_exact = v_exact.max()[1]
+        exact -= sol
+        domain = '{[i]: 0 <= i < diff.dofs}'
+        instructions = '''
+        for i
+            diff[i] = abs(diff[i])
+        end
+        '''
+        par_loop((domain, instructions), dx, {'diff': (exact, RW)}, is_loopy_kernel=True)
+        with exact.dat.vec_ro as v_diff:
+            L_inf_err = v_diff.max()[1]/L_inf_exact
+
+        return L1_err, L2_err, L_inf_err
