@@ -5,7 +5,9 @@ import numpy as np
 
 __all__ = ["BoydOptions"]
 
-# TODO: More setups to consider
+
+# TODO: More test cases to consider
+
 
 class BoydOptions(Options):
     """
@@ -34,11 +36,12 @@ class BoydOptions(Options):
         self.default_mesh.coordinates.interpolate(as_vector([x - lx/2, y - ly/2]))
         self.x, self.y = SpatialCoordinate(self.default_mesh)
 
-        # Boundary conditions  # TODO: this doesn't seem right
+        # No slip boundary conditions along North and South boundaries
         self.boundary_conditions[1] = {'uv': Constant(0.)}
         self.boundary_conditions[2] = {'uv': Constant(0.)}
-        self.boundary_conditions[3] = {'uv': Constant(0.)}
-        self.boundary_conditions[4] = {'uv': Constant(0.)}
+        if not periodic:
+            self.boundary_conditions[3] = {'uv': Constant(0.)}
+            self.boundary_conditions[4] = {'uv': Constant(0.)}
 
         # Physical
         self.base_viscosity = 0.
@@ -54,7 +57,6 @@ class BoydOptions(Options):
         # Adaptivity
         self.h_min = 1e-3
         self.h_max = 10.
-
 
         # Hermite series coefficients
         u = np.zeros(28)
@@ -160,7 +162,7 @@ class BoydOptions(Options):
         :arg t: current time.
         :return: first order asymptotic solution for test problem of Boyd.
         """
-        C = - 0.395*self.soliton_amplitude*self.soliton_amplitude
+        C = -0.395*self.soliton_amplitude*self.soliton_amplitude
         phi = self.phi(t)
         coeffs = self.hermite_coeffs
         polys = self.polynomials()
@@ -180,10 +182,13 @@ class BoydOptions(Options):
         self.bathymetry = Constant(1.)
         return self.bathymetry
 
-    def set_coriolis(self, fs, plane='beta'):  # TODO: f-plane, beta-plane and sin approximations
+    def set_coriolis(self, fs, plane='beta'):
         x, y = SpatialCoordinate(fs.mesh())
         self.coriolis = Function(fs)
-        self.coriolis.interpolate(y)
+        if plane == 'beta':
+            self.coriolis.interpolate(y)
+        else:
+            raise NotImplementedError  # TODO: f-plane and sin approximations
         return self.coriolis
 
     def exact_solution(self, fs, t, order=0):

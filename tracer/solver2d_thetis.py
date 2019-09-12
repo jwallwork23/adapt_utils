@@ -59,7 +59,7 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         self.nonlinear = False
 
     def solve(self):
-        bcs = self.op.boundary_conditions
+        bcs = self.op.boundary_conditions  # FIXME: Neumann conditions are currently default
         BCs = {'shallow water': {}, 'tracer': {}}
         for i in bcs.keys():
             if bcs[i] == 'dirichlet_zero':
@@ -67,7 +67,6 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
                 BCs['tracer'][i] = {'value': Constant(0.)}
             elif bcs[i] == 'neumann_zero':
                 continue
-                # TODO: Neumann conditions are currently default
         b = Function(self.P1).assign(1.)
         eta = Function(self.P1)
 
@@ -365,7 +364,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             e.set_next_export_ix(solver_obj.i_export)
 
         # solve
-        solver_obj.bnd_functions['tracer'] = op.boundary_conditions
+        solver_obj.bnd_functions['tracer'] = op.boundary_conditions  # FIXME: Neumann currently default
         solver_obj.iterate()
         self.solution = solver_obj.fields.tracer_2d
         self.ts = solver_obj.timestepper.timesteppers.tracer
