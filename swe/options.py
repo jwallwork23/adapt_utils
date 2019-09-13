@@ -286,7 +286,8 @@ class BoydOptions(Options):
                 reference_sol_lower.project(sol_lower)
             sol_upper = reference_sol_upper
             sol_lower = reference_sol_lower
-            mesh = reference_mesh
+        xcoords = Function(sol_upper.function_space())
+        xcoords.interpolate(mesh.coordinates[0])
 
         # Get relative mean peak height
         with sol_upper.dat.vec_ro as vu:
@@ -297,8 +298,8 @@ class BoydOptions(Options):
         self.h_lower /= 0.1567020
 
         # Get relative mean phase speed
-        x_upper = mesh.coordinates.dat.data_ro[i_upper][0]
-        x_lower = mesh.coordinates.dat.data_ro[i_lower][0]
+        x_upper = xcoords.dat.data_ro[i_upper]
+        x_lower = xcoords.dat.data_ro[i_lower]
         self.c_upper = (48 - x_upper)/47.18
         self.c_lower = (48 - x_lower)/47.18
 
