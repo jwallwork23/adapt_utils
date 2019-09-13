@@ -249,8 +249,8 @@ class BoydOptions(Options):
     def get_peaks(self, sol_periodic):
         """
         Given a numerical solution of the test case, compute the metrics as given in [Huang et al 2008]:
-          * h± : relative peak height
-          * C± : relative mean phase speed
+          * h± : relative peak height for Northern / Southern soliton
+          * C± : relative mean phase speed for Northern / Southern soliton
           * RMS: root mean square error
 
         :arg sol_periodic: Numerical solution of PDE.
@@ -267,8 +267,8 @@ class BoydOptions(Options):
         upper.interpolate(0.5*(sign(y)+1))
         lower = Function(sol.function_space())
         lower.interpolate(0.5*(-sign(y)+1))
-        sol_upper = sol.copy()
-        sol_lower = sol.copy()
+        sol_upper = Function(sol.function_space()).assign(sol)
+        sol_lower = Function(sol.function_space()).assign(sol)
         sol_upper *= upper
         sol_lower *= lower
         with pyadjoint.stop_annotating():
