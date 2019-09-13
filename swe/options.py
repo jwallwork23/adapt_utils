@@ -225,8 +225,7 @@ class BoydOptions(Options):
         """
         Set up a non-periodic, very fine mesh on the PDE domain.
         """
-        #n = 50
-        n = 1
+        n = 50
         reference_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly)
         x, y = SpatialCoordinate(reference_mesh)
         reference_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
@@ -247,7 +246,7 @@ class BoydOptions(Options):
             # FIXME: This assumes P1 and is not parallelisable
         return sol_np
 
-    def get_peaks(self, sol_periodic, reference_space=True):
+    def get_peaks(self, sol_periodic, reference_space=True, remove_periodicity=True):
         """
         Given a numerical solution of the test case, compute the metrics as given in [Huang et al 2008]:
           * h± : relative peak height for Northern / Southern soliton
@@ -259,7 +258,10 @@ class BoydOptions(Options):
         """
 
         # Remove periodicity
-        sol = self.remove_periodicity(sol_periodic)
+        if remove_periodicity:
+            sol = self.remove_periodicity(sol_periodic)
+        else:
+            sol = sol_periodic
 
         # Split Northern and Southern halves of domain
         mesh = sol.function_space().mesh()
