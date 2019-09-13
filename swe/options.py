@@ -261,21 +261,29 @@ class BoydOptions(Options):
         reference_mesh = self.get_reference_mesh()
         fs = FunctionSpace(reference_mesh, sol.ufl_element())
 
-        # Project solution into reference space with sign flipped in south
-        x, y = SpatialCoordinate(sol.function_space().mesh())
-        flip = Function(sol.function_space())
-        flip.interpolate(sign(y))
-        sol *= flip
+        # Project solution into reference space for Northern and Southern halves of domain
+        y = SpatialCoordinate(sol.function_space().mesh())[1]
+        upper = Function(sol.function_space())
+        upper.interpolate(0.5*(sign(y)+1))
+        lower = Function(sol.function_space())
+        lower.interpolate(0.5*(-sign(y)+1))
+        sol_upper = sol.copy()
+        sol_lower = sol.copy()
+        sol_upper *= upper
+        sol_lower *= lower
         with pyadjoint.stop_annotating():
-            reference_sol = Function(fs)
-            reference_sol.project(sol)
+            reference_sol_upper = Function(fs)
+            reference_sol_upper.project(sol_upper)
+            reference_sol_lower = Function(fs)
+            reference_sol_lower.project(sol_lower)
 
         # Get relative mean peak height
-        with reference_sol.dat.vec_ro as v:
-            i_upper, self.h_upper = v.max()
-            i_lower, self.h_lower = v.min()
+        with reference_sol_upper.dat.vec_ro as vu:
+            i_upper, self.h_upper = vu.max()
+        with reference_sol_lower.dat.vec_ro as vl:
+            i_lower, self.h_lower = vl.max()
         self.h_upper /= 0.1567020
-        self.h_lower /= -0.1567020
+        self.h_lower /= 0.1567020
 
         # Get relative mean phase speed
         x_upper = reference_mesh.coordinates.dat.data_ro[i_upper][0]
