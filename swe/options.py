@@ -1,5 +1,6 @@
-from thetis import *
+from thetis_adjoint import *
 from thetis.configuration import *
+import pyadjoint
 
 from adapt_utils.options import Options
 
@@ -31,16 +32,17 @@ class BoydOptions(Options):
         super(BoydOptions, self).__init__(approach)
         self.approach = approach
         self.periodic = periodic
+        self.n = n
 
         # Initial mesh
-        lx = 48
-        ly = 24
+        self.lx = 48
+        self.ly = 24
         if periodic:
-            self.default_mesh = PeriodicRectangleMesh(lx*n, ly*n, lx, ly, direction='x')
+            self.default_mesh = PeriodicRectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly, direction='x')
         else:
-            self.default_mesh = RectangleMesh(lx*n, ly*n, lx, ly)
+            self.default_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly)
         x, y = SpatialCoordinate(self.default_mesh)
-        self.default_mesh.coordinates.interpolate(as_vector([x - lx/2, y - ly/2]))
+        self.default_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
         self.x, self.y = SpatialCoordinate(self.default_mesh)
         # NOTE: This setup corresponds to 'Grid B' in [Huang et al 2008].
 
@@ -63,7 +65,7 @@ class BoydOptions(Options):
         self.h_min = 1e-3
         self.h_max = 10.
 
-        # Order of approximation for IC and analytical solution
+        # Order of approximation for IC and anaself.lytical solution
         self.order = 0
 
         # Hermite series coefficients
@@ -220,37 +222,70 @@ class BoydOptions(Options):
         return self.initial_value
 
     def get_reference_mesh(self):
-        raise NotImplementedError  # TODO: project sol onto mesh with res n=50 to get better approx
+        """
+        Set up a non-periodic, very fine mesh on the PDE domain.
+        """
+        n = 50
+        reference_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly)
+        x, y = SpatialCoordinate(reference_mesh)
+        reference_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
+        return reference_mesh
 
-    def get_peaks(self, sol):
-        #self.get_reference_mesh()
-        fs = sol.function_space()
-        mesh = fs.mesh()
-        x, y = SpatialCoordinate(mesh)
+    def remove_periodicity(self, sol):
+        """
+        :arg sol: Function to remove periodicity of.
+        """
+        nonperiodic_mesh = RectangleMesh(self.lx*self.n, self.ly*self.n, self.lx, self.ly)
+        x, y = SpatialCoordinate(nonperiodic_mesh)
+        nonperiodic_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
 
-        zero = Function(fs).assign(0.)
-        sol_upper = Function(fs)
-        sol_upper.interpolate(conditional(ge(y, 0), sol, zero))
-        sol_lower = Function(fs)
-        sol_lower.interpolate(conditional(le(y, 0), sol, zero))
+        V = FunctionSpace(nonperiodic_mesh, sol.ufl_element())
+        sol_np = Function(V)
+        for i in range(len(nonperiodic_mesh.coordinates.dat.data_ro)):
+            sol_np.dat.data[i] = sol.at(nonperiodic_mesh.coordinates.dat.data_ro[i], tolerance=1e-8)
+            # FIXME: This assumes P1 and is not parallelisable
+        return sol_np
+
+    def get_peaks(self, sol_periodic):
+        """
+        Given a numerical solution of the test case, compute the metrics as given in [Huang et al 2008]:
+          * h± : relative peak height
+          * C± : relative mean phase speed
+          * RMS: root mean square error
+
+        :arg sol_periodic: Numerical solution of PDE.
+        """
+
+        # Remove periodicity and form a reference space on a fine mesh
+        sol = self.remove_periodicity(sol_periodic)
+        reference_mesh = self.get_reference_mesh()
+        fs = FunctionSpace(reference_mesh, sol.ufl_element())
+
+        # Project solution into reference space with sign flipped in south
+        x, y = SpatialCoordinate(sol.function_space().mesh())
+        flip = Function(sol.function_space())
+        flip.interpolate(sign(y))
+        sol *= flip
+        with pyadjoint.stop_annotating():
+            reference_sol = Function(fs)
+            reference_sol.project(sol)
 
         # Get relative mean peak height
-        with sol_upper.dat.vec_ro as vu:
-            i_upper, self.h_upper = vu.max()
-        with sol_lower.dat.vec_ro as vl:
-            i_lower, self.h_lower = vl.max()
+        with reference_sol.dat.vec_ro as v:
+            i_upper, self.h_upper = v.max()
+            i_lower, self.h_lower = v.min()
         self.h_upper /= 0.1567020
-        self.h_lower /= 0.1567020
+        self.h_lower /= -0.1567020
 
         # Get relative mean phase speed
-        x_upper = mesh.coordinates.dat.data_ro[i_upper][0]
-        x_lower = mesh.coordinates.dat.data_ro[i_lower][0]
+        x_upper = reference_mesh.coordinates.dat.data_ro[i_upper][0]
+        x_lower = reference_mesh.coordinates.dat.data_ro[i_lower][0]
         self.c_upper = (48 - x_upper)/47.18
         self.c_lower = (48 - x_lower)/47.18
 
-        # Get RMS error
+        # Calculate RMS error (on coarse mesh)
         initial_surf = self.initial_value.split()[1]
-        diff = sol.copy()
+        diff = sol_periodic.copy()
         diff -= initial_surf
         diff *= diff
-        self.rms = sqrt(sum(diff.dat.data_ro[:]) / fs.dof_count)
+        self.rms = sqrt(sum(diff.dat.data_ro[:]) / sol_periodic.function_space().dof_count)
