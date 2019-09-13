@@ -225,7 +225,8 @@ class BoydOptions(Options):
         """
         Set up a non-periodic, very fine mesh on the PDE domain.
         """
-        n = 50
+        #n = 50
+        n = 1
         reference_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly)
         x, y = SpatialCoordinate(reference_mesh)
         reference_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
@@ -246,7 +247,7 @@ class BoydOptions(Options):
             # FIXME: This assumes P1 and is not parallelisable
         return sol_np
 
-    def get_peaks(self, sol_periodic):
+    def get_peaks(self, sol_periodic, reference_space=True):
         """
         Given a numerical solution of the test case, compute the metrics as given in [Huang et al 2008]:
           * h± : relative peak height for Northern / Southern soliton
@@ -254,15 +255,15 @@ class BoydOptions(Options):
           * RMS: root mean square error
 
         :arg sol_periodic: Numerical solution of PDE.
+        :kwarg reference_space: Project onto a fine mesh to get a better approximation.
         """
 
-        # Remove periodicity and form a reference space on a fine mesh
+        # Remove periodicity
         sol = self.remove_periodicity(sol_periodic)
-        reference_mesh = self.get_reference_mesh()
-        fs = FunctionSpace(reference_mesh, sol.ufl_element())
 
-        # Project solution into reference space for Northern and Southern halves of domain
-        y = SpatialCoordinate(sol.function_space().mesh())[1]
+        # Split Northern and Southern halves of domain
+        mesh = sol.function_space().mesh()
+        y = SpatialCoordinate(mesh)[1]
         upper = Function(sol.function_space())
         upper.interpolate(0.5*(sign(y)+1))
         lower = Function(sol.function_space())
@@ -271,23 +272,31 @@ class BoydOptions(Options):
         sol_lower = Function(sol.function_space()).assign(sol)
         sol_upper *= upper
         sol_lower *= lower
-        with pyadjoint.stop_annotating():
-            reference_sol_upper = Function(fs)
-            reference_sol_upper.project(sol_upper)
-            reference_sol_lower = Function(fs)
-            reference_sol_lower.project(sol_lower)
+
+        # Project solution into a reference space on a fine mesh
+        if reference_space:
+            reference_mesh = self.get_reference_mesh()
+            fs = FunctionSpace(reference_mesh, sol.ufl_element())
+            with pyadjoint.stop_annotating():
+                reference_sol_upper = Function(fs)
+                reference_sol_upper.project(sol_upper)
+                reference_sol_lower = Function(fs)
+                reference_sol_lower.project(sol_lower)
+            sol_upper = reference_sol_upper
+            sol_lower = reference_sol_lower
+            mesh = reference_mesh
 
         # Get relative mean peak height
-        with reference_sol_upper.dat.vec_ro as vu:
+        with sol_upper.dat.vec_ro as vu:
             i_upper, self.h_upper = vu.max()
-        with reference_sol_lower.dat.vec_ro as vl:
+        with sol_lower.dat.vec_ro as vl:
             i_lower, self.h_lower = vl.max()
         self.h_upper /= 0.1567020
         self.h_lower /= 0.1567020
 
         # Get relative mean phase speed
-        x_upper = reference_mesh.coordinates.dat.data_ro[i_upper][0]
-        x_lower = reference_mesh.coordinates.dat.data_ro[i_lower][0]
+        x_upper = mesh.coordinates.dat.data_ro[i_upper][0]
+        x_lower = mesh.coordinates.dat.data_ro[i_lower][0]
         self.c_upper = (48 - x_upper)/47.18
         self.c_lower = (48 - x_lower)/47.18
 
