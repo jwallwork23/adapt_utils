@@ -71,7 +71,7 @@ def construct_hessian(f, mesh=None, op=DefaultOptions()):
         L = -inner(div(τ), grad(f))*dx
         for i in range(dim):
             for j in range(dim):
-                a += τ[i, j]*n[j]*dx(i)
+                L += τ[i, j]*n[j]*f.dx(i)*ds
 
         H = Function(P1_ten)
         solve(a == L, H, solver_parameters=op.hessian_solver_parameters)
