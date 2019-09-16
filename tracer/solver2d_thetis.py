@@ -75,7 +75,10 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         options.timestepper_type = 'SteadyState'
         options.timestep = 20.
         options.simulation_end_time = 0.9*options.timestep
-        options.fields_to_export = ['tracer_2d']
+        if self.op.plot_pvd:
+            options.fields_to_export = ['tracer_2d']
+        else:
+            options.no_exports = True
         options.compute_residuals_tracer = True
         options.solve_tracer = True
         options.tracer_only = True

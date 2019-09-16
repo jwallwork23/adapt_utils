@@ -58,7 +58,10 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
         # Outputs
         options.output_directory = self.di
-        options.fields_to_export = ['uv_2d', 'elev_2d']
+        if op.plot_pvd:
+            options.fields_to_export = ['uv_2d', 'elev_2d']
+        else:
+            options.no_exports = True
 
         # Parameters
         options.use_grad_div_viscosity_term = op.symmetric_viscosity

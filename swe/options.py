@@ -65,7 +65,7 @@ class BoydOptions(Options):
         self.h_min = 1e-3
         self.h_max = 10.
 
-        # Order of approximation for IC and anaself.lytical solution
+        # Order of approximation for IC and analytical solution
         self.order = 0
 
         # Hermite series coefficients
