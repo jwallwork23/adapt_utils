@@ -235,15 +235,23 @@ class BoydOptions(Options):
         """
         :arg sol: Function to remove periodicity of.
         """
+        # Generate an identical non-periodic mesh
         nonperiodic_mesh = RectangleMesh(self.lx*self.n, self.ly*self.n, self.lx, self.ly)
         x, y = SpatialCoordinate(nonperiodic_mesh)
         nonperiodic_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
 
+        # Project into corresponding function space
         V = FunctionSpace(nonperiodic_mesh, sol.ufl_element())
         sol_np = Function(V)
-        for i in range(len(nonperiodic_mesh.coordinates.dat.data_ro)):
-            sol_np.dat.data[i] = sol.at(nonperiodic_mesh.coordinates.dat.data_ro[i], tolerance=1e-8)
-            # FIXME: This assumes P1 and is not parallelisable
+        #sol_np.project(sol)
+
+        #### FIXME HACK: not parallel
+        coords_V = Function(V)
+        coords_V.interpolate(nonperiodic_mesh.coordinates)
+        for i in range(len(coords_V.dat.data_ro)):
+            sol_np.dat.data[i] = sol.at(coords_V.dat.data_ro[i], tolerance=1e-8)
+        #### FIXME HACK: not parallel
+
         return sol_np
 
     def get_peaks(self, sol_periodic, reference_space=True, remove_periodicity=True):
@@ -298,14 +306,14 @@ class BoydOptions(Options):
         self.h_lower /= 0.1567020
 
         # Get relative mean phase speed
-        x_upper = xcoords.dat.data_ro[i_upper]
-        x_lower = xcoords.dat.data_ro[i_lower]
-        self.c_upper = (48 - x_upper)/47.18
-        self.c_lower = (48 - x_lower)/47.18
+        xdat = xcoords.vector().gather()
+        self.c_upper = (48 - xdat[i_upper])/47.18
+        self.c_lower = (48 - xdat[i_lower])/47.18
 
-        # Calculate RMS error (on coarse mesh)
-        initial_surf = self.initial_value.split()[1]
+        # Calculate RMS error (on coarse mesh)  FIXME: should not use periodic (repeated entries)
+        #diff = sol.copy()
+        #diff -= self.remove_periodicity(self.initial_value.split()[1])
         diff = sol_periodic.copy()
-        diff -= initial_surf
+        diff -= self.initial_value.split()[1]
         diff *= diff
-        self.rms = sqrt(sum(diff.dat.data_ro[:]) / sol_periodic.function_space().dof_count)
+        self.rms = sqrt(np.mean(diff.vector().gather()))
