@@ -22,8 +22,9 @@ class BoydOptions(Options):
     viscosity = FiredrakeScalarExpression(Constant(0.)).tag(config=True)
     drag_coefficient = FiredrakeScalarExpression(Constant(0.)).tag(config=True)
     soliton_amplitude = PositiveFloat(0.395).tag(config=True)
+    g = PositiveFloat(1.).tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', periodic=True, n=1):
+    def __init__(self, approach='fixed_mesh', periodic=True, n=1, order=0, compute_metrics=True):
         """
         :kwarg approach: mesh adaptation approach
         :kwarg periodic: toggle periodic boundary in x-direction
@@ -33,6 +34,7 @@ class BoydOptions(Options):
         self.approach = approach
         self.periodic = periodic
         self.n = n
+        self.order = order
 
         # Initial mesh
         self.lx = 48
@@ -46,29 +48,26 @@ class BoydOptions(Options):
         self.x, self.y = SpatialCoordinate(self.default_mesh)
         # NOTE: This setup corresponds to 'Grid B' in [Huang et al 2008].
 
-        # Physical
-        self.g = 1.
-
         # Solver
         self.family = 'dg-dg'
         self.symmetric_viscosity = False
 
         # Time integration
         self.dt = 0.05
-        self.start_time = 30.
-        self.end_time = 120.
+        if compute_metrics:
+            self.end_time = 120.
+        else:
+            self.start_time = 10.
+            self.end_time = 20.
         self.dt_per_export = 10
         self.dt_per_remesh = 20
         self.timestepper = 'CrankNicolson'
 
         # Adaptivity
-        self.h_min = 1e-3
+        self.h_min = 1e-8
         self.h_max = 10.
 
-        # Order of approximation for IC and analytical solution
-        self.order = 0
-
-        # Hermite series coefficients
+        # Unnormalised Hermite series coefficients
         u = np.zeros(28)
         v = np.zeros(28)
         eta = np.zeros(28)
@@ -115,7 +114,9 @@ class BoydOptions(Options):
         self.hermite_coeffs = {'u': u, 'v': v, 'eta': eta}
 
     def set_bcs(self):
-        # No slip boundary conditions along North and South boundaries
+        """
+        Set no slip boundary conditions uv = 0 along North and South boundaries.
+        """
         self.boundary_conditions[1] = {'uv': Constant(as_vector([0., 0.]))}
         self.boundary_conditions[2] = {'uv': Constant(as_vector([0., 0.]))}
         if not self.periodic:
@@ -125,7 +126,7 @@ class BoydOptions(Options):
 
     def polynomials(self):
         """
-        Get Hermite polynomials
+        Get Hermite polynomials.
         """
         polys = [Constant(1.), 2*self.y]
         for i in range(2, 28):
@@ -134,80 +135,101 @@ class BoydOptions(Options):
 
     def xi(self, t=0.):
         """
-        :arg t: current time.
-        :return: time shifted x-coordinate.
+        Get time-shifted x-coordinate.
+
+        :kwarg t: current time.
         """
-        c = -1/3
+        c = -1/3  # Modon propagation speed
         if self.order == 1:
             c -= 0.395*self.soliton_amplitude*self.soliton_amplitude
         return self.x - c*t
 
     def phi(self, t=0.):
         """
-        :arg t: current time.
-        :return: sech^2 term.
+        sech^2 term.
+
+        :kwarg t: current time.
         """
         B = self.soliton_amplitude
-        A = 0.771*B*B
-        return A*(1/(cosh(B*self.xi(t))**2))
+        return 0.771*B*B*(1/(cosh(B*self.xi(t))**2))
 
     def dphidx(self, t=0.):
         """
-        :arg t: current time. 
-        :return: tanh * phi term.
+        tanh * phi term.
+
+        :kwarg t: current time. 
         """
         B = self.soliton_amplitude
         return -2*B*self.phi(t)*tanh(B*self.xi(t))
 
     def psi(self):
         """
-        :arg t: current time. 
-        :return: exp term.
+        exp term.
         """
         return exp(-0.5*self.y*self.y)
 
     def zeroth_order_terms(self, t=0.):
         """
-        :arg t: current time.
-        :return: zeroth order asymptotic solution for test problem of Boyd.
+        Zeroth order asymptotic solution.
+
+        :kwarg t: current time.
         """
         self.terms = {}
         self.terms['u'] = self.phi(t)*0.25*(-9 + 6*self.y*self.y)*self.psi()
-        self.terms['v'] = 2 * self.y*self.dphidx(t)*self.psi()
+        self.terms['v'] = 2*self.y*self.dphidx(t)*self.psi()
         self.terms['eta'] = self.phi(t)*0.25*(3 + 6*self.y*self.y)*self.psi()
+
+    def hermite_sum(self, field):
+        """
+        Sum the terms of the Hermite expansion for a given field.
+        """
+        h = sum(self.hermite_coeffs[field][i]*self.polynomials()[i] for i in range(28))
+        return self.psi()*h
 
     def first_order_terms(self, t=0.):
         """
-        :arg t: current time.
-        :return: first order asymptotic solution for test problem of Boyd.
+        First order asymptotic solution.
+
+        :kwarg t: current time.
         """
         C = -0.395*self.soliton_amplitude*self.soliton_amplitude
         phi = self.phi(t)
-        coeffs = self.hermite_coeffs
-        polys = self.polynomials()
         self.zeroth_order_terms(t)
-        # NOTE: The last psi in the following is not included
-        self.terms['u'] += C*phi*0.5625*(3 + 2*self.y*self.y)*self.psi()
-        self.terms['u'] += phi*phi*self.psi()*sum(coeffs['u'][i]*polys[i] for i in range(28))
-        self.terms['v'] += self.dphidx(t)*phi*self.psi()*sum(coeffs['v'][i]*polys[i] for i in range(28))
-        self.terms['eta'] += C*phi*0.5625 * (-5 + 2*self.y*self.y)*self.psi()
-        self.terms['eta'] += phi*phi*self.psi()*sum(coeffs['eta'][i]*polys[i] for i in range(28))
 
-    def set_coriolis(self, fs, plane='beta'):
+        # Expansion for u
+        self.terms['u'] += C*phi*0.5625*(3 + 2*self.y*self.y)*self.psi()
+        self.terms['u'] += phi*phi*self.hermite_sum('u')
+
+        # Expansion for v
+        self.terms['v'] += self.dphidx(t)*phi*self.hermite_sum('v')
+
+        # Expansion for eta
+        self.terms['eta'] += C*phi*0.5625*(-5 + 2*self.y*self.y)*self.psi()
+        self.terms['eta'] += phi*phi*self.hermite_sum('eta')
+
+    def set_coriolis(self, fs):
+        """
+        Set beta plane approximation Coriolis parameter.
+
+        :arg fs: `FunctionSpace` in which the solution should live.
+        """
         x, y = SpatialCoordinate(fs.mesh())
         self.coriolis = Function(fs)
-        if plane == 'beta':
-            self.coriolis.interpolate(y)
-        else:
-            raise NotImplementedError  # TODO: f-plane and sin approximations
+        self.coriolis.interpolate(y)
         return self.coriolis
 
     def get_exact_solution(self, fs, t=0.):
+        """
+        Evaluate asymptotic solution of chosen order.
+
+        :arg fs: `FunctionSpace` in which the solution should live.
+        :kwarg t: current time.
+        """
         assert self.order in (0, 1)
         if self.order == 0:
-            self.zeroth_order_terms()
+            self.zeroth_order_terms(t)
         else:
-            self.first_order_terms()
+            self.first_order_terms(t)
         self.exact_solution = Function(fs)
         u, eta = self.exact_solution.split()
         u.interpolate(as_vector([self.terms['u'], self.terms['v']]))
@@ -217,6 +239,11 @@ class BoydOptions(Options):
         return self.exact_solution
 
     def set_initial_condition(self, fs):
+        """
+        Set initial elevation and velocity using asymptotic solution.
+
+        :arg fs: `FunctionSpace` in which the initial condition should live.
+        """
         self.get_exact_solution(fs, t=0.)
         self.initial_value = self.exact_solution.copy()
         return self.initial_value
