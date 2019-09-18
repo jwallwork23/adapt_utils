@@ -632,7 +632,7 @@ class UnsteadyProblem():
 
         # prognostic fields
         self.solution = Function(self.V)
-        self.set_initial_condition()
+        self.set_start_condition()
         self.adjoint_solution = Function(self.V)
 
         # outputs
@@ -658,10 +658,13 @@ class UnsteadyProblem():
         """
         pass
 
-    def set_initial_condition(self):
-        self.solution = self.op.set_initial_condition(self.V)
+    def set_start_condition(self, adjoint=False):
+        if adjoint:
+            self.solution = self.op.set_final_condition(self.V)
+        else:
+            self.solution = self.op.set_initial_condition(self.V)
 
-    def solve(self):
+    def solve(self, adjoint=False):
         """
         Solve PDE using mesh adaptivity.
         """
@@ -669,12 +672,14 @@ class UnsteadyProblem():
         adj = not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity')  # FIXME
         if self.approach != 'fixed_mesh':
             self.adapt_mesh()
-            self.set_initial_condition()
+            self.set_start_condition(adjoint)
             self.adapt_mesh()
-            self.set_initial_condition()
+            self.set_start_condition(adjoint)
+        elif adjoint:
+            self.set_start_condition(adjoint)
         while self.step_end <= self.op.end_time:
             if self.approach == 'fixed_mesh':
-                self.solve_step()
+                self.solve_step(adjoint)
                 break
             solution_chk = self.solution.copy()
             if adj:
@@ -688,12 +693,12 @@ class UnsteadyProblem():
                 self.adapt_mesh()
                 PETSc.Sys.Print("Number of elements: %d" % self.mesh.num_cells())
                 if self.remesh_step == 0:
-                    self.set_initial_condition()
+                    self.set_start_condition(adjoint)
                 else:
                     with pyadjoint.stop_annotating():
                         self.solution = Function(self.V)
                         self.solution.project(solution_chk)
-                self.solve_step()
+                self.solve_step(adjoint)
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
 
