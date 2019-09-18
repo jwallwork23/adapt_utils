@@ -313,6 +313,7 @@ class SteadyTurbineProblem(SteadyProblem):
         #self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
 
 
+# TODO: make a subclass of UnsteadyShallowWaterProblem
 class UnsteadyTurbineProblem(UnsteadyProblem):
     # TODO: doc
     def __init__(self,
