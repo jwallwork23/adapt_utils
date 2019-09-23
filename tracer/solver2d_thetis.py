@@ -334,8 +334,11 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         self.solution.rename('Tracer concentration')
         self.adjoint_solution.rename('Adjoint tracer concentration')
 
-    def get_boundary_conditions(self):
-        bcs = self.op.boundary_conditions  # FIXME: Neumann conditions are currently default
+    def get_boundary_conditions(self, adjoint=False):
+        if adjoint:
+            bcs = self.op.adjoint_boundary_conditions
+        else:
+            bcs = self.op.boundary_conditions  # FIXME: Neumann conditions are currently default
         BCs = {'shallow water': {}, 'tracer': {}}
         for i in bcs.keys():
             if bcs[i] == 'dirichlet_zero':
@@ -390,7 +393,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             e.set_next_export_ix(solver_obj.i_export)
 
         # Solve
-        solver_obj.bnd_functions = self.get_boundary_conditions()
+        solver_obj.bnd_functions = self.get_boundary_conditions(adjoint)
         solver_obj.iterate()
         self.solution = solver_obj.fields.tracer_2d
         self.ts = solver_obj.timestepper.timesteppers.tracer
