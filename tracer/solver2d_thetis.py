@@ -52,10 +52,6 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         self.kernel = op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
-        # Rename solution fields
-        self.solution.rename('Tracer concentration')
-        self.adjoint_solution.rename('Adjoint tracer concentration')
-
         # Classification
         self.nonlinear = False
 
@@ -329,10 +325,6 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             self.source = self.op.set_source(self.V)
         self.kernel = self.op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
-
-        # Rename solution fields
-        self.solution.rename('Tracer concentration')
-        self.adjoint_solution.rename('Adjoint tracer concentration')
 
     def get_boundary_conditions(self, adjoint=False):
         if adjoint:
