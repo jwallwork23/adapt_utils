@@ -63,6 +63,7 @@ class Options(FrozenConfigurable):
 
     # PDE / optimisation
     boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)
+    adjoint_boundary_conditions = PETScSolverParameters({}, help="Boundary conditions for adjoint problem expressed as a dictionary.").tag(config=True)
     degree = PositiveInteger(1, help="Order of function space").tag(config=True)
     region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
     element_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in mesh element count").tag(config=True)

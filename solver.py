@@ -6,6 +6,7 @@ from fenics_adjoint.solving import SolveBlock       # For extracting adjoint sol
 from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
 import pyadjoint
 
+import os
 import datetime
 from time import clock
 import numpy as np
@@ -58,8 +59,8 @@ class SteadyProblem():
         self.h = CellSize(self.mesh)
 
         # prognostic fields
-        self.solution = Function(self.V)
-        self.adjoint_solution = Function(self.V)
+        self.solution = Function(self.V, name='Solution')
+        self.adjoint_solution = Function(self.V, name='Adjoint solution')
 
         # outputs
         self.di = create_directory(self.op.di)
@@ -618,7 +619,7 @@ class UnsteadyProblem():
         self.stab = op.stabilisation
         self.approach = op.approach
 
-        # function spaces and mesh quantities
+        # Function spaces and mesh quantities
         self.V = FunctionSpace(self.mesh, self.finite_element)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
@@ -630,12 +631,12 @@ class UnsteadyProblem():
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
 
-        # prognostic fields
-        self.solution = Function(self.V)
+        # Prognostic fields
+        self.solution = Function(self.V, name='Solution')
         self.set_start_condition()
-        self.adjoint_solution = Function(self.V)
+        self.adjoint_solution = Function(self.V, name='Adjoint solution')
 
-        # outputs
+        # Outputs
         self.di = create_directory(self.op.di)
         self.solution_file = File(self.di + 'solution.pvd')
         self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
@@ -652,17 +653,20 @@ class UnsteadyProblem():
             num_vertices = self.mesh.num_vertices()
         self.op.target = num_vertices * rescaling
 
-    def solve_step(self):
+    def solve_step(self, adjoint=False, **kwargs):
         """
         Solve forward PDE on a particular mesh.
         """
         pass
 
-    def set_start_condition(self, adjoint=False):
+    def set_start_condition(self, adjoint=False, assign=True):
         if adjoint:
-            self.solution = self.op.set_final_condition(self.V)
+            self.adjoint_solution.assign(self.op.set_final_condition(self.V))
         else:
-            self.solution = self.op.set_initial_condition(self.V)
+            if assign:
+                self.solution.assign(self.op.set_initial_condition(self.V))
+            else:
+                self.solution = self.op.set_initial_condition(self.V)
 
     def solve(self, adjoint=False):
         """
@@ -672,9 +676,9 @@ class UnsteadyProblem():
         adj = not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity')  # FIXME
         if self.approach != 'fixed_mesh':
             self.adapt_mesh()
-            self.set_start_condition(adjoint)
+            self.set_start_condition(adjoint, assign=False)
             self.adapt_mesh()
-            self.set_start_condition(adjoint)
+            self.set_start_condition(adjoint, assign=False)
         elif adjoint:
             self.set_start_condition(adjoint)
         while self.step_end <= self.op.end_time:
@@ -693,7 +697,7 @@ class UnsteadyProblem():
                 self.adapt_mesh()
                 PETSc.Sys.Print("Number of elements: %d" % self.mesh.num_cells())
                 if self.remesh_step == 0:
-                    self.set_start_condition(adjoint)
+                    self.set_start_condition(adjoint, assign=False)
                 else:
                     with pyadjoint.stop_annotating():
                         self.solution = Function(self.V)
@@ -717,11 +721,11 @@ class UnsteadyProblem():
             self.get_qoi_kernel()
         return assemble(inner(self.solution, self.kernel)*dx(degree=12))
 
-    def solve_continuous_adjoint(self):  # NOTE: this should save to HDF5
+    def solve_continuous_adjoint(self):
         """
         Solve the adjoint PDE using a hand-coded continuous adjoint.
         """
-        pass
+        self.solve(adjoint=True)
 
     def solve_discrete_adjoint(self):
         """
@@ -742,7 +746,8 @@ class UnsteadyProblem():
             ValueError("Expected one SolveBlock, but encountered {:d}".format(N))
         for i in range(0, N, self.op.dt_per_remesh):
             self.adjoint_solution.assign(solve_blocks[i].adj_sol)  # TODO: annotate in pyadjoint to track progress
-            with DumbCheckpoint('outputs/hdf5/Adjoint2d_' + index_string(i), mode=FILE_CREATE) as sa:
+            filename = 'Adjoint2d_{:5s}'.format(index_string(i))
+            with DumbCheckpoint(os.path.join(self.di, 'hdf5', filename), mode=FILE_CREATE) as sa:
                 sa.store(self.adjoint_solution)
                 sa.close()
             PETSc.Sys.Print("Storing adjoint solution %d" % i)
@@ -759,14 +764,22 @@ class UnsteadyProblem():
         else:
             self.solve_continuous_adjoint()
 
-    def get_adjoint_state(self):
+    def get_adjoint_state(self, variable='Tracer2d'):
         """
         Get adjoint solution at timestep i.
         """
-        i = self.remesh_step * self.op.dt_per_remesh
-        with DumbCheckpoint('outputs/hdf5/Adjoint2d_' + index_string(i), mode=FILE_READ) as la:
-            la.load(self.adjoint_solution)
+        op = self.op
+        names = {'Tracer2d': 'tracer_2d', 'Velocity2d': 'uv_2d', 'Elevation2d': 'elev_2d'}
+        num_exports = int(np.floor((op.end_time - op.dt)/op.dt/op.dt_per_export))
+        #i = self.remesh_step*int(self.op.dt_per_export/self.op.dt_per_export)
+        i = num_exports - self.remesh_step*int(self.op.dt_per_export/self.op.dt_per_export)
+        #filename = 'Adjoint2d_{:5s}'.format(index_string(i))  # FIXME for continuous adjoint
+        filename = '{:s}_{:5s}'.format(variable, index_string(i))
+        to_load = Function(self.V, name=names[variable])
+        with DumbCheckpoint(os.path.join(self.di, 'hdf5', filename), mode=FILE_READ) as la:
+            la.load(to_load)
             la.close()
+        self.adjoint_solution.assign(to_load)
         self.adjoint_solution_file.write(self.adjoint_solution, t=self.op.dt*i)
 
     def dwp_indication(self):

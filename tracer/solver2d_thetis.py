@@ -88,14 +88,14 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         solver_obj.assign_initial_conditions(elev=Function(self.P1), uv=self.u)
         solver_obj.bnd_functions = self.get_boundary_conditions()
         solver_obj.iterate()
-        self.solution = solver_obj.fields.tracer_2d
+        self.solution.assign(solver_obj.fields.tracer_2d)
 
     def solve_continuous_adjoint(self):
         """
         Solve continuous adjoint problem under the assumption that the fluid velocity is divergence-free.
         """
         PETSc.Sys.Print("""
-Solving adjoint problem in continuous form\n
+\nSolving adjoint problem in continuous form\n
 **** NOTE velocity field is assumed divergence-free ****""")
         raise NotImplementedError  # TODO
 
@@ -339,19 +339,14 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             bcs = self.op.adjoint_boundary_conditions
         else:
             bcs = self.op.boundary_conditions  # FIXME: Neumann conditions are currently default
-        BCs = {'shallow water': {}, 'tracer': {}}
-        for i in bcs.keys():
-            if bcs[i] == 'dirichlet_zero':
-                bcs[i] = {'value': Constant(0.)}
-                BCs['tracer'][i] = {'value': Constant(0.)}
-            elif bcs[i] == 'neumann_zero':
-                continue
+        BCs = {'shallow water': {}, 'tracer': bcs}
         return BCs
 
     def solve_step(self, adjoint=False):
         self.set_fields()
         if adjoint:
-            PETSc.Sys.Print("""Solving adjoint problem in continuous form
+            PETSc.Sys.Print("""
+\nSolving adjoint problem in continuous form
 **** NOTE velocity field is assumed divergence-free ****\n\n""")
         op = self.op
 
@@ -363,9 +358,11 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end-0.5*op.dt
         options.output_directory = self.di
+        if adjoint:
+            options.fields_to_export_hdf5 = ['tracer_2d']
         if op.plot_pvd:
             options.fields_to_export = ['tracer_2d']
-        else:
+        elif not adjoint:
             options.no_exports = True
         options.compute_residuals_tracer = True
         options.solve_tracer = True
@@ -374,7 +371,8 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         if hasattr(self, 'source'):
             options.tracer_source_2d = self.source
         velocity = -self.u if adjoint else self.u
-        solver_obj.assign_initial_conditions(elev=Function(self.V), uv=velocity, tracer=self.solution)
+        init = self.adjoint_solution if adjoint else self.solution
+        solver_obj.assign_initial_conditions(elev=Function(self.V), uv=velocity, tracer=init)
 
         # set up callbacks
         #cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
@@ -395,7 +393,10 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         # Solve
         solver_obj.bnd_functions = self.get_boundary_conditions(adjoint)
         solver_obj.iterate()
-        self.solution = solver_obj.fields.tracer_2d
+        if adjoint:
+            self.adjoint_solution.assign(solver_obj.fields.tracer_2d)
+        else:
+            self.solution.assign(solver_obj.fields.tracer_2d)
         self.ts = solver_obj.timestepper.timesteppers.tracer
 
     def get_timestepper(self, adjoint=False):

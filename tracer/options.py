@@ -379,6 +379,7 @@ class LeVequeOptions(TracerOptions):
         q_in = Constant(0.0)
         for i in range(4):
             self.boundary_conditions[i] = {i: {'value': q_in}}
+            #self.adjoint_boundary_conditions[i] = {i: {'neumann': q_in}}  # TODO
 
         # Time integration
         self.dt = math.pi/300.0
