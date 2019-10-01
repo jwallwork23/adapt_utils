@@ -43,7 +43,7 @@ class SteadyProblem():
         self.prev_solution = prev_solution
         self.approach = op.approach
 
-        # function spaces and mesh quantities
+        # Function spaces and mesh quantities
         self.V = FunctionSpace(self.mesh, self.finite_element)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
@@ -58,14 +58,17 @@ class SteadyProblem():
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
 
-        # prognostic fields
+        # Prognostic fields
         self.solution = Function(self.V, name='Solution')
         self.adjoint_solution = Function(self.V, name='Adjoint solution')
 
-        # outputs
+        # Outputs
         self.di = create_directory(self.op.di)
         self.solution_file = File(self.di + 'solution.pvd')
         self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
+
+        self.estimators = {}
+        self.indicators = {}
 
     def set_target_vertices(self, num_vertices=None):
         """
@@ -628,6 +631,8 @@ class UnsteadyProblem():
         self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
         self.test = TestFunction(self.V)
         self.trial = TrialFunction(self.V)
+        self.p0test = TestFunction(self.P0)
+        self.p0trial = TrialFunction(self.P0)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
 
@@ -644,6 +649,8 @@ class UnsteadyProblem():
 
         # Adaptivity
         self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
+        self.estimators = {}
+        self.indicators = {}
 
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         """
@@ -711,6 +718,9 @@ class UnsteadyProblem():
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
 
+            # Plot error indicator
+            self.plot()
+
     def get_qoi_kernel(self):
         """
         Derivative `g` of functional of interest `J`. i.e. For solution `u` we have
@@ -773,7 +783,7 @@ class UnsteadyProblem():
         """
         Get adjoint solution at timestep i.
         """
-        if self.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
+        if self.approach in ('uniform', 'hessian', 'explicit', 'vorticity'):
             return
         if not hasattr(self, 'V_orig'):
             self.V_orig = FunctionSpace(self.mesh, self.finite_element)
@@ -1034,11 +1044,10 @@ class UnsteadyProblem():
                 self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
                 self.test = TestFunction(self.V)
                 self.trial = TrialFunction(self.V)
+                self.p0test = TestFunction(self.P0)
+                self.p0trial = TrialFunction(self.P0)
                 self.n = FacetNormal(self.mesh)
                 self.h = CellSize(self.mesh)
 
                 self.solution = Function(self.V, name='Solution')
                 self.adjoint_solution = Function(self.V, name='Adjoint solution')
-
-            # Plot results
-            self.plot()

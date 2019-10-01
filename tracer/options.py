@@ -397,6 +397,10 @@ class LeVequeOptions(TracerOptions):
         self.fluid_velocity.interpolate(as_vector((0.5 - y, x - 0.5)))
         return self.fluid_velocity
 
+    def set_source(self, fs):
+        self.source = Constant(0.)
+        return self.source
+
     def set_initial_condition(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
         bell_x0, bell_y0, bell_r0 = self.source_loc[0]
