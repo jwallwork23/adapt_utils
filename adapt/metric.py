@@ -6,24 +6,29 @@ from numpy import linalg as la
 from scipy import linalg as sla
 
 from adapt_utils.options import DefaultOptions
-from adapt_utils.adapt.recovery import construct_hessian
+from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hessian
 
 
-__all__ = ["steady_metric", "isotropic_metric", "anisotropic_refinement", "metric_intersection", "metric_relaxation", "metric_complexity"]
+__all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "anisotropic_refinement", "metric_intersection", "metric_relaxation", "metric_complexity"]
 
 
-def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
+def steady_metric(f=None, H=None, mesh=None, noscale=False, op=DefaultOptions()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
 
-    :arg f: Field to compute the Hessian of.
+    Clearly at least one of `f` and `H` must not be provided.
+
+    :kwarg f: Field to compute the Hessian of.
     :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
     :kwarg noscale: If `noscale == True` then we simply take the Hessian with eigenvalues in modulus.
     :kwarg op: `Options` class object providing min/max cell size values.
-    :return: Steady metric associated with Hessian H.
+    :return: Steady metric associated with Hessian `H`.
     """
+    assert not np.all(np.array([f, H]) == None)
     if H is None:
+        if mesh is None:
+            mesh = f.function_space().mesh()
         H = construct_hessian(f, mesh=mesh, op=op)
     V = H.function_space()
     mesh = V.mesh()
@@ -88,7 +93,8 @@ def steady_metric(f, H=None, mesh=None, noscale=False, op=DefaultOptions()):
 
     # Scale by target complexity / desired error
     if op.normalisation == 'complexity':
-        M *= pow(op.target/assemble(detH*dx), 2/dim)
+        C = pow(op.target/assemble(detH*dx), 2/dim)
+        M *= C
     else:
         M *= dim*op.target  # NOTE in the 'error' case this is the inverse thereof
         if p is not None:
@@ -165,10 +171,10 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
             g *= pow(detM, -1/(2*p + dim))
             detM.interpolate(pow(detM, p/(2*p + dim)))
         if op.normalisation == 'complexity':
-            g *= pow(op.target/assemble(detM*dx), 2/dim)
+            g *= pow(op.target/assemble(detM*ds), 2/dim)
         else:
             if p is not None:
-                g *= pow(assemble(detM*dx), 1/p)
+                g *= pow(assemble(detM*ds), 1/p)
 
         g = max_value(1/h_max2, min_value(g, 1/h_min2))
         g = max_value(g, g/a2)
@@ -178,6 +184,156 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
         M.interpolate(as_matrix([[g, 0], [0, g]]))
     else:
         M.interpolate(as_matrix([[g, 0, 0], [0, g, 0], [0, 0, g]]))
+
+    return M
+
+def metric_with_boundary(f=None, mesh=None, H=None, op=DefaultOptions()):
+    r"""
+    Computes a Hessian-based steady metric for mesh adaptation, intersected with the corresponding
+    boundary metric. The approach used here follows that of [Loseille et al. 2010].
+
+    Clearly at least one of `f` and `H` must not be provided.
+
+    :kwarg f: Field to compute the Hessian of.
+    :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
+    :kwarg op: `Options` class object providing min/max cell size values.
+    :return: Intersected interior and boundary metric associated with Hessian `H`.
+    """
+    assert not np.all(np.array([f, H]) == None)
+    if H is None:
+        if mesh is None:
+            mesh = f.function_space().mesh()
+        H = construct_hessian(f, mesh=mesh, op=op)
+    P1_ten = H.function_space()
+    mesh = P1_ten.mesh()
+    dim = mesh.topological_dimension()
+    #assert dim in (2, 3)
+    try:
+        assert dim == 2
+    except:
+        raise NotImplementedError  # TODO
+
+    # Functions to hold metric and boundary Hessian
+    M_int = Function(P1_ten)
+    M_bdy = Function(P1_ten)
+    h = construct_boundary_hessian(f, mesh=mesh, op=op)
+    P1 = h.function_space()
+    detM_int = Function(P1)
+    detM_bdy = Function(P1)
+
+    # Set parameters
+    a2 = pow(op.max_anisotropy, 2)
+    h_min2 = pow(op.h_min, 2)
+    h_max2 = pow(op.h_max, 2)
+    #assert op.normalisation in ('complexity', 'error')
+    try:
+        assert op.normalisation == 'complexity'
+    except:
+        raise NotImplementedError  # TODO
+    rescale = op.target
+    if f is not None:
+        rescale /= max(norm(f), op.f_min)
+    p = op.norm_order
+
+    # Compute interior metric
+    msg = "WARNING: minimum element size reached as {m:.2e}"
+    for k in range(mesh.num_vertices()):
+
+        # Ensure local Hessian is symmetric
+        H_loc = H.dat.data[k]
+        for i in range(dim-1):
+            for j in range(i+1, dim):
+                mean_diag = 0.5*(H_loc[i][j] + H_loc[j][i])
+                H_loc[i][j] = mean_diag
+                H_loc[j][i] = mean_diag
+
+        # Find eigenpairs of Hessian
+        lam, v = la.eigh(H_loc)
+
+        # Take eigenvalues in modulus, so that the metric is SPD
+        det = 1.
+        for i in range(dim):
+            lam[i] = max(abs(lam[i]), 1e-10)  # Truncate eigenvalues to avoid round-off error
+            det *= lam[i]
+
+        # Reconstruct edited Hessian
+        for l in range(dim):
+            for i in range(dim):
+                for j in range(i, dim):
+                    M_int.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
+        for i in range(1, dim):
+            for j in range(i):
+                M_int.dat.data[k][i, j] = M_int.dat.data[k][j, i]
+
+        # Apply Lp normalisation
+        if p is None:
+            if op.normalisation == 'complexity':
+                detM_int.dat.data[k] = np.sqrt(det)
+        elif p >= 1:
+            M_int.dat.data[k] *= pow(det, -1./(2*p + dim))
+            detM_int.dat.data[k] = pow(det, p/(2.*p + dim))
+
+    # Normalise
+    h.interpolate(abs(h))
+    detM_bdy.assign(h)
+    if p is not None:
+        assert p >= 1
+        h *= pow(h, -1/(2*p + dim-1))
+        detM_bdy.interpolate(pow(detM_bdy, p/(2*p + dim-1)))
+
+    # Solve algebraic problem for metric scale parameter, as in [Loseille et al. 2010]
+    if op.normalisation == 'complexity':
+        a = pow(op.target/assemble(detM_int*dx), 2/dim)
+        b = pow(op.target/assemble(detM_bdy*ds), 2/(dim-1))
+        # TODO: not sure about exponents here
+        C = get_metric_coefficient(a, b, op=op)
+        h *= C
+    else:
+        raise NotImplementedError  # TODO
+    h = max_value(1/h_max2, min_value(h, 1/h_min2))
+    #h = max_value(h, h/a2)
+
+    # Construct boundary metric
+    if dim == 2:
+        M_bdy.interpolate(as_matrix([[1/h_max2, 0], [0, h]]))
+    else:
+       raise NotImplementedError  # TODO
+
+    # Scale interior metric
+    if op.normalisation == 'complexity':
+        M_int *= C
+    else:
+       raise NotImplementedError  # TODO
+
+    for k in range(mesh.num_vertices()):
+
+        # Find eigenpairs of metric
+        lam, v = la.eigh(M_int.dat.data[k])
+
+        # Impose maximum and minimum element sizes and maximum anisotropy
+        det = 1.
+        for i in range(dim):
+            lam[i] = min(1/h_min2, max(1/h_max2, abs(lam[i])))
+        lam_max = max(lam)
+        for i in range(dim):
+            lam[i] = max(lam[i], lam_max/a2)
+            if lam[i] < lam_max/a2:
+                lam[i] = lam_max/a2
+                raise Warning("Maximum anisotropy reached")
+        if lam_max >= 0.9999/h_min2:
+            print(msg.format(m=np.sqrt(min(1./lam))))
+
+        # Reconstruct edited Hessian
+        for l in range(dim):
+            for i in range(dim):
+                for j in range(i, dim):
+                    M_int.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
+        for i in range(1, dim):
+            for j in range(i):
+                M_int.dat.data[k][i, j] = M_int.dat.data[k][j, i]
+
+    # Intersect interior and boundary metrics
+    M = metric_intersection(M_int, M_bdy, bdy=True)
 
     return M
 
@@ -270,3 +426,20 @@ def metric_complexity(M):
     """
     return assemble(sqrt(det(M))*dx)
 
+def get_metric_coefficient(a, b, op=DefaultOptions()):
+    r"""
+    Solve algebraic problem to get scaling coefficient for interior/boundary metric. See
+    [Loseille et al. 2010] for details.
+
+    :arg a: determinant integral associated with interior metric.
+    :arg b: determinant integral associated with boundary metric.
+    :kwarg op: `Options` class object providing min/max cell size values.
+    :return: Scaling coefficient.
+    """
+    from sympy.solvers import solve
+    from sympy import Symbol
+
+    c = Symbol('c')
+    sol = solve(a*pow(c, -0.6) + b*pow(c, -0.5) - op.target, c)
+    assert len(sol) == 1
+    return Constant(sol[0])

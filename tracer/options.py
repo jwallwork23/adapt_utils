@@ -376,6 +376,7 @@ class LeVequeOptions(TracerOptions):
         q_in = Constant(0.0)
         for i in range(4):
             self.boundary_conditions[i] = {i: {'value': q_in}}
+            #self.adjoint_boundary_conditions[i] = {i: {'neumann': q_in}}  # TODO
 
         # Time integration
         self.dt = math.pi/300.0
@@ -392,6 +393,10 @@ class LeVequeOptions(TracerOptions):
         self.fluid_velocity = Function(fs)
         self.fluid_velocity.interpolate(as_vector((0.5 - y, x - 0.5)))
         return self.fluid_velocity
+
+    def set_source(self, fs):
+        self.source = Constant(0.)
+        return self.source
 
     def set_initial_condition(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
@@ -412,11 +417,22 @@ class LeVequeOptions(TracerOptions):
 
     def set_qoi_kernel(self, fs):
         b = self.ball(fs, source=False)
-        area = assemble(b*dx)
+        with pyadjoint.stop_annotating():
+            area = assemble(b*dx)
         area_exact = math.pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
         self.kernel = rescaling*b
         return self.kernel
+
+    def set_final_condition(self, fs):
+        b = self.ball(fs, source=False)
+        with pyadjoint.stop_annotating():
+            area = assemble(b*dx)
+        area_exact = math.pi*self.region_of_interest[0][2]**2
+        rescaling = area_exact/area if area != 0. else 1
+        self.final_value = Function(fs)
+        self.final_value.interpolate(rescaling*b)
+        return self.final_value
 
     def exact_solution(self, fs):
         if not hasattr(self, 'initial_value'):

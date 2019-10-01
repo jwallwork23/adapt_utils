@@ -2,6 +2,7 @@ from firedrake import *
 from firedrake.petsc import PETSc
 from thetis import create_directory
 
+import os
 import datetime
 from time import clock
 import numpy as np
@@ -38,7 +39,7 @@ class SteadyProblem():
         self.prev_solution = prev_solution
         self.approach = op.approach
 
-        # function spaces and mesh quantities
+        # Function spaces and mesh quantities
         self.V = FunctionSpace(self.mesh, self.finite_element)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
@@ -53,14 +54,17 @@ class SteadyProblem():
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
 
-        # prognostic fields
-        self.solution = Function(self.V)
-        self.adjoint_solution = Function(self.V)
+        # Prognostic fields
+        self.solution = Function(self.V, name='Solution')
+        self.adjoint_solution = Function(self.V, name='Adjoint solution')
 
-        # outputs
+        # Outputs
         self.di = create_directory(self.op.di)
         self.solution_file = File(self.di + 'solution.pvd')
         self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
+
+        self.estimators = {}
+        self.indicators = {}
 
     def set_target_vertices(self, num_vertices=None):
         """
@@ -590,7 +594,7 @@ class UnsteadyProblem():
         self.stab = op.stabilisation
         self.approach = op.approach
 
-        # function spaces and mesh quantities
+        # Function spaces and mesh quantities
         self.V = FunctionSpace(self.mesh, self.finite_element)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
@@ -599,15 +603,17 @@ class UnsteadyProblem():
         self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
         self.test = TestFunction(self.V)
         self.trial = TrialFunction(self.V)
+        self.p0test = TestFunction(self.P0)
+        self.p0trial = TrialFunction(self.P0)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
 
-        # prognostic fields
-        self.solution = Function(self.V)
+        # Prognostic fields
+        self.solution = Function(self.V, name='Solution')
+        self.adjoint_solution = Function(self.V, name='Adjoint solution')
         self.set_start_condition()
-        self.adjoint_solution = Function(self.V)
 
-        # outputs
+        # Outputs
         self.di = create_directory(self.op.di)
         self.solution_file = File(self.di + 'solution.pvd')
         self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
@@ -615,6 +621,8 @@ class UnsteadyProblem():
 
         # Adaptivity
         self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
+        self.estimators = {}
+        self.indicators = {}
 
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         """
@@ -624,17 +632,23 @@ class UnsteadyProblem():
             num_vertices = self.mesh.num_vertices()
         self.op.target = num_vertices * rescaling
 
-    def solve_step(self):
+    def solve_step(self, adjoint=False, **kwargs):
         """
         Solve forward PDE on a particular mesh.
         """
         pass
 
-    def set_start_condition(self, adjoint=False):
+    def set_start_condition(self, adjoint=False, assign=True):
         if adjoint:
-            self.solution = self.op.set_qoi_kernel(self.V)
+            if assign:
+                self.adjoint_solution.assign(self.op.set_final_condition(self.V))
+            else:
+                self.adjoint_solution = self.op.set_final_condition(self.V)
         else:
-            self.solution = self.op.set_initial_condition(self.V)
+            if assign:
+                self.solution.assign(self.op.set_initial_condition(self.V))
+            else:
+                self.solution = self.op.set_initial_condition(self.V)
 
     def solve(self, adjoint=False):
         """
@@ -643,32 +657,40 @@ class UnsteadyProblem():
         self.remesh_step = 0
         adj = not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity')  # FIXME
         if self.approach != 'fixed_mesh':
+            self.get_adjoint_state()
             self.adapt_mesh()
-            self.set_start_condition()
+            self.set_start_condition(adjoint, assign=False)
+            self.get_adjoint_state()
             self.adapt_mesh()
-            self.set_start_condition()
+            self.set_start_condition(adjoint, assign=False)
+        elif adjoint:
+            self.set_start_condition(adjoint)
         while self.step_end <= self.op.end_time:
             if self.approach == 'fixed_mesh':
-                self.solve_step()
+                self.solve_step(adjoint)
                 break
             solution_chk = self.solution.copy()
             if adj:
                 self.get_adjoint_state()
-                solution_adjoint_chk = self.adjoint_solution.copy()
-            for i in range(self.op.num_adapt):
+                adjoint_solution_chk = self.adjoint_solution.copy()
+            for i in range(self.op.num_adapt):  # FIXME: mesh seems to jump ahead if num_adapt > 1
                 if adj:
-                    self.adjoint_solution = Function(self.V)
+                    self.adjoint_solution = Function(self.V, name='Adjoint solution')
                     self.adjoint_solution.project(adjoint_solution_chk)
                 self.adapt_mesh()
                 PETSc.Sys.Print("Number of elements: %d" % self.mesh.num_cells())
                 if self.remesh_step == 0:
-                    self.set_start_condition()
+                    self.set_start_condition(adjoint, assign=False)
                 else:
-                    self.solution = Function(self.V)
+                    self.solution = Function(self.V, name='Solution')
                     self.solution.project(solution_chk)
-                self.solve_step()
+                self.solve_step(adjoint)
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
+
+            # Plot error indicator
+            self.plot()
+        self.get_qoi_kernel()
 
     def get_qoi_kernel(self):
         """
@@ -685,11 +707,11 @@ class UnsteadyProblem():
             self.get_qoi_kernel()
         return assemble(inner(self.solution, self.kernel)*dx(degree=12))
 
-    def solve_continuous_adjoint(self):  # NOTE: this should save to HDF5
+    def solve_continuous_adjoint(self):
         """
         Solve the adjoint PDE using a hand-coded continuous adjoint.
         """
-        pass
+        self.solve(adjoint=True)
 
     def solve_adjoint(self):
         """
@@ -698,14 +720,29 @@ class UnsteadyProblem():
         PETSc.Sys.Print("Solving adjoint problem...")
         self.solve_continuous_adjoint()
 
-    def get_adjoint_state(self):
+    def get_adjoint_state(self, variable='Tracer2d'):
         """
         Get adjoint solution at timestep i.
         """
-        i = self.remesh_step * self.op.dt_per_remesh
-        with DumbCheckpoint('outputs/hdf5/Adjoint2d_' + index_string(i), mode=FILE_READ) as la:
-            la.load(self.adjoint_solution)
+        if self.approach in ('uniform', 'hessian', 'explicit', 'vorticity'):
+            return
+        if not hasattr(self, 'V_orig'):
+            self.V_orig = FunctionSpace(self.mesh, self.finite_element)
+        op = self.op
+        names = {'Tracer2d': 'tracer_2d', 'Velocity2d': 'uv_2d', 'Elevation2d': 'elev_2d'}
+        num_exports = int(np.floor((op.end_time - op.dt)/op.dt/op.dt_per_export))
+        i = num_exports - self.remesh_step*int(self.op.dt_per_export/self.op.dt_per_export)
+
+        # FIXME for continuous adjoint
+        #i = self.remesh_step*int(self.op.dt_per_export/self.op.dt_per_export)
+        #filename = 'Adjoint2d_{:5s}'.format(index_string(i))
+
+        filename = '{:s}_{:5s}'.format(variable, index_string(i))
+        to_load = Function(self.V_orig, name=names[variable])
+        with DumbCheckpoint(os.path.join(self.di, 'hdf5', filename), mode=FILE_READ) as la:
+            la.load(to_load)
             la.close()
+        self.adjoint_solution.project(to_load)
         self.adjoint_solution_file.write(self.adjoint_solution, t=self.op.dt*i)
 
     def dwp_indication(self):
@@ -946,8 +983,10 @@ class UnsteadyProblem():
             self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
             self.test = TestFunction(self.V)
             self.trial = TrialFunction(self.V)
+            self.p0test = TestFunction(self.P0)
+            self.p0trial = TrialFunction(self.P0)
             self.n = FacetNormal(self.mesh)
             self.h = CellSize(self.mesh)
 
-            # Plot results
-            self.plot()
+            self.solution = Function(self.V, name='Solution')
+            self.adjoint_solution = Function(self.V, name='Adjoint solution')

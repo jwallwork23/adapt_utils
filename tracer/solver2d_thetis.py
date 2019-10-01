@@ -22,6 +22,7 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
     for (prescribed) velocity :math:`\textbf{u}`, diffusivity :math:`\nu \geq 0`, source :math:`f`
     and (prognostic) concentration :math:`\phi`.
     """
+    # TODO: update to new framework
     def __init__(self,
                  op=PowerOptions(),
                  stab=None,
@@ -51,10 +52,6 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         self.kernel = op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
-        # Rename solution fields
-        self.solution.rename('Tracer concentration')
-        self.adjoint_solution.rename('Adjoint tracer concentration')
-
         # Classification
         self.nonlinear = False
 
@@ -79,7 +76,6 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
             options.fields_to_export = ['tracer_2d']
         else:
             options.no_exports = True
-        options.compute_residuals_tracer = True
         options.solve_tracer = True
         options.tracer_only = True
         options.horizontal_diffusivity = self.nu
@@ -87,14 +83,14 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         solver_obj.assign_initial_conditions(elev=Function(self.P1), uv=self.u)
         solver_obj.bnd_functions = self.get_boundary_conditions()
         solver_obj.iterate()
-        self.solution = solver_obj.fields.tracer_2d
+        self.solution.assign(solver_obj.fields.tracer_2d)
 
     def solve_continuous_adjoint(self):
         """
         Solve continuous adjoint problem under the assumption that the fluid velocity is divergence-free.
         """
         PETSc.Sys.Print("""
-Solving adjoint problem in continuous form\n
+\nSolving adjoint problem in continuous form\n
 **** NOTE velocity field is assumed divergence-free ****""")
         raise NotImplementedError  # TODO
 
@@ -324,31 +320,24 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
     def set_fields(self):
         self.nu = self.op.set_diffusivity(self.V)
         self.u = self.op.set_velocity(self.P1_vec)
-        if hasattr(self.op, 'source'):
-            self.source = self.op.set_source(self.V)
+        self.source = self.op.set_source(self.V)
         self.kernel = self.op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
-        # Rename solution fields
-        self.solution.rename('Tracer concentration')
-        self.adjoint_solution.rename('Adjoint tracer concentration')
-
-    def get_boundary_conditions(self):
-        bcs = self.op.boundary_conditions  # FIXME: Neumann conditions are currently default
-        BCs = {'shallow water': {}, 'tracer': {}}
-        for i in bcs.keys():
-            if bcs[i] == 'dirichlet_zero':
-                bcs[i] = {'value': Constant(0.)}
-                BCs['tracer'][i] = {'value': Constant(0.)}
-            elif bcs[i] == 'neumann_zero':
-                continue
+    def get_boundary_conditions(self, adjoint=False):
+        if adjoint:
+            bcs = self.op.adjoint_boundary_conditions
+        else:
+            bcs = self.op.boundary_conditions  # FIXME: Neumann conditions are currently default
+        BCs = {'shallow water': {}, 'tracer': bcs}
         return BCs
 
     def solve_step(self, adjoint=False):
         self.set_fields()
         if adjoint:
-            PETSc.Sys.Print("""Solving adjoint problem in continuous form\n
-**** NOTE velocity field is assumed divergence-free ****""")
+            PETSc.Sys.Print("""
+\nSolving adjoint problem in continuous form
+**** NOTE velocity field is assumed divergence-free ****\n\n""")
         op = self.op
 
         # Create solver and pass parameters, etc.
@@ -359,15 +348,20 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end-0.5*op.dt
         options.output_directory = self.di
-        options.fields_to_export = ['tracer_2d']
-        options.compute_residuals_tracer = True
+        if adjoint:
+            options.fields_to_export_hdf5 = ['tracer_2d']
+        if op.plot_pvd:
+            options.fields_to_export = ['tracer_2d']
+        elif not adjoint:
+            options.no_exports = True
         options.solve_tracer = True
         options.tracer_only = True
         options.horizontal_diffusivity = self.nu
         if hasattr(self, 'source'):
             options.tracer_source_2d = self.source
         velocity = -self.u if adjoint else self.u
-        solver_obj.assign_initial_conditions(elev=Function(self.V), uv=velocity, tracer=self.solution)
+        init = self.adjoint_solution if adjoint else self.solution
+        solver_obj.assign_initial_conditions(elev=Function(self.V), uv=velocity, tracer=init)
 
         # set up callbacks
         #cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
@@ -386,9 +380,12 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             e.set_next_export_ix(solver_obj.i_export)
 
         # Solve
-        solver_obj.bnd_functions = self.get_boundary_conditions()
+        solver_obj.bnd_functions = self.get_boundary_conditions(adjoint)
         solver_obj.iterate()
-        self.solution = solver_obj.fields.tracer_2d
+        if adjoint:
+            self.adjoint_solution.assign(solver_obj.fields.tracer_2d)
+        else:
+            self.solution.assign(solver_obj.fields.tracer_2d)
         self.ts = solver_obj.timestepper.timesteppers.tracer
 
     def get_timestepper(self, adjoint=False):
@@ -431,10 +428,122 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         else:
             self.M = None
 
-    def dwr_estimation(self):
-        if self.remesh_step == 0:
+    def dwr_indication(self):
+        if not hasattr(self, 'ts'):
             self.get_timestepper()
-        cell_res = self.ts.cell_residual(adjoint=self.interpolated_adjoint_solution)
-        edge_res = self.ts.edge_residual(adjoint=self.interpolated_adjoint_solution)
-        self.indicator = Function(self.P0, name='dwr')
-        self.indicator.interpolate(cell_res + edge_res)
+        try:
+            self.get_strong_residual(adjoint=True)
+        except:
+            self.get_timestepper()
+            self.get_strong_residual(adjoint=True)
+        self.get_flux_terms()
+        self.indicator = Function(self.P1, name='dwr')
+        self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
+        self.estimators['dwr'] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
+
+    def explicit_indication(self, square=False):
+        if not hasattr(self, 'ts'):
+            self.get_timestepper()
+        try:
+            self.get_strong_residual(adjoint=False, square=square)
+        except:
+            self.get_timestepper()
+            self.get_strong_residual(adjoint=False)
+        self.indicator = Function(self.P1, name='explicit')
+        self.indicator.interpolate(self.indicators['strong_residual'])
+
+        # TODO: flux terms
+
+    def get_strong_residual(self, adjoint=True, square=False):
+        phi_new = self.ts.solution
+        phi_old = self.ts.solution_old
+        i = self.p0test
+
+        assert self.op.timestepper == 'CrankNicolson'
+        phi = 0.5*(phi_new + phi_old)
+
+        # TODO: time-dependent u case
+        F = self.source - (phi_new-phi_old)/self.op.dt - dot(self.u, grad(phi)) + div(self.nu*grad(phi))
+
+        if adjoint:
+            self.get_adjoint_state()
+            dwr = inner(F, self.adjoint_solution)
+            self.estimators['dwr_cell'] = abs(assemble(dwr*dwr*dx)) if square else abs(assemble(dwr*dx))
+            self.indicators['dwr_cell'] = assemble(i*dwr*dwr*dx) if square else assemble(i*dwr*dx)
+        else:
+            self.estimators['strong_residual'] = abs(assemble(F*dx))
+            self.indicators['strong_residual'] = assemble(F*i*dx)
+
+    def get_flux_terms(self):
+        phi_new = self.ts.solution
+        phi_old = self.ts.solution_old
+        self.get_adjoint_state()
+        uv = self.u  # TODO: time-dependent u case
+        nu = self.nu
+        n = self.n
+        i = self.p0test
+        adj = self.adjoint_solution
+        h = self.h
+        degree = self.finite_element.degree()
+        family = self.finite_element.family()
+        dg = degree == 'Discontinuous Lagrange'
+
+        # Account for timestepping
+        if self.op.timestepper == 'CrankNicolson':
+            phi = 0.5*(phi_new + phi_old)
+        elif self.op.timestepper == 'ForwardEuler':
+            phi = phi_old
+        elif self.op.timestepper == 'BackwardEuler':
+            phi = phi_new
+        else:
+            raise NotImplementedError
+
+        flux_terms = 0
+
+        if dg:
+            uv_av = avg(uv)
+            un_av = dot(uv_av, n('-'))
+            s = 0.5*(sign(un_av) + 1.0)
+            phi_up = phi('-')*s + phi('+')*(1-s)
+
+            # Interface term
+            loc = i*dot(uv, n)*adj
+            flux_terms -= phi_up*(loc('+') + loc('-'))*dS
+
+            # TODO: Lax-Friedrichs
+
+            # SIPG term
+            sigma = 1.5/h if degree == 0 else 5.0*degree*(degree + 1)/h
+            alpha = avg(sigma)
+            loc = i*n*adj
+            flux_terms -= alpha*inner(avg(nu)*jump(phi, n), loc('+') + loc('-'))*dS
+            flux_terms += inner(jump(nu*grad(phi)), loc('+') + loc('-'))*dS
+            loc = i*nu*grad(adj)
+            flux_terms += 0.5*inner(loc('+') + loc('-'), jump(phi, n))*dS
+
+        # Term resulting from integration by parts in advection term
+        loc = i*dot(uv, n)*phi*adj
+        flux_terms += (loc('+') + loc('-'))*dS
+
+        # Term resulting from integration by parts in diffusion term
+        loc = -i*dot(nu*grad(phi), n)*adj
+        flux_terms += (loc('+') + loc('-'))*dS + loc*ds
+
+        # Boundary conditions
+        bcs = self.op.boundary_conditions
+        for j in bcs.keys():
+            if 'value' in bcs[j].keys() and dg:
+                phi_ext = bcs[j]['value']
+                uv_av = 0.5*(uv + phi_ext)
+                un_av = dot(n, uv_av)
+                s = 0.5*(sign(un_av) + 1.0)
+                phi_up = (phi - phi_ext)*(1 - s)
+                flux_terms -= i*phi_up*dot(uv_av, n)*adj*ds(j)
+                flux_terms += i*dot(uv, n)*phi*adj*ds(j)
+
+        # Solve auxiliary finite element problem to get traces on particular element
+        mass_term = i*self.p0trial*dx
+        res = Function(self.P0)
+        solve(mass_term == flux_terms, res)
+        self.estimators['dwr_flux'] = abs(assemble(res*dx))
+        self.indicators['dwr_flux'] = res
