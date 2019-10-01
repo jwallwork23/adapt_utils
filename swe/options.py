@@ -1,6 +1,5 @@
-from thetis_adjoint import *
+from thetis import *
 from thetis.configuration import *
-import pyadjoint
 
 from adapt_utils.options import Options
 
@@ -314,11 +313,10 @@ class BoydOptions(Options):
         if reference_space:
             reference_mesh = self.get_reference_mesh()
             fs = FunctionSpace(reference_mesh, sol.ufl_element())
-            with pyadjoint.stop_annotating():
-                reference_sol_upper = Function(fs)
-                reference_sol_upper.project(sol_upper)
-                reference_sol_lower = Function(fs)
-                reference_sol_lower.project(sol_lower)
+            reference_sol_upper = Function(fs)
+            reference_sol_upper.project(sol_upper)
+            reference_sol_lower = Function(fs)
+            reference_sol_lower.project(sol_lower)
             sol_upper = reference_sol_upper
             sol_lower = reference_sol_lower
         xcoords = Function(sol_upper.function_space())

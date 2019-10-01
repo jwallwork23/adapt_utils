@@ -1,7 +1,6 @@
-from thetis_adjoint import *
+from thetis import *
 from thetis.physical_constants import *
 from firedrake.petsc import PETSc
-import pyadjoint
 import math
 
 from adapt_utils.solver import UnsteadyProblem

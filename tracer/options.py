@@ -417,8 +417,7 @@ class LeVequeOptions(TracerOptions):
 
     def set_qoi_kernel(self, fs):
         b = self.ball(fs, source=False)
-        with pyadjoint.stop_annotating():
-            area = assemble(b*dx)
+        area = assemble(b*dx)
         area_exact = math.pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
         self.kernel = rescaling*b
@@ -426,8 +425,7 @@ class LeVequeOptions(TracerOptions):
 
     def set_final_condition(self, fs):
         b = self.ball(fs, source=False)
-        with pyadjoint.stop_annotating():
-            area = assemble(b*dx)
+        area = assemble(b*dx)
         area_exact = math.pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
         self.final_value = Function(fs)
