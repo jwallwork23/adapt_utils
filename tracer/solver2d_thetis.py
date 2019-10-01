@@ -433,18 +433,32 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         if not hasattr(self, 'ts'):
             self.get_timestepper()
         try:
-            self.strong_residual(adjoint=True)
+            self.get_strong_residual(adjoint=True)
         except:
             self.get_timestepper()
-            self.strong_residual(adjoint=True)
-        self.flux_terms()
+            self.get_strong_residual(adjoint=True)
+        self.get_flux_terms()
         self.indicator = Function(self.P1, name='dwr')
         self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
         self.estimators['dwr'] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
 
-    def strong_residual(self, adjoint=True):
+    def explicit_indication(self, square=False):
+        if not hasattr(self, 'ts'):
+            self.get_timestepper()
+        try:
+            self.get_strong_residual(adjoint=False, square=square)
+        except:
+            self.get_timestepper()
+            self.get_strong_residual(adjoint=False)
+        self.indicator = Function(self.P1, name='explicit')
+        self.indicator.interpolate(self.indicators['strong_residual'])
+
+        # TODO: flux terms
+
+    def get_strong_residual(self, adjoint=True, square=False):
         phi_new = self.ts.solution
         phi_old = self.ts.solution_old
+        i = self.p0test
 
         assert self.op.timestepper == 'CrankNicolson'
         phi = 0.5*(phi_new + phi_old)
@@ -454,13 +468,14 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
 
         if adjoint:
             self.get_adjoint_state()
-            self.estimators['dwr_cell'] = abs(assemble(inner(F, self.adjoint_solution)*dx))
-            self.indicators['dwr_cell'] = assemble(self.p0test*inner(F, self.adjoint_solution)*dx)
+            dwr = inner(F, self.adjoint_solution)
+            self.estimators['dwr_cell'] = abs(assemble(dwr*dwr*dx)) if square else abs(assemble(dwr*dx))
+            self.indicators['dwr_cell'] = assemble(i*dwr*dwr*dx) if square else assemble(i*dwr*dx)
         else:
             self.estimators['strong_residual'] = abs(assemble(F*dx))
-            self.indicators['strong_residual'] = assemble(F*self.p0test*dx)
+            self.indicators['strong_residual'] = assemble(F*i*dx)
 
-    def flux_terms(self):
+    def get_flux_terms(self):
         phi_new = self.ts.solution
         phi_old = self.ts.solution_old
         self.get_adjoint_state()

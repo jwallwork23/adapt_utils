@@ -701,7 +701,7 @@ class UnsteadyProblem():
             if adj:
                 self.get_adjoint_state()
                 adjoint_solution_chk = self.adjoint_solution.copy()
-            for i in range(self.op.num_adapt):
+            for i in range(self.op.num_adapt):  # FIXME: mesh seems to jump ahead if num_adapt > 1
                 if adj:
                     with pyadjoint.stop_annotating():
                         self.adjoint_solution = Function(self.V, name='Adjoint solution')
@@ -720,6 +720,7 @@ class UnsteadyProblem():
 
             # Plot error indicator
             self.plot()
+        self.get_qoi_kernel()
 
     def get_qoi_kernel(self):
         """
