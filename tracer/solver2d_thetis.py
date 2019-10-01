@@ -349,8 +349,6 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end-0.5*op.dt
         options.output_directory = 'outputs/adjoint' if adjoint else self.di
-        #if adjoint:
-        #    options.fields_to_export_hdf5 = ['tracer_2d']
         options.fields_to_export_hdf5 = []
         if op.plot_pvd:
             options.fields_to_export = ['tracer_2d']
@@ -459,10 +457,13 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         except:
             self.get_timestepper()
             self.get_strong_residual(weighted=True, adjoint=adjoint)
-        self.get_flux_terms()
+        self.get_flux_terms(adjoint=adjoint)
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
         self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
+
+    def dwr_indication_adjoint(self):
+        self.dwr_indication(adjoint=True)
 
     def explicit_indication(self, adjoint=False, square=False):
         if not hasattr(self, 'ts'):
@@ -476,6 +477,9 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         self.indicator.interpolate(self.indicators['strong_residual'])
 
         # TODO: flux terms?
+
+    def explicit_indication_adjoint(self, square=False):
+        self.explicit_indication(adjoint=True, square=square)
 
     def get_power_metric(self, adjoint=False):
         """
@@ -520,12 +524,12 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
 
         # TODO: time-dependent u case
         # TODO: non divergence-free u case
-        uv = -self.u if adjoint else self.u
+        uv = self.u
         f = self.kernel if adjoint else self.source
         F = f - (phi_new-phi_old)/self.op.dt - dot(uv, grad(phi)) + div(self.nu*grad(phi))
 
         if weighted:
-            dwr = inner(F, self.adjoint_solution)
+            dwr = inner(F, adj)
             self.estimators['dwr_cell'] = abs(assemble(dwr*dwr*dx)) if square else abs(assemble(dwr*dx))
             self.indicators['dwr_cell'] = assemble(i*dwr*dwr*dx) if square else assemble(i*dwr*dx)
         else:
@@ -536,7 +540,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         phi, phi_new, phi_old, adj, adj_new, adj_old = self.get_ts_components(adjoint)
         # TODO: time-dependent u case
         # TODO: non divergence-free u case
-        uv = -self.u if adjoint else self.u
+        uv = self.u
         nu = self.nu
         n = self.n
         i = self.p0test

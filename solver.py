@@ -640,17 +640,11 @@ class UnsteadyProblem():
         """
         pass
 
-    def set_start_condition(self, adjoint=False, assign=True):
+    def set_start_condition(self, adjoint=False):
         if adjoint:
-            if assign:
-                self.adjoint_solution.assign(self.op.set_final_condition(self.V))
-            else:
-                self.adjoint_solution = self.op.set_final_condition(self.V)
+            self.adjoint_solution = self.op.set_final_condition(self.V)
         else:
-            if assign:
-                self.solution.assign(self.op.set_initial_condition(self.V))
-            else:
-                self.solution = self.op.set_initial_condition(self.V)
+            self.solution = self.op.set_initial_condition(self.V)
 
     def solve(self, adjoint=False):
         """
@@ -659,38 +653,37 @@ class UnsteadyProblem():
         self.remesh_step = 0
         adj = not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity')  # FIXME
         if self.approach != 'fixed_mesh':
-            self.get_adjoint_state()
-            self.adapt_mesh()
-            self.set_start_condition(adjoint, assign=False)
-            self.get_adjoint_state()
-            self.adapt_mesh()
-            self.set_start_condition(adjoint, assign=False)
+            #for i in range(self.op.num_adapt):
+            for i in range(2):
+                self.get_adjoint_state()
+                self.adapt_mesh()
+                self.set_start_condition(adjoint)
         elif adjoint:
             self.set_start_condition(adjoint)
         while self.step_end <= self.op.end_time:
+
             if self.approach == 'fixed_mesh':
                 self.solve_step(adjoint)
                 break
-            solution_chk = self.solution.copy()
-            if adj:
-                self.get_adjoint_state()
-                adjoint_solution_chk = self.adjoint_solution.copy()
+
+            # Store current solution
+            solution_chk = Function(self.V)
+            solution_chk.assign(self.solution)
+
+            # Adapt and solve for next step
             for i in range(self.op.num_adapt):  # FIXME: mesh seems to jump ahead if num_adapt > 1
-                if adj:
-                    self.adjoint_solution = Function(self.V, name='Adjoint solution')
-                    self.adjoint_solution.project(adjoint_solution_chk)
                 self.adapt_mesh()
                 if self.remesh_step == 0:
-                    self.set_start_condition(adjoint, assign=False)
+                    self.set_start_condition(adjoint)
                 else:
-                    self.solution = Function(self.V, name='Solution')
                     self.solution.project(solution_chk)
                 self.solve_step(adjoint)
+            self.plot()
+
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
 
-            # Plot error indicator
-            self.plot()
+        # Evaluate QoI
         self.get_qoi_kernel()
 
     def get_qoi_kernel(self):
