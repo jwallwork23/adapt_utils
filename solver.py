@@ -611,6 +611,7 @@ class UnsteadyProblem():
         # Prognostic fields
         self.solution = Function(self.V, name='Solution')
         self.adjoint_solution = Function(self.V, name='Adjoint solution')
+        self.adjoint_solution_old = Function(self.V, name='Old adjoint solution')
         self.set_start_condition()
 
         # Outputs
@@ -623,6 +624,7 @@ class UnsteadyProblem():
         self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
         self.estimators = {}
         self.indicators = {}
+        self.num_exports = int(np.floor((op.end_time - op.dt)/op.dt/op.dt_per_export))
 
     def set_target_vertices(self, rescaling=0.85, num_vertices=None):
         """
@@ -678,7 +680,6 @@ class UnsteadyProblem():
                     self.adjoint_solution = Function(self.V, name='Adjoint solution')
                     self.adjoint_solution.project(adjoint_solution_chk)
                 self.adapt_mesh()
-                PETSc.Sys.Print("Number of elements: %d" % self.mesh.num_cells())
                 if self.remesh_step == 0:
                     self.set_start_condition(adjoint, assign=False)
                 else:
@@ -730,19 +731,20 @@ class UnsteadyProblem():
             self.V_orig = FunctionSpace(self.mesh, self.finite_element)
         op = self.op
         names = {'Tracer2d': 'tracer_2d', 'Velocity2d': 'uv_2d', 'Elevation2d': 'elev_2d'}
-        num_exports = int(np.floor((op.end_time - op.dt)/op.dt/op.dt_per_export))
-        i = num_exports - self.remesh_step*int(self.op.dt_per_export/self.op.dt_per_export)
+        i = self.remesh_step*int(self.op.dt_per_export/self.op.dt_per_remesh)
 
         # FIXME for continuous adjoint
-        #i = self.remesh_step*int(self.op.dt_per_export/self.op.dt_per_export)
-        #filename = 'Adjoint2d_{:5s}'.format(index_string(i))
+        filename = 'Adjoint2d_{:5s}'.format(index_string(i))
 
-        filename = '{:s}_{:5s}'.format(variable, index_string(i))
+        #filename = '{:s}_{:5s}'.format(variable, index_string(i))
         to_load = Function(self.V_orig, name=names[variable])
-        with DumbCheckpoint(os.path.join(self.di, 'hdf5', filename), mode=FILE_READ) as la:
+        to_load_old = Function(self.V_orig, name=names[variable])
+        with DumbCheckpoint(os.path.join('outputs/adjoint/hdf5', filename), mode=FILE_READ) as la:
             la.load(to_load)
+            la.load(to_load_old)
             la.close()
         self.adjoint_solution.project(to_load)
+        self.adjoint_solution_old.project(to_load_old)
         self.adjoint_solution_file.write(self.adjoint_solution, t=self.op.dt*i)
 
     def dwp_indication(self):
@@ -823,6 +825,7 @@ class UnsteadyProblem():
         for the forward PDE. Otherwise, we weight the Hessian of the forward solution with a residual
         for the adjoint PDE.
         """
+        # TODO: update
         if adjoint:
             self.explicit_indication_adjoint(square=False)
             self.p1indicator.interpolate(abs(self.p1cell_res_adjoint))
@@ -972,7 +975,7 @@ class UnsteadyProblem():
         if self.M is not None and norm(self.M) > 0.1*norm(Constant(1, domain=self.mesh)):
             # FIXME: The 0.1 factor seems pretty arbitrary
             self.mesh = adapt(self.mesh, self.M)
-            #self.mesh = multi_adapt(self.M, op=self.op)
+            PETSc.Sys.Print("Number of elements: %d" % self.mesh.num_cells())
 
             # Re-establish function spaces
             self.V = FunctionSpace(self.mesh, self.finite_element)
@@ -990,3 +993,4 @@ class UnsteadyProblem():
 
             self.solution = Function(self.V, name='Solution')
             self.adjoint_solution = Function(self.V, name='Adjoint solution')
+            self.adjoint_solution_old = Function(self.V, name='Old adjoint solution')

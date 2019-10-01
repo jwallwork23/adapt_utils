@@ -5,6 +5,7 @@ from time import clock
 import numpy as np
 
 from adapt_utils.tracer.options import *
+from adapt_utils.misc.misc import index_string
 from adapt_utils.adapt.metric import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
@@ -347,9 +348,10 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         options.timestep = op.dt
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end-0.5*op.dt
-        options.output_directory = self.di
-        if adjoint:
-            options.fields_to_export_hdf5 = ['tracer_2d']
+        options.output_directory = 'outputs/adjoint' if adjoint else self.di
+        #if adjoint:
+        #    options.fields_to_export_hdf5 = ['tracer_2d']
+        options.fields_to_export_hdf5 = []
         if op.plot_pvd:
             options.fields_to_export = ['tracer_2d']
         elif not adjoint:
@@ -379,14 +381,28 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         for e in solver_obj.exporters.values():
             e.set_next_export_ix(solver_obj.i_export)
 
+        def store_old_value():
+            """
+            Script for storing previous iteration to HDF5, as well as current.
+            """
+            i = index_string(self.num_exports - int(solver_obj.iteration/self.op.dt_per_export))
+            print(i)
+            filename = 'Adjoint2d_{:5s}'.format(i)
+            filepath = 'outputs/adjoint/hdf5'
+            with DumbCheckpoint(os.path.join(filepath, filename), mode=FILE_CREATE) as dc:
+                dc.store(solver_obj.timestepper.timesteppers.tracer.solution)
+                dc.store(solver_obj.timestepper.timesteppers.tracer.solution_old)
+                dc.close()
+
         # Solve
         solver_obj.bnd_functions = self.get_boundary_conditions(adjoint)
-        solver_obj.iterate()
         if adjoint:
+            solver_obj.iterate(export_func=store_old_value)
             self.adjoint_solution.assign(solver_obj.fields.tracer_2d)
         else:
+            solver_obj.iterate()
             self.solution.assign(solver_obj.fields.tracer_2d)
-        self.ts = solver_obj.timestepper.timesteppers.tracer
+            self.ts = solver_obj.timestepper.timesteppers.tracer
 
     def get_timestepper(self, adjoint=False):
         self.set_fields()
@@ -399,7 +415,6 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         options.timestep = op.dt
         options.simulation_end_time = 0.9*op.dt
         options.fields_to_export = []
-        options.compute_residuals_tracer = True
         options.solve_tracer = True
         options.tracer_only = True
         options.horizontal_diffusivity = self.nu
@@ -419,7 +434,12 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         # Solve
         solver_obj.bnd_functions['tracer'] = op.boundary_conditions
         solver_obj.create_timestepper()
-        self.ts = solver_obj.timestepper.timesteppers.tracer
+        if not adjoint:
+            self.ts = solver_obj.timestepper.timesteppers.tracer
+
+    def get_hessian(self, adjoint=False):
+        f = self.adjoint_solution if adjoint else self.solution
+        return steady_metric(f, mesh=self.mesh, noscale=True, op=self.op)
 
     def get_hessian_metric(self, adjoint=False):
         field_for_adapt = self.adjoint_solution if adjoint else self.solution
@@ -428,45 +448,83 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         else:
             self.M = None
 
-    def dwr_indication(self):
+    def dwr_indication(self, adjoint=False):
+        label = 'dwr'
+        if adjoint:
+            label += '_adjoint'
         if not hasattr(self, 'ts'):
             self.get_timestepper()
         try:
-            self.get_strong_residual(adjoint=True)
+            self.get_strong_residual(weighted=True, adjoint=adjoint)
         except:
             self.get_timestepper()
-            self.get_strong_residual(adjoint=True)
+            self.get_strong_residual(weighted=True, adjoint=adjoint)
         self.get_flux_terms()
-        self.indicator = Function(self.P1, name='dwr')
+        self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
-        self.estimators['dwr'] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
+        self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
 
-    def explicit_indication(self, square=False):
+    def explicit_indication(self, adjoint=False, square=False):
         if not hasattr(self, 'ts'):
             self.get_timestepper()
         try:
-            self.get_strong_residual(adjoint=False, square=square)
+            self.get_strong_residual(weighted=False, adjoint=adjoint, square=square)
         except:
             self.get_timestepper()
-            self.get_strong_residual(adjoint=False)
+            self.get_strong_residual(weighted=False, adjoint=adjoint)
         self.indicator = Function(self.P1, name='explicit')
         self.indicator.interpolate(self.indicators['strong_residual'])
 
-        # TODO: flux terms
+        # TODO: flux terms?
 
-    def get_strong_residual(self, adjoint=True, square=False):
-        phi_new = self.ts.solution
-        phi_old = self.ts.solution_old
+    def get_power_metric(self, adjoint=False):
+        """
+        Construct an anisotropic metric using an approach inspired by [Power et al. 2006].
+
+        If `adjoint` mode is turned off, we weight the Hessian of the adjoint solution with a residual
+        for the forward PDE. Otherwise, we weight the Hessian of the forward solution with a residual
+        for the adjoint PDE.
+        """
+        self.get_adjoint_state()
+        self.explicit_indication(adjoint=adjoint, square=False)
+        H = self.get_hessian(adjoint=not adjoint)
+        for i in range(self.mesh.num_vertices()):
+            H.dat.data[i][:,:] *= self.indicator.dat.data[i]  # TODO: use pyop2
+        phi = self.get_ts_components(adjoint=adjoint)[0]
+        self.M = steady_metric(phi, H=H, op=self.op)
+
+    def get_ts_components(self, adjoint=False):
+        self.get_adjoint_state()
+        phi_new = self.adjoint_solution_old if adjoint else self.ts.solution
+        phi_old = self.adjoint_solution if adjoint else self.ts.solution_old
+        adj_new = self.ts.solution if adjoint else self.adjoint_solution_old
+        adj_old = self.ts.solution_old if adjoint else self.adjoint_solution
+
+        # Account for timestepping
+        if self.op.timestepper == 'CrankNicolson':
+            phi = 0.5*(phi_new + phi_old)
+            adj = 0.5*(adj_new + adj_old)
+        elif self.op.timestepper == 'ForwardEuler':
+            phi = phi_old
+            adj = adj_new
+        elif self.op.timestepper == 'BackwardEuler':
+            phi = phi_new
+            adj = adj_old
+        else:
+            raise NotImplementedError
+        return phi, phi_new, phi_old, adj, adj_new, adj_old
+
+    def get_strong_residual(self, adjoint=False, weighted=True, square=False):
         i = self.p0test
-
-        assert self.op.timestepper == 'CrankNicolson'
-        phi = 0.5*(phi_new + phi_old)
+        phi, phi_new, phi_old, adj, adj_new, adj_old = self.get_ts_components(adjoint)
 
         # TODO: time-dependent u case
-        F = self.source - (phi_new-phi_old)/self.op.dt - dot(self.u, grad(phi)) + div(self.nu*grad(phi))
+        # TODO: non divergence-free u case
+        uv = -self.u if adjoint else self.u
+        f = self.kernel if adjoint else self.source
+        F = f - (phi_new-phi_old)/self.op.dt - dot(uv, grad(phi)) + div(self.nu*grad(phi))
 
-        if adjoint:
-            self.get_adjoint_state()
+        if weighted:
             dwr = inner(F, self.adjoint_solution)
             self.estimators['dwr_cell'] = abs(assemble(dwr*dwr*dx)) if square else abs(assemble(dwr*dx))
             self.indicators['dwr_cell'] = assemble(i*dwr*dwr*dx) if square else assemble(i*dwr*dx)
@@ -474,32 +532,20 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             self.estimators['strong_residual'] = abs(assemble(F*dx))
             self.indicators['strong_residual'] = assemble(F*i*dx)
 
-    def get_flux_terms(self):
-        phi_new = self.ts.solution
-        phi_old = self.ts.solution_old
-        self.get_adjoint_state()
-        uv = self.u  # TODO: time-dependent u case
+    def get_flux_terms(self, adjoint=False):
+        phi, phi_new, phi_old, adj, adj_new, adj_old = self.get_ts_components(adjoint)
+        # TODO: time-dependent u case
+        # TODO: non divergence-free u case
+        uv = -self.u if adjoint else self.u
         nu = self.nu
         n = self.n
         i = self.p0test
-        adj = self.adjoint_solution
         h = self.h
         degree = self.finite_element.degree()
         family = self.finite_element.family()
         dg = degree == 'Discontinuous Lagrange'
 
-        # Account for timestepping
-        if self.op.timestepper == 'CrankNicolson':
-            phi = 0.5*(phi_new + phi_old)
-        elif self.op.timestepper == 'ForwardEuler':
-            phi = phi_old
-        elif self.op.timestepper == 'BackwardEuler':
-            phi = phi_new
-        else:
-            raise NotImplementedError
-
         flux_terms = 0
-
         if dg:
             uv_av = avg(uv)
             un_av = dot(uv_av, n('-'))
