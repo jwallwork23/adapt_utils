@@ -333,7 +333,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         BCs = {'shallow water': {}, 'tracer': bcs}
         return BCs
 
-    def solve_step(self, adjoint=False):
+    def solve_step(self, adjoint=False, time=None):
         self.set_fields()
         if adjoint:
             PETSc.Sys.Print("""
@@ -375,7 +375,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         solver_obj.i_export = self.remesh_step
         solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
         solver_obj.iteration = self.remesh_step*op.dt_per_remesh
-        solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
+        solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh if time is None else time
         for e in solver_obj.exporters.values():
             e.set_next_export_ix(solver_obj.i_export)
 
@@ -400,6 +400,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         else:
             solver_obj.iterate()
             self.solution.assign(solver_obj.fields.tracer_2d)
+            self.solution_old.assign(solver_obj.timestepper.timesteppers.tracer.solution_old)
             self.ts = solver_obj.timestepper.timesteppers.tracer
 
     def get_timestepper(self, adjoint=False):

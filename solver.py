@@ -610,6 +610,7 @@ class UnsteadyProblem():
 
         # Prognostic fields
         self.solution = Function(self.V, name='Solution')
+        self.solution_old = Function(self.V, name='Old solution')
         self.adjoint_solution = Function(self.V, name='Adjoint solution')
         self.adjoint_solution_old = Function(self.V, name='Old adjoint solution')
         self.set_start_condition()
@@ -651,7 +652,6 @@ class UnsteadyProblem():
         Solve PDE using mesh adaptivity.
         """
         self.remesh_step = 0
-        adj = not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity')  # FIXME
 
         # Adapt w.r.t. initial conditions a few times before the solver loop
         if self.approach != 'fixed_mesh':
@@ -670,10 +670,6 @@ class UnsteadyProblem():
                 self.solve_step(adjoint)
                 break
 
-            # Store solution from previous step
-            solution_old = Function(self.V)
-            solution_old.assign(self.solution)
-
             # Adaptive mesh case
             for i in range(self.op.num_adapt):
                 self.adapt_mesh()
@@ -681,26 +677,31 @@ class UnsteadyProblem():
                 # Interpolate value from previous step onto new mesh
                 if self.remesh_step == 0:
                     self.set_start_condition(adjoint)
+                elif i == 0:
+                    self.solution.project(solution)
                 else:
                     self.solution.project(solution_old)
 
                 # Solve PDE on new mesh
                 self.op.plot_pvd = True if i == 0 else False
-                self.solve_step(adjoint)
+                time = None if i == 0 else self.step_end - self.op.dt
+                self.solve_step(adjoint=adjoint, time=time)
 
-                # Store solution on first mesh in sequence
+                # Store solutions from last two steps on first mesh in sequence
                 if i == 0:
                     solution = Function(self.V)
                     solution.assign(self.solution)
+                    solution_old = Function(self.V)
+                    solution_old.assign(self.solution_old)
                     if self.step_end + self.op.dt*self.op.dt_per_remesh > self.op.end_time:
                         break  # No need to do adapt for final timestep
-            self.solution.project(solution)
             self.plot()
 
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
 
         # Evaluate QoI
+        self.solution.project(solution)
         self.get_qoi_kernel()
 
     def get_qoi_kernel(self):
@@ -1002,5 +1003,8 @@ class UnsteadyProblem():
             self.h = CellSize(self.mesh)
 
             self.solution = Function(self.V, name='Solution')
+            self.solution_old = Function(self.V, name='Old solution')
             self.adjoint_solution = Function(self.V, name='Adjoint solution')
             self.adjoint_solution_old = Function(self.V, name='Old adjoint solution')
+        else:
+            PETSc.Sys.Print("******** WARNING: Adaptation not used ********")
