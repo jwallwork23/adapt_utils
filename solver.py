@@ -652,32 +652,49 @@ class UnsteadyProblem():
         """
         self.remesh_step = 0
         adj = not self.approach in ('uniform', 'hessian', 'explicit', 'vorticity')  # FIXME
+
+        # Adapt w.r.t. initial conditions a few times before the solver loop
         if self.approach != 'fixed_mesh':
-            #for i in range(self.op.num_adapt):
-            for i in range(2):
+            for i in range(max(self.op.num_adapt, 2)):
                 self.get_adjoint_state()
                 self.adapt_mesh()
                 self.set_start_condition(adjoint)
         elif adjoint:
             self.set_start_condition(adjoint)
+
+        # Solve/adapt loop
         while self.step_end <= self.op.end_time:
 
+            # Fixed mesh case
             if self.approach == 'fixed_mesh':
                 self.solve_step(adjoint)
                 break
 
-            # Store current solution
-            solution_chk = Function(self.V)
-            solution_chk.assign(self.solution)
+            # Store solution from previous step
+            solution_old = Function(self.V)
+            solution_old.assign(self.solution)
 
-            # Adapt and solve for next step
-            for i in range(self.op.num_adapt):  # FIXME: mesh seems to jump ahead if num_adapt > 1
+            # Adaptive mesh case
+            for i in range(self.op.num_adapt):
                 self.adapt_mesh()
+
+                # Interpolate value from previous step onto new mesh
                 if self.remesh_step == 0:
                     self.set_start_condition(adjoint)
                 else:
-                    self.solution.project(solution_chk)
+                    self.solution.project(solution_old)
+
+                # Solve PDE on new mesh
+                self.op.plot_pvd = True if i == 0 else False
                 self.solve_step(adjoint)
+
+                # Store solution on first mesh in sequence
+                if i == 0:
+                    solution = Function(self.V)
+                    solution.assign(self.solution)
+                    if self.step_end + self.op.dt*self.op.dt_per_remesh > self.op.end_time:
+                        break  # No need to do adapt for final timestep
+            self.solution.project(solution)
             self.plot()
 
             self.step_end += self.op.dt*self.op.dt_per_remesh

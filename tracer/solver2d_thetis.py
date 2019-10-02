@@ -450,8 +450,6 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         label = 'dwr'
         if adjoint:
             label += '_adjoint'
-        if not hasattr(self, 'ts'):
-            self.get_timestepper()
         try:
             self.get_strong_residual(weighted=True, adjoint=adjoint)
         except:
@@ -466,8 +464,6 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         self.dwr_indication(adjoint=True)
 
     def explicit_indication(self, adjoint=False, square=False):
-        if not hasattr(self, 'ts'):
-            self.get_timestepper()
         try:
             self.get_strong_residual(weighted=False, adjoint=adjoint, square=square)
         except:
