@@ -883,10 +883,10 @@ class UnsteadyProblem():
             self.get_hessian_metric(adjoint=True)
             self.M = metric_intersection(M, self.M)
         elif self.approach == 'explicit':
-            self.explicit_indication()
+            self.explicit_indication(square=True)
             self.get_isotropic_metric()
         elif self.approach == 'explicit_adjoint':
-            self.explicit_indication_adjoint()
+            self.explicit_indication_adjoint(square=True)
             self.get_isotropic_metric()
         elif self.approach == 'explicit_relaxed':
             self.explicit_indication()

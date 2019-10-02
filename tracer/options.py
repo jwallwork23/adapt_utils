@@ -374,7 +374,7 @@ class LeVequeOptions(TracerOptions):
         # Boundary conditions  # FIXME: Doesn't currently do anything in Thetis
         #q_in = Constant(1.0)
         q_in = Constant(0.0)
-        for i in range(4):
+        for i in range(1, 5):
             self.boundary_conditions[i] = {i: {'value': q_in}}
             #self.adjoint_boundary_conditions[i] = {i: {'neumann': q_in}}  # TODO
 

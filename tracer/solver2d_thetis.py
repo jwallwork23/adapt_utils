@@ -469,11 +469,11 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             self.get_strong_residual(weighted=False, adjoint=adjoint, square=square)
         except:
             self.get_timestepper()
-            self.get_strong_residual(weighted=False, adjoint=adjoint)
+            self.get_strong_residual(weighted=False, adjoint=adjoint, square=square)
+        #self.get_flux_terms(adjoint=adjoint, square=square)  # TODO
         self.indicator = Function(self.P1, name='explicit')
+        #self.indicator.interpolate(self.indicators['strong_residual'] + self.indicators['dwr_flux'])
         self.indicator.interpolate(self.indicators['strong_residual'])
-
-        # TODO: flux terms?
 
     def explicit_indication_adjoint(self, square=False):
         self.explicit_indication(adjoint=True, square=square)
@@ -533,7 +533,8 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             self.estimators['strong_residual'] = abs(assemble(F*dx))
             self.indicators['strong_residual'] = assemble(F*i*dx)
 
-    def get_flux_terms(self, adjoint=False):
+    def get_flux_terms(self, adjoint=False, square=False):
+        assert not square  # TODO
         phi, phi_new, phi_old, adj, adj_new, adj_old = self.get_ts_components(adjoint)
         # TODO: time-dependent u case
         # TODO: non divergence-free u case
@@ -547,6 +548,16 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         dg = degree == 'Discontinuous Lagrange'
 
         flux_terms = 0
+
+        # Term resulting from integration by parts in advection term
+        loc = i*dot(uv, n)*phi*adj
+        flux_integrand = (loc('+') + loc('-'))
+
+        # Term resulting from integration by parts in diffusion term
+        loc = -i*dot(nu*grad(phi), n)*adj
+        flux_integrand += (loc('+') + loc('-'))
+        bdy_integrand = loc
+
         if dg:
             uv_av = avg(uv)
             un_av = dot(uv_av, n('-'))
@@ -555,7 +566,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
 
             # Interface term
             loc = i*dot(uv, n)*adj
-            flux_terms -= phi_up*(loc('+') + loc('-'))*dS
+            flux_integrand += -phi_up*(loc('+') + loc('-'))
 
             # TODO: Lax-Friedrichs
 
@@ -563,30 +574,26 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             sigma = 1.5/h if degree == 0 else 5.0*degree*(degree + 1)/h
             alpha = avg(sigma)
             loc = i*n*adj
-            flux_terms -= alpha*inner(avg(nu)*jump(phi, n), loc('+') + loc('-'))*dS
-            flux_terms += inner(jump(nu*grad(phi)), loc('+') + loc('-'))*dS
+            flux_integrand += -alpha*inner(avg(nu)*jump(phi, n), loc('+') + loc('-'))
+            flux_integrand += inner(jump(nu*grad(phi)), loc('+') + loc('-'))
             loc = i*nu*grad(adj)
-            flux_terms += 0.5*inner(loc('+') + loc('-'), jump(phi, n))*dS
+            flux_integrand += 0.5*inner(loc('+') + loc('-'), jump(phi, n))
 
-        # Term resulting from integration by parts in advection term
-        loc = i*dot(uv, n)*phi*adj
-        flux_terms += (loc('+') + loc('-'))*dS
-
-        # Term resulting from integration by parts in diffusion term
-        loc = -i*dot(nu*grad(phi), n)*adj
-        flux_terms += (loc('+') + loc('-'))*dS + loc*ds
+        flux_terms += flux_integrand*flux_integrand*dS if square else flux_integrand*dS
 
         # Boundary conditions
         bcs = self.op.boundary_conditions
-        for j in bcs.keys():
+        for j in bcs.keys():  # TODO: loop over mesh edges
+            bdy_j_integrand = bdy_integrand
             if 'value' in bcs[j].keys() and dg:
                 phi_ext = bcs[j]['value']
                 uv_av = 0.5*(uv + phi_ext)
                 un_av = dot(n, uv_av)
                 s = 0.5*(sign(un_av) + 1.0)
                 phi_up = (phi - phi_ext)*(1 - s)
-                flux_terms -= i*phi_up*dot(uv_av, n)*adj*ds(j)
-                flux_terms += i*dot(uv, n)*phi*adj*ds(j)
+                bdy_j_integrand += -i*phi_up*dot(uv_av, n)*adj
+                bdy_j_integrand += i*dot(uv, n)*phi*adj
+            flux_terms += bdy_j_integrand*bdy_j_integrand*ds(j) if square else bdy_j_integrand*ds(j)
 
         # Solve auxiliary finite element problem to get traces on particular element
         mass_term = i*self.p0trial*dx
