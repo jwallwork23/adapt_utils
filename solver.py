@@ -647,6 +647,12 @@ class UnsteadyProblem():
         else:
             self.solution = self.op.set_initial_condition(self.V)
 
+    def set_fields(self):
+        """
+        Set velocity field, viscosity, QoI kernel, etc.
+        """
+        pass
+
     def solve(self, adjoint=False):
         """
         Solve PDE using mesh adaptivity.
@@ -659,6 +665,7 @@ class UnsteadyProblem():
                 self.get_adjoint_state()
                 self.adapt_mesh()
                 self.set_start_condition(adjoint)
+                self.set_fields()
         elif adjoint:
             self.set_start_condition(adjoint)
 
@@ -701,7 +708,8 @@ class UnsteadyProblem():
             self.remesh_step += 1
 
         # Evaluate QoI
-        self.solution.project(solution)
+        if self.approach != 'fixed_mesh':
+            self.solution.project(solution)
         self.get_qoi_kernel()
 
     def get_qoi_kernel(self):

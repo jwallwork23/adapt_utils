@@ -7,6 +7,7 @@ import numpy as np
 from adapt_utils.tracer.options import *
 from adapt_utils.misc.misc import index_string
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.recovery import construct_gradient
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
 
@@ -564,7 +565,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             s = 0.5*(sign(un_av) + 1.0)
             phi_up = phi('-')*s + phi('+')*(1-s)
 
-            # Interface term
+            # Interface term  # NOTE: there are some cancellations with IBP above
             loc = i*dot(uv, n)*adj
             flux_integrand += -phi_up*(loc('+') + loc('-'))
 
@@ -601,3 +602,46 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         solve(mass_term == flux_terms, res)
         self.estimators['dwr_flux'] = abs(assemble(res*dx))
         self.indicators['dwr_flux'] = res
+
+    def get_loseille_metric(self, adjoint=False, relax=False, superpose=False):
+        assert not (relax and superpose)
+
+        # Get variables
+        assert not self.op.order_increase  # TODO
+        adj = self.solution if adjoint else self.adjoint_solution
+        sol = self.adjoint_solution if adjoint else self.solution
+        adj_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(adj)))
+        adj = Function(self.P1).interpolate(abs(adj))
+
+        # Get potential to take Hessian w.r.t.
+        if adjoint:
+            source = self.kernel
+            F1 = -sol*self.u[0] - self.nu*sol.dx(0)
+            F2 = -sol*self.u[1] - self.nu*sol.dx(1)
+        else:
+            source = self.source
+            F1 = sol*self.u[0] - self.nu*sol.dx(0)
+            F2 = sol*self.u[1] - self.nu*sol.dx(1)
+
+        # Construct Hessians
+        H1 = steady_metric(F1, mesh=self.mesh, noscale=True, op=self.op)
+        H2 = steady_metric(F2, mesh=self.mesh, noscale=True, op=self.op)
+        if not (relax or superpose):
+            Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
+
+        # Form metric  # TODO: use pyop2
+        self.M = Function(self.P1_ten)
+        for i in range(self.mesh.num_vertices()):
+            self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
+            self.M.dat.data[i][:,:] += H2.dat.data[i]*adj_diff.dat.data[i][1]
+            if relax:
+                self.M.dat.data[i][:,:] += Hf.dat.data[i]*adj.dat.data[i]
+        self.M = steady_metric(None, H=self.M, op=self.op)
+
+        if superpose:
+            Mf = Function(self.P1_ten)
+            for i in range(self.mesh.num_vertices()):
+                Mf.dat.data[i][:,:] += Hf.dat.data[i]*adj.dat.data[i]
+            self.M = metric_intersection(self.M, Mf)
+
+        # TODO: boundary contributions

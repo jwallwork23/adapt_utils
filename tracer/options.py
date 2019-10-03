@@ -355,9 +355,9 @@ class LeVequeOptions(TracerOptions):
     The QoI considered in this test case may be viewed as an extension of the QoI considered in the
     [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
-    def __init__(self, approach='fixed_mesh', shape=0):
+    def __init__(self, approach='fixed_mesh', shape=0, n=0):
         super(LeVequeOptions, self).__init__(approach)
-        self.default_mesh = UnitSquareMesh(40, 40)
+        self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
 
         # Source / receiver
         self.source_loc = [(0.25, 0.5, 0.15), (0.5, 0.25, 0.15), (0.5, 0.75, 0.15), (0.475, 0.525, 0.85)]
