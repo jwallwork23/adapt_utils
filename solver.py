@@ -674,7 +674,7 @@ class UnsteadyProblem():
 
             # Fixed mesh case
             if self.approach == 'fixed_mesh':
-                self.solve_step(adjoint)
+                self.solve_step(adjoint=adjoint)
                 break
 
             # Adaptive mesh case

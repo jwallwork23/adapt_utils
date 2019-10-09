@@ -247,11 +247,10 @@ class BoydOptions(Options):
         self.initial_value = self.exact_solution.copy()
         return self.initial_value
 
-    def get_reference_mesh(self):
+    def get_reference_mesh(self, n=50):
         """
         Set up a non-periodic, very fine mesh on the PDE domain.
         """
-        n = 50
         reference_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly)
         x, y = SpatialCoordinate(reference_mesh)
         reference_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
@@ -269,33 +268,21 @@ class BoydOptions(Options):
         # Project into corresponding function space
         V = FunctionSpace(nonperiodic_mesh, sol.ufl_element())
         sol_np = Function(V)
-        #sol_np.project(sol)
-
-        #### FIXME HACK: not parallel
-        coords_V = Function(V)
-        coords_V.interpolate(nonperiodic_mesh.coordinates)
-        for i in range(len(coords_V.dat.data_ro)):
-            sol_np.dat.data[i] = sol.at(coords_V.dat.data_ro[i], tolerance=1e-8)
-        #### FIXME HACK: not parallel
+        sol_np.project(sol)
 
         return sol_np
 
-    def get_peaks(self, sol_periodic, reference_space=True, remove_periodicity=True):
+    def get_peaks(self, sol_periodic, reference_mesh_resolution=50):
         """
         Given a numerical solution of the test case, compute the metrics as given in [Huang et al 2008]:
           * h± : relative peak height for Northern / Southern soliton
           * C± : relative mean phase speed for Northern / Southern soliton
           * RMS: root mean square error
+        The solution is projected onto a finer space in order to get a better approximation.
 
         :arg sol_periodic: Numerical solution of PDE.
-        :kwarg reference_space: Project onto a fine mesh to get a better approximation.
         """
-
-        # Remove periodicity
-        if remove_periodicity:
-            sol = self.remove_periodicity(sol_periodic)
-        else:
-            sol = sol_periodic
+        sol = self.remove_periodicity(sol_periodic)
 
         # Split Northern and Southern halves of domain
         mesh = sol.function_space().mesh()
@@ -310,22 +297,21 @@ class BoydOptions(Options):
         sol_lower *= lower
 
         # Project solution into a reference space on a fine mesh
-        if reference_space:
-            reference_mesh = self.get_reference_mesh()
-            fs = FunctionSpace(reference_mesh, sol.ufl_element())
-            reference_sol_upper = Function(fs)
-            reference_sol_upper.project(sol_upper)
-            reference_sol_lower = Function(fs)
-            reference_sol_lower.project(sol_lower)
-            sol_upper = reference_sol_upper
-            sol_lower = reference_sol_lower
-        xcoords = Function(sol_upper.function_space())
-        xcoords.interpolate(mesh.coordinates[0])
+        reference_mesh = self.get_reference_mesh(n=reference_mesh_resolution)
+        fs = FunctionSpace(reference_mesh, sol.ufl_element())
+        sol_proj = Function(fs)
+        sol_proj.project(sol)
+        sol_upper_proj = Function(fs)
+        sol_upper_proj.project(sol_upper)
+        sol_lower_proj = Function(fs)
+        sol_lower_proj.project(sol_lower)
+        xcoords = Function(sol_proj.function_space())
+        xcoords.interpolate(reference_mesh.coordinates[0])
 
         # Get relative mean peak height
-        with sol_upper.dat.vec_ro as vu:
+        with sol_upper_proj.dat.vec_ro as vu:
             i_upper, self.h_upper = vu.max()
-        with sol_lower.dat.vec_ro as vl:
+        with sol_lower_proj.dat.vec_ro as vl:
             i_lower, self.h_lower = vl.max()
         self.h_upper /= 0.1567020
         self.h_lower /= 0.1567020
@@ -335,10 +321,10 @@ class BoydOptions(Options):
         self.c_upper = (48 - xdat[i_upper])/47.18
         self.c_lower = (48 - xdat[i_lower])/47.18
 
-        # Calculate RMS error (on coarse mesh)  FIXME: should not use periodic (repeated entries)
-        #diff = sol.copy()
-        #diff -= self.remove_periodicity(self.initial_value.split()[1])
-        diff = sol_periodic.copy()
-        diff -= self.initial_value.split()[1]
-        diff *= diff
-        self.rms = sqrt(np.mean(diff.vector().gather()))
+        # Calculate RMS error
+        init = self.remove_periodicity(self.initial_value.split()[1])
+        init_proj = Function(fs)
+        init_proj.project(init)
+        sol_proj -= init_proj
+        sol_proj *= sol_proj
+        self.rms = sqrt(np.mean(sol_proj.vector().gather()))

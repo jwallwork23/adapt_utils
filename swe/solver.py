@@ -40,7 +40,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         physical_constants['g_grav'].assign(op.g)
 
 
-    def solve_step(self):
+    def solve_step(self, **kwargs):
         op = self.op
         solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
         options = solver_obj.options
