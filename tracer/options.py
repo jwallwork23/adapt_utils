@@ -371,12 +371,12 @@ class LeVequeOptions(TracerOptions):
             self.region_of_interest = [(0.5, 0.75, 0.175)]
         self.base_diffusivity = 0.
 
-        # Boundary conditions  # FIXME: Doesn't currently do anything in Thetis
+        # Boundary conditions
         #q_in = Constant(1.0)
         q_in = Constant(0.0)
         for i in range(1, 5):
             self.boundary_conditions[i] = {i: {'value': q_in}}
-            #self.adjoint_boundary_conditions[i] = {i: {'neumann': q_in}}  # TODO
+            self.adjoint_boundary_conditions[i] = {i: {'diff_flux': q_in}}
 
         # Time integration
         self.dt = math.pi/300.0
