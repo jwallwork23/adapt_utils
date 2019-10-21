@@ -7,6 +7,7 @@ import numpy as np
 from adapt_utils.tracer.options import *
 from adapt_utils.misc.misc import index_string
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.p0_metric import *
 from adapt_utils.adapt.recovery import construct_gradient
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
@@ -645,3 +646,16 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
             self.M = metric_intersection(self.M, Mf)
 
         # TODO: boundary contributions
+
+    def custom_adapt(self):  # TODO: also consider seperate forward / adjoint versions
+        if self.approach == 'carpio':
+            H = self.get_hessian(adjoint=False)
+            H_adj = self.get_hessian(adjoint=True)
+            M = metric_intersection(H, H_adj)
+            self.dwr_indication()
+            i = self.indicator.copy()
+            self.dwr_indication_adjoint()
+            self.indicator.interpolate(i + self.indicator)
+            amd = AnisotropicMetricDriver(self.mesh, hessian=M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric

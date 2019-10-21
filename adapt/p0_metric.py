@@ -4,7 +4,6 @@ import numpy as np
 import numpy
 from numpy import linalg as la
 
-from adapt_utils.adapt.adaptation import multi_adapt
 from adapt_utils.options import DefaultOptions
 
 
@@ -136,7 +135,7 @@ class AnisotropicMetricDriver():
         self.project_metric()
 
     def adapt_mesh(self):
-        self.mesh = multi_adapt(self.p1metric, op=self.op)
+        self.mesh = adapt(self.p1metric, op=self.op)
 
     def Lij(self, i, j):
         eigenvectors = [self.evec0, self.evec1]
