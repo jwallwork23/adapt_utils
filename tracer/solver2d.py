@@ -454,5 +454,5 @@ class SteadyTracerProblem2d(SteadyProblem):
             self.dwr_indication_adjoint()
             self.p1indicator.interpolate(i + self.p1indicator)
             amd = AnisotropicMetricDriver(self.mesh, hessian=M, indicator=self.p1indicator, op=self.op)
-            amd.get_loseille_metric()
+            amd.get_anisotropic_metric()
             self.M = amd.p1metric

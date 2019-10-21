@@ -17,6 +17,10 @@ class AnisotropicMetricDriver():
     """
     def __init__(self, mesh, hessian=None, indicator=None, op=DefaultOptions()):
         self.mesh = mesh
+        try:
+            assert self.mesh.topological_dimension() == 2
+        except:
+            raise NotImplementedError
         self.H = hessian
         self.eta = indicator
         self.op = op

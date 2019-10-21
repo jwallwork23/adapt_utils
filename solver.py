@@ -136,10 +136,13 @@ class SteadyProblem():
             name = self.p1indicator.dat.name
             self.p1indicator.rename(name + ' p1indicator')
             File(self.di + 'p1indicator.pvd').write(self.p1indicator)
-        if hasattr(self, 'p0indicator'):
-            name = self.p0indicator.dat.name
-            self.p0indicator.rename(name + ' p0indicator')
-            File(self.di + 'p0indicator.pvd').write(self.p0indicator)
+        try:
+            if hasattr(self, 'p0indicator'):
+                name = self.p0indicator.dat.name
+                self.p0indicator.rename(name + ' p0indicator')
+                File(self.di + 'p0indicator.pvd').write(self.p0indicator)
+        except:
+            PETSc.Sys.Print("WARNING: No cellwise error indicator provided.")
 
     def dwr_indication(self):
         """
@@ -343,11 +346,11 @@ class SteadyProblem():
         #if hasattr(self, 'p0indicator'):
         #    self.estimator = sum(self.p0indicator.dat.data)
         if estimate_error:
-            if self.approach in ('dwr', 'power', 'loseille'):
+            if self.approach in ('dwr', 'power', 'loseille', 'carpio'):
                 self.dwr_estimation()
-            elif self.approach in ('dwr_adjoint', 'power_adjoint', 'loseille_adjoint'):
+            elif 'adjoint' in self.approach:
                 self.dwr_estimation_adjoint()
-            elif self.approach in ('dwr_relaxed', 'dwr_superposed', 'power_relaxed', 'power_superposed', 'loseille_relaxed', 'loseille_superposed'):
+            elif 'relaxed' in self.approach or 'superposed' in self.approach:
                 self.estimator = 0.5*(self.dwr_estimation() + self.dwr_estimation_adjoint())
             elif self.approach == 'dwp':
                 self.dwp_estimation()
@@ -367,7 +370,6 @@ class SteadyProblem():
         """
         if not hasattr(self, 'M'):
             self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
-        #self.mesh = multi_adapt(self.M, op=self.op)
         self.mesh = adapt(self.mesh, self.M)
         print('Done adapting.')
         self.plot()
