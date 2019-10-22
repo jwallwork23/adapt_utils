@@ -335,13 +335,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimators['dwr_flux'] = assemble(res*dx)
         self.indicators['dwr_flux'] = res
 
-    def explicit_estimation(self):
+    def explicit_indication(self):
         raise NotImplementedError  # TODO
 
-    def explicit_estimation_adjoint(self):
+    def explicit_indication_adjoint(self):
         raise NotImplementedError  # TODO
 
-    def dwr_estimation(self, adjoint=False):
+    def dwr_indication(self, adjoint=False):
         label = 'dwr'
         if adjoint:
             label += '_adjoint'
@@ -352,8 +352,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
         self.indicators[label] = self.indicator
 
-    def dwr_estimation_adjoint(self):
-        self.dwr_estimation(adjoint=True)
+    def dwr_indication_adjoint(self):
+        self.dwr_indication(adjoint=True)
 
     def get_anisotropic_metric(self, sol, adjoint_sol, adjoint=False):
         assert sol.function_space() == self.solution.function_space()

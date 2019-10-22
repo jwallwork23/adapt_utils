@@ -233,7 +233,7 @@ class SteadyProblem():
         else:
             self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
 
-    def indicate_error(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=True):
+    def indicate_error(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=False):
         """
         Evaluate error estimation strategy of choice in order to obtain a metric field for mesh
         adaptation.
@@ -476,10 +476,10 @@ class MeshOptimisation():
 
             # Estimate and record error  # FIXME
             tp.indicate_error()
-            self.dat['estimator'].append(tp.estimator)
-            PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i], tp.estimator))
-            if self.log:  # TODO: parallelise
-                self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
+            #self.dat['estimator'].append(tp.estimator)
+            #PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i], tp.estimator))
+            #if self.log:  # TODO: parallelise
+            #    self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
 
             # Stopping criteria
             if i >= self.minit and i > self.startit:
