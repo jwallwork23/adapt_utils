@@ -2,7 +2,8 @@ from thetis import *
 from firedrake.petsc import PETSc
 import math
 
-from adapt_utils.solver import *
+from adapt_utils.solver import *  # TODO: Temporary
+from adapt_utils.swe.solver import *
 from adapt_utils.turbine.options import *
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.metric import *
@@ -12,119 +13,43 @@ from adapt_utils.adapt.interpolation import *
 __all__ = ["SteadyTurbineProblem", "UnsteadyTurbineProblem"]
 
 
-class SteadyTurbineProblem(SteadyProblem):
+class SteadyTurbineProblem(SteadyShallowWaterProblem):
     """
     General solver object for stationary tidal turbine problems.
     """
-    # TODO: Documentation
-    def __init__(self,
-                 mesh=None,
-                 discrete_adjoint=True,
-                 op=Steady2TurbineOptions(),
-                 prev_solution=None):
-        if op.family == 'dg-dg' and op.degree in (1, 2):
-            element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
-        elif op.family == 'dg-cg':
-            element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
-        else:
-            raise NotImplementedError
-        if mesh is None:
-            mesh = op.default_mesh
-        super(SteadyTurbineProblem, self).__init__(mesh, op, element, discrete_adjoint, prev_solution)
-
-        # Stabilisation
-        if self.stab is not None:
-            try:
-                assert self.stab == 'lax_friedrichs'
-            except:
-                raise NotImplementedError
-        self.prev_solution = prev_solution
-        if prev_solution is not None:
-            self.interpolate_solution()
-
-        # Physical fields
-        self.set_fields()
-
-        # Parameters for adjoint computation
-        self.gradient_field = self.op.bathymetry
-        z, zeta = self.adjoint_solution.split()
-        z.rename("Adjoint fluid velocity")
-        zeta.rename("Adjoint elevation")
-
-        # Classification
-        self.nonlinear = True
-
-    def set_fields(self):
-        self.viscosity = self.op.set_viscosity()
-        self.inflow = self.op.set_inflow(self.P1_vec)
-        self.drag_coefficient = Constant(self.op.drag_coefficient)
-
-    def solve(self):
+    def extra_setup(self, solver_obj):
         """
-        Create a Thetis FlowSolver2d object for solving the (modified) shallow water equations and solve.
+        We haven't meshed the turbines with separate ids, so define a farm everywhere and make it
+        have a density of 1/D^2 inside the DxD squares where the turbines are and 0 outside.
         """
         op = self.op
-        solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
-        options = solver_obj.options
-        options.use_nonlinear_equations = True
-        options.check_volume_conservation_2d = True
-
-        # Timestepping
-        options.timestep = op.dt
-        options.simulation_export_time = op.dt
-        options.simulation_end_time = op.end_time
-        options.timestepper_type = 'SteadyState'
-        options.timestepper_options.solver_parameters = op.params
-        PETSc.Sys.Print(options.timestepper_options.solver_parameters)
-        # options.timestepper_options.implicitness_theta = 1.0
-
-        # Outputs
-        options.output_directory = self.di
-        options.fields_to_export = ['uv_2d', 'elev_2d']
-
-        # Parameters
-        options.use_grad_div_viscosity_term = op.symmetric_viscosity
-        options.element_family = op.family
-        options.horizontal_viscosity = self.viscosity
-        options.quadratic_drag_coefficient = self.drag_coefficient
-        options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
-        #options.use_grad_depth_viscosity_term = False
-        options.use_grad_depth_viscosity_term = True
-        options.compute_residuals = True
-
-        # Boundary conditions
-        op.set_bcs()
-        solver_obj.bnd_functions['shallow_water'] = op.boundary_conditions
-
-        # We haven't meshed the turbines with separate ids, so define a farm everywhere
-        # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
-        # and 0 outside
         num_turbines = len(op.region_of_interest)
         scaling = num_turbines/assemble(op.bump(self.P1)*dx)
         self.turbine_density = op.bump(self.P1, scale=scaling)
-        #File(self.di+'Bump.pvd').write(turbine_density)
-        farm_options = TidalTurbineFarmOptions()
-        farm_options.turbine_density = self.turbine_density
-        farm_options.turbine_options.diameter = op.turbine_diameter
-        farm_options.turbine_options.thrust_coefficient = op.thrust_coefficient
+        self.farm_options = TidalTurbineFarmOptions()
+        self.farm_options.turbine_density = self.turbine_density
+        self.farm_options.turbine_options.diameter = op.turbine_diameter
+        self.farm_options.turbine_options.thrust_coefficient = op.thrust_coefficient
+
         # Turbine drag is applied everywhere (where the turbine density isn't zero)
-        options.tidal_turbine_farms["everywhere"] = farm_options
+        solver_obj.options.tidal_turbine_farms["everywhere"] = self.farm_options
 
         # Callback that computes average power
         cb = turbines.TurbineFunctionalCallback(solver_obj)
         solver_obj.add_callback(cb, 'timestep')
 
-        # Initial conditions
-        if self.prev_solution is not None:
-            solver_obj.assign_initial_conditions(uv=self.interpolated_solution)
-        else:
-            solver_obj.assign_initial_conditions(uv=self.inflow)
+        return cb
 
-        # Solve
-        solver_obj.iterate()
-        self.solution.assign(solver_obj.fields.solution_2d)
+    def extra_residual_terms(self, u, eta, u_old, eta_old, z, zeta):
+        H = self.bathymetry + eta_old
+        density = self.farm_options.turbine_density
+        C_T = self.farm_options.turbine_options.thrust_coefficient
+        A_T = pi*(self.farm_options.turbine_options.diameter/2.0)**2
+        C_D = C_T*A_T*density/2.0
+        return -self.p0test*C_D*sqrt(dot(u_old, u_old))*inner(u, z)/H*dx
+
+    def get_callbacks(self, cb):
         self.qoi = cb.average_power
-        self.ts = solver_obj.timestepper
 
     def get_qoi_kernel(self):
         self.kernel = Function(self.V)
@@ -134,66 +59,6 @@ class SteadyTurbineProblem(SteadyProblem):
 
     def quantity_of_interest(self):
         return self.qoi
-
-    def get_hessian_metric(self, adjoint=False):
-        sol = self.adjoint_solution if adjoint else self.solution
-        u, eta = sol.split()
-        if self.op.adapt_field in ('fluid_speed', 'both'):
-            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
-            self.M = steady_metric(spd, op=self.op)
-        elif self.op.adapt_field == 'elevation':
-            self.M = steady_metric(eta, op=self.op)
-        if self.op.adapt_field == 'both':
-            M = steady_metric(eta, op=self.op)
-            self.M = metric_intersection(self.M, M)
-
-    def explicit_estimation(self):
-        cell_res = self.ts.cell_residual()
-        self.cell_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
-        self.cell_residuals[0].project(cell_res[0])
-        self.cell_residuals[1].project(cell_res[1])
-        self.cell_residuals[2].project(cell_res[2])
-        if self.approach == 'explicit':
-            self.indicator = Function(self.P1)
-            cell_res_dot = self.cell_residuals[0]*self.cell_residuals[0]
-            cell_res_dot += self.cell_residuals[1]*self.cell_residuals[1]
-            cell_res_dot += self.cell_residuals[2]*self.cell_residuals[2]
-            self.indicator.interpolate(cell_res_dot)
-        #edge_res = self.ts.edge_residual()  # TODO
-        #self.edge_residuals = [Function(self.P1), Function(self.P1), Function(self.P1)]
-        #self.edge_residuals[0].project(abs(cell_res[0]))
-        #self.edge_residuals[1].project(abs(cell_res[1]))
-        #self.edge_residuals[2].project(abs(cell_res[2]))
-        #if self.approach == 'explicit':
-        #    self.indicator = Function(self.P1)
-        #    edge_res_dot = self.edge_residuals[0]*self.edge_residuals[0]
-        #    edge_res_dot += self.edge_residuals[1]*self.edge_residuals[1]
-        #    edge_res_dot += self.edge_residuals[2]*self.edge_residuals[2]
-        #self.indicator.project(cell_res + edge_res)
-
-    def explicit_estimation_adjoint(self):
-        raise NotImplementedError  # TODO
-
-    def dwr_estimation(self):  # TODO: Different flavours of DWR
-        if self.op.dwr_approach != 'flux_only':
-            cell_res = self.ts.cell_residual(self.adjoint_solution)
-        if self.op.dwr_approach != 'cell_only':
-            edge_res = self.ts.edge_residual(self.adjoint_solution)
-        self.indicator = Function(self.P1)  # project straight into P1
-        #self.indicator = Function(self.P0)
-        if self.op.dwr_approach == 'error_representation':
-            self.indicator.project(cell_res + edge_res)
-        elif self.op.dwr_approach == 'cell_only':
-            self.indicator.project(cell_res)
-        elif self.op.dwr_approach == 'flux_only':
-            self.indicator.project(edge_res)
-        elif self.op.dwr_approach == 'ainsworth_oden':
-            self.indicator.project(self.h*cell_res + 0.5*self.h*self.h*edge_res)
-        else:
-            raise NotImplementedError  # TODO
-
-    def dwr_estimation_adjoint(self):
-        raise NotImplementedError  # TODO
 
     def get_anisotropic_metric(self, adjoint=False, relax=True, superpose=False):
         assert not (relax and superpose)
@@ -264,7 +129,6 @@ class SteadyTurbineProblem(SteadyProblem):
             self.M = metric_intersection(self.M, Mf)
 
         # TODO: Account for flux terms contributed by DG scheme
-
         # TODO: boundary contributions
 
     def custom_adapt(self):
@@ -272,45 +136,6 @@ class SteadyTurbineProblem(SteadyProblem):
             self.indicator = Function(self.P1, name='vorticity')
             self.indicator.interpolate(curl(self.solution.split()[0]))
             self.get_isotropic_metric()
-        elif self.approach == 'Power':
-            self.explicit_estimation()
-            z, zeta = self.adjoint_solution.split()
-            #spd = sqrt(inner(z,z))
-            #H1 = construct_hessian(spd, mesh=self.mesh, noscale=True, op=self.op)
-            H1 = steady_metric(z[0], mesh=self.mesh, noscale=True, op=self.op)
-            H2 = steady_metric(z[1], mesh=self.mesh, noscale=True, op=self.op)
-            H3 = steady_metric(zeta, mesh=self.mesh, noscale=True, op=self.op)
-            self.M = Function(self.P1_ten)
-            for i in range(self.mesh.num_vertices()):  # TODO: use pyop2
-                #self.M.dat.data[i][:, :] += self.indicator.dat.data[i]*H1.dat.data[i]
-                self.M.dat.data[i][:, :] += self.cell_residuals[0].dat.data[i]*H1.dat.data[i]
-                self.M.dat.data[i][:, :] += self.cell_residuals[1].dat.data[i]*H2.dat.data[i]
-                self.M.dat.data[i][:, :] += self.cell_residuals[2].dat.data[i]*H3.dat.data[i]
-            # TODO: What about edge residuals?
-            self.M = steady_metric(None, H=self.M, mesh=self.mesh, op=self.op)
-            File('outputs/test.pvd').write(self.M)
-
-    def plot(self):
-        """
-        Plot current mesh and indicator field, if available.
-        """
-        File(self.di + 'mesh.pvd').write(self.mesh.coordinates)
-        if hasattr(self, 'indicator'):
-            name = self.indicator.dat.name
-            self.indicator.rename(name + ' indicator')
-            File(self.di + 'indicator.pvd').write(self.indicator)
-        if hasattr(self, 'adjoint_solution'):
-            z, zeta = self.adjoint_solution.split()
-            self.adjoint_solution_file.write(z, zeta)
-
-    def interpolate_solution(self):
-        """
-        Here we only need interpolate the velocity.
-        """
-        PETSc.Sys.Print("Interpolating solution across meshes...")
-        self.interpolated_solution = Function(self.V.sub(0))
-        self.interpolated_solution.project(self.prev_solution.split()[0])
-        #self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
 
 
 # TODO: make a subclass of UnsteadyShallowWaterProblem
