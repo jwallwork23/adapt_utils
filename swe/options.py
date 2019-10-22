@@ -6,22 +6,53 @@ from adapt_utils.options import Options
 import numpy as np
 
 
-__all__ = ["BoydOptions"]
+__all__ = ["ShallowWaterOptions", "BoydOptions"]
 
 
-# TODO: ShallowWaterOptions superclass to take away some of the Thetis parameters
-# TODO: More test cases to consider
+class ShallowWaterOptions(Options):
+    """
+    Parameters for shallow water solver.
+    """
+
+    # Physical
+    bathymetry = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
+    base_viscosity = NonNegativeFloat(None, allow_none=True).tag(config=True)
+    viscosity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
+    drag_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    g = PositiveFloat(9.81).tag(config=True)
+
+    # Model
+    grad_div_viscosity = Bool(False).tag(config=True)
+    grad_depth_viscosity = Bool(True).tag(config=True)
+    lax_friedrichs = Bool(True).tag(config=True)
+    lax_friedrichs_scaling_factor = FiredrakeConstantTraitlet(Constant(1.0)).tag(config=True)
+    family = Enum(['dg-dg', 'rt-dg', 'dg-cg'], default_value='dg-dg').tag(config=True)
+
+    # Adaptation
+    adapt_field = Unicode('fluid_speed', help="Adaptation field of interest, from {'fluid_speed', 'elevation', 'both'}.").tag(config=True)
+    region_of_interest = List(default_value=[]).tag(config=True)
+
+    def set_viscosity(self, fs):
+        pass
+
+    def set_initial_condition(self, fs):
+        pass
+
+    def set_coriolis(self, fs):
+        pass
+
+    def set_bcs(self, fs):
+        pass
+
+    def set_qoi_kernel(self, fs):
+        pass
 
 
-class BoydOptions(Options):
+class BoydOptions(ShallowWaterOptions):
     """
     Parameters for test case in [Boyd et al. 1996].
     """
-    bathymetry = FiredrakeScalarExpression(Constant(1.)).tag(config=True)
-    viscosity = FiredrakeScalarExpression(Constant(0.)).tag(config=True)
-    drag_coefficient = FiredrakeScalarExpression(Constant(0.)).tag(config=True)
     soliton_amplitude = PositiveFloat(0.395).tag(config=True)
-    g = PositiveFloat(1.).tag(config=True)
 
     def __init__(self, approach='fixed_mesh', periodic=True, n=1, order=0, compute_metrics=True):
         """
@@ -35,6 +66,9 @@ class BoydOptions(Options):
         self.n = n
         self.order = order
 
+        # Physics
+        self.g.assign(1.)
+
         # Initial mesh
         self.lx = 48
         self.ly = 24
@@ -46,10 +80,6 @@ class BoydOptions(Options):
         self.default_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
         self.x, self.y = SpatialCoordinate(self.default_mesh)
         # NOTE: This setup corresponds to 'Grid B' in [Huang et al 2008].
-
-        # Solver
-        self.family = 'dg-dg'
-        self.symmetric_viscosity = False
 
         # Time integration
         self.dt = 0.05
