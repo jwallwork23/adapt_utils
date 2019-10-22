@@ -155,7 +155,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
             raise Exception('Unsupported boundary type {:}'.format(funcs.keys()))
         return eta, u
 
-    def get_strong_residual(self, sol, adjoint_sol, sol_old=None):
+    def get_strong_residual(self, sol, adjoint_sol, sol_old=None, adjoint=False):
+        assert not adjoint  # FIXME
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
         u, eta = sol.split()
@@ -196,7 +197,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimators['dwr_cell'] = assemble(F*dx)
         self.indicators['dwr_cell'] = assemble(i*F*dx)
 
-    def get_flux_terms(self, sol, adjoint_sol, sol_old=None):
+    def get_flux_terms(self, sol, adjoint_sol, sol_old=None, adjoint=False):
+        assert not adjoint  # FIXME
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
         u, eta = sol.split()
@@ -337,11 +339,19 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def explicit_estimation_adjoint(self):
         raise NotImplementedError  # TODO
 
-    def dwr_estimation(self):
-        raise NotImplementedError  # TODO
+    def dwr_estimation(self, adjoint=False):
+        label = 'dwr'
+        if adjoint:
+            label += '_adjoint'
+        self.get_strong_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
+        self.get_flux_terms(self.solution, self.adjoint_solution, adjoint=adjoint)
+        self.indicator = Function(self.P1, name=label)
+        self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
+        self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
+        self.indicators[label] = self.indicator
 
     def dwr_estimation_adjoint(self):
-        raise NotImplementedError  # TODO
+        self.dwr_estimation(adjoint=True)
 
     def get_anisotropic_metric(self, sol, adjoint_sol, adjoint=False):
         assert sol.function_space() == self.solution.function_space()

@@ -1,6 +1,10 @@
 from firedrake import *
 from firedrake.petsc import PETSc
 from thetis import create_directory
+from thetis_adjoint import *
+from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
+from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
+import pyadjoint
 
 import os
 import datetime
@@ -101,12 +105,36 @@ class SteadyProblem():
         """
         pass
 
+    def solve_discrete_adjoint(self):
+        """
+        Solve the adjoint PDE in the discrete sense, using pyadjoint.
+        """
+        # Compute some gradient in order to get adjoint solutions
+        J = self.quantity_of_interest()
+        compute_gradient(J, Control(self.gradient_field))
+        tape = get_working_tape()
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
+                                                        and not isinstance(block, ProjectBlock)
+                                                        and block.adj_sol is not None]
+        try:
+            assert len(solve_blocks) == 1
+        except:
+            ValueError("Expected one SolveBlock, but encountered {:d}".format(len(solve_blocks)))
+
+        # extract adjoint solution
+        self.adjoint_solution.assign(solve_blocks[0].adj_sol)
+        tape.clear_tape()
+
     def solve_adjoint(self):
         """
         Solve adjoint problem using specified method.
         """
-        PETSc.Sys.Print("Solving adjoint problem...")
-        self.solve_continuous_adjoint()
+        if self.discrete_adjoint:
+            PETSc.Sys.Print("Solving discrete adjoint problem...")
+            self.solve_discrete_adjoint()
+        else:
+            PETSc.Sys.Print("Solving continuous adjoint problem...")
+            self.solve_continuous_adjoint()
 
     def dwp_indication(self):
         """
