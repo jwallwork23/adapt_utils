@@ -13,16 +13,14 @@ Imperial College London.
 
 For the current development version, follow the following instructions:
 
-* Clone this repository and make it accessible to the PYTHONPATH environment variable.
-
-* Download the [Firedrake][1] install script, set
-    * ``export PETSC_CONFIGURE_OPTIONS="--download-pragmatic --with-cxx-dialect=C++11"``
-
-    and install with option parameter ``--install thetis``.
-
-* Fetch and checkout the remote branches
-    * ``https://github.com/thetisproject/thetis/tree/joe`` for thetis;
-    * ``https://github.com/taupalosaurus/firedrake`` for firedrake, fork ``barral/meshadapt``
+* Clone this repository and make it accessible to the `PYTHONPATH` environment variable.
+* Set the environment variable
+  ``export PETSC_CONFIGURE_OPTIONS="--download-pragmatic --with-cxx-dialect=C++11"``
+  and install [Firedrake][1] with the flags ``--install thetis`` and ``--install pyadjoint``.
+* Add ``**self.kwargs`` to the definition of ``backend.solve`` on line 165 of
+  ``firedrake/src/pyadjoint/fenics_adjoint/solving.py``.
+* Fetch and checkout the remote branch
+    * ``https://github.com/jwallwork23/firedrake`` for firedrake, fork ``joe/meshadapt``
     and call ``make`` in ``firedrake/src/firedrake`` to enable pragmatic drivers.
 
 
