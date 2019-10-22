@@ -41,12 +41,12 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
         return cb
 
     def extra_residual_terms(self, u, eta, u_old, eta_old, z, zeta):
-        H = self.bathymetry + eta_old
+        H = self.op.bathymetry + eta_old
         density = self.farm_options.turbine_density
         C_T = self.farm_options.turbine_options.thrust_coefficient
         A_T = pi*(self.farm_options.turbine_options.diameter/2.0)**2
         C_D = C_T*A_T*density/2.0
-        return -self.p0test*C_D*sqrt(dot(u_old, u_old))*inner(u, z)/H*dx
+        return -C_D*sqrt(dot(u_old, u_old))*inner(u, z)/H
 
     def get_callbacks(self, cb):
         self.qoi = cb.average_power

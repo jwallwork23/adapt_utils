@@ -122,8 +122,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
             M = steady_metric(eta, op=self.op)
             self.M = metric_intersection(self.M, M)
 
-    def get_bnd_functions(self, eta_in, u_in, bdy_id):
-        b = self.bathymetry
+    def get_bdy_functions(self, eta_in, u_in, bdy_id):
+        b = self.op.bathymetry
         bdy_len = self.mesh.boundary_len[bdy_id]
         funcs = self.boundary_conditions.get(bdy_id)
         if 'elev' in funcs and 'uv' in funcs:
@@ -169,12 +169,12 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         op = self.op
         i = self.p0test
-        b = self.bathymetry
-        nu = self.nu
-        f = op.coriolis
-        C_d = op.drag_coefficient
+        b = op.bathymetry
+        nu = op.viscosity
+        f = None if not hasattr(op, 'coriolis') else op.coriolis
+        C_d = None if not hasattr(op, 'drag_coefficient') else op.drag_coefficient
         H = b + eta
-        g = self.g
+        g = op.g
 
         F = -g*inner(grad(eta), z)                           # ExternalPressureGradient
         F += -div(H*u)*zeta                                  # HUDiv
@@ -210,11 +210,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         op = self.op
         i = self.p0test
-        b = self.bathymetry
-        nu = self.nu
-        f = self.coriolis
+        b = op.bathymetry
+        nu = op.viscosity
         H = b + eta
-        g = self.g
+        g = op.g
         n = self.n
 
         # ExternalPressureGradient
@@ -228,7 +227,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if self.op.family == 'dg-dg':
             u_rie = avg(u) + sqrt(g/avg(H))*jump(eta, n)
             loc = -i*n*zeta
-            flux_terms += dot(h*u_rie, loc('+') + loc('-'))*dS
+            flux_terms += dot(avg(H)*u_rie, loc('+') + loc('-'))*dS
         loc = i*dot(H*u, n)*zeta
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
@@ -251,6 +250,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         else:
             stress = nu*grad(u)
             stress_jump = avg(nu)*tensor_jump(u, n)
+        p = op.degree
         alpha = 1.5 if p == 0 else 5*p*(p+1)
         loc = i*outer(z, n)
         flux_terms += -alpha/avg(self.h)*inner(loc('+') + loc('-'), stress_jump)*dS
@@ -277,7 +277,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
                 H_ext = eta_ext_old + b
                 H_av = 0.5*(H + H_ext)
                 eta_jump = eta - eta_ext
-                un_rie = 0.5*(inner*u + u_ext, n) + sqrt(g/H_av)*eta_jump
+                un_rie = 0.5*inner(u + u_ext, n) + sqrt(g/H_av)*eta_jump
                 un_jump = inner(u_old - u_ext_old, n)
                 eta_rie = 0.5*(eta_old + eta_ext_old) + sqrt(H_av/g)*un_jump
                 H_rie = b + eta_rie
@@ -297,7 +297,11 @@ class SteadyShallowWaterProblem(SteadyProblem):
                     if u_ext is u:
                         continue
                     delta_u = u - u_ext
-                flux_terms += -i*alpha/h*inner(outer(z, n), stress_jump)*ds(j)
+                    if op.grad_div_viscosity:
+                        stress_jump = 2*avg(nu)*sym(outer(delta_u, n))
+                    else:
+                        stress_jump = avg(nu)*outer(delta_u, n)
+                flux_terms += -i*alpha/self.h*inner(outer(z, n), stress_jump)*ds(j)
                 flux_terms += i*inner(grad(z), stress_jump)*ds(j)
                 flux_terms += i*inner(outer(z, n), stress)*ds(j)
 
