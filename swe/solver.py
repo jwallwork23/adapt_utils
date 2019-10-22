@@ -2,6 +2,7 @@ from thetis import *
 from thetis.physical_constants import *
 from firedrake.petsc import PETSc
 import math
+import pyadjoint
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
@@ -93,7 +94,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         # Initial conditions
         if self.prev_solution is not None:
-            solver_obj.assign_initial_conditions(uv=self.interpolated_solution)
+            u_interp, eta_interp = self.interpolated_solution.split()
+            solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
         else:
             solver_obj.assign_initial_conditions(uv=self.inflow)
 
@@ -431,10 +433,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
         """
         Here we only need interpolate the velocity.
         """
+        self.interpolated_solution = Function(self.V)
+        u_interp, eta_interp = self.interpolated_solution.split()
+        u_, eta_ = self.prev_solution.split()
         PETSc.Sys.Print("Interpolating solution across meshes...")
-        self.interpolated_solution = Function(self.V.sub(0))
-        self.interpolated_solution.project(self.prev_solution.split()[0])
-        #self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
+        with pyadjoint.stop_annotating():
+            u_interp.project(u_)
+            eta_interp.project(eta_)
 
 
 class UnsteadyShallowWaterProblem(UnsteadyProblem):

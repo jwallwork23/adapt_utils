@@ -145,7 +145,7 @@ class Steady15TurbineOptions(SteadyTurbineOptions):
         self.base_viscosity = 3.0
         super(Steady15TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(150, 50, 3000., 1000.)    # FIXME: wrong ids
-        x, y = SpatialCoordinates(self.default_mesh)
+        x, y = SpatialCoordinate(self.default_mesh)
         self.default_mesh.coordinates.interpolate(as_vector([x - 1500., y - 500.]))
         self.h_max = 100
         self.bathymetry = Constant(50.0)
