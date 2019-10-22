@@ -4,15 +4,17 @@ import math
 
 import numpy as np
 
-from adapt_utils.options import Options
+from adapt_utils.swe.options import ShallowWaterOptions
 
 
 __all__ = ["Steady1TurbineOptions", "Steady2TurbineOptions", "Steady15TurbineOptions",
            "Unsteady2TurbineOptions", "Unsteady15TurbineOptions"]
 
 
-class SteadyTurbineOptions(Options):
-    # TODO: doc
+class SteadyTurbineOptions(ShallowWaterOptions):
+    """
+    Base class holding parameters for steady state tidal turbine problems.
+    """
 
     # Solver parameters
     params = PETScSolverParameters({
@@ -24,27 +26,14 @@ class SteadyTurbineOptions(Options):
              'snes_monitor': None,
              }).tag(config=True)
 
-    # Adaptivity parameters
-    adapt_field = Unicode('fluid_speed', help="Adaptation field of interest, from {'fluid_speed', 'elevation', 'both'}.").tag(config=True)
-
-    # Physical parameters
-    symmetric_viscosity = Bool(False, help="Symmetrise viscosity term").tag(config=True)
-    drag_coefficient = NonNegativeFloat(0.0025).tag(config=True)
-
-    region_of_interest = List(default_value=[]).tag(config=True)
-
-    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed', dt=20.):
+    def __init__(self, approach='fixed_mesh'):
         super(SteadyTurbineOptions, self).__init__(approach)
-        self.adapt_field = adapt_field
-        try:
-            assert self.adapt_field in ('fluid_speed', 'elevation', 'both')
-        except:
-            raise ValueError('Field for adaptation {:s} not recognised.'.format(self.adapt_field))
-        self.dt = dt
+        self.dt = 20.
         self.end_time = 18.
-        self.bathymetry = Constant(self.depth)
+        self.bathymetry = Constant(40.0)
         self.viscosity = Constant(self.base_viscosity)
-        self.stabilisation = 'lax_friedrichs'
+        self.lax_friedrichs = True
+        self.drag_coefficient = Constant(0.0025)
 
         # Correction to account for the fact that the thrust coefficient is based on an upstream
         # velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
@@ -79,6 +68,9 @@ class SteadyTurbineOptions(Options):
         self.thrust_coefficient *= correction
         # NOTE, that we're not yet correcting power output here, so that will be overestimated
 
+    def set_bcs(self, fs):
+        pass
+
 
 class Steady1TurbineOptions(SteadyTurbineOptions):
     """Parameters for the steady 1 turbine problem"""
@@ -86,28 +78,29 @@ class Steady1TurbineOptions(SteadyTurbineOptions):
     # Turbine parameters
     turbine_diameter = PositiveFloat(18.).tag(config=True)
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
-    base_viscosity = NonNegativeFloat(1., help="Fluid viscosity (assumed constant).").tag(config=True)
-    depth = PositiveFloat(40., help="Water depth (assumes flat bathymetry).").tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
-        super(Steady1TurbineOptions, self).__init__(approach, adapt_field)
+    def __init__(self, approach='fixed_mesh'):
+        super(Steady1TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
+        self.base_viscosity = 1.0
 
         # Tidal farm
         D = self.turbine_diameter
         self.region_of_interest = [(500, 100, D/2)]
         self.thrust_coefficient_correction()
 
-    def set_bcs(self):
+    def set_bcs(self, fs):
         left_tag = 1
         right_tag = 2
         top_bottom_tag = 3
-        freeslip_bc = {'un': Constant(0.)}
         if not hasattr(self, 'boundary_conditions'):
             self.boundary_conditions = {}
+        if not hasattr(self, 'inflow'):
+            self.set_inflow(f.sub()[0])
         self.boundary_conditions[left_tag] = {'uv': self.inflow}
         self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
-        self.boundary_conditions[top_bottom_tag] = freeslip_bc
+        self.boundary_conditions[top_bottom_tag] = {'un': Constant(0.)}
+        return self.boundary_conditions
 
 
 class Steady2TurbineOptions(SteadyTurbineOptions):
@@ -116,11 +109,9 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
     # Turbine parameters
     turbine_diameter = PositiveFloat(18.).tag(config=True)
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
-    base_viscosity = NonNegativeFloat(1., help="Fluid viscosity (assumed constant).").tag(config=True)
-    depth = PositiveFloat(40., help="Water depth (assumes flat bathymetry).").tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
-        super(Steady2TurbineOptions, self).__init__(approach, adapt_field)
+    def __init__(self, approach='fixed_mesh'):
+        super(Steady2TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
 
         # Tidal farm
@@ -128,16 +119,19 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.region_of_interest = [(50, 100, D/2), (400, 100, D/2)]
         self.thrust_coefficient_correction()
 
-    def set_bcs(self):
+    def set_bcs(self, fs):
         left_tag = 1
         right_tag = 2
         top_bottom_tag = 3
-        freeslip_bc = {'un': Constant(0.)}
         if not hasattr(self, 'boundary_conditions'):
             self.boundary_conditions = {}
+        if not hasattr(self, 'inflow'):
+            self.set_inflow(fs.sub()[0])
         self.boundary_conditions[left_tag] = {'uv': self.inflow}
         self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
-        self.boundary_conditions[top_bottom_tag] = freeslip_bc
+        self.boundary_conditions[top_bottom_tag] = {'un': Constant(0.)}
+        return self.boundary_conditions
+
 
 class Steady15TurbineOptions(SteadyTurbineOptions):
     """Parameters for the steady 15 turbine problem"""
@@ -145,14 +139,15 @@ class Steady15TurbineOptions(SteadyTurbineOptions):
     # Turbine parameters
     turbine_diameter = PositiveFloat(20.).tag(config=True)
     thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
-    base_viscosity = NonNegativeFloat(3., help="Fluid viscosity (assumed constant).").tag(config=True)
-    depth = PositiveFloat(50., help="Water depth (assumes flat bathymetry).").tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
-        super(Steady15TurbineOptions, self).__init__(approach, adapt_field)
+    def __init__(self, approach='fixed_mesh'):
+        super(Steady15TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(150, 50, 3000., 1000.)    # FIXME: wrong ids
-        self.default_mesh.coordinates.dat.data[:] -= [1500., 500.]  # FIXME: not parallel
+        x, y = SpatialCoordinates(self.default_mesh)
+        self.default_mesh.coordinates.interpolate(as_vector([x - 1500., y - 500.]))
         self.h_max = 100
+        self.base_viscosity = 3.0
+        self.bathymetry = Constant(50.0)
 
         # Tidal farm
         D = self.turbine_diameter
@@ -163,22 +158,27 @@ class Steady15TurbineOptions(SteadyTurbineOptions):
                 self.region_of_interest.append((i*delta_x, j*delta_y, D/2))
         self.thrust_coefficient_correction()
 
-    def set_bcs(self):  # TODO: standardise with above
+    def set_bcs(self, fs):
         bottom_tag = 1
         right_tag = 2
         top_tag = 3
         left_tag = 4
-        freeslip_bc = {'un': Constant(0.)}
-        self.boundary_conditions = {
-          left_tag: {'uv': self.inflow},
-          right_tag: {'elev': Constant(0.)},
-          top_tag: freeslip_bc,
-          bottom_tag: freeslip_bc,
-        }
+        if not hasattr(self, 'boundary_conditions'):
+            self.boundary_conditions = {}
+        if not hasattr(self, 'inflow'):
+            self.set_inflow(fs.sub()[0])
+        self.boundary_conditions[left_tag] = {'uv': self.inflow}
+        self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
+        self.boundary_conditions[top_tag] =  {'un': Constant(0.)}
+        self.boundary_conditions[bottom_tag] = {'un': Constant(0.)}
+        return self.boundary_conditions
+
+
+# TODO: bring below up to date
 
 
 class UnsteadyTurbineOptions(SteadyTurbineOptions):
-    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
+    def __init__(self, approach='fixed_mesh'):
         super(UnsteadyTurbineOptions, self).__init__(approach)
 
         # Solver
@@ -224,8 +224,8 @@ class Unsteady2TurbineOptions(UnsteadyTurbineOptions):
     base_viscosity = NonNegativeFloat(3., help="Fluid viscosity (assumed constant).").tag(config=True)
     depth = PositiveFloat(40., help="Water depth (assumes flat bathymetry).").tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
-        super(Unsteady2TurbineOptions, self).__init__(approach, adapt_field)
+    def __init__(self, approach='fixed_mesh'):
+        super(Unsteady2TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
 
         # Tidal farm
@@ -262,8 +262,8 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
     base_viscosity = NonNegativeFloat(3., help="Fluid viscosity (assumed constant).").tag(config=True)
     depth = PositiveFloat(50., help="Water depth (assumes flat bathymetry).").tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', adapt_field='fluid_speed'):
-        super(Unsteady15TurbineOptions, self).__init__(approach, adapt_field)
+    def __init__(self, approach='fixed_mesh'):
+        super(Unsteady15TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(150, 50, 3000., 1000.)    # FIXME: wrong ids
         self.default_mesh.coordinates.dat.data[:] -= [1500., 500.]  # FIXME: not parallel
         self.h_max = 100
