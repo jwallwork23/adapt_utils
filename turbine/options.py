@@ -80,9 +80,9 @@ class Steady1TurbineOptions(SteadyTurbineOptions):
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
+        self.base_viscosity = 1.0
         super(Steady1TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
-        self.base_viscosity = 1.0
 
         # Tidal farm
         D = self.turbine_diameter
@@ -111,6 +111,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
+        self.base_viscosity = 1.0
         super(Steady2TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
 
@@ -141,12 +142,12 @@ class Steady15TurbineOptions(SteadyTurbineOptions):
     thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
+        self.base_viscosity = 3.0
         super(Steady15TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(150, 50, 3000., 1000.)    # FIXME: wrong ids
         x, y = SpatialCoordinates(self.default_mesh)
         self.default_mesh.coordinates.interpolate(as_vector([x - 1500., y - 500.]))
         self.h_max = 100
-        self.base_viscosity = 3.0
         self.bathymetry = Constant(50.0)
 
         # Tidal farm

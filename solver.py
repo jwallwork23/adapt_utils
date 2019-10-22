@@ -132,24 +132,17 @@ class SteadyProblem():
         Plot current mesh and indicator field, if available.
         """
         File(self.di + 'mesh.pvd').write(self.mesh.coordinates)
-        if hasattr(self, 'p1indicator'):
-            name = self.p1indicator.dat.name
-            self.p1indicator.rename(name + ' p1indicator')
-            File(self.di + 'p1indicator.pvd').write(self.p1indicator)
-        try:
-            if hasattr(self, 'p0indicator'):
-                name = self.p0indicator.dat.name
-                self.p0indicator.rename(name + ' p0indicator')
-                File(self.di + 'p0indicator.pvd').write(self.p0indicator)
-        except:
-            PETSc.Sys.Print("WARNING: No cellwise error indicator provided.")
+        if hasattr(self, 'indicator'):
+            name = self.indicator.dat.name
+            self.indicator.rename(name + ' indicator')
+            File(self.di + 'indicator.pvd').write(self.indicator)
 
     def dwr_indication(self):
         """
         Indicate errors in the quantity of interest by the Dual Weighted Residual method. This is
         inherently problem-dependent.
 
-        The resulting P0 field should be stored as `self.p0indicator`.
+        The resulting P0 field should be stored as `self.indicator`.
         """
         pass
 
@@ -177,11 +170,12 @@ class SteadyProblem():
         Scale an identity matrix by the indicator field in order to drive
         isotropic mesh refinement.
         """
-        #self.p0indicator.interpolate(abs(self.p0indicator))
-        if not hasattr(self, 'p1indicator'):
-            self.p1indicator = project(self.p0indicator, self.P1)
-            self.p1indicator.interpolate(abs(self.p1indicator))  # ensure non-negativity
-        self.M = isotropic_metric(self.p1indicator, op=self.op)
+        el = self.indicator.ufl_element()
+        name = self.indicator.dat.name
+        if (el.family(), el.degree()) != ('Lagrange', 1):
+            self.indicator = project(self.indicator, self.P1)
+            self.indicator.rename(name)
+        self.M = isotropic_metric(self.indicator, op=self.op)
 
     def get_loseille_metric(self, adjoint=False, relax=False):
         """
@@ -343,8 +337,8 @@ class SteadyProblem():
             self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
 
         ## FIXME
-        #if hasattr(self, 'p0indicator'):
-        #    self.estimator = sum(self.p0indicator.dat.data)
+        #if hasattr(self, 'indicator'):
+        #    self.estimator = sum(self.indicator.dat.data)
         if estimate_error:
             if self.approach in ('dwr', 'power', 'loseille', 'carpio'):
                 self.dwr_estimation()
@@ -417,7 +411,6 @@ class MeshOptimisation():
         if self.log:
             self.logfile = open('{:s}/optimisation_log'.format(self.di), 'a+')
             self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
-            self.logfile.write('stabilisation: {:s}\n'.format(self.op.stabilisation))
             self.logfile.write('dwr_approach: {:s}\n'.format(self.op.dwr_approach))
             self.logfile.write('high_order: {:b}\n'.format(self.op.order_increase))
             self.logfile.write('relax: {:b}\n'.format(self.op.relax))
