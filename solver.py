@@ -361,7 +361,7 @@ class SteadyProblem():
             amd = AnisotropicMetricDriver(self.mesh, indicator=self.indicator, op=self.op)
             amd.get_isotropic_metric()
             self.M = amd.p1metric
-        elif self.approach == 'carpio_isotropic_relaxed':
+        elif self.approach == 'carpio_isotropic_both':
             self.dwr_indication()
             i = self.indicator.copy()
             self.dwr_indication_adjoint()
@@ -369,12 +369,37 @@ class SteadyProblem():
             amd = AnisotropicMetricDriver(self.mesh, indicator=eta, op=self.op)
             amd.get_isotropic_metric()
             self.M = amd.p1metric
+        elif self.approach == 'carpio':
+            self.dwr_indication()
+            self.get_hessian_metric(noscale=True, degree=1)  # NOTE: degree 0 doesn't work
+            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio_adjoint':
+            self.dwr_indication_adjoint()
+            self.get_hessian_metric(noscale=True, degree=1, adjoint=True)
+            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio_both':
+            self.dwr_indication()
+            i = self.indicator.copy()
+            self.get_hessian_metric(noscale=True, degree=1)
+            M = self.M.copy()
+            self.dwr_indication_adjoint()
+            self.get_hessian_metric(noscale=True, degree=1, adjoint=True)
+            self.indicator.interpolate(i + self.indicator)
+            self.M.interpolate(M + self.M)
+            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric
         else:
             try:
                 assert hasattr(self, 'custom_adapt')
-                self.custom_adapt()
             except:
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
+            PETSc.Sys.Print("Using custom metric '{:s}'".format(self.approach))
+            self.custom_adapt()
 
         # Apply metric relaxation, if requested
         if prev_metric is not None:
@@ -410,9 +435,10 @@ class SteadyProblem():
         :kwarg estimate_error: Toggle computation of global error estimate.
         """
         if not hasattr(self, 'M'):
+            PETSc.Sys.Print("Metric not found. Computing it now.")
             self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
         self.mesh = adapt(self.mesh, self.M)
-        print('Done adapting.')
+        PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.plot()
 
 

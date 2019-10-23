@@ -6,6 +6,8 @@ import pyadjoint
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
+from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.p0_metric import *
 
 
 __all__ = ["SteadyShallowWaterProblem", "UnsteadyShallowWaterProblem"]
