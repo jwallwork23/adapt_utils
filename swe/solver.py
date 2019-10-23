@@ -112,16 +112,16 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def quantity_of_interest(self):
         pass
 
-    def get_hessian_metric(self, adjoint=False):
+    def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
         sol = self.adjoint_solution if adjoint else self.solution
         u, eta = sol.split()
         if self.op.adapt_field in ('fluid_speed', 'both'):
             spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
-            self.M = steady_metric(spd, op=self.op)
+            self.M = steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
         elif self.op.adapt_field == 'elevation':
-            self.M = steady_metric(eta, op=self.op)
+            self.M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
         if self.op.adapt_field == 'both':
-            M = steady_metric(eta, op=self.op)
+            M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
             self.M = metric_intersection(self.M, M)
 
     def get_bdy_functions(self, eta_in, u_in, bdy_id):

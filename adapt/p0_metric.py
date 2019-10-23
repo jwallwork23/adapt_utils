@@ -66,7 +66,7 @@ class AnisotropicMetricDriver():
 
     def get_hessian_eigenpair(self):
         assert self.H is not None
-        if self.H.function_space().ufl_element().degree() == 0:  # TODO
+        if self.H.function_space().ufl_element().degree() == 0:
             H_avg = self.H
         else:
             H_avg = Function(self.P0_ten)
