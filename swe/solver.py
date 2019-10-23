@@ -234,6 +234,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             flux_terms += dot(avg(H)*u_rie, loc('+') + loc('-'))*dS
         loc = i*dot(H*u, n)*zeta
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
+        # NOTE: This ^^^ is an influential term for steady turbine
 
         # HorizontalAdvection
         un_av = dot(avg(u), n('-'))
@@ -242,6 +243,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         flux_terms += jump(u, n)*dot(u_up, loc('+') + loc('-'))*dS
         loc = i*inner(outer(u, n), outer(u, z))
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
+        # NOTE: This ^^^ is an influential term for steady turbine
         if op.lax_friedrichs:
             gamma = 0.5*abs(un_av)*op.lax_friedrichs_scaling_factor
             loc = -i*z
@@ -345,8 +347,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
         label = 'dwr'
         if adjoint:
             label += '_adjoint'
-        self.get_strong_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
-        self.get_flux_terms(self.solution, self.adjoint_solution, adjoint=adjoint)
+        sol_old = None if not hasattr(self, 'interpolated_solution') else self.interpolated_solution
+        self.get_strong_residual(self.solution, self.adjoint_solution, sol_old, adjoint=adjoint)
+        self.get_flux_terms(self.solution, self.adjoint_solution, sol_old, adjoint=adjoint)
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
         self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']

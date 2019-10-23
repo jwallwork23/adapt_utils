@@ -5,6 +5,7 @@ import numpy
 from numpy import linalg as la
 
 from adapt_utils.options import DefaultOptions
+from adapt_utils.adapt.metric import isotropic_metric
 
 
 __all__ = ["AnisotropicMetricDriver"]
@@ -26,6 +27,7 @@ class AnisotropicMetricDriver():
 
         # Spaces
         self.P0 = FunctionSpace(mesh, "DG", 0)
+        self.P1 = FunctionSpace(mesh, "CG", 1)
         self.P0_vec = VectorFunctionSpace(mesh, "DG", 0)
         self.P0_ten = TensorFunctionSpace(mesh, "DG", 0)
         self.P1_ten = TensorFunctionSpace(mesh, "CG", 1)
@@ -34,10 +36,12 @@ class AnisotropicMetricDriver():
             self.p0hessian = project(hessian, self.P0_ten)
 
         # Fields related to mesh
-        self.h = CellSize(mesh)    # current element size
         self.J = Jacobian(mesh)
+        self.detJ = JacobianDeterminant(mesh)
         self.ne = mesh.num_cells()
-        self.h_opt = Function(self.P0)  # optimal element size
+        self.K_hat = 0.5                # Area of reference element
+        self.K = Function(self.P0)      # Current element size
+        self.K_opt = Function(self.P0)  # Optimal element size
 
         # Eigenvalues and eigenvectors
         self.eval0 = Function(self.P0)
@@ -50,17 +54,9 @@ class AnisotropicMetricDriver():
         self.p1metric = Function(self.P1_ten)
         self.estimator = Function(self.P0)
 
-    def get_reference_element_size(self):
-        h_ref = Function(self.P0)
-        h_ref.interpolate(self.h/abs(det(self.J))/sqrt(0.5*self.ne))
-        #h_ref.interpolate(self.h/abs(det(self.J))))
-        #assert np.var(h_ref.dat.data) < 1e-10  # FIXME
-        self.h_ref = h_ref.dat.data[0]
-
     def get_eigenpair(self):
         JJt = Function(self.P0_ten)
-        JJt.interpolate(self.J*transpose(self.J))
-
+        JJt.interpolate(self.J*self.J.T)
         for i in range(self.ne):
             lam, v = la.eigh(JJt.dat.data[i])
             self.eval0.dat.data[i] = lam[0]
@@ -70,8 +66,11 @@ class AnisotropicMetricDriver():
 
     def get_hessian_eigenpair(self):
         assert self.H is not None
-        H_avg = Function(self.P0_ten)
-        H_avg.interpolate(self.H)
+        if self.H.function_space().ufl_element().degree() == 0:  # TODO
+            H_avg = self.H
+        else:
+            H_avg = Function(self.P0_ten)
+            H_avg.interpolate(self.H)
 
         for i in range(self.ne):
             lam, v = la.eigh(H_avg.dat.data[i])
@@ -86,23 +85,32 @@ class AnisotropicMetricDriver():
                 self.evec0.dat.data[i][:] = v[1]
                 self.evec1.dat.data[i][:] = v[0]
 
+    def get_element_size(self):
+        self.K.interpolate(self.K_hat*abs(self.detJ))
+
     def get_optimal_element_size(self):
         assert self.eta is not None
         alpha = self.op.convergence_rate
-        self.h_opt.interpolate(max_value(self.eta**(1/(alpha+1)), self.op.min_norm))
-        Sum = np.sum(self.h_opt.dat.data)
-        scaling = (pow(self.op.target, -self.op.convergence_rate)/Sum)**(1/alpha)
-        self.h_opt.interpolate(self.h*scaling*self.h_opt**(-1))
+        self.K_opt.interpolate(self.eta**(1/(alpha+1)))
+        Sum = np.sum(self.K_opt.dat.data)
+        if self.op.normalisation == 'error':
+            scaling = pow(self.op.target/Sum, 1/alpha)
+        else:
+            scaling = Sum/self.op.target
+        self.K_opt.interpolate(self.K*scaling*pow(self.K_opt, -1))
 
     def get_optimised_eigenpair(self):
-        s = Function(self.P0)
-        s.interpolate(sqrt(abs(self.eval0/self.eval1)))
+
+        # Reorder eigenvectors
         tmp = Function(self.P0_vec)
         tmp.assign(self.evec0)
         self.evec0.assign(self.evec1)
         self.evec1.assign(tmp)
-        self.eval0.interpolate(self.h_opt/self.h_ref*s)
-        self.eval1.interpolate(self.h_opt/self.h_ref/s)
+
+        # Compute optimal eigenvalues using stretching factor and optimal element size
+        s = Function(self.P0).interpolate(sqrt(abs(self.eval0/self.eval1)))
+        self.eval0.interpolate(abs(self.K_opt/self.K_hat*s))
+        self.eval1.interpolate(abs(self.K_opt/self.K_hat/s))
 
     def build_metric(self):
         """
@@ -126,9 +134,15 @@ class AnisotropicMetricDriver():
         self.build_metric()
         self.project_metric()
 
+    def get_isotropic_metric(self):
+        self.get_element_size()
+        self.get_optimal_element_size()
+        indicator = Function(self.P1).interpolate(abs(self.K_hat/self.K_opt))
+        self.p1metric = isotropic_metric(indicator, op=self.op)
+
     def get_anisotropic_metric(self):
         self.get_hessian_eigenpair()
-        self.get_reference_element_size()
+        self.get_element_size()
         self.get_optimal_element_size()
         self.get_optimised_eigenpair()
         self.build_metric()

@@ -16,6 +16,7 @@ from adapt_utils.options import DefaultOptions
 from adapt_utils.misc.misc import index_string
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.p0_metric import *
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem", "MeshOptimisation", "OuterLoop"]
@@ -350,6 +351,24 @@ class SteadyProblem():
             self.get_power_metric(adjoint=True)
             #self.M = metric_intersection(self.M, M)
             self.M = metric_intersection(M, self.M)
+        elif self.approach == 'carpio_isotropic':
+            self.dwr_indication()
+            amd = AnisotropicMetricDriver(self.mesh, indicator=self.indicator, op=self.op)
+            amd.get_isotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio_isotropic_adjoint':
+            self.dwr_indication_adjoint()
+            amd = AnisotropicMetricDriver(self.mesh, indicator=self.indicator, op=self.op)
+            amd.get_isotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio_isotropic_relaxed':
+            self.dwr_indication()
+            i = self.indicator.copy()
+            self.dwr_indication_adjoint()
+            eta = Function(self.P0).interpolate(i + self.indicator)
+            amd = AnisotropicMetricDriver(self.mesh, indicator=eta, op=self.op)
+            amd.get_isotropic_metric()
+            self.M = amd.p1metric
         else:
             try:
                 assert hasattr(self, 'custom_adapt')
@@ -358,10 +377,10 @@ class SteadyProblem():
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
         # Apply metric relaxation, if requested
-        assert relaxation_parameter >= 0
-        assert relaxation_parameter <= 1
-        self.M_unrelaxed = self.M.copy()
         if prev_metric is not None:
+            assert relaxation_parameter >= 0
+            assert relaxation_parameter <= 1
+            self.M_unrelaxed = self.M.copy()
             self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
 
         ## FIXME
@@ -379,7 +398,7 @@ class SteadyProblem():
             else:
                 raise NotImplementedError  # TODO
 
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=True):
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=False):
         """
         Adapt mesh using metric constructed in error estimation step.
 
