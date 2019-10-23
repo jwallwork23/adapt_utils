@@ -20,6 +20,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     params = PETScSolverParameters({
              'mat_type': 'aij',
              'ksp_type': 'preonly',
+             'ksp_monitor': None,
              'pc_type': 'lu',
              'pc_factor_mat_solver_type': 'mumps',
              'snes_type': 'newtonls',
@@ -46,7 +47,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
 
         # Adaptivity
         self.h_min = 1e-5
-        self.h_max = 20.
+        self.h_max = 200.
 
     def set_viscosity(self):
         self.viscosity.assign(self.base_viscosity)
@@ -66,7 +67,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         A_T = math.pi*(D/2)**2
         correction = 4/(1+math.sqrt(1-A_T/(40.*D)))**2
         self.thrust_coefficient *= correction
-        # NOTE, that we're not yet correcting power output here, so that will be overestimated
+        # NOTE: we're not yet correcting power output here, so that will be overestimated
 
     def set_bcs(self, fs):
         pass
@@ -80,7 +81,8 @@ class Steady1TurbineOptions(SteadyTurbineOptions):
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
-        self.base_viscosity = 1.0
+        self.base_viscosity = 1.3e-3
+        # self.base_viscosity = 1.0
         super(Steady1TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
 
@@ -111,7 +113,8 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
-        self.base_viscosity = 1.0
+        self.base_viscosity = 1.3e-3
+        # self.base_viscosity = 1.0
         super(Steady2TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
 
@@ -142,7 +145,8 @@ class Steady15TurbineOptions(SteadyTurbineOptions):
     thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
-        self.base_viscosity = 3.0
+        self.base_viscosity = 1.3e-3
+        # self.base_viscosity = 3.0
         super(Steady15TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(150, 50, 3000., 1000.)    # FIXME: wrong ids
         x, y = SpatialCoordinate(self.default_mesh)

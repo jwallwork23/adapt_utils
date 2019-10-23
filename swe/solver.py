@@ -115,16 +115,25 @@ class SteadyShallowWaterProblem(SteadyProblem):
         pass
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
+        field = self.op.adapt_field
+        assert field in ('fluid_speed', 'elevation', 'both', 'all')
         sol = self.adjoint_solution if adjoint else self.solution
         u, eta = sol.split()
-        if self.op.adapt_field in ('fluid_speed', 'both'):
+        if field in ('fluid_speed', 'both'):
             spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
             self.M = steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
-        elif self.op.adapt_field == 'elevation':
+        elif field in ('elevation', 'all'):
             self.M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
-        if self.op.adapt_field == 'both':
+        if field == 'both':
             M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
             self.M = metric_intersection(self.M, M)
+        elif field == 'all':
+            s = Function(self.P1).interpolate(u[0])
+            Mu = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+            s = Function(self.P1).interpolate(u[1])
+            Mv = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+            self.M *= 0.3333
+            self.M += 0.3333*(Mu + Mv)
 
     def get_bdy_functions(self, eta_in, u_in, bdy_id):
         b = self.op.bathymetry
@@ -230,7 +239,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
         # HUDiv
-        if self.op.family == 'dg-dg':
+        if self.op.family in ('dg-dg', 'rt-dg'):
             u_rie = avg(u) + sqrt(g/avg(H))*jump(eta, n)
             loc = -i*n*zeta
             flux_terms += dot(avg(H)*u_rie, loc('+') + loc('-'))*dS

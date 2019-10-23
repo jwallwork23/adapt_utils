@@ -91,10 +91,10 @@ class AnisotropicMetricDriver():
     def get_optimal_element_size(self):
         assert self.eta is not None
         alpha = self.op.convergence_rate
-        self.K_opt.interpolate(self.eta**(1/(alpha+1)))
+        self.K_opt.interpolate(pow(self.eta, 1/(alpha+1)))
         Sum = np.sum(self.K_opt.dat.data)
         if self.op.normalisation == 'error':
-            scaling = pow(self.op.target/Sum, 1/alpha)
+            scaling = pow(self.op.target*Sum, -1/alpha)  # FIXME
         else:
             scaling = Sum/self.op.target
         self.K_opt.interpolate(max_value(self.K*scaling*pow(self.K_opt, -1), self.op.min_norm))
