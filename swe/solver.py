@@ -248,7 +248,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         # NOTE: This ^^^ is an influential term for steady turbine
 
         # HorizontalAdvection
-        un_av = dot(avg(u), n('-'))
         u_up = avg(u)
         loc = -i*z
         flux_terms += jump(u, n)*dot(u_up, loc('+') + loc('-'))*dS
@@ -256,7 +255,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
         # NOTE: This ^^^ is an influential term for steady turbine
         if op.lax_friedrichs:
-            gamma = 0.5*abs(un_av)*op.lax_friedrichs_scaling_factor
+            gamma = 0.5*abs(dot(u_up, n('-')))*op.lax_friedrichs_scaling_factor
             loc = -i*z
             flux_terms += gamma*dot(loc('+') + loc('-'), jump(u))*dS
 

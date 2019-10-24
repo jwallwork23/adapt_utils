@@ -7,8 +7,8 @@ import numpy as np
 from adapt_utils.swe.options import ShallowWaterOptions
 
 
-__all__ = ["Steady1TurbineOptions", "Steady2TurbineOptions", "Steady15TurbineOptions",
-           "Unsteady2TurbineOptions", "Unsteady15TurbineOptions"]
+__all__ = ["Steady1TurbineOptions", "Steady2TurbineOptions", "Steady2TurbineOffsetOptions",
+           "Steady15TurbineOptions", "Unsteady2TurbineOptions", "Unsteady15TurbineOptions"]
 
 
 class SteadyTurbineOptions(ShallowWaterOptions):
@@ -35,15 +35,6 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.viscosity = Constant(self.base_viscosity)
         self.lax_friedrichs = True
         self.drag_coefficient = Constant(0.0025)
-
-        # Correction to account for the fact that the thrust coefficient is based on an upstream
-        # velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
-        # Piggott 2016, eq. (15))
-        D = self.turbine_diameter
-        A_T = math.pi*(D/2)**2
-        correction = 4/(1+math.sqrt(1-A_T/(40.*D)))**2
-        self.thrust_coefficient *= correction
-        # NOTE, that we're not yet correcting power output here, so that will be overestimated
 
         # Adaptivity
         self.h_min = 1e-5
@@ -135,6 +126,12 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
         self.boundary_conditions[top_bottom_tag] = {'un': Constant(0.)}
         return self.boundary_conditions
+
+class Steady2TurbineOffsetOptions(Steady2TurbineOptions):
+    def __init__(self, approach='fixed_mesh'):
+        super(Steady2TurbineOffsetOptions, self).__init__(approach)
+        D = self.turbine_diameter
+        self.region_of_interest = [(50, 50, D/2), (400, 150, D/2)]
 
 
 class Steady15TurbineOptions(SteadyTurbineOptions):

@@ -1,19 +1,23 @@
 from adapt_utils.turbine.options import *
+import os
 
 
 __all__ = ["generate_geo_file"]
 
 
-def generate_geo_file(op, coarse=True, filepath='.'):
+def generate_geo_file(op, coarse=True, offset=False, filepath='.'):
     label = 'coarse' if coarse else 'fine'
     locs = op.region_of_interest
     n = len(locs)
     assert n > 0
+    label += '_{:d}'.format(n)
+    if offset:
+        label += '_offset'
     d = locs[0][2]
     for i in range(1, n):
         assert locs[i][2] == d
     D = 2*d
-    f = open('%s/%s_%d_turbine.geo' % (filepath, label, n), 'w+')
+    f = open(os.path.join(filepath, label + '_turbine.geo'), 'w+')
     if n < 3:
         f.write('W=200.;     // width of channel\n')
         f.write('L=1e3;      // length of channel\n')
