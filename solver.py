@@ -248,9 +248,6 @@ class SteadyProblem():
         """
         if self.approach == 'fixed_mesh':
             return
-        elif self.approach == 'uniform':
-            self.mesh = MeshHierarchy(self.mesh, 1)[1]
-            return
         elif self.approach == 'hessian':
             self.get_hessian_metric()
         elif self.approach == 'hessian_adjoint':
@@ -434,10 +431,16 @@ class SteadyProblem():
         :kwarg prev_metric: Metric from previous step. If unprovided, metric relaxation cannot be applied.
         :kwarg estimate_error: Toggle computation of global error estimate.
         """
-        if not hasattr(self, 'M'):
-            PETSc.Sys.Print("Metric not found. Computing it now.")
-            self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
-        self.mesh = adapt(self.mesh, self.M)
+        if self.approach == 'fixed_mesh':
+            return
+        elif self.approach == 'uniform':
+            self.mesh = MeshHierarchy(self.mesh, 1)[1]
+            return
+        else:
+            if not hasattr(self, 'M'):
+                PETSc.Sys.Print("Metric not found. Computing it now.")
+                self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
+            self.mesh = adapt(self.mesh, self.M)
         PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.plot()
 
@@ -455,7 +458,8 @@ class MeshOptimisation():
         self.di = create_directory(op.di)
 
         # Default tolerances etc
-        self.msg = "Mesh %2d: %7d cells, qoi %.4e, estimator %.4e"
+        #self.msg = "Mesh %2d: %7d cells, qoi %.4e, estimator %.4e"
+        self.msg = "Mesh %2d: %7d cells, qoi %.4e"
         self.conv_msg = "Converged after %d iterations due to %s"
         self.startit = 0
         self.minit = 1
@@ -523,6 +527,7 @@ class MeshOptimisation():
             tp.indicate_error()
             #self.dat['estimator'].append(tp.estimator)
             #PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i], tp.estimator))
+            PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i]))
             #if self.log:  # TODO: parallelise
             #    self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
 
