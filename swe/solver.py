@@ -116,24 +116,40 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
         field = self.op.adapt_field
-        assert field in ('fluid_speed', 'elevation', 'both', 'all')
+        assert field in ('elevation',
+                         'fluid_speed', 'velocity_x', 'velocity_y',
+                         'inflow', 'inflow_and_elevation',
+                         'both', 'all')
         sol = self.adjoint_solution if adjoint else self.solution
         u, eta = sol.split()
         if field in ('fluid_speed', 'both'):
             spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
             self.M = steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
-        elif field in ('elevation', 'all'):
+        if field in ('elevation', 'all', 'inflow_and_elevation'):
             self.M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
+        if field in ('velocity_x', 'all'):
+            s = Function(self.P1).interpolate(u[0])
+            Mu = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+        if field in ('velocity_y', 'all'):
+            s = Function(self.P1).interpolate(u[1])
+            Mv = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+        if field in ('inflow', 'inflow_and_elevation'):
+            v = Function(self.P1).interpolate(inner(u, self.op.inflow))
+            Mi = steady_metric(v, noscale=noscale, degree=degree, op=self.op)
         if field == 'both':
             M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
             self.M = metric_intersection(self.M, M)
         elif field == 'all':
-            s = Function(self.P1).interpolate(u[0])
-            Mu = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
-            s = Function(self.P1).interpolate(u[1])
-            Mv = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
             self.M *= 0.3333
             self.M += 0.3333*(Mu + Mv)
+        elif field == 'velocity_x':
+            self.M = Mu
+        elif field == 'velocity_y':
+            self.M = Mv
+        elif field == 'inflow':
+            self.M = Mi
+        elif field == 'inflow_and_elevation':
+            self.M = metric_intersection(self.M, Mi)
 
     def get_bdy_functions(self, eta_in, u_in, bdy_id):
         b = self.op.bathymetry
