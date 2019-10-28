@@ -40,7 +40,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.h_min = 1e-5
         self.h_max = 200.
 
-    def set_viscosity(self):
+    def set_viscosity(self, fs):
         self.viscosity.assign(self.base_viscosity)
         return self.viscosity
 
@@ -110,17 +110,32 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
     def __init__(self, approach='fixed_mesh'):
         # self.base_viscosity = 1.3e-3
         self.base_viscosity = 1.0
+        # self.base_viscosity = 10.0
         super(Steady2TurbineOptions, self).__init__(approach)
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
 
         # FIXME (Hack for boundary marker consistency)
-        m = self.default_mesh.exterior_facets.markers
-        m = np.where(m == 4, 3, m)
+        #m = self.default_mesh.exterior_facets.markers
+        #m = np.where(m == 4, 3, m)
 
         # Tidal farm
         D = self.turbine_diameter
-        self.region_of_interest = [(50, 100, D/2), (400, 100, D/2)]
+        #self.region_of_interest = [(50, 100, D/2), (400, 100, D/2)]
+        self.region_of_interest = [(325, 100, D/2), (675, 100, D/2)]
         self.thrust_coefficient_correction()
+
+    def set_viscosity(self, fs):
+        sponge = False
+        self.viscosity = Function(fs)
+        if sponge:
+            x, y = SpatialCoordinate(fs.mesh())
+            xmin = 0.0
+            xmax = 1000.0
+            ramp = 0.5
+            eps = 20.0
+            self.viscosity.interpolate(self.base_viscosity + exp(ramp*(x-xmax+eps)))
+        else:
+            self.viscosity.assign(self.base_viscosity)
 
     def set_bcs(self, fs):
         left_tag = 1

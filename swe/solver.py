@@ -53,7 +53,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.nonlinear = True
 
     def set_fields(self):
-        self.op.set_viscosity()
+        self.op.set_viscosity(self.P1)
         self.inflow = self.op.set_inflow(self.P1_vec)
 
     def solve(self):
@@ -314,9 +314,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
                         continue
                     delta_u = u - u_ext
                     if op.grad_div_viscosity:
-                        stress_jump = 2*avg(nu)*sym(outer(delta_u, n))
+                        stress_jump = 2*nu*sym(outer(delta_u, n))
                     else:
-                        stress_jump = avg(nu)*outer(delta_u, n)
+                        stress_jump = nu*outer(delta_u, n)
                 flux_terms += -i*alpha/self.h*inner(outer(z, n), stress_jump)*ds(j)
                 flux_terms += i*inner(grad(z), stress_jump)*ds(j)
                 flux_terms += i*inner(outer(z, n), stress)*ds(j)

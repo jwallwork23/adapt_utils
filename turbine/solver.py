@@ -178,7 +178,7 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
         self.solution = op.set_initial_condition(self.V)
 
     def set_fields(self):
-        self.viscosity = self.op.set_viscosity()
+        self.viscosity = self.op.set_viscosity(self.P1)
         self.drag_coefficient = Constant(self.op.drag_coefficient)
         self.op.set_boundary_surface(self.V.sub(1))
 
