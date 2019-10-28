@@ -156,7 +156,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         return self.boundary_conditions
 
 class Steady2TurbineOffsetOptions(Steady2TurbineOptions):
-    def __init__(self, approach='fixed_mesh', spacing=1.5):
+    def __init__(self, approach='fixed_mesh', spacing=1.0):
         """
         :kwarg spacing: number of turbine widths to offset in each direction.
         """

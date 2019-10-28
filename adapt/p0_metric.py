@@ -65,15 +65,9 @@ class AnisotropicMetricDriver():
             self.evec1.dat.data[i][:] = v[1]
 
     def get_hessian_eigenpair(self):
-        assert self.H is not None
-        if self.H.function_space().ufl_element().degree() == 0:
-            H_avg = self.H
-        else:
-            H_avg = Function(self.P0_ten)
-            H_avg.interpolate(self.H)
-
+        assert self.p0hessian is not None
         for i in range(self.ne):
-            lam, v = la.eigh(H_avg.dat.data[i])
+            lam, v = la.eigh(self.p0hessian.dat.data[i])
             if np.abs(lam[0]) > np.abs(lam[1]):
                 self.eval0.dat.data[i] = lam[0]
                 self.eval1.dat.data[i] = lam[1]
@@ -109,6 +103,8 @@ class AnisotropicMetricDriver():
 
         # Compute optimal eigenvalues using stretching factor and optimal element size
         s = Function(self.P0).interpolate(sqrt(abs(self.eval0/self.eval1)))
+        # s = sqrt(abs(self.eval0/self.eval1))  # FIXME
+        # s = assemble(self.p0test*sqrt(abs(self.eval0/self.eval1))*dx)
         self.eval0.interpolate(abs(self.K_opt/self.K_hat*s))
         self.eval1.interpolate(abs(self.K_opt/self.K_hat/s))
 
