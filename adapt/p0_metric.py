@@ -97,7 +97,7 @@ class AnisotropicMetricDriver():
             scaling = pow(self.op.target*Sum, -1/alpha)  # FIXME
         else:
             scaling = Sum/self.op.target
-        self.K_opt.interpolate(max_value(self.K*scaling*pow(self.K_opt, -1), self.op.min_norm))
+        self.K_opt.interpolate(max_value(self.K*scaling*pow(self.K_opt, -1), self.op.f_min))
 
     def get_optimised_eigenpair(self):
 

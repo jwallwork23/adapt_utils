@@ -488,7 +488,6 @@ class MeshOptimisation():
         if self.log:
             self.logfile = open('{:s}/optimisation_log'.format(self.di), 'a+')
             self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
-            self.logfile.write('dwr_approach: {:s}\n'.format(self.op.dwr_approach))
             self.logfile.write('high_order: {:b}\n'.format(self.op.order_increase))
             self.logfile.write('relax: {:b}\n'.format(self.op.relax))
             self.logfile.write('maxit: {:d}\n'.format(self.maxit))

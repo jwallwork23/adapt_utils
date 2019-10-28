@@ -12,7 +12,6 @@ class Options(FrozenConfigurable):
 
     # Adapt
     approach = Unicode('fixed_mesh', help="Mesh adaptive approach.").tag(config=True)
-    dwr_approach = Unicode('error_representation', help="DWR error estimation approach, from {'error_representation', 'dwr', 'cell_facet_split'}. (See [Rognes & Logg, 2010])").tag(config=True)  # TODO
     num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     convergence_rate = PositiveInteger(6, help="Convergence rate parameter used in approach of [Carpio et al. 2013].").tag(config=True)
@@ -20,8 +19,6 @@ class Options(FrozenConfigurable):
     h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
 
     # Smooth / intersect
-    gradate = Bool(False, help="Toggle metric gradation.").tag(config=True)  # TODO: deprecated
-    max_element_growth = PositiveFloat(1.4, help="Gradation scaling parameter.").tag(config=True)
     intersect = Bool(False, help="Intersect with previous mesh.").tag(config=True)
     relax = Bool(False, help="Take metric relaxation with previous mesh.").tag(config=True)
     intersect_boundary = Bool(False, help="Intersect with initial boundary metric.").tag(config=True)
@@ -70,34 +67,11 @@ class Options(FrozenConfigurable):
     qoi_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in quantity of interest.").tag(config=True)
 
     # Adjoint
-    adjoint_steps = NonNegativeInteger(1000, help="Number of adjoint steps used").tag(config=True)
-    solve_adjoint = Bool(False, help="Toggle adjoint problem solving.").tag(config=True)
     order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
         self.approach = approach
         self.di = 'outputs/' + self.approach + '/'
-
-    def final_index(self):
-        """Final timestep index"""
-        return int(np.ceil(self.end_time / self.dt))
-
-    def first_export(self):
-        """First exported timestep of period of interest"""
-        return int(self.start_time / (self.dt_per_export * self.dt))
-
-    def final_export(self):
-        """Final exported timestep of period of interest"""
-        return int(np.ceil(self.end_time / (self.dt_per_export * self.dt)))
-
-    def final_mesh_index(self):
-        """Final mesh index"""
-        return int(self.final_index() / self.dt_per_remesh)
-
-    def exports_per_remesh(self):
-        """Number of exports per mesh adaptation"""
-        assert self.dt_per_remesh % self.dt_per_export == 0
-        return int(self.dt_per_remesh / self.dt_per_export)
 
     def ball(self, fs, scale=1., source=False):
         """Ball indicator function associated with region(s) of interest"""
@@ -200,7 +174,6 @@ class Options(FrozenConfigurable):
         return box
 
 
-# TODO: does this really need to exist? It is pretty arbitrary
 class DefaultOptions(Options):
     name = 'Parameters for the case where no mode is selected'
     mode = 'Default'
