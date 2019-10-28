@@ -22,8 +22,8 @@ def generate_geo_file(op, level='coarse', tag=None, filepath='.'):
     D = 2*d
     f = open(os.path.join(filepath, label + '_turbine.geo'), 'w+')
     if n < 3:
-        f.write('W=200.;     // width of channel\n')
-        f.write('L=1e3;      // length of channel\n')
+        f.write('W={:.1f};     // width of channel\n'.format(op.domain_width))
+        f.write('L={:.1f};      // length of channel\n'.format(op.domain_length))
         if level == 'xcoarse':
             dx1 = 40.
             dx2 = 8.
@@ -40,8 +40,8 @@ def generate_geo_file(op, level='coarse', tag=None, filepath='.'):
             dx1 = 2.5
             dx2 = 0.5
     elif n == 15:
-        f.write('W=1e3.;     // width of channel\n')
-        f.write('L=3e3;      // length of channel\n')
+        f.write('W={:.1f};     // width of channel\n'.format(op.domain_width))
+        f.write('L={:.1f};      // length of channel\n'.format(op.domain_length))
         raise NotImplementedError
     else:
         raise NotImplementedError

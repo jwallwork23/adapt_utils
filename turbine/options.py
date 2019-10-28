@@ -75,7 +75,9 @@ class Steady1TurbineOptions(SteadyTurbineOptions):
         # self.base_viscosity = 1.3e-3
         self.base_viscosity = 1.0
         super(Steady1TurbineOptions, self).__init__(approach)
-        self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
+        L = 1000.0
+        W = 300.0
+        self.default_mesh = RectangleMesh(100, 20, L, W)
 
         # FIXME (Hack for boundary marker consistency)
         #m = self.default_mesh.exterior_facets.markers
@@ -83,7 +85,7 @@ class Steady1TurbineOptions(SteadyTurbineOptions):
 
         # Tidal farm
         D = self.turbine_diameter
-        self.region_of_interest = [(500, 100, D/2)]
+        self.region_of_interest = [(L/2, W/2, D/2)]
         self.thrust_coefficient_correction()
 
     def set_bcs(self, fs):
@@ -112,7 +114,9 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.base_viscosity = 1.0
         # self.base_viscosity = 10.0
         super(Steady2TurbineOptions, self).__init__(approach)
-        self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
+        self.domain_length = 1000.0
+        self.domain_width = 300.0
+        self.default_mesh = RectangleMesh(100, 20, self.domain_length, self.domain_width)
 
         # FIXME (Hack for boundary marker consistency)
         #m = self.default_mesh.exterior_facets.markers
@@ -120,8 +124,9 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
 
         # Tidal farm
         D = self.turbine_diameter
-        #self.region_of_interest = [(50, 100, D/2), (400, 100, D/2)]
-        self.region_of_interest = [(325, 100, D/2), (675, 100, D/2)]
+        L = self.domain_length
+        W = self.domain_width
+        self.region_of_interest = [(L/2-8*D, W/2, D/2), (L/2+8*D, W/2, D/2)]
         self.thrust_coefficient_correction()
 
     def set_viscosity(self, fs):
@@ -151,11 +156,15 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         return self.boundary_conditions
 
 class Steady2TurbineOffsetOptions(Steady2TurbineOptions):
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh', spacing=1.5):
+        """
+        :kwarg spacing: number of turbine widths to offset in each direction.
+        """
         super(Steady2TurbineOffsetOptions, self).__init__(approach)
         D = self.turbine_diameter
-        #self.region_of_interest = [(50, 50, D/2), (400, 150, D/2)]
-        self.region_of_interest = [(325, 75, D/2), (675, 125, D/2)]
+        L = self.domain_length
+        W = self.domain_width
+        self.region_of_interest = [(L/2-8*D, W/2-spacing*D, D/2), (L/2+8*D, W/2+spacing*D, D/2)]
 
 
 class Steady15TurbineOptions(SteadyTurbineOptions):
@@ -169,9 +178,11 @@ class Steady15TurbineOptions(SteadyTurbineOptions):
         # self.base_viscosity = 1.3e-3
         self.base_viscosity = 3.0
         super(Steady15TurbineOptions, self).__init__(approach)
-        self.default_mesh = RectangleMesh(150, 50, 3000., 1000.)    # FIXME: wrong ids
+        self.domain_length = 3000.0
+        self.domain_width = 1000.0
+        self.default_mesh = RectangleMesh(150, 50, self.domain_length, self.domain_width)    # FIXME: wrong ids
         x, y = SpatialCoordinate(self.default_mesh)
-        self.default_mesh.coordinates.interpolate(as_vector([x - 1500., y - 500.]))
+        self.default_mesh.coordinates.interpolate(as_vector([x - self.domain_length/2, y - self.domain_width/2]))
         self.h_max = 100
         self.bathymetry = Constant(50.0)
 
