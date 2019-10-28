@@ -78,8 +78,8 @@ class Steady1TurbineOptions(SteadyTurbineOptions):
         self.default_mesh = RectangleMesh(100, 20, 1000., 200.)
 
         # FIXME (Hack for boundary marker consistency)
-        m = self.default_mesh.exterior_facets.markers
-        m = np.where(m == 4, 3, m)
+        #m = self.default_mesh.exterior_facets.markers
+        #m = np.where(m == 4, 3, m)
 
         # Tidal farm
         D = self.turbine_diameter
@@ -154,7 +154,8 @@ class Steady2TurbineOffsetOptions(Steady2TurbineOptions):
     def __init__(self, approach='fixed_mesh'):
         super(Steady2TurbineOffsetOptions, self).__init__(approach)
         D = self.turbine_diameter
-        self.region_of_interest = [(50, 50, D/2), (400, 150, D/2)]
+        #self.region_of_interest = [(50, 50, D/2), (400, 150, D/2)]
+        self.region_of_interest = [(325, 75, D/2), (675, 125, D/2)]
 
 
 class Steady15TurbineOptions(SteadyTurbineOptions):

@@ -5,7 +5,7 @@ import os
 __all__ = ["generate_geo_file"]
 
 
-def generate_geo_file(op, level='coarse', offset=False, filepath='.'):
+def generate_geo_file(op, level='coarse', tag=None, filepath='.'):
     try:
         assert level in ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
     except:
@@ -14,8 +14,8 @@ def generate_geo_file(op, level='coarse', offset=False, filepath='.'):
     n = len(locs)
     assert n > 0
     label = '{:s}_{:d}'.format(level, n)
-    if offset:
-        label += '_offset'
+    if tag is not None:
+        label += '_' + tag
     d = locs[0][2]
     for i in range(1, n):
         assert locs[i][2] == d
