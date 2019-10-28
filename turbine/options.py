@@ -11,26 +11,62 @@ __all__ = ["Steady1TurbineOptions", "Steady2TurbineOptions", "Steady2TurbineOffs
            "Steady15TurbineOptions", "Unsteady2TurbineOptions", "Unsteady15TurbineOptions"]
 
 
+# Default: Newton with line search; solve linear system exactly with LU factorisation
+default_params = {
+    'mat_type': 'aij',
+    'snes_type': 'newtonls',
+    'snes_rtol': 1e-3,
+    # 'snes_rtol': 1e-2,
+    'snes_linesearch_type': 'bt',
+    # 'snes_linesearch_monitor': None,
+    'snes_monitor': None,
+    'ksp_type': 'preonly',
+    'pc_type': 'lu',
+    'pc_factor_mat_solver_type': 'mumps',
+}
+
+# Robust but approximate: just repeatedly apply LU preconditioner
+ksponly_params = {
+    'mat_type': 'aij',
+    'snes_type': 'ksponly',
+    'snes_monitor': None,
+    'ksp_type': 'preonly',
+    'pc_type': 'lu',
+    'pc_factor_mat_solver_type': 'mumps',
+}
+
+# FIXME ILU: Newton with line search; solve linear system approximately using ILU
+ilu_params = {
+    'mat_type': 'aij',
+    'snes_type': 'newtonls',
+    'snes_rtol': 1e-3,
+    'snes_linesearch_type': 'bt',
+    # 'snes_linesearch_monitor': None,
+    'snes_monitor': None,
+    'ksp_type': 'gmres',
+    'ksp_monitor': None,
+    'ksp_atol': 1e-5,
+    'pc_type': 'ilu',
+    'pc_type_factor_levels': 10,
+    # 'pc_factor_nonzeros_along_diagonal': None,
+}
+
+
 class SteadyTurbineOptions(ShallowWaterOptions):
     """
     Base class holding parameters for steady state tidal turbine problems.
     """
 
     # Solver parameters
-    params = PETScSolverParameters({
-             'mat_type': 'aij',
-             'ksp_type': 'preonly',
-             'ksp_monitor': None,
-             'pc_type': 'lu',
-             'pc_factor_mat_solver_type': 'mumps',
-             'snes_type': 'newtonls',
-             'snes_monitor': None,
-             }).tag(config=True)
+    params = PETScSolverParameters(ilu_params).tag(config=True)
 
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, approach='fixed_mesh', num_iterations=2):
         super(SteadyTurbineOptions, self).__init__(approach)
         self.dt = 20.
-        self.end_time = 18.
+        if self.params == ksponly_params:
+            self.end_time = num_iterations*self.dt - 0.2
+        else:
+            self.end_time = 18.
         self.bathymetry = Constant(40.0)
         self.viscosity = Constant(self.base_viscosity)
         self.lax_friedrichs = True
