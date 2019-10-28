@@ -378,15 +378,24 @@ class SteadyProblem():
             amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric
+        elif self.approach == 'carpio_almost_both':
+            self.dwr_indication()
+            self.get_hessian_metric(noscale=False, degree=1)
+            M = self.M.copy()
+            self.get_hessian_metric(noscale=False, degree=1, adjoint=True)
+            self.M = metric_intersection(self.M, M)
+            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric
         elif self.approach == 'carpio_both':
             self.dwr_indication()
             i = self.indicator.copy()
-            self.get_hessian_metric(noscale=True, degree=1)
+            self.get_hessian_metric(noscale=False, degree=1)
             M = self.M.copy()
             self.dwr_indication_adjoint()
-            self.get_hessian_metric(noscale=True, degree=1, adjoint=True)
+            self.get_hessian_metric(noscale=False, degree=1, adjoint=True)
             self.indicator.interpolate(i + self.indicator)
-            self.M.interpolate(M + self.M)
+            self.M = metric_intersection(self.M, M)
             amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric
