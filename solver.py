@@ -449,7 +449,7 @@ class SteadyProblem():
             if not hasattr(self, 'M'):
                 PETSc.Sys.Print("Metric not found. Computing it now.")
                 self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
-            self.mesh = adapt(self.mesh, self.M)
+            self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
         PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.plot()
 
@@ -567,6 +567,7 @@ class MeshOptimisation():
                 prev_sol = tp.solution
             if self.op.relax:
                 M_ = tp.M_unrelaxed
+
         self.dat['time'] = clock() - tstart
         PETSc.Sys.Print('Time to solution: %.1fs' % (self.dat['time']))
         if self.log:
@@ -1074,7 +1075,7 @@ class UnsteadyProblem():
         # Adapt mesh
         if self.M is not None and norm(self.M) > 0.1*norm(Constant(1, domain=self.mesh)):
             # FIXME: The 0.1 factor seems pretty arbitrary
-            self.mesh = adapt(self.mesh, self.M)
+            self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
             PETSc.Sys.Print("Number of elements: %d" % self.mesh.num_cells())
 
             # Re-establish function spaces
