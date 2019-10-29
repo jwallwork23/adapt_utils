@@ -58,13 +58,20 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     """
 
     # Solver parameters
+<<<<<<< HEAD
     params = PETScSolverParameters(ksponly_params).tag(config=True)
+=======
+    params = PETScSolverParameters(ilu_params).tag(config=True)
+>>>>>>> 35994d60832d631cd5e4a0cab77fbf40f0debcdc
 
     def __init__(self, approach='fixed_mesh', num_iterations=2):
         super(SteadyTurbineOptions, self).__init__(approach)
         self.dt = 20.
+<<<<<<< HEAD
         if approach in ('fixed_mesh', 'uniform'):
             self.params = default_params
+=======
+>>>>>>> 35994d60832d631cd5e4a0cab77fbf40f0debcdc
         if self.params == ksponly_params:
             self.end_time = num_iterations*self.dt - 0.2
         else:
