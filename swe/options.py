@@ -23,7 +23,7 @@ class ShallowWaterOptions(Options):
 
     # Model
     grad_div_viscosity = Bool(False).tag(config=True)
-    grad_depth_viscosity = Bool(True).tag(config=True)
+    grad_depth_viscosity = Bool(False).tag(config=True)
     lax_friedrichs = Bool(True).tag(config=True)
     lax_friedrichs_scaling_factor = FiredrakeConstantTraitlet(Constant(1.0)).tag(config=True)
     family = Enum(['dg-dg', 'rt-dg', 'dg-cg'], default_value='dg-dg').tag(config=True)

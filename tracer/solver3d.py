@@ -189,12 +189,9 @@ class SteadyTracerProblem3d(SteadyProblem):
         solve(mass_term == flux_terms, self.edge_res)
 
         # Form error estimator
-        if self.op.dwr_approach == 'error_representation':
-            self.p0indicator = Function(self.P0)
-            self.p0indicator += self.cell_res + self.edge_res
-            self.p1indicator = project(self.p0indicator, self.P1)
-        else:
-            raise NotImplementedError
+        self.p0indicator = Function(self.P0)
+        self.p0indicator += self.cell_res + self.edge_res
+        self.p1indicator = project(self.p0indicator, self.P1)
         self.p0indicator.interpolate(abs(self.p0indicator))
         self.p1indicator.interpolate(abs(self.p1indicator))
         self.p0indicator.rename('explicit')
@@ -227,12 +224,9 @@ class SteadyTracerProblem3d(SteadyProblem):
         solve(mass_term == flux_terms, self.edge_res_adjoint)
 
         # Form error estimator
-        if self.op.dwr_approach == 'error_representation':
-            self.p0indicator = Function(self.P0)
-            self.p0indicator += self.cell_res_adjoint + self.edge_res_adjoint
-            self.p1indicator = project(self.p0indicator, self.P1)
-        else:
-            raise NotImplementedError
+        self.p0indicator = Function(self.P0)
+        self.p0indicator += self.cell_res_adjoint + self.edge_res_adjoint
+        self.p1indicator = project(self.p0indicator, self.P1)
         self.p0indicator.interpolate(abs(self.p0indicator))
         self.p1indicator.interpolate(abs(self.p1indicator))
         self.p0indicator.rename('explicit_adjoint')
@@ -271,12 +265,9 @@ class SteadyTracerProblem3d(SteadyProblem):
 
         # Sum
         self.cell_res = assemble(i*R*dx)
-        if self.op.dwr_approach == 'error_representation':
-            self.p0indicator = Function(self.P0)
-            self.p0indicator += self.cell_res + self.edge_res
-            self.p1indicator = project(self.p0indicator, self.P1)
-        else:
-            raise NotImplementedError
+        self.p0indicator = Function(self.P0)
+        self.p0indicator += self.cell_res + self.edge_res
+        self.p1indicator = project(self.p0indicator, self.P1)
         self.p0indicator.interpolate(abs(self.p0indicator))
         self.p1indicator.interpolate(abs(self.p1indicator))
         self.p0indicator.rename('dwr')

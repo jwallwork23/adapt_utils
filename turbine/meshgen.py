@@ -1,31 +1,47 @@
 from adapt_utils.turbine.options import *
+import os
 
 
 __all__ = ["generate_geo_file"]
 
 
-def generate_geo_file(op, coarse=True, filepath='.'):
-    label = 'coarse' if coarse else 'fine'
+def generate_geo_file(op, level='coarse', tag=None, filepath='.'):
+    try:
+        assert level in ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
+    except:
+        raise NotImplementedError
     locs = op.region_of_interest
     n = len(locs)
     assert n > 0
+    label = '{:s}_{:d}'.format(level, n)
+    if tag is not None:
+        label += '_' + tag
     d = locs[0][2]
     for i in range(1, n):
         assert locs[i][2] == d
     D = 2*d
-    f = open('%s/%s_%d_turbine.geo' % (filepath, label, n), 'w+')
+    f = open(os.path.join(filepath, label + '_turbine.geo'), 'w+')
     if n < 3:
-        f.write('W=200.;     // width of channel\n')
-        f.write('L=1e3;      // length of channel\n')
-        if coarse:
+        f.write('W={:.1f};     // width of channel\n'.format(op.domain_width))
+        f.write('L={:.1f};      // length of channel\n'.format(op.domain_length))
+        if level == 'xcoarse':
+            dx1 = 40.
+            dx2 = 8.
+        elif level == 'coarse':
             dx1 = 20.
             dx2 = 4.
-        else:
+        elif level == 'medium':
+            dx1 = 10.
+            dx2 = 2.
+        elif level == 'fine':
             dx1 = 5.
             dx2 = 1.
+        else:
+            dx1 = 2.5
+            dx2 = 0.5
     elif n == 15:
-        f.write('W=1e3.;     // width of channel\n')
-        f.write('L=3e3;      // length of channel\n')
+        f.write('W={:.1f};     // width of channel\n'.format(op.domain_width))
+        f.write('L={:.1f};      // length of channel\n'.format(op.domain_length))
         raise NotImplementedError
     else:
         raise NotImplementedError

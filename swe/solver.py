@@ -2,9 +2,12 @@ from thetis import *
 from thetis.physical_constants import *
 from firedrake.petsc import PETSc
 import math
+import pyadjoint
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
+from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.p0_metric import *
 
 
 __all__ = ["SteadyShallowWaterProblem", "UnsteadyShallowWaterProblem"]
@@ -50,7 +53,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.nonlinear = True
 
     def set_fields(self):
-        self.op.set_viscosity()
+        self.op.set_viscosity(self.P1)
         self.inflow = self.op.set_inflow(self.P1_vec)
 
     def solve(self):
@@ -93,7 +96,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         # Initial conditions
         if self.prev_solution is not None:
-            solver_obj.assign_initial_conditions(uv=self.interpolated_solution)
+            u_interp, eta_interp = self.interpolated_solution.split()
+            solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
         else:
             solver_obj.assign_initial_conditions(uv=self.inflow)
 
@@ -110,17 +114,42 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def quantity_of_interest(self):
         pass
 
-    def get_hessian_metric(self, adjoint=False):
+    def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
+        field = self.op.adapt_field
+        assert field in ('elevation',
+                         'fluid_speed', 'velocity_x', 'velocity_y',
+                         'inflow', 'inflow_and_elevation',
+                         'both', 'all')
         sol = self.adjoint_solution if adjoint else self.solution
         u, eta = sol.split()
-        if self.op.adapt_field in ('fluid_speed', 'both'):
+        if field in ('fluid_speed', 'both'):
             spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
-            self.M = steady_metric(spd, op=self.op)
-        elif self.op.adapt_field == 'elevation':
-            self.M = steady_metric(eta, op=self.op)
-        if self.op.adapt_field == 'both':
-            M = steady_metric(eta, op=self.op)
+            self.M = steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
+        if field in ('elevation', 'all', 'inflow_and_elevation'):
+            self.M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
+        if field in ('velocity_x', 'all'):
+            s = Function(self.P1).interpolate(u[0])
+            Mu = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+        if field in ('velocity_y', 'all'):
+            s = Function(self.P1).interpolate(u[1])
+            Mv = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+        if field in ('inflow', 'inflow_and_elevation'):
+            v = Function(self.P1).interpolate(inner(u, self.op.inflow))
+            Mi = steady_metric(v, noscale=noscale, degree=degree, op=self.op)
+        if field == 'both':
+            M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
             self.M = metric_intersection(self.M, M)
+        elif field == 'all':
+            self.M *= 0.3333
+            self.M += 0.3333*(Mu + Mv)
+        elif field == 'velocity_x':
+            self.M = Mu
+        elif field == 'velocity_y':
+            self.M = Mv
+        elif field == 'inflow':
+            self.M = Mi
+        elif field == 'inflow_and_elevation':
+            self.M = metric_intersection(self.M, Mi)
 
     def get_bdy_functions(self, eta_in, u_in, bdy_id):
         b = self.op.bathymetry
@@ -155,7 +184,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
             raise Exception('Unsupported boundary type {:}'.format(funcs.keys()))
         return eta, u
 
-    def get_strong_residual(self, sol, adjoint_sol, sol_old=None):
+    def get_strong_residual(self, sol, adjoint_sol, sol_old=None, adjoint=False):
+        assert not adjoint  # FIXME
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
         u, eta = sol.split()
@@ -196,7 +226,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimators['dwr_cell'] = assemble(F*dx)
         self.indicators['dwr_cell'] = assemble(i*F*dx)
 
-    def get_flux_terms(self, sol, adjoint_sol, sol_old=None):
+    def get_flux_terms(self, sol, adjoint_sol, sol_old=None, adjoint=False):
+        assert not adjoint  # FIXME
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
         u, eta = sol.split()
@@ -224,22 +255,23 @@ class SteadyShallowWaterProblem(SteadyProblem):
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
         # HUDiv
-        if self.op.family == 'dg-dg':
+        if self.op.family in ('dg-dg', 'rt-dg'):
             u_rie = avg(u) + sqrt(g/avg(H))*jump(eta, n)
             loc = -i*n*zeta
             flux_terms += dot(avg(H)*u_rie, loc('+') + loc('-'))*dS
         loc = i*dot(H*u, n)*zeta
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
+        # NOTE: This ^^^ is an influential term for steady turbine
 
         # HorizontalAdvection
-        un_av = dot(avg(u), n('-'))
         u_up = avg(u)
         loc = -i*z
         flux_terms += jump(u, n)*dot(u_up, loc('+') + loc('-'))*dS
         loc = i*inner(outer(u, n), outer(u, z))
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
+        # NOTE: This ^^^ is an influential term for steady turbine
         if op.lax_friedrichs:
-            gamma = 0.5*abs(un_av)*op.lax_friedrichs_scaling_factor
+            gamma = 0.5*abs(dot(u_up, n('-')))*op.lax_friedrichs_scaling_factor
             loc = -i*z
             flux_terms += gamma*dot(loc('+') + loc('-'), jump(u))*dS
 
@@ -298,9 +330,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
                         continue
                     delta_u = u - u_ext
                     if op.grad_div_viscosity:
-                        stress_jump = 2*avg(nu)*sym(outer(delta_u, n))
+                        stress_jump = 2*nu*sym(outer(delta_u, n))
                     else:
-                        stress_jump = avg(nu)*outer(delta_u, n)
+                        stress_jump = nu*outer(delta_u, n)
                 flux_terms += -i*alpha/self.h*inner(outer(z, n), stress_jump)*ds(j)
                 flux_terms += i*inner(grad(z), stress_jump)*ds(j)
                 flux_terms += i*inner(outer(z, n), stress)*ds(j)
@@ -341,8 +373,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
         label = 'dwr'
         if adjoint:
             label += '_adjoint'
-        self.get_strong_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
-        self.get_flux_terms(self.solution, self.adjoint_solution, adjoint=adjoint)
+        sol_old = None if not hasattr(self, 'interpolated_solution') else self.interpolated_solution
+        self.get_strong_residual(self.solution, self.adjoint_solution, sol_old, adjoint=adjoint)
+        self.get_flux_terms(self.solution, self.adjoint_solution, sol_old, adjoint=adjoint)
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
         self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
@@ -429,10 +462,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
         """
         Here we only need interpolate the velocity.
         """
+        self.interpolated_solution = Function(self.V)
+        u_interp, eta_interp = self.interpolated_solution.split()
+        u_, eta_ = self.prev_solution.split()
         PETSc.Sys.Print("Interpolating solution across meshes...")
-        self.interpolated_solution = Function(self.V.sub(0))
-        self.interpolated_solution.project(self.prev_solution.split()[0])
-        #self.interpolated_solution = interp(self.mesh, self.prev_solution.split()[0])
+        with pyadjoint.stop_annotating():
+            u_interp.project(u_)
+            eta_interp.project(eta_)
 
 
 class UnsteadyShallowWaterProblem(UnsteadyProblem):

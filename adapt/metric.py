@@ -12,7 +12,7 @@ from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hes
 __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "anisotropic_refinement", "metric_intersection", "metric_relaxation", "metric_complexity"]
 
 
-def steady_metric(f=None, H=None, mesh=None, noscale=False, op=DefaultOptions()):
+def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=DefaultOptions()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
@@ -22,6 +22,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, op=DefaultOptions())
     :kwarg f: Field to compute the Hessian of.
     :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
     :kwarg noscale: If `noscale == True` then we simply take the Hessian with eigenvalues in modulus.
+    :kwarg degree: polynomial degree of Hessian.
     :kwarg op: `Options` class object providing min/max cell size values.
     :return: Steady metric associated with Hessian `H`.
     """
@@ -29,7 +30,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, op=DefaultOptions())
     if H is None:
         if mesh is None:
             mesh = f.function_space().mesh()
-        H = construct_hessian(f, mesh=mesh, op=op)
+        H = construct_hessian(f, mesh=mesh, degree=degree, op=op)
     V = H.function_space()
     mesh = V.mesh()
     dim = mesh.topological_dimension()

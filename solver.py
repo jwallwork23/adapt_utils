@@ -1,6 +1,10 @@
 from firedrake import *
 from firedrake.petsc import PETSc
 from thetis import create_directory
+from thetis_adjoint import *
+from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
+from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
+import pyadjoint
 
 import os
 import datetime
@@ -12,6 +16,7 @@ from adapt_utils.options import DefaultOptions
 from adapt_utils.misc.misc import index_string
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.p0_metric import *
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem", "MeshOptimisation", "OuterLoop"]
@@ -101,12 +106,36 @@ class SteadyProblem():
         """
         pass
 
+    def solve_discrete_adjoint(self):
+        """
+        Solve the adjoint PDE in the discrete sense, using pyadjoint.
+        """
+        # Compute some gradient in order to get adjoint solutions
+        J = self.quantity_of_interest()
+        compute_gradient(J, Control(self.gradient_field))
+        tape = get_working_tape()
+        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
+                                                        and not isinstance(block, ProjectBlock)
+                                                        and block.adj_sol is not None]
+        try:
+            assert len(solve_blocks) == 1
+        except:
+            ValueError("Expected one SolveBlock, but encountered {:d}".format(len(solve_blocks)))
+
+        # extract adjoint solution
+        self.adjoint_solution.assign(solve_blocks[0].adj_sol)
+        tape.clear_tape()
+
     def solve_adjoint(self):
         """
         Solve adjoint problem using specified method.
         """
-        PETSc.Sys.Print("Solving adjoint problem...")
-        self.solve_continuous_adjoint()
+        if self.discrete_adjoint:
+            PETSc.Sys.Print("Solving discrete adjoint problem...")
+            self.solve_discrete_adjoint()
+        else:
+            PETSc.Sys.Print("Solving continuous adjoint problem...")
+            self.solve_continuous_adjoint()
 
     def dwp_indication(self):
         """
@@ -114,9 +143,9 @@ class SteadyProblem():
         used for mesh adaptive tsunami modelling in [Davis and LeVeque, 2016]. Here 'DWP' is used
         to stand for Dual Weighted Primal.
         """
-        self.p1indicator = Function(self.P1)
-        self.p1indicator.project(inner(self.solution, self.adjoint_solution))
-        self.p1indicator.rename('dwp')
+        self.indicator = Function(self.P1)
+        self.indicator.project(inner(self.solution, self.adjoint_solution))
+        self.indicator.rename('dwp')
 
     def dwp_estimation(self):
         self.estimator = assemble(inner(self.solution, self.adjoint_solution)*dx)
@@ -219,9 +248,6 @@ class SteadyProblem():
         """
         if self.approach == 'fixed_mesh':
             return
-        elif self.approach == 'uniform':
-            self.mesh = MeshHierarchy(self.mesh, 1)[1]
-            return
         elif self.approach == 'hessian':
             self.get_hessian_metric()
         elif self.approach == 'hessian_adjoint':
@@ -322,18 +348,70 @@ class SteadyProblem():
             self.get_power_metric(adjoint=True)
             #self.M = metric_intersection(self.M, M)
             self.M = metric_intersection(M, self.M)
+        elif self.approach == 'carpio_isotropic':
+            self.dwr_indication()
+            amd = AnisotropicMetricDriver(self.mesh, indicator=self.indicator, op=self.op)
+            amd.get_isotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio_isotropic_adjoint':
+            self.dwr_indication_adjoint()
+            amd = AnisotropicMetricDriver(self.mesh, indicator=self.indicator, op=self.op)
+            amd.get_isotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio_isotropic_both':
+            self.dwr_indication()
+            i = self.indicator.copy()
+            self.dwr_indication_adjoint()
+            eta = Function(self.P0).interpolate(i + self.indicator)
+            amd = AnisotropicMetricDriver(self.mesh, indicator=eta, op=self.op)
+            amd.get_isotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio':
+            self.dwr_indication()
+            self.get_hessian_metric(noscale=True, degree=1)  # NOTE: degree 0 doesn't work
+            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio_adjoint':
+            self.dwr_indication_adjoint()
+            self.get_hessian_metric(noscale=True, degree=1, adjoint=True)
+            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio_almost_both':
+            self.dwr_indication()
+            self.get_hessian_metric(noscale=False, degree=1)
+            M = self.M.copy()
+            self.get_hessian_metric(noscale=False, degree=1, adjoint=True)
+            self.M = metric_intersection(self.M, M)
+            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric
+        elif self.approach == 'carpio_both':
+            self.dwr_indication()
+            i = self.indicator.copy()
+            self.get_hessian_metric(noscale=False, degree=1)
+            M = self.M.copy()
+            self.dwr_indication_adjoint()
+            self.get_hessian_metric(noscale=False, degree=1, adjoint=True)
+            self.indicator.interpolate(i + self.indicator)
+            self.M = metric_intersection(self.M, M)
+            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd.get_anisotropic_metric()
+            self.M = amd.p1metric
         else:
             try:
                 assert hasattr(self, 'custom_adapt')
-                self.custom_adapt()
             except:
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
+            PETSc.Sys.Print("Using custom metric '{:s}'".format(self.approach))
+            self.custom_adapt()
 
         # Apply metric relaxation, if requested
-        assert relaxation_parameter >= 0
-        assert relaxation_parameter <= 1
-        self.M_unrelaxed = self.M.copy()
         if prev_metric is not None:
+            assert relaxation_parameter >= 0
+            assert relaxation_parameter <= 1
+            self.M_unrelaxed = self.M.copy()
             self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
 
         ## FIXME
@@ -351,7 +429,7 @@ class SteadyProblem():
             else:
                 raise NotImplementedError  # TODO
 
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=True):
+    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=False):
         """
         Adapt mesh using metric constructed in error estimation step.
 
@@ -362,10 +440,17 @@ class SteadyProblem():
         :kwarg prev_metric: Metric from previous step. If unprovided, metric relaxation cannot be applied.
         :kwarg estimate_error: Toggle computation of global error estimate.
         """
-        if not hasattr(self, 'M'):
-            self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
-        self.mesh = adapt(self.mesh, self.M)
-        print('Done adapting.')
+        if self.approach == 'fixed_mesh':
+            return
+        elif self.approach == 'uniform':
+            self.mesh = MeshHierarchy(self.mesh, 1)[1]
+            return
+        else:
+            if not hasattr(self, 'M'):
+                PETSc.Sys.Print("Metric not found. Computing it now.")
+                self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
+            self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
+        PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.plot()
 
 
@@ -382,7 +467,8 @@ class MeshOptimisation():
         self.di = create_directory(op.di)
 
         # Default tolerances etc
-        self.msg = "Mesh %2d: %7d cells, qoi %.4e, estimator %.4e"
+        #self.msg = "Mesh %2d: %7d cells, qoi %.4e, estimator %.4e"
+        self.msg = "Mesh %2d: %7d cells, qoi %.4e"
         self.conv_msg = "Converged after %d iterations due to %s"
         self.startit = 0
         self.minit = 1
@@ -411,7 +497,6 @@ class MeshOptimisation():
         if self.log:
             self.logfile = open('{:s}/optimisation_log'.format(self.di), 'a+')
             self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
-            self.logfile.write('dwr_approach: {:s}\n'.format(self.op.dwr_approach))
             self.logfile.write('high_order: {:b}\n'.format(self.op.order_increase))
             self.logfile.write('relax: {:b}\n'.format(self.op.relax))
             self.logfile.write('maxit: {:d}\n'.format(self.maxit))
@@ -450,6 +535,7 @@ class MeshOptimisation():
             tp.indicate_error()
             #self.dat['estimator'].append(tp.estimator)
             #PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i], tp.estimator))
+            PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i]))
             #if self.log:  # TODO: parallelise
             #    self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
 
@@ -481,6 +567,7 @@ class MeshOptimisation():
                 prev_sol = tp.solution
             if self.op.relax:
                 M_ = tp.M_unrelaxed
+
         self.dat['time'] = clock() - tstart
         PETSc.Sys.Print('Time to solution: %.1fs' % (self.dat['time']))
         if self.log:
@@ -988,7 +1075,7 @@ class UnsteadyProblem():
         # Adapt mesh
         if self.M is not None and norm(self.M) > 0.1*norm(Constant(1, domain=self.mesh)):
             # FIXME: The 0.1 factor seems pretty arbitrary
-            self.mesh = adapt(self.mesh, self.M)
+            self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
             PETSc.Sys.Print("Number of elements: %d" % self.mesh.num_cells())
 
             # Re-establish function spaces
