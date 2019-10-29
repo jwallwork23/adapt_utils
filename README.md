@@ -1,7 +1,6 @@
 ### Mesh adaptation in Firedrake
 
-In this code, anisotropic mesh adaptivity is applied to solving the nonlinear shallow water equations and advection-diffusion equations in the coastal, estuarine and ocean modelling solver provided by [Thetis][2]. The Thetis project is built upon the [Firedrake][1] project, which enables efficient FEM solution in Python by automatic generation of C code. Anisotropic mesh adaptivity is achieved using [PRAgMaTIc][3]. This is research of the Applied Modelling and Computation Group ([AMCG][4]) at
-Imperial College London.
+In this code, anisotropic and isotropic goal-oriented mesh adaptation is applied to solving the shallow water and tracer transport problems using the coastal, estuarine and ocean modelling solver provided by [Thetis][2]. Thetis is built upon the [Firedrake][1] project, which enables efficient FEM solution in Python by automatic generation of [PETSc][3] code. Anisotropic mesh adaptivity is achieved using [PRAgMaTIc][4]. A continuous adjoint solver is provided for advection-diffusion problems and the discrete adjoint code [Pyadjoint][5] can be used to generate adjoint solutions for more general problems. This is research of the Applied Modelling and Computation Group ([AMCG][6]) at Imperial College London.
 
 ### Versions
 
@@ -11,14 +10,11 @@ Imperial College London.
 
 * If using `v1.0`, download Firedrake, PETSc and Pragmatic using [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3250888.svg)](https://doi.org/10.5281/zenodo.3250888).
 
-For the current development version, follow the following instructions:
-
+For a development version:
 * Clone this repository and make it accessible to the `PYTHONPATH` environment variable.
 * Set the environment variable
   ``export PETSC_CONFIGURE_OPTIONS="--download-pragmatic --with-cxx-dialect=C++11"``
   and install [Firedrake][1] with the flags ``--install thetis`` and ``--install pyadjoint``.
-* Add ``**self.kwargs`` to the definition of ``backend.solve`` on line 165 of
-  ``firedrake/src/pyadjoint/fenics_adjoint/solving.py``.
 * Fetch and checkout the remote branch
     * ``https://github.com/jwallwork23/firedrake`` for firedrake, fork ``joe/meshadapt``
     and call ``make`` in ``firedrake/src/firedrake`` to enable pragmatic drivers.
@@ -28,6 +24,7 @@ For the current development version, follow the following instructions:
 
 [1]: http://firedrakeproject.org/ "Firedrake"
 [2]: http://thetisproject.org/index.html "Thetis"
-[3]: https://github.com/meshadaptation/pragmatic "PRAgMaTIc"
-[4]: http://www.imperial.ac.uk/earth-science/research/research-groups/amcg/ "AMCG"
-
+[3]: https://www.mcs.anl.gov/petsc/ "PETSc"
+[4]: https://github.com/meshadaptation/pragmatic "PRAgMaTIc"
+[5]: https://bitbucket.org/dolfin-adjoint/pyadjoint/src "Pyadjoint"
+[6]: http://www.imperial.ac.uk/earth-science/research/research-groups/amcg/ "AMCG"
