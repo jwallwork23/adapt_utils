@@ -31,6 +31,7 @@ ksponly_params = {
     'snes_type': 'ksponly',
     'snes_monitor': None,
     'ksp_type': 'preonly',
+    'ksp_monitor_singular_value': None,
     'pc_type': 'lu',
     'pc_factor_mat_solver_type': 'mumps',
 }
@@ -58,20 +59,13 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     """
 
     # Solver parameters
-<<<<<<< HEAD
     params = PETScSolverParameters(ksponly_params).tag(config=True)
-=======
-    params = PETScSolverParameters(ilu_params).tag(config=True)
->>>>>>> 35994d60832d631cd5e4a0cab77fbf40f0debcdc
 
     def __init__(self, approach='fixed_mesh', num_iterations=2):
         super(SteadyTurbineOptions, self).__init__(approach)
         self.dt = 20.
-<<<<<<< HEAD
-        if approach in ('fixed_mesh', 'uniform'):
+        if approach in ('fixed_mesh', 'uniform') or 'isotropic' in approach:
             self.params = default_params
-=======
->>>>>>> 35994d60832d631cd5e4a0cab77fbf40f0debcdc
         if self.params == ksponly_params:
             self.end_time = num_iterations*self.dt - 0.2
         else:
