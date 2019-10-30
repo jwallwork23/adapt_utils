@@ -96,12 +96,18 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         # Initial conditions
         if self.prev_solution is not None:
+            interp = self.interpolated_solution
             u_interp, eta_interp = self.interpolated_solution.split()
-            solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
         else:
-            solver_obj.assign_initial_conditions(uv=self.inflow)
+            interp = Function(self.V)
+            u_interp, eta_interp = interp.split()
+            u_interp.interpolate(self.inflow)
+        solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
 
         # Solve
+        # solver_obj.create_timestepper()
+        # self.lhs = lhs(solver_obj.timestepper.F)  # TODO: not much use for condition number atm
+        self.lhs = self.get_weak_residual(interp)
         solver_obj.iterate()
         self.solution.assign(solver_obj.fields.solution_2d)
 
@@ -183,6 +189,80 @@ class SteadyShallowWaterProblem(SteadyProblem):
         else:
             raise Exception('Unsupported boundary type {:}'.format(funcs.keys()))
         return eta, u
+
+    def get_weak_residual(self, sol_old, sol=None):
+        u_test, eta_test = TestFunctions(self.V)
+        if sol is None:
+            u, eta = TrialFunctions(self.V)
+        else:
+            u, eta = sol.split()
+        u_old, eta_old = sol_old.split()
+
+        op = self.op
+        b = op.bathymetry
+        nu = op.viscosity
+        f = None if not hasattr(op, 'coriolis') else op.coriolis
+        C_d = None if not hasattr(op, 'drag_coefficient') else op.drag_coefficient
+        H = b + eta
+        H_old = b + eta_old
+        H_avg = avg(H_old)
+        g = op.g
+        n = self.n
+
+        f = 0
+
+        # ExternalPressureGradient  # FIXME: assumes dg-dg
+        f = -g*eta*nabla_div(u_test)*dx
+        head_star = avg(eta) + 0.5*sqrt(avg(H_old)/g)*jump(u, n)
+        f += g*head_star*jump(u_test, n)*dS
+
+        # HUDiv  # FIXME: assumes dg-dg
+        f = -inner(grad(eta_test), H_old*u)*dx
+        uv_rie = avg(u) + sqrt(g/H_avg)*jump(eta, n)
+        hu_star = H_avg*uv_rie
+        f += inner(jump(eta_test, n), hu_star)*dS
+
+        # HorizontalAdvection  # TODO
+
+        # HorizontalViscosity  # TODO
+
+        # QuadraticDrag  # TODO
+
+        # Extra terms  # TODO
+
+        return -f  # FIXME: temporary
+
+        bcs = self.boundary_conditions
+        for j in bcs:
+            funcs = bcs.get(j)
+            if funcs is not None:
+                eta_ext, u_ext = self.get_bdy_functions(eta, u, j)
+                eta_ext_old, u_ext_old = self.get_bnd_functions(eta_old, uv_old, j)
+
+                # ExternalPressureGradient  # FIXME: assumes dg-dg
+                un_jump = inner(u - u_ext, n)
+                eta_rie = 0.5*(eta + eta_ext) + sqrt(H_old/g)*un_jump
+                f += g*eta_rie*dot(u_test, n)*ds(j)
+
+                # HUDiv  # FIXME: assumes dg-dg
+                H_ext = b + eta_ext_old
+                H_av = 0.5*(H_old + H_ext)
+                eta_jump = eta - eta_ext
+                un_rie = 0.5*inner(u + u_ext, n) + sqrt(g/H_av)*eta_jump
+                un_jump = inner(u_old - u_ext_old, n)
+                eta_rie = 0.5*(eta_old + eta_ext_old) + sqrt(H_av/g)*un_jump
+                H_rie = b + eta_rie
+                f += H_rie*un_rie*eta_test*ds
+
+            if funcs is None or 'symm' in funcs:
+
+                # ExternalPressureGradient  # FIXME: assumes dg-dg
+                un_jump = inner(u, n)
+                head_rie = eta + sqrt(H_old/g)*un_jump
+                f += g*head_rie*dot(u_test, n)*ds(j)
+
+        raise NotImplementedError
+        return -f
 
     def get_strong_residual(self, sol, adjoint_sol, sol_old=None, adjoint=False):
         assert not adjoint  # FIXME

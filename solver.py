@@ -466,7 +466,7 @@ class SteadyProblem():
             msg = "Cannot determine condition number since {:s} does not know the LHS."
             raise ValueError(msg.format(self.__class__.__name__))
         if hasattr(self.V, 'num_sub_spaces'):
-            n = self.V.num_sub_spaces
+            n = self.V.num_sub_spaces()
             cc = NestedConditionCheck(self.lhs)
             if submatrices is None:
                 submatrices = []
