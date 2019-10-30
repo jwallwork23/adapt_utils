@@ -1,7 +1,10 @@
 from firedrake import *
 
 # TODO: use SLEPc
+import numpy as np
 import numpy.linalg as la
+import scipy.sparse as sp
+import scipy.sparse.linalg as sla
 
 
 __all__ = ["UnnestedConditionCheck", "NestedConditionCheck"]
@@ -30,15 +33,15 @@ class UnnestedConditionCheck(BaseConditionCheck):
             raise ValueError("Matrix type 'nest' not supported. Use `NestedConditionCheck` instead.")
         self.m = self.n = 1
 
-    # TODO: do not convert to dense! Use getRow(i) and sparse linalg
-
-    def convert_dense(self):
-        self.A_dense = self.A.convert('dense')
-
     def condition_number(self):
-        if not hasattr(self, 'A_dense'):
-            self.convert_dense()
-        return la.cond(self.A_dense)
+        indptr, indices, data = self.A.getValuesCSR()
+        A_sparse = sp.csr_matrix((data, indices, indptr), shape=(self.m, self.n))
+        try:
+            eigval = sla.eigs(A_sparse)[0]
+        except:
+            eigval = la.eig(A_sparse)[0]
+        # TODO: check nonzero
+        return np.max(eigval)/np.min(eigval)
 
 
 class NestedConditionCheck(BaseConditionCheck):
@@ -58,12 +61,12 @@ class NestedConditionCheck(BaseConditionCheck):
             for j in range(self.n):
                 self.submatrices[i][j] = self.A.getNestSubMatrix(i, j)
 
-    # TODO: do not convert to dense! Use getRow(i) and sparse linalg
-
-    def convert_dense(self, i, j):
-        self.dense_submatrices[i][j] = self.submatrices[i][j].convert('dense').getDenseArray()
-
     def condition_number(self, i, j):
-        if not j in self.dense_submatrices[i]:
-            self.convert_dense(i, j)
-        return la.cond(self.dense_submatrices[i][j])
+        indptr, indices, data = self.submatrices[i][j].getValuesCSR()
+        A_sparse = sp.csr_matrix((data, indices, indptr), shape=(self.m, self.n))
+        try:
+            eigval = sla.eigs(A_sparse)[0]
+        except:
+            eigval = la.eig(A_sparse)[0]
+        # TODO: check nonzero
+        return np.max(eigval)/np.min(eigval)
