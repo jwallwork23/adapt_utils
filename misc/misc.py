@@ -2,7 +2,8 @@ from firedrake import *
 import numpy as np
 
 
-__all__ = ["index_string", "subdomain_indicator", "bessi0", "bessk0"]
+__all__ = ["index_string", "subdomain_indicator", "get_boundary_nodes", "print_doc",
+           "bessi0", "bessk0"]
 
 
 def index_string(index):
@@ -17,6 +18,19 @@ def subdomain_indicator(mesh, subdomain_id):
     Creates a P0 indicator function relating with `subdomain_id`.
     """
     return assemble(TestFunction(FunctionSpace(mesh, "DG", 0))*dx(subdomain_id))
+
+def get_boundary_nodes(fs, segment='on_boundary'):
+    """
+    :arg fs: function space to get boundary nodes for.
+    :kwarg segment: segment of boundary to get nodes of (default 'on_boundary').
+    """
+    return fs.boundary_nodes(segment, 'topological')
+
+def print_doc(anything):
+    """
+    Print the docstring of any class or function.
+    """
+    print(anything.__doc__)
 
 def bessi0(x):
     """
