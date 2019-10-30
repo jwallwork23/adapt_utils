@@ -14,6 +14,7 @@ import pickle
 
 from adapt_utils.options import DefaultOptions
 from adapt_utils.misc.misc import index_string
+from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
@@ -452,6 +453,32 @@ class SteadyProblem():
             self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
         PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.plot()
+
+    def check_conditioning(self, submatrices=None):
+        """
+        Check condition number of LHS matrix, or submatrices thereof.
+
+        :kwarg submatries: indices for desired submatrices (default all with `None`).
+        """
+        try:
+            assert hasattr(self, 'lhs')
+        except:
+            msg = "Cannot determine condition number since {:s} does not know the LHS."
+            raise ValueError(msg.format(self.__class__.__name__))
+        if hasattr(self.V, 'num_sub_spaces'):
+            n = self.V.num_sub_spaces
+            cc = NestedConditionCheck(self.lhs)
+            if submatrices is None:
+                submatrices = []
+                for i in range(n):
+                    for j in range(n):
+                        submatrices.append((i, j))
+            for s in submatrices:
+                k = cc.condition_number(s[0], s[1])
+                PETSc.Sys.Print("Condition number %1d,%1d: %.4e" % (s[0], s[1], k))
+        else:
+            cc = UnnestedConditionCheck(self.lhs)
+            PETSc.Sys.Print("Condition number: %.4e" % cc.condition_number())
 
 
 class MeshOptimisation():

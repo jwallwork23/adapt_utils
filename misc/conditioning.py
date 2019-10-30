@@ -1,5 +1,4 @@
 from firedrake import *
-from firedrake.petsc import PETSc
 
 # TODO: use SLEPc
 import numpy.linalg as la
@@ -34,7 +33,7 @@ class UnnestedConditionCheck(BaseConditionCheck):
     def condition_number(self):
         if not hasattr(self, 'A_dense'):
             self.convert_dense()
-        PETSc.Sys.Print("Condition number: %.4e" % la.cond(self.A_dense))
+        return la.cond(self.A_dense)
 
 
 class NestedConditionCheck(BaseConditionCheck):
@@ -56,4 +55,4 @@ class NestedConditionCheck(BaseConditionCheck):
     def condition_number(self, i, j):
         if self.dense_submatrices[i][j] == {}:
             self.convert_dense(i, j)
-        PETSc.Sys.Print("Condition number %1d,%1d: %.4e" % la.cond(self.dense_submatrices[i][j]))
+        return la.cond(self.dense_submatrices[i][j])
