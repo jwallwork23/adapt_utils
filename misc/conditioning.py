@@ -1,6 +1,6 @@
 from firedrake import *
+from firedrake.petsc import PETSc
 
-# TODO: use SLEPc
 import numpy as np
 import numpy.linalg as la
 import scipy.sparse as sp
@@ -12,21 +12,59 @@ __all__ = ["UnnestedConditionCheck", "NestedConditionCheck"]
 
 class BaseConditionCheck():
 
-    def __init__(self, bilinear_form):
+    def __init__(self, bilinear_form, mass_term=None):
         self.a = bilinear_form
         self.A = assemble(bilinear_form).M.handle
+        if mass_term is not None:
+            self.M = assemble(mass_term).M.handle
 
-    def _get_csr(self, *args):
+    def _get_wrk(self, *args):
         pass
 
+    def _get_csr(self):
+        indptr, indices, data = self.wrk.getValuesCSR()
+        self.csr = sp.csr_matrix((data, indices, indptr), shape=self.wrk.getSize())
+
     def condition_number(self, *args, eps=1e-10):
-        self._get_csr(*args)
+        self._get_wrk(*args)
         try:
-            eigval = sla.eigs(self.csr)[0]
+            from slepc4py import SLEPc
         except:
-            eigval = la.eig(self.csr)[0]
-        eigval = np.where(np.abs(eigval) < eps, eps, np.abs(eigval))
-        return np.max(eigval)/np.min(eigval)
+            # If SLEPc is not available, use SciPy
+            self._get_csr()
+            eigval = np.abs(sla.eigs(self.csr)[0])
+            return np.max(eigval)/max(np.min(eigval), eps)
+
+        if hasattr(self, 'M'):
+            raise NotImplementedError  # TODO
+        else:
+            # Solve eigenvalue problem
+            n = self.wrk.getSize()[0]
+            es = SLEPc.EPS().create(comm=COMM_WORLD)
+            es.setDimensions(n)
+            es.setOperators(self.wrk)
+            opts = PETSc.Options()
+            opts.setValue('eps_type', 'krylovschur')
+            opts.setValue('eps_monitor', None)
+            # opts.setValue('eps_pc_type', 'lu')
+            # opts.setValue('eps_pc_factor_mat_solver_type', 'mumps')
+            es.setFromOptions()
+            PETSc.Sys.Print("Solving eigenvalue problem using SLEPc...")
+            es.solve()
+
+            # Check convergence
+            nconv = es.getConverged()
+            if nconv == 0:
+                import sys
+                warning("Did not converge any eigenvalues")
+                sys.exit(0)
+
+            # Compute condition number
+            vr, vi = self.wrk.getVecs()
+            eigmax = es.getEigenpair(0, vr, vi).real
+            eigmin = es.getEigenpair(n-1, vr, vi).real
+            eigmin = max(eigmin, eps)
+            return np.abs(eigmax/eigmin)
 
 
 class UnnestedConditionCheck(BaseConditionCheck):
@@ -37,11 +75,9 @@ class UnnestedConditionCheck(BaseConditionCheck):
             assert self.A.getType() != 'nest'
         except:
             raise ValueError("Matrix type 'nest' not supported. Use `NestedConditionCheck` instead.")
-        self.m = self.n = 1
 
-    def _get_csr(self):
-        indptr, indices, data = self.A.getValuesCSR()
-        self.csr = sp.csr_matrix((data, indices, indptr), shape=self.A.getSize())
+    def _get_wrk(self):
+        self.wrk = self.A
 
 
 class NestedConditionCheck(BaseConditionCheck):
@@ -52,14 +88,12 @@ class NestedConditionCheck(BaseConditionCheck):
             assert self.A.getType() == 'nest'
         except:
             raise ValueError("Matrix type {:} not supported.".format(self.A.getType()))
-        self.m, self.n = self.A.getNestSize()
+        m, n = self.A.getNestSize()
         self.submatrices = {}
-        for i in range(self.m):
+        for i in range(m):
             self.submatrices[i] = {}
-            for j in range(self.n):
+            for j in range(n):
                 self.submatrices[i][j] = self.A.getNestSubMatrix(i, j)
 
-    def _get_csr(self, i, j):
-        indptr, indices, data = self.submatrices[i][j].getValuesCSR()
-        size = self.submatrices[i][j].getSize()
-        self.csr = sp.csr_matrix((data, indices, indptr), shape=size)
+    def _get_wrk(self, i, j):
+        self.wrk = self.submatrices[i][j]
