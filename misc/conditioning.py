@@ -33,14 +33,14 @@ class UnnestedConditionCheck(BaseConditionCheck):
             raise ValueError("Matrix type 'nest' not supported. Use `NestedConditionCheck` instead.")
         self.m = self.n = 1
 
-    def condition_number(self):
+    def condition_number(self, eps=1e-10):
         indptr, indices, data = self.A.getValuesCSR()
-        A_sparse = sp.csr_matrix((data, indices, indptr), shape=(self.m, self.n))
+        A_sparse = sp.csr_matrix((data, indices, indptr), shape=self.A.getSize())
         try:
             eigval = sla.eigs(A_sparse)[0]
         except:
             eigval = la.eig(A_sparse)[0]
-        # TODO: check nonzero
+        eigval = np.where(np.abs(eigval) < eps, eps, np.abs(eigval))
         return np.max(eigval)/np.min(eigval)
 
 
@@ -61,12 +61,13 @@ class NestedConditionCheck(BaseConditionCheck):
             for j in range(self.n):
                 self.submatrices[i][j] = self.A.getNestSubMatrix(i, j)
 
-    def condition_number(self, i, j):
+    def condition_number(self, i, j, eps=1e-10):
         indptr, indices, data = self.submatrices[i][j].getValuesCSR()
-        A_sparse = sp.csr_matrix((data, indices, indptr), shape=(self.m, self.n))
+        size = self.submatrices[i][j].getSize()
+        A_sparse = sp.csr_matrix((data, indices, indptr), shape=size)
         try:
             eigval = sla.eigs(A_sparse)[0]
         except:
             eigval = la.eig(A_sparse)[0]
-        # TODO: check nonzero
+        eigval = np.where(np.abs(eigval) < eps, eps, np.abs(eigval))
         return np.max(eigval)/np.min(eigval)
