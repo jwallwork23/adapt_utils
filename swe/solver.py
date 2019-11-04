@@ -201,13 +201,14 @@ class SteadyShallowWaterProblem(SteadyProblem):
         op = self.op
         b = op.bathymetry
         nu = op.viscosity
-        f = None if not hasattr(op, 'coriolis') else op.coriolis
+        coriolis = None if not hasattr(op, 'coriolis') else op.coriolis
         C_d = None if not hasattr(op, 'drag_coefficient') else op.drag_coefficient
         H = b + eta
         H_old = b + eta_old
         H_avg = avg(H_old)
         g = op.g
         n = self.n
+        h = self.h
 
         f = 0
 
@@ -222,27 +223,67 @@ class SteadyShallowWaterProblem(SteadyProblem):
         hu_star = H_avg*uv_rie
         f += inner(jump(eta_test, n), hu_star)*dS
 
-        # HorizontalAdvection  # TODO
+        # HorizontalAdvection
+        if self.nonlinear:
+            f += -(Dx(u_old[0]*u_test[0], 0)*u[0]
+                  + Dx(u_old[0]*u_test[1], 0)*u[1]
+                  + Dx(u_old[1]*u_test[0], 1)*u[0]
+                  + Dx(u_old[1]*u_test[1], 1)*u[1])*dx
+            u_up = avg(u)
+            f += (u_up[0]*jump(u_test[0], u_old[0]*n[0])
+                  + u_up[1]*jump(u_test[1], u_old[0]*n[0])
+                  + u_up[0]*jump(u_test[0], u_old[1]*n[1])
+                  + u_up[1]*jump(u_test[1], u_old[1]*n[1]))*dS
+            # Lax-Friedrichs stabilization  # FIXME
+        #    if op.lax_friedrichs:
+        #        gamma = 0.5*abs(dot(avg(u_old), n('-')))*op.lax_friedrichs_scaling_factor
+        #        f += gamma*dot(jump(u_test), jump(u))*dS
 
-        # HorizontalViscosity  # TODO
+        # HorizontalViscosity
+        if op.grad_div_viscosity:
+            stress = nu*2.*sym(grad(u))
+            stress_jump = avg(nu)*2.*sym(tensor_jump(u, n))
+        else:
+            stress = nu*grad(u)
+            stress_jump = avg(nu)*tensor_jump(u, n)
 
-        # QuadraticDrag  # TODO
+        f += inner(grad(u_test), stress)*dx
 
-        # Extra terms  # TODO
+        p = self.op.degree
+        alpha = 5.*p*(p+1)
+        if p == 0:
+            alpha = 1.5
+        f += (
+            + alpha/avg(h)*inner(tensor_jump(u_test, n), stress_jump)*dS
+            - inner(avg(grad(u_test)), stress_jump)*dS
+            - inner(tensor_jump(u_test, n), avg(stress))*dS
+            )
+        if op.grad_depth_viscosity:
+            f += -dot(u_test, dot(grad(H_old)/H_old, stress))*dx
 
-        return -f  # FIXME: temporary
 
-        bcs = self.boundary_conditions
+        # QuadraticDrag
+        if C_d is not None:
+            f += C_d*sqrt(dot(u_old, u_old))*inner(u_test, u)/H_old*dx
+
+        # Coriolis
+        if coriolis is not None:
+            f += coriolis*(-u[1]*u_test[0] + u[0]*u_test[1])*dx
+
+        if hasattr(self, 'extra_weak_residual_terms'):  # NOTE sign
+            f -= self.extra_weak_residual_terms(u, eta, u_old, eta_old, u_test, eta_test)
+
+        bcs = self.boundary_conditions  # FIXME
         for j in bcs:
             funcs = bcs.get(j)
             if funcs is not None:
                 eta_ext, u_ext = self.get_bdy_functions(eta, u, j)
-                eta_ext_old, u_ext_old = self.get_bnd_functions(eta_old, uv_old, j)
+                eta_ext_old, u_ext_old = self.get_bdy_functions(eta_old, u_old, j)
 
                 # ExternalPressureGradient  # FIXME: assumes dg-dg
                 un_jump = inner(u - u_ext, n)
                 eta_rie = 0.5*(eta + eta_ext) + sqrt(H_old/g)*un_jump
-                f += g*eta_rie*dot(u_test, n)*ds(j)
+                #f += g*eta_rie*dot(u_test, n)*ds(j)
 
                 # HUDiv  # FIXME: assumes dg-dg
                 H_ext = b + eta_ext_old
@@ -252,16 +293,47 @@ class SteadyShallowWaterProblem(SteadyProblem):
                 un_jump = inner(u_old - u_ext_old, n)
                 eta_rie = 0.5*(eta_old + eta_ext_old) + sqrt(H_av/g)*un_jump
                 H_rie = b + eta_rie
-                f += H_rie*un_rie*eta_test*ds
+                #f += H_rie*un_rie*eta_test*ds(j)
+
+                # HorizontalAdvection
+                eta_jump = eta_old - eta_ext_old
+                un_rie = 0.5*inner(u_old + u_ext_old, n) + sqrt(g/H_old)*eta_jump
+                u_av = 0.5*(u_ext + u)
+                #f += (u_av[0]*u_test[0]*un_rie
+                #      + u_av[1]*u_test[1]*un_rie)*ds(j)
+
+                # HorizontalViscosity
+                if 'un' in funcs:
+                    delta_uv = (dot(u, n) - funcs['un'])*n
+                else:
+                    if u_ext is u:
+                        continue
+                    delta_u = u - u_ext
+
+                if op.grad_div_viscosity:
+                    stress_jump = nu*2.*sym(outer(delta_u, n))
+                else:
+                    stress_jump = nu*outer(delta_u, n)
+
+                #f += (
+                #    alpha/h*inner(outer(u_test, n), stress_jump)*ds(j)
+                #    - inner(grad(u_test), stress_jump)*ds(j)
+                #    - inner(outer(u_test, n), stress)*ds(j)
+                #)
 
             if funcs is None or 'symm' in funcs:
 
                 # ExternalPressureGradient  # FIXME: assumes dg-dg
                 un_jump = inner(u, n)
                 head_rie = eta + sqrt(H_old/g)*un_jump
-                f += g*head_rie*dot(u_test, n)*ds(j)
+                #f += g*head_rie*dot(u_test, n)*ds(j)
 
-        raise NotImplementedError
+            if funcs is None:
+                if op.lax_friedrichs:
+                    u_ext = u - 2*dot(u, n)*n
+                    gamma = 0.5*abs(dot(u_old, n))*op.lax_friedrichs_scaling_factor
+                    #f += gamma*dot(u_test, u-u_ext)*ds(j)
+
         return -f
 
     def get_strong_residual(self, sol, adjoint_sol, sol_old=None, adjoint=False):
