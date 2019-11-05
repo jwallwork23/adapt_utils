@@ -90,6 +90,9 @@ class SteadyTracerProblem2d(SteadyProblem):
             a += coeff*-div(nu*grad(phi))*dx
             L += coeff*f*dx
 
+        # For condition number studies  # TODO: what about RHS?
+        self.lhs = a
+
         # Solve
         bc = DirichletBC(self.V, 0, dbcs)
         solve(a == L, self.solution, bcs=bc, solver_parameters=self.op.params)

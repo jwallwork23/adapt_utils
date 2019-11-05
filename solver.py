@@ -2,8 +2,8 @@ from firedrake import *
 from firedrake.petsc import PETSc
 from thetis import create_directory
 from thetis_adjoint import *
-from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
-from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
+# from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
+# from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
 import pyadjoint
 
 import os
@@ -473,12 +473,15 @@ class SteadyProblem():
                 for i in range(n):
                     for j in range(n):
                         submatrices.append((i, j))
+            self.condition_number = {}
             for s in submatrices:
-                k = cc.condition_number(s[0], s[1])
-                PETSc.Sys.Print("Condition number %1d,%1d: %.4e" % (s[0], s[1], k))
+                kappa = cc.condition_number(s[0], s[1])
+                self.condition_number[s] = kappa
+                PETSc.Sys.Print("Condition number %1d,%1d: %.4e" % (s[0], s[1], kappa))
         else:
             cc = UnnestedConditionCheck(self.lhs)
-            PETSc.Sys.Print("Condition number: %.4e" % cc.condition_number())
+            self.condition_number = cc.condition_number()
+            PETSc.Sys.Print("Condition number: %.4e" % self.condition_number)
 
 
 class MeshOptimisation():

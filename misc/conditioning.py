@@ -32,7 +32,13 @@ class BaseConditionCheck():
         except:
             # If SLEPc is not available, use SciPy
             self._get_csr()
-            eigval = np.abs(sla.eigs(self.csr)[0])
+            eigval = sla.eigs(self.csr)[0]
+            eigmin = np.min(eigval)
+            if eigmin > 0.0:
+                PETSc.Sys.Print("Mass matrix is positive-definite")
+            else:
+                PETSc.Sys.Print("Mass matrix is not positive-definite. Minimal eigenvalue: {:.4e}".format(eigmin))
+            eigval = np.abs(eigval)
             return np.max(eigval)/max(np.min(eigval), eps)
 
         if hasattr(self, 'M'):
@@ -64,6 +70,10 @@ class BaseConditionCheck():
             eigmax = es.getEigenpair(0, vr, vi).real
             eigmin = es.getEigenpair(n-1, vr, vi).real
             eigmin = max(eigmin, eps)
+            if eigmin > 0.0:
+                PETSc.Sys.Print("Mass matrix is positive-definite")
+            else:
+                PETSc.Sys.Print("Mass matrix is not positive-definite. Minimal eigenvalue: {:.4e}".format(eigmin))
             return np.abs(eigmax/eigmin)
 
 
