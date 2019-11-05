@@ -605,7 +605,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             options.no_exports = True
 
         # Parameters
-        options.use_grad_div_viscosity_term = op.symmetric_viscosity
+        options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
         options.horizontal_viscosity = op.viscosity
         options.quadratic_drag_coefficient = op.drag_coefficient

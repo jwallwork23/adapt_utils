@@ -4,6 +4,7 @@ from thetis.configuration import *
 from adapt_utils.options import Options
 
 import numpy as np
+import weakref
 
 
 __all__ = ["ShallowWaterOptions", "BoydOptions"]
@@ -19,7 +20,7 @@ class ShallowWaterOptions(Options):
     base_viscosity = NonNegativeFloat(None, allow_none=True).tag(config=True)
     viscosity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
     drag_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
-    g = PositiveFloat(9.81).tag(config=True)
+    g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
 
     # Model
     grad_div_viscosity = Bool(False).tag(config=True)
@@ -72,10 +73,17 @@ class BoydOptions(ShallowWaterOptions):
         # Initial mesh
         self.lx = 48
         self.ly = 24
+        self.distribution_parameters = {
+                'partition': True,
+                'overlap_type': (DistributedMeshOverlapType.VERTEX, 10),
+        }
         if periodic:
-            self.default_mesh = PeriodicRectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly, direction='x')
+            self.default_mesh = PeriodicRectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly,
+                                                      direction='x',
+                                                      distribution_parameters=self.distribution_parameters)
         else:
-            self.default_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly)
+            self.default_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly,
+                                              distribution_parameters=self.distribution_parameters)
         x, y = SpatialCoordinate(self.default_mesh)
         self.default_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
         self.x, self.y = SpatialCoordinate(self.default_mesh)
@@ -281,9 +289,11 @@ class BoydOptions(ShallowWaterOptions):
         """
         Set up a non-periodic, very fine mesh on the PDE domain.
         """
-        reference_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly)
+        reference_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly,
+                                       distribution_parameters=self.distribution_parameters)
         x, y = SpatialCoordinate(reference_mesh)
         reference_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
+
         return reference_mesh
 
     def remove_periodicity(self, sol):
@@ -291,9 +301,13 @@ class BoydOptions(ShallowWaterOptions):
         :arg sol: Function to remove periodicity of.
         """
         # Generate an identical non-periodic mesh
-        nonperiodic_mesh = RectangleMesh(self.lx*self.n, self.ly*self.n, self.lx, self.ly)
+        nonperiodic_mesh = RectangleMesh(self.lx*self.n, self.ly*self.n, self.lx, self.ly,
+                                         distribution_parameters=self.distribution_parameters)
         x, y = SpatialCoordinate(nonperiodic_mesh)
         nonperiodic_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
+
+        # Mark meshes as compatible
+        nonperiodic_mesh._parallel_compatible = {weakref.ref(sol.function_space().mesh())}
 
         # Project into corresponding function space
         V = FunctionSpace(nonperiodic_mesh, sol.ufl_element())
@@ -329,6 +343,7 @@ class BoydOptions(ShallowWaterOptions):
         # Project solution into a reference space on a fine mesh
         reference_mesh = self.get_reference_mesh(n=reference_mesh_resolution)
         fs = FunctionSpace(reference_mesh, sol.ufl_element())
+        reference_mesh._parallel_compatible = {weakref.ref(mesh)}  # Mark meshes as compatible
         sol_proj = Function(fs)
         sol_proj.project(sol)
         sol_upper_proj = Function(fs)
