@@ -2,8 +2,8 @@ from firedrake import *
 from firedrake.petsc import PETSc
 from thetis import create_directory
 from thetis_adjoint import *
-# from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
-# from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
+from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
+from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
 import pyadjoint
 
 import os
