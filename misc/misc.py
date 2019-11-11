@@ -8,6 +8,9 @@ __all__ = ["get_min_angle", "index_string", "subdomain_indicator", "get_boundary
 
 
 def get_min_angle(mesh):
+    """
+    Compute the minimum angle in each mesh element.
+    """
     plex = mesh._plex
 
     # Ensure correct section
@@ -43,8 +46,34 @@ def get_min_angle(mesh):
         normalised = []
         for i in dat:
             normalised.append(dat[i]['vector']/dat[i]['length'])
-        min_angles[c] = acos(np.abs(np.dot(normalised[0], normalised[1])))
+        min_angles.dat.data[c] = acos(np.abs(np.dot(normalised[0], normalised[1])))
     return min_angles
+
+def sipg_parameter(nu, constant=True, p=1):
+    """
+    Compute SIPG parameter for a given mesh and viscosity/diffusivity :math:`nu`.
+
+    Epshteyn and Riviere (2007). Estimation of penalty parameters for symmetric
+    interior penalty Galerkin methods. Journal of Computational and Applied
+    Mathematics, 206(2):843-872. http://dx.doi.org/10.1016/j.cam.2006.08.029
+
+    :arg nu: viscosity/diffusivity of problem.
+    :kwarg constant: toggle whether we want a spatially varying coefficient.
+    :kwarg p: degree of function space used to solve problem.
+    """
+    min_angles = get_min_angle(fs.mesh())
+    assert p > 0
+    if constant:
+        if isinstance(nu, Constant):
+            nu_max = nu.dat.data
+        else:
+            nu_max = np.max(nu.dat.data)
+        return Constant(3*p*(p+1)*nu_max*np.min(min_angles))
+    sigma = Function(FunctionSpace(fs.mesh(), "DG", 0))
+    sigma.interpolate(3*p*(p+1)*nu)  # FIXME: assumes viscosity constant in each element
+    for i in range(len(sigma.dat.data)):
+        sigma.dat.data[i] /= tan(min_angles[i])  # TODO: check numbering is consistent
+    return sigma
 
 def index_string(index):
     """
