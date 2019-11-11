@@ -70,7 +70,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.timestep = op.dt
         options.simulation_export_time = op.dt
         options.simulation_end_time = op.end_time
-        options.timestepper_type = 'SteadyState'
+        options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters = op.params
         PETSc.Sys.Print(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
@@ -436,6 +436,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             stress_jump = avg(nu)*tensor_jump(u, n)
         p = op.degree
         alpha = 1.5 if p == 0 else 5*p*(p+1)
+        #alpha = Constant(200.0)  # TODO: temp
         loc = i*outer(z, n)
         flux_terms += -alpha/avg(self.h)*inner(loc('+') + loc('-'), stress_jump)*dS
         flux_terms += inner(loc('+') + loc('-'), avg(stress))*dS

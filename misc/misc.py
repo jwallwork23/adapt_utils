@@ -3,8 +3,8 @@ import numpy as np
 import numpy.linalg as la
 
 
-__all__ = ["get_min_angle", "index_string", "subdomain_indicator", "get_boundary_nodes", "print_doc",
-           "bessi0", "bessk0"]
+__all__ = ["get_min_angle", "sipg_parameter", "index_string", "subdomain_indicator",
+           "get_boundary_nodes", "print_doc", "bessi0", "bessk0"]
 
 
 def get_min_angle(mesh):
@@ -46,10 +46,10 @@ def get_min_angle(mesh):
         normalised = []
         for i in dat:
             normalised.append(dat[i]['vector']/dat[i]['length'])
-        min_angles.dat.data[c] = acos(np.abs(np.dot(normalised[0], normalised[1])))
+        min_angles[c] = acos(np.abs(np.dot(normalised[0], normalised[1])))
     return min_angles
 
-def sipg_parameter(nu, constant=True, p=1):
+def sipg_parameter(mesh, nu, constant=True, p=1):
     """
     Compute SIPG parameter for a given mesh and viscosity/diffusivity :math:`nu`.
 
@@ -61,15 +61,15 @@ def sipg_parameter(nu, constant=True, p=1):
     :kwarg constant: toggle whether we want a spatially varying coefficient.
     :kwarg p: degree of function space used to solve problem.
     """
-    min_angles = get_min_angle(fs.mesh())
+    min_angles = get_min_angle(mesh)
     assert p > 0
     if constant:
         if isinstance(nu, Constant):
-            nu_max = nu.dat.data
+            nu_max = nu.dat.data[0]
         else:
             nu_max = np.max(nu.dat.data)
-        return Constant(3*p*(p+1)*nu_max*np.min(min_angles))
-    sigma = Function(FunctionSpace(fs.mesh(), "DG", 0))
+        return Constant(3*p*(p+1)*nu_max/tan(np.min(min_angles)))
+    sigma = Function(FunctionSpace(mesh, "DG", 0))
     sigma.interpolate(3*p*(p+1)*nu)  # FIXME: assumes viscosity constant in each element
     for i in range(len(sigma.dat.data)):
         sigma.dat.data[i] /= tan(min_angles[i])  # TODO: check numbering is consistent

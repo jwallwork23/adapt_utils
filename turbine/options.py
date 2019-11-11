@@ -16,6 +16,9 @@ default_params = {
     'mat_type': 'aij',
     'snes_type': 'newtonls',
     'snes_rtol': 1e-3,
+    # 'snes_rtol': 1e-8,
+    'snes_atol': 1e-16,
+    'snes_max_it': 100,
     # 'snes_rtol': 1e-2,
     'snes_linesearch_type': 'bt',
     # 'snes_linesearch_monitor': None,
@@ -63,17 +66,13 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     """
 
     # Solver parameters
-    params = PETScSolverParameters(ksponly_params).tag(config=True)
+    params = PETScSolverParameters(default_params).tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', num_iterations=2):
+    def __init__(self, approach='fixed_mesh', num_iterations=1):
         super(SteadyTurbineOptions, self).__init__(approach)
+        self.timestepper = 'SteadyState'
         self.dt = 20.
-        if approach in ('fixed_mesh', 'uniform') or 'isotropic' in approach:
-            self.params = default_params
-        if self.params == ksponly_params:
-            self.end_time = num_iterations*self.dt - 0.2
-        else:
-            self.end_time = 18.
+        self.end_time = num_iterations*self.dt - 0.2
         self.bathymetry = Constant(40.0)
         self.viscosity = Constant(self.base_viscosity)
         self.lax_friedrichs = True

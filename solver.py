@@ -13,7 +13,7 @@ import numpy as np
 import pickle
 
 from adapt_utils.options import DefaultOptions
-from adapt_utils.misc.misc import index_string
+from adapt_utils.misc.misc import index_string, sipg_parameter
 from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
@@ -59,6 +59,15 @@ class SteadyProblem():
         self.p0trial = TrialFunction(self.P0)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
+
+        # Interior penalty parameter
+        if hasattr(op, 'diffusivity'):
+            self.sipg_parameter = sipg_parameter(mesh, op.diffusivity, constant=True, p=op.degree)
+        if hasattr(op, 'viscosity'):
+            self.sipg_parameter = sipg_parameter(mesh, op.viscosity, constant=True, p=op.degree)
+        else:
+            self.sipg_parameter = None
+        print("SIPG parameter: ", self.sipg_parameter.dat.data[0])
 
         # Prognostic fields
         self.solution = Function(self.V, name='Solution')
@@ -518,6 +527,9 @@ class MeshOptimisation():
                     'estimator': [],
                     'approach': self.op.approach}
 
+        # Nonlinear problems
+        self.use_prev_sol = True
+
     def iterate(self):
         assert self.minit >= self.startit
         M_ = None
@@ -593,7 +605,7 @@ class MeshOptimisation():
             #tp.set_target_vertices(num_vertices=self.dat['vertices'][0])
             tp.adapt_mesh(prev_metric=M_)
             tp.plot()
-            if tp.nonlinear:
+            if tp.nonlinear and self.use_prev_sol:
                 prev_sol = tp.solution
             if self.op.relax:
                 M_ = tp.M_unrelaxed
