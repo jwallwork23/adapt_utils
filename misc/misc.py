@@ -1,10 +1,50 @@
 from firedrake import *
 import numpy as np
+import numpy.linalg as la
 
 
-__all__ = ["index_string", "subdomain_indicator", "get_boundary_nodes", "print_doc",
+__all__ = ["get_min_angle", "index_string", "subdomain_indicator", "get_boundary_nodes", "print_doc",
            "bessi0", "bessk0"]
 
+
+def get_min_angle(mesh):
+    plex = mesh._plex
+
+    # Ensure correct section
+    dim = mesh._topological_dimension
+    entity_dofs = np.zeros(dim+1, dtype=np.int32)
+    entity_dofs[0] = mesh.geometric_dimension()
+    coordSection = dmplex.create_section(mesh, entity_dofs)
+    dmCoords = plex.getCoordinateDM()
+    dmCoords.setDefaultSection(coordSection)
+    coords_local = dmCoords.createLocalVec()
+    coords_local.array[:] = np.reshape(mesh.coordinates.dat.data_ro_with_halos, coords_local.array.shape)
+    plex.setCoordinatesLocal(coords_local)
+
+    # Loop over all cells
+    cells = plex.getDepthStratum(2)
+    coords = mesh.coordinates.dat.data_ro_with_halos
+    min_angles = np.zeros(cells[1])
+    for c in range(cells[0], cells[1]):
+        local_vertices = plex.getTransitiveClosure(c)[0][4:]
+        endpoints = [np.array(coords[coordSection.getOffset(v)//dim]) for v in local_vertices]
+        dat = {0: {}, 1: {}, 2: {}}
+        dat[0]['vector'] = endpoints[1]-endpoints[0]
+        dat[0]['length'] = la.norm(dat[0]['vector'])
+        dat[1]['vector'] = endpoints[2]-endpoints[1]
+        dat[1]['length'] = la.norm(dat[1]['vector'])
+        dat[2]['vector'] = endpoints[0]-endpoints[2]
+        dat[2]['length'] = la.norm(dat[2]['vector'])
+        lmin = min(dat[0]['length'], dat[1]['length'], dat[2]['length'])
+        for i in dat:
+            if np.abs(dat[i]['length'] - lmin) < 1e-8:
+                dat.pop(i)
+                break
+        normalised = []
+        for i in dat:
+            normalised.append(dat[i]['vector']/dat[i]['length'])
+        min_angles[c] = acos(np.abs(np.dot(normalised[0], normalised[1])))
+    return min_angles
 
 def index_string(index):
     """
