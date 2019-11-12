@@ -1,4 +1,5 @@
 from firedrake import *
+from firedrake_adjoint import *  # FIXME: Do we really need this?
 import numpy as np
 import numpy.linalg as la
 
