@@ -87,6 +87,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_lax_friedrichs_velocity = op.lax_friedrichs
         options.lax_friedrichs_velocity_scaling_factor = op.lax_friedrichs_scaling_factor
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
+        options.sipg_parameter = self.sipg_parameter
 
         # Boundary conditions
         solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
@@ -249,10 +250,12 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         f += inner(grad(u_test), stress)*dx
 
-        p = self.op.degree
-        alpha = 5.*p*(p+1)
-        if p == 0:
-            alpha = 1.5
+        alpha = self.sipg_parameter
+        if alpha is None:
+            p = self.op.degree
+            alpha = 5.*p*(p+1)
+            if p == 0:
+                alpha = 1.5
         f += (
             + alpha/avg(h)*inner(tensor_jump(u_test, n), stress_jump)*dS
             - inner(avg(grad(u_test)), stress_jump)*dS
@@ -434,9 +437,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         else:
             stress = nu*grad(u)
             stress_jump = avg(nu)*tensor_jump(u, n)
-        p = op.degree
-        alpha = 1.5 if p == 0 else 5*p*(p+1)
-        #alpha = Constant(200.0)  # TODO: temp
+        alpha = self.sipg_parameter
+        if alpha is None:
+            p = op.degree
+            alpha = 1.5 if p == 0 else 5*p*(p+1)
         loc = i*outer(z, n)
         flux_terms += -alpha/avg(self.h)*inner(loc('+') + loc('-'), stress_jump)*dS
         flux_terms += inner(loc('+') + loc('-'), avg(stress))*dS
