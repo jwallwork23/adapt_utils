@@ -65,6 +65,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options = solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
+        options.use_automatic_sipg_parameter = False
 
         # Timestepping
         options.timestep = op.dt
@@ -588,6 +589,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options = solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
+        options.use_automatic_sipg_parameter = False
 
         # Timestepping
         options.timestep = op.dt

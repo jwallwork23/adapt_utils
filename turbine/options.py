@@ -15,8 +15,8 @@ __all__ = ["Steady1TurbineOptions", "Steady2TurbineOptions", "Steady2TurbineOffs
 default_params = {
     'mat_type': 'aij',
     'snes_type': 'newtonls',
-    'snes_rtol': 1e-3,
-    # 'snes_rtol': 1e-2,
+    # 'snes_rtol': 1e-3,
+    'snes_rtol': 1e-8,
     'snes_linesearch_type': 'bt',
     # 'snes_linesearch_monitor': None,
     'snes_monitor': None,
