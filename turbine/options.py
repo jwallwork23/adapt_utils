@@ -17,12 +17,18 @@ default_params = {
     'snes_type': 'newtonls',
     # 'snes_rtol': 1e-3,
     'snes_rtol': 1e-8,
+    'snes_atol': 1e-16,
+    'snes_max_it': 100,
+    # 'snes_rtol': 1e-2,
     'snes_linesearch_type': 'bt',
     # 'snes_linesearch_monitor': None,
     'snes_monitor': None,
     'ksp_type': 'preonly',
+    # 'ksp_type': 'richardson',
+    # 'ksp_monitor_singular_value': None,
     'pc_type': 'lu',
     'pc_factor_mat_solver_type': 'mumps',
+    'mat_mumps_icntl_14': 200,
 }
 
 # Robust but approximate: just repeatedly apply LU preconditioner
@@ -34,6 +40,7 @@ ksponly_params = {
     'ksp_monitor_singular_value': None,
     'pc_type': 'lu',
     'pc_factor_mat_solver_type': 'mumps',
+    'mat_mumps_icntl_14': 200,
 }
 
 # FIXME ILU: Newton with line search; solve linear system approximately using ILU PC
@@ -59,17 +66,13 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     """
 
     # Solver parameters
-    params = PETScSolverParameters(ksponly_params).tag(config=True)
+    params = PETScSolverParameters(default_params).tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', num_iterations=2):
+    def __init__(self, approach='fixed_mesh', num_iterations=1):
         super(SteadyTurbineOptions, self).__init__(approach)
+        self.timestepper = 'SteadyState'
         self.dt = 20.
-        if approach in ('fixed_mesh', 'uniform') or 'isotropic' in approach:
-            self.params = default_params
-        if self.params == ksponly_params:
-            self.end_time = num_iterations*self.dt - 0.2
-        else:
-            self.end_time = 18.
+        self.end_time = num_iterations*self.dt - 0.2
         self.bathymetry = Constant(40.0)
         self.viscosity = Constant(self.base_viscosity)
         self.lax_friedrichs = True

@@ -13,7 +13,7 @@ import numpy as np
 import pickle
 
 from adapt_utils.options import DefaultOptions
-from adapt_utils.misc.misc import index_string
+from adapt_utils.misc.misc import index_string, sipg_parameter
 from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
@@ -59,6 +59,15 @@ class SteadyProblem():
         self.p0trial = TrialFunction(self.P0)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
+
+        # Interior penalty parameter
+        if hasattr(op, 'diffusivity'):
+            self.sipg_parameter = sipg_parameter(mesh, op.diffusivity, p=op.degree)
+        if hasattr(op, 'viscosity'):
+            self.sipg_parameter = sipg_parameter(mesh, op.viscosity, p=op.degree)
+        else:
+            self.sipg_parameter = Constant(10.0)
+        PETSc.Sys.Print("SIPG parameter: %.2f" % self.sipg_parameter.values()[0])
 
         # Prognostic fields
         self.solution = Function(self.V, name='Solution')
@@ -473,12 +482,15 @@ class SteadyProblem():
                 for i in range(n):
                     for j in range(n):
                         submatrices.append((i, j))
+            self.condition_number = {}
             for s in submatrices:
-                k = cc.condition_number(s[0], s[1])
-                PETSc.Sys.Print("Condition number %1d,%1d: %.4e" % (s[0], s[1], k))
+                kappa = cc.condition_number(s[0], s[1])
+                self.condition_number[s] = kappa
+                PETSc.Sys.Print("Condition number %1d,%1d: %.4e" % (s[0], s[1], kappa))
         else:
             cc = UnnestedConditionCheck(self.lhs)
-            PETSc.Sys.Print("Condition number: %.4e" % cc.condition_number())
+            self.condition_number = cc.condition_number()
+            PETSc.Sys.Print("Condition number: %.4e" % self.condition_number)
 
 
 class MeshOptimisation():
@@ -514,6 +526,9 @@ class MeshOptimisation():
                     'qoi': [],
                     'estimator': [],
                     'approach': self.op.approach}
+
+        # Nonlinear problems
+        self.use_prev_sol = True
 
     def iterate(self):
         assert self.minit >= self.startit
@@ -590,7 +605,7 @@ class MeshOptimisation():
             #tp.set_target_vertices(num_vertices=self.dat['vertices'][0])
             tp.adapt_mesh(prev_metric=M_)
             tp.plot()
-            if tp.nonlinear:
+            if tp.nonlinear and self.use_prev_sol:
                 prev_sol = tp.solution
             if self.op.relax:
                 M_ = tp.M_unrelaxed

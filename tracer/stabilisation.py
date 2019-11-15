@@ -1,6 +1,9 @@
 from firedrake import *
 from firedrake.slate.slac.compiler import PETSC_DIR
-import firedrake.dmplex as dmplex
+try:
+    import firedrake.cython.dmplex as dmplex
+except:
+    import firedrake.dmplex as dmplex  # Older Firedrake version
 import numpy as np
 
 
