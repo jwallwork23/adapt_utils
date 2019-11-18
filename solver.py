@@ -11,7 +11,7 @@ import numpy as np
 import pickle
 
 from adapt_utils.options import DefaultOptions
-from adapt_utils.misc.misc import index_string, sipg_parameter
+from adapt_utils.misc.misc import index_string
 from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
@@ -57,15 +57,6 @@ class SteadyProblem():
         self.p0trial = TrialFunction(self.P0)
         self.n = FacetNormal(self.mesh)
         self.h = CellSize(self.mesh)
-
-        # Interior penalty parameter
-        if hasattr(op, 'diffusivity'):
-            self.sipg_parameter = sipg_parameter(mesh, op.diffusivity, p=op.degree)
-        if hasattr(op, 'viscosity'):
-            self.sipg_parameter = sipg_parameter(mesh, op.viscosity, p=op.degree)
-        else:
-            self.sipg_parameter = Constant(10.0)
-        PETSc.Sys.Print("SIPG parameter: %.2f" % self.sipg_parameter.values()[0])
 
         # Prognostic fields
         self.solution = Function(self.V, name='Solution')

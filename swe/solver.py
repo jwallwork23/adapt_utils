@@ -87,8 +87,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_lax_friedrichs_velocity = op.lax_friedrichs
         options.lax_friedrichs_velocity_scaling_factor = op.lax_friedrichs_scaling_factor
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
-        options.use_automatic_sipg_parameter = False
-        options.sipg_parameter = self.sipg_parameter
+        options.use_automatic_sipg_parameter = True
 
         # Boundary conditions
         solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
@@ -690,8 +689,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.coriolis_frequency = op.set_coriolis(self.P1)
         options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
-        options.use_automatic_sipg_parameter = False
-        options.sipg_parameter = self.sipg_parameter
+        options.use_automatic_sipg_parameter = True
 
         # Boundary conditions
         solver_obj.bnd_functions['shallow_water'] = op.set_bcs()
