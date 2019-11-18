@@ -1,5 +1,14 @@
 from firedrake import *
-from firedrake.slate.slac.compiler import PETSC_ARCH
+try:
+    from firedrake.slate.slac.compiler import PETSC_ARCH
+except:
+    import os
+
+    PETSC_ARCH = os.environ.get('PETSC_ARCH')
+    PETSC_DIR = os.environ.get('PETSC_DIR')
+    PETSC_ARCH = os.path.join(PETSC_DIR, PETSC_ARCH)
+    if not os.path.exists(os.path.join(PETSC_ARCH, 'include/eigen3')):
+        PETSC_ARCH = '/usr/local'
 
 import numpy as np
 import numpy
@@ -151,15 +160,11 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
     M = Function(TensorFunctionSpace(mesh, "CG", 1))
     g = Function(P1)
 
-    # Set parameters
-    a2 = pow(op.max_anisotropy, 2)
-    h_min2 = pow(op.h_min, 2)
-    h_max2 = pow(op.h_max, 2)
+    # Scale indicator
     assert op.normalisation in ('complexity', 'error')
     rescale = 1 if noscale else op.target
-    if f is not None:
+    if f is not None and not noscale:
         rescale /= max(norm(f), op.f_min)
-    p = op.norm_order
 
     # Project into P1 space
     g.project(max_value(abs(rescale*f), 1e-10))
@@ -167,6 +172,11 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
 
     # Normalise
     if not noscale:
+        a2 = pow(op.max_anisotropy, 2)
+        h_min2 = pow(op.h_min, 2)
+        h_max2 = pow(op.h_max, 2)
+        p = op.norm_order
+
         detM = Function(P1)
         detM.assign(g)
         if p is not None:
@@ -343,7 +353,6 @@ def metric_with_boundary(f=None, mesh=None, H=None, op=DefaultOptions()):
 
     return M
 
-# TODO: par_loop
 def anisotropic_refinement(metric, direction=0):
     r"""
     Anisotropically refine a mesh (or, more precisely, the metric field associated with a mesh)
@@ -354,23 +363,11 @@ def anisotropic_refinement(metric, direction=0):
     :param direction: 0 or 1, corresponding to x- or y-direction, respectively.
     :return: anisotropically refined metric.
     """
-    fs = metric.function_space()
-    M = Function(fs)
-    mesh = fs.mesh()
-    dim = mesh.topological_dimension()
-    assert dim in (2, 3)
-    scale = 4 if dim == 2 else 8  # TODO: Check this extension to 3d
-    for k in range(mesh.num_vertices()):
-        lam, v = la.eigh(metric.dat.data[k])
-        lam[direction] *= scale
-        # TODO: These loops could be done more efficiently by just adding extra terms in the skew direction
-        for l in range(dim):
-            for i in range(dim):
-                for j in range(i, dim):
-                    M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
-        for i in range(1, dim):
-            for j in range(i):
-                M.dat.data[k][i, j] = M.dat.data[k][j, i]
+    M = metric.copy()
+    fs = M.function_space()
+    dim = fs.mesh().topological_dimension()
+    kernel = op2.Kernel(anisotropic_refinement_kernel(dim, direction), "anisotropic", cpp=True, include_dirs=["%s/include/eigen3" % PETSC_ARCH])
+    op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
     return M
 
 def metric_intersection(M1, M2, bdy=None):

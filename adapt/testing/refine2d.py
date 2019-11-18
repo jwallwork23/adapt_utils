@@ -29,7 +29,7 @@ except:
 
 # check isotropic metric does the same thing
 print('Testing isotropic metric')
-f.assign(2/np.sqrt(2))
+f.assign(1/np.sqrt(2))
 M = isotropic_metric(f, noscale=True)
 mesh2 = AnisotropicAdaptation(mesh, M).adapted_mesh
 try:
@@ -78,3 +78,5 @@ except:
     plot(mesh2)
     plt.show()
     exit(0)
+
+print("All tests passed!")

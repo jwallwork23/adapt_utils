@@ -27,7 +27,7 @@ except:
 
 # check isotropic metric does the same thing
 print('Testing isotropic metric')
-f.assign(2/np.sqrt(2))
+f.assign(1/np.sqrt(2))
 M = isotropic_metric(f, noscale=True)
 mesh2 = AnisotropicAdaptation(mesh, M).adapted_mesh
 try:
@@ -59,12 +59,27 @@ except:
     print("FAIL: Anisotropic metric 1")
     exit(0)
 
-# check metric intersection combines these appropriately
-print('Testing metric intersection')
-M4 = metric_intersection(M2, M3)
+# check anistropic refinement in z-direction
+print('Testing anisotropic metric 2')
+M = interpolate(as_matrix([[1/np.sqrt(2), 0], [0, 1/np.sqrt(2)]]), P1_ten)
+M4 = anisotropic_refinement(M, direction=2)
 mesh2 = AnisotropicAdaptation(mesh, M4).adapted_mesh
 try:
-    assert mesh2.num_vertices() == 27
+    assert mesh2.num_vertices() == 12
+    # TODO: check there are more cells in z-direction
+except:
+    print("FAIL: Anisotropic metric 2")
+    exit(0)
+
+# check metric intersection combines these appropriately
+print('Testing metric intersection')
+M5 = metric_intersection(M2, M3)
+M5 = metric_intersection(M5, M4)
+mesh2 = AnisotropicAdaptation(mesh, M5).adapted_mesh
+try:
+    assert mesh2.num_vertices() == 27  # FIXME
 except:
     print("FAIL: Metric intersection")
     exit(0)
+
+print("All tests passed!")
