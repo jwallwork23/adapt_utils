@@ -159,8 +159,6 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
     # Scale indicator
     assert op.normalisation in ('complexity', 'error')
     rescale = 1 if noscale else op.target
-    if f is not None and not noscale:
-        rescale /= max(norm(f), op.f_min)
 
     # Project into P1 space
     g.project(max_value(abs(rescale*f), 1e-10))
@@ -234,17 +232,12 @@ def metric_with_boundary(f=None, mesh=None, H=None, op=DefaultOptions()):
     detM_bdy = Function(P1)
 
     # Set parameters
-    a2 = pow(op.max_anisotropy, 2)
-    h_min2 = pow(op.h_min, 2)
-    h_max2 = pow(op.h_max, 2)
     #assert op.normalisation in ('complexity', 'error')
     try:
         assert op.normalisation == 'complexity'
     except:
         raise NotImplementedError  # TODO
     rescale = op.target
-    if f is not None:
-        rescale /= max(norm(f), op.f_min)
     p = op.norm_order
 
     # Compute interior metric
@@ -286,6 +279,9 @@ def metric_with_boundary(f=None, mesh=None, H=None, op=DefaultOptions()):
             detM_int.dat.data[k] = pow(det, p/(2.*p + dim))
 
     # Normalise
+    a2 = pow(op.max_anisotropy, 2)
+    h_min2 = pow(op.h_min, 2)
+    h_max2 = pow(op.h_max, 2)
     h.interpolate(abs(h))
     detM_bdy.assign(h)
     if p is not None:
