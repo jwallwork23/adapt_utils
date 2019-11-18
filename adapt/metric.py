@@ -1,4 +1,5 @@
 from firedrake import *
+from firedrake.slate.slac.compiler import PETSC_ARCH
 
 import numpy as np
 import numpy
@@ -7,11 +8,13 @@ from scipy import linalg as sla
 
 from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hessian
+from adapt_utils.adapt.kernels import *
 
 
 __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "anisotropic_refinement", "metric_intersection", "metric_relaxation", "metric_complexity"]
 
 
+# TODO: par_loop
 def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=DefaultOptions()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
@@ -188,6 +191,8 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
 
     return M
 
+# FIXME
+# TODO: par_loop
 def metric_with_boundary(f=None, mesh=None, H=None, op=DefaultOptions()):
     r"""
     Computes a Hessian-based steady metric for mesh adaptation, intersected with the corresponding
@@ -338,6 +343,7 @@ def metric_with_boundary(f=None, mesh=None, H=None, op=DefaultOptions()):
 
     return M
 
+# TODO: par_loop
 def anisotropic_refinement(metric, direction=0):
     r"""
     Anisotropically refine a mesh (or, more precisely, the metric field associated with a mesh)
@@ -367,23 +373,6 @@ def anisotropic_refinement(metric, direction=0):
                 M.dat.data[k][i, j] = M.dat.data[k][j, i]
     return M
 
-def local_metric_intersection(M1, M2, dim=2):
-    r"""
-    Intersect two metrics `M1` and `M2` defined at a particular point in space.
-
-    :arg M1: the first metric.
-    :arg M2: the second metric.
-    :kwarg dim: spatial dimension of space.
-    """
-    sqM1 = sla.sqrtm(M1)
-    sqiM1 = la.inv(sqM1)  # Note inverse and square root commute whenever both are defined
-    lam, v = la.eigh(np.dot(np.transpose(sqiM1), np.dot(M2, sqiM1)))
-    M12hat = np.zeros((dim, dim))
-    for i in range(dim):
-        M12hat[i, i] = max(lam[i], 1)
-    M12 = np.dot(v, np.dot(M12hat, np.transpose(v)))
-    return np.dot(np.transpose(sqM1), np.dot(M12, sqM1))
-
 def metric_intersection(M1, M2, bdy=None):
     r"""
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
@@ -398,10 +387,11 @@ def metric_intersection(M1, M2, bdy=None):
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
     assert V == M2.function_space()
-    M = M1.copy()
-    for i in DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices()):
-        M.dat.data[i][:,:] = local_metric_intersection(M1.dat.data[i], M2.dat.data[i], dim=dim)
-    return M
+    M12 = M1.copy()
+    node_set = DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices())
+    kernel = op2.Kernel(intersect_kernel(dim), "intersect", cpp=True, include_dirs=["%s/include/eigen3" % PETSC_ARCH])
+    op2.par_loop(kernel, P1_ten.node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
+    return M12
 
 def metric_relaxation(M1, M2, alpha=0.5):
     r"""
