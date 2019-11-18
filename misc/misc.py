@@ -1,5 +1,8 @@
 from firedrake import *
-import firedrake.cython.dmplex as dmplex
+try:
+    import firedrake.cython.dmplex as dmplex
+except:
+    import firedrake.dmplex as dmplex
 from firedrake.petsc import PETSc
 import numpy as np
 import numpy.linalg as la
