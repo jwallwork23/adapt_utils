@@ -2,8 +2,6 @@ from firedrake import *
 from firedrake.petsc import PETSc
 from thetis import create_directory
 from thetis_adjoint import *
-from fenics_adjoint.solving import SolveBlock       # For extracting adjoint solutions
-from fenics_adjoint.projection import ProjectBlock  # Exclude projections from tape reading
 import pyadjoint
 
 import os
@@ -124,8 +122,8 @@ class SteadyProblem():
         J = self.quantity_of_interest()
         compute_gradient(J, Control(self.gradient_field))
         tape = get_working_tape()
-        solve_blocks = [block for block in tape._blocks if isinstance(block, SolveBlock)
-                                                        and not isinstance(block, ProjectBlock)
+        sblocks = ('SolveBlock', 'LinearVariationalSolveBlock', 'NonlinearVariationalSolveBlock')
+        solve_blocks = [block for block in tape._blocks if block.__class__.__name__ in (sblocks)
                                                         and block.adj_sol is not None]
         try:
             assert len(solve_blocks) == 1

@@ -1,6 +1,9 @@
 from firedrake import *
 from firedrake_adjoint import *  # FIXME: This won't be needed once SIPG is in Thetis
-import firedrake.cython.dmplex as dmplex
+try:
+    import firedrake.cython.dmplex as dmplex
+except:
+    import firedrake.dmplex as dmplex
 from firedrake.petsc import PETSc
 import numpy as np
 import numpy.linalg as la
