@@ -57,6 +57,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
     p = op.norm_order
 
     msg = "WARNING: minimum element size reached as {m:.2e}"
+    # TODO: Insert par_loop below
     for k in range(mesh.num_vertices()):
 
         # Ensure local Hessian is symmetric
@@ -109,6 +110,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
         if p is not None:
             M *= pow(assemble(detH*dx), 1/p)
 
+    # TODO: Insert par_loop below
     for k in range(mesh.num_vertices()):
 
         # Find eigenpairs of metric
