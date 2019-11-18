@@ -388,9 +388,10 @@ def metric_intersection(M1, M2, bdy=None):
     assert dim in (2, 3)
     assert V == M2.function_space()
     M12 = M1.copy()
-    node_set = DirichletBC(V, 0, bdy).nodes if bdy is not None else range(V.mesh().num_vertices())
+    # FIXME: boundary intersection does not work
+    node_set = DirichletBC(V, 0, bdy).nodes if bdy is not None else V.node_set
     kernel = op2.Kernel(intersect_kernel(dim), "intersect", cpp=True, include_dirs=["%s/include/eigen3" % PETSC_ARCH])
-    op2.par_loop(kernel, P1_ten.node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
+    op2.par_loop(kernel, node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
     return M12
 
 def metric_relaxation(M1, M2, alpha=0.5):
