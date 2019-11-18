@@ -53,14 +53,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
     detH = Function(FunctionSpace(mesh, "CG", 1))
 
     # Set parameters
-    ia2 = pow(op.max_anisotropy, -2)
-    ih_min2 = pow(op.h_min, -2)
-    ih_max2 = pow(op.h_max, -2)
     assert op.normalisation in ('complexity', 'error')
-    rescale = 1 if noscale else op.target
-    if f is not None:
-        rescale /= max(norm(f), op.f_min)
-        #rescale = interpolate(rescale/max_value(abs(f), op.f_min))
     p = op.norm_order
 
     msg = "WARNING: minimum element size reached as {m:.2e}"
@@ -105,6 +98,9 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
         return M
 
     # Scale by target complexity / desired error
+    ia2 = pow(op.max_anisotropy, -2)
+    ih_min2 = pow(op.h_min, -2)
+    ih_max2 = pow(op.h_max, -2)
     if op.normalisation == 'complexity':
         C = pow(op.target/assemble(detH*dx), 2/dim)
         M *= C

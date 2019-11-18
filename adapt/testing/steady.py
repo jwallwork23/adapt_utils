@@ -3,8 +3,9 @@ from adapt_utils.adapt.metric import steady_metric
 from adapt_utils.adapt.recovery import construct_hessian
 from adapt_utils.options import *
 import numpy as np
-
+import os
 import matplotlib.pyplot as plt
+
 
 # Sensor tests considered in [Olivier 2011].
 
@@ -19,20 +20,23 @@ op = DefaultOptions()
 op.h_min = 1e-6
 op.h_max = 0.1
 op.num_adapt = 4
-modes = ['target', 'p_norm', 'p_norm', 'p_norm']
-orders = [None, 1, 2, None]
-for op.normalisation, op.norm_order in zip(modes, orders):
-    if op.normalisation == 'p_norm':
-        normalisation = 'l-inf' if op.norm_order is None else 'l{:d}'.format(op.norm_order)
-    else:
-        normalisation = 'target'
-    for i in range(4):
-        for k in range(3):
-            print("\nNormalisation {:s}  Sensor {:d}  Iteration {:d}".format(normalisation, i, k))
-            op.target = pow(10, k)
-            for j in range(op.num_adapt):
-                if j == 0:
-                    mesh = SquareMesh(40, 40, 2, 2)
-                    mesh.coordinates.dat.data[:] -= [1, 1]
-                mesh = adapt(mesh, steady_metric(sensor(i, mesh), mesh=mesh, op=op))
-            File('plots/normalisation_{:s}__sensor_{:d}__mesh_{:d}.pvd'.format(normalisation, i, k)).write(mesh.coordinates)
+modes = ['complexity', 'error']
+orders = [None, 1, 2]
+levels = 3
+for op.normalisation in modes:
+    for op.norm_order in orders:
+        normalisation = op.normalisation
+        if normalisation == 'error':
+            normalisation += 'l-inf' if op.norm_order is None else 'l{:d}'.format(op.norm_order)
+        else:
+            normalisation += 'l-inf' if op.norm_order is None else 'l{:d}'.format(op.norm_order)
+        for i in range(4):
+            for k in range(levels):
+                print("\nNormalisation {:s}  Sensor {:d}  Iteration {:d}".format(normalisation, i, k))
+                op.target = pow(10, k)
+                for j in range(op.num_adapt):
+                    if j == 0:
+                        mesh = SquareMesh(40, 40, 2, 2)
+                        mesh.coordinates.dat.data[:] -= [1, 1]
+                    mesh = adapt(mesh, steady_metric(sensor(i, mesh), mesh=mesh, op=op))
+                File('_'.join('plots/normalisation', normalisation, 'sensor', str(i), 'mesh', str(k) + '.pvd')).write(mesh.coordinates)

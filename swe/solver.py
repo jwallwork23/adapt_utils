@@ -88,6 +88,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.lax_friedrichs_velocity_scaling_factor = op.lax_friedrichs_scaling_factor
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
+        solver_obj.create_equations()
+        self.sipg_parameter = options.sipg_parameter
 
         # Boundary conditions
         solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
