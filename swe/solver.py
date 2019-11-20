@@ -404,12 +404,25 @@ class SteadyShallowWaterProblem(SteadyProblem):
         g = op.g
         n = self.n
 
+        # HorizontalAdvection
+        u_up = avg(u)
+        loc = -i*z
+        flux_terms = jump(u, n)*dot(u_up, loc('+') + loc('-'))*dS
+        loc = i*inner(outer(u, n), outer(u, z))
+        flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
+        # NOTE: This ^^^ is an influential term for steady turbine
+        if op.lax_friedrichs:
+            gamma = 0.5*abs(dot(u_up, n('-')))*op.lax_friedrichs_scaling_factor
+            loc = -i*z
+            flux_terms += gamma*dot(loc('+') + loc('-'), jump(u))*dS
+
         # ExternalPressureGradient
         eta_star = avg(eta) + 0.5*sqrt(avg(H)/g)*jump(u, n)
-        loc = -i*g*dot(z, n)
-        flux_terms = eta_star*(loc('+') + loc('-'))*dS
-        loc = i*g*eta*dot(z, n)
-        flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
+        if self.op.family != 'dg-cg':
+            loc = -i*g*dot(z, n)
+            flux_terms += eta_star*(loc('+') + loc('-'))*dS
+            loc = i*g*eta*dot(z, n)
+            flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
         # HUDiv
         if self.op.family in ('dg-dg', 'rt-dg'):
@@ -419,18 +432,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         loc = i*dot(H*u, n)*zeta
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
         # NOTE: This ^^^ is an influential term for steady turbine
-
-        # HorizontalAdvection
-        u_up = avg(u)
-        loc = -i*z
-        flux_terms += jump(u, n)*dot(u_up, loc('+') + loc('-'))*dS
-        loc = i*inner(outer(u, n), outer(u, z))
-        flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
-        # NOTE: This ^^^ is an influential term for steady turbine
-        if op.lax_friedrichs:
-            gamma = 0.5*abs(dot(u_up, n('-')))*op.lax_friedrichs_scaling_factor
-            loc = -i*z
-            flux_terms += gamma*dot(loc('+') + loc('-'), jump(u))*dS
 
         # HorizontalViscosity
         if op.grad_div_viscosity:
@@ -461,7 +462,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
                 eta_ext, u_ext = self.get_bdy_functions(eta, u, j)
                 un_jump = inner(u - u_ext, n)
                 eta_rie = 0.5*(eta + eta_ext) + sqrt(H/g)*un_jump
-                flux_terms += i*g*(eta_rie - eta)*dot(z, n)*ds(j)
+                if self.op.family == 'dg-cg':
+                    flux_terms += i*g*eta_rie*dot(z, n)*ds(j)
+                else:
+                    flux_terms += i*g*(eta_rie - eta)*dot(z, n)*ds(j)
 
                 # HUDiv
                 eta_ext_old, u_ext_old = self.get_bdy_functions(eta_old, u_old, j)
@@ -496,7 +500,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
                 flux_terms += i*inner(grad(z), stress_jump)*ds(j)
                 flux_terms += i*inner(outer(z, n), stress)*ds(j)
 
-            if funcs is None or 'symm' in funcs:
+            if self.op.family != 'dg-cg' and (funcs is None or 'symm' in funcs):
 
                 # ExternalPressureGradient
                 un_jump = inner(u, n)
