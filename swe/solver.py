@@ -23,9 +23,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
                  op=ShallowWaterOptions(),
                  prev_solution=None):
         if op.family == 'dg-dg' and op.degree in (1, 2):
-            element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
+            element = VectorElement("DG", triangle, op.degree)*FiniteElement("DG", triangle, op.degree)
         elif op.family == 'dg-cg':
-            element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
+            element = VectorElement("DG", triangle, op.degree)*FiniteElement("Lagrange", triangle, op.degree+1)
         else:
             raise NotImplementedError
         if mesh is None:
@@ -82,6 +82,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         # Parameters
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
+        options.polynomial_degree = op.degree
         options.horizontal_viscosity = op.viscosity
         options.quadratic_drag_coefficient = op.drag_coefficient
         options.use_lax_friedrichs_velocity = op.lax_friedrichs

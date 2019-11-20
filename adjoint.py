@@ -71,7 +71,7 @@ def evaluate_adj(solve_block, markings=False):
     fwd_block_variable = outputs[0]
     u = fwd_block_variable.output
 
-    if hasattr(solve_block, 'kernel'):
+    if hasattr(solve_block, 'kernel'):  # FIXME: Definitely won't work in time dependent case
         assert hasattr(solve_block, 'enriched_space')
         dJdu = backend.assemble(backend.inner(solve_block.kernel, backend.TestFunction(solve_block.enriched_space))*backend.dx()).vector()
     else:
