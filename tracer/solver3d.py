@@ -129,7 +129,7 @@ class SteadyTracerProblem3d(SteadyProblem):
         solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.op.params)
         self.adjoint_solution_file.write(self.adjoint_solution)
 
-    def solve_high_order(self, adjoint=True):
+    def solve_high_order(self, adjoint=True):  # TODO: Use prolong and restrict
         """
         Solve the problem using linear and quadratic approximations on a refined mesh, take the
         difference and project back into the original space.
