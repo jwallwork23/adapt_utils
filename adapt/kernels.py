@@ -1,9 +1,43 @@
 from adapt_utils.options import DefaultOptions
 
-__all__ = ["intersect_kernel", "anisotropic_refinement_kernel", "metric_from_hessian_kernel", "scale_metric_kernel"]
 
-# TODO: For plugin, see https://github.com/jwallwork23/adapt_utils/blob/43a291fe3d2fdf7b64d0f7ebaecff7b7d150e641/adapt/metric.py
-# NOTE: May need to use std::min and std::max
+__all__ = ["get_eigendecomposition_kernel", "set_eigendecomposition_kernel", "intersect_kernel",
+           "anisotropic_refinement_kernel", "metric_from_hessian_kernel", "scale_metric_kernel"]
+
+
+# TODO: test
+def get_eigendecomposition_kernel(d):
+    return """
+#include <Eigen/Dense>
+
+using namespace Eigen;
+
+void intersect(double EVecs_[%d], double EVals_[%d], const double * M_) {
+  Map<Matrix<double, %d, %d, RowMajor> > Evecs((double *)EVecs_);
+  Map<Matrix<double, %d, %d, RowMajor> > Evals((double *)EVals_);
+  Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
+  SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(M);
+  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
+  Matrix<double, %d, %d, RowMajor> D = eigensolver.eigenvalues();
+  EVecs = Q;
+  EVals = D;
+}
+""" % (d*d, d*d, d, d, d, d, d, d, d, d, d, d, d, d)
+
+# TODO: test
+def set_eigendecomposition_kernel(d):
+    return """
+#include <Eigen/Dense>
+
+using namespace Eigen;
+
+void intersect(double M_[%d], const double * EVecs_, const double * EVals_) {
+  Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
+  Map<Matrix<double, %d, %d, RowMajor> > Evecs((double *)Evecs_);
+  Map<Matrix<double, %d, %d, RowMajor> > Evals((double *)Evals_);
+  M = EVecs * EVals * EVecs.transpose()
+}
+""" % (d*d, d, d, d, d, d, d)
 
 def intersect_kernel(d):
     return """

@@ -54,6 +54,7 @@ class AnisotropicMetricDriver():
         self.p1metric = Function(self.P1_ten)
         self.estimator = Function(self.P0)
 
+    # TODO: use PyOP2
     def get_eigenpair(self):
         JJt = Function(self.P0_ten)
         JJt.interpolate(self.J*self.J.T)
@@ -64,6 +65,7 @@ class AnisotropicMetricDriver():
             self.evec0.dat.data[i][:] = v[0]
             self.evec1.dat.data[i][:] = v[1]
 
+    # TODO: use PyOP2
     def get_hessian_eigenpair(self):
         assert self.p0hessian is not None
         for i in range(self.ne):
@@ -108,6 +110,7 @@ class AnisotropicMetricDriver():
         self.eval0.interpolate(abs(self.K_opt/self.K_hat*s))
         self.eval1.interpolate(abs(self.K_opt/self.K_hat/s))
 
+    # TODO: use PyOP2
     def build_metric(self):
         """
         NOTE: Assumes eigevalues are already squared.
