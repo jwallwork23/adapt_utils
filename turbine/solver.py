@@ -271,6 +271,7 @@ class UnsteadyTurbineProblem(UnsteadyProblem):
     def quantity_of_interest(self):
         return self.qoi
 
+    # TODO: update
     def get_hessian_metric(self, adjoint=False):
         sol = self.adjoint_solution if adjoint else self.solution
         u, eta = sol.split()
