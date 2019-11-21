@@ -125,40 +125,53 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
         field = self.op.adapt_field
-        assert field in ('elevation',
-                         'fluid_speed', 'velocity_x', 'velocity_y',
-                         'inflow', 'inflow_and_elevation',
-                         'both', 'all')
         sol = self.adjoint_solution if adjoint else self.solution
         u, eta = sol.split()
-        if field in ('fluid_speed', 'both'):
-            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
-            self.M = steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
-        if field in ('elevation', 'all', 'inflow_and_elevation'):
-            self.M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
-        if field in ('velocity_x', 'all'):
+
+        def elevation():
+            return steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
+
+        def velocity_x():
             s = Function(self.P1).interpolate(u[0])
-            Mu = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
-        if field in ('velocity_y', 'all'):
+            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+
+        def velocity_y():
             s = Function(self.P1).interpolate(u[1])
-            Mv = steady_metric(s, noscale=noscale, degree=degree, op=self.op)
-        if field in ('inflow', 'inflow_and_elevation'):
+            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+
+        def speed():
+            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
+            return steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
+
+        def inflow():
             v = Function(self.P1).interpolate(inner(u, self.op.inflow))
-            Mi = steady_metric(v, noscale=noscale, degree=degree, op=self.op)
-        if field == 'both':
-            M = steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
-            self.M = metric_intersection(self.M, M)
-        elif field == 'all':
-            self.M *= 0.3333
-            self.M += 0.3333*(Mu + Mv)
-        elif field == 'velocity_x':
-            self.M = Mu
-        elif field == 'velocity_y':
-            self.M = Mv
-        elif field == 'inflow':
-            self.M = Mi
-        elif field == 'inflow_and_elevation':
-            self.M = metric_intersection(self.M, Mi)
+            return steady_metric(v, noscale=noscale, degree=degree, op=self.op)
+        # TODO: Signed fluid speed?
+
+        metrics = {'elevation': elevation, 'velocity_x': velocity_x, 'velocity_y': velocity_y,
+                   'speed': speed, 'inflow': inflow}
+
+        self.M = Function(self.P1_ten)
+        if field in metrics:
+            self.M = metrics[fields]()
+        elif field == 'all_avg':
+            self.M += metrics['velocity_x']/3.0
+            self.M += metrics['velocity_y']/3.0
+            self.M += metrics['elevation']/3.0
+        elif field == 'all_int':  # TODO: different orders
+            self.M = metric_intersection(metrics['velocity_x'], metrics['velocity_y'])
+            self.M = metric_intersection(self.M, metrics['elevation'])
+        elif 'avg' in field:
+            fields = field.split('_avg_')
+            assert len(fields) == 2  # TODO: More fields
+            self.M += 0.5*metrics[fields[0]]
+            self.M += 0.5*metrics[fields[1]]
+        elif 'int' in field:
+            fields = field.split('_int_')
+            assert len(fields) == 2  # TODO: More fields
+            self.M = metric_intersection(metrics[fields[0]], metrics[fields[1]])
+        else:
+            raise ValueError("Adaptation field {:s} not recognised.".format(field))
 
     def get_bdy_functions(self, eta_in, u_in, bdy_id):
         b = self.op.bathymetry

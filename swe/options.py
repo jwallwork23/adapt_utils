@@ -30,7 +30,7 @@ class ShallowWaterOptions(Options):
     family = Enum(['dg-dg', 'rt-dg', 'dg-cg'], default_value='dg-dg').tag(config=True)
 
     # Adaptation
-    adapt_field = Unicode('fluid_speed', help="Adaptation field of interest, from {'fluid_speed', 'elevation', 'both'}.").tag(config=True)
+    adapt_field = Unicode('speed_avg_elevation', help="Adaptation field of interest.").tag(config=True)
     region_of_interest = List(default_value=[]).tag(config=True)
 
     def set_viscosity(self, fs):
