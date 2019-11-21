@@ -47,9 +47,9 @@ void anisotropic(double A_[%d]) {
 }
 """ % (d*d, d, d, d, d, d, d, d, d, direction, scale)
 
-# TODO: Plugin and test
 # TODO: 3d implementation
-def metric_from_hessian_kernel(p, noscale=False, op=DefaultOptions()):
+def metric_from_hessian_kernel(noscale=False, op=DefaultOptions()):
+    p = op.norm_order
     if p is None:
         return """
 #include <Eigen/Dense>
@@ -75,9 +75,9 @@ void metric_from_hessian(double A_[4], double * f, const double * B_)
     double det = D(0) * D(1);
     *f += sqrt(det);
   }
-  A += Q * D.asDiagonal() * Q.transpose()
+  A += Q * D.asDiagonal() * Q.transpose();
 }
-""" % (p, 'false' if noscale and op.normalisation == 'complexity' else 'true', p, p)
+""" % ('false' if noscale or op.normalisation == 'error' else 'true')
     else:
         return """
 #include <Eigen/Dense>
@@ -109,7 +109,6 @@ void metric_from_hessian(double A_[4], double * f, const double * B_)
 }
 """ % (p, 'false' if noscale else 'true', p, p)
 
-# TODO: Plugin and test
 # TODO: 3d implementation
 def scale_metric_kernel(op=DefaultOptions()):
     ia2 = pow(op.max_anisotropy, -2)
@@ -121,7 +120,7 @@ def scale_metric_kernel(op=DefaultOptions()):
 
 using namespace Eigen;
 
-void metric2(double A_[4])
+void scale_metric(double A_[4])
 {
   Map<Matrix<double, 2, 2, RowMajor> > A((double *)A_);
   SelfAdjointEigenSolver<Matrix<double, 2, 2, RowMajor>> eigensolver(A);
@@ -129,7 +128,7 @@ void metric2(double A_[4])
   Vector2d D = eigensolver.eigenvalues();
   D(0) = fmin(%f, fmax(%f, abs(D(0))));
   D(1) = fmin(%f, fmax(%f, abs(D(1))));
-  double max_eig = max(D(0), D(1));
+  double max_eig = fmax(D(0), D(1));
   D(0) = fmax(D(0), %f * max_eig);
   D(1) = fmax(D(1), %f * max_eig);
   A = Q * D.asDiagonal() * Q.transpose();

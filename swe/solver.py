@@ -418,8 +418,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
             flux_terms += gamma*dot(loc('+') + loc('-'), jump(u))*dS
 
         # ExternalPressureGradient
-        eta_star = avg(eta) + 0.5*sqrt(avg(H)/g)*jump(u, n)
         if self.op.family != 'dg-cg':
+            eta_star = avg(eta) + 0.5*sqrt(avg(H)/g)*jump(u, n)
             loc = -i*g*dot(z, n)
             flux_terms += eta_star*(loc('+') + loc('-'))*dS
             loc = i*g*eta*dot(z, n)
