@@ -75,9 +75,9 @@ void metric_from_hessian(double A_[4], double * f, const double * B_)
     double det = D(0) * D(1);
     *f += sqrt(det);
   }
-  A += Q * D.asDiagonal() * Q.transpose()
+  A += Q * D.asDiagonal() * Q.transpose();
 }
-""" % (p, 'false' if noscale and op.normalisation == 'complexity' else 'true', p, p)
+""" % ('false' if noscale or op.normalisation == 'complexity' else 'true')
     else:
         return """
 #include <Eigen/Dense>

@@ -9,6 +9,7 @@ except:
     PETSC_ARCH = os.path.join(PETSC_DIR, PETSC_ARCH)
     if not os.path.exists(os.path.join(PETSC_ARCH, 'include/eigen3')):
         PETSC_ARCH = '/usr/local'
+include_dir = ["%s/include/eigen3" % PETSC_ARCH]
 
 import numpy as np
 import numpy
@@ -46,7 +47,8 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
     V = H.function_space()
     mesh = V.mesh()
     dim = mesh.topological_dimension()
-    assert dim in (2, 3)
+    #assert dim in (2, 3)
+    assert dim == 2  # TODO: 3d parloops
 
     # Functions to hold metric and its determinant
     M = Function(V)
@@ -56,44 +58,8 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
     assert op.normalisation in ('complexity', 'error')
     p = op.norm_order
 
-    msg = "WARNING: minimum element size reached as {m:.2e}"
-    # TODO: Insert par_loop below
-    for k in range(mesh.num_vertices()):
-
-        # Ensure local Hessian is symmetric
-        H_loc = H.dat.data[k]
-        for i in range(dim-1):
-            for j in range(i+1, dim):
-                mean_diag = 0.5*(H_loc[i][j] + H_loc[j][i])
-                H_loc[i][j] = mean_diag
-                H_loc[j][i] = mean_diag
-
-        # Find eigenpairs of Hessian
-        lam, v = la.eigh(H_loc)
-
-        # Take eigenvalues in modulus, so that the metric is SPD
-        det = 1.
-        for i in range(dim):
-            lam[i] = max(abs(lam[i]), 1e-10)  # Truncate eigenvalues to avoid round-off error
-            det *= lam[i]
-
-        # Reconstruct edited Hessian
-        for l in range(dim):
-            for i in range(dim):
-                for j in range(i, dim):
-                    M.dat.data[k][i, j] += lam[l]*v[l][i]*v[l][j]
-        for i in range(1, dim):
-            for j in range(i):
-                M.dat.data[k][i, j] = M.dat.data[k][j, i]
-
-        # Apply Lp normalisation
-        if not noscale:
-            if p is None:
-                if op.normalisation == 'complexity':
-                    detH.dat.data[k] = np.sqrt(det)
-            elif p >= 1:
-                M.dat.data[k] *= pow(det, -1./(2*p + dim))
-                detH.dat.data[k] = pow(det, p/(2.*p + dim))
+    kernel = op2.Kernel(metric_from_hessian_kernel(p), "metric_from_hessian", cpp=True, include_dirs=include_dir)
+    op2.par_loop(kernel, V.node_set, M.dat(op2.RW), detH.dat(op2.RW), H.dat(op2.READ))
 
     if noscale:
         return M
@@ -360,7 +326,7 @@ def anisotropic_refinement(metric, direction=0):
     M = metric.copy()
     fs = M.function_space()
     dim = fs.mesh().topological_dimension()
-    kernel = op2.Kernel(anisotropic_refinement_kernel(dim, direction), "anisotropic", cpp=True, include_dirs=["%s/include/eigen3" % PETSC_ARCH])
+    kernel = op2.Kernel(anisotropic_refinement_kernel(dim, direction), "anisotropic", cpp=True, include_dirs=include_dir)
     op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
     return M
 
@@ -381,7 +347,7 @@ def metric_intersection(M1, M2, bdy=None):
     M12 = M1.copy()
     # FIXME: boundary intersection does not work
     node_set = DirichletBC(V, 0, bdy).nodes if bdy is not None else V.node_set
-    kernel = op2.Kernel(intersect_kernel(dim), "intersect", cpp=True, include_dirs=["%s/include/eigen3" % PETSC_ARCH])
+    kernel = op2.Kernel(intersect_kernel(dim), "intersect", cpp=True, include_dirs=include_dir)
     op2.par_loop(kernel, node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
     return M12
 
