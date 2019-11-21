@@ -450,7 +450,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
             flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
         # HUDiv
-        if self.op.family in ('dg-dg', 'rt-dg'):
             u_rie = avg(u) + sqrt(g/avg(H))*jump(eta, n)
             loc = -i*n*zeta
             flux_terms += dot(avg(H)*u_rie, loc('+') + loc('-'))*dS
@@ -482,18 +481,18 @@ class SteadyShallowWaterProblem(SteadyProblem):
             funcs = bcs.get(j)
 
             if funcs is not None:
+                eta_ext, u_ext = self.get_bdy_functions(eta, u, j)
+                eta_ext_old, u_ext_old = self.get_bdy_functions(eta_old, u_old, j)
 
                 # ExternalPressureGradient
-                eta_ext, u_ext = self.get_bdy_functions(eta, u, j)
                 un_jump = inner(u - u_ext, n)
                 eta_rie = 0.5*(eta + eta_ext) + sqrt(H/g)*un_jump
                 if self.op.family == 'dg-cg':
-                    flux_terms += i*g*eta_rie*dot(z, n)*ds(j)
+                    flux_terms += -i*g*eta_rie*dot(z, n)*ds(j)
                 else:
-                    flux_terms += i*g*(eta_rie - eta)*dot(z, n)*ds(j)
+                    flux_terms += -i*g*(eta_rie - eta)*dot(z, n)*ds(j)
 
                 # HUDiv
-                eta_ext_old, u_ext_old = self.get_bdy_functions(eta_old, u_old, j)
                 H_ext = eta_ext_old + b
                 H_av = 0.5*(H + H_ext)
                 eta_jump = eta - eta_ext
