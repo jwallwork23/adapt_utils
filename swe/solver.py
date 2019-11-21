@@ -156,21 +156,21 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if field in metrics:
             self.M = metrics[fields]()
         elif field == 'all_avg':
-            self.M += metrics['velocity_x']/3.0
-            self.M += metrics['velocity_y']/3.0
-            self.M += metrics['elevation']/3.0
+            self.M += metrics['velocity_x']()/3.0
+            self.M += metrics['velocity_y']()/3.0
+            self.M += metrics['elevation']()/3.0
         elif field == 'all_int':  # TODO: different orders
-            self.M = metric_intersection(metrics['velocity_x'], metrics['velocity_y'])
-            self.M = metric_intersection(self.M, metrics['elevation'])
+            self.M = metric_intersection(metrics['velocity_x'](), metrics['velocity_y']())
+            self.M = metric_intersection(self.M, metrics['elevation']())
         elif 'avg' in field:
             fields = field.split('_avg_')
             assert len(fields) == 2  # TODO: More fields
-            self.M += 0.5*metrics[fields[0]]
-            self.M += 0.5*metrics[fields[1]]
+            self.M += 0.5*metrics[fields[0]]()
+            self.M += 0.5*metrics[fields[1]]()
         elif 'int' in field:
             fields = field.split('_int_')
             assert len(fields) == 2  # TODO: More fields
-            self.M = metric_intersection(metrics[fields[0]], metrics[fields[1]])
+            self.M = metric_intersection(metrics[fields[0]](), metrics[fields[1]]())
         else:
             raise ValueError("Adaptation field {:s} not recognised.".format(field))
 
