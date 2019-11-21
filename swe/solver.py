@@ -147,10 +147,18 @@ class SteadyShallowWaterProblem(SteadyProblem):
         def inflow():
             v = Function(self.P1).interpolate(inner(u, self.op.inflow))
             return steady_metric(v, noscale=noscale, degree=degree, op=self.op)
-        # TODO: Signed fluid speed?
+
+        def bathymetry():
+            b = Function(self.P1).interpolate(self.op.bathymetry)
+            return steady_metric(b, noscale=noscale, degree=degree, op=self.op)
+
+        def viscosity():
+            nu = Function(self.P1).interpolate(self.op.viscosity)
+            return steady_metric(nu, noscale=noscale, degree=degree, op=self.op)
 
         metrics = {'elevation': elevation, 'velocity_x': velocity_x, 'velocity_y': velocity_y,
-                   'speed': speed, 'inflow': inflow}
+                   'speed': speed, 'inflow': inflow,
+                   'bathymetry': bathymetry, 'viscosity': viscosity}
 
         self.M = Function(self.P1_ten)
         if field in metrics:
@@ -159,18 +167,21 @@ class SteadyShallowWaterProblem(SteadyProblem):
             self.M += metrics['velocity_x']()/3.0
             self.M += metrics['velocity_y']()/3.0
             self.M += metrics['elevation']()/3.0
-        elif field == 'all_int':  # TODO: different orders
+        elif field == 'all_int':
             self.M = metric_intersection(metrics['velocity_x'](), metrics['velocity_y']())
             self.M = metric_intersection(self.M, metrics['elevation']())
+        elif 'avg' in field and 'int' in field:
+            raise NotImplementedError  # TODO
         elif 'avg' in field:
             fields = field.split('_avg_')
-            assert len(fields) == 2  # TODO: More fields
-            self.M += 0.5*metrics[fields[0]]()
-            self.M += 0.5*metrics[fields[1]]()
+            num_fields = len(fields)
+            for i in range(num_fields):
+                self.M += metrics[fields[i]]()/num_fields
         elif 'int' in field:
             fields = field.split('_int_')
-            assert len(fields) == 2  # TODO: More fields
-            self.M = metric_intersection(metrics[fields[0]](), metrics[fields[1]]())
+            self.M = metrics[fields[0]]()
+            for i in range(1, len(fields)):
+                self.M = metric_intersection(self.M, metrics[fields[i]]())
         else:
             raise ValueError("Adaptation field {:s} not recognised.".format(field))
 
