@@ -28,6 +28,7 @@ default_params = {
     # 'ksp_monitor_singular_value': None,
     'pc_type': 'lu',
     'pc_factor_mat_solver_type': 'mumps',
+    # 'mat_mumps_cntl_1': 0.1,
     'mat_mumps_icntl_14': 200,
 }
 
@@ -60,13 +61,10 @@ ilu_params = {
 }
 
 
-default_adjoint_params = {
-    'mat_type': 'aij',
-    'ksp_type': 'preonly',
-    'pc_type': 'lu',
-    'pc_factor_mat_solver_type': 'mumps',
-    'mat_mumps_icntl_14': 200,
-}
+keys = {key for key in default_params if not 'snes' in key}
+default_adjoint_params = {}
+for key in keys:
+    default_adjoint_params[key] = default_params[key]
 
 
 class SteadyTurbineOptions(ShallowWaterOptions):
