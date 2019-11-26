@@ -1,9 +1,29 @@
 from firedrake import *
+from firedrake.petsc import PETSc
+from firedrake.mesh import MeshGeometry  # FIXME: won't work for adjoint case
 
 from adapt_utils.options import DefaultOptions
 
 
 __all__ = ["iso_P2", "multi_adapt"]
+
+
+# FIXME: won't work for adjoint case
+class AdaptMesh(MeshGeometry):
+    """
+    Subclassed mesh object which adds some extra features.
+    """
+    def __init__(self, coordinates):
+        super(self, AdaptMesh).__init__(self, coordinates)
+
+    def save_plex(self, filename):
+        viewer = PETSc.Viewer().createHDF5(filename, 'r')
+        viewer(self._plex)
+
+    def load_plex(self, filename):
+        newplex = PETSc.DMPlex().create()
+        newplex.createFromFile(filename)
+        self.__init__(Mesh(newplex).coordinates)
 
 
 def iso_P2(mesh):

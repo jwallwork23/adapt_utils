@@ -162,7 +162,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         self.M = Function(self.P1_ten)
         if field in metrics:
-            self.M = metrics[fields]()
+            self.M = metrics[field]()
         elif field == 'all_avg':
             self.M += metrics['velocity_x']()/3.0
             self.M += metrics['velocity_y']()/3.0
