@@ -60,6 +60,15 @@ ilu_params = {
 }
 
 
+default_adjoint_params = {
+    'mat_type': 'aij',
+    'ksp_type': 'preonly',
+    'pc_type': 'lu',
+    'pc_factor_mat_solver_type': 'mumps',
+    'mat_mumps_icntl_14': 200,
+}
+
+
 class SteadyTurbineOptions(ShallowWaterOptions):
     """
     Base class holding parameters for steady state tidal turbine problems.
@@ -67,6 +76,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
 
     # Solver parameters
     params = PETScSolverParameters(default_params).tag(config=True)
+    adjoint_params = PETScSolverParameters(default_adjoint_params).tag(config=True)
 
     def __init__(self, approach='fixed_mesh', num_iterations=1):
         super(SteadyTurbineOptions, self).__init__(approach)

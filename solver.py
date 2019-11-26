@@ -1,8 +1,6 @@
 from firedrake import *
 from firedrake.petsc import PETSc
 from thetis import create_directory
-from thetis_adjoint import *
-import pyadjoint
 
 import os
 import datetime
@@ -107,23 +105,9 @@ class SteadyProblem():
 
     def solve_discrete_adjoint(self):
         """
-        Solve the adjoint PDE in the discrete sense, using pyadjoint.
+        Solve the adjoint PDE in the discrete sense.
         """
-        # Compute some gradient in order to get adjoint solutions
-        J = self.quantity_of_interest()
-        compute_gradient(J, Control(self.gradient_field))
-        tape = get_working_tape()
-        sblocks = ('SolveBlock', 'LinearVariationalSolveBlock', 'NonlinearVariationalSolveBlock')
-        solve_blocks = [block for block in tape._blocks if block.__class__.__name__ in (sblocks)
-                                                        and block.adj_sol is not None]
-        try:
-            assert len(solve_blocks) == 1
-        except:
-            ValueError("Expected one SolveBlock, but encountered {:d}".format(len(solve_blocks)))
-
-        # extract adjoint solution
-        self.adjoint_solution.assign(solve_blocks[0].adj_sol)
-        tape.clear_tape()
+        pass
 
     def solve_adjoint(self):
         """

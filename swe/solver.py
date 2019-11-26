@@ -2,7 +2,6 @@ from thetis import *
 from thetis.physical_constants import *
 from firedrake.petsc import PETSc
 import math
-import pyadjoint
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
@@ -44,7 +43,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.boundary_conditions = op.set_bcs(self.V)
 
         # Parameters for adjoint computation
-        self.gradient_field = self.op.bathymetry  # For pyadjoint gradient computation
         z, zeta = self.adjoint_solution.split()
         z.rename("Adjoint fluid velocity")
         zeta.rename("Adjoint elevation")
@@ -56,13 +54,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.op.set_viscosity(self.P1)
         self.inflow = self.op.set_inflow(self.P1_vec)
 
-    def solve(self):
+    def setup_solver(self):
         """
-        Create a Thetis FlowSolver2d object for solving the shallow water equations and solve.
+        Create a Thetis FlowSolver2d object for solving the shallow water equations.
         """
         op = self.op
-        solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
-        options = solver_obj.options
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
+        options = self.solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
 
@@ -89,14 +87,14 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.lax_friedrichs_velocity_scaling_factor = op.lax_friedrichs_scaling_factor
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
-        solver_obj.create_equations()
+        self.solver_obj.create_equations()
         self.sipg_parameter = options.sipg_parameter
 
         # Boundary conditions
-        solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
+        self.solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
 
         if hasattr(self, 'extra_setup'):
-            cb = self.extra_setup(solver_obj)
+            self.extra_setup()
 
         # Initial conditions
         if self.prev_solution is not None:
@@ -106,17 +104,24 @@ class SteadyShallowWaterProblem(SteadyProblem):
             interp = Function(self.V)
             u_interp, eta_interp = interp.split()
             u_interp.interpolate(self.inflow)
-        solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+        self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+        self.lhs = self.solver_obj.timestepper.F
+        self.solution = self.solver_obj.fields.solution_2d
 
-        # Solve
-        # solver_obj.create_timestepper()
-        # self.lhs = lhs(solver_obj.timestepper.F)  # TODO: not much use for condition number atm
-        self.lhs = self.get_weak_residual(interp)
-        solver_obj.iterate()
-        self.solution.assign(solver_obj.fields.solution_2d)
+    def solve(self):
+        if not hasattr(self, 'solver_obj'):
+            self.setup_solver()
+        self.solver_obj.iterate()
+        self.solution = self.solver_obj.fields.solution_2d
 
-        if cb is not None:
-            self.get_callbacks(cb)
+        if hasattr(self, 'cb'):
+            self.get_callbacks(self.cb)
+
+    def solve_discrete_adjoint(self):
+        dFdu = derivative(self.lhs, self.solution, TrialFunction(self.V))
+        dFdu_form = adjoint(dFdu)
+        dJdu = derivative(self.quantity_of_interest_form(), self.solution, TestFunction(self.V))
+        solve(dFdu_form == dJdu, self.adjoint_solution, solver_parameters=self.op.adjoint_params)
 
     def get_qoi_kernel(self):
         pass
@@ -653,9 +658,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         u_interp, eta_interp = self.interpolated_solution.split()
         u_, eta_ = self.prev_solution.split()
         PETSc.Sys.Print("Interpolating solution across meshes...")
-        with pyadjoint.stop_annotating():
-            u_interp.project(u_)
-            eta_interp.project(eta_)
+        u_interp.project(u_)
+        eta_interp.project(eta_)
 
 
 class UnsteadyShallowWaterProblem(UnsteadyProblem):

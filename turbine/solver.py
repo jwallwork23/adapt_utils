@@ -17,7 +17,7 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
     """
     General solver object for stationary tidal turbine problems.
     """
-    def extra_setup(self, solver_obj):
+    def extra_setup(self):
         """
         We haven't meshed the turbines with separate ids, so define a farm everywhere and make it
         have a density of 1/D^2 inside the DxD squares where the turbines are and 0 outside.
@@ -31,30 +31,23 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
         self.farm_options.turbine_options.diameter = op.turbine_diameter
         self.farm_options.turbine_options.thrust_coefficient = op.thrust_coefficient
 
+        A_T = pi*(op.turbine_diameter/2.0)**2
+        self.C_D = op.thrust_coefficient*A_T*self.turbine_density/2.0
+
         # Turbine drag is applied everywhere (where the turbine density isn't zero)
-        solver_obj.options.tidal_turbine_farms["everywhere"] = self.farm_options
+        self.solver_obj.options.tidal_turbine_farms["everywhere"] = self.farm_options
 
         # Callback that computes average power
-        cb = turbines.TurbineFunctionalCallback(solver_obj)
-        solver_obj.add_callback(cb, 'timestep')
-
-        return cb
+        self.cb = turbines.TurbineFunctionalCallback(self.solver_obj)
+        self.solver_obj.add_callback(self.cb, 'timestep')
 
     def extra_residual_terms(self, u, eta, u_old, eta_old, z, zeta):
         H_old = self.op.bathymetry + eta_old
-        density = self.farm_options.turbine_density
-        C_T = self.farm_options.turbine_options.thrust_coefficient
-        A_T = pi*(self.farm_options.turbine_options.diameter/2.0)**2
-        C_D = C_T*A_T*density/2.0
-        return -C_D*sqrt(dot(u_old, u_old))*inner(u, z)/H_old
+        return -self.C_D*sqrt(dot(u_old, u_old))*inner(u, z)/H_old
 
     def extra_weak_residual_terms(self, u, eta, u_old, eta_old, u_test, eta_test):
         H_old = self.op.bathymetry + eta_old
-        density = self.farm_options.turbine_density
-        C_T = self.farm_options.turbine_options.thrust_coefficient
-        A_T = pi*(self.farm_options.turbine_options.diameter/2.0)**2
-        C_D = C_T*A_T*density/2.0
-        return -C_D*sqrt(dot(u_old, u_old))*inner(u, u_test)/H_old*dx
+        return -self.C_D*sqrt(dot(u_old, u_old))*inner(u, u_test)/H_old*dx
 
     def get_callbacks(self, cb):
         self.qoi = cb.average_power
@@ -67,6 +60,9 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
 
     def quantity_of_interest(self):
         return self.qoi
+
+    def quantity_of_interest_form(self):
+        return self.C_D*pow(inner(split(self.solution)[0], split(self.solution)[0]), 1.5)*dx
 
     def get_anisotropic_metric(self, adjoint=False, relax=True, superpose=False):
         assert not (relax and superpose)
