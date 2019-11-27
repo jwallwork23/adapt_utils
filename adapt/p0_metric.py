@@ -6,6 +6,7 @@ from numpy import linalg as la
 
 from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.metric import isotropic_metric
+from adapt_utils.adapt.kernels import get_eigendecomposition_kernel, set_eigendecomposition_kernel
 
 
 __all__ = ["AnisotropicMetricDriver"]
@@ -44,10 +45,10 @@ class AnisotropicMetricDriver():
         self.K_opt = Function(self.P0)  # Optimal element size
 
         # Eigenvalues and eigenvectors
-        self.eval0 = Function(self.P0)
-        self.eval1 = Function(self.P0)
+        self.eval = Function(self.P0_vec)
         self.evec0 = Function(self.P0_vec)
         self.evec1 = Function(self.P0_vec)
+        self.evec = Function(self.P0_ten)  # TODO: Combine into tensor
 
         # Metrics and error estimators
         self.p0metric = Function(self.P0_ten)
@@ -60,10 +61,12 @@ class AnisotropicMetricDriver():
         JJt.interpolate(self.J*self.J.T)
         for i in range(self.ne):
             lam, v = la.eigh(JJt.dat.data[i])
-            self.eval0.dat.data[i] = lam[0]
-            self.eval1.dat.data[i] = lam[1]
+            self.eval.dat.data[i][0] = lam[0]
+            self.eval.dat.data[i][1] = lam[1]
             self.evec0.dat.data[i][:] = v[0]
             self.evec1.dat.data[i][:] = v[1]
+        #kernel = op2.Kernel(get_eigendecomposition_kernel(dim), "get_eigendecomposition", cpp=True, include_dirs=include_dir)
+        #op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
 
     # TODO: use PyOP2
     def get_hessian_eigenpair(self):
@@ -71,13 +74,14 @@ class AnisotropicMetricDriver():
         for i in range(self.ne):
             lam, v = la.eigh(self.p0hessian.dat.data[i])
             if np.abs(lam[0]) > np.abs(lam[1]):
-                self.eval0.dat.data[i] = lam[0]
-                self.eval1.dat.data[i] = lam[1]
+                #self.eval.dat.data[i][0] = lam[0]
+                #self.eval.dat.data[i][1] = lam[1]
+                self.eval.dat.data[i][:] = lam
                 self.evec0.dat.data[i][:] = v[0]
                 self.evec1.dat.data[i][:] = v[1]
             else:
-                self.eval0.dat.data[i] = lam[1]
-                self.eval1.dat.data[i] = lam[0]
+                self.eval.dat.data[i][0] = lam[1]
+                self.eval.dat.data[i][1] = lam[0]
                 self.evec0.dat.data[i][:] = v[1]
                 self.evec1.dat.data[i][:] = v[0]
 
@@ -104,11 +108,11 @@ class AnisotropicMetricDriver():
         self.evec1.assign(tmp)
 
         # Compute optimal eigenvalues using stretching factor and optimal element size
-        s = Function(self.P0).interpolate(sqrt(abs(self.eval0/self.eval1)))
-        # s = sqrt(abs(self.eval0/self.eval1))  # FIXME
-        # s = assemble(self.p0test*sqrt(abs(self.eval0/self.eval1))*dx)
-        self.eval0.interpolate(abs(self.K_opt/self.K_hat*s))
-        self.eval1.interpolate(abs(self.K_opt/self.K_hat/s))
+        s = Function(self.P0).interpolate(sqrt(abs(self.eval[0]/self.eval[1])))
+        # s = sqrt(abs(self.eval[0]/self.eval1))  # FIXME
+        # s = assemble(self.p0test*sqrt(abs(self.eval[0]/self.eval[1]))*dx)
+
+        self.eval.interpolate(as_vector([abs(self.K_opt/self.K_hat*s), abs(self.K_opt/self.K_hat/s)]))
 
     # TODO: use PyOP2
     def build_metric(self):
@@ -116,8 +120,8 @@ class AnisotropicMetricDriver():
         NOTE: Assumes eigevalues are already squared.
         """
         for i in range(self.ne):
-            lam0 = 1/self.eval0.dat.data[i]
-            lam1 = 1/self.eval1.dat.data[i]
+            lam0 = 1/self.eval.dat.data[i][0]
+            lam1 = 1/self.eval.dat.data[i][1]
             v0 = self.evec0.dat.data[i]
             v1 = self.evec1.dat.data[i]
             self.p0metric.dat.data[i][0, 0] = lam0*v0[0]*v0[0] + lam1*v1[0]*v1[0]
@@ -156,18 +160,18 @@ class AnisotropicMetricDriver():
         return assemble(self.p0test*triple_product*triple_product*dx)
 
     def cell_interpolation_error(self):
-        l = self.eval0*self.eval0*self.Lij(0, 0)
-        l += self.eval0*self.eval1*self.Lij(0, 1)
-        l += self.eval1*self.eval0*self.Lij(1, 0)
-        l += self.eval1*self.eval1*self.Lij(1, 1)
+        l = self.eval[0]*self.eval[0]*self.Lij(0, 0)
+        l += self.eval[0]*self.eval[1]*self.Lij(0, 1)
+        l += self.eval[1]*self.eval[0]*self.Lij(1, 0)
+        l += self.eval[1]*self.eval[1]*self.Lij(1, 1)
         self.estimator.interpolate(sqrt(l))
 
     def gradient_interpolation_error(self):
         self.cell_interpolation_error()
-        coeff = pow(min_value(self.eval0, self.eval1), -0.5)
+        coeff = pow(min_value(self.eval[0], self.eval[1]), -0.5)
         self.estimator.interpolate(coeff*self.estimator)
 
     def edge_interpolation_error(self):
         self.cell_interpolation_error()
-        coeff = sqrt((self.eval0+self.eval1)*pow(min_value(self.eval0, self.eval1), 1.5))
+        coeff = sqrt((self.eval[0]+self.eval[1])*pow(min_value(self.eval[0], self.eval[1]), 1.5))
         self.estimator.interpolate(coeff*self.estimator)

@@ -12,7 +12,7 @@ def get_eigendecomposition_kernel(d):
 
 using namespace Eigen;
 
-void intersect(double EVecs_[%d], double EVals_[%d], const double * M_) {
+void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double * M_) {
   Map<Matrix<double, %d, %d, RowMajor> > Evecs((double *)EVecs_);
   Map<Matrix<double, %d, %d, RowMajor> > Evals((double *)EVals_);
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
@@ -31,7 +31,7 @@ def set_eigendecomposition_kernel(d):
 
 using namespace Eigen;
 
-void intersect(double M_[%d], const double * EVecs_, const double * EVals_) {
+void set_eigendecomposition(double M_[%d], const double * EVecs_, const double * EVals_) {
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
   Map<Matrix<double, %d, %d, RowMajor> > Evecs((double *)Evecs_);
   Map<Matrix<double, %d, %d, RowMajor> > Evals((double *)Evals_);
