@@ -1,5 +1,10 @@
+# Directories
 __pycache__/
+
+# Specific files
+adapt/interpolation.py
 plots/.ipynb_checkpoints
 FIXME
 
+# File types
 *.swp
