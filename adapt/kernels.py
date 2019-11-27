@@ -191,8 +191,7 @@ void metric_from_hessian(double A_[4], double * f, const double * B_)
 }
 """ % (p, 'false' if noscale else 'true', p, p)
 
-# TODO: 3d implementation
-def scale_metric_kernel(op=DefaultOptions()):
+def scale_metric_kernel(d, op=DefaultOptions()):
     ia2 = pow(op.max_anisotropy, -2)
     ih_min2 = pow(op.h_min, -2)
     ih_max2 = pow(op.h_max, -2)
@@ -202,17 +201,16 @@ def scale_metric_kernel(op=DefaultOptions()):
 
 using namespace Eigen;
 
-void scale_metric(double A_[4])
+void scale_metric(double A_[%d])
 {
-  Map<Matrix<double, 2, 2, RowMajor> > A((double *)A_);
-  SelfAdjointEigenSolver<Matrix<double, 2, 2, RowMajor>> eigensolver(A);
-  Matrix<double, 2, 2, RowMajor> Q = eigensolver.eigenvectors();
-  Vector2d D = eigensolver.eigenvalues();
-  D(0) = fmin(%f, fmax(%f, abs(D(0))));
-  D(1) = fmin(%f, fmax(%f, abs(D(1))));
+  Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+  SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(A);
+  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
+  Vector%dd D = eigensolver.eigenvalues();
+  for (int i=0; i<%d; i++) D(i) = fmin(%f, fmax(%f, abs(D(i))));
   double max_eig = fmax(D(0), D(1));
-  D(0) = fmax(D(0), %f * max_eig);
-  D(1) = fmax(D(1), %f * max_eig);
+  if (%d == 3) max_eig = fmax(max_eig, D(2));
+  for (int i=0; i<%d; i++) D(i) = fmax(D(i), %f * max_eig);
   A = Q * D.asDiagonal() * Q.transpose();
 }
-""" % (ih_min2, ih_max2, ih_min2, ih_max2, ia2, ia2)
+""" % (d*d, d, d, d, d, d, d, d, d, ih_min2, ih_max2, d, d, ia2)
