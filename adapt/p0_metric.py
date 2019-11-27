@@ -61,10 +61,10 @@ class AnisotropicMetricDriver():
         JJt.interpolate(self.J*self.J.T)
         for i in range(self.ne):
             lam, v = la.eigh(JJt.dat.data[i])
-            self.eval.dat.data[i][0] = lam[0]
-            self.eval.dat.data[i][1] = lam[1]
-            self.evec0.dat.data[i][:] = v[0]
-            self.evec1.dat.data[i][:] = v[1]
+            self.eval.dat.data[i][:] = lam
+            self.evec.dat.data[i][:,:] = v
+            self.evec0.dat.data[i][:] = v[0]  # TODO: remove
+            self.evec1.dat.data[i][:] = v[1]  # TODO: remove
         #kernel = op2.Kernel(get_eigendecomposition_kernel(dim), "get_eigendecomposition", cpp=True, include_dirs=include_dir)
         #op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
 
@@ -74,12 +74,19 @@ class AnisotropicMetricDriver():
         for i in range(self.ne):
             lam, v = la.eigh(self.p0hessian.dat.data[i])
             if np.abs(lam[0]) > np.abs(lam[1]):
-                #self.eval.dat.data[i][0] = lam[0]
-                #self.eval.dat.data[i][1] = lam[1]
                 self.eval.dat.data[i][:] = lam
-                self.evec0.dat.data[i][:] = v[0]
-                self.evec1.dat.data[i][:] = v[1]
+                self.evec0.dat.data[i][:] = v[0]  # TODO: remove
+                self.evec1.dat.data[i][:] = v[1]  # TODO: remove
+                self.evec.dat.data[i][:,:] = v
             else:
+                #tmp = np.array(v[0])
+                #v[0][:] = v[1]
+                #v[1][:] = tmp
+                #tmp = np.array(lam[0])
+                #lam[0][:] = lam[1]
+                #lam[1][:] = tmp
+                #self.eval.dat.data[i][:] = lam
+                #self.evec.dat.data[i][:] = v
                 self.eval.dat.data[i][0] = lam[1]
                 self.eval.dat.data[i][1] = lam[0]
                 self.evec0.dat.data[i][:] = v[1]
@@ -119,6 +126,7 @@ class AnisotropicMetricDriver():
         """
         NOTE: Assumes eigevalues are already squared.
         """
+        #self.eval.interpolate(1.0/self.eval)
         for i in range(self.ne):
             lam0 = 1/self.eval.dat.data[i][0]
             lam1 = 1/self.eval.dat.data[i][1]
