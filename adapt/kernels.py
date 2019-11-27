@@ -129,75 +129,91 @@ void anisotropic(double A_[%d]) {
 }
 """ % (d*d, d, d, d, d, d, d, d, d, direction, scale)
 
-# TODO: 3d implementation
-def metric_from_hessian_kernel(noscale=False, op=DefaultOptions()):
+def metric_from_hessian_kernel(d, noscale=False, op=DefaultOptions()):
     p = op.norm_order
+    scale = 'false' if noscale or op.normalisation == 'error' else 'true'
     if p is None:
-        return """
+        return linf_metric_from_hessian_kernel(d, scale)
+    else:
+        return lp_metric_from_hessian_kernel(d, scale, p)
+
+def linf_metric_from_hessian_kernel(d, scale):
+    return """
 #include <Eigen/Dense>
-#include <algorithm>
 
 using namespace Eigen;
 
-void metric_from_hessian(double A_[4], double * f, const double * B_)
+void metric_from_hessian(double A_[%d], double * f, const double * B_)
 {
-  Map<Matrix<double, 2, 2, RowMajor> > A((double *)A_);
-  Map<Matrix<double, 2, 2, RowMajor> > B((double *)B_);
-  double mean_diag = 0.5*(B(0,1) + B(1,0));
-  B(0,1) = mean_diag;
-  B(1,0) = mean_diag;
-  SelfAdjointEigenSolver<Matrix<double, 2, 2, RowMajor>> eigensolver(B);
-  Matrix<double, 2, 2, RowMajor> Q = eigensolver.eigenvectors();
-  Vector2d D = eigensolver.eigenvalues();
-  D(0) = fmax(1e-10, abs(D(0)));
-  D(1) = fmax(1e-10, abs(D(1)));
+  Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+
+  double mean_diag;
+  int i,j;
+  for (i=0; i<%d-1; i++) {
+    for (j=i+1; i<%d; i++) {
+      mean_diag = 0.5*(B(i,j) + B(j,i));
+      B(i,j) = mean_diag;
+      B(j,i) = mean_diag;
+    }
+  }
+
+  SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(B);
+  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
+  Vector%dd D = eigensolver.eigenvalues();
 
   /* Normalisation */
+  for (i=0; i<%d; i++) D(i) = fmax(1e-10, abs(D(i)));
   if (%s) {
-    double det = D(0) * D(1);
+    double det = 1.0;
+    for (i=0; i<%d; i++) det *= D(i);
     *f += sqrt(det);
   }
   A += Q * D.asDiagonal() * Q.transpose();
 }
-""" % ('false' if noscale or op.normalisation == 'error' else 'true')
-    else:
-        return """
+""" % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d)
+
+def lp_metric_from_hessian_kernel(d, scale, p):
+    return """
 #include <Eigen/Dense>
-#include <algorithm>
 
 using namespace Eigen;
 
-void metric_from_hessian(double A_[4], double * f, const double * B_)
+void metric_from_hessian(double A_[%d], double * f, const double * B_)
 {
-  Map<Matrix<double, 2, 2, RowMajor> > A((double *)A_);
-  Map<Matrix<double, 2, 2, RowMajor> > B((double *)B_);
-  double mean_diag = 0.5*(B(0,1) + B(1,0));
-  B(0,1) = mean_diag;
-  B(1,0) = mean_diag;
-  SelfAdjointEigenSolver<Matrix<double, 2, 2, RowMajor>> eigensolver(B);
-  Matrix<double, 2, 2, RowMajor> Q = eigensolver.eigenvectors();
-  Vector2d D = eigensolver.eigenvalues();
-  D(0) = fmax(1e-10, abs(D(0)));
-  D(1) = fmax(1e-10, abs(D(1)));
-  double scaling = 1.0;
+  Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+
+  double mean_diag;
+  int i,j;
+  for (i=0; i<%d-1; i++) {
+    for (j=i+1; i<%d; i++) {
+      mean_diag = 0.5*(B(i,j) + B(j,i));
+      B(i,j) = mean_diag;
+      B(j,i) = mean_diag;
+    }
+  }
+
+  SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(B);
+  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
+  Vector%dd D = eigensolver.eigenvalues();
 
   /* Normalisation */
+  for (i=0; i<%d; i++) D(i) = fmax(1e-10, abs(D(i)));
+  double scaling = 1.0;
   if (%s) {
-    double det = D(0) * D(1);
+    double det = 1.0;
+    for (i=0; i<%d; i++) det *= D(i);
     scaling = pow(det, -1 / (2 * %d + 2));
     *f += pow(det, %d / (2 * %d + 2));
   }
   A += scaling * Q * D.asDiagonal() * Q.transpose();
 }
-""" % (p, 'false' if noscale else 'true', p, p)
+""" % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d, p, p, p)
 
 def scale_metric_kernel(d, op=DefaultOptions()):
-    ia2 = pow(op.max_anisotropy, -2)
-    ih_min2 = pow(op.h_min, -2)
-    ih_max2 = pow(op.h_max, -2)
     return """
 #include <Eigen/Dense>
-#include <algorithm>
 
 using namespace Eigen;
 
@@ -213,4 +229,4 @@ void scale_metric(double A_[%d])
   for (int i=0; i<%d; i++) D(i) = fmax(D(i), %f * max_eig);
   A = Q * D.asDiagonal() * Q.transpose();
 }
-""" % (d*d, d, d, d, d, d, d, d, d, ih_min2, ih_max2, d, d, ia2)
+""" % (d*d, d, d, d, d, d, d, d, d, pow(op.h_min, -2), pow(op.h_max, -2), d, d, pow(op.max_anisotropy, -2))
