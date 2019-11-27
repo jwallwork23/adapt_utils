@@ -72,7 +72,7 @@ def get_reordered_eigendecomposition_kernel(d):
     if d == 2:
         return get_reordered_eigendecomposition_kernel_2d
     else:
-        raise NotImplementedError# TODO: 3d case
+        raise NotImplementedError  # TODO: 3d case
 
 def set_eigendecomposition_kernel(d):
     return """
