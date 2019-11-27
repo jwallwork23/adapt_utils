@@ -12,7 +12,7 @@ except:
 from adapt_utils.options import DefaultOptions
 
 
-__all__ = ["get_eigendecomposition_kernel", "get_reordered_eigendecomposition_kernel_2d",
+__all__ = ["get_eigendecomposition_kernel", "get_reordered_eigendecomposition_kernel",
            "set_eigendecomposition_kernel", "intersect_kernel", "anisotropic_refinement_kernel",
            "metric_from_hessian_kernel", "scale_metric_kernel", "include_dir"]
 
@@ -38,9 +38,8 @@ void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double *
 }
 """ % (d*d, d, d, d, d, d, d, d, d, d, d, d)
 
-# TODO: 3d case
-def get_reordered_eigendecomposition_kernel_2d():
-    return """
+
+get_reordered_eigendecomposition_kernel_2d = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -70,7 +69,13 @@ void get_reordered_eigendecomposition(double EVecs_[4], double EVals_[2], const 
 }
 """
 
-# TODO: Use Eigen::DiagonalMatrix
+
+def get_reordered_eigendecomposition_kernel(d):
+    if d == 2:
+        return get_reordered_eigendecomposition_kernel_2d
+    else:
+        raise NotImplementedError  # TODO
+
 def set_eigendecomposition_kernel(d):
     return """
 #include <Eigen/Dense>
@@ -81,13 +86,9 @@ void set_eigendecomposition(double M_[%d], const double * EVecs_, const double *
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
   Map<Matrix<double, %d, %d, RowMajor> > EVecs((double *)EVecs_);
   Map<Vector%dd> EVals((double *)EVals_);
-  MatrixXd D(%d, %d);
-  D = MatrixXd::Zero(%d, %d);
-  D(0,0) = EVals(0);
-  D(1,1) = EVals(1);
-  M = EVecs.transpose() * D * EVecs;
+  M = EVecs.transpose() * EVals.asDiagonal() * EVecs;
 }
-""" % (d*d, d, d, d, d, d, d, d, d, d)
+""" % (d*d, d, d, d, d, d)
 
 def intersect_kernel(d):
     return """
@@ -116,7 +117,6 @@ def anisotropic_refinement_kernel(d, direction):
     scale = 4 if d == 2 else 8
     return """
 #include <Eigen/Dense>
-#include <iostream>
 
 using namespace Eigen;
 
