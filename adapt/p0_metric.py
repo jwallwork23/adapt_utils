@@ -46,8 +46,6 @@ class AnisotropicMetricDriver():
 
         # Eigenvalues and eigenvectors
         self.eval = Function(self.P0_vec)
-        self.evec0 = Function(self.P0_vec)
-        self.evec1 = Function(self.P0_vec)
         self.evec = Function(self.P0_ten)  # TODO: Combine into tensor
 
         # Metrics and error estimators
@@ -63,34 +61,25 @@ class AnisotropicMetricDriver():
             lam, v = la.eigh(JJt.dat.data[i])
             self.eval.dat.data[i][:] = lam
             self.evec.dat.data[i][:,:] = v
-            self.evec0.dat.data[i][:] = v[0]  # TODO: remove
-            self.evec1.dat.data[i][:] = v[1]  # TODO: remove
         #kernel = op2.Kernel(get_eigendecomposition_kernel(dim), "get_eigendecomposition", cpp=True, include_dirs=include_dir)
         #op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
 
     # TODO: use PyOP2
     def get_hessian_eigenpair(self):
+        # NOTE: The eigenvectors are already reordered for use in get_optimised_eigenpair
         assert self.p0hessian is not None
         for i in range(self.ne):
             lam, v = la.eigh(self.p0hessian.dat.data[i])
             if np.abs(lam[0]) > np.abs(lam[1]):
-                self.eval.dat.data[i][:] = lam
-                self.evec0.dat.data[i][:] = v[0]  # TODO: remove
-                self.evec1.dat.data[i][:] = v[1]  # TODO: remove
-                self.evec.dat.data[i][:,:] = v
+                v0 = np.array(v[0])
+                v[0][:] = v[1]
+                v[1][:] = v0
             else:
-                #tmp = np.array(v[0])
-                #v[0][:] = v[1]
-                #v[1][:] = tmp
-                #tmp = np.array(lam[0])
-                #lam[0][:] = lam[1]
-                #lam[1][:] = tmp
-                #self.eval.dat.data[i][:] = lam
-                #self.evec.dat.data[i][:] = v
-                self.eval.dat.data[i][0] = lam[1]
-                self.eval.dat.data[i][1] = lam[0]
-                self.evec0.dat.data[i][:] = v[1]
-                self.evec1.dat.data[i][:] = v[0]
+                lam0 = np.array(lam[0])
+                lam[0] = lam[1]
+                lam[1] = lam0
+            self.eval.dat.data[i][:] = lam
+            self.evec.dat.data[i][:] = v
 
     def get_element_size(self):
         self.K.interpolate(self.K_hat*abs(self.detJ))
@@ -107,18 +96,11 @@ class AnisotropicMetricDriver():
         self.K_opt.interpolate(max_value(self.K*scaling*pow(self.K_opt, -1), self.op.f_min))
 
     def get_optimised_eigenpair(self):
-
-        # Reorder eigenvectors
-        tmp = Function(self.P0_vec)
-        tmp.assign(self.evec0)
-        self.evec0.assign(self.evec1)
-        self.evec1.assign(tmp)
-
-        # Compute optimal eigenvalues using stretching factor and optimal element size
-        s = Function(self.P0).interpolate(sqrt(abs(self.eval[0]/self.eval[1])))
-        # s = sqrt(abs(self.eval[0]/self.eval1))  # FIXME
-        # s = assemble(self.p0test*sqrt(abs(self.eval[0]/self.eval[1]))*dx)
-
+        """
+        Compute optimal eigenvalues using stretching factor and optimal element size.
+        """
+        #s = Function(self.P0).interpolate(sqrt(abs(self.eval[0]/self.eval[1])))  # NOTE: old version
+        s = sqrt(abs(self.eval[0]/self.eval[1]))
         self.eval.interpolate(as_vector([abs(self.K_opt/self.K_hat*s), abs(self.K_opt/self.K_hat/s)]))
 
     # TODO: use PyOP2
@@ -126,12 +108,12 @@ class AnisotropicMetricDriver():
         """
         NOTE: Assumes eigevalues are already squared.
         """
-        #self.eval.interpolate(1.0/self.eval)
+        self.eval.interpolate(as_vector([1/self.eval[0], 1/self.eval[1]]))
         for i in range(self.ne):
-            lam0 = 1/self.eval.dat.data[i][0]
-            lam1 = 1/self.eval.dat.data[i][1]
-            v0 = self.evec0.dat.data[i]
-            v1 = self.evec1.dat.data[i]
+            lam0 = self.eval.dat.data[i][0]
+            lam1 = self.eval.dat.data[i][1]
+            v0 = self.evec.dat.data[i][0,:]
+            v1 = self.evec.dat.data[i][1,:]
             self.p0metric.dat.data[i][0, 0] = lam0*v0[0]*v0[0] + lam1*v1[0]*v1[0]
             self.p0metric.dat.data[i][0, 1] = lam0*v0[0]*v0[1] + lam1*v1[0]*v1[1]
             self.p0metric.dat.data[i][1, 0] = self.p0metric.dat.data[i][0, 1]
@@ -163,7 +145,7 @@ class AnisotropicMetricDriver():
         self.mesh = adapt(self.p1metric, op=self.op)
 
     def Lij(self, i, j):
-        eigenvectors = [self.evec0, self.evec1]
+        eigenvectors = [self.evec[0], self.evec[1]]  # NOTE: These may need reordering
         triple_product = dot(eigenvectors[i], dot(self.p0hessian, eigenvectors[j]))
         return assemble(self.p0test*triple_product*triple_product*dx)
 
