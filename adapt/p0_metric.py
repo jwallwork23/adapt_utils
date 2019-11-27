@@ -54,12 +54,14 @@ class AnisotropicMetricDriver():
         JJt.interpolate(self.J*self.J.T)
         kernel = op2.Kernel(get_eigendecomposition_kernel(self.dim), "get_eigendecomposition", cpp=True, include_dirs=include_dir)
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
+        self.eval.interpolate(as_vector([1/self.eval[0], 1/self.eval[1]]))  # TODO: avoid interp
 
     def get_hessian_eigenpair(self):
-        # NOTE: The eigenvectors are already reordered for use in get_optimised_eigenpair
         assert self.p0hessian is not None
-        kernel = op2.Kernel(get_reordered_eigendecomposition_kernel_2d(), "get_reordered_eigendecomposition", cpp=True, include_dirs=include_dir)
+        kernel = op2.Kernel(get_reordered_eigendecomposition_kernel(self.dim), "get_reordered_eigendecomposition", cpp=True, include_dirs=include_dir)
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), self.p0hessian.dat(op2.READ))
+        s = sqrt(abs(self.eval[1]/self.eval[0]))
+        self.eval.interpolate(as_vector([abs(self.K_opt/self.K_hat*s), abs(self.K_opt/self.K_hat/s)]))
 
     def get_element_size(self):
         self.K.interpolate(self.K_hat*abs(self.detJ))
@@ -75,18 +77,10 @@ class AnisotropicMetricDriver():
             scaling = Sum/self.op.target
         self.K_opt.interpolate(max_value(self.K*scaling*pow(self.K_opt, -1), self.op.f_min))
 
-    def get_optimised_eigenpair(self):
-        """
-        Compute optimal eigenvalues using stretching factor and optimal element size.
-        """
-        s = sqrt(abs(self.eval[0]/self.eval[1]))
-        self.eval.interpolate(as_vector([abs(self.K_opt/self.K_hat*s), abs(self.K_opt/self.K_hat/s)]))
-
     def build_metric(self):
         """
         NOTE: Assumes eigevalues are already squared.
         """
-        self.eval.interpolate(as_vector([1/self.eval[0], 1/self.eval[1]]))
         kernel = op2.Kernel(set_eigendecomposition_kernel(self.dim), "set_eigendecomposition", cpp=True, include_dirs=include_dir)
         op2.par_loop(kernel, self.P0_ten.node_set, self.p0metric.dat(op2.RW), self.evec.dat(op2.READ), self.eval.dat(op2.READ))
 
@@ -108,7 +102,6 @@ class AnisotropicMetricDriver():
         self.get_hessian_eigenpair()
         self.get_element_size()
         self.get_optimal_element_size()
-        self.get_optimised_eigenpair()
         self.build_metric()
         self.project_metric()
 
