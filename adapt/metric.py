@@ -13,7 +13,7 @@ from adapt_utils.adapt.kernels import *
 __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "anisotropic_refinement", "metric_intersection", "metric_relaxation", "metric_complexity"]
 
 
-# TODO: par_loop
+# TODO: test 3d case works
 def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=DefaultOptions()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
@@ -36,8 +36,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
     V = H.function_space()
     mesh = V.mesh()
     dim = mesh.topological_dimension()
-    #assert dim in (2, 3)
-    assert dim == 2  # TODO: 3d parloops
+    assert dim in (2, 3)
     assert op.normalisation in ('complexity', 'error')
 
     # Functions to hold metric and its determinant
@@ -45,7 +44,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
     detH = Function(FunctionSpace(mesh, "CG", 1))
 
     # Turn Hessian into a metric
-    kernel = op2.Kernel(metric_from_hessian_kernel(noscale=noscale, op=op),
+    kernel = op2.Kernel(metric_from_hessian_kernel(dim, noscale=noscale, op=op),
                         "metric_from_hessian", cpp=True, include_dirs=include_dir)
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW), detH.dat(op2.RW), H.dat(op2.READ))
 
@@ -62,7 +61,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
         if op.norm_order is not None:
             assert det > 1e-8
             M *= pow(det, 1/op.norm_order)
-    kernel = op2.Kernel(scale_metric_kernel(op=op), "scale_metric",
+    kernel = op2.Kernel(scale_metric_kernel(dim, op=op), "scale_metric",
                         cpp=True, include_dirs=include_dir)
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW))
 
@@ -309,7 +308,7 @@ def metric_intersection(M1, M2, bdy=None):
     assert V == M2.function_space()
     M12 = M1.copy()
     # FIXME: boundary intersection does not work
-    node_set = DirichletBC(V, 0, bdy).nodes if bdy is not None else V.node_set
+    node_set = V.boundary_nodes(bdy, 'topological') if bdy is not None else V.node_set
     kernel = op2.Kernel(intersect_kernel(dim), "intersect", cpp=True, include_dirs=include_dir)
     op2.par_loop(kernel, node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
     return M12
