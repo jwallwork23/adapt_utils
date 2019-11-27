@@ -1,9 +1,5 @@
 from firedrake import *
 
-import numpy as np
-import numpy
-from numpy import linalg as la
-
 from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.metric import isotropic_metric
 from adapt_utils.adapt.kernels import *
@@ -69,10 +65,12 @@ class AnisotropicMetricDriver():
         self.K.interpolate(self.K_hat*abs(self.detJ))
 
     def get_optimal_element_size(self):
+        #import numpy
         assert self.eta is not None
         alpha = self.op.convergence_rate
         self.K_opt.interpolate(pow(self.eta, 1/(alpha+1)))
-        Sum = np.sum(self.K_opt.dat.data)
+        #Sum = numpy.sum(self.K_opt.dat.data)  # TODO: use PyOP2
+        Sum = K_opt.vector().gather().sum()
         if self.op.normalisation == 'error':
             scaling = pow(self.op.target*Sum, -1/alpha)  # FIXME
         else:

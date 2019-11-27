@@ -31,7 +31,7 @@ void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double *
   Map<Vector%dd> EVals((double *)EVals_);
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(M);
-  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors().transpose();
+  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
   Vector%dd D = eigensolver.eigenvalues();
   EVecs = Q;
   EVals = D;
