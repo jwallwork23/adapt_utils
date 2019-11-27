@@ -29,7 +29,7 @@ default_params = {
     'pc_type': 'lu',
     'pc_factor_mat_solver_type': 'mumps',
     # 'mat_mumps_cntl_1': 0.1,
-    'mat_mumps_icntl_14': 200,
+    # 'mat_mumps_icntl_14': 200,
 }
 
 # Robust but approximate: just repeatedly apply LU preconditioner
