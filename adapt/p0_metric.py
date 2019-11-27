@@ -40,7 +40,6 @@ class AnisotropicMetricDriver():
         # Fields related to mesh
         self.J = Jacobian(mesh)
         self.detJ = JacobianDeterminant(mesh)
-        self.ne = mesh.num_cells()
         self.K_hat = 0.5                # Area of reference element
         self.K = Function(self.P0)      # Current element size
         self.K_opt = Function(self.P0)  # Optimal element size
@@ -64,7 +63,7 @@ class AnisotropicMetricDriver():
     def get_hessian_eigenpair(self):
         # NOTE: The eigenvectors are already reordered for use in get_optimised_eigenpair
         assert self.p0hessian is not None
-        for i in range(self.ne):
+        for i in range(self.mesh.num_cells()):
             lam, v = la.eigh(self.p0hessian.dat.data[i])
             if np.abs(lam[0]) > np.abs(lam[1]):
                 v0 = np.array(v[0])
