@@ -1,15 +1,4 @@
 from firedrake import *
-try:
-    from firedrake.slate.slac.compiler import PETSC_ARCH
-except:
-    import os
-
-    PETSC_ARCH = os.environ.get('PETSC_ARCH')
-    PETSC_DIR = os.environ.get('PETSC_DIR')
-    PETSC_ARCH = os.path.join(PETSC_DIR, PETSC_ARCH)
-    if not os.path.exists(os.path.join(PETSC_ARCH, 'include/eigen3')):
-        PETSC_ARCH = '/usr/local'
-include_dir = ["%s/include/eigen3" % PETSC_ARCH]
 
 import numpy as np
 import numpy

@@ -6,7 +6,7 @@ from numpy import linalg as la
 
 from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.metric import isotropic_metric
-from adapt_utils.adapt.kernels import get_eigendecomposition_kernel, set_eigendecomposition_kernel
+from adapt_utils.adapt.kernels import get_eigendecomposition_kernel, set_eigendecomposition_kernel, include_dir
 
 
 __all__ = ["AnisotropicMetricDriver"]
@@ -18,8 +18,9 @@ class AnisotropicMetricDriver():
     """
     def __init__(self, mesh, hessian=None, indicator=None, op=DefaultOptions()):
         self.mesh = mesh
+        self.dim = self.mesh.topological_dimension()
         try:
-            assert self.mesh.topological_dimension() == 2
+            assert self.dim == 2
         except:
             raise NotImplementedError
         self.H = hessian
@@ -46,23 +47,18 @@ class AnisotropicMetricDriver():
 
         # Eigenvalues and eigenvectors
         self.eval = Function(self.P0_vec)
-        self.evec = Function(self.P0_ten)  # TODO: Combine into tensor
+        self.evec = Function(self.P0_ten)
 
         # Metrics and error estimators
         self.p0metric = Function(self.P0_ten)
         self.p1metric = Function(self.P1_ten)
         self.estimator = Function(self.P0)
 
-    # TODO: use PyOP2
     def get_eigenpair(self):
         JJt = Function(self.P0_ten)
         JJt.interpolate(self.J*self.J.T)
-        for i in range(self.ne):
-            lam, v = la.eigh(JJt.dat.data[i])
-            self.eval.dat.data[i][:] = lam
-            self.evec.dat.data[i][:,:] = v
-        #kernel = op2.Kernel(get_eigendecomposition_kernel(dim), "get_eigendecomposition", cpp=True, include_dirs=include_dir)
-        #op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
+        kernel = op2.Kernel(get_eigendecomposition_kernel(self.dim), "get_eigendecomposition", cpp=True, include_dirs=include_dir)
+        op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
 
     # TODO: use PyOP2
     def get_hessian_eigenpair(self):

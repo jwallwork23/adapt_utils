@@ -1,28 +1,43 @@
+try:
+    from firedrake.slate.slac.compiler import PETSC_ARCH
+except:
+    import os
+
+    PETSC_ARCH = os.environ.get('PETSC_ARCH')
+    PETSC_DIR = os.environ.get('PETSC_DIR')
+    PETSC_ARCH = os.path.join(PETSC_DIR, PETSC_ARCH)
+    if not os.path.exists(os.path.join(PETSC_ARCH, 'include/eigen3')):
+        PETSC_ARCH = '/usr/local'
+
 from adapt_utils.options import DefaultOptions
 
 
 __all__ = ["get_eigendecomposition_kernel", "set_eigendecomposition_kernel", "intersect_kernel",
-           "anisotropic_refinement_kernel", "metric_from_hessian_kernel", "scale_metric_kernel"]
+           "anisotropic_refinement_kernel", "metric_from_hessian_kernel", "scale_metric_kernel",
+           "include_dir"]
 
 
-# TODO: test
+include_dir = ["%s/include/eigen3" % PETSC_ARCH]
+
+
 def get_eigendecomposition_kernel(d):
     return """
 #include <Eigen/Dense>
+#include <iostream>
 
 using namespace Eigen;
 
 void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double * M_) {
-  Map<Matrix<double, %d, %d, RowMajor> > Evecs((double *)EVecs_);
-  Map<Matrix<double, %d, %d, RowMajor> > Evals((double *)EVals_);
+  Map<Matrix<double, %d, %d, RowMajor> > EVecs((double *)EVecs_);
+  Map<Vector%dd> EVals((double *)EVals_);
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(M);
   Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
-  Matrix<double, %d, %d, RowMajor> D = eigensolver.eigenvalues();
+  Vector%dd D = eigensolver.eigenvalues();
   EVecs = Q;
   EVals = D;
 }
-""" % (d*d, d*d, d, d, d, d, d, d, d, d, d, d, d, d)
+""" % (d*d, d, d, d, d, d, d, d, d, d, d, d)
 
 # TODO: test
 def set_eigendecomposition_kernel(d):
