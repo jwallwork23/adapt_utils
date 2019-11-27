@@ -12,9 +12,9 @@ except:
 from adapt_utils.options import DefaultOptions
 
 
-__all__ = ["get_eigendecomposition_kernel", "set_eigendecomposition_kernel", "intersect_kernel",
-           "anisotropic_refinement_kernel", "metric_from_hessian_kernel", "scale_metric_kernel",
-           "include_dir"]
+__all__ = ["get_eigendecomposition_kernel", "get_reordered_eigendecomposition_kernel_2d",
+           "set_eigendecomposition_kernel", "intersect_kernel", "anisotropic_refinement_kernel",
+           "metric_from_hessian_kernel", "scale_metric_kernel", "include_dir"]
 
 
 include_dir = ["%s/include/eigen3" % PETSC_ARCH]
@@ -31,39 +31,44 @@ void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double *
   Map<Vector%dd> EVals((double *)EVals_);
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(M);
-  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
+  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors().transpose();
   Vector%dd D = eigensolver.eigenvalues();
   EVecs = Q;
   EVals = D;
 }
 """ % (d*d, d, d, d, d, d, d, d, d, d, d, d)
 
-def get_reordered_eigendecomposition_kernel(d):
+# TODO: 3d case
+def get_reordered_eigendecomposition_kernel_2d():
     return """
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
-void get_reordered_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double * M_) {
-  Map<Matrix<double, %d, %d, RowMajor> > EVecs((double *)EVecs_);
-  Map<Vector%dd> EVals((double *)EVals_);
-  Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
-  SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(M);
-  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
-  Vector%dd D = eigensolver.eigenvalues();
+void get_reordered_eigendecomposition(double EVecs_[4], double EVals_[2], const double * M_) {
+  Map<Matrix<double, 2, 2, RowMajor> > EVecs((double *)EVecs_);
+  Map<Vector2d> EVals((double *)EVals_);
+  Map<Matrix<double, 2, 2, RowMajor> > M((double *)M_);
+  SelfAdjointEigenSolver<Matrix<double, 2, 2, RowMajor>> eigensolver(M);
+  Matrix<double, 2, 2, RowMajor> Q = eigensolver.eigenvectors().transpose();
+  Vector2d D = eigensolver.eigenvalues();
   if (fabs(D(0)) > fabs(D(1))) {
     EVecs(0,0) = Q(1,0);
     EVecs(0,1) = Q(1,1);
-    EVals(0,0) = D(0,0);
-    EVals(0,1) = D(0,1);
+    EVecs(1,0) = Q(0,0);
+    EVecs(1,1) = Q(0,1);
+    EVals(0) = D(0);
+    EVals(1) = D(1);
   } else {
     EVecs(0,0) = Q(0,0);
     EVecs(0,1) = Q(0,1);
-    EVals(0,0) = D(1,0);
-    EVals(0,1) = D(1,1);
+    EVecs(1,0) = Q(1,0);
+    EVecs(1,1) = Q(1,1);
+    EVals(0) = D(1);
+    EVals(1) = D(0);
   }
 }
-""" % (d*d, d, d, d, d, d, d, d, d, d, d, d)
+"""
 
 # TODO: Use Eigen::DiagonalMatrix
 def set_eigendecomposition_kernel(d):

@@ -6,7 +6,7 @@ from numpy import linalg as la
 
 from adapt_utils.options import DefaultOptions
 from adapt_utils.adapt.metric import isotropic_metric
-from adapt_utils.adapt.kernels import get_eigendecomposition_kernel, set_eigendecomposition_kernel, include_dir
+from adapt_utils.adapt.kernels import *
 
 
 __all__ = ["AnisotropicMetricDriver"]
@@ -59,22 +59,11 @@ class AnisotropicMetricDriver():
         kernel = op2.Kernel(get_eigendecomposition_kernel(self.dim), "get_eigendecomposition", cpp=True, include_dirs=include_dir)
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
 
-    # TODO: use PyOP2
     def get_hessian_eigenpair(self):
         # NOTE: The eigenvectors are already reordered for use in get_optimised_eigenpair
         assert self.p0hessian is not None
-        for i in range(self.mesh.num_cells()):
-            lam, v = la.eigh(self.p0hessian.dat.data[i])
-            if np.abs(lam[0]) > np.abs(lam[1]):
-                v0 = np.array(v[0])
-                v[0][:] = v[1]
-                v[1][:] = v0
-            else:
-                lam0 = np.array(lam[0])
-                lam[0] = lam[1]
-                lam[1] = lam0
-            self.eval.dat.data[i][:] = lam
-            self.evec.dat.data[i][:] = v
+        kernel = op2.Kernel(get_reordered_eigendecomposition_kernel_2d(), "get_reordered_eigendecomposition", cpp=True, include_dirs=include_dir)
+        op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), self.p0hessian.dat(op2.READ))
 
     def get_element_size(self):
         self.K.interpolate(self.K_hat*abs(self.detJ))
@@ -94,7 +83,6 @@ class AnisotropicMetricDriver():
         """
         Compute optimal eigenvalues using stretching factor and optimal element size.
         """
-        #s = Function(self.P0).interpolate(sqrt(abs(self.eval[0]/self.eval[1])))  # NOTE: old version
         s = sqrt(abs(self.eval[0]/self.eval[1]))
         self.eval.interpolate(as_vector([abs(self.K_opt/self.K_hat*s), abs(self.K_opt/self.K_hat/s)]))
 
