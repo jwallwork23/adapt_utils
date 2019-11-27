@@ -23,7 +23,6 @@ include_dir = ["%s/include/eigen3" % PETSC_ARCH]
 def get_eigendecomposition_kernel(d):
     return """
 #include <Eigen/Dense>
-#include <iostream>
 
 using namespace Eigen;
 
@@ -39,7 +38,7 @@ void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double *
 }
 """ % (d*d, d, d, d, d, d, d, d, d, d, d, d)
 
-# TODO: test
+# TODO: Use Eigen::DiagonalMatrix
 def set_eigendecomposition_kernel(d):
     return """
 #include <Eigen/Dense>
@@ -48,11 +47,15 @@ using namespace Eigen;
 
 void set_eigendecomposition(double M_[%d], const double * EVecs_, const double * EVals_) {
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
-  Map<Matrix<double, %d, %d, RowMajor> > Evecs((double *)Evecs_);
-  Map<Matrix<double, %d, %d, RowMajor> > Evals((double *)Evals_);
-  M = EVecs * EVals * EVecs.transpose()
+  Map<Matrix<double, %d, %d, RowMajor> > EVecs((double *)EVecs_);
+  Map<Vector%dd> EVals((double *)EVals_);
+  MatrixXd D(%d, %d);
+  D = MatrixXd::Zero(%d, %d);
+  D(0,0) = EVals(0);
+  D(1,1) = EVals(1);
+  M = EVecs.transpose() * D * EVecs;
 }
-""" % (d*d, d, d, d, d, d, d)
+""" % (d*d, d, d, d, d, d, d, d, d, d)
 
 def intersect_kernel(d):
     return """

@@ -99,21 +99,13 @@ class AnisotropicMetricDriver():
         s = sqrt(abs(self.eval[0]/self.eval[1]))
         self.eval.interpolate(as_vector([abs(self.K_opt/self.K_hat*s), abs(self.K_opt/self.K_hat/s)]))
 
-    # TODO: use PyOP2
     def build_metric(self):
         """
         NOTE: Assumes eigevalues are already squared.
         """
         self.eval.interpolate(as_vector([1/self.eval[0], 1/self.eval[1]]))
-        for i in range(self.ne):
-            lam0 = self.eval.dat.data[i][0]
-            lam1 = self.eval.dat.data[i][1]
-            v0 = self.evec.dat.data[i][0,:]
-            v1 = self.evec.dat.data[i][1,:]
-            self.p0metric.dat.data[i][0, 0] = lam0*v0[0]*v0[0] + lam1*v1[0]*v1[0]
-            self.p0metric.dat.data[i][0, 1] = lam0*v0[0]*v0[1] + lam1*v1[0]*v1[1]
-            self.p0metric.dat.data[i][1, 0] = self.p0metric.dat.data[i][0, 1]
-            self.p0metric.dat.data[i][1, 1] = lam0*v0[1]*v0[1] + lam1*v1[1]*v1[1]
+        kernel = op2.Kernel(set_eigendecomposition_kernel(self.dim), "set_eigendecomposition", cpp=True, include_dirs=include_dir)
+        op2.par_loop(kernel, self.P0_ten.node_set, self.p0metric.dat(op2.RW), self.evec.dat(op2.READ), self.eval.dat(op2.READ))
 
     def project_metric(self):
         self.p1metric.project(self.p0metric)
