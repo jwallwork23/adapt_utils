@@ -1,0 +1,13 @@
+# TODO: HDG formulation used by Thomas
+#
+#   * Use hybridization on the Lax-Friedrichs formulation to get a Lagrange multiplier on a
+#     vector-valued trace space.
+#   * Then statically condense down to the vector-trace system using an exact Schur complement.
+#   * The direct AMG on the trace system should work just fine (for example, using GAMG)
+#   * Once you have the HDG formulation written down, should be able to use firedrake.SCPC on it
+#     just like in the HDG poisson example firedrake/tests/slate/test_hdg_poisson.py
+#   * Try to not use LU on the trace system and go for a preconditioned Krylov method instead
+#   * You will get more mileage out of LU for HDG since the condensed system is much smaller
+#   * It will depend on how "fine" you want to  make the problem
+#
+#   * Ask Thomas if need help formulating the HDG problem
