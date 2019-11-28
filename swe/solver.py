@@ -223,18 +223,12 @@ class SteadyShallowWaterProblem(SteadyProblem):
             raise Exception('Unsupported boundary type {:}'.format(funcs.keys()))
         return eta, u
 
-    def get_strong_residual(self, sol, adjoint_sol, sol_old=None, adjoint=False):
+    def get_strong_residual(self, sol, adjoint_sol, adjoint=False):
         assert not adjoint  # FIXME
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
         u, eta = sol.split()
         z, zeta = adjoint_sol.split()
-        if sol_old is None:
-            u_old = u
-            eta_old = eta
-        else:
-            assert sol_old.function_space() == self.solution.function_space()
-            u_old, eta_old = sol_old.split()
 
         op = self.op
         i = self.p0test
@@ -245,22 +239,22 @@ class SteadyShallowWaterProblem(SteadyProblem):
         H = b + eta
         g = op.g
 
-        F = -g*inner(grad(eta), z)                           # ExternalPressureGradient
-        F += -div(H*u)*zeta                                  # HUDiv
-        F += -inner(dot(u_old, nabla_grad(u)), z)            # HorizontalAdvection
+        F = -g*inner(z, grad(eta))                           # ExternalPressureGradient
+        F += -zeta*div(H*u)                                  # HUDiv
+        F += -inner(z, dot(u, nabla_grad(u)))                # HorizontalAdvection
         if f is not None:
-            F += -inner(f*as_vector((-u[1], u[0])), z)       # Coriolis
+            F += -inner(z, f*as_vector((-u[1], u[0])))       # Coriolis
         if C_d is not None:
-            F += -C_d*sqrt(dot(u_old, u_old))*inner(u, z)/H  # QuadraticDrag
+            F += -C_d*sqrt(dot(u, u))*inner(z, u)/H          # QuadraticDrag
 
         # HorizontalViscosity
         stress = 2*nu*sym(grad(u)) if op.grad_div_viscosity else nu*grad(u)
-        F += -inner(div(stress), z)
+        F += inner(z, div(stress))
         if op.grad_depth_viscosity:
-            F += -inner(dot(grad(H)/H, stress), z)
+            F += inner(z, dot(grad(H)/H, stress))
 
         if hasattr(self, 'extra_residual_terms'):
-            F += self.extra_residual_terms(u, eta, u_old, eta_old, z, zeta)
+            F += self.extra_residual_terms(u, eta, z, zeta)
 
         self.estimators['dwr_cell'] = assemble(F*dx)
         self.indicators['dwr_cell'] = assemble(i*F*dx)
@@ -418,7 +412,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if adjoint:
             label += '_adjoint'
         sol_old = None if not hasattr(self, 'interpolated_solution') else self.interpolated_solution
-        self.get_strong_residual(self.solution, self.adjoint_solution, sol_old, adjoint=adjoint)
+        self.get_strong_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
         self.get_flux_terms(self.solution, self.adjoint_solution, sol_old, adjoint=adjoint)
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))

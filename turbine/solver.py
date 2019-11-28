@@ -41,13 +41,9 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
         self.cb = turbines.TurbineFunctionalCallback(self.solver_obj)
         self.solver_obj.add_callback(self.cb, 'timestep')
 
-    def extra_residual_terms(self, u, eta, u_old, eta_old, z, zeta):
-        H_old = self.op.bathymetry + eta_old
-        return -self.C_D*sqrt(dot(u_old, u_old))*inner(u, z)/H_old
-
-    def extra_weak_residual_terms(self, u, eta, u_old, eta_old, u_test, eta_test):
-        H_old = self.op.bathymetry + eta_old
-        return -self.C_D*sqrt(dot(u_old, u_old))*inner(u, u_test)/H_old*dx
+    def extra_residual_terms(self, u, eta, z, zeta):
+        H = self.op.bathymetry + eta
+        return -self.C_D*sqrt(dot(u, u))*inner(z, u)/H
 
     def get_callbacks(self, cb):
         self.qoi = cb.average_power
