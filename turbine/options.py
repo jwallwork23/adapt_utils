@@ -32,6 +32,37 @@ default_params = {
     # 'mat_mumps_icntl_14': 200,
 }
 
+# FIXME: Maybe we'd have to use PressureProjectionPicard for this to work...
+fieldsplit_params = {
+    'ksp_type': 'preonly',  # we solve the full schur complement exactly, so no need for outer krylov
+    'mat_type': 'matfree',
+    'pc_type': 'fieldsplit',
+    'pc_fieldsplit_type': 'schur',
+    'pc_fieldsplit_schur_fact_type': 'full',
+    # velocity mass block:
+    'fieldsplit_U_2d': {
+        'ksp_type': 'gmres',
+        'pc_type': 'python',
+        'pc_python_type': 'firedrake.AssembledPC',
+        'assembled_ksp_type': 'preonly',
+        'assembled_pc_type': 'bjacobi',
+        'assembled_sub_pc_type': 'ilu',
+    },
+    # schur system: explicitly assemble the schur system
+    # this only works with pressureprojectionicard if the velocity block is just the mass matrix
+    # and if the velocity is DG so that this mass matrix can be inverted explicitly
+    'fieldsplit_H_2d': {
+        'ksp_type': 'preonly',
+        'pc_type': 'python',
+        'pc_python_type': 'thetis.AssembledSchurPC',
+        'schur_ksp_type': 'gmres',
+        'schur_ksp_max_it': 100,
+        'schur_ksp_converged_reason': False,
+        'schur_pc_type': 'gamg',
+    },
+}
+
+
 # Robust but approximate: just repeatedly apply LU preconditioner
 ksponly_params = {
     'mat_type': 'aij',
