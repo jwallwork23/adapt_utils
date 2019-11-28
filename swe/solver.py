@@ -259,18 +259,12 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimators['dwr_cell'] = assemble(F*dx)
         self.indicators['dwr_cell'] = assemble(i*F*dx)
 
-    def get_flux_terms(self, sol, adjoint_sol, sol_old=None, adjoint=False):
+    def get_flux_terms(self, sol, adjoint_sol, adjoint=False):
         assert not adjoint  # FIXME
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
         u, eta = sol.split()
         z, zeta = adjoint_sol.split()
-        if sol_old is None:
-            u_old = u
-            eta_old = eta
-        else:
-            assert sol_old.function_space() == self.solution.function_space()
-            u_old, eta_old = sol_old.split()
 
         op = self.op
         i = self.p0test
@@ -284,7 +278,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         u_up = avg(u)
         loc = -i*z
         flux_terms = jump(u, n)*dot(u_up, loc('+') + loc('-'))*dS
-        loc = i*inner(outer(u, n), outer(u, z))
+        loc = i*inner(outer(u, z), outer(u, n))
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
         # NOTE: This ^^^ is an influential term for steady turbine
         if op.lax_friedrichs:
@@ -301,10 +295,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
             flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
         # HUDiv
-            u_rie = avg(u) + sqrt(g/avg(H))*jump(eta, n)
-            loc = -i*n*zeta
-            flux_terms += dot(avg(H)*u_rie, loc('+') + loc('-'))*dS
-        loc = i*dot(H*u, n)*zeta
+        u_rie = avg(u) + sqrt(g/avg(H))*jump(eta, n)
+        loc = -i*zeta*n
+        flux_terms += dot(avg(H)*u_rie, loc('+') + loc('-'))*dS
+        loc = i*zeta*dot(H*u, n)
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
         # NOTE: This ^^^ is an influential term for steady turbine
 
@@ -316,15 +310,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
             stress = nu*grad(u)
             stress_jump = avg(nu)*tensor_jump(u, n)
         alpha = self.sipg_parameter
-        if alpha is None:
-            p = op.degree
-            alpha = 1.5 if p == 0 else 5*p*(p+1)
+        assert alpha is not None
         loc = i*outer(z, n)
         flux_terms += -alpha/avg(self.h)*inner(loc('+') + loc('-'), stress_jump)*dS
         flux_terms += inner(loc('+') + loc('-'), avg(stress))*dS
         loc = i*grad(z)
         flux_terms += 0.5*inner(loc('+') + loc('-'), stress_jump)*dS
-        loc = -i*inner(stress, outer(z, n))
+        loc = i*inner(outer(z, n), stress)
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
         bcs = self.boundary_conditions
@@ -333,7 +325,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
             if funcs is not None:
                 eta_ext, u_ext = self.get_bdy_functions(eta, u, j)
-                eta_ext_old, u_ext_old = self.get_bdy_functions(eta_old, u_old, j)
 
                 # ExternalPressureGradient
                 un_jump = inner(u - u_ext, n)
@@ -344,21 +335,19 @@ class SteadyShallowWaterProblem(SteadyProblem):
                     flux_terms += -i*g*(eta_rie - eta)*dot(z, n)*ds(j)
 
                 # HUDiv
-                H_ext = eta_ext_old + b
+                H_ext = eta_ext + b
                 H_av = 0.5*(H + H_ext)
                 eta_jump = eta - eta_ext
                 un_rie = 0.5*inner(u + u_ext, n) + sqrt(g/H_av)*eta_jump
-                un_jump = inner(u_old - u_ext_old, n)
-                eta_rie = 0.5*(eta_old + eta_ext_old) + sqrt(H_av/g)*un_jump
+                un_jump = inner(u - u_ext, n)
+                eta_rie = 0.5*(eta + eta_ext) + sqrt(H_av/g)*un_jump
                 H_rie = b + eta_rie
                 flux_terms += -i*H_rie*un_rie*zeta*ds(j)
 
                 # HorizontalAdvection
-                eta_jump = eta_old - eta_ext_old
-                H_old = b + eta_old
-                un_rie = 0.5*inner(u_old + u_ext_old, n) + sqrt(g/H_old)*eta_jump
-                u_av = 0.5*(u_old + u)
-                flux_terms += -i*dot(u_av, z)*un_rie*ds(j)
+                eta_jump = eta - eta_ext
+                un_rie = 0.5*inner(u + u_ext, n) + sqrt(g/H)*eta_jump
+                flux_terms += -i*dot(u, z)*un_rie*ds(j)
 
                 # HorizontalViscosity
                 if 'un' in funcs:
@@ -411,9 +400,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         label = 'dwr'
         if adjoint:
             label += '_adjoint'
-        sol_old = None if not hasattr(self, 'interpolated_solution') else self.interpolated_solution
         self.get_strong_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
-        self.get_flux_terms(self.solution, self.adjoint_solution, sol_old, adjoint=adjoint)
+        self.get_flux_terms(self.solution, self.adjoint_solution, adjoint=adjoint)
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
         self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
