@@ -56,7 +56,7 @@ class AnisotropicMetricDriver():
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
         self.eval.interpolate(as_vector([1/self.eval[0], 1/self.eval[1]]))  # TODO: avoid interp?
 
-    def get_hessian_eigenpair(self):
+    def get_hessian_eigenpair(self):  # TODO: Enforce max anisotropy
         assert self.p0hessian is not None
         kernel = op2.Kernel(get_reordered_eigendecomposition_kernel(self.dim), "get_reordered_eigendecomposition", cpp=True, include_dirs=include_dir)
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), self.p0hessian.dat(op2.READ))
@@ -75,7 +75,7 @@ class AnisotropicMetricDriver():
             scaling = pow(self.op.target*Sum, -1/alpha)  # FIXME
         else:
             scaling = Sum/self.op.target
-        self.K_opt.interpolate(max_value(self.K*scaling*pow(self.K_opt, -1), self.op.f_min))
+        self.K_opt.interpolate(min_value(max_value(scaling*self.K/self.K_opt, self.op.h_min**2), self.op.h_max**2))
 
     def build_metric(self):
         """
