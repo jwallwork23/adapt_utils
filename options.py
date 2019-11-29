@@ -19,10 +19,9 @@ class Options(FrozenConfigurable):
     h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
 
     # Smooth / intersect
-    intersect = Bool(False, help="Intersect with previous mesh.").tag(config=True)
-    relax = Bool(False, help="Take metric relaxation with previous mesh.").tag(config=True)
+    intersect = Bool(False, help="Intersect with previous mesh.").tag(config=True)  # TODO: remove
+    relax = Bool(False, help="Take metric relaxation with previous mesh.").tag(config=True)  # TODO: remove
     intersect_boundary = Bool(False, help="Intersect with initial boundary metric.").tag(config=True)
-    adapt_on_bathymetry = Bool(False, help="Toggle adaptation based on bathymetry.").tag(config=True)
 
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach.").tag(config=True)
@@ -36,9 +35,6 @@ class Options(FrozenConfigurable):
     normalisation = Unicode('complexity', help="Metric normalisation approach, from {'complexity', 'error'}.").tag(config=True)
     target = PositiveFloat(1e+2, help="Target complexity / inverse desired error for normalisation, as appropriate.").tag(config=True)
     norm_order = NonNegativeInteger(None, allow_none=True, help="Degree p of Lp norm used in 'error' normalisation approach. Use 'None' to specify infinity norm.").tag(config=True)
-    min_norm = PositiveFloat(1e-6, help="Minimum norm tolerated in metric rescaling.").tag(config=True)
-    max_norm = PositiveFloat(1e9, help="Maximum norm tolerated in metric rescaling.").tag(config=True)
-    f_min = PositiveFloat(1e-6, help="Minimum function value tolerated for metric constructed using its Hessian.").tag(config=True)
 
     # Hessian
     hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
@@ -65,6 +61,7 @@ class Options(FrozenConfigurable):
     region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
     element_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in mesh element count").tag(config=True)
     qoi_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in quantity of interest.").tag(config=True)
+    estimator_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in error estimator.").tag(config=True)
 
     # Adjoint
     order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
