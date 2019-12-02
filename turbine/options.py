@@ -118,7 +118,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.drag_coefficient = Constant(0.0025)
 
         # Adaptivity
-        self.h_min = 1e-3
+        self.h_min = 1e-5
         self.h_max = 200.
 
     def set_viscosity(self, fs):
