@@ -122,6 +122,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         dFdu_form = adjoint(dFdu)
         dJdu = derivative(self.quantity_of_interest_form(), self.solution, TestFunction(self.V))
         solve(dFdu_form == dJdu, self.adjoint_solution, solver_parameters=self.op.adjoint_params)
+        self.plot()
 
     def get_qoi_kernel(self):
         pass

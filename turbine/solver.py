@@ -7,7 +7,6 @@ from adapt_utils.swe.solver import *
 from adapt_utils.turbine.options import *
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.interpolation import *
 
 
 __all__ = ["SteadyTurbineProblem", "UnsteadyTurbineProblem"]
