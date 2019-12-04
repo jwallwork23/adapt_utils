@@ -119,7 +119,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
 
         # Adaptivity
         self.h_min = 1e-5
-        self.h_max = 200.
+        self.h_max = 500.0
 
     def set_viscosity(self, fs):
         self.viscosity.assign(self.base_viscosity)

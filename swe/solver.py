@@ -238,9 +238,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         f = None if not hasattr(op, 'coriolis') else op.coriolis
         C_d = None if not hasattr(op, 'drag_coefficient') else op.drag_coefficient
         H = b + eta
-        g = op.g
 
-        F = -g*inner(z, grad(eta))                           # ExternalPressureGradient
+        F = -op.g*inner(z, grad(eta))                        # ExternalPressureGradient
         F += -zeta*div(H*u)                                  # HUDiv
         F += -inner(z, dot(u, nabla_grad(u)))                # HorizontalAdvection
         if f is not None:
@@ -277,15 +276,23 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         # HorizontalAdvection
         u_up = avg(u)
-        loc = -i*z
-        flux_terms = jump(u, n)*dot(u_up, loc('+') + loc('-'))*dS
-        loc = i*inner(outer(u, z), outer(u, n))
-        flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
-        # NOTE: This ^^^ is an influential term for steady turbine
+        loc = -i*z[0]
+        flux_terms = jump(u[0], n[0])*dot(u_up[0], loc('+') + loc('-'))*dS
+        flux_terms += jump(u[1], n[1])*dot(u_up[0], loc('+') + loc('-'))*dS
+        loc = -i*z[1]
+        flux_terms += jump(u[0], n[0])*dot(u_up[1], loc('+') + loc('-'))*dS
+        flux_terms += jump(u[1], n[1])*dot(u_up[1], loc('+') + loc('-'))*dS
         if op.lax_friedrichs:
             gamma = 0.5*abs(dot(u_up, n('-')))*op.lax_friedrichs_scaling_factor
             loc = -i*z
             flux_terms += gamma*dot(loc('+') + loc('-'), jump(u))*dS
+
+        # NOTE: The following is an influential term for steady turbine...
+        # loc = i*inner(outer(u, z), outer(u, n))
+        # loc = i*inner(u, z)*inner(u, n)
+        # loc = i*inner(z, u*dot(u, n))
+        loc = i*inner(dot(outer(u, z), u), n)
+        flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
         # ExternalPressureGradient
         if self.op.family != 'dg-cg':
@@ -296,9 +303,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
             flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
         # HUDiv
-        u_rie = avg(u) + sqrt(g/avg(H))*jump(eta, n)
-        loc = -i*zeta*n
-        flux_terms += dot(avg(H)*u_rie, loc('+') + loc('-'))*dS
+        if self.op.family != 'dg-cg':
+            u_rie = avg(u) + sqrt(g/avg(H))*jump(eta, n)
+            loc = -i*zeta*n
+            flux_terms += dot(avg(H)*u_rie, loc('+') + loc('-'))*dS
         loc = i*zeta*dot(H*u, n)
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
         # NOTE: This ^^^ is an influential term for steady turbine
@@ -317,7 +325,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         flux_terms += inner(loc('+') + loc('-'), avg(stress))*dS
         loc = i*grad(z)
         flux_terms += 0.5*inner(loc('+') + loc('-'), stress_jump)*dS
-        loc = i*inner(outer(z, n), stress)
+        # loc = -i*inner(outer(z, n), stress)
+        loc = -i*inner(dot(z, stress), n)
         flux_terms += (loc('+') + loc('-'))*dS + loc*ds  # Term arising from IBP
 
         bcs = self.boundary_conditions
