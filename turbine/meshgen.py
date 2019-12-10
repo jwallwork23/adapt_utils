@@ -6,6 +6,14 @@ __all__ = ["generate_geo_file"]
 
 
 def generate_geo_file(op, level='coarse', tag=None, filepath='.'):
+    """
+    Generate domain geometry file using the specifications in `op`.
+
+    :arg op: Parameter class.
+    :kwarg level: Desired level of mesh resolution.
+    :kwarg tag: Additional label to use in naming.
+    :kwarg filepath: Where to save .geo file.
+    """
     try:
         assert level in ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
     except:

@@ -112,7 +112,7 @@ for i in range(op.num_adapt):
         tp_ho.get_flux_terms(proj, tp_ho.adjoint_solution)
         tp_ho.indicator = interpolate(abs(tp_ho.indicators['dwr_cell'] + tp_ho.indicators['dwr_flux']), tp_ho.P0)
         tp.indicator = project(tp_ho.indicator, tp.P0)  # This is equivalent to averaging
-        tp.estimators['dwr'] = assemble(tp.indicator*dx)
+        tp.estimators['dwr'] = tp.indicator.vector().sum()
 
         # Compute metric
         if tp.approach == 'carpio_isotropic':

@@ -125,6 +125,86 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
 
     return M
 
+def anisotropic_refinement(metric, direction=0):
+    r"""
+    Anisotropically refine a mesh (or, more precisely, the metric field associated with a mesh)
+    in such a way as to approximately half the element size in a canonical direction (x- or y-), by
+    scaling of the corresponding eigenvalue.
+
+    :param M: metric to refine.
+    :param direction: 0 or 1, corresponding to x- or y-direction, respectively.
+    :return: anisotropically refined metric.
+    """
+    M = metric.copy()
+    fs = M.function_space()
+    dim = fs.mesh().topological_dimension()
+    kernel = op2.Kernel(anisotropic_refinement_kernel(dim, direction), "anisotropic", cpp=True, include_dirs=include_dir)
+    op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
+    return M
+
+def metric_intersection(M1, M2, bdy=None):
+    r"""
+    Intersect a metric field, i.e. intersect (globally) over all local metrics.
+
+    :arg M1: first metric to be intersected.
+    :arg M2: second metric to be intersected.
+    :param bdy: specify domain boundary to intersect over.
+    :return: intersection of metrics M1 and M2.
+    """
+    V = M1.function_space()
+    mesh = V.mesh()
+    dim = mesh.topological_dimension()
+    assert dim in (2, 3)
+    assert V == M2.function_space()
+    M12 = M1.copy()
+    # FIXME: boundary intersection does not work
+    node_set = V.boundary_nodes(bdy, 'topological') if bdy is not None else V.node_set
+    kernel = op2.Kernel(intersect_kernel(dim), "intersect", cpp=True, include_dirs=include_dir)
+    op2.par_loop(kernel, node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
+    return M12
+
+def metric_relaxation(M1, M2, alpha=0.5):
+    r"""
+    As an alternative to intersection, pointwise metric information may be combined using a convex
+    combination. Whilst this method does not have as clear an interpretation as metric intersection,
+    it has the benefit that the combination may be weighted towards one of the metrics in question.
+
+    :arg M1: first metric to be combined.
+    :arg M2: second metric to be combined.
+    :param alpha: scalar parameter in [0,1].
+    :return: convex combination of metrics M1 and M2 with parameter alpha.
+    """
+    V = M1.function_space()
+    assert V == M2.function_space()
+    M = Function(V)
+    M += alpha*M1 + (1-alpha)*M2
+    return M
+
+def metric_complexity(M):
+    r"""
+    Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted
+    based thereupon.
+    """
+    return assemble(sqrt(det(M))*dx)
+
+def get_metric_coefficient(a, b, op=DefaultOptions()):
+    r"""
+    Solve algebraic problem to get scaling coefficient for interior/boundary metric. See
+    [Loseille et al. 2010] for details.
+
+    :arg a: determinant integral associated with interior metric.
+    :arg b: determinant integral associated with boundary metric.
+    :kwarg op: `Options` class object providing min/max cell size values.
+    :return: Scaling coefficient.
+    """
+    from sympy.solvers import solve
+    from sympy import Symbol
+
+    c = Symbol('c')
+    sol = solve(a*pow(c, -0.6) + b*pow(c, -0.5) - op.target, c)
+    assert len(sol) == 1
+    return Constant(sol[0])
+
 # FIXME
 # TODO: par_loop
 def metric_with_boundary(f=None, mesh=None, H=None, op=DefaultOptions()):
@@ -274,83 +354,3 @@ def metric_with_boundary(f=None, mesh=None, H=None, op=DefaultOptions()):
     M = metric_intersection(M_int, M_bdy, bdy=True)
 
     return M
-
-def anisotropic_refinement(metric, direction=0):
-    r"""
-    Anisotropically refine a mesh (or, more precisely, the metric field associated with a mesh)
-    in such a way as to approximately half the element size in a canonical direction (x- or y-), by
-    scaling of the corresponding eigenvalue.
-
-    :param M: metric to refine.
-    :param direction: 0 or 1, corresponding to x- or y-direction, respectively.
-    :return: anisotropically refined metric.
-    """
-    M = metric.copy()
-    fs = M.function_space()
-    dim = fs.mesh().topological_dimension()
-    kernel = op2.Kernel(anisotropic_refinement_kernel(dim, direction), "anisotropic", cpp=True, include_dirs=include_dir)
-    op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
-    return M
-
-def metric_intersection(M1, M2, bdy=None):
-    r"""
-    Intersect a metric field, i.e. intersect (globally) over all local metrics.
-
-    :arg M1: first metric to be intersected.
-    :arg M2: second metric to be intersected.
-    :param bdy: specify domain boundary to intersect over.
-    :return: intersection of metrics M1 and M2.
-    """
-    V = M1.function_space()
-    mesh = V.mesh()
-    dim = mesh.topological_dimension()
-    assert dim in (2, 3)
-    assert V == M2.function_space()
-    M12 = M1.copy()
-    # FIXME: boundary intersection does not work
-    node_set = V.boundary_nodes(bdy, 'topological') if bdy is not None else V.node_set
-    kernel = op2.Kernel(intersect_kernel(dim), "intersect", cpp=True, include_dirs=include_dir)
-    op2.par_loop(kernel, node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
-    return M12
-
-def metric_relaxation(M1, M2, alpha=0.5):
-    r"""
-    As an alternative to intersection, pointwise metric information may be combined using a convex
-    combination. Whilst this method does not have as clear an interpretation as metric intersection,
-    it has the benefit that the combination may be weighted towards one of the metrics in question.
-
-    :arg M1: first metric to be combined.
-    :arg M2: second metric to be combined.
-    :param alpha: scalar parameter in [0,1].
-    :return: convex combination of metrics M1 and M2 with parameter alpha.
-    """
-    V = M1.function_space()
-    assert V == M2.function_space()
-    M = Function(V)
-    M += alpha*M1 + (1-alpha)*M2
-    return M
-
-def metric_complexity(M):
-    r"""
-    Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted
-    based thereupon.
-    """
-    return assemble(sqrt(det(M))*dx)
-
-def get_metric_coefficient(a, b, op=DefaultOptions()):
-    r"""
-    Solve algebraic problem to get scaling coefficient for interior/boundary metric. See
-    [Loseille et al. 2010] for details.
-
-    :arg a: determinant integral associated with interior metric.
-    :arg b: determinant integral associated with boundary metric.
-    :kwarg op: `Options` class object providing min/max cell size values.
-    :return: Scaling coefficient.
-    """
-    from sympy.solvers import solve
-    from sympy import Symbol
-
-    c = Symbol('c')
-    sol = solve(a*pow(c, -0.6) + b*pow(c, -0.5) - op.target, c)
-    assert len(sol) == 1
-    return Constant(sol[0])

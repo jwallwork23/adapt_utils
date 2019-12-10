@@ -5,6 +5,7 @@ __pycache__/
 adapt/interpolation.py
 plots/.ipynb_checkpoints
 FIXME
+adjoint.py
 
 # File types
 *.swp

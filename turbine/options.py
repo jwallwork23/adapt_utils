@@ -16,82 +16,14 @@ default_params = {
     'mat_type': 'aij',
     'snes_type': 'newtonls',
     'snes_rtol': 1e-3,
-    # 'snes_rtol': 1e-8,
     'snes_atol': 1e-16,
     'snes_max_it': 100,
-    # 'snes_rtol': 1e-2,
     'snes_linesearch_type': 'bt',
-    # 'snes_linesearch_monitor': None,
     'snes_monitor': None,
     'ksp_type': 'preonly',
-    # 'ksp_type': 'richardson',
-    # 'ksp_monitor_singular_value': None,
     'pc_type': 'lu',
     'pc_factor_mat_solver_type': 'mumps',
-    # 'mat_mumps_cntl_1': 0.1,
-    # 'mat_mumps_icntl_14': 200,
 }
-
-# FIXME: Maybe we'd have to use PressureProjectionPicard for this to work...
-fieldsplit_params = {
-    'ksp_type': 'preonly',  # we solve the full schur complement exactly, so no need for outer krylov
-    'mat_type': 'matfree',
-    'pc_type': 'fieldsplit',
-    'pc_fieldsplit_type': 'schur',
-    'pc_fieldsplit_schur_fact_type': 'full',
-    # velocity mass block:
-    'fieldsplit_U_2d': {
-        'ksp_type': 'gmres',
-        'pc_type': 'python',
-        'pc_python_type': 'firedrake.AssembledPC',
-        'assembled_ksp_type': 'preonly',
-        'assembled_pc_type': 'bjacobi',
-        'assembled_sub_pc_type': 'ilu',
-    },
-    # schur system: explicitly assemble the schur system
-    # this only works with pressureprojectionicard if the velocity block is just the mass matrix
-    # and if the velocity is DG so that this mass matrix can be inverted explicitly
-    'fieldsplit_H_2d': {
-        'ksp_type': 'preonly',
-        'pc_type': 'python',
-        'pc_python_type': 'thetis.AssembledSchurPC',
-        'schur_ksp_type': 'gmres',
-        'schur_ksp_max_it': 100,
-        'schur_ksp_converged_reason': False,
-        'schur_pc_type': 'gamg',
-    },
-}
-
-
-# Robust but approximate: just repeatedly apply LU preconditioner
-ksponly_params = {
-    'mat_type': 'aij',
-    'snes_type': 'ksponly',
-    'snes_monitor': None,
-    'ksp_type': 'preonly',
-    'ksp_monitor_singular_value': None,
-    'pc_type': 'lu',
-    'pc_factor_mat_solver_type': 'mumps',
-    'mat_mumps_icntl_14': 200,
-}
-
-# FIXME ILU: Newton with line search; solve linear system approximately using ILU PC
-ilu_params = {
-    'mat_type': 'aij',
-    'snes_type': 'newtonls',
-    'snes_rtol': 1e-3,
-    'snes_linesearch_type': 'bt',
-    # 'snes_linesearch_monitor': None,
-    'snes_monitor': None,
-    'ksp_type': 'gmres',
-    'ksp_atol': 1e-5,
-    'ksp_monitor_singular_value': None,
-    'pc_type': 'ilu',
-    'pc_type_factor_levels': 10,
-    # 'pc_factor_nonzeros_along_diagonal': None,
-}
-
-
 keys = {key for key in default_params if not 'snes' in key}
 default_adjoint_params = {}
 for key in keys:
@@ -139,7 +71,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         A_T = math.pi*(D/2)**2
         correction = 4/(1+math.sqrt(1-A_T/(40.*D)))**2
         self.thrust_coefficient *= correction
-        # NOTE: we're not yet correcting power output here, so that will be overestimated
+        # NOTE: We're not yet correcting power output here, so that will be overestimated
 
     def set_bcs(self, fs):
         pass
@@ -200,8 +132,8 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.default_mesh = RectangleMesh(100, 20, self.domain_length, self.domain_width)
 
         # FIXME (Hack for boundary marker consistency)
-        #m = self.default_mesh.exterior_facets.markers
-        #m = np.where(m == 4, 3, m)
+        # m = self.default_mesh.exterior_facets.markers
+        # m = np.where(m == 4, 3, m)
 
         # Tidal farm
         D = self.turbine_diameter
@@ -300,17 +232,17 @@ class UnsteadyTurbineOptions(SteadyTurbineOptions):
         super(UnsteadyTurbineOptions, self).__init__(approach)
 
         # Solver
-        #self.params = {'ksp_type': 'gmres',
-        #               'pc_type': 'fieldsplit',
-        #               'pc_fieldsplit_type': 'multiplicative',
-        #               'snes_type': 'newtonls',
-        #               #'snes_rtol': 1e-5,
-        #               'snes_monitor': None,}
-        #self.params = {'ksp_type': 'gmres',
-        #               'pc_type': 'lu',
-        #               'pc_factor_mat_solver_type': 'mumps',
-        #               'snes_type': 'newtonls',
-        #               'snes_monitor': None,}
+        # self.params = {'ksp_type': 'gmres',
+        #                'pc_type': 'fieldsplit',
+        #                'pc_fieldsplit_type': 'multiplicative',
+        #                'snes_type': 'newtonls',
+        #                #'snes_rtol': 1e-5,
+        #                'snes_monitor': None,}
+        # self.params = {'ksp_type': 'gmres',
+        #                'pc_type': 'lu',
+        #                'pc_factor_mat_solver_type': 'mumps',
+        #                'snes_type': 'newtonls',
+        #                'snes_monitor': None,}
 
         # Time period and discretisation
         self.dt = 3

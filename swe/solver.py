@@ -1,7 +1,6 @@
 from thetis import *
 from thetis.physical_constants import *
 from firedrake.petsc import PETSc
-import math
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
@@ -401,12 +400,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimators['dwr_flux'] = assemble(res*dx)
         self.indicators['dwr_flux'] = res
 
-    def explicit_indication(self):
-        raise NotImplementedError  # TODO
-
-    def explicit_indication_adjoint(self):
-        raise NotImplementedError  # TODO
-
     def dwr_indication(self, adjoint=False):
         label = 'dwr'
         if adjoint:
@@ -417,64 +410,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
         self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
         self.indicators[label] = self.indicator
-
-    def dwr_indication_adjoint(self):
-        self.dwr_indication(adjoint=True)
-
-    def get_anisotropic_metric(self, sol, adjoint_sol, adjoint=False):
-        assert sol.function_space() == self.solution.function_space()
-        assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
-        u, eta = sol.split()
-        z, zeta = adjoint_sol.split()
-
-        z0_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(z[0], mesh=self.mesh)))
-        z1_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(z[1], mesh=self.mesh)))
-        zeta_diff = Function(self.P1_vec).interpolate(construct_gradient(zeta))
-        z_p1 = Function(self.P1_vec).interpolate(abs(z))
-
-        op = self.op
-        b = self.op.bathymetry
-        H = eta + b
-        g = op.g
-        nu = op.viscosity
-        C_b = op.drag_coefficient
-        normu = sqrt(inner(u, u))
-        normu3 = normu**3
-        F1 = [0, 0, 0]
-        F2 = [0, 0, 0]
-
-        if adjoint:
-            raise NotImplementedError  # TODO
-        else:
-            F1[0] = H*u[0]*u[0] + 0.5*g*eta*eta - nu*H*u[0].dx(0) + C_b*normu3/3.
-            F1[1] = H*u[0]*u[1] - nu*H*u[1].dx(0)
-            F1[2] = H*u[0]
-            F2[0] = H*u[0]*u[1] - nu*H*u[0].dx(1)
-            F2[1] = H*u[1]*u[1] + 0.5*g*eta*eta - nu*H*u[1].dx(1) + C_b*normu3/3.
-            F2[2] = H*u[1]
-            # FIXME: doesn't use non-conservative form
-
-        H1 = [0, 0, 0]
-        H2 = [0, 0, 0]
-
-        # Construct Hessians
-        for i in range(3):
-            H1[i] = steady_metric(F1[i], mesh=self.mesh, noscale=True, op=self.op)
-            H2[i] = steady_metric(F2[i], mesh=self.mesh, noscale=True, op=self.op)
-
-        # Form metric
-        self.M = Function(self.P1_ten)
-        for i in range(len(self.M.dat.data)):
-            self.M.dat.data[i][:,:] += H1[0].dat.data[i]*z0_diff.dat.data[i][0]
-            self.M.dat.data[i][:,:] += H1[1].dat.data[i]*z1_diff.dat.data[i][0]
-            self.M.dat.data[i][:,:] += H1[2].dat.data[i]*zeta_diff.dat.data[i][0]
-            self.M.dat.data[i][:,:] += H2[0].dat.data[i]*z0_diff.dat.data[i][1]
-            self.M.dat.data[i][:,:] += H2[1].dat.data[i]*z1_diff.dat.data[i][0]
-            self.M.dat.data[i][:,:] += H2[2].dat.data[i]*zeta_diff.dat.data[i][0]
-        self.M = steady_metric(None, H=self.M, op=self.op)
-
-        # TODO: Account for flux terms contributed by DG scheme
-        # TODO: boundary contributions
 
     def custom_adapt(self):
         if self.approach == 'vorticity':
@@ -553,8 +488,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end - 0.5*op.dt
         options.timestepper_type = op.timestepper
-        #options.timestepper_options.solver_parameters = op.params
-        PETSc.Sys.Print(options.timestepper_options.solver_parameters)
+        # options.timestepper_options.solver_parameters = op.params
+        # PETSc.Sys.Print(options.timestepper_options.solver_parameters)
 
         # Outputs
         options.output_directory = self.di

@@ -74,7 +74,7 @@ class SteadyProblem():
         """
         if num_vertices is None:
             num_vertices = self.mesh.num_vertices()
-        self.op.target = num_vertices * self.op.rescaling
+        self.op.target = num_vertices*self.op.rescaling
 
     def solve(self):
         """
@@ -217,16 +217,13 @@ class SteadyProblem():
         else:
             self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
 
-    def indicate_error(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=False):
+    def indicate_error(self, estimate_error=False):
         """
         Evaluate error estimation strategy of choice in order to obtain a metric field for mesh
         adaptation.
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
 
-        :kwarg relaxation_parameter: Scalar in the range [0, 1] used to take a weighted average
-        between metrics at the current and previous steps.
-        :kwarg prev_metric: Metric from previous step. If unprovided, metric relaxation cannot be applied.
         :kwarg estimate_error: Toggle computation of global error estimate.
         """
         if self.approach == 'fixed_mesh':
@@ -361,15 +358,6 @@ class SteadyProblem():
             amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric
-        elif self.approach == 'carpio_almost_both':
-            self.dwr_indication()
-            self.get_hessian_metric(noscale=False, degree=1)
-            M = self.M.copy()
-            self.get_hessian_metric(noscale=False, degree=1, adjoint=True)
-            self.M = metric_intersection(self.M, M)
-            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
-            amd.get_anisotropic_metric()
-            self.M = amd.p1metric
         elif self.approach == 'carpio_both':
             self.dwr_indication()
             i = self.indicator.copy()
@@ -390,16 +378,9 @@ class SteadyProblem():
             PETSc.Sys.Print("Using custom metric '{:s}'".format(self.approach))
             self.custom_adapt()
 
-        # Apply metric relaxation, if requested
-        if prev_metric is not None:
-            assert relaxation_parameter >= 0
-            assert relaxation_parameter <= 1
-            self.M_unrelaxed = self.M.copy()
-            self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
-
         ## FIXME
         #if hasattr(self, 'indicator'):
-        #    self.estimator = sum(self.indicator.dat.data)
+        #    self.estimator = self.indicator.vector().sum()
         if estimate_error:
             if self.approach in ('dwr', 'power', 'loseille', 'carpio'):
                 self.dwr_estimation()
@@ -412,15 +393,12 @@ class SteadyProblem():
             else:
                 raise NotImplementedError  # TODO
 
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None, estimate_error=False):
+    def adapt_mesh(self, estimate_error=False):
         """
         Adapt mesh using metric constructed in error estimation step.
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
 
-        :kwarg relaxation_parameter: Scalar in the range [0, 1] used to take a weighted average
-        between metrics at the current and previous steps.
-        :kwarg prev_metric: Metric from previous step. If unprovided, metric relaxation cannot be applied.
         :kwarg estimate_error: Toggle computation of global error estimate.
         """
         if self.approach == 'fixed_mesh':
@@ -431,7 +409,7 @@ class SteadyProblem():
         else:
             if not hasattr(self, 'M'):
                 PETSc.Sys.Print("Metric not found. Computing it now.")
-                self.indicate_error(relaxation_parameter=relaxation_parameter, prev_metric=prev_metric, estimate_error=estimate_error)
+                self.indicate_error(estimate_error=estimate_error)
             self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
         PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.plot()
@@ -479,7 +457,7 @@ class MeshOptimisation():
         self.di = create_directory(op.di)
 
         # Default tolerances etc
-        #self.msg = "Mesh %2d: %7d cells, qoi %.4e, estimator %.4e"
+        # self.msg = "Mesh %2d: %7d cells, qoi %.4e, estimator %.4e"
         self.msg = "Mesh %2d: %7d cells, qoi %.4e"
         self.conv_msg = "Converged after %d iterations due to %s"
         self.startit = 0
@@ -513,7 +491,6 @@ class MeshOptimisation():
             self.logfile = open('{:s}/optimisation_log'.format(self.di), 'a+')
             self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
             self.logfile.write('high_order: {:b}\n'.format(self.op.order_increase))
-            self.logfile.write('relax: {:b}\n'.format(self.op.relax))
             self.logfile.write('maxit: {:d}\n'.format(self.maxit))
             self.logfile.write('element_rtol: {:f}\n'.format(self.element_rtol))
             self.logfile.write('qoi_rtol: {:f}\n'.format(self.qoi_rtol))
@@ -548,11 +525,11 @@ class MeshOptimisation():
 
             # Estimate and record error  # FIXME
             tp.indicate_error()
-            #self.dat['estimator'].append(tp.estimator)
-            #PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i], tp.estimator))
+            # self.dat['estimator'].append(tp.estimator)
+            # PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i], tp.estimator))
             PETSc.Sys.Print(self.msg % (i, self.dat['elements'][i], self.dat['qoi'][i]))
-            #if self.log:  # TODO: parallelise
-            #    self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
+            # if self.log:  # TODO: parallelise
+            #     self.logfile.write('Mesh  {:2d}: estimator = {:.4e}\n'.format(i, tp.estimator))
 
             # Stopping criteria
             if i >= self.minit and i > self.startit:
@@ -561,8 +538,8 @@ class MeshOptimisation():
                 el_diff = abs(self.dat['elements'][j] - self.dat['elements'][j-1])
                 if obj_diff < self.qoi_rtol*self.dat['qoi'][j-1]:
                     out = self.conv_msg % (i+1, 'convergence in quantity of interest.')
-                #elif self.dat['estimator'][j] < self.estimator_atol:  # FIXME
-                #    out = self.conv_msg % (i+1, 'convergence in error estimator.')
+                # elif self.dat['estimator'][j] < self.estimator_atol:  # FIXME
+                #     out = self.conv_msg % (i+1, 'convergence in error estimator.')
                 elif el_diff < self.element_rtol*self.dat['elements'][j-1] and i > self.startit+1:
                     out = self.conv_msg % (i+1, 'convergence in mesh element count.')
                 elif i >= self.maxit-1:
@@ -575,13 +552,11 @@ class MeshOptimisation():
                     break
 
             # Adapt mesh
-            #tp.set_target_vertices(num_vertices=self.dat['vertices'][0])
-            tp.adapt_mesh(prev_metric=M_)
+            # tp.set_target_vertices(num_vertices=self.dat['vertices'][0])
+            tp.adapt_mesh()
             tp.plot()
             if tp.nonlinear and self.use_prev_sol:
                 prev_sol = tp.solution
-            if self.op.relax:
-                M_ = tp.M_unrelaxed
 
         self.dat['time'] = clock() - tstart
         PETSc.Sys.Print('Time to solution: %.1fs' % (self.dat['time']))
@@ -611,7 +586,7 @@ class OuterLoop():
         self.qoi_rtol = 0.005
         self.outer_startit = 0
         self.outer_maxit = 4
-        #self.log = False
+        # self.log = False
         self.log = True
         self.base = 10
         self.start_error = 1
@@ -852,7 +827,7 @@ class UnsteadyProblem():
         # FIXME for continuous adjoint
         filename = 'Adjoint2d_{:5s}'.format(index_string(i))
 
-        #filename = '{:s}_{:5s}'.format(variable, index_string(i))
+        # filename = '{:s}_{:5s}'.format(variable, index_string(i))
         to_load = Function(self.V_orig, name=names[variable])
         to_load_old = Function(self.V_orig, name=names[variable])
         with DumbCheckpoint(os.path.join('outputs/adjoint/hdf5', filename), mode=FILE_READ) as la:
@@ -957,15 +932,13 @@ class UnsteadyProblem():
             self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
 
 
-    def adapt_mesh(self, relaxation_parameter=0.9, prev_metric=None):
+    def adapt_mesh(self):
         """
         Adapt mesh according to error estimation strategy of choice.
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
 
-        :kwarg relaxation_parameter: Scalar in the range [0, 1] used to take a weighted average
         between metrics at the current and previous steps.
-        :kwarg prev_metric: Metric from previous step. If unprovided, metric relaxation cannot be applied.
         :kwarg estimate_error: Toggle computation of global error estimate.
         """
         if self.approach == 'fixed_mesh':
@@ -1079,13 +1052,6 @@ class UnsteadyProblem():
                 self.custom_adapt()
             except:
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
-
-        # Apply metric relaxation, if requested
-        assert relaxation_parameter >= 0
-        assert relaxation_parameter <= 1
-        self.M_unrelaxed = self.M.copy()
-        if prev_metric is not None:
-            self.M.project(metric_relaxation(self.M, project(prev_metric, self.P1_ten), relaxation_parameter))
 
         # Adapt mesh
         if self.M is not None and norm(self.M) > 0.1*norm(Constant(1, domain=self.mesh)):

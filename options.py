@@ -18,23 +18,18 @@ class Options(FrozenConfigurable):
     h_min = PositiveFloat(1e-10, help="Minimum tolerated element size.").tag(config=True)
     h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
 
-    # Smooth / intersect
-    intersect = Bool(False, help="Intersect with previous mesh.").tag(config=True)  # TODO: remove
-    relax = Bool(False, help="Take metric relaxation with previous mesh.").tag(config=True)  # TODO: remove
-    intersect_boundary = Bool(False, help="Intersect with initial boundary metric.").tag(config=True)
-
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach.").tag(config=True)
 
     # Plotting
     plot_pvd = Bool(False, help="Toggle plotting of fields.").tag(config=True)
-    plot_metric = Bool(False, help="Toggle plotting of metric field.").tag(config=True)
 
     # Metric
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
     normalisation = Unicode('complexity', help="Metric normalisation approach, from {'complexity', 'error'}.").tag(config=True)
     target = PositiveFloat(1e+2, help="Target complexity / inverse desired error for normalisation, as appropriate.").tag(config=True)
     norm_order = NonNegativeInteger(None, allow_none=True, help="Degree p of Lp norm used in 'error' normalisation approach. Use 'None' to specify infinity norm.").tag(config=True)
+    intersect_boundary = Bool(False, help="Intersect with initial boundary metric.").tag(config=True)
 
     # Hessian
     hessian_recovery = Unicode('dL2', help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
