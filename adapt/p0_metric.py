@@ -72,7 +72,7 @@ class AnisotropicMetricDriver():
         self.K_opt.interpolate(pow(self.eta, 1/(alpha+1)))
         Sum = self.K_opt.vector().gather().sum()
         if self.op.normalisation == 'error':
-            scaling = pow(self.op.target*Sum, -1/alpha)  # FIXME
+            scaling = pow(Sum*self.op.target, -1/alpha)  # FIXME
         else:
             scaling = Sum/self.op.target
         self.K_opt.interpolate(min_value(max_value(scaling*self.K/self.K_opt, self.op.h_min**2), self.op.h_max**2))
@@ -96,7 +96,7 @@ class AnisotropicMetricDriver():
         self.get_element_size()
         self.get_optimal_element_size()
         indicator = Function(self.P1).interpolate(abs(self.K_hat/self.K_opt))
-        self.p1metric = isotropic_metric(indicator, op=self.op)
+        self.p1metric = isotropic_metric(indicator, noscale=True, op=self.op)
 
     def get_anisotropic_metric(self):
         self.get_element_size()

@@ -5,20 +5,15 @@ In this code, anisotropic and isotropic goal-oriented mesh adaptation is applied
 ### Versions
 
 * `v1.0`: 'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake': [![DOI](https://zenodo.org/badge/169627287.svg)](https://zenodo.org/badge/latestdoi/169627287)
+* `v1.1`: 'Goal-Oriented Error Estimation and Mesh Adaptation in Shallow Water Modelling': `TO DO`
 
 ### User instructions
 
-* If using `v1.0`, download Firedrake, PETSc and Pragmatic using [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3250888.svg)](https://doi.org/10.5281/zenodo.3250888).
-
-For a development version:
 * Clone this repository and make it accessible to the `PYTHONPATH` environment variable.
-* Set the environment variable
-  ``export PETSC_CONFIGURE_OPTIONS="--download-pragmatic --with-cxx-dialect=C++11"``
-  and install [Firedrake][1] with the flags ``--install thetis`` and ``--install pyadjoint``.
-* Fetch and checkout the remote branch
-    * ``https://github.com/jwallwork23/firedrake`` for firedrake, fork ``joe/meshadapt``
-    and call ``make`` in ``firedrake/src/firedrake`` to enable pragmatic drivers.
-
+* If using `v1.0`, download Firedrake, PETSc and Pragmatic using [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3250888.svg)](https://doi.org/10.5281/zenodo.3250888).
+* If using `v1.1`:
+	* Install the same PETSc version as used in `v1.0`.
+	* Download Firedrake using [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3568997.svg)](https://doi.org/10.5281/zenodo.3568997), with the flags `--install thetis --install pyadjoint --honour-petsc-dir`.
 
 #### For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
 
