@@ -20,7 +20,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
                  mesh=None,
                  discrete_adjoint=True,
                  op=ShallowWaterOptions(),
-                 prev_solution=None):
+                 prev_solution=None,
+                 hierarchy=False):
         if op.family == 'dg-dg' and op.degree in (1, 2):
             element = VectorElement("DG", triangle, op.degree)*FiniteElement("DG", triangle, op.degree)
         elif op.family == 'dg-cg':
@@ -33,7 +34,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         self.prev_solution = prev_solution
         if prev_solution is not None:
-            self.interpolate_solution()
+            self.interpolate_solution(hierarchy)
 
         # Physical fields
         self.set_fields()
@@ -70,7 +71,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.simulation_end_time = op.end_time
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters = op.params
-        PETSc.Sys.Print(options.timestepper_options.solver_parameters)
+        # PETSc.Sys.Print(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs
@@ -357,7 +358,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
                 # HorizontalAdvection
                 eta_jump = eta - eta_ext
                 un_rie = 0.5*inner(u + u_ext, n) + sqrt(g/H)*eta_jump
-                flux_terms += -i*dot(u, z)*un_rie*ds(j)
+                flux_terms += -i*dot(0.5*(u + u_ext), z)*un_rie*ds(j)
 
                 # HorizontalViscosity
                 if 'un' in funcs:
@@ -494,16 +495,19 @@ class SteadyShallowWaterProblem(SteadyProblem):
             z, zeta = self.adjoint_solution.split()
             self.adjoint_solution_file.write(z, zeta)
 
-    def interpolate_solution(self):
+    def interpolate_solution(self, hierarchy=False):
         """
         Here we only need interpolate the velocity.
         """
         self.interpolated_solution = Function(self.V)
-        u_interp, eta_interp = self.interpolated_solution.split()
-        u_, eta_ = self.prev_solution.split()
         PETSc.Sys.Print("Interpolating solution across meshes...")
-        u_interp.project(u_)
-        eta_interp.project(eta_)
+        if hierarchy:
+            prolong(self.prev_solution, self.interpolated_solution)
+        else:
+            u_interp, eta_interp = self.interpolated_solution.split()
+            u_, eta_ = self.prev_solution.split()
+            u_interp.project(u_)
+            eta_interp.project(eta_)
 
 
 class UnsteadyShallowWaterProblem(UnsteadyProblem):
