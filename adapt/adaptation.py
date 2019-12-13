@@ -4,21 +4,23 @@ from firedrake.petsc import PETSc
 from adapt_utils.options import DefaultOptions
 
 
-__all__ = ["iso_P2"]
+__all__ = ["AdaptiveMesh", "iso_P2"]
 
 
+# TODO: Copy method
 class AdaptiveMesh():
     """
     Wrapper which adds extra features to mesh.
     """
-    def __init__(self, mesh, levels=1):
+    def __init__(self, mesh, levels=0):
         """
         `AdaptMesh` object is initialised as the basis of a `MeshHierarchy`.
         """
         self.levels = levels
         self.hierarchy = MeshHierarchy(mesh, levels)
         self.mesh = self.hierarchy[0]
-        self.refined_mesh = self.hierarchy[1]
+        if levels > 0:
+            self.refined_mesh = self.hierarchy[1]
 
     def save_plex(self, filename):
         """
@@ -39,8 +41,7 @@ class AdaptiveMesh():
         """
         Adapt mesh using a specified metric. The `MeshHierarchy` is reinstated.
         """
-        adaptor = AnisotropicAdaptation(self.mesh, metric)
-        self.__init__(adaptor.adapted_mesh, levels=self.levels)
+        self.__init__(adapt(self.mesh, metric), levels=self.levels)
 
 
 # TODO: This will become redundant once `AdaptiveMesh` is used everywhere

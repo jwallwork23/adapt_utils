@@ -10,7 +10,7 @@ from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hes
 from adapt_utils.adapt.kernels import *
 
 
-__all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "anisotropic_refinement", "metric_intersection", "metric_relaxation", "metric_complexity"]
+__all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_intersection", "metric_relaxation", "metric_complexity"]
 
 
 # TODO: test 3d case works
@@ -123,23 +123,6 @@ def isotropic_metric(f, noscale=False, op=DefaultOptions()):
     else:
         M.interpolate(as_matrix([[g, 0, 0], [0, g, 0], [0, 0, g]]))
 
-    return M
-
-def anisotropic_refinement(metric, direction=0):
-    r"""
-    Anisotropically refine a mesh (or, more precisely, the metric field associated with a mesh)
-    in such a way as to approximately half the element size in a canonical direction (x- or y-), by
-    scaling of the corresponding eigenvalue.
-
-    :param M: metric to refine.
-    :param direction: 0 or 1, corresponding to x- or y-direction, respectively.
-    :return: anisotropically refined metric.
-    """
-    M = metric.copy()
-    fs = M.function_space()
-    dim = fs.mesh().topological_dimension()
-    kernel = op2.Kernel(anisotropic_refinement_kernel(dim, direction), "anisotropic", cpp=True, include_dirs=include_dir)
-    op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
     return M
 
 def metric_intersection(M1, M2, bdy=None):

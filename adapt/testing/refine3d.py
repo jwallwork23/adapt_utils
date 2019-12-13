@@ -1,7 +1,5 @@
 from firedrake import *
-
 from adapt_utils import *
-
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -14,6 +12,8 @@ P1 = FunctionSpace(mesh, "CG", 1)
 P1_ten = TensorFunctionSpace(mesh, "CG", 1)
 f = Function(P1)
 M = Function(P1_ten)
+
+raise NotImplementedError  # TODO
 
 # check nothing happens when we adapt with the identity metric  # FIXME: what is 3d identity metric?
 print('Testing hard-coded metric')

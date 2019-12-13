@@ -12,8 +12,13 @@ class AnisotropicMetricDriver():
     """
     Driver for anisotropic mesh adaptation using an approach based on [Carpio et al. 2013].
     """
-    def __init__(self, mesh, hessian=None, indicator=None, op=DefaultOptions()):
-        self.mesh = mesh
+    def __init__(self, adaptive_mesh, hessian=None, indicator=None, op=DefaultOptions()):
+        self.am = adaptive_mesh
+        if hasattr(adaptive_mesh, 'mesh'):
+            self.mesh = adaptive_mesh.mesh
+        else:
+            self.mesh = adaptive_mesh
+            print("WARNING: MeshGeometry argument to be replaced by AdaptiveMesh.")  # TODO: Make the change
         self.dim = self.mesh.topological_dimension()
         try:
             assert self.dim == 2
@@ -24,18 +29,18 @@ class AnisotropicMetricDriver():
         self.op = op
 
         # Spaces
-        self.P0 = FunctionSpace(mesh, "DG", 0)
-        self.P1 = FunctionSpace(mesh, "CG", 1)
-        self.P0_vec = VectorFunctionSpace(mesh, "DG", 0)
-        self.P0_ten = TensorFunctionSpace(mesh, "DG", 0)
-        self.P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+        self.P0 = FunctionSpace(self.mesh, "DG", 0)
+        self.P1 = FunctionSpace(self.mesh, "CG", 1)
+        self.P0_vec = VectorFunctionSpace(self.mesh, "DG", 0)
+        self.P0_ten = TensorFunctionSpace(self.mesh, "DG", 0)
+        self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
         self.p0test = TestFunction(self.P0)
         if hessian is not None:
             self.p0hessian = project(hessian, self.P0_ten)
 
         # Fields related to mesh
-        self.J = Jacobian(mesh)
-        self.detJ = JacobianDeterminant(mesh)
+        self.J = Jacobian(self.mesh)
+        self.detJ = JacobianDeterminant(self.mesh)
         self.K_hat = 0.5                # Area of reference element
         self.K = Function(self.P0)      # Current element size
         self.K_opt = Function(self.P0)  # Optimal element size
@@ -133,15 +138,19 @@ class AnisotropicMetricDriver():
         self.build_metric()
         self.project_metric()
 
-    def adapt_mesh(self):
-        """
-        Adapt mesh using vertexwise metric.
-        """
+    def check_p1metric_exists(self):
         try:
             assert hasattr(self, 'p1metric')
         except ValueError:
             raise ValueError("Vertexwise metric does not exist. Please choose an adaptation strategy.")
-        self.mesh = adapt(self.p1metric, op=self.op)
+
+    def adapt_mesh(self, hessian=None, indicator=None):
+        """
+        Adapt mesh using vertexwise metric.
+        """
+        self.check_p1metric_exists()
+        self.am.adapt(self.p1metric)
+        self.__init__(self.am, hessian=hessian, indicator=indicator, op=self.op)
 
     def Lij(self, i, j):
         """
@@ -176,3 +185,18 @@ class AnisotropicMetricDriver():
         self.cell_interpolation_error()
         coeff = sqrt((self.eval[0]+self.eval[1])*pow(min_value(self.eval[0], self.eval[1]), 1.5))
         self.estimator.interpolate(coeff*self.estimator)
+
+    def component_stretch(self):
+        """
+        Anisotropically refine the vertexwise metric in such a way as to approximately half the
+        element size in each canonical direction (x- or y-), by scaling the corresponding eigenvalue.
+        """
+        self.check_p1metric_exists()
+        dim = self.mesh.topological_dimension()
+        self.component_stretch_metrics = []
+        fs = self.p1metric.function_space()
+        for direction in range(dim):
+            M = Function(self.p1metric)  # FIXME: Copy doesn't seem to work for tensor fields
+            kernel = op2.Kernel(anisotropic_refinement_kernel(dim, direction), "anisotropic", cpp=True, include_dirs=include_dir)
+            op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
+            self.component_stretch_metrics.append(M)
