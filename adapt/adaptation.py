@@ -1,13 +1,9 @@
 from firedrake import *
-from firedrake.petsc import PETSc
-
-from adapt_utils.options import DefaultOptions
 
 
 __all__ = ["AdaptiveMesh", "iso_P2"]
 
 
-# TODO: Copy method
 class AdaptiveMesh():
     """
     Wrapper which adds extra features to mesh.
@@ -42,6 +38,9 @@ class AdaptiveMesh():
         Adapt mesh using a specified metric. The `MeshHierarchy` is reinstated.
         """
         self.__init__(adapt(self.mesh, metric), levels=self.levels)
+
+    def copy(self):
+        return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
 
 
 # TODO: This will become redundant once `AdaptiveMesh` is used everywhere
