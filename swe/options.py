@@ -44,3 +44,5 @@ class ShallowWaterOptions(Options):
 
     def set_qoi_kernel(self, fs):
         pass
+
+# TODO: UnsteadyShallowWaterOptions
