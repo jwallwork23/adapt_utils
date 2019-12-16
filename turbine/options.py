@@ -1,14 +1,12 @@
 from thetis import *
 from thetis.configuration import *
-import math
 
 import numpy as np
 
 from adapt_utils.swe.options import ShallowWaterOptions
 
 
-__all__ = ["Steady1TurbineOptions", "Steady2TurbineOptions", "Steady2TurbineOffsetOptions",
-           "Steady15TurbineOptions", "Unsteady2TurbineOptions", "Unsteady15TurbineOptions"]
+__all__ = ["SteadyTurbineOptions", "UnsteadyTurbineOptions"]
 
 
 # Default: Newton with line search; solve linear system exactly with LU factorisation
@@ -68,8 +66,8 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         Piggott 2016, eq. (15))
         """
         D = self.turbine_diameter
-        A_T = math.pi*(D/2)**2
-        correction = 4/(1+math.sqrt(1-A_T/(40.*D)))**2
+        A_T = pi*(D/2)**2
+        correction = 4/(1+sqrt(1-A_T/(40.*D)))**2
         self.thrust_coefficient *= correction
         # NOTE: We're not yet correcting power output here, so that will be overestimated
 
@@ -77,156 +75,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         pass
 
 
-class Steady1TurbineOptions(SteadyTurbineOptions):
-    """Parameters for the steady 1 turbine problem"""
-
-    # Turbine parameters
-    turbine_diameter = PositiveFloat(18.).tag(config=True)
-    thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
-
-    def __init__(self, approach='fixed_mesh'):
-        # self.base_viscosity = 1.3e-3
-        self.base_viscosity = 1.0
-        super(Steady1TurbineOptions, self).__init__(approach)
-        L = 1000.0
-        W = 300.0
-        self.default_mesh = RectangleMesh(100, 20, L, W)
-
-        # FIXME (Hack for boundary marker consistency)
-        #m = self.default_mesh.exterior_facets.markers
-        #m = np.where(m == 4, 3, m)
-
-        # Tidal farm
-        D = self.turbine_diameter
-        self.region_of_interest = [(L/2, W/2, D/2)]
-        self.thrust_coefficient_correction()
-
-    def set_bcs(self, fs):
-        left_tag = 1
-        right_tag = 2
-        top_bottom_tag = 3
-        if not hasattr(self, 'boundary_conditions'):
-            self.boundary_conditions = {}
-        if not hasattr(self, 'inflow'):
-            self.set_inflow(f.sub()[0])
-        self.boundary_conditions[left_tag] = {'uv': self.inflow}
-        self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
-        self.boundary_conditions[top_bottom_tag] = {'un': Constant(0.)}
-        return self.boundary_conditions
-
-
-class Steady2TurbineOptions(SteadyTurbineOptions):
-    """Parameters for the steady 2 turbine problem"""
-
-    # Turbine parameters
-    turbine_diameter = PositiveFloat(18.).tag(config=True)
-    thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
-
-    def __init__(self, approach='fixed_mesh'):
-        # self.base_viscosity = 1.3e-3
-        self.base_viscosity = 1.0
-        # self.base_viscosity = 10.0
-        super(Steady2TurbineOptions, self).__init__(approach)
-        self.domain_length = 1000.0
-        self.domain_width = 300.0
-        self.default_mesh = RectangleMesh(100, 20, self.domain_length, self.domain_width)
-
-        # FIXME (Hack for boundary marker consistency)
-        # m = self.default_mesh.exterior_facets.markers
-        # m = np.where(m == 4, 3, m)
-
-        # Tidal farm
-        D = self.turbine_diameter
-        L = self.domain_length
-        W = self.domain_width
-        self.region_of_interest = [(L/2-8*D, W/2, D/2), (L/2+8*D, W/2, D/2)]
-        self.thrust_coefficient_correction()
-
-    def set_viscosity(self, fs):
-        sponge = False
-        self.viscosity = Function(fs)
-        if sponge:
-            x, y = SpatialCoordinate(fs.mesh())
-            xmin = 0.0
-            xmax = 1000.0
-            ramp = 0.5
-            eps = 20.0
-            self.viscosity.interpolate(self.base_viscosity + exp(ramp*(x-xmax+eps)))
-        else:
-            self.viscosity.assign(self.base_viscosity)
-
-    def set_bcs(self, fs):
-        left_tag = 1
-        right_tag = 2
-        top_bottom_tag = 3
-        if not hasattr(self, 'boundary_conditions'):
-            self.boundary_conditions = {}
-        if not hasattr(self, 'inflow'):
-            self.set_inflow(fs.sub()[0])
-        self.boundary_conditions[left_tag] = {'uv': self.inflow}
-        self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
-        self.boundary_conditions[top_bottom_tag] = {'un': Constant(0.)}
-        return self.boundary_conditions
-
-class Steady2TurbineOffsetOptions(Steady2TurbineOptions):
-    def __init__(self, approach='fixed_mesh', spacing=1.0):
-        """
-        :kwarg spacing: number of turbine widths to offset in each direction.
-        """
-        super(Steady2TurbineOffsetOptions, self).__init__(approach)
-        D = self.turbine_diameter
-        L = self.domain_length
-        W = self.domain_width
-        self.region_of_interest = [(L/2-8*D, W/2-spacing*D, D/2), (L/2+8*D, W/2+spacing*D, D/2)]
-
-
-class Steady15TurbineOptions(SteadyTurbineOptions):
-    """Parameters for the steady 15 turbine problem"""
-
-    # Turbine parameters
-    turbine_diameter = PositiveFloat(20.).tag(config=True)
-    thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
-
-    def __init__(self, approach='fixed_mesh'):
-        # self.base_viscosity = 1.3e-3
-        self.base_viscosity = 3.0
-        super(Steady15TurbineOptions, self).__init__(approach)
-        self.domain_length = 3000.0
-        self.domain_width = 1000.0
-        self.default_mesh = RectangleMesh(150, 50, self.domain_length, self.domain_width)    # FIXME: wrong ids
-        x, y = SpatialCoordinate(self.default_mesh)
-        self.default_mesh.coordinates.interpolate(as_vector([x - self.domain_length/2, y - self.domain_width/2]))
-        self.h_max = 100
-        self.bathymetry = Constant(50.0)
-
-        # Tidal farm
-        D = self.turbine_diameter
-        delta_x = 10*D
-        delta_y = 7.5*D
-        for i in [-2, -1, 0, 1, 2]:
-            for j in [-1, 0, 1]:
-                self.region_of_interest.append((i*delta_x, j*delta_y, D/2))
-        self.thrust_coefficient_correction()
-
-    def set_bcs(self, fs):
-        bottom_tag = 1
-        right_tag = 2
-        top_tag = 3
-        left_tag = 4
-        if not hasattr(self, 'boundary_conditions'):
-            self.boundary_conditions = {}
-        if not hasattr(self, 'inflow'):
-            self.set_inflow(fs.sub()[0])
-        self.boundary_conditions[left_tag] = {'uv': self.inflow}
-        self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
-        self.boundary_conditions[top_tag] =  {'un': Constant(0.)}
-        self.boundary_conditions[bottom_tag] = {'un': Constant(0.)}
-        return self.boundary_conditions
-
-
 # TODO: bring below up to date
-
-
 class UnsteadyTurbineOptions(SteadyTurbineOptions):
     def __init__(self, approach='fixed_mesh'):
         super(UnsteadyTurbineOptions, self).__init__(approach)
@@ -255,7 +104,7 @@ class UnsteadyTurbineOptions(SteadyTurbineOptions):
 
         # Boundary forcing
         self.hmax = 0.5
-        self.omega = 2*math.pi/self.T_tide
+        self.omega = 2*pi/self.T_tide
 
         # Turbines
         self.base_viscosity = 3.

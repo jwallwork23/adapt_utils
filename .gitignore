@@ -13,3 +13,4 @@ adjoint.py
 *.geo
 *.pvd
 *.vtu
+*.ipynb_checkpoints
