@@ -48,7 +48,7 @@ estimator_rtol = rtol
 if level == 'uniform':
     mesh = op.default_mesh
 else:
-    mesh = Mesh('{:s}_turbine.msh'.format(label))
+    mesh = Mesh('_'.join([format(label), 'turbine.msh']))
 mh = MeshHierarchy(mesh, 1)
 print("Number of elements: {:d}".format(mesh.num_cells()))
 

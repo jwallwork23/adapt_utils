@@ -9,3 +9,7 @@ adjoint.py
 
 # File types
 *.swp
+*.msh
+*.geo
+*.pvd
+*.vtu

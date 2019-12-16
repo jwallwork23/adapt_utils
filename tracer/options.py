@@ -169,12 +169,6 @@ class TelemacOptions(TracerOptions):
         self.boundary_conditions[3] = 'neumann_zero'
         self.boundary_conditions[4] = 'neumann_zero'
 
-        # Time integration
-        self.dt = 0.1
-        self.end_time = 60.
-        self.dt_per_export = 10
-        self.dt_per_remesh = 20
-
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity
@@ -192,10 +186,6 @@ class TelemacOptions(TracerOptions):
         scaling *= 0.5*self.source_value
         self.source.interpolate(self.ball(fs, source=True, scale=scaling))
         return self.source
-
-    def set_initial_condition(self, fs):
-        self.initial_value = Function(fs)
-        return self.initial_value
 
     def set_qoi_kernel(self, fs):
         b = self.ball(fs, source=False)
@@ -271,12 +261,6 @@ class Telemac3dOptions(TracerOptions):
         self.boundary_conditions[5] = 'neumann_zero'
         self.boundary_conditions[6] = 'neumann_zero'
 
-        # Time integration
-        self.dt = 0.1
-        self.end_time = 60.
-        self.dt_per_export = 10
-        self.dt_per_remesh = 20
-
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity
@@ -294,10 +278,6 @@ class Telemac3dOptions(TracerOptions):
         scaling *= 0.5*self.source_value
         self.source.interpolate(self.ball(fs, source=True, scale=scaling))
         return self.source
-
-    def set_initial_condition(self, fs):
-        self.initial_value = Function(fs)
-        return self.initial_value
 
     def set_qoi_kernel(self, fs):
         b = self.ball(fs, source=False)
