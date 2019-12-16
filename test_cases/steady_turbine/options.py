@@ -1,5 +1,6 @@
 from thetis import *
 from thetis.configuration import *
+import os
 
 from adapt_utils.turbine.options import SteadyTurbineOptions
 
@@ -13,6 +14,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
     # Turbine parameters
     turbine_diameter = PositiveFloat(18.).tag(config=True)
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
+    mesh_path = Unicode('xcoarse.msh').tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
         # self.base_viscosity = 1.3e-3
@@ -20,7 +22,8 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         super(Steady2TurbineOptions, self).__init__(approach)
         self.domain_length = 1000.0
         self.domain_width = 300.0
-        self.default_mesh = Mesh('xcoarse_2_turbine.msh')
+        if os.path.exists(self.mesh_path):
+            self.default_mesh = Mesh(self.mesh_path)
 
         # Tidal farm
         D = self.turbine_diameter
@@ -52,6 +55,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
             self.set_inflow(fs.sub()[0])
         self.boundary_conditions[left_tag] = {'uv': self.inflow}
         self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
+        return self.boundary_conditions
 
 
 class Steady2TurbineOffsetOptions(Steady2TurbineOptions):
@@ -59,9 +63,9 @@ class Steady2TurbineOffsetOptions(Steady2TurbineOptions):
         """
         :kwarg spacing: number of turbine widths to offset in each direction.
         """
+        self.mesh_path = 'xcoarse_offset.msh'
         super(Steady2TurbineOffsetOptions, self).__init__(approach)
         D = self.turbine_diameter
         L = self.domain_length
         W = self.domain_width
         self.region_of_interest = [(L/2-8*D, W/2-spacing*D, D/2), (L/2+8*D, W/2+spacing*D, D/2)]
-        self.default_mesh = Mesh('xcoarse_2_offset_turbine.msh')

@@ -1,5 +1,5 @@
 from thetis import *
-from adapt_utils.test_cases.2turbine.options import *
+from adapt_utils.test_cases.steady_turbine.options import *
 from adapt_utils.turbine.solver import SteadyTurbineProblem
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
@@ -9,19 +9,17 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-approach', help="Mesh adaptation strategy")
 parser.add_argument('-target', help="Scaling parameter for metric")
 parser.add_argument('-offset', help="Toggle offset or aligned turbine configurations")
-parser.add_argument('-adapt_field', help="Field(s) to compute Hessian w.r.t.")
 parser.add_argument('-initial_mesh', help="Resolution of initial mesh")
+parser.add_argument('-adapt_field', help="Field(s) to compute Hessian w.r.t.")
 parser.add_argument('-rtol', help="Relative tolerance for adaptation algorithm termination")
 args = parser.parse_args()
 
 op2.init(log_level=INFO)
 
 # Problem setup
-level = 'xcoarse' if args.initial_mesh is None else args.initial_mesh
 offset = False if args.offset is None else bool(args.offset)
-label = level + '_2'
-if offset:
-    label += '_offset'
+level = 'xcoarse' if args.initial_mesh is None else args.initial_mesh
+label = '_'.join([level, 'offset']) if offset else level
 sol = None
 
 # Adaptation parameters
@@ -45,10 +43,7 @@ element_rtol = rtol
 estimator_rtol = rtol
 
 # Set initial mesh hierarchy
-if level == 'uniform':
-    mesh = op.default_mesh
-else:
-    mesh = Mesh('_'.join([format(label), 'turbine.msh']))
+mesh = op.default_mesh
 mh = MeshHierarchy(mesh, 1)
 print("Number of elements: {:d}".format(mesh.num_cells()))
 

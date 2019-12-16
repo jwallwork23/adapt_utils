@@ -14,21 +14,15 @@ def generate_geo_file(op, level='coarse', tag=None, filepath='.'):
     :kwarg tag: Additional label to use in naming.
     :kwarg filepath: Where to save .geo file.
     """
-    try:
-        assert level in ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
-    except:
-        raise NotImplementedError
     locs = op.region_of_interest
     n = len(locs)
     assert n > 0
-    label = '{:s}_{:d}'.format(level, n)
-    if tag is not None:
-        label += '_' + tag
+    label = '_'.join([level, tag]) if tag is not None else level
     d = locs[0][2]
     for i in range(1, n):
         assert locs[i][2] == d
     D = 2*d
-    f = open(os.path.join(filepath, label + '_turbine.geo'), 'w+')
+    f = open(os.path.join(filepath, label + '.geo'), 'w+')
     if n < 3:
         f.write('W={:.1f};     // width of channel\n'.format(op.domain_width))
         f.write('L={:.1f};      // length of channel\n'.format(op.domain_length))
@@ -44,15 +38,17 @@ def generate_geo_file(op, level='coarse', tag=None, filepath='.'):
         elif level == 'fine':
             dx1 = 5.
             dx2 = 1.
-        else:
+        elif level == 'xfine':
             dx1 = 2.5
             dx2 = 0.5
+        else:
+            raise ValueError("Mesh resolution level '{:s}' not recognised.".format(label))
     elif n == 15:
         f.write('W={:.1f};     // width of channel\n'.format(op.domain_width))
         f.write('L={:.1f};      // length of channel\n'.format(op.domain_length))
-        raise NotImplementedError
+        raise NotImplementedError  # FIXME
     else:
-        raise NotImplementedError
+        raise NotImplementedError("Only cases with 1, 2 or 15 turbines currently considered.")
     f.write('D=%.1f;     // turbine diameter\n' % D)
     f.write('dx1=%.1f;   // outer resolution\n' % dx1)
     f.write('dx2=%.1f;   // inner resolution\n' % dx2)

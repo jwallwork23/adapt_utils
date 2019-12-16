@@ -1,21 +1,13 @@
 from thetis import *
 from firedrake.petsc import PETSc
-from adapt_utils.turbine.options import *
+from adapt_utils.test_cases.steady_turbine.options import *
 from adapt_utils.turbine.solver import *
 
 offset = False
-init_mesh = 'xcoarse'
 level = 5
-num_turbines = 2
-
-if offset:
-    filename = '_'.join([init_mesh, str(num_turbines), 'offset', 'turbine.msh'])
-else:
-    filename = '_'.join([init_mesh, str(num_turbines), 'turbine.msh'])
-mesh = Mesh(filename)
-mh = MeshHierarchy(mesh, level)
 
 op = Steady2TurbineOffsetOptions() if offset else Steady2TurbineOptions()
+mh = MeshHierarchy(op.default_mesh, level)
 op.family = 'dg-cg'
 
 tp = SteadyTurbineProblem(mesh=mh[level], op=op)

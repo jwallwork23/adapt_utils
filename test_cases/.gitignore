@@ -1,5 +1,5 @@
-2turbine/outputs
-15turbine/outputs
+steady_turbine/outputs
+unsteady_turbine/outputs
 point_discharge2d/outputs
 point_discharge3d/outputs
 inundated_beach/outputs

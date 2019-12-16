@@ -69,7 +69,7 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
 class UnsteadyTurbineProblem(UnsteadyProblem):
     # TODO: doc
     def __init__(self,
-                 op=Unsteady2TurbineOptions(),
+                 op=UnsteadyTurbineOptions(),
                  mesh=None,
                  discrete_adjoint=True):
         if op.family == 'dg-dg' and op.degree in (1, 2):
