@@ -4,6 +4,9 @@ from thetis.configuration import *
 from adapt_utils.turbine.options import SteadyTurbineOptions
 
 
+__all__ = ["Steady2TurbineOptions", "Steady2TurbineOffsetOptions"]
+
+
 class Steady2TurbineOptions(SteadyTurbineOptions):
     """Parameters for the steady 2 turbine problem"""
 

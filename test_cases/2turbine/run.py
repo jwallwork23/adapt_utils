@@ -1,5 +1,5 @@
 from thetis import *
-from adapt_utils.turbine.options import *
+from adapt_utils.test_cases.2turbine.options import *
 from adapt_utils.turbine.solver import SteadyTurbineProblem
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
