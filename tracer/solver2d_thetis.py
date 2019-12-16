@@ -27,7 +27,7 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
     """
     # TODO: update to new framework
     def __init__(self,
-                 op=PowerOptions(),
+                 op=TracerOptions(),
                  stab=None,
                  mesh=None,
                  discrete_adjoint=False,

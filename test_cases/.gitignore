@@ -4,6 +4,9 @@ steady_turbine/__pycache__/
 unsteady_turbine/outputs/
 unsteady_turbine/screenshots/
 unsteady_turbine/__pycache__/
+box_discharge2d/outputs/
+box_discharge2d/screenshots/
+box_discharge2d/__pycache__/
 point_discharge2d/outputs/
 point_discharge2d/screenshots/
 point_discharge2d/__pycache__/
