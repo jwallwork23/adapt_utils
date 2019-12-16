@@ -471,6 +471,9 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         # Set ICs
         self.solution = Function(self.V)
         self.solution.assign(op.set_initial_condition(self.V))
+        if op.plot_pvd:
+            u, eta = self.solution.split()
+            File(os.path.join(op.di, 'init.pvd')).write(u, eta)
 
         # Gravitational constant
         physical_constants['g_grav'].assign(op.g)
