@@ -1,5 +1,6 @@
 from thetis import *
 from thetis.configuration import *
+import os
 
 from adapt_utils.turbine.options import UnsteadyTurbineOptions
 
@@ -7,49 +8,73 @@ from adapt_utils.turbine.options import UnsteadyTurbineOptions
 __all__ = ["Unsteady15TurbineOptions"]
 
 
-# TODO: Bring up to date
 class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
-    """Parameters for the unsteady 15 turbine problem"""
+    """Parameters for the unsteady 15 turbine array test case"""
 
     # Turbine parameters
     turbine_diameter = PositiveFloat(20.).tag(config=True)
     thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
-    base_viscosity = NonNegativeFloat(3., help="Fluid viscosity (assumed constant).").tag(config=True)
-    depth = PositiveFloat(50., help="Water depth (assumes flat bathymetry).").tag(config=True)
+    mesh_path = Unicode('channel.msh').tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
-        super(Unsteady15TurbineOptions, self).__init__(approach)
-        self.default_mesh = RectangleMesh(150, 50, 3000., 1000.)    # FIXME: wrong ids
-        self.default_mesh.coordinates.dat.data[:] -= [1500., 500.]  # FIXME: not parallel
-        self.h_max = 100
+        self.base_viscosity = 3.0
+        super(Steady2TurbineOptions, self).__init__(approach)
+        self.domain_length = 3000.0
+        self.domain_width = 1000.0
+        if os.path.exists(self.mesh_path):
+            self.default_mesh = Mesh(self.mesh_path)
+        self.bathymetry.assign(50.0)
+
+        # Timestepping
+        self.dt = 3.0
+        self.T_tide = 1.24*3600.0
+        self.T_ramp = 1.0*self.T_tide
+        self.end_time = self.T_ramp + 2.0*self.T_tide
+        self.dt_per_export = 10
+        self.dt_per_remesh = 10  # FIXME: solver seems to go out of sync if this != dt_per_export
 
         # Tidal farm
         D = self.turbine_diameter
-        delta_x = 10*D
-        delta_y = 7.5*D
-        for i in [-2, -1, 0, 1, 2]:
-            for j in [-1, 0, 1]:
-                self.region_of_interest.append((i*delta_x, j*delta_y, D/2))
+        L = self.domain_length
+        W = self.domain_width
+        self.turbine_tags = range(2, 17):
+        self.region_of_interest = [(L/2-8*D, W/2, D/2), (L/2+8*D, W/2, D/2)]  # FIXME
         self.thrust_coefficient_correction()
 
+        # Boundary forcing
+        self.max_depth = 50.0
+        self.omega = 2*pi/self.T_tide
+
+        # Solver parameters and discretisation
+        self.lax_friedrichs = False  # TODO: temp
+        self.family = 'dg-cg'
+
+    def set_viscosity(self, fs):
+        sponge = False
+        self.viscosity = Function(fs)
+        if sponge:
+            x, y = SpatialCoordinate(fs.mesh())
+            xmin = 0.0
+            xmax = 1000.0
+            ramp = 0.5
+            eps = 20.0
+            self.viscosity.interpolate(self.base_viscosity + exp(ramp*(x-xmax+eps)))
+        else:
+            self.viscosity.assign(self.base_viscosity)
+
+    def set_bcs(self, fs):
+        self.set_boundary_surface(fs.sub()[1])
+        inflow_tag = 4
+        outflow_tag = 2
+        if not hasattr(self, 'boundary_conditions'):
+            self.boundary_conditions = {}
+        self.boundary_conditions[inflow_tag] = {'elev': self.elev_in}
+        self.boundary_conditions[outflow_tag] = {'elev': self.elev_out}
+        return self.boundary_conditions
+
     def set_initial_condition(self, fs):
+        self.initial_condition = Function(fs)
+        u, eta = self.initial_condition.split()
         x, y = SpatialCoordinate(fs.mesh())
-        q_init = Function(fs)
-        self.uv_init, self.elev_init = q_init.split()
-        self.uv_init.interpolate(as_vector([1e-8, 0.]))
-        self.elev_init.interpolate(-1/3000*x)  # linear from -1 to 1
-        return q_init
-
-    def set_bcs(self):  # TODO: standardise with other Options classes
-        bottom_tag = 1
-        right_tag = 2
-        top_tag = 3
-        left_tag = 4
-        freeslip_bc = {'un': Constant(0.)}
-        self.boundary_conditions = {
-          left_tag: {'elev': self.elev_in},
-          right_tag: {'elev': self.elev_out},
-          top_tag: freeslip_bc,
-          bottom_tag: freeslip_bc,
-        }
-
+        u.assign(as_vector([1e-8, 0.0]))
+        eta.interpolate(-1/3000*x)

@@ -75,27 +75,10 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         pass
 
 
-# TODO: bring up to date
 class UnsteadyTurbineOptions(SteadyTurbineOptions):
     def __init__(self, approach='fixed_mesh'):
         super(UnsteadyTurbineOptions, self).__init__(approach)
-
-        # Time period and discretisation
-        self.dt = 3
         self.timestepper = 'CrankNicolson'
-        self.T_tide = 1.24*3600
-        self.T_ramp = 1*self.T_tide
-        self.end_time = self.T_ramp+2*self.T_tide
-        self.dt_per_export = 10
-        self.dt_per_remesh = 10  # FIXME: solver seems to go out of sync if this != dt_per_export
-
-        # Boundary forcing
-        self.hmax = 0.5
-        self.omega = 2*pi/self.T_tide
-
-        # Turbines
-        self.base_viscosity = 3.
-        self.thrust_coefficient = 7.6
 
     def set_boundary_surface(self, fs):
         self.elev_in = Function(fs)

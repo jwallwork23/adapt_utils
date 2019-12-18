@@ -475,13 +475,25 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             u, eta = self.solution.split()
             File(os.path.join(op.di, 'init.pvd')).write(u, eta)
 
-        # Gravitational constant
+        # Physical fields
+        self.set_fields()
         physical_constants['g_grav'].assign(op.g)
 
+        # Parameters for adjoint computation
+        self.gradient_field = self.op.bathymetry
+        z, zeta = self.adjoint_solution.split()
+        z.rename("Adjoint fluid velocity")
+        zeta.rename("Adjoint elevation")
+
+    def set_fields(self):
+        self.viscosity = self.op.set_viscosity(self.P1)
+        self.drag_coefficient = Constant(self.op.drag_coefficient)
+        self.op.set_boundary_surface(self.V.sub(1))
 
     def solve_step(self, **kwargs):
+        self.set_fields()
         op = self.op
-        solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
         options = solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
@@ -491,8 +503,9 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end - 0.5*op.dt
         options.timestepper_type = op.timestepper
-        # options.timestepper_options.solver_parameters = op.params
+        options.timestepper_options.solver_parameters = op.params
         # PETSc.Sys.Print(options.timestepper_options.solver_parameters)
+        # options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs
         options.output_directory = self.di
@@ -507,26 +520,112 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.horizontal_viscosity = op.viscosity
         options.quadratic_drag_coefficient = op.drag_coefficient
         options.coriolis_frequency = op.set_coriolis(self.P1)
-        options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
+        options.use_lax_friedrichs_velocity = op.lax_friedrichs
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
 
         # Boundary conditions
-        solver_obj.bnd_functions['shallow_water'] = op.set_bcs()
+        self.solver_obj.bnd_functions['shallow_water'] = op.set_bcs()
+        update_forcings = self.get_update_forcings()
+
+        if hasattr(self, 'extra_setup'):
+            self.extra_setup()
 
         # Initial conditions
         uv, elev = self.solution.split()
-        solver_obj.assign_initial_conditions(uv=uv, elev=elev)
+        self.solver_obj.assign_initial_conditions(uv=uv, elev=elev)
 
         # Ensure correct iteration count
-        solver_obj.i_export = self.remesh_step
-        solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
-        solver_obj.iteration = self.remesh_step*op.dt_per_remesh
-        solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
+        self.solver_obj.i_export = self.remesh_step
+        self.solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
+        self.solver_obj.iteration = self.remesh_step*op.dt_per_remesh
+        self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
         for e in solver_obj.exporters.values():
-            e.set_next_export_ix(solver_obj.i_export)
+            e.set_next_export_ix(self.solver_obj.i_export)
 
         # Solve
-        solver_obj.iterate()
-        self.solution.assign(solver_obj.fields.solution_2d)
-        self.ts = solver_obj.timestepper
+        self.solver_obj.iterate(update_forcings=update_forcings)
+        self.solution.assign(self.solver_obj.fields.solution_2d)
+        self.ts = self.solver_obj.timestepper
+
+    def get_update_forcings(self):
+        pass
+
+    def get_qoi_kernel(self):
+        pass
+
+    def quantity_of_interest(self):
+        pass
+
+    def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
+        field = self.op.adapt_field
+        sol = self.adjoint_solution if adjoint else self.solution
+        u, eta = sol.split()
+
+        def elevation():
+            return steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
+
+        def velocity_x():
+            s = Function(self.P1).interpolate(u[0])
+            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+
+        def velocity_y():
+            s = Function(self.P1).interpolate(u[1])
+            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+
+        def speed():
+            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
+            return steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
+
+        def inflow():
+            v = Function(self.P1).interpolate(inner(u, self.op.inflow))
+            return steady_metric(v, noscale=noscale, degree=degree, op=self.op)
+
+        def bathymetry():
+            b = Function(self.P1).interpolate(self.op.bathymetry)
+            return steady_metric(b, noscale=noscale, degree=degree, op=self.op)
+
+        def viscosity():
+            nu = Function(self.P1).interpolate(self.op.viscosity)
+            return steady_metric(nu, noscale=noscale, degree=degree, op=self.op)
+
+        metrics = {'elevation': elevation, 'velocity_x': velocity_x, 'velocity_y': velocity_y,
+                   'speed': speed, 'inflow': inflow,
+                   'bathymetry': bathymetry, 'viscosity': viscosity}
+
+        self.M = Function(self.P1_ten)
+        if field in metrics:
+            self.M = metrics[field]()
+        elif field == 'all_avg':
+            self.M += metrics['velocity_x']()/3.0
+            self.M += metrics['velocity_y']()/3.0
+            self.M += metrics['elevation']()/3.0
+        elif field == 'all_int':
+            self.M = metric_intersection(metrics['velocity_x'](), metrics['velocity_y']())
+            self.M = metric_intersection(self.M, metrics['elevation']())
+        elif 'avg' in field and 'int' in field:
+            raise NotImplementedError  # TODO
+        elif 'avg' in field:
+            fields = field.split('_avg_')
+            num_fields = len(fields)
+            for i in range(num_fields):
+                self.M += metrics[fields[i]]()/num_fields
+        elif 'int' in field:
+            fields = field.split('_int_')
+            self.M = metrics[fields[0]]()
+            for i in range(1, len(fields)):
+                self.M = metric_intersection(self.M, metrics[fields[i]]())
+        else:
+            raise ValueError("Adaptation field {:s} not recognised.".format(field))
+
+    def custom_adapt(self):
+        if self.approach == 'vorticity':
+            self.indicator = Function(self.P1, name='vorticity')
+            self.indicator.interpolate(curl(self.solution.split()[0]))
+            self.get_isotropic_metric()
+
+    def interpolate_solution(self):
+        raise NotImplementedError  # TODO
+
+    def interpolate_adjoint_solution(self):
+        raise NotImplementedError  # TODO
