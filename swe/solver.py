@@ -70,7 +70,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.simulation_end_time = op.end_time
         options.timestepper_type = op.timestepper
         options.timestepper_options.solver_parameters = op.params
-        # PETSc.Sys.Print(options.timestepper_options.solver_parameters)
+        if op.debug:
+            PETSc.Sys.Print(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs
@@ -494,7 +495,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.set_fields()
         op = self.op
         self.solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
-        options = solver_obj.options
+        options = self.solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
 
@@ -503,8 +504,11 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end - 0.5*op.dt
         options.timestepper_type = op.timestepper
-        options.timestepper_options.solver_parameters = op.params
-        # PETSc.Sys.Print(options.timestepper_options.solver_parameters)
+        if op.params != {}:
+            options.timestepper_options.solver_parameters = op.params
+        if op.debug:
+            options.timestepper_options.solver_parameters['snes_monitor'] = None
+            PETSc.Sys.Print(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs
@@ -525,8 +529,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.use_automatic_sipg_parameter = True
 
         # Boundary conditions
-        self.solver_obj.bnd_functions['shallow_water'] = op.set_bcs()
-        update_forcings = self.get_update_forcings()
+        self.solver_obj.bnd_functions['shallow_water'] = op.set_bcs(self.V)
+        self.update_forcings = self.get_update_forcings()
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
@@ -540,13 +544,12 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
         self.solver_obj.iteration = self.remesh_step*op.dt_per_remesh
         self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
-        for e in solver_obj.exporters.values():
+        for e in self.solver_obj.exporters.values():
             e.set_next_export_ix(self.solver_obj.i_export)
 
         # Solve
-        self.solver_obj.iterate(update_forcings=update_forcings)
+        self.solver_obj.iterate(update_forcings=self.update_forcings)
         self.solution.assign(self.solver_obj.fields.solution_2d)
-        self.ts = self.solver_obj.timestepper
 
     def get_update_forcings(self):
         pass

@@ -42,9 +42,6 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
         H = self.op.bathymetry + eta
         return -self.C_D*sqrt(dot(u, u))*inner(z, u)/H
 
-    def get_callbacks(self, cb):
-        self.qoi = cb.average_power
-
     def get_qoi_kernel(self):
         self.kernel = Function(self.V)
         u = self.solution.split()[0]
@@ -52,6 +49,7 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
         k_u.interpolate(Constant(1/3)*self.turbine_density*sqrt(inner(u, u))*u)
 
     def quantity_of_interest(self):
+        self.qoi = self.cb.average_power
         return self.qoi
 
     def quantity_of_interest_form(self):
@@ -65,17 +63,14 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
 
 
 class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
-    # TODO: doc
-    def __init__(self,
-                 op=UnsteadyTurbineOptions(),
-                 mesh=None,
-                 discrete_adjoint=True):
-        super(UnsteadyTurbineProblem, self).__init__(mesh, op, element, discrete_adjoint)
-
+    """
+    General solver object for time-dependent tidal turbine problems.
+    """
     def get_update_forcings(self):
+        op = self.op
         def update_forcings(t):
-            op.elev_in.assign(op.hmax*cos(op.omega*(t-op.T_ramp)))
-            op.elev_out.assign(op.hmax*cos(op.omega*(t-op.T_ramp)+pi))
+            op.elev_in.assign(op.max_depth*cos(op.omega*(t-op.T_ramp)))
+            op.elev_out.assign(op.max_depth*cos(op.omega*(t-op.T_ramp)+pi))
         return update_forcings
 
     def extra_setup(self):
@@ -88,25 +83,22 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
             # We haven't meshed the turbines with separate ids, so define a farm everywhere
             # and make it have a density of 1/D^2 inside the DxD squares where the turbines are
             # and 0 outside
-            scaling = num_turbines/assemble(op.bump(self.P1)*dx)
-            self.turbine_density = op.bump(self.P1, scale=scaling)
+            self.turbine_density = Constant(1.0/(op.turbine_diameter*5), domain=self.mesh)
+            # scaling = num_turbines/assemble(op.bump(self.P1)*dx)  # FIXME
+            # self.turbine_density = op.bump(self.P1, scale=scaling)
             self.farm_options = TidalTurbineFarmOptions()
             self.farm_options.turbine_density = self.turbine_density
             self.farm_options.turbine_options.diameter = op.turbine_diameter
             self.farm_options.turbine_options.thrust_coefficient = op.thrust_coefficient
-            # Turbine drag is applied everywhere (where the turbine density isn't zero)
-            for i in range(op.turbine_tags):
+            for i in op.turbine_tags:
                 self.solver_obj.options.tidal_turbine_farms[i] = self.farm_options
 
             # Callback that computes average power
-            self.cb = turbines.TurbineFunctionalCallback(solver_obj)
-            self.solver_obj.add_callback(cb, 'timestep')
+            self.cb = turbines.TurbineFunctionalCallback(self.solver_obj)
+            self.solver_obj.add_callback(self.cb, 'timestep')
 
     def quantity_of_interest(self):
-        return self.qoi
-
-    def get_callbacks(self, cb):
-        self.qoi = cb.average_power
+        return self.cb.average_power
 
     def get_qoi_kernel(self):
         self.kernel = Function(self.V)
