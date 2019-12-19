@@ -10,6 +10,10 @@ __all__ = ["DefaultOptions"]
 class Options(FrozenConfigurable):
     name = 'Common parameters for mesh adaptive simulations'
 
+    # Outputs
+    debug = Bool(False, help="Toggle debugging mode for more verbose screen output.").tag(config=True)
+    plot_pvd = Bool(False, help="Toggle plotting of fields.").tag(config=True)
+
     # Adapt
     approach = Unicode('fixed_mesh', help="Mesh adaptive approach.").tag(config=True)
     num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
@@ -20,9 +24,6 @@ class Options(FrozenConfigurable):
 
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach.").tag(config=True)
-
-    # Plotting
-    plot_pvd = Bool(False, help="Toggle plotting of fields.").tag(config=True)
 
     # Metric
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
@@ -105,14 +106,23 @@ class Options(FrozenConfigurable):
         for j in range(len(locs)):
             x0 = locs[j][0]
             y0 = locs[j][1]
-            r = locs[j][2] if dim == 2 else locs[j][3]
+            r0 = locs[j][2] if dim == 2 else locs[j][3]
+            if dim == 2 and len(locs) == 4:
+                r1 = locs[j][3]
+            elif dim == 3 and len(locs) > 4:
+                r1 = locs[j][4]
+            else:
+                r1 = r0
             expr1 = (x-x0)*(x-x0) + (y-y0)*(y-y0)
-            expr2 = scale*exp(1 -1/(1 - (x-x0)*(x-x0)/r**2))*exp(1 - 1/(1 - (y-y0)*(y-y0)/r**2))
+            expr2 = scale*exp(1 -1/(1 - (x-x0)*(x-x0)/r0**2))*exp(1 - 1/(1 - (y-y0)*(y-y0)/r1**2))
+            vol = r0*r1
             if dim == 3:
                 z0 = locs[j][2]
+                r2 = r0 if len(locs) < 6 else locs[j][5]
                 expr1 += (z-z0)*(z-z0)
-                expr2 *= exp(1 - 1/(1 - (z-z0)*(z-z0)/r**2))
-            i += conditional(lt(expr1, r*r), expr2, 0)
+                expr2 *= exp(1 - 1/(1 - (z-z0)*(z-z0)/r2**2))
+                vol *= r2
+            i += conditional(lt(expr1, vol), expr2, 0)
         bump = Function(fs)
         bump.interpolate(i)
         return bump
@@ -154,11 +164,18 @@ class Options(FrozenConfigurable):
         for j in range(len(locs)):
             x0 = locs[j][0]
             y0 = locs[j][1]
-            r = locs[j][2] if dim == 2 else locs[j][3]
-            expr = And(And(gt(x, x0-r), lt(x, x0+r)), And(gt(y, y0-r), lt(y, y0+r)))
+            r0 = locs[j][2] if dim == 2 else locs[j][3]
+            if dim == 2 and len(locs) == 4:
+                r1 = locs[j][3]
+            elif dim == 3 and len(locs) > 4:
+                r1 = locs[j][4]
+            else:
+                r1 = r0
+            expr = And(And(gt(x, x0-r0), lt(x, x0+r0)), And(gt(y, y0-r1), lt(y, y0+r1)))
             if dim == 3:
+                r2 = r0 if len(locs) < 6 else locs[j][5]
                 z0 = locs[j][2]
-                expr = And(expr, And(gt(z, z0-r), lt(z, z0+r)))
+                expr = And(expr, And(gt(z, z0-r2), lt(z, z0+r2)))
             b = expr if j == 0 else Or(b, expr)
         expr = conditional(b, scale, 0.)
         box = Function(fs)
