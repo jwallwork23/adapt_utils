@@ -69,8 +69,8 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
     def get_update_forcings(self):
         op = self.op
         def update_forcings(t):
-            op.elev_in.assign(op.max_depth*cos(op.omega*(t-op.T_ramp)))
-            op.elev_out.assign(op.max_depth*cos(op.omega*(t-op.T_ramp)+pi))
+            op.elev_in.assign(op.max_amplitude*cos(op.omega*(t-op.T_ramp)))
+            op.elev_out.assign(op.max_amplitude*cos(op.omega*(t-op.T_ramp)+pi))
         return update_forcings
 
     def extra_setup(self):
@@ -98,7 +98,8 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
             self.solver_obj.add_callback(self.cb, 'timestep')
 
     def quantity_of_interest(self):
-        return self.cb.average_power
+        self.qoi = self.cb.average_power
+        return self.qoi
 
     def get_qoi_kernel(self):
         self.kernel = Function(self.V)

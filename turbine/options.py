@@ -36,13 +36,14 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     # Solver parameters
     params = PETScSolverParameters(default_params).tag(config=True)
     adjoint_params = PETScSolverParameters(default_adjoint_params).tag(config=True)
+    max_depth = PositiveFloat(40.0).tag(config=True)
 
     def __init__(self, approach='fixed_mesh', num_iterations=1):
         super(SteadyTurbineOptions, self).__init__(approach)
         self.timestepper = 'SteadyState'
         self.dt = 20.
         self.end_time = num_iterations*self.dt - 0.2
-        self.bathymetry = Constant(40.0)
+        self.bathymetry = Constant(self.max_depth)
         self.viscosity = Constant(self.base_viscosity)
         self.lax_friedrichs = True
         self.drag_coefficient = Constant(0.0025)
@@ -67,7 +68,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         """
         D = self.turbine_diameter
         A_T = pi*(D/2)**2
-        correction = 4/(1+sqrt(1-A_T/(40.*D)))**2
+        correction = 4/(1+sqrt(1-A_T/(self.max_depth*D)))**2
         self.thrust_coefficient *= correction
         # NOTE: We're not yet correcting power output here, so that will be overestimated
 

@@ -23,4 +23,4 @@ op.end_time = op.dt_per_export*op.dt  # TODO: temporary
 
 tp = UnsteadyTurbineProblem(op=op)
 tp.solve()
-print("Total power output of array: {:.1f}kW".format(tp.quantity_of_interest()))
+print("Total power output of array: {:.1f}W".format(tp.quantity_of_interest()))
