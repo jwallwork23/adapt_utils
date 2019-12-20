@@ -6,6 +6,17 @@ from adapt_utils.turbine.options import *
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.metric import *
 
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import rc
+import h5py
+import os
+
+rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('text', usetex=True)
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
+
 
 __all__ = ["SteadyTurbineProblem", "UnsteadyTurbineProblem"]
 
@@ -106,3 +117,32 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
         u = self.solution.split()[0]
         k_u = self.kernel.split()[0]
         k_u.interpolate(Constant(1/3)*self.turbine_density*sqrt(inner(u, u))*u)
+
+    def plot_power_timeseries(self, fontsize=18):
+        dat = h5py.File(os.path.join(self.op.di, 'diagnostic_turbine.hdf5'))
+        time_period = np.array(dat['time'])
+        power = np.array(dat['current_power']).transpose()
+        dat.close()
+        total_power = np.sum(power, axis=0)
+        num_turbines = power.shape[0]
+        fig = plt.figure(figsize=(12, 7))
+        ax = plt.subplot(111)
+        for i in range(num_turbines):
+            ax.plot(time_period, power[i], label='Turbine {:d}'.format(i+1), marker='x')
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        plt.xlabel(r'Time ($\mathrm s$)', fontsize=fontsize)
+        plt.ylabel(r'Power ($\mathrm W$)', fontsize=fontsize)
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=fontsize)
+        plt.savefig(os.path.join(self.op.di, 'power_timeseries.pdf'))
+        plt.title('Power output timeseries of turbines in a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
+        plt.savefig(os.path.join(self.op.di, 'power_timeseries.png'))
+        fig = plt.figure()
+        ax = plt.subplot(111)
+        ax.plot(time_period, total_power, marker='x')
+        plt.xlabel(r'Time ($\mathrm s$)', fontsize=fontsize)
+        plt.ylabel(r'Power ($\mathrm W$)', fontsize=fontsize)
+        plt.savefig(os.path.join(self.op.di, 'total_power_timeseries.pdf'))
+        plt.title('Total power output timeseries of a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
+        plt.savefig(os.path.join(self.op.di, 'total_power_timeseries.png'))
+        plt.show()

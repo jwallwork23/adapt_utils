@@ -36,14 +36,13 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     # Solver parameters
     params = PETScSolverParameters(default_params).tag(config=True)
     adjoint_params = PETScSolverParameters(default_adjoint_params).tag(config=True)
-    max_depth = PositiveFloat(40.0).tag(config=True)
 
     def __init__(self, approach='fixed_mesh', num_iterations=1):
         super(SteadyTurbineOptions, self).__init__(approach)
         self.timestepper = 'SteadyState'
         self.dt = 20.
         self.end_time = num_iterations*self.dt - 0.2
-        self.bathymetry = Constant(self.max_depth)
+        self.bathymetry = Constant(40.0)
         self.viscosity = Constant(self.base_viscosity)
         self.lax_friedrichs = True
         self.drag_coefficient = Constant(0.0025)
@@ -60,12 +59,23 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.inflow = Function(fs).interpolate(as_vector([3., 0.]))
         return self.inflow
 
+    def get_max_depth(self):
+        assert hasattr(self, 'bathymetry')
+        if isinstance(self.bathymetry, Constant):
+            self.max_depth = self.bathymetry.values()[0]
+        elif isinstance(self.bathymetry, Function):
+            self.max_depth = self.bathymetry.vector().gather().max()
+        else:
+            raise ValueError("Bathymetry format cannot be understood.")
+
     def thrust_coefficient_correction(self):
         """
         Correction to account for the fact that the thrust coefficient is based on an upstream
         velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
         Piggott 2016, eq. (15))
         """
+        if not hasattr(self, 'max_depth'):
+            self.get_max_depth()
         D = self.turbine_diameter
         A_T = pi*(D/2)**2
         correction = 4/(1+sqrt(1-A_T/(self.max_depth*D)))**2

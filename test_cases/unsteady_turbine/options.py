@@ -30,9 +30,8 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
             os.path.exists(self.meshfile)
         except ValueError:
             raise ValueError("Mesh fine not generated.")
-        self.max_depth = 50.0
         self.default_mesh = Mesh(self.meshfile)
-        self.bathymetry.assign(self.max_depth)
+        self.bathymetry.assign(50.0)
 
         # Timestepping
         self.dt = 3.0

@@ -9,12 +9,14 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-approach", help="Mesh adaptation strategy")
 parser.add_argument("-debug", help="Activate debugging mode for more verbose output to screen")
+parser.add_argument("-just_plot")
 args = parser.parse_args()
 
 if args.debug is not None and bool(args.debug):
     set_log_level(DEBUG)
 
 approach = 'fixed_mesh' if args.approach is None else args.approach
+just_plot = False if args.just_plot is None else bool(args.just_plot)
 
 op = Unsteady15TurbineOptions(approach=approach)
 op.plot_pvd = True
@@ -22,5 +24,7 @@ op.plot_pvd = True
 op.end_time = op.dt_per_export*op.dt  # TODO: temporary
 
 tp = UnsteadyTurbineProblem(op=op)
-tp.solve()
-print("Total power output of array: {:.1f}W".format(tp.quantity_of_interest()))
+if not just_plot:
+    tp.solve()
+    print("Total power output of array: {:.1f}W".format(tp.quantity_of_interest()))
+tp.plot_power_timeseries()
