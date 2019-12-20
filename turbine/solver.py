@@ -127,11 +127,13 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
         num_turbines = power.shape[0]
         fig = plt.figure(figsize=(12, 7))
         ax = plt.subplot(111)
+        array_width = self.op.array_width
         for i in range(num_turbines):
-            col = (i-i%3)//3
-            row = i%3
-            label = 'Turbine {:d}{:s}'.format(col+1, ['(a)', '(b)', '(c)'][row])
-            colour = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple'][col]
+            col = (i-i%array_width)//array_width
+            row = i%array_width
+            label = 'Turbine {:d}({:s})'.format(col+1, chr(97+row))
+            colour = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
+                      'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'][col]
             marker = ['x', 'o', '+'][row]
             ax.plot(time_period, power[i], label=label, marker=marker, color=colour)
         box = ax.get_position()
@@ -140,7 +142,7 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
         plt.ylabel(r'Power ($\mathrm{kW}$)', fontsize=fontsize)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'power_timeseries.pdf'))
-        plt.title('Power output timeseries of turbines in a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
+        plt.title('Power output of turbines in a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'power_timeseries.png'))
         fig = plt.figure()
         ax = plt.subplot(111)
@@ -148,6 +150,6 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
         plt.xlabel(r'Time ($\mathrm s$)', fontsize=fontsize)
         plt.ylabel(r'Power ($\mathrm{kW}$)', fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'total_power_timeseries.pdf'))
-        plt.title('Total power output timeseries of a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
+        plt.title('Total power output of a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'total_power_timeseries.png'))
         plt.show()

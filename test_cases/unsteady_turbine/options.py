@@ -17,6 +17,8 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
     # Turbine parameters
     turbine_length = PositiveFloat(20.0).tag(config=True)
     turbine_width = PositiveFloat(5.0).tag(config=True)
+    array_length = PositiveInteger(5).tag(config=True)
+    array_width = PositiveInteger(3).tag(config=True)
     thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
     meshfile = Unicode(os.path.join(rootdir, 'test_cases', 'unsteady_turbine', 'channel.msh')).tag(config=True)
     params = PETScSolverParameters({}).tag(config=True)  # TODO
