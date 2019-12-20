@@ -20,9 +20,10 @@ just_plot = False if args.just_plot is None else bool(args.just_plot)
 
 op = Unsteady15TurbineOptions(approach=approach)
 op.plot_pvd = True
-op.end_time = 300.0  # TODO: temp
+op.save_hdf5 = True
+op.end_time = 60.0  # TODO: temp
 
-tp = UnsteadyTurbineProblem(op=op)
+tp = UnsteadyTurbineProblem(op=op, load_index=1)
 if not just_plot:
     tp.solve()
     print("Total power output of array: {:.1f}W".format(tp.quantity_of_interest()))

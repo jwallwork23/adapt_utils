@@ -121,13 +121,31 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
     def plot_power_timeseries(self, fontsize=18):
         dat = h5py.File(os.path.join(self.op.di, 'diagnostic_turbine.hdf5'))
         time_period = np.array(dat['time'])
-        power = np.array(dat['current_power']).transpose()/1000.0
+        if time_period[-1] < 60.0*5:
+            time_units = '$\mathrm s$'
+        elif time_period[-1] < 3600.0*5:
+            time_units = 'minutes'
+            time_period /= 60.0
+        else:
+            time_units = 'hours'
+            time_period /= 3600.0
+        power = np.array(dat['current_power']).transpose()
         dat.close()
+        max_power = power.max()
+        if max_power < 5e3:
+            power_units = '$\mathrm W$'
+        elif max_power < 5e6:
+            power_units = '$\mathrm{kW}$'
+            power /= 1e3
+        else:
+            power_units = '$\mathrm{MW}$'
+            power /= 1e6
         total_power = np.sum(power, axis=0)
         num_turbines = power.shape[0]
         fig = plt.figure(figsize=(12, 7))
         ax = plt.subplot(111)
         array_width = self.op.array_width
+        n = self.op.dt_per_export
         for i in range(num_turbines):
             col = (i-i%array_width)//array_width
             row = i%array_width
@@ -135,20 +153,20 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
             colour = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
                       'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'][col]
             marker = ['x', 'o', '+'][row]
-            ax.plot(time_period, power[i], label=label, marker=marker, color=colour)
+            ax.plot(time_period[::n], power[i][::n], label=label, marker=marker, color=colour)
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-        plt.xlabel(r'Time ($\mathrm s$)', fontsize=fontsize)
-        plt.ylabel(r'Power ($\mathrm{kW}$)', fontsize=fontsize)
+        plt.xlabel(r'Time ({:s})'.format(time_units), fontsize=fontsize)
+        plt.ylabel(r'Power ({:s})'.format(power_units), fontsize=fontsize)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'power_timeseries.pdf'))
         plt.title('Power output of turbines in a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'power_timeseries.png'))
         fig = plt.figure()
         ax = plt.subplot(111)
-        ax.plot(time_period, total_power, marker='x')
-        plt.xlabel(r'Time ($\mathrm s$)', fontsize=fontsize)
-        plt.ylabel(r'Power ($\mathrm{kW}$)', fontsize=fontsize)
+        ax.plot(time_period[::n], total_power[::n], marker='x')
+        plt.xlabel(r'Time ({:s})'.format(time_units), fontsize=fontsize)
+        plt.ylabel(r'Power ({:s})'.format(power_units), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'total_power_timeseries.pdf'))
         plt.title('Total power output of a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'total_power_timeseries.png'))

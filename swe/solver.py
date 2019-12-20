@@ -76,7 +76,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         # Outputs
         options.output_directory = self.di
-        options.fields_to_export = ['uv_2d', 'elev_2d']
+        options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
+        options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []
 
         # Parameters
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
@@ -447,8 +448,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
 
 class UnsteadyShallowWaterProblem(UnsteadyProblem):
-    # TODO: doc
-    def __init__(self, op, mesh=None, discrete_adjoint=True):
+    """
+    General solver object for time-dependent shallow water problems.
+    """
+    def __init__(self, op, mesh=None, discrete_adjoint=True, load_index=0):
         if op.family == 'dg-dg' and op.degree in (1, 2):
             element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
         elif op.family == 'dg-cg':
@@ -457,6 +460,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             raise NotImplementedError
         if mesh is None:
             mesh = op.default_mesh
+        self.load_index = load_index
         super(UnsteadyShallowWaterProblem, self).__init__(mesh, op, element, discrete_adjoint)
 
         # Stabilisation
@@ -513,10 +517,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
         # Outputs
         options.output_directory = self.di
-        if op.plot_pvd:
-            options.fields_to_export = ['uv_2d', 'elev_2d']
-        else:
-            options.no_exports = True
+        options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
+        options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []
 
         # Parameters
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
@@ -536,16 +538,21 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             self.extra_setup()
 
         # Initial conditions
-        uv, elev = self.solution.split()
-        self.solver_obj.assign_initial_conditions(uv=uv, elev=elev)
+        if self.load_index > 0:
+            self.solver_obj.load_state(self.load_index)
 
-        # Ensure correct iteration count
-        self.solver_obj.i_export = self.remesh_step
-        self.solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
-        self.solver_obj.iteration = self.remesh_step*op.dt_per_remesh
-        self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
-        for e in self.solver_obj.exporters.values():
-            e.set_next_export_ix(self.solver_obj.i_export)
+            # TODO: Adaptive case. Will need to save mesh.
+        else:
+            uv, elev = self.solution.split()
+            self.solver_obj.assign_initial_conditions(uv=uv, elev=elev)
+
+            # Ensure correct iteration count
+            self.solver_obj.i_export = self.remesh_step
+            self.solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
+            self.solver_obj.iteration = self.remesh_step*op.dt_per_remesh
+            self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
+            for e in self.solver_obj.exporters.values():
+                e.set_next_export_ix(self.solver_obj.i_export)
 
         # Solve
         self.solver_obj.iterate(update_forcings=self.update_forcings)
