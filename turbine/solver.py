@@ -105,7 +105,7 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
                 self.solver_obj.options.tidal_turbine_farms[i] = self.farm_options
 
             # Callback that computes average power
-            self.cb = turbines.TurbineFunctionalCallback(self.solver_obj)
+            self.cb = turbines.TurbineFunctionalCallback(self.solver_obj, print_to_screen=False)
             self.solver_obj.add_callback(self.cb, 'timestep')
 
     def quantity_of_interest(self):
@@ -121,18 +121,23 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
     def plot_power_timeseries(self, fontsize=18):
         dat = h5py.File(os.path.join(self.op.di, 'diagnostic_turbine.hdf5'))
         time_period = np.array(dat['time'])
-        power = np.array(dat['current_power']).transpose()
+        power = np.array(dat['current_power']).transpose()/1000.0
         dat.close()
         total_power = np.sum(power, axis=0)
         num_turbines = power.shape[0]
         fig = plt.figure(figsize=(12, 7))
         ax = plt.subplot(111)
         for i in range(num_turbines):
-            ax.plot(time_period, power[i], label='Turbine {:d}'.format(i+1), marker='x')
+            col = (i-i%3)//3
+            row = i%3
+            label = 'Turbine {:d}{:s}'.format(col+1, ['(a)', '(b)', '(c)'][row])
+            colour = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple'][col]
+            marker = ['x', 'o', '+'][row]
+            ax.plot(time_period, power[i], label=label, marker=marker, color=colour)
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         plt.xlabel(r'Time ($\mathrm s$)', fontsize=fontsize)
-        plt.ylabel(r'Power ($\mathrm W$)', fontsize=fontsize)
+        plt.ylabel(r'Power ($\mathrm{kW}$)', fontsize=fontsize)
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'power_timeseries.pdf'))
         plt.title('Power output timeseries of turbines in a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
@@ -141,7 +146,7 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
         ax = plt.subplot(111)
         ax.plot(time_period, total_power, marker='x')
         plt.xlabel(r'Time ($\mathrm s$)', fontsize=fontsize)
-        plt.ylabel(r'Power ($\mathrm W$)', fontsize=fontsize)
+        plt.ylabel(r'Power ($\mathrm{kW}$)', fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'total_power_timeseries.pdf'))
         plt.title('Total power output timeseries of a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'total_power_timeseries.png'))

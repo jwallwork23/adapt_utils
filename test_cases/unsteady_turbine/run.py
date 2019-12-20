@@ -20,8 +20,7 @@ just_plot = False if args.just_plot is None else bool(args.just_plot)
 
 op = Unsteady15TurbineOptions(approach=approach)
 op.plot_pvd = True
-
-op.end_time = op.dt_per_export*op.dt  # TODO: temporary
+op.end_time = 300.0  # TODO: temp
 
 tp = UnsteadyTurbineProblem(op=op)
 if not just_plot:
