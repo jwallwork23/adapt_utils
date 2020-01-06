@@ -153,17 +153,22 @@ class SteadyProblem():
             self.indicator.rename(' '.join([name, 'indicator']))
             File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator)
 
-    def dwr_indication(self):
+    def dwr_indication(self, adjoint=False):
         """
         Indicate errors in the quantity of interest by the Dual Weighted Residual method. This is
         inherently problem-dependent.
 
         The resulting P0 field should be stored as `self.indicator`.
         """
-        pass
-
-    def dwr_indication_adjoint(self):
-        pass
+        label = 'dwr'
+        if adjoint:
+            label += '_adjoint'
+        self.get_strong_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
+        self.get_flux_terms(self.solution, self.adjoint_solution, adjoint=adjoint)
+        self.indicator = Function(self.P1, name=label)
+        self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
+        self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
+        self.indicators[label] = self.indicator
 
     def get_hessian(self, adjoint=False):
         """
@@ -277,34 +282,34 @@ class SteadyProblem():
             self.dwr_indication()
             self.get_isotropic_metric()
         elif self.approach == 'dwr_adjoint':
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.get_isotropic_metric()
         elif self.approach == 'dwr_both':
             self.dwr_indication()
             self.get_isotropic_metric()
             i = self.p1indicator.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.p1indicator.interpolate(Constant(0.5)*(i+self.p1indicator))
             self.get_isotropic_metric()
         elif self.approach == 'dwr_averaged':
             self.dwr_indication()
             self.get_isotropic_metric()
             i = self.p1indicator.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.p1indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.p1indicator)))
             self.get_isotropic_metric()
         elif self.approach == 'dwr_relaxed':
             self.dwr_indication()
             self.get_isotropic_metric()
             M = self.M.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.get_isotropic_metric()
             self.M = metric_relaxation(M, self.M)
         elif self.approach == 'dwr_superposed':
             self.dwr_indication()
             self.get_isotropic_metric()
             M = self.M.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.get_isotropic_metric()
             self.M = metric_intersection(M, self.M)
         elif self.approach == 'loseille':
@@ -342,14 +347,14 @@ class SteadyProblem():
             amd.get_isotropic_metric()
             self.M = amd.p1metric
         elif self.approach == 'carpio_isotropic_adjoint':
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             amd = AnisotropicMetricDriver(self.mesh, indicator=self.indicator, op=self.op)
             amd.get_isotropic_metric()
             self.M = amd.p1metric
         elif self.approach == 'carpio_isotropic_both':
             self.dwr_indication()
             i = self.indicator.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             eta = Function(self.P0).interpolate(i + self.indicator)
             amd = AnisotropicMetricDriver(self.mesh, indicator=eta, op=self.op)
             amd.get_isotropic_metric()
@@ -361,7 +366,7 @@ class SteadyProblem():
             amd.get_anisotropic_metric()
             self.M = amd.p1metric
         elif self.approach == 'carpio_adjoint':
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.get_hessian_metric(noscale=True, degree=1, adjoint=True)
             amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
             amd.get_anisotropic_metric()
@@ -371,7 +376,7 @@ class SteadyProblem():
             i = self.indicator.copy()
             self.get_hessian_metric(noscale=False, degree=1)
             M = self.M.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.get_hessian_metric(noscale=False, degree=1, adjoint=True)
             self.indicator.interpolate(i + self.indicator)
             self.M = metric_intersection(self.M, M)
@@ -865,17 +870,14 @@ class UnsteadyProblem():
             self.indicator.rename(' '.join([self.approach, 'indicator']))
             self.indicator_file.write(self.indicator, t=self.remesh_step*self.op.dt)
 
-    def dwr_indication(self):
+    def dwr_indication(self, adjoint=False):
         """
         Indicate errors in the quantity of interest by the Dual Weighted Residual method. This is
         inherently problem-dependent.
 
         The resulting P0 field should be stored as `self.indicator`.
         """
-        pass
-
-    def dwr_indication_adjoint(self):
-        pass
+        pass  # TODO: Use steady format, but need to get adjoint sol
 
     def get_hessian(self, adjoint=False):
         """
@@ -994,34 +996,34 @@ class UnsteadyProblem():
             self.dwr_indication()
             self.get_isotropic_metric()
         elif self.approach == 'dwr_adjoint':
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.get_isotropic_metric()
         elif self.approach == 'dwr_both':
             self.dwr_indication()
             self.get_isotropic_metric()
             i = self.p1indicator.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.p1indicator.interpolate(Constant(0.5)*(i+self.p1indicator))
             self.get_isotropic_metric()
         elif self.approach == 'dwr_averaged':
             self.dwr_indication()
             self.get_isotropic_metric()
             i = self.p1indicator.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.p1indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.p1indicator)))
             self.get_isotropic_metric()
         elif self.approach == 'dwr_relaxed':
             self.dwr_indication()
             self.get_isotropic_metric()
             M = self.M.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.get_isotropic_metric()
             self.M = metric_relaxation(M, self.M)
         elif self.approach == 'dwr_superposed':
             self.dwr_indication()
             self.get_isotropic_metric()
             M = self.M.copy()
-            self.dwr_indication_adjoint()
+            self.dwr_indication(adjoint=True)
             self.get_isotropic_metric()
             self.M = metric_intersection(M, self.M)
         elif self.approach == 'loseille':

@@ -8,15 +8,15 @@ from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.p0_metric import *
-from adapt_utils.solver import SteadyProblem
+from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
 
-__all__ = ["SteadyTracerProblem2d"]
+__all__ = ["SteadyTracerProblem2d", "UnsteadyTracerProblem2d"]
 
 
 class SteadyTracerProblem2d(SteadyProblem):
     r"""
-    General continuous Galerkin solver object for 2D stationary tracer advection problems of the form
+    General solver object for 2D stationary tracer advection problems of the form
 
 ..  math::
     \textbf{u} \cdot \nabla(\phi) - \nabla \cdot (\nu \cdot \nabla(\phi)) = f,
@@ -24,9 +24,11 @@ class SteadyTracerProblem2d(SteadyProblem):
     for (prescribed) velocity :math:`\textbf{u}`, diffusivity :math:`\nu \geq 0`, source :math:`f`
     and (prognostic) concentration :math:`\phi`.
 
-    Implemented boundary conditions:
-        * Neumann zero;
-        * Dirichlet zero;
+    Defaults to P1 continuous Galerkin with SUPG stabilisation.
+
+    Implemented boundary condition types:
+        * Neumann;
+        * Dirichlet;
         * outflow.
     """
     def __init__(self,
@@ -40,6 +42,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Extract parameters from Options class
         self.nu = op.set_diffusivity(self.P1)
         self.u = op.set_velocity(self.P1_vec)
+        self.divergence_free = np.allclose(norm(div(self.u)), 0.0)
         self.source = op.set_source(self.P1)
         self.kernel = op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
@@ -47,7 +50,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Stabilisation
         if self.stab is None:
             self.stab = 'SUPG'
-        assert self.stab in ('no', 'SU', 'SUPG')
+        assert self.stab in ('no', 'SU', 'SUPG', 'lax_friedrichs')
         if self.stab in ('SU', 'SUPG'):
             #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
             self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
@@ -170,7 +173,7 @@ class SteadyTracerProblem2d(SteadyProblem):
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
 
-    def explicit_indication(self, square=True):
+    def explicit_indication(self):
         phi = self.solution
         i = self.p0test
         bcs = self.op.boundary_conditions
@@ -180,16 +183,16 @@ class SteadyTracerProblem2d(SteadyProblem):
         r = phi*dot(self.u, self.n) - self.nu*dot(self.n, nabla_grad(phi))
 
         # For use in anisotropic methods
-        self.cell_res = assemble(i*R*R*dx) if square else assemble(i*R*dx)
-        if not square:
-            self.p1cell_res = interpolate(R, self.P1)
+        self.cell_res = assemble(i*R*dx)
+        self.p1cell_res = interpolate(R, self.P1)
 
         # Solve auxiliary problem to assemble edge residual
         mass_term = i*self.p0trial*dx
-        flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS if square else ((i*r)('+') + (i*r)('-'))*dS
+        flux_terms = ((i*r)('+') + (i*r)('-'))*dS
         for j in bcs.keys():
-            if bcs[j] == 'neumann_zero':
-                flux_terms += i*r*r*ds(j) if square else i*r*ds(j)
+            if 'diff_flux' in bcs[j]:
+                assert np.allclose(bcs[j]['diff_flux'], 0.0)  # TODO: Nonzero case
+                flux_terms += i*r*ds(j)
         self.edge_res = Function(self.P0)
         solve(mass_term == flux_terms, self.edge_res)
 
@@ -202,7 +205,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.p0indicator.rename('explicit')
         self.p1indicator.rename('explicit')
 
-    def explicit_indication_adjoint(self, square=True):
+    def explicit_indication_adjoint(self):
         lam = self.adjoint_solution
         u = self.u
         nu = self.nu
@@ -212,19 +215,18 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         # Cell residual
         R = -div(u*lam) - div(nu*grad(lam))
-        self.cell_res_adjoint = assemble(i*R*R*dx) if square else assemble(i*R*dx)
+        self.cell_res_adjoint = assemble(i*R*dx)
 
         # For use in anisotropic approaches
-        if not square:
-            self.p1cell_res_adjoint = interpolate(R, self.P1)
+        self.p1cell_res_adjoint = interpolate(R, self.P1)
 
         # Edge residual
         mass_term = i*self.p0trial*dx
-        r = - lam*dot(u, n) - nu*dot(n, nabla_grad(lam))
-        flux_terms = ((i*r*r)('+') + (i*r*r)('-'))*dS if square else ((i*r)('+') + (i*r)('-'))*dS
+        r = -lam*phi*dot(u, n) - nu*dot(n, nabla_grad(lam))
+        flux_terms = ((i*r)('+') + (i*r)('-'))*dS
         for j in bcs.keys():
-            if bcs[j] == 'dirichlet_zero':
-                flux_terms += i*r*r*ds(j) if square else i*r*ds(j)  # Robin BC in adjoint
+            if not 'value' in bcs[j]:
+                flux_terms += i*r*ds(j)  # Robin BC in adjoint
         self.edge_res_adjoint = Function(self.P0)
         solve(mass_term == flux_terms, self.edge_res_adjoint)
 
@@ -236,66 +238,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.p1indicator.interpolate(abs(self.p1indicator))
         self.p0indicator.rename('explicit_adjoint')
         self.p1indicator.rename('explicit_adjoint')
-
-    def dwr_estimation(self):
-        u = self.u
-        nu = self.nu
-        n = self.n
-        f = self.source
-        bcs = self.op.boundary_conditions
-        phi = self.solution
-        lam = self.solve_high_order(adjoint=True) if not hasattr(self, 'errorterm') else self.errorterm
-
-        # Finite element problem
-        a = lam*dot(u, grad(phi))*dx
-        a += nu*inner(grad(phi), grad(lam))*dx
-        for j in bcs.keys():
-            if bcs[j] == 'none':  # TODO: make consistent with Thetis
-                a += -nu*lam*dot(n, nabla_grad(phi))*ds(j)
-        L = f*lam*dx
-
-        # Stabilisation
-        if self.stab == "SU":
-            a += self.stabilisation*dot(u, grad(lam))*dot(u, grad(phi))*dx
-        elif self.stab == "SUPG":
-            coeff = self.stabilisation*dot(u, grad(lam))
-            a += coeff*dot(u, grad(phi))*dx
-            a += coeff*-div(nu*grad(phi))*dx
-            L += coeff*f*dx
-
-        # Evaluate error estimator
-        self.estimator = np.abs(assemble(L-a))
-        return self.estimator
-
-    def dwr_estimation_adjoint(self):
-        u = self.u
-        nu = self.nu
-        n = self.n
-        bcs = self.op.boundary_conditions
-        lam = self.adjoint_solution
-        phi = self.solve_high_order(adjoint=False) if not hasattr(self, 'errorterm') else self.errorterm
-
-        # Adjoint finite element problem
-        a = lam*dot(u, grad(phi))*dx
-        a += nu*inner(grad(lam), grad(phi))*dx
-        for i in bcs.keys():
-            if bcs[i] == 'dirichlet_zero':
-                a += -lam*phi*(dot(u, n))*ds(i)
-                a += -nu*phi*dot(n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
-        L = self.kernel*phi*dx
-
-        # Stabilisation
-        if self.stab == 'SU':
-            a += self.stabilisation*div(u*phi)*div(u*lam)*dx
-        elif self.stab == "SUPG":  # NOTE: this is not equivalent to discrete adjoint
-            coeff = -self.stabilisation*div(u*phi)
-            a += coeff*-div(u*lam)*dx
-            a += coeff*-div(nu*grad(lam))*dx
-            L += coeff*self.kernel*dx
-
-        # Evaluate error estimator
-        self.estimator = np.abs(assemble(L-a))
-        return self.estimator
 
     def dwr_indication(self):
         i = self.p0test
@@ -310,15 +252,16 @@ class SteadyTracerProblem2d(SteadyProblem):
         else:
             lam = self.adjoint_solution
 
-        # Residual
+        # Cell residual
         R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
+        self.cell_res = assemble(i*R*dx)
 
         # Flux terms (arising from integration by parts)
         mass_term = i*self.p0trial*dx
         flux = -nu*lam*dot(n, nabla_grad(phi))
         flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
         for j in bcs.keys():
-            if bcs[j] == 'neumann_zero':
+            if 'diff_flux' in bcs[j]:  # TODO: Non-zero case
                 flux_terms += i*flux*ds(j)
             # NOTE: For CG methods, Dirichlet error is zero, by construction
         self.edge_res = Function(self.P0)
@@ -329,9 +272,8 @@ class SteadyTracerProblem2d(SteadyProblem):
             R += (f - dot(u, grad(phi)) + div(nu*grad(phi)))*self.stabilisation*dot(u, grad(self.adjoint_solution))
 
         # Sum
-        self.cell_res = assemble(i*R*dx)
-        self.p0indicator = Function(self.P0)
-        self.p0indicator += self.cell_res + self.edge_res
+        self.p0indicator = Function(self.cell_res)
+        self.p0indicator += self.edge_res
         self.p1indicator = project(self.p0indicator, self.P1)
         self.p0indicator.interpolate(abs(self.p0indicator))
         self.p1indicator.interpolate(abs(self.p1indicator))
@@ -356,7 +298,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         flux = -(lam*dot(u, n) + nu*dot(n, nabla_grad(lam)))*phi
         flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
         for j in bcs.keys():
-            if bcs[j] == 'neumann_zero':
+            if 'diff_flux' in bcs[j]:  # TODO: Non-zero case
                 flux_terms += i*flux*ds(j)  # Robin BC in adjoint
         self.edge_res_adjoint = Function(self.P0)
         solve(mass_term == flux_terms, self.edge_res_adjoint)
@@ -439,15 +381,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Fhat = i*dot(phi, n)
         # bdy_contributions -= Fhat*ds(2) + Fhat*ds(3) + Fhat*ds(4)
 
-    def custom_adapt(self):  # TODO: also consider seperate forward / adjoint versions
-        if self.approach == 'carpio':
-            H = self.get_hessian(adjoint=False)
-            H_adj = self.get_hessian(adjoint=True)
-            M = metric_intersection(H, H_adj)
-            self.dwr_indication()
-            i = self.p1indicator.copy()
-            self.dwr_indication_adjoint()
-            self.p1indicator.interpolate(i + self.p1indicator)
-            amd = AnisotropicMetricDriver(self.mesh, hessian=M, indicator=self.p1indicator, op=self.op)
-            amd.get_anisotropic_metric()
-            self.M = amd.p1metric
+
+class UnsteadyTracerProblem2d(UnsteadyProblem):
+    raise NotImplementedError  # TODO: Copy over most of the above

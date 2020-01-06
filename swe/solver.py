@@ -404,17 +404,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimators['dwr_flux'] = assemble(res*dx)
         self.indicators['dwr_flux'] = res
 
-    def dwr_indication(self, adjoint=False):
-        label = 'dwr'
-        if adjoint:
-            label += '_adjoint'
-        self.get_strong_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
-        self.get_flux_terms(self.solution, self.adjoint_solution, adjoint=adjoint)
-        self.indicator = Function(self.P1, name=label)
-        self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
-        self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
-        self.indicators[label] = self.indicator
-
     def custom_adapt(self):
         if self.approach == 'vorticity':
             self.indicator = Function(self.P1, name='vorticity')
