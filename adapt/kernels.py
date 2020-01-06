@@ -14,7 +14,8 @@ from adapt_utils.options import DefaultOptions
 
 __all__ = ["get_eigendecomposition_kernel", "get_reordered_eigendecomposition_kernel",
            "set_eigendecomposition_kernel", "intersect_kernel", "anisotropic_refinement_kernel",
-           "metric_from_hessian_kernel", "scale_metric_kernel", "include_dir"]
+           "metric_from_hessian_kernel", "scale_metric_kernel", "matvec_kernel", "matscale_kernel",
+           "include_dir"]
 
 
 include_dir = ["%s/include/eigen3" % PETSC_ARCH]
@@ -230,3 +231,30 @@ void scale_metric(double A_[%d])
   A = Q * D.asDiagonal() * Q.transpose();
 }
 """ % (d*d, d, d, d, d, d, d, d, d, pow(op.h_min, -2), pow(op.h_max, -2), d, d, pow(op.max_anisotropy, -2))
+
+def matvec_kernel(d):
+    return """
+#include <Eigen/Dense>
+
+using namespace Eigen;
+
+void matvec(double y_[%d], const double * A_, const double * x_) {
+  Map<Vector%dd> y((double *)y_);
+  Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+  Map<Vector%dd> x((double *)x_);
+  y = A * x;
+}
+""" % (d, d, d, d, d)
+
+def matscale_kernel(d):
+    return """
+#include <Eigen/Dense>
+
+using namespace Eigen;
+
+void matvec(double U_[%d], const double * M_, const double * v_) {
+  Map<Matrix<double, %d, %d, RowMajor> > U((double *)U_);
+  Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
+  U = *v_ * M;
+}
+""" % (d*d, d, d, d, d)
