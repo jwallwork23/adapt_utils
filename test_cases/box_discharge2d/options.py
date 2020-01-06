@@ -29,11 +29,11 @@ class PowerOptions(TracerOptions):
         self.base_diffusivity = 1.
 
         # Boundary conditions  # TODO: make Thetis-conforming
-        self.boundary_conditions[1] = 'dirichlet_zero'
-        #self.boundary_conditions[2] = 'neumann_zero'
-        self.boundary_conditions[2] = 'none'
-        self.boundary_conditions[3] = 'neumann_zero'
-        self.boundary_conditions[4] = 'neumann_zero'
+        self.boundary_conditions[1] = {'value': Constant(0.0)}
+        #self.boundary_conditions[2] = {'diff_flux': Constant(0.0)}
+        self.boundary_conditions[2] = {}
+        self.boundary_conditions[3] = {'diff_flux': Constant(0.0)}
+        self.boundary_conditions[4] = {'diff_flux': Constant(0.0)}
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)

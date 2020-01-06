@@ -75,10 +75,12 @@ class SteadyTracerProblem3d(SteadyProblem):
         a = psi*dot(u, grad(phi))*dx
         a += nu*inner(grad(phi), grad(psi))*dx
         for i in bcs.keys():
-            if bcs[i] == 'none':  # TODO: make consistent with Thetis
+            if bcs[i] == {}:
                 a += -nu*psi*dot(n, nabla_grad(phi))*ds(i)
-            if bcs[i] == 'dirichlet_zero':
-                dbcs.append(i)
+            elif 'diff_flux' in bcs[i]:
+                a += -psi*dot(n, bcs[i]['diff_flux'])*ds(i)
+            elif 'value' in bcs[i]:
+                dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))
         L = f*psi*dx
 
         # Stabilisation
@@ -91,8 +93,7 @@ class SteadyTracerProblem3d(SteadyProblem):
             L += coeff*f*dx
 
         # Solve
-        bc = DirichletBC(self.V, 0, dbcs)
-        solve(a == L, self.solution, bcs=bc, solver_parameters=self.op.params)
+        solve(a == L, self.solution, bcs=dbcs, solver_parameters=self.op.params)
         self.solution_file.write(self.solution)
 
     def solve_continuous_adjoint(self):
@@ -104,13 +105,13 @@ class SteadyTracerProblem3d(SteadyProblem):
         lam = self.trial
         psi = self.test
 
-        # Adjoint finite element problem
+        # Adjoint finite element problem  # TODO: check below for non-zero BCs
         a = lam*dot(u, grad(psi))*dx
         a += nu*inner(grad(lam), grad(psi))*dx
         for i in bcs.keys():
-            if bcs[i] != 'neumann_zero':  # TODO: make consistent with Thetis
-                dbcs.append(i)                              # Dirichlet BC in adjoint
-            if bcs[i] == 'dirichlet_zero':
+            if not 'diff_flux' in bcs[i]:
+                dbcs.append(DirichletBC(self.V, 0, i))  # Dirichlet BC in adjoint
+            if 'value' in bcs[i]:
                 a += -lam*psi*(dot(u, n))*ds(i)
                 a += -nu*psi*dot(n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
         L = self.kernel*psi*dx
@@ -125,8 +126,7 @@ class SteadyTracerProblem3d(SteadyProblem):
             L += coeff*self.kernel*dx
 
         # Solve
-        bc = DirichletBC(self.V, 0, dbcs)
-        solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.op.params)
+        solve(a == L, self.adjoint_solution, bcs=dbcs, solver_parameters=self.op.params)
         self.adjoint_solution_file.write(self.adjoint_solution)
 
     def solve_high_order(self, adjoint=True):

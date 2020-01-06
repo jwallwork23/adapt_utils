@@ -106,11 +106,11 @@ class TelemacOptions(TracerOptions):
         self.source_discharge = 0.1
         self.base_diffusivity = 0.1
 
-        # Boundary conditions  # TODO: make Thetis-conforming
-        self.boundary_conditions[1] = 'dirichlet_zero'
-        self.boundary_conditions[2] = 'none'
-        self.boundary_conditions[3] = 'neumann_zero'
-        self.boundary_conditions[4] = 'neumann_zero'
+        # Boundary conditions
+        self.boundary_conditions[1] = {'value': Constant(0.0)}
+        self.boundary_conditions[2] = {}
+        self.boundary_conditions[3] = {'diff_flux': Constant(0.0)}
+        self.boundary_conditions[4] = {'diff_flux': Constant(0.0)}
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)
@@ -196,13 +196,13 @@ class Telemac3dOptions(TracerOptions):
         self.source_discharge = 0.1
         self.base_diffusivity = 0.1
 
-        # Boundary conditions  # TODO: make Thetis-conforming
-        self.boundary_conditions[1] = 'dirichlet_zero'
-        self.boundary_conditions[2] = 'none'
-        self.boundary_conditions[3] = 'neumann_zero'
-        self.boundary_conditions[4] = 'neumann_zero'
-        self.boundary_conditions[5] = 'neumann_zero'
-        self.boundary_conditions[6] = 'neumann_zero'
+        # Boundary conditions
+        self.boundary_conditions[1] = {'value': Constant(0.0)}
+        self.boundary_conditions[2] = {}
+        self.boundary_conditions[3] = {'diff_flux': Constant(0.0)}
+        self.boundary_conditions[4] = {'diff_flux': Constant(0.0)}
+        self.boundary_conditions[5] = {'diff_flux': Constant(0.0)}
+        self.boundary_conditions[6] = {'diff_flux': Constant(0.0)}
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)

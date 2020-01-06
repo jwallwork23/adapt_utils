@@ -59,17 +59,6 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         # Classification
         self.nonlinear = False
 
-    def get_boundary_conditions(self):
-        bcs = self.op.boundary_conditions  # FIXME: Neumann conditions are currently default
-        BCs = {'shallow water': {}, 'tracer': {}}
-        for i in bcs.keys():
-            if bcs[i] == 'dirichlet_zero':
-                bcs[i] = {'value': Constant(0.)}
-                BCs['tracer'][i] = {'value': Constant(0.)}
-            elif bcs[i] == 'neumann_zero':
-                continue
-        return BCs
-
     def solve(self):
         solver_obj = solver2d.FlowSolver2d(self.mesh, Constant(1.))
         options = solver_obj.options
@@ -85,7 +74,7 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
         options.horizontal_diffusivity = self.nu
         options.tracer_source_2d = self.source
         solver_obj.assign_initial_conditions(elev=Function(self.P1), uv=self.u)
-        solver_obj.bnd_functions = self.get_boundary_conditions()
+        solver_obj.bnd_functions['tracer'] = self.op.boundary_conditions
         solver_obj.iterate()
         self.solution.assign(solver_obj.fields.tracer_2d)
 
@@ -328,14 +317,6 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         self.kernel = self.op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
-    def get_boundary_conditions(self, adjoint=False):
-        if adjoint:
-            bcs = self.op.adjoint_boundary_conditions
-        else:
-            bcs = self.op.boundary_conditions  # FIXME: Neumann conditions are currently default
-        BCs = {'shallow water': {}, 'tracer': bcs}
-        return BCs
-
     def solve_step(self, adjoint=False, time=None):
         self.set_fields()
         if adjoint:
@@ -396,7 +377,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
                 dc.close()
 
         # Solve
-        solver_obj.bnd_functions = self.get_boundary_conditions(adjoint)
+        solver_obj.bnd_functions['tracer'] = self.op.adjoint_boundary_conditions if adjoint else self.op.boundary_conditions
         if adjoint:
             solver_obj.iterate(export_func=store_old_value)
             self.adjoint_solution.assign(solver_obj.fields.tracer_2d)
