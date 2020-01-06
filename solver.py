@@ -14,6 +14,7 @@ from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
+from adapt_utils.adapt.kernels import matscale_kernel
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem", "MeshOptimisation", "OuterLoop"]
@@ -219,8 +220,8 @@ class SteadyProblem():
             self.explicit_indication(square=False)
             self.p1indicator.interpolate(abs(self.p1cell_res))
         H = self.get_hessian(adjoint=not adjoint)
-        for i in range(self.mesh.num_vertices()):
-            H.dat.data[i][:,:] *= self.p1indicator.dat.data[i]  # TODO: use pyop2
+        kernel = op2.Kernel(matscale_kernel, "matscale", cpp=True, include_dirs=include_dir)
+        op2.par_loop(kernel, self.P1.node_set, H.dat(op2.RW), H.dat(op2.READ), self.p1indicator.dat(op2.READ))
         if adjoint:
             self.M = steady_metric(self.solution, H=H, op=self.op)
         else:
@@ -929,8 +930,8 @@ class UnsteadyProblem():
             self.explicit_indication(square=False)
             self.p1indicator.interpolate(abs(self.p1cell_res))
         H = self.get_hessian(adjoint=not adjoint)
-        for i in range(self.mesh.num_vertices()):
-            H.dat.data[i][:,:] *= self.p1indicator.dat.data[i]  # TODO: use pyop2
+        kernel = op2.Kernel(matscale_kernel, "matscale", cpp=True, include_dirs=include_dir)
+        op2.par_loop(kernel, self.P1.node_set, H.dat(op2.RW), H.dat(op2.READ), self.p1indicator.dat(op2.READ))
         if adjoint:
             self.M = steady_metric(self.solution, H=H, op=self.op)
         else:
