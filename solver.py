@@ -32,14 +32,20 @@ class SteadyProblem():
         * solve adjoint PDE;
         * adapt mesh based on some error estimator of choice.
     """
-    def __init__(self, mesh, op, finite_element, discrete_adjoint=False, prev_solution=None):
-        self.mesh = op.default_mesh if mesh is None else mesh
+    def __init__(self, mesh, op, finite_element, discrete_adjoint=False, prev_solution=None, levels=1):
+
+        # Read args and kwargs
         self.op = op
         self.finite_element = finite_element
         self.stab = op.stabilisation
         self.discrete_adjoint = discrete_adjoint
         self.prev_solution = prev_solution
         self.approach = op.approach
+
+        # Build AdaptiveMesh object
+        mesh = op.default_mesh if mesh is None else mesh
+        self.am = AdaptiveMesh(mesh, levels=levels)
+        self.mesh = self.am.mesh
 
         # Function spaces and mesh quantities
         self.V = FunctionSpace(self.mesh, self.finite_element)
@@ -62,9 +68,10 @@ class SteadyProblem():
 
         # Outputs
         self.di = create_directory(self.op.di)
-        self.solution_file = File(self.di + 'solution.pvd')
-        self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
+        self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
+        self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
 
+        # Error estimator/indicator storage
         self.estimators = {}
         self.indicators = {}
 
@@ -130,9 +137,6 @@ class SteadyProblem():
         self.indicator.project(inner(self.solution, self.adjoint_solution))
         self.indicator.rename('dwp')
 
-    def dwp_estimation(self):
-        self.estimator = assemble(inner(self.solution, self.adjoint_solution)*dx)
-
     def explicit_indication(self, space=None, square=True):
         pass
 
@@ -143,11 +147,11 @@ class SteadyProblem():
         """
         Plot current mesh and indicator field, if available.
         """
-        File(self.di + 'mesh.pvd').write(self.mesh.coordinates)
+        File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
         if hasattr(self, 'indicator'):
             name = self.indicator.dat.name
-            self.indicator.rename(name + ' indicator')
-            File(self.di + 'indicator.pvd').write(self.indicator)
+            self.indicator.rename(' '.join([name, 'indicator']))
+            File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator)
 
     def dwr_indication(self):
         """
@@ -217,17 +221,21 @@ class SteadyProblem():
         else:
             self.M = steady_metric(self.adjoint_solution, H=H, op=self.op)
 
-    def indicate_error(self, estimate_error=False):
+    def indicate_error(self):
         """
         Evaluate error estimation strategy of choice in order to obtain a metric field for mesh
         adaptation.
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
-
-        :kwarg estimate_error: Toggle computation of global error estimate.
         """
         if self.approach == 'fixed_mesh':
             return
+        elif self.approach == 'uniform':
+            try:
+                assert self.am.levels > 1
+            except ValueError:
+                raise ValueError("Cannot perform uniform refinement because `AdaptiveMesh` object is not hierarchical.")
+            self.mesh = self.am.hierarchy[1]
         elif self.approach == 'hessian':
             self.get_hessian_metric()
         elif self.approach == 'hessian_adjoint':
@@ -326,7 +334,7 @@ class SteadyProblem():
             self.get_power_metric(adjoint=False)
             M = self.M.copy()
             self.get_power_metric(adjoint=True)
-            #self.M = metric_intersection(self.M, M)
+            # self.M = metric_intersection(self.M, M)
             self.M = metric_intersection(M, self.M)
         elif self.approach == 'carpio_isotropic':
             self.dwr_indication()
@@ -378,28 +386,15 @@ class SteadyProblem():
             PETSc.Sys.Print("Using custom metric '{:s}'".format(self.approach))
             self.custom_adapt()
 
-        ## FIXME
-        #if hasattr(self, 'indicator'):
-        #    self.estimator = self.indicator.vector().sum()
-        if estimate_error:
-            if self.approach in ('dwr', 'power', 'loseille', 'carpio'):
-                self.dwr_estimation()
-            elif 'adjoint' in self.approach:
-                self.dwr_estimation_adjoint()
-            elif 'relaxed' in self.approach or 'superposed' in self.approach:
-                self.estimator = 0.5*(self.dwr_estimation() + self.dwr_estimation_adjoint())
-            elif self.approach == 'dwp':
-                self.dwp_estimation()
-            else:
-                raise NotImplementedError  # TODO
+        # Assemble global error estimator
+        if hasattr(self, 'indicator'):
+            self.estimator = self.indicator.vector().gather().sum()
 
-    def adapt_mesh(self, estimate_error=False):
+    def adapt_mesh(self):
         """
         Adapt mesh using metric constructed in error estimation step.
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
-
-        :kwarg estimate_error: Toggle computation of global error estimate.
         """
         if self.approach == 'fixed_mesh':
             return
@@ -409,8 +404,10 @@ class SteadyProblem():
         else:
             if not hasattr(self, 'M'):
                 PETSc.Sys.Print("Metric not found. Computing it now.")
-                self.indicate_error(estimate_error=estimate_error)
-            self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
+                self.indicate_error()
+            self.am.adapt(self.M)
+            self.mesh = self.am.mesh
+            # self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
         PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.plot()
 
@@ -488,7 +485,7 @@ class MeshOptimisation():
 
         # Create a log file and spit out parameters
         if self.log:
-            self.logfile = open('{:s}/optimisation_log'.format(self.di), 'a+')
+            self.logfile = open(os.path.join(self.di, 'optimisation_log'), 'a+')
             self.logfile.write('\n{:s}{:s}\n\n'.format(date, self.logmsg))
             self.logfile.write('high_order: {:b}\n'.format(self.op.order_increase))
             self.logfile.write('maxit: {:d}\n'.format(self.maxit))
@@ -597,7 +594,7 @@ class OuterLoop():
         dat = {'elements': [], 'qoi': [], 'time': [], 'estimator': []}
 
         # Create log file
-        logfile = open(self.di + 'desired_error_test.log', 'a+')
+        logfile = open(os.path.join(self.di, 'desired_error_test.log'), 'a+')
         logfile.write('\n' + date + '\n\n')
         logfile.write('maxit: {:d}\n'.format(self.maxit))
         logfile.write('element_rtol: {:.4f}\n'.format(self.element_rtol))
@@ -620,7 +617,7 @@ class OuterLoop():
             self.final_J = opt.dat['qoi'][-1]
 
             # Logging
-            logfile = open(self.di + 'desired_error_test.log', 'a+')
+            logfile = open(os.path.join(self.di, 'desired_error_test.log'), 'a+')
             logfile.write(self.msg.format(mode,
                                           1/self.op.target,
                                           opt.dat['elements'][-1],
@@ -644,7 +641,7 @@ class OuterLoop():
                     PETSc.Sys.Print(opt.conv_msg % (i+1, 'convergence in quantity of interest.'))
                     break
             J_ = opt.dat['qoi'][-1]
-        picklefile = open(self.di + 'desired_error.pickle', 'wb')
+        picklefile = open(os.path.join(self.di, 'desired_error.pickle'), 'wb')
         pickle.dump(dat, picklefile)
         picklefile.close()
 
@@ -658,13 +655,19 @@ class UnsteadyProblem():
         * solve adjoint PDE;
         * adapt mesh based on some error estimator of choice.
     """
-    def __init__(self, mesh, op, finite_element, discrete_adjoint=False):
+    def __init__(self, mesh, op, finite_element, discrete_adjoint=False, levels=1):
+
+        # Read args and kwargs
         self.finite_element = finite_element
         self.discrete_adjoint = discrete_adjoint
         self.op = op
-        self.mesh = op.default_mesh if mesh is None else mesh
         self.stab = op.stabilisation
         self.approach = op.approach
+
+        # Construct AdaptiveMesh object
+        mesh = op.default_mesh if mesh is None else mesh
+        self.am = AdaptiveMesh(mesh, levels=levels)
+        self.mesh = self.am.mesh
 
         # Function spaces and mesh quantities
         self.V = FunctionSpace(self.mesh, self.finite_element)
@@ -689,9 +692,9 @@ class UnsteadyProblem():
 
         # Outputs
         self.di = create_directory(self.op.di)
-        self.solution_file = File(self.di + 'solution.pvd')
-        self.adjoint_solution_file = File(self.di + 'adjoint_solution.pvd')
-        self.indicator_file = File(self.di + 'indicator.pvd')
+        self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
+        self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
+        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
 
         # Adaptivity
         self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
@@ -859,7 +862,7 @@ class UnsteadyProblem():
         Plot current mesh and indicator field, if available.
         """
         if hasattr(self, 'indicator'):
-            self.indicator.rename(self.approach + ' indicator')
+            self.indicator.rename(' '.join([self.approach, 'indicator']))
             self.indicator_file.write(self.indicator, t=self.remesh_step*self.op.dt)
 
     def dwr_indication(self):
@@ -944,7 +947,11 @@ class UnsteadyProblem():
         if self.approach == 'fixed_mesh':
             return
         elif self.approach == 'uniform':
-            self.mesh = MeshHierarchy(self.mesh, 1)[1]
+            try:
+                assert self.am.levels > 1
+            except ValueError:
+                raise ValueError("Cannot perform uniform refinement because `AdaptiveMesh` object is not hierarchical.")
+            self.mesh = self.am.hierarchy[1]
             return
         elif self.approach == 'hessian':
             self.get_hessian_metric()
@@ -1044,7 +1051,7 @@ class UnsteadyProblem():
             self.get_power_metric(adjoint=False)
             M = self.M.copy()
             self.get_power_metric(adjoint=True)
-            #self.M = metric_intersection(self.M, M)
+            # self.M = metric_intersection(self.M, M)
             self.M = metric_intersection(M, self.M)
         else:
             try:
@@ -1053,10 +1060,11 @@ class UnsteadyProblem():
             except:
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
 
-        # Adapt mesh
-        if self.M is not None and norm(self.M) > 0.1*norm(Constant(1, domain=self.mesh)):
-            # FIXME: The 0.1 factor seems pretty arbitrary
-            self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
+        # Adapt mesh  # FIXME: The 0.1 factor seems pretty arbitrary
+        if self.M is not None: # and norm(self.M) > 0.1*norm(Constant(1, domain=self.mesh)):
+            self.am.adapt(self.M)
+            self.mesh = self.am.mesh
+            # self.mesh = Mesh(adapt(self.mesh, self.M).coordinates)
             PETSc.Sys.Print("Number of elements: %d" % self.mesh.num_cells())
 
             # Re-establish function spaces

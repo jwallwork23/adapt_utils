@@ -7,6 +7,8 @@ from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
 
+import os
+
 
 __all__ = ["SteadyShallowWaterProblem", "UnsteadyShallowWaterProblem"]
 
@@ -29,7 +31,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             raise NotImplementedError
         if mesh is None:
             mesh = op.default_mesh
-        super(SteadyShallowWaterProblem, self).__init__(mesh, op, element, discrete_adjoint, prev_solution)
+        super(SteadyShallowWaterProblem, self).__init__(mesh, op, element, discrete_adjoint, prev_solution, 1)
 
         self.prev_solution = prev_solution
         if prev_solution is not None:
@@ -423,11 +425,11 @@ class SteadyShallowWaterProblem(SteadyProblem):
         """
         Plot current mesh and indicator field, if available.
         """
-        File(self.di + 'mesh.pvd').write(self.mesh.coordinates)
+        File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
         if hasattr(self, 'indicator'):
             name = self.indicator.dat.name
             self.indicator.rename(name + ' indicator')
-            File(self.di + 'indicator.pvd').write(self.indicator)
+            File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator)
         if hasattr(self, 'adjoint_solution'):
             z, zeta = self.adjoint_solution.split()
             self.adjoint_solution_file.write(z, zeta)

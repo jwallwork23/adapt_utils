@@ -36,7 +36,7 @@ class SteadyTracerProblem3d(SteadyProblem):
                  discrete_adjoint=False,
                  finite_element=FiniteElement("Lagrange", tetrahedron, 1),
                  prev_solution=None):
-        super(SteadyTracerProblem3d, self).__init__(mesh, op, finite_element, discrete_adjoint, None)
+        super(SteadyTracerProblem3d, self).__init__(mesh, op, finite_element, discrete_adjoint, None, 1)
 
         # Extract parameters from Options class
         self.nu = op.set_diffusivity(self.P1)
@@ -50,9 +50,9 @@ class SteadyTracerProblem3d(SteadyProblem):
             self.stab = 'SUPG'
         assert self.stab in ('no', 'SU', 'SUPG')
         if self.stab in ('SU', 'SUPG'):
-            #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
+            # self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
             self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
-            #self.stabilisation = anisotropic_stabilisation(self.u, mesh=self.mesh)
+            # self.stabilisation = anisotropic_stabilisation(self.u, mesh=self.mesh)
 
         # Rename solution fields
         self.solution.rename('Tracer concentration')
@@ -129,7 +129,7 @@ class SteadyTracerProblem3d(SteadyProblem):
         solve(a == L, self.adjoint_solution, bcs=bc, solver_parameters=self.op.params)
         self.adjoint_solution_file.write(self.adjoint_solution)
 
-    def solve_high_order(self, adjoint=True):  # TODO: Use prolong and restrict
+    def solve_high_order(self, adjoint=True):
         """
         Solve the problem using linear and quadratic approximations on a refined mesh, take the
         difference and project back into the original space.
@@ -138,23 +138,28 @@ class SteadyTracerProblem3d(SteadyProblem):
 
         # Solve adjoint problem on fine mesh using quadratic elements
         tp_p2 = SteadyTracerProblem3d(self.op,
-                                      mesh=iso_P2(self.mesh),
+                                      mesh=self.am.hierarchy[1],
                                       finite_element=FiniteElement(family, tetrahedron, 2))
-        sol_p1 = Function(tp_p2.P1)  # Project into P1 to get linear approximation, too
         if adjoint:
             tp_p2.solve_adjoint()
-            sol_p1.project(tp_p2.adjoint_solution)
         else:
             tp_p2.solve()
-            sol_p1.project(tp_p2.solution)
+        sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
+
+        # Project into P1 to get linear approximation, too
+        sol = self.adjoint_solution if adjoint else self.solution
+        sol_p1 = Function(tp_p2.P1)
+        prolong(sol, sol_p1)
 
         # Evaluate difference on fine mesh and project onto coarse mesh
-        sol_p2 = tp_p2.adjoint_solution if adjoint else tp_p2.solution
-        sol = Function(tp_p2.V)
-        sol.interpolate(sol_p2 - sol)
+        sol = Function(tp_p2.P2)
+        sol -= sol_p1
         self.errorterm = Function(self.P2)
-        self.errorterm.project(sol)
-        return self.errorterm
+        try:
+            inject(sol, self.errorterm)
+        except:
+            self.errorterm.project(sol)
+        return self.errorterm  # FIXME: Should keep errorterm in h.o. space as long as possible
 
     def get_hessian(self, adjoint=False):
         f = self.adjoint_solution if adjoint else self.solution

@@ -1,6 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
+import os
 import numpy as np
 
 
@@ -65,7 +66,7 @@ class Options(FrozenConfigurable):
 
     def __init__(self, approach='fixed_mesh'):
         self.approach = approach
-        self.di = 'outputs/' + self.approach + '/'
+        self.di = os.path.join('outputs', self.approach)
 
     def ball(self, fs, scale=1., source=False):
         """Ball indicator function associated with region(s) of interest"""

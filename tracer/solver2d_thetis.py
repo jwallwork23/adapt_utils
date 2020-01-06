@@ -45,7 +45,8 @@ class SteadyTracerProblem2d_Thetis(SteadyProblem):
                                                            op,
                                                            finite_element,
                                                            discrete_adjoint,
-                                                           None)
+                                                           None,
+                                                           1)
         assert(finite_element.family() == "Discontinuous Lagrange")  # TODO
 
         # Extract parameters from Options class
@@ -309,7 +310,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
                  mesh=None,
                  discrete_adjoint=False,
                  finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1)):
-        super(UnsteadyTracerProblem2d_Thetis, self).__init__(mesh, op, finite_element, discrete_adjoint)
+        super(UnsteadyTracerProblem2d_Thetis, self).__init__(mesh, op, finite_element, discrete_adjoint, 1)
         assert(finite_element.family() == "Discontinuous Lagrange")
 
         self.set_fields()
@@ -366,12 +367,12 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         solver_obj.assign_initial_conditions(elev=Function(self.V), uv=velocity, tracer=init)
 
         # set up callbacks
-        #cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
-        #if self.remesh_step == 0:
-        #    self.init_norm = cb.initial_value
-        #else:
-        #    cb.initial_value = self.init_norm
-        #solver_obj.add_callback(cb, 'export')
+        # cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
+        # if self.remesh_step == 0:
+        #     self.init_norm = cb.initial_value
+        # else:
+        #     cb.initial_value = self.init_norm
+        # solver_obj.add_callback(cb, 'export')
 
         # Ensure correct iteration count
         solver_obj.i_export = self.remesh_step
@@ -472,9 +473,9 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyProblem):
         except:
             self.get_timestepper()
             self.get_strong_residual(weighted=False, adjoint=adjoint, square=square)
-        #self.get_flux_terms(adjoint=adjoint, square=square)  # TODO
+        # self.get_flux_terms(adjoint=adjoint, square=square)  # TODO
         self.indicator = Function(self.P1, name='explicit')
-        #self.indicator.interpolate(self.indicators['strong_residual'] + self.indicators['dwr_flux'])
+        # self.indicator.interpolate(self.indicators['strong_residual'] + self.indicators['dwr_flux'])
         self.indicator.interpolate(self.indicators['strong_residual'])
 
     def explicit_indication_adjoint(self, square=False):
