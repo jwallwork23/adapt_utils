@@ -14,8 +14,8 @@ from adapt_utils.options import DefaultOptions
 
 __all__ = ["get_eigendecomposition_kernel", "get_reordered_eigendecomposition_kernel",
            "set_eigendecomposition_kernel", "intersect_kernel", "anisotropic_refinement_kernel",
-           "metric_from_hessian_kernel", "scale_metric_kernel", "matvec_kernel", "matscale_kernel",
-           "include_dir"]
+           "metric_from_hessian_kernel", "scale_metric_kernel", "include_dir",
+           "gemv_kernel", "matscale_kernel", "matscale_sum_kernel"]
 
 
 include_dir = ["%s/include/eigen3" % PETSC_ARCH]
@@ -232,19 +232,28 @@ void scale_metric(double A_[%d])
 }
 """ % (d*d, d, d, d, d, d, d, d, d, pow(op.h_min, -2), pow(op.h_max, -2), d, d, pow(op.max_anisotropy, -2))
 
-def matvec_kernel(d):
+def gemv_kernel(d, alpha=1.0, beta=0.0, tol=1e-8):
     return """
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
-void matvec(double y_[%d], const double * A_, const double * x_) {
+void gemv(double y_[%d], const double * A_, const double * x_) {
   Map<Vector%dd> y((double *)y_);
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
   Map<Vector%dd> x((double *)x_);
-  y = A * x;
+  double alpha = %f;
+  double beta = %f;
+  double tol = %f;
+
+  if (fabs(beta) < tol) y *= beta;
+  if (fabs(alpha-1.0) < tol) {
+    y += A * x;
+  } else {
+    y += alpha * A * x;
+  }
 }
-""" % (d, d, d, d, d)
+""" % (d, d, d, d, d, alpha, beta, tol)
 
 def matscale_kernel(d):
     return """
@@ -252,9 +261,45 @@ def matscale_kernel(d):
 
 using namespace Eigen;
 
-void matvec(double U_[%d], const double * M_, const double * v_) {
-  Map<Matrix<double, %d, %d, RowMajor> > U((double *)U_);
-  Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
-  U = *v_ * M;
+void matscale(double B_[%d], const double * A_, const double * alpha_) {
+  Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+  B += *alpha_ * A;
 }
 """ % (d*d, d, d, d, d)
+
+def matscale_sum_kernel(d):
+    if d == 2:
+        return """
+#include <Eigen/Dense>
+
+using namespace Eigen;
+
+void matscale_sum(double B_[%d], const double * A1_, const double * A2_, const double * x_) {
+  Map<Matrix<double, %d, %d, RowMajor> > A1((double *)A1_);
+  Map<Matrix<double, %d, %d, RowMajor> > A2((double *)A2_);
+  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+  Map<Vector2d> x((double *)x_);
+  B += x[0] * A1;
+  B += x[1] * A2;
+}
+""" % (d*d, d, d, d, d)
+    elif d == 3:
+        return """
+#include <Eigen/Dense>
+
+using namespace Eigen;
+
+void matscale_sum(double B_[%d], const double * A1_, const double * A2_, const double * A3_, const double * x_) {
+  Map<Matrix<double, %d, %d, RowMajor> > A1((double *)A1_);
+  Map<Matrix<double, %d, %d, RowMajor> > A2((double *)A2_);
+  Map<Matrix<double, %d, %d, RowMajor> > A3((double *)A3_);
+  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+  Map<Vector3d> x((double *)x_);
+  B += x[0] * A1;
+  B += x[1] * A2;
+  B += x[2] * A3;
+}
+""" % (d*d, d, d, d, d)
+    else:
+        raise NotImplementedError

@@ -6,6 +6,7 @@ from adapt_utils.tracer.options import *
 from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.kernels import matscale_component_kernel
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.p0_metric import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
@@ -318,7 +319,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.p1indicator.rename('dwr_adjoint')
         
     def get_loseille_metric(self, adjoint=False, relax=True, superpose=False):
-        assert not (relax and superpose)
+        assert (relax or superpose) and not (relax and superpose)
 
         # Solve adjoint problem
         if self.op.order_increase:
@@ -360,20 +361,35 @@ class SteadyTracerProblem2d(SteadyProblem):
         H2 = steady_metric(F2, mesh=self.mesh, noscale=True, op=self.op)
         Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
 
-        # Form metric  # TODO: use pyop2
-        self.M = Function(self.P1_ten)
-        for i in range(self.mesh.num_vertices()):
-            self.M.dat.data[i][:,:] += H1.dat.data[i]*adj_diff.dat.data[i][0]
-            self.M.dat.data[i][:,:] += H2.dat.data[i]*adj_diff.dat.data[i][1]
-            if relax:
-                self.M.dat.data[i][:,:] += Hf.dat.data[i]*adj.dat.data[i]
-        self.M = steady_metric(None, H=self.M, op=self.op)
+        # Hessian for source term
+        Mf = Function(self.P1_ten).assign(np.finfo(0.0).min)
+        kernel = op2.Kernel(matscale_kernel(2),
+                            "matscale",
+                            cpp=True,
+                            include_dirs=include_dir)
+        op2.par_loop(kernel,
+                     self.P1_ten.node_set,
+                     Mf.dat(op2.RW),
+                     Hf.dat(op2.READ),
+                     adj.dat(op2.READ))
 
-        if superpose:
-            Mf = Function(self.P1_ten)
-            for i in range(self.mesh.num_vertices()):
-                Mf.dat.data[i][:,:] += Hf.dat.data[i]*adj.dat.data[i]
+        # Form metric
+        self.M = Function(self.P1_ten).assign(np.finfo(0.0).min)
+        kernel = op2.Kernel(matscale_sum_kernel(2),
+                            "matscale_sum",
+                            cpp=True,
+                            include_dirs=include_dir)
+        op2.par_loop(kernel,
+                     self.P1_ten.node_set,
+                     self.M.dat(op2.RW),
+                     H1.dat(op2.READ),
+                     H2.dat(op2.READ),
+                     adj_diff.dat(op2.READ))
+        if relax:
+            self.M = metric_relaxation(self.M, Mf)
+        elif superpose:
             self.M = metric_intersection(self.M, Mf)
+        self.M = steady_metric(None, H=self.M, op=self.op)
 
         # TODO: boundary contributions
         # bdy_contributions = i*(F1*n[0] + F2*n[1])*ds

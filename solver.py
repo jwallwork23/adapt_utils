@@ -220,8 +220,9 @@ class SteadyProblem():
             self.explicit_indication(square=False)
             self.p1indicator.interpolate(abs(self.p1cell_res))
         H = self.get_hessian(adjoint=not adjoint)
+        H_scaled = Function(self.P1_ten).assign(np.finfo(0.0).min)
         kernel = op2.Kernel(matscale_kernel, "matscale", cpp=True, include_dirs=include_dir)
-        op2.par_loop(kernel, self.P1.node_set, H.dat(op2.RW), H.dat(op2.READ), self.p1indicator.dat(op2.READ))
+        op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.p1indicator.dat(op2.READ))
         if adjoint:
             self.M = steady_metric(self.solution, H=H, op=self.op)
         else:
@@ -930,8 +931,9 @@ class UnsteadyProblem():
             self.explicit_indication(square=False)
             self.p1indicator.interpolate(abs(self.p1cell_res))
         H = self.get_hessian(adjoint=not adjoint)
+        H_scaled = Function(self.P1_ten).assign(np.finfo(0.0).min)
         kernel = op2.Kernel(matscale_kernel, "matscale", cpp=True, include_dirs=include_dir)
-        op2.par_loop(kernel, self.P1.node_set, H.dat(op2.RW), H.dat(op2.READ), self.p1indicator.dat(op2.READ))
+        op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.p1indicator.dat(op2.READ))
         if adjoint:
             self.M = steady_metric(self.solution, H=H, op=self.op)
         else:
