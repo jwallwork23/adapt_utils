@@ -31,18 +31,12 @@ class ShallowWaterOptions(Options):
     region_of_interest = List(default_value=[]).tag(config=True)
 
     def set_viscosity(self, fs):
-        pass
+        raise NotImplementedError
 
-    def set_initial_condition(self, fs):
-        pass
+    def set_inflow(self, fs):
+        raise NotImplementedError
 
     def set_coriolis(self, fs):
-        pass
+        raise NotImplementedError
 
-    def set_bcs(self, fs):
-        pass
-
-    def set_qoi_kernel(self, fs):
-        pass
-
-# TODO: UnsteadyShallowWaterOptions
+# TODO: UnsteadyShallowWaterOptions, inheriting from the above

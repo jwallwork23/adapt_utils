@@ -82,9 +82,6 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.thrust_coefficient *= correction
         # NOTE: We're not yet correcting power output here, so that will be overestimated
 
-    def set_bcs(self, fs):
-        pass
-
 
 class UnsteadyTurbineOptions(SteadyTurbineOptions):
     def __init__(self, approach='fixed_mesh'):

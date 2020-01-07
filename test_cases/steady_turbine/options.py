@@ -45,7 +45,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         else:
             self.viscosity.assign(self.base_viscosity)
 
-    def set_bcs(self, fs):
+    def set_boundary_conditions(self, fs):
         left_tag = 1
         right_tag = 2
         top_bottom_tag = 3

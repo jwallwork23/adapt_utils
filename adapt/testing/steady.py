@@ -16,7 +16,7 @@ def sensor(i, mesh):
             0.1*sin(50*x) + atan(0.1/(sin(5*y) - 2*x)),
             atan(0.1/(sin(5*y)-2*x))+atan(0.5/(sin(3*y)-7*x))][i]
 
-op = DefaultOptions()
+op = Options()
 op.h_min = 1e-6
 op.h_max = 0.1
 op.num_adapt = 4

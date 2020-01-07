@@ -82,7 +82,7 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         else:
             self.viscosity.assign(self.base_viscosity)
 
-    def set_bcs(self, fs):
+    def set_boundary_conditions(self, fs):
         self.set_boundary_surface(fs.sub(1))
         inflow_tag = 4
         outflow_tag = 2

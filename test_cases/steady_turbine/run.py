@@ -100,7 +100,7 @@ for i in range(op.num_adapt):
 
         # Make sure everything is defined on the right mesh
         tp_ho.set_fields()
-        tp_ho.boundary_conditions = op.set_bcs(tp.V)
+        tp_ho.boundary_conditions = op.set_boundary_conditions(tp.V)
 
         # Indicate error in enriched space and then project (average) down to base space
         tp_ho.get_dwr_residual(proj, tp_ho.adjoint_solution)

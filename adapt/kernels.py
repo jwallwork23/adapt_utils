@@ -9,7 +9,7 @@ except:
     if not os.path.exists(os.path.join(PETSC_ARCH, 'include/eigen3')):
         PETSC_ARCH = '/usr/local'
 
-from adapt_utils.options import DefaultOptions
+from adapt_utils.options import * 
 
 
 __all__ = ["get_eigendecomposition_kernel", "get_reordered_eigendecomposition_kernel",
@@ -130,7 +130,7 @@ void anisotropic(double A_[%d]) {
 }
 """ % (d*d, d, d, d, d, d, d, d, d, direction, scale)
 
-def metric_from_hessian_kernel(d, noscale=False, op=DefaultOptions()):
+def metric_from_hessian_kernel(d, noscale=False, op=Options()):
     p = op.norm_order
     scale = 'false' if noscale or op.normalisation == 'error' else 'true'
     if p is None:
@@ -212,7 +212,7 @@ void metric_from_hessian(double A_[%d], double * f, const double * B_)
 }
 """ % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d, p, p, p)
 
-def scale_metric_kernel(d, op=DefaultOptions()):
+def scale_metric_kernel(d, op=Options()):
     return """
 #include <Eigen/Dense>
 

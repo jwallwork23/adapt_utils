@@ -5,7 +5,7 @@ import os
 import numpy as np
 
 
-__all__ = ["DefaultOptions"]
+__all__ = ["Options"]
 
 
 class Options(FrozenConfigurable):
@@ -64,6 +64,7 @@ class Options(FrozenConfigurable):
     def __init__(self, approach='fixed_mesh'):
         self.approach = approach
         self.di = os.path.join('outputs', self.approach)
+        self.end_time -= 0.5*self.dt
 
     def ball(self, fs, scale=1., source=False):
         """Ball indicator function associated with region(s) of interest"""
@@ -181,17 +182,20 @@ class Options(FrozenConfigurable):
         box.interpolate(expr)
         return box
 
+    def set_initial_condition(self, fs):
+        raise NotImplementedError
 
-class DefaultOptions(Options):
-    name = 'Parameters for the case where no mode is selected'
-    mode = 'Default'
+    def set_boundary_conditions(self, fs):
+        raise NotImplementedError
 
-    def __init__(self, approach='fixed_mesh', dt=0.01):
-        super(DefaultOptions, self).__init__(approach)
-        self.dt = dt
-        self.start_time = 0.
-        self.end_time = 10.
-        self.dt_per_export = 10
-        self.end_time -= 0.5*self.dt
-        self.h_min = 1e-6
-        self.h_max = 1e3
+    def set_source(self, fs):
+        raise NotImplementedError
+
+    def set_qoi_kernel(self, fs):
+        raise NotImplementedError
+
+    def exact_solution(self, fs):
+        raise NotImplementedError
+
+    def exact_qoi(self):
+        raise NotImplementedError

@@ -42,7 +42,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         physical_constants['g_grav'].assign(op.g)
 
         # BCs
-        self.boundary_conditions = op.set_bcs(self.V)
+        self.boundary_conditions = op.set_boundary_conditions(self.V)
 
         # Parameters for adjoint computation
         z, zeta = self.adjoint_solution.split()
@@ -522,7 +522,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.use_automatic_sipg_parameter = True
 
         # Boundary conditions
-        self.solver_obj.bnd_functions['shallow_water'] = op.set_bcs(self.V)
+        self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
         self.update_forcings = self.get_update_forcings()
 
         if hasattr(self, 'extra_setup'):

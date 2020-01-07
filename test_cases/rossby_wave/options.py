@@ -112,7 +112,7 @@ class BoydOptions(ShallowWaterOptions):
         eta[26] = -0.1178252e-21
         self.hermite_coeffs = {'u': u, 'v': v, 'eta': eta}
 
-    def set_bcs(self):
+    def set_boundary_conditions(self):
         """
         Set no slip boundary conditions uv = 0 along North and South boundaries.
         """

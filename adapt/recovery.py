@@ -1,12 +1,12 @@
 from firedrake import *
 
-from adapt_utils.options import DefaultOptions
+from adapt_utils.options import *
 
 
 __all__ = ["construct_gradient", "construct_hessian", "construct_boundary_hessian"]
 
 
-def construct_gradient(f, mesh=None, op=DefaultOptions()):
+def construct_gradient(f, mesh=None, op=Options()):
     r"""
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
@@ -34,7 +34,7 @@ def construct_gradient(f, mesh=None, op=DefaultOptions()):
     return g
 
 
-def construct_hessian(f, mesh=None, degree=1, op=DefaultOptions()):
+def construct_hessian(f, mesh=None, degree=1, op=Options()):
     r"""
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all
     second derivative information has been lost. As such, the Hessian of `f` cannot be directly
@@ -102,7 +102,7 @@ def construct_hessian(f, mesh=None, degree=1, op=DefaultOptions()):
 
     return H
 
-def construct_boundary_hessian(f, mesh=None, op=DefaultOptions()):
+def construct_boundary_hessian(f, mesh=None, op=Options()):
     """
     Recover the Hessian of `f` on the domain boundary. That is, the Hessian in the direction
     tangential to the boundary. In two dimensions this gives a scalar field, whereas in three

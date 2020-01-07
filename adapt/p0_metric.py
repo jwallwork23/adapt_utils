@@ -1,6 +1,6 @@
 from firedrake import *
 
-from adapt_utils.options import DefaultOptions
+from adapt_utils.options import *
 from adapt_utils.adapt.metric import isotropic_metric
 from adapt_utils.adapt.kernels import *
 
@@ -12,7 +12,7 @@ class AnisotropicMetricDriver():
     """
     Driver for anisotropic mesh adaptation using an approach based on [Carpio et al. 2013].
     """
-    def __init__(self, adaptive_mesh, hessian=None, indicator=None, op=DefaultOptions()):
+    def __init__(self, adaptive_mesh, hessian=None, indicator=None, op=Options()):
         self.am = adaptive_mesh
         if hasattr(adaptive_mesh, 'mesh'):
             self.mesh = adaptive_mesh.mesh

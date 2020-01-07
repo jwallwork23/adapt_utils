@@ -5,7 +5,7 @@ import numpy
 from numpy import linalg as la
 from scipy import linalg as sla
 
-from adapt_utils.options import DefaultOptions
+from adapt_utils.options import *
 from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hessian
 from adapt_utils.adapt.kernels import *
 
@@ -14,7 +14,7 @@ __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_
 
 
 # TODO: test 3d case works
-def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=DefaultOptions()):
+def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
@@ -67,7 +67,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Default
 
     return M
 
-def isotropic_metric(f, noscale=False, op=DefaultOptions()):
+def isotropic_metric(f, noscale=False, op=Options()):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
@@ -170,7 +170,7 @@ def metric_complexity(M):
     """
     return assemble(sqrt(det(M))*dx)
 
-def get_metric_coefficient(a, b, op=DefaultOptions()):
+def get_metric_coefficient(a, b, op=Options()):
     r"""
     Solve algebraic problem to get scaling coefficient for interior/boundary metric. See
     [Loseille et al. 2010] for details.
@@ -190,7 +190,7 @@ def get_metric_coefficient(a, b, op=DefaultOptions()):
 
 # FIXME
 # TODO: par_loop
-def metric_with_boundary(f=None, mesh=None, H=None, op=DefaultOptions()):
+def metric_with_boundary(f=None, mesh=None, H=None, op=Options()):
     r"""
     Computes a Hessian-based steady metric for mesh adaptation, intersected with the corresponding
     boundary metric. The approach used here follows that of [Loseille et al. 2010].
