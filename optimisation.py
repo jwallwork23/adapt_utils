@@ -131,7 +131,7 @@ class MeshOptimisation():
                     break
 
             # Adapt mesh
-            # tp.set_target_vertices(num_vertices=self.dat['vertices'][0])
+            # tp.op.target = self.dat['vertices'][0]*tp.op.rescaling
             tp.adapt_mesh()
             tp.plot()
             if tp.nonlinear and self.use_prev_sol:

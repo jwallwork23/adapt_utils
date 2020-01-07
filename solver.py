@@ -75,19 +75,79 @@ class SteadyProblem():
         self.estimators = {}
         self.indicators = {}
 
-    def set_target_vertices(self, num_vertices=None):
-        """
-        Set target number of vertices for adapted mesh by scaling the current number of vertices.
-        """
-        if num_vertices is None:
-            num_vertices = self.mesh.num_vertices()
-        self.op.target = num_vertices*self.op.rescaling
+    def solve(self, adjoint=False):
+        if adjoint:
+            self.solve_adjoint()
+        else:
+            self.solve_forward()
 
-    def solve(self):
+    def solve_forward(self):
         """
         Solve forward PDE.
         """
         pass
+
+    def solve_adjoint(self):
+        """
+        Solve adjoint problem using method specified by `discrete_adjoint` boolean kwarg.
+        """
+        if self.discrete_adjoint:
+            PETSc.Sys.Print("Solving discrete adjoint problem...")
+            self.solve_discrete_adjoint()
+        else:
+            PETSc.Sys.Print("Solving continuous adjoint problem...")
+            self.solve_continuous_adjoint()
+
+    def solve_continuous_adjoint(self):
+        pass
+
+    def solve_discrete_adjoint(self):
+        pass
+
+    def solve_high_order(self, adjoint=True):  # TODO: Account for nonlinear case
+        """
+        Solve the problem using linear and quadratic approximations on a refined mesh, take the
+        difference and project back into the original space.
+        """
+        # Solve adjoint problem on fine mesh using quadratic elements
+        self.tp_enriched.solve(adjoint=adjoint)
+        # TODO: For adjoint case, what if nonlinear?
+        sol_p2 = self.tp_enriched.get_solution(adjoint=adjoint)
+
+        # Project into P1 to get linear approximation, too
+        sol_p1 = self.project_solution(self.tp_enriched.P1, adjoint=adjoint)
+        # sol_p1 = Function(self.tp_enriched.P1)
+        # prolong(sol, sol_p1)  # FIXME: Maybe the hierarchy isn't recognised?
+
+        # Evaluate difference in enriched space
+        self.set_error(interpolate(sol_p2 - sol_p1, self.tp_enriched.P2), adjoint=adjoint)
+
+    def get_solution(self, adjoint=False):
+        """
+        Retrieve forward or adjoint solution, as specified by boolean kwarg `adjoint`.
+        """
+        return self.adjoint_solution if adjoint else self.solution
+
+    def set_error(self, val, adjoint=False):
+        """
+        Set forward or adjoint error, as specified by boolean kwarg `adjoint`.
+        """
+        if adjoint:
+            self.adjoint_error = val
+        else:
+            self.error = val
+
+    def get_solution_label(self, adjoint=False):
+        return 'adjoint_solution' if adjoint else 'solution'
+
+    def project_solution(self, space, adjoint=False):
+        """
+        Project forward or adjoint solution into `space` space, as specified by the boolean kwarg
+        `adjoint`.
+        """
+        if not hasattr(self, self.get_solution_label(adjoint)):
+            self.solve(adjoint)
+        return project(self.get_solution(adjoint), space)
 
     def get_qoi_kernel(self):
         """
@@ -104,40 +164,11 @@ class SteadyProblem():
             self.get_qoi_kernel()
         return assemble(inner(self.solution, self.kernel)*dx(degree=12))
 
-    def solve_continuous_adjoint(self):
-        """
-        Solve the adjoint PDE using a hand-coded continuous adjoint.
-        """
-        pass
-
-    def solve_discrete_adjoint(self):
-        """
-        Solve the adjoint PDE in the discrete sense.
-        """
-        pass
-
-    def solve_adjoint(self):
-        """
-        Solve adjoint problem using specified method.
-        """
-        if self.discrete_adjoint:
-            PETSc.Sys.Print("Solving discrete adjoint problem...")
-            self.solve_discrete_adjoint()
-        else:
-            PETSc.Sys.Print("Solving continuous adjoint problem...")
-            self.solve_continuous_adjoint()
-
-    def dwp_indication(self):
-        """
-        Indicate significance by the product of forward and adjoint solutions. This approach was
-        used for mesh adaptive tsunami modelling in [Davis and LeVeque, 2016]. Here 'DWP' is used
-        to stand for Dual Weighted Primal.
-        """
-        self.indicator = Function(self.P1)
-        self.indicator.project(inner(self.solution, self.adjoint_solution))
-        self.indicator.rename('dwp')
-
     def get_strong_residual(self, adjoint=False):
+        """
+        Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
+        boolean kwarg.
+        """
         if adjoint:
             self.get_strong_residual_forward()
         else:
@@ -150,37 +181,68 @@ class SteadyProblem():
         pass
 
     def get_dwr_residual(self, sol, adjoint_sol, adjoint=False):
+        """
+        Evaluate the cellwise component of the forward or adjoint Dual Weighted Residual (DWR) error
+        estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg `adjoint`.
+        """
+        if adjoint:
+            self.get_dwr_residual_adjoint(sol, adjoint_sol)
+        else:
+            self.get_dwr_residual_forward(sol, adjoint_sol)
+
+    def get_dwr_residual_forward(self, sol, adjoint_sol):
+        pass
+
+    def get_dwr_residual_adjoint(self, sol, adjoint_sol):
         pass
 
     def get_dwr_flux(self, sol, adjoint_sol, adjoint=False):
+        """
+        Evaluate the edgewise component of the forward or adjoint Dual Weighted Residual (DWR) error
+        estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg `adjoint`.
+        """
+        if adjoint:
+            self.get_dwr_flux_adjoint(sol, adjoint_sol)
+        else:
+            self.get_dwr_flux_forward(sol, adjoint_sol)
+
+    def get_dwr_flux_forward(self, sol, adjoint_sol):
         pass
 
-    def plot(self):
-        """
-        Plot current mesh and indicator field, if available.
-        """
-        File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
-        if hasattr(self, 'indicator'):
-            name = self.indicator.dat.name
-            self.indicator.rename(' '.join([name, 'indicator']))
-            File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator)
+    def get_dwr_flux_adjoint(self, sol, adjoint_sol):
+        pass
 
-    def dwr_indication(self, adjoint=False):
+    def dwr_indication(self, adjoint=False):  # TODO: Change inputs for consistency
         """
-        Indicate errors in the quantity of interest by the Dual Weighted Residual method. This is
-        inherently problem-dependent.
+        Indicate errors in the quantity of interest by the Dual Weighted Residual (DWR) method of
+        [Becker and Rannacher, 2001].
 
-        The resulting P0 field should be stored as `self.indicator`.
+        A P1 field to be used for isotropic mesh adaptation is stored as `self.indicator`.
         """
         label = 'dwr'
+        cell_label = 'dwr_cell'
+        flux_label = 'dwr_flux'
         if adjoint:
             label += '_adjoint'
+            cell_label += '_adjoint'
+            flux_label += '_adjoint'
         self.get_dwr_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
         self.get_dwr_flux(self.solution, self.adjoint_solution, adjoint=adjoint)
         self.indicator = Function(self.P1, name=label)
-        self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
-        self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
+        self.indicator.interpolate(abs(self.indicators[cell_label] + self.indicators[flux_label]))
+        self.estimators[label] = self.estimators[cell_label] + self.estimators[flux_label]
         self.indicators[label] = self.indicator
+
+    def dwp_indication(self):
+        """
+        Indicate significance by the product of forward and adjoint solutions. This approach was
+        used for mesh adaptive tsunami modelling in [Davis and LeVeque, 2016]. Here 'DWP' is used
+        to stand for Dual Weighted Primal.
+        """
+        prod = inner(self.solution, self.adjoint_solution)
+        self.indicators['dwp'] = assemble(self.p0test*prod*dx)
+        self.indicator = interpolate(prod, self.P1)
+        self.indicator.rename('dwp')
 
     def get_hessian(self, adjoint=False):
         """
@@ -210,7 +272,7 @@ class SteadyProblem():
             self.indicator.rename(name)
         self.M = isotropic_metric(self.indicator, op=self.op)
 
-    def get_loseille_metric(self, adjoint=False, relax=False):
+    def get_loseille_metric(self, adjoint=False, relax=True):
         """
         Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
         """
@@ -231,6 +293,16 @@ class SteadyProblem():
         kernel = op2.Kernel(matscale_kernel(dim), "matscale", cpp=True, include_dirs=include_dir)
         op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.indicator.dat(op2.READ))
         self.M = steady_metric(self.solution if adjoint else self.adjoint_solution, H=H, op=self.op)
+
+    def plot(self):
+        """
+        Plot current mesh and indicator field, if available.
+        """
+        File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
+        if hasattr(self, 'indicator'):
+            name = self.indicator.dat.name
+            self.indicator.rename(' '.join([name, 'indicator']))
+            File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator)
 
     def indicate_error(self):
         """
@@ -432,7 +504,7 @@ class SteadyProblem():
             PETSc.Sys.Print("Condition number: %.4e" % self.condition_number)
 
 
-class UnsteadyProblem():
+class UnsteadyProblem():  # TODO: Subclass SteadyProblem; update
     """
     Base class for solving time-dependent PDE problems using mesh adaptivity.
 
@@ -487,14 +559,6 @@ class UnsteadyProblem():
         self.estimators = {}
         self.indicators = {}
         self.num_exports = int(np.floor((op.end_time - op.dt)/op.dt/op.dt_per_export))
-
-    def set_target_vertices(self, rescaling=0.85, num_vertices=None):
-        """
-        Set target number of vertices for adapted mesh by scaling the current number of vertices.
-        """
-        if num_vertices is None:
-            num_vertices = self.mesh.num_vertices()
-        self.op.target = num_vertices * rescaling
 
     def solve_step(self, adjoint=False, **kwargs):
         """

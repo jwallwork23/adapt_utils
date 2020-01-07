@@ -2,7 +2,6 @@ from firedrake import *
 
 import numpy as np
 
-from adapt_utils.tracer.options import *
 from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
@@ -53,7 +52,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         if self.stab is None:
             self.stab = 'SUPG'
         assert self.stab in ('no', 'SU', 'SUPG', 'lax_friedrichs')
-        if self.stab in ('SU', 'SUPG'):
+        if self.stab in ('SU', 'SUPG'):  # FIXME
             #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
             self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
             #self.stabilisation = anisotropic_stabilisation(self.u, mesh=self.mesh)
@@ -65,39 +64,38 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Classification
         self.nonlinear = False
 
-    def solve(self):
-        u = self.u
-        nu = self.nu
-        n = self.n
-        f = self.source
-        bcs = self.op.boundary_conditions
-        dbcs = []
+    def solve_forward(self):
         phi = self.trial
         psi = self.test
 
         # Finite element problem
-        a = psi*dot(u, grad(phi))*dx
-        a += nu*inner(grad(phi), grad(psi))*dx
-        L = f*psi*dx
+        a = psi*dot(self.u, grad(phi))*dx + self.nu*inner(grad(phi), grad(psi))*dx
+        L = self.source*psi*dx
+
+        # Stabilisation
+        if self.stab in ("SU", "SUPG"):
+            coeff = self.stabilisation*dot(self.u, grad(psi))
+            a += coeff*dot(self.u, grad(phi))*dx
+            if self.stab == "SUPG":
+                a += coeff*-div(self.nu*grad(phi))*dx
+                L += coeff*self.source*dx
+                psi = psi + coeff
+        elif not self.stab is None:
+            raise ValueError("Unrecognised stabilisation method.")
+
+        # Boundary conditions
+        bcs = self.op.boundary_conditions
+        dbcs = []
         for i in bcs.keys():
             if bcs[i] == {}:
-                a += -nu*psi*dot(n, nabla_grad(phi))*ds(i)
+                a += -self.nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
             if 'diff_flux' in bcs[i]:
-                a += -nu*psi*dot(n, nabla_grad(phi))*ds(i)
+                a += -self.nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
                 L += -psi*bcs[i]['diff_flux']*ds(i)
             if 'value' in bcs[i]:
                 dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))
 
-        # Stabilisation
-        if self.stab == "SU":
-            a += self.stabilisation*dot(u, grad(psi))*dot(u, grad(phi))*dx
-        elif self.stab == "SUPG":
-            coeff = self.stabilisation*dot(u, grad(psi))
-            a += coeff*dot(u, grad(phi))*dx
-            a += coeff*-div(nu*grad(phi))*dx
-            L += coeff*f*dx
-
-        # For condition number studies  # TODO: what about RHS?
+        # For condition number studies  # TODO: account for RHS
         self.lhs = a
 
         # Solve
@@ -105,63 +103,37 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.solution_file.write(self.solution)
 
     def solve_continuous_adjoint(self):
-        u = self.u
-        nu = self.nu
-        n = self.n
-        bcs = self.op.boundary_conditions
-        dbcs = []
         lam = self.trial
         psi = self.test
 
-        # Adjoint finite element problem  # TODO: Check below for non-zero BCs
-        a = lam*dot(u, grad(psi))*dx
-        a += nu*inner(grad(lam), grad(psi))*dx
+        # Adjoint finite element problem
+        a = lam*dot(self.u, grad(psi))*dx + self.nu*inner(grad(lam), grad(psi))*dx
         L = self.kernel*psi*dx
+
+        # Stabilisation
+        if self.stab in ("SU", "SUPG"):
+            coeff = -self.stabilisation*div(self.u*psi)
+            a += -coeff*div(self.u*lam)*dx
+            if self.stab == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
+                a += coeff*-div(self.nu*grad(lam))*dx
+                L += coeff*self.kernel*dx
+                psi = psi + coeff
+        elif not self.stab is None:
+            raise ValueError("Unrecognised stabilisation method.")
+
+        # Boundary conditions
+        bcs = self.op.boundary_conditions
+        dbcs = []
         for i in bcs.keys():
             if not 'diff_flux' in bcs[i]:
                 dbcs.append(DirichletBC(self.V, 0, i))  # Dirichlet BC in adjoint
-            if 'value' in bcs[i]:
-                a += -lam*psi*(dot(u, n))*ds(i)
-                a += -nu*psi*dot(n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
-
-        # Stabilisation
-        if self.stab == 'SU':
-            a += self.stabilisation*div(u*psi)*div(u*lam)*dx
-        elif self.stab == "SUPG":  # NOTE: this is not equivalent to discrete adjoint
-            coeff = -self.stabilisation*div(u*psi)
-            a += coeff*-div(u*lam)*dx
-            a += coeff*-div(nu*grad(lam))*dx
-            L += coeff*self.kernel*dx
+            if not 'value' in bcs[i]:
+                a += -lam*psi*(dot(self.u, self.n))*ds(i)
+                a += -self.nu*psi*dot(self.n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
 
         # Solve
         solve(a == L, self.adjoint_solution, bcs=dbcs, solver_parameters=self.op.params)
         self.adjoint_solution_file.write(self.adjoint_solution)
-
-    def solve_high_order(self, adjoint=True):
-        """
-        Solve the problem using linear and quadratic approximations on a refined mesh, take the
-        difference and project back into the original space.
-        """
-        sol = self.adjoint_solution if adjoint else self.solution
-
-        # Solve adjoint problem on fine mesh using quadratic elements
-        if adjoint:
-            self.tp_enriched.solve_adjoint()
-            sol_p2 = self.tp_enriched.adjoint_solution
-        else:
-            self.tp_enriched.solve()
-            sol_p2 = self.tp_enriched.solution
-
-        # Project into P1 to get linear approximation, too
-        sol_p1 = Function(self.tp_enriched.P1)
-        # prolong(sol, sol_p1)  # FIXME: Maybe the hierarchy isn't recognised?
-        sol_p1.project(sol)
-
-        # Evaluate difference in enriched space
-        if adjoint:
-            self.adjoint_error = interpolate(sol_p2 - sol_p1, self.tp_enriched.P2)
-        else:
-            self.error = interpolate(sol_p2 - sol_p1, self.tp_enriched.P2)
 
     def get_hessian(self, adjoint=False):
         f = self.adjoint_solution if adjoint else self.solution
@@ -170,111 +142,107 @@ class SteadyTracerProblem2d(SteadyProblem):
     def get_hessian_metric(self, adjoint=False):
         self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
 
-    def get_strong_residual(self):
-        phi = self.solution
-
-        # Compute residuals
-        R = self.source - dot(self.u, grad(phi)) + div(self.nu*grad(phi))
+    def get_strong_residual_forward(self):
+        R = self.source - dot(self.u, grad(self.solution)) + div(self.nu*grad(self.solution))
         self.indicators['cell_res_forward'] = assemble(self.p0test*abs(R)*dx)
-
-        # For use in anisotropic methods
         self.indicator = interpolate(self.indicators['cell_res_forward'], self.P1)
         self.indicator.rename('forward strong residual')
 
     def get_strong_residual_adjoint(self):
-        lam = self.adjoint_solution
-
-        # Cell residual
-        R = self.kernel + div(self.u*lam) + div(self.nu*grad(lam))
+        R = self.kernel + div(self.u*self.adjoint_solution) + div(self.nu*grad(self.adjoint_solution))
         self.indicators['cell_res_adjoint'] = assemble(self.p0test*abs(R)*dx)
-
-        # For use in anisotropic approaches
         self.indicator = interpolate(self.indicators['cell_res_adjoint'], self.P1)
         self.indicator.rename('adjoint strong residual')
 
-    def dwr_indication(self):
+    def get_dwr_residual_forward(self, sol, adjoint_sol):  # FIXME: Inputs are unused
+        tpe = self.tp_enriched
+        phi = project(self.solution, tpe.V)  # FIXME: prolong
+        if not hasattr(self, 'adjoint_error'):
+            self.solve_high_order(adjoint=True)
+        strong_residual = tpe.source - dot(tpe.u, grad(phi)) + div(tpe.nu*grad(phi))
+        dwr = strong_residual*self.adjoint_error
+        if self.stab == 'SUPG':  # Account for stabilisation error
+            dwr += strong_residual*tpe.stabilisation*dot(tpe.u, grad(self.adjoint_error))
+        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*dwr*dx), self.P0)  # FIXME: inject?
+        self.indicators['dwr_cell'].interpolate(abs(self.indicators['dwr_cell']))
+        self.estimators['dwr_cell'] = self.indicators['dwr_cell'].vector().gather().sum()
+
+    def get_dwr_flux_forward(self, sol, adjoint_sol):  # FIXME: Inputs are unused
         tpe = self.tp_enriched
         i = tpe.p0test
         phi = project(self.solution, tpe.V)  # FIXME: prolong
-        u = tpe.u
-        nu = tpe.nu
-        n = tpe.n
-        f = tpe.source
-        bcs = tpe.op.boundary_conditions
         if not hasattr(self, 'adjoint_error'):
             self.solve_high_order(adjoint=True)
-        lam = self.adjoint_error
-
-        # Cell residual
-        R = (f - dot(u, grad(phi)) + div(nu*grad(phi)))*lam
-        if self.stab == 'SUPG':  # Account for stabilisation error
-            R += (f - dot(u, grad(phi)) + div(nu*grad(phi)))*tpe.stabilisation*dot(u, grad(lam))
-        self.cell_res = project(assemble(i*R*dx), self.P0)  # FIXME: inject
 
         # Flux terms (arising from integration by parts)
         mass_term = i*tpe.p0trial*dx
-        flux = -nu*lam*dot(n, nabla_grad(phi))
-        flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+        flux = -tpe.nu*dot(tpe.n, nabla_grad(phi))
+        dwr = flux*self.adjoint_error
+        if self.stab == 'SUPG':  # Account for stabilisation error
+            coeff = tpe.stabilisation*dot(tpe.u, grad(self.adjoint_error))
+            dwr += coeff*flux
+        flux_terms = ((i*dwr)('+') + (i*dwr)('-'))*dS
+
+        # Account for boundary conditions
+        # NOTES:
+        #   * For CG methods, Dirichlet error is zero, by construction.
+        #   * Negative sign in `flux`.
+        bcs = tpe.op.boundary_conditions
         for j in bcs.keys():
-            if 'diff_flux' in bcs[j]:  # TODO: Non-zero case
-                flux_terms += i*flux*ds(j)
-            # NOTE: For CG methods, Dirichlet error is zero, by construction
+            if 'diff_flux' in bcs[j]:
+                flux_terms += i*(dwr + bcs[j]['diff_flux']*self.adjoint_error)*ds(j)
+                if self.stab == "SUPG":
+                    flux_terms += i*bcs[j]['diff_flux']*coeff*ds(j)
+
+        # Solve auxiliary FEM problem
         edge_res = Function(tpe.P0)
         solve(mass_term == flux_terms, edge_res)
-        self.edge_res = project(edge_res, self.P0)  # FIXME: inject
+        self.indicators['dwr_flux'] = project(edge_res, self.P0)  # FIXME: inject?
+        self.indicators['dwr_flux'].interpolate(abs(self.indicators['dwr_flux']))
+        self.estimators['dwr_flux'] = self.indicators['dwr_flux'].vector().gather().sum()
 
-        # Sum
-        self.p0indicator = Function(self.cell_res)
-        self.p0indicator += self.edge_res
-        self.indicator = project(self.p0indicator, self.P1)
-        self.p0indicator.interpolate(abs(self.p0indicator))
-        self.indicator.interpolate(abs(self.indicator))
-        self.p0indicator.rename('dwr')
-        self.indicator.rename('dwr')
-
-    def dwr_indication_adjoint(self):
+    def get_dwr_residual_adjoint(self, sol, adjoint_sol):  # FIXME: Inputs are unused
+        tpe = self.tp_enriched
+        lam = project(self.adjoint_solution, tpe.V)  # FIXME: prolong
+        if not hasattr(self, 'error'):
+            self.solve_high_order(adjoint=False)
+        strong_residual = tpe.op.box(tpe.P0) + div(tpe.u*lam) + div(tpe.nu*grad(lam))
+        dwr = strong_residual*self.error
+        if self.stab == 'SUPG':  # Account for stabilisation error
+            dwr += strong_residual*tpe.stabilisation*dot(tpe.u, grad(self.error))
+        self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*dwr*dx), self.P0)  # FIXME: inject?
+        self.indicators['dwr_cell_adjoint'].interpolate(abs(self.indicators['dwr_cell_adjoint']))
+        self.estimators['dwr_cell_adjoint'] = self.indicators['dwr_cell_adjoint'].vector().gather().sum()
+        
+    def get_dwr_flux_adjoint(self, sol, adjoint_sol):  # FIXME: Inputs are unused
         tpe = self.tp_enriched
         i = tpe.p0test
         lam = project(self.adjoint_solution, tpe.V)  # FIXME: prolong
-        u = tpe.u
-        nu = tpe.nu
-        n = tpe.n
-        bcs = tpe.op.boundary_conditions
         if not hasattr(self, 'error'):
             self.solve_high_order(adjoint=False)
-        phi = self.error
-
-        # Cell residual
-        dJdphi = tpe.op.box(tpe.P0)  # Adjoint source term
-        R = (dJdphi + div(u*lam) + div(nu*grad(lam)))*phi
-        if self.stab == 'SUPG':  # Account for stabilisation error
-            R += (dJdphi + div(u*lam) + div(nu*grad(lam)))*tpe.stabilisation*dot(u, grad(phi))
-        self.cell_res_adjoint = project(assemble(i*R*dx), self.P0)  # FIXME: inject
 
         # Edge residual
         mass_term = i*tpe.p0trial*dx
-        flux = -(lam*dot(u, n) + nu*dot(n, nabla_grad(lam)))*phi
-        flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+        flux = -(lam*dot(tpe.u, tpe.n) + tpe.nu*dot(tpe.n, nabla_grad(lam)))
+        dwr = flux*self.error
+        if self.stab == 'SUPG':  # Account for stabilisation error
+            dwr += flux*tpe.stabilisation*dot(tpe.u, grad(self.error))
+        flux_terms = ((i*dwr)('+') + (i*dwr)('-'))*dS
+
+        # Account for boundary conditions
+        bcs = tpe.op.boundary_conditions
         for j in bcs.keys():
-            if 'diff_flux' in bcs[j]:  # TODO: Non-zero case
-                flux_terms += i*flux*ds(j)  # Robin BC in adjoint
+            if not 'value' in bcs[j]:
+                flux_terms += i*dwr*ds(j)  # Robin BC in adjoint
+
+        # Solve auxiliary FEM problem
         edge_res_adjoint = Function(tpe.P0)
         solve(mass_term == flux_terms, edge_res_adjoint)
-        self.edge_res_adjoint = project(edge_res_adjoint, self.P0)  # FIXME: inject
-
-        # Sum
-        self.p0indicator = Function(self.P0)
-        self.p0indicator += self.cell_res_adjoint + self.edge_res_adjoint
-        self.indicator = project(self.p0indicator, self.P1)
-        self.p0indicator.interpolate(abs(self.p0indicator))
-        self.indicator.interpolate(abs(self.indicator))
-        self.p0indicator.rename('dwr_adjoint')
-        self.indicator.rename('dwr_adjoint')
+        self.indicators['dwr_flux_adjoint'] = project(edge_res_adjoint, self.P0)  # FIXME: inject?
+        self.indicators['dwr_flux_adjoint'].interpolate(abs(self.indicators['dwr_flux_adjoint']))
+        self.estimators['dwr_flux_adjoint'] = self.indicators['dwr_flux_adjoint'].vector().gather().sum()
         
-    def get_loseille_metric(self, adjoint=False, relax=True, superpose=False):
-        assert (relax or superpose) and not (relax and superpose)
-
-        # Solve adjoint problem
+    def get_loseille_metric(self, adjoint=False, relax=True):
         adj = self.solution if adjoint else self.adjoint_solution
         sol = self.adjoint_solution if adjoint else self.solution
         adj_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(adj)))
@@ -335,10 +303,7 @@ class SteadyTracerProblem2d(SteadyProblem):
                      H1.dat(op2.READ),
                      H2.dat(op2.READ),
                      adj_diff.dat(op2.READ))
-        if relax:
-            self.M = metric_relaxation(self.M, Mf)
-        elif superpose:
-            self.M = metric_intersection(self.M, Mf)
+        self.M = metric_relaxation(self.M, Mf) if relax else metric_intersection(self.M, Mf)
         self.M = steady_metric(None, H=self.M, op=self.op)
 
         # TODO: boundary contributions
