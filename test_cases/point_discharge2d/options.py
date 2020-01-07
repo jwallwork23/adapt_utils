@@ -49,6 +49,10 @@ class TelemacOptions(TracerOptions):
         self.boundary_conditions[3] = {'diff_flux': Constant(0.0)}
         self.boundary_conditions[4] = {'diff_flux': Constant(0.0)}
 
+        # Metric normalisation
+        self.normalisation = 'error'
+        self.norm_order = 1
+
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity

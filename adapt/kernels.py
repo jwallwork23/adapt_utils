@@ -1,3 +1,4 @@
+from firedrake import op2
 try:
     from firedrake.slate.slac.compiler import PETSC_ARCH
 except:
