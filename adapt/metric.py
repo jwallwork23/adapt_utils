@@ -10,7 +10,8 @@ from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hes
 from adapt_utils.adapt.kernels import *
 
 
-__all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_intersection", "metric_relaxation", "metric_complexity"]
+__all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_intersection",
+           "metric_relaxation", "metric_complexity", "combine_metrics"]
 
 
 # TODO: test 3d case works
@@ -162,6 +163,12 @@ def metric_relaxation(M1, M2, alpha=0.5):
     M = Function(V)
     M += alpha*M1 + (1-alpha)*M2
     return M
+
+def combine_metrics(M1, M2, average=True):
+    if average:
+        return metric_relaxation(M1, M2)
+    else:
+        return metric_intersection(M1, M2)
 
 def metric_complexity(M):
     r"""

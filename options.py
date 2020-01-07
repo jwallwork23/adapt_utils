@@ -183,19 +183,19 @@ class Options(FrozenConfigurable):
         return box
 
     def set_initial_condition(self, fs):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def set_boundary_conditions(self, fs):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def set_source(self, fs):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def set_qoi_kernel(self, fs):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def exact_solution(self, fs):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def exact_qoi(self):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")

@@ -29,13 +29,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
             element = VectorElement("DG", triangle, op.degree)*FiniteElement("Lagrange", triangle, op.degree+1)
         else:
             raise NotImplementedError
-        if mesh is None:
-            mesh = op.default_mesh
         super(SteadyShallowWaterProblem, self).__init__(op, mesh, element, discrete_adjoint, prev_solution, 1)
-
-        self.prev_solution = prev_solution
         if prev_solution is not None:
-            self.interpolate_solution(hierarchy)
+            self.interpolate_solution(hierarchy)  # TODO: Make consistent
 
         # Physical fields
         self.set_fields()
@@ -112,88 +108,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.lhs = self.solver_obj.timestepper.F
         self.solution = self.solver_obj.fields.solution_2d
 
-    def solve(self):
+    def solve_forward(self):
         if not hasattr(self, 'solver_obj'):
             self.setup_solver()
         self.solver_obj.iterate()
         self.solution = self.solver_obj.fields.solution_2d
-
         if hasattr(self, 'cb'):
             self.get_callbacks(self.cb)
-
-    def solve_discrete_adjoint(self):
-        dFdu = derivative(self.lhs, self.solution, TrialFunction(self.V))
-        dFdu_form = adjoint(dFdu)
-        dJdu = derivative(self.quantity_of_interest_form(), self.solution, TestFunction(self.V))
-        solve(dFdu_form == dJdu, self.adjoint_solution, solver_parameters=self.op.adjoint_params)
-        self.plot()
-
-    def get_qoi_kernel(self):
-        pass
-
-    def quantity_of_interest(self):
-        pass
-
-    def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
-        field = self.op.adapt_field
-        sol = self.adjoint_solution if adjoint else self.solution
-        u, eta = sol.split()
-
-        def elevation():
-            return steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
-
-        def velocity_x():
-            s = Function(self.P1).interpolate(u[0])
-            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
-
-        def velocity_y():
-            s = Function(self.P1).interpolate(u[1])
-            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
-
-        def speed():
-            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
-            return steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
-
-        def inflow():
-            v = Function(self.P1).interpolate(inner(u, self.op.inflow))
-            return steady_metric(v, noscale=noscale, degree=degree, op=self.op)
-
-        def bathymetry():
-            b = Function(self.P1).interpolate(self.op.bathymetry)
-            return steady_metric(b, noscale=noscale, degree=degree, op=self.op)
-
-        def viscosity():
-            nu = Function(self.P1).interpolate(self.op.viscosity)
-            return steady_metric(nu, noscale=noscale, degree=degree, op=self.op)
-
-        metrics = {'elevation': elevation, 'velocity_x': velocity_x, 'velocity_y': velocity_y,
-                   'speed': speed, 'inflow': inflow,
-                   'bathymetry': bathymetry, 'viscosity': viscosity}
-
-        self.M = Function(self.P1_ten)
-        if field in metrics:
-            self.M = metrics[field]()
-        elif field == 'all_avg':
-            self.M += metrics['velocity_x']()/3.0
-            self.M += metrics['velocity_y']()/3.0
-            self.M += metrics['elevation']()/3.0
-        elif field == 'all_int':
-            self.M = metric_intersection(metrics['velocity_x'](), metrics['velocity_y']())
-            self.M = metric_intersection(self.M, metrics['elevation']())
-        elif 'avg' in field and 'int' in field:
-            raise NotImplementedError  # TODO
-        elif 'avg' in field:
-            fields = field.split('_avg_')
-            num_fields = len(fields)
-            for i in range(num_fields):
-                self.M += metrics[fields[i]]()/num_fields
-        elif 'int' in field:
-            fields = field.split('_int_')
-            self.M = metrics[fields[0]]()
-            for i in range(1, len(fields)):
-                self.M = metric_intersection(self.M, metrics[fields[i]]())
-        else:
-            raise ValueError("Adaptation field {:s} not recognised.".format(field))
 
     def get_bdy_functions(self, eta_in, u_in, bdy_id):
         b = self.op.bathymetry
@@ -229,7 +150,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         return eta, u
 
     def get_dwr_residual(self, sol, adjoint_sol, adjoint=False):
-        assert not adjoint  # FIXME
+        if not adjoint:
+            raise NotImplementedError  # TODO
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
         u, eta = sol.split()
@@ -264,7 +186,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.indicators['dwr_cell'] = assemble(i*F*dx)
 
     def get_dwr_flux(self, sol, adjoint_sol, adjoint=False):
-        assert not adjoint  # FIXME
+        if not adjoint:
+            raise NotImplementedError  # TODO
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
         u, eta = sol.split()
@@ -437,6 +360,67 @@ class SteadyShallowWaterProblem(SteadyProblem):
             u_interp.project(u_)
             eta_interp.project(eta_)
 
+    def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
+        field = self.op.adapt_field
+        sol = self.get_solution(adjoint)
+        u, eta = sol.split()
+
+        def elevation():
+            return steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
+
+        def velocity_x():
+            s = Function(self.P1).interpolate(u[0])
+            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+
+        def velocity_y():
+            s = Function(self.P1).interpolate(u[1])
+            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+
+        def speed():
+            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
+            return steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
+
+        def inflow():
+            v = Function(self.P1).interpolate(inner(u, self.op.inflow))
+            return steady_metric(v, noscale=noscale, degree=degree, op=self.op)
+
+        def bathymetry():
+            b = Function(self.P1).interpolate(self.op.bathymetry)
+            return steady_metric(b, noscale=noscale, degree=degree, op=self.op)
+
+        def viscosity():
+            nu = Function(self.P1).interpolate(self.op.viscosity)
+            return steady_metric(nu, noscale=noscale, degree=degree, op=self.op)
+
+        metrics = {'elevation': elevation, 'velocity_x': velocity_x, 'velocity_y': velocity_y,
+                   'speed': speed, 'inflow': inflow,
+                   'bathymetry': bathymetry, 'viscosity': viscosity}
+
+        self.M = Function(self.P1_ten)
+        if field in metrics:
+            self.M = metrics[field]()
+        elif field == 'all_avg':
+            self.M += metrics['velocity_x']()/3.0
+            self.M += metrics['velocity_y']()/3.0
+            self.M += metrics['elevation']()/3.0
+        elif field == 'all_int':
+            self.M = metric_intersection(metrics['velocity_x'](), metrics['velocity_y']())
+            self.M = metric_intersection(self.M, metrics['elevation']())
+        elif 'avg' in field and 'int' in field:
+            raise NotImplementedError  # TODO
+        elif 'avg' in field:
+            fields = field.split('_avg_')
+            num_fields = len(fields)
+            for i in range(num_fields):
+                self.M += metrics[fields[i]]()/num_fields
+        elif 'int' in field:
+            fields = field.split('_int_')
+            self.M = metrics[fields[0]]()
+            for i in range(1, len(fields)):
+                self.M = metric_intersection(self.M, metrics[fields[i]]())
+        else:
+            raise ValueError("Adaptation field {:s} not recognised.".format(field))
+
 
 class UnsteadyShallowWaterProblem(UnsteadyProblem):
     """
@@ -550,12 +534,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solution.assign(self.solver_obj.fields.solution_2d)
 
     def get_update_forcings(self):
-        pass
-
-    def get_qoi_kernel(self):
-        pass
-
-    def quantity_of_interest(self):
         pass
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):

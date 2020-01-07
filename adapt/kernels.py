@@ -275,31 +275,31 @@ def matscale_sum_kernel(d):
 
 using namespace Eigen;
 
-void matscale_sum(double B_[%d], const double * A1_, const double * A2_, const double * x_) {
-  Map<Matrix<double, %d, %d, RowMajor> > A1((double *)A1_);
-  Map<Matrix<double, %d, %d, RowMajor> > A2((double *)A2_);
-  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+void matscale_sum(double B_[4], const double * A1_, const double * A2_, const double * x_) {
+  Map<Matrix<double, 2, 2, RowMajor> > A1((double *)A1_);
+  Map<Matrix<double, 2, 2, RowMajor> > A2((double *)A2_);
+  Map<Matrix<double, 2, 2, RowMajor> > B((double *)B_);
   Map<Vector2d> x((double *)x_);
   B += x[0] * A1;
   B += x[1] * A2;
 }
-""" % (d*d, d, d, d, d)
+"""
     elif d == 3:
         return """
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
-void matscale_sum(double B_[%d], const double * A1_, const double * A2_, const double * A3_, const double * x_) {
-  Map<Matrix<double, %d, %d, RowMajor> > A1((double *)A1_);
-  Map<Matrix<double, %d, %d, RowMajor> > A2((double *)A2_);
-  Map<Matrix<double, %d, %d, RowMajor> > A3((double *)A3_);
-  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+void matscale_sum(double B_[9], const double * A1_, const double * A2_, const double * A3_, const double * x_) {
+  Map<Matrix<double, 3, 3, RowMajor> > A1((double *)A1_);
+  Map<Matrix<double, 3, 3, RowMajor> > A2((double *)A2_);
+  Map<Matrix<double, 3, 3, RowMajor> > A3((double *)A3_);
+  Map<Matrix<double, 3, 3, RowMajor> > B((double *)B_);
   Map<Vector3d> x((double *)x_);
   B += x[0] * A1;
   B += x[1] * A2;
   B += x[2] * A3;
 }
-""" % (d*d, d, d, d, d)
+"""
     else:
         raise NotImplementedError

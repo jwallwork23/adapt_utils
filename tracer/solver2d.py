@@ -5,7 +5,7 @@ import numpy as np
 from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.kernels import matscale_sum_kernel
+from adapt_utils.adapt.kernels import matscale_kernel, matscale_sum_kernel, include_dir
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.p0_metric import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
@@ -135,13 +135,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         solve(a == L, self.adjoint_solution, bcs=dbcs, solver_parameters=self.op.params)
         self.adjoint_solution_file.write(self.adjoint_solution)
 
-    def get_hessian(self, adjoint=False):
-        f = self.adjoint_solution if adjoint else self.solution
-        return steady_metric(f, mesh=self.mesh, noscale=True, op=self.op)
-
-    def get_hessian_metric(self, adjoint=False):
-        self.M = steady_metric(self.adjoint_solution if adjoint else self.solution, op=self.op)
-
     def get_strong_residual_forward(self):
         R = self.source - dot(self.u, grad(self.solution)) + div(self.nu*grad(self.solution))
         self.indicators['cell_res_forward'] = assemble(self.p0test*abs(R)*dx)
@@ -241,12 +234,15 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.indicators['dwr_flux_adjoint'] = project(edge_res_adjoint, self.P0)  # FIXME: inject?
         self.indicators['dwr_flux_adjoint'].interpolate(abs(self.indicators['dwr_flux_adjoint']))
         self.estimators['dwr_flux_adjoint'] = self.indicators['dwr_flux_adjoint'].vector().gather().sum()
+
+    def get_hessian_metric(self, adjoint=False, noscale=False):
+        self.M = steady_metric(self.get_solution(adjoint), mesh=self.mesh, noscale=noscale, op=self.op)
         
-    def get_loseille_metric(self, adjoint=False, relax=True):
-        adj = self.solution if adjoint else self.adjoint_solution
-        sol = self.adjoint_solution if adjoint else self.solution
-        adj_diff = Function(self.P1_vec).interpolate(abs(construct_gradient(adj)))
-        adj = Function(self.P1).interpolate(abs(adj))
+    def get_loseille_metric(self, adjoint=False, relax=True):  # FIXME!
+        adj = self.get_solution(not adjoint)
+        sol = self.get_solution(adjoint)
+        adj_diff = interpolate(abs(construct_gradient(adj)), self.P1_vec)
+        adj = interpolate(abs(adj), self.P1)
 
         # Get potential to take Hessian w.r.t.
         # x, y = SpatialCoordinate(self.mesh)
@@ -303,10 +299,9 @@ class SteadyTracerProblem2d(SteadyProblem):
                      H1.dat(op2.READ),
                      H2.dat(op2.READ),
                      adj_diff.dat(op2.READ))
-        self.M = metric_relaxation(self.M, Mf) if relax else metric_intersection(self.M, Mf)
-        self.M = steady_metric(None, H=self.M, op=self.op)
+        self.M = steady_metric(None, H=combine_metrics(self.M, Mf, average=relax), op=self.op)
 
-        # TODO: boundary contributions
+        # Account for boundary contributions  # TODO: Use EquationBC
         # bdy_contributions = i*(F1*n[0] + F2*n[1])*ds
         # n = self.n
         # Fhat = i*dot(phi, n)
