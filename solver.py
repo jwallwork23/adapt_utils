@@ -10,7 +10,7 @@ from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
-from adapt_utils.adapt.kernels import matscale_kernel, include_dir
+from adapt_utils.adapt.kernels import *
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem"]
@@ -329,7 +329,7 @@ class SteadyProblem():
         H = self.get_hessian(adjoint=not adjoint)
         H_scaled = Function(self.P1_ten).assign(np.finfo(0.0).min)
         dim = self.mesh.topological_dimension()
-        kernel = op2.Kernel(matscale_kernel(dim), "matscale", cpp=True, include_dirs=include_dir)
+        kernel = mykernel(matscale_kernel(dim), "matscale")
         op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.indicator.dat(op2.READ))
         self.M = steady_metric(self.solution if adjoint else self.adjoint_solution, H=H, op=self.op)
 

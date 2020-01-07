@@ -4,7 +4,10 @@ try:
     import firedrake.cython.dmplex as dmplex
 except:
     import firedrake.dmplex as dmplex  # Older Firedrake version
+
 import numpy as np
+
+from adapt_utils.adapt.kernels import *
 
 
 __all__ = ["anisotropic_stabilisation"]
@@ -22,18 +25,7 @@ def cell_metric(mesh, metric=None):
     P0_ten = TensorFunctionSpace(mesh, "DG", 0)
     J = interpolate(Jacobian(mesh), P0_ten)
     metric = metric or Function(P0_ten, name="CellMetric")
-    d = str(dim)
-    kernel_str = """
-#include <Eigen/Dense>
-
-void polar(double A_[%s], const double * B_) {
-  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > B((double *)B_);
-  Eigen::JacobiSVD<Eigen::Matrix<double, %s, %s, Eigen::RowMajor> > svd(B, Eigen::ComputeFullV);
-
-  A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
-}""" % (str(dim*dim), d, d, d, d, d, d)
-    kernel = op2.Kernel(kernel_str, "polar", cpp=True, include_dirs=["%s/include/eigen3" % d for d in PETSC_DIR])
+    kernel = mykernel(polar_kernel(dim), "polar")
     op2.par_loop(kernel, P0_ten.node_set, metric.dat(op2.INC), J.dat(op2.READ))
     return metric
 

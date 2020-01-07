@@ -12,14 +12,17 @@ except:
 from adapt_utils.options import * 
 
 
-__all__ = ["get_eigendecomposition_kernel", "get_reordered_eigendecomposition_kernel",
+__all__ = ["mykernel", "get_eigendecomposition_kernel", "get_reordered_eigendecomposition_kernel",
            "set_eigendecomposition_kernel", "intersect_kernel", "anisotropic_refinement_kernel",
            "metric_from_hessian_kernel", "scale_metric_kernel", "include_dir",
-           "gemv_kernel", "matscale_kernel", "matscale_sum_kernel"]
+           "gemv_kernel", "matscale_kernel", "matscale_sum_kernel", "polar_kernel", ]
 
 
 include_dir = ["%s/include/eigen3" % PETSC_ARCH]
 
+
+def mykernel(kernel, name):
+    return op2.Kernel(kernel, name, cpp=True, include_dirs=include_dir)
 
 def get_eigendecomposition_kernel(d):
     return """
@@ -303,3 +306,15 @@ void matscale_sum(double B_[9], const double * A1_, const double * A2_, const do
 """
     else:
         raise NotImplementedError
+
+def polar_kernel(d):
+    return """
+#include <Eigen/Dense>
+
+void polar(double A_[%d], const double * B_) {
+  Eigen::Map<Eigen::Matrix<double, %d, %d, Eigen::RowMajor> > A((double *)A_);
+  Eigen::Map<Eigen::Matrix<double, %d, %d, Eigen::RowMajor> > B((double *)B_);
+  Eigen::JacobiSVD<Eigen::Matrix<double, %d, %d, Eigen::RowMajor> > svd(B, Eigen::ComputeFullV);
+
+  A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
+}""" % (d*d, d, d, d, d, d, d)

@@ -60,7 +60,7 @@ class AnisotropicMetricDriver():
         """
         JJt = Function(self.P0_ten)
         JJt.interpolate(self.J*self.J.T)
-        kernel = op2.Kernel(get_eigendecomposition_kernel(self.dim), "get_eigendecomposition", cpp=True, include_dirs=include_dir)
+        kernel = mykernel(get_eigendecomposition_kernel(self.dim), "get_eigendecomposition")
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
         self.eval.interpolate(as_vector([1/self.eval[0], 1/self.eval[1]]))  # TODO: avoid interp?
 
@@ -69,7 +69,7 @@ class AnisotropicMetricDriver():
         Extract eigenpairs related to provided Hessian.
         """
         assert self.p0hessian is not None
-        kernel = op2.Kernel(get_reordered_eigendecomposition_kernel(self.dim), "get_reordered_eigendecomposition", cpp=True, include_dirs=include_dir)
+        kernel = mykernel(get_reordered_eigendecomposition_kernel(self.dim), "get_reordered_eigendecomposition")
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), self.p0hessian.dat(op2.READ))
         s = sqrt(abs(self.eval[0]/self.eval[1]))
         self.eval.interpolate(as_vector([abs(self.K_hat/self.K_opt/s), abs(self.K_hat/self.K_opt*s)]))
@@ -102,7 +102,7 @@ class AnisotropicMetricDriver():
 
         NOTE: Assumes eigevalues are already squared.
         """
-        kernel = op2.Kernel(set_eigendecomposition_kernel(self.dim), "set_eigendecomposition", cpp=True, include_dirs=include_dir)
+        kernel = kernel(set_eigendecomposition_kernel(self.dim), "set_eigendecomposition")
         op2.par_loop(kernel, self.P0_ten.node_set, self.p0metric.dat(op2.RW), self.evec.dat(op2.READ), self.eval.dat(op2.READ))
 
     def project_metric(self):
@@ -197,6 +197,6 @@ class AnisotropicMetricDriver():
         fs = self.p1metric.function_space()
         for direction in range(dim):
             M = Function(self.p1metric)  # FIXME: Copy doesn't seem to work for tensor fields
-            kernel = op2.Kernel(anisotropic_refinement_kernel(dim, direction), "anisotropic", cpp=True, include_dirs=include_dir)
+            kernel = mykernel(anisotropic_refinement_kernel(dim, direction), "anisotropic")
             op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
             self.component_stretch_metrics.append(M)

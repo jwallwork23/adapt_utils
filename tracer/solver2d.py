@@ -5,7 +5,7 @@ import numpy as np
 from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.kernels import matscale_kernel, matscale_sum_kernel, include_dir
+from adapt_utils.adapt.kernels import *
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.p0_metric import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
@@ -238,7 +238,7 @@ class SteadyTracerProblem2d(SteadyProblem):
     def get_hessian_metric(self, adjoint=False, noscale=False):
         self.M = steady_metric(self.get_solution(adjoint), mesh=self.mesh, noscale=noscale, op=self.op)
         
-    def get_loseille_metric(self, adjoint=False, relax=True):  # FIXME!
+    def get_loseille_metric(self, adjoint=False, relax=True):
         adj = self.get_solution(not adjoint)
         sol = self.get_solution(adjoint)
         adj_diff = interpolate(abs(construct_gradient(adj)), self.P1_vec)
@@ -275,31 +275,27 @@ class SteadyTracerProblem2d(SteadyProblem):
         H2 = steady_metric(F2, mesh=self.mesh, noscale=True, op=self.op)
         Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
 
-        # Hessian for source term
-        Mf = Function(self.P1_ten).assign(np.finfo(0.0).min)
-        kernel = op2.Kernel(matscale_kernel(2),
-                            "matscale",
-                            cpp=True,
-                            include_dirs=include_dir)
+        # Hessian for conservative part
+        M = Function(self.P1_ten).assign(0.0)
+        kernel = mykernel(matscale_sum_kernel(2), "matscale_sum")
+        op2.par_loop(kernel,
+                     self.P1_ten.node_set,
+                     M.dat(op2.RW),
+                     H1.dat(op2.READ),
+                     H2.dat(op2.READ),
+                     adj_diff.dat(op2.READ))
+
+        # Account for source term
+        Mf = Function(self.P1_ten).assign(0.0)
+        kernel = mykernel(matscale_kernel(2), "matscale")
         op2.par_loop(kernel,
                      self.P1_ten.node_set,
                      Mf.dat(op2.RW),
                      Hf.dat(op2.READ),
                      adj.dat(op2.READ))
 
-        # Form metric
-        self.M = Function(self.P1_ten).assign(np.finfo(0.0).min)
-        kernel = op2.Kernel(matscale_sum_kernel(2),
-                            "matscale_sum",
-                            cpp=True,
-                            include_dirs=include_dir)
-        op2.par_loop(kernel,
-                     self.P1_ten.node_set,
-                     self.M.dat(op2.RW),
-                     H1.dat(op2.READ),
-                     H2.dat(op2.READ),
-                     adj_diff.dat(op2.READ))
-        self.M = steady_metric(None, H=combine_metrics(self.M, Mf, average=relax), op=self.op)
+        # Combine contributions
+        self.M = steady_metric(None, H=combine_metrics(M, Mf, average=relax), op=self.op)
 
         # Account for boundary contributions  # TODO: Use EquationBC
         # bdy_contributions = i*(F1*n[0] + F2*n[1])*ds
