@@ -28,11 +28,11 @@ class TracerOptions(Options):
     nx = PositiveInteger(4, help="Mesh resolution in x- and y-directions.").tag(config=True)
 
     # Solver
-    params = PETScSolverParameters({'pc_type': 'lu',
+    params = PETScSolverParameters({'ksp_type': 'preonly',
+                                    'pc_type': 'lu',
                                     'mat_type': 'aij' ,
                                     'pc_factor_mat_solver_type': 'mumps',
-                                    'ksp_monitor': None,
-                                    'ksp_converged_reason': None}).tag(config=True)
+                                    }).tag(config=True)
     # TODO: For problems bigger than ~1e6 dofs in 2d, we want to use a scalable iterative solver
 
     # Physical 

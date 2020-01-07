@@ -38,8 +38,8 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
              raise NotImplementedError
         if mesh is None:
             mesh = op.default_mesh
-        super(SteadyTracerProblem2d_Thetis, self).__init__(op,
-                                                           mesh,
+        super(SteadyTracerProblem2d_Thetis, self).__init__(mesh,
+                                                           op,
                                                            discrete_adjoint,
                                                            finite_element,
                                                            None)
@@ -83,7 +83,7 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
     def solve_continuous_adjoint(self):
         raise NotImplementedError  # TODO
 
-    def get_strong_residual(self, sol, adjoint_sol, adjoint=False, weighted=True):
+    def get_dwr_residual(self, sol, adjoint_sol, adjoint=False, weighted=True):
         if adjoint:
             F = self.kernel + div(self.u*adjoint_sol) + div(self.nu*grad(adjoint_sol))
             dwr = inner(F, sol)
@@ -96,7 +96,7 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         else:
             self.indicators['strong_residual'] = assemble(self.p0test*F*dx)
 
-    def get_flux_terms(self, sol, adjoint_sol, adjoint=False):
+    def get_dwr_flux(self, sol, adjoint_sol, adjoint=False):
         try:
             assert self.divergence_free
         except:
@@ -161,12 +161,6 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         solve(mass_term == flux_terms, res)
         self.estimators['dwr_flux'] = abs(assemble(res*dx))
         self.indicators['dwr_flux'] = res
-
-    def explicit_indication(self):
-        raise NotImplementedError
-
-    def explicit_indication_adjoint(self):
-        raise NotImplementedError
 
 
 class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
@@ -341,7 +335,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
             raise NotImplementedError
         return phi, phi_new, phi_old, adj, adj_new, adj_old
 
-    def get_strong_residual(self, adjoint=False, weighted=True):
+    def get_dwr_residual(self, adjoint=False, weighted=True):
         i = self.p0test
         phi, phi_new, phi_old, adj, adj_new, adj_old = self.get_ts_components(adjoint)
 
@@ -357,7 +351,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
         else:
             self.indicators['strong_residual'] = assemble(F*i*dx)
 
-    def get_flux_terms(self, adjoint=False):
+    def get_dwr_flux(self, adjoint=False):
         phi, phi_new, phi_old, adj, adj_new, adj_old = self.get_ts_components(adjoint)
         # TODO: time-dependent u case
         # TODO: non divergence-free u case

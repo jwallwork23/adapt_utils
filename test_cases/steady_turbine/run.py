@@ -103,8 +103,8 @@ for i in range(op.num_adapt):
         tp_ho.boundary_conditions = op.set_bcs(tp.V)
 
         # Indicate error in enriched space and then project (average) down to base space
-        tp_ho.get_strong_residual(proj, tp_ho.adjoint_solution)
-        tp_ho.get_flux_terms(proj, tp_ho.adjoint_solution)
+        tp_ho.get_dwr_residual(proj, tp_ho.adjoint_solution)
+        tp_ho.get_dwr_flux(proj, tp_ho.adjoint_solution)
         tp_ho.indicator = interpolate(abs(tp_ho.indicators['dwr_cell'] + tp_ho.indicators['dwr_flux']), tp_ho.P0)
         tp.indicator = project(tp_ho.indicator, tp.P0)  # This is equivalent to averaging
         tp.estimators['dwr'] = tp.indicator.vector().sum()

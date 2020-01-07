@@ -19,10 +19,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
     """
     def __init__(self,
                  mesh=None,
-                 discrete_adjoint=True,
                  op=ShallowWaterOptions(),
+                 discrete_adjoint=True,
                  prev_solution=None,
-                 hierarchy=False):
+                 hierarchy=False):  # TODO: Make hierarchy consistent with tracer solver
         if op.family == 'dg-dg' and op.degree in (1, 2):
             element = VectorElement("DG", triangle, op.degree)*FiniteElement("DG", triangle, op.degree)
         elif op.family == 'dg-cg':
@@ -31,7 +31,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             raise NotImplementedError
         if mesh is None:
             mesh = op.default_mesh
-        super(SteadyShallowWaterProblem, self).__init__(mesh, op, element, discrete_adjoint, prev_solution, 1)
+        super(SteadyShallowWaterProblem, self).__init__(op, mesh, element, discrete_adjoint, prev_solution, 1)
 
         self.prev_solution = prev_solution
         if prev_solution is not None:
@@ -228,7 +228,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             raise Exception('Unsupported boundary type {:}'.format(funcs.keys()))
         return eta, u
 
-    def get_strong_residual(self, sol, adjoint_sol, adjoint=False):
+    def get_dwr_residual(self, sol, adjoint_sol, adjoint=False):
         assert not adjoint  # FIXME
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
@@ -263,7 +263,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimators['dwr_cell'] = assemble(F*dx)
         self.indicators['dwr_cell'] = assemble(i*F*dx)
 
-    def get_flux_terms(self, sol, adjoint_sol, adjoint=False):
+    def get_dwr_flux(self, sol, adjoint_sol, adjoint=False):
         assert not adjoint  # FIXME
         assert sol.function_space() == self.solution.function_space()
         assert adjoint_sol.function_space() == self.adjoint_solution.function_space()

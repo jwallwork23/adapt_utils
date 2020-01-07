@@ -14,7 +14,7 @@ from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
-from adapt_utils.adapt.kernels import matscale_kernel
+from adapt_utils.adapt.kernels import matscale_kernel, include_dir
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem", "MeshOptimisation", "OuterLoop"]
@@ -33,7 +33,7 @@ class SteadyProblem():
         * solve adjoint PDE;
         * adapt mesh based on some error estimator of choice.
     """
-    def __init__(self, mesh, op, finite_element, discrete_adjoint=False, prev_solution=None, levels=1):
+    def __init__(self, op, mesh, finite_element, discrete_adjoint=False, prev_solution=None, levels=1):
 
         # Read args and kwargs
         self.op = op
@@ -47,6 +47,8 @@ class SteadyProblem():
         mesh = op.default_mesh if mesh is None else mesh
         self.am = AdaptiveMesh(mesh, levels=levels)
         self.mesh = self.am.mesh
+        if levels > 0:
+            self.tp_refined = self.__class__
 
         # Function spaces and mesh quantities
         self.V = FunctionSpace(self.mesh, self.finite_element)
@@ -75,6 +77,13 @@ class SteadyProblem():
         # Error estimator/indicator storage
         self.estimators = {}
         self.indicators = {}
+
+        # Create equivalent problem in refined space
+        if levels > 0:
+            fe = FiniteElement(finite_element.family(),
+                               finite_element.cell(),
+                               finite_element.degree()+1)
+            self.tp_enriched = type(self)(op, self.am.refined_mesh, fe, discrete_adjoint, prev_solution, levels-1)
 
     def set_target_vertices(self, num_vertices=None):
         """
@@ -138,10 +147,16 @@ class SteadyProblem():
         self.indicator.project(inner(self.solution, self.adjoint_solution))
         self.indicator.rename('dwp')
 
-    def explicit_indication(self, space=None, square=True):
+    def get_strong_residual(self):
         pass
 
-    def explicit_indication_adjoint(self, space=None, square=True):
+    def get_strong_residual_adjoint(self):
+        pass
+
+    def get_dwr_residual(self, sol, adjoint_sol, adjoint=False):
+        pass
+
+    def get_dwr_flux(self, sol, adjoint_sol, adjoint=False):
         pass
 
     def plot(self):
@@ -164,8 +179,8 @@ class SteadyProblem():
         label = 'dwr'
         if adjoint:
             label += '_adjoint'
-        self.get_strong_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
-        self.get_flux_terms(self.solution, self.adjoint_solution, adjoint=adjoint)
+        self.get_dwr_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
+        self.get_dwr_flux(self.solution, self.adjoint_solution, adjoint=adjoint)
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators['dwr_cell'] + self.indicators['dwr_flux']))
         self.estimators[label] = self.estimators['dwr_cell'] + self.estimators['dwr_flux']
@@ -214,15 +229,14 @@ class SteadyProblem():
         for the adjoint PDE.
         """
         if adjoint:
-            self.explicit_indication_adjoint(square=False)
-            self.p1indicator.interpolate(abs(self.p1cell_res_adjoint))
+            self.get_strong_residual_adjoint()
         else:
-            self.explicit_indication(square=False)
-            self.p1indicator.interpolate(abs(self.p1cell_res))
+            self.get_strong_residual()
         H = self.get_hessian(adjoint=not adjoint)
         H_scaled = Function(self.P1_ten).assign(np.finfo(0.0).min)
-        kernel = op2.Kernel(matscale_kernel, "matscale", cpp=True, include_dirs=include_dir)
-        op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.p1indicator.dat(op2.READ))
+        dim = self.mesh.topological_dimension()
+        kernel = op2.Kernel(matscale_kernel(dim), "matscale", cpp=True, include_dirs=include_dir)
+        op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.indicator.dat(op2.READ))
         if adjoint:
             self.M = steady_metric(self.solution, H=H, op=self.op)
         else:
@@ -257,26 +271,6 @@ class SteadyProblem():
             M = self.M.copy()
             self.get_hessian_metric(adjoint=True)
             self.M = metric_intersection(M, self.M)
-        elif self.approach == 'explicit':
-            self.explicit_indication()
-            self.get_isotropic_metric()
-        elif self.approach == 'explicit_adjoint':
-            self.explicit_indication_adjoint()
-            self.get_isotropic_metric()
-        elif self.approach == 'explicit_relaxed':
-            self.explicit_indication()
-            self.get_isotropic_metric()
-            M = self.M.copy()
-            self.explicit_indication_adjoint()
-            self.get_isotropic_metric()
-            self.M = metric_relaxation(M, self.M)
-        elif self.approach == 'explicit_superposed':
-            self.explicit_indication()
-            self.get_isotropic_metric()
-            M = self.M.copy()
-            self.explicit_indication_adjoint()
-            self.get_isotropic_metric()
-            self.M = metric_intersection(M, self.M)
         elif self.approach == 'dwp':
             self.dwp_indication()
             self.get_isotropic_metric()
@@ -289,16 +283,16 @@ class SteadyProblem():
         elif self.approach == 'dwr_both':
             self.dwr_indication()
             self.get_isotropic_metric()
-            i = self.p1indicator.copy()
+            i = self.indicator.copy()
             self.dwr_indication(adjoint=True)
-            self.p1indicator.interpolate(Constant(0.5)*(i+self.p1indicator))
+            self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
             self.get_isotropic_metric()
         elif self.approach == 'dwr_averaged':
             self.dwr_indication()
             self.get_isotropic_metric()
-            i = self.p1indicator.copy()
+            i = self.indicator.copy()
             self.dwr_indication(adjoint=True)
-            self.p1indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.p1indicator)))
+            self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
             self.get_isotropic_metric()
         elif self.approach == 'dwr_relaxed':
             self.dwr_indication()
@@ -524,7 +518,7 @@ class MeshOptimisation():
                 self.logfile.write('Mesh  {:2d}:        J = {:.4e}\n'.format(i, self.dat['qoi'][j]))
 
             # Solve adjoint
-            if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'explicit', 'vorticity'):
+            if not self.op.approach in ('fixed_mesh', 'uniform', 'hessian', 'vorticity'):
                 tp.solve_adjoint()
 
             # Estimate and record error  # FIXME
@@ -662,7 +656,7 @@ class UnsteadyProblem():
         * solve adjoint PDE;
         * adapt mesh based on some error estimator of choice.
     """
-    def __init__(self, mesh, op, finite_element, discrete_adjoint=False, levels=1):
+    def __init__(self, op, mesh, finite_element, discrete_adjoint=False, levels=1):
 
         # Read args and kwargs
         self.finite_element = finite_element
@@ -826,7 +820,7 @@ class UnsteadyProblem():
         """
         Get adjoint solution at timestep i.
         """
-        if self.approach in ('uniform', 'hessian', 'explicit', 'vorticity'):
+        if self.approach in ('uniform', 'hessian', 'vorticity'):
             return
         if not hasattr(self, 'V_orig'):
             self.V_orig = FunctionSpace(self.mesh, self.finite_element)
@@ -858,10 +852,10 @@ class UnsteadyProblem():
         self.indicator.project(inner(self.solution, self.adjoint_solution))
         self.indicator.rename('dwp')
 
-    def explicit_indication(self, space=None, square=True):
+    def get_strong_residual(self):
         pass
 
-    def explicit_indication_adjoint(self, space=None, square=True):
+    def get_strong_residual_adjoint(self):
         pass
 
     def plot(self):
@@ -923,17 +917,17 @@ class UnsteadyProblem():
         for the forward PDE. Otherwise, we weight the Hessian of the forward solution with a residual
         for the adjoint PDE.
         """
-        # TODO: update
         if adjoint:
-            self.explicit_indication_adjoint(square=False)
-            self.p1indicator.interpolate(abs(self.p1cell_res_adjoint))
+            self.get_strong_residual_adjoint()
+            self.indicator.interpolate(abs(self.p1cell_res_adjoint))
         else:
-            self.explicit_indication(square=False)
-            self.p1indicator.interpolate(abs(self.p1cell_res))
+            self.get_strong_residual()
+            self.indicator.interpolate(abs(self.p1cell_res))
         H = self.get_hessian(adjoint=not adjoint)
         H_scaled = Function(self.P1_ten).assign(np.finfo(0.0).min)
-        kernel = op2.Kernel(matscale_kernel, "matscale", cpp=True, include_dirs=include_dir)
-        op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.p1indicator.dat(op2.READ))
+        dim = self.mesh.topological_dimension()
+        kernel = op2.Kernel(matscale_kernel(dim), "matscale", cpp=True, include_dirs=include_dir)
+        op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.indicator.dat(op2.READ))
         if adjoint:
             self.M = steady_metric(self.solution, H=H, op=self.op)
         else:
@@ -972,26 +966,6 @@ class UnsteadyProblem():
             M = self.M.copy()
             self.get_hessian_metric(adjoint=True)
             self.M = metric_intersection(M, self.M)
-        elif self.approach == 'explicit':
-            self.explicit_indication(square=True)
-            self.get_isotropic_metric()
-        elif self.approach == 'explicit_adjoint':
-            self.explicit_indication_adjoint(square=True)
-            self.get_isotropic_metric()
-        elif self.approach == 'explicit_relaxed':
-            self.explicit_indication()
-            self.get_isotropic_metric()
-            M = self.M.copy()
-            self.explicit_indication_adjoint()
-            self.get_isotropic_metric()
-            self.M = metric_relaxation(M, self.M)
-        elif self.approach == 'explicit_superposed':
-            self.explicit_indication()
-            self.get_isotropic_metric()
-            M = self.M.copy()
-            self.explicit_indication_adjoint()
-            self.get_isotropic_metric()
-            self.M = metric_intersection(M, self.M)
         elif self.approach == 'dwp':
             self.dwp_indication()
             self.get_isotropic_metric()
@@ -1004,16 +978,16 @@ class UnsteadyProblem():
         elif self.approach == 'dwr_both':
             self.dwr_indication()
             self.get_isotropic_metric()
-            i = self.p1indicator.copy()
+            i = self.indicator.copy()
             self.dwr_indication(adjoint=True)
-            self.p1indicator.interpolate(Constant(0.5)*(i+self.p1indicator))
+            self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
             self.get_isotropic_metric()
         elif self.approach == 'dwr_averaged':
             self.dwr_indication()
             self.get_isotropic_metric()
-            i = self.p1indicator.copy()
+            i = self.indicator.copy()
             self.dwr_indication(adjoint=True)
-            self.p1indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.p1indicator)))
+            self.indicator.interpolate(Constant(0.5)*(abs(i)+abs(self.indicator)))
             self.get_isotropic_metric()
         elif self.approach == 'dwr_relaxed':
             self.dwr_indication()

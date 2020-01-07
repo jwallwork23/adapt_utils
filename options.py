@@ -61,9 +61,6 @@ class Options(FrozenConfigurable):
     qoi_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in quantity of interest.").tag(config=True)
     estimator_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in error estimator.").tag(config=True)
 
-    # Adjoint
-    order_increase = Bool(False, help="Interpolate adjoint solution into higher order space.").tag(config=True)
-
     def __init__(self, approach='fixed_mesh'):
         self.approach = approach
         self.di = os.path.join('outputs', self.approach)
