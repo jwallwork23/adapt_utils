@@ -242,7 +242,13 @@ class SteadyTracerProblem2d(SteadyProblem):
         adj = self.get_solution(not adjoint)
         sol = self.get_solution(adjoint)
         adj_diff = interpolate(abs(construct_gradient(adj)), self.P1_vec)
+        adj_diff.rename("Gradient of adjoint solution")
+        adj_diff_x = interpolate(adj_diff[0], self.P1)
+        adj_diff_x.rename("x-derivative of adjoint solution")
+        adj_diff_y = interpolate(adj_diff[1], self.P1)
+        adj_diff_y.rename("y-derivative of adjoint solution")
         adj = interpolate(abs(adj), self.P1)
+        adj.rename("Adjoint solution in modulus")
 
         # Get potential to take Hessian w.r.t.
         # x, y = SpatialCoordinate(self.mesh)
@@ -272,30 +278,48 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         # Construct Hessians
         H1 = steady_metric(F1, mesh=self.mesh, noscale=True, op=self.op)
+        H1.rename("Hessian for x-component")
         H2 = steady_metric(F2, mesh=self.mesh, noscale=True, op=self.op)
+        H2.rename("Hessian for y-component")
         Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
+        Hf.rename("Hessian for source term")
 
-        # Hessian for conservative part
-        M = Function(self.P1_ten).assign(0.0)
-        kernel = eigen_kernel(matscale_sum, 2)
+        # Hessians for conservative parts
+        M1 = Function(self.P1_ten).assign(0.0)
+        M2 = Function(self.P1_ten).assign(0.0)
+        kernel = eigen_kernel(matscale, 2)
         op2.par_loop(kernel,
                      self.P1_ten.node_set,
-                     M.dat(op2.RW),
+                     M1.dat(op2.RW),
                      H1.dat(op2.READ),
+                     adj_diff_x.dat(op2.READ))
+        M1 = steady_metric(None, H=M1, op=self.op)
+        M1.rename("Metric for x-component of conservative terms")
+        op2.par_loop(kernel,
+                     self.P1_ten.node_set,
+                     M2.dat(op2.RW),
                      H2.dat(op2.READ),
-                     adj_diff.dat(op2.READ))
+                     adj_diff_y.dat(op2.READ))
+        M2 = steady_metric(None, H=M2, op=self.op)
+        M2.rename("Metric for y-component of conservative terms")
+        M = combine_metrics(M1, M2, average=relax)
 
         # Account for source term
         Mf = Function(self.P1_ten).assign(0.0)
-        kernel = eigen_kernel(matscale, 2)
         op2.par_loop(kernel,
                      self.P1_ten.node_set,
                      Mf.dat(op2.RW),
                      Hf.dat(op2.READ),
                      adj.dat(op2.READ))
+        Mf = steady_metric(None, H=Mf, op=self.op)
+        Mf.rename("Metric for source term")
 
         # Combine contributions
-        self.M = steady_metric(None, H=combine_metrics(M, Mf, average=relax), op=self.op)
+        self.M = combine_metrics(M, Mf, average=relax)
+        self.M.rename("Loseille metric")
+
+        # TODO: Remove (it's for debugging)
+        File(self.di + '/loseille_metrics.pvd').write(H1, H2, Hf, M1, M2, Mf, adj, adj_diff, self.M)
 
         # Account for boundary contributions  # TODO: Use EquationBC
         # bdy_contributions = i*(F1*n[0] + F2*n[1])*ds

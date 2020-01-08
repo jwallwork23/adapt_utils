@@ -31,6 +31,7 @@ class SteadyTracerProblem3d(SteadyTracerProblem2d):
         * outflow.
     """
     def get_loseille_metric(self, adjoint=False, relax=True):
+        raise NotImplementedError  # TODO: update
         adj = self.get_solution(not adjoint)
         sol = self.get_solution(adjoint)
         adj_diff = interpolate(abs(construct_gradient(adj)), self.P1_vec))

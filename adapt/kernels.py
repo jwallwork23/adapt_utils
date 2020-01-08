@@ -16,7 +16,7 @@ from adapt_utils.options import *
 __all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecomposition",
            "set_eigendecomposition", "intersect", "anisotropic_refinement",
            "metric_from_hessian", "scale_metric", "include_dir",
-           "gemv", "matscale", "matscale_sum", "polar", ]
+           "gemv", "matscale", "matscale_sum", "singular_value_decomposition"]
 
 
 include_dir = ["%s/include/eigen3" % PETSC_ARCH]
