@@ -99,7 +99,7 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
     def get_dwr_flux(self, sol, adjoint_sol, adjoint=False):
         try:
             assert self.divergence_free
-        except:
+        except AssertionError:
             raise NotImplementedError  # TODO
         uv = -self.u
         nu = self.nu
@@ -192,7 +192,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
         if adjoint and not self.discrete_adjoint:  # TODO: discrete adjoint solver should be easy
             try:
                 assert self.divergence_free
-            except ValueError
+            except AssertionError:
                 raise ValueError("Automated continuous adjoint not valid as velocity field is not divergence free")
         op = self.op
 

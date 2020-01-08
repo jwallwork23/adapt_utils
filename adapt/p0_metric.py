@@ -14,15 +14,11 @@ class AnisotropicMetricDriver():
     """
     def __init__(self, adaptive_mesh, hessian=None, indicator=None, op=Options()):
         self.am = adaptive_mesh
-        if hasattr(adaptive_mesh, 'mesh'):
-            self.mesh = adaptive_mesh.mesh
-        else:
-            self.mesh = adaptive_mesh
-            print("WARNING: MeshGeometry argument to be replaced by AdaptiveMesh.")  # TODO: Make the change
+        self.mesh = adaptive_mesh
         self.dim = self.mesh.topological_dimension()
         try:
             assert self.dim == 2
-        except:
+        except AssertionError:
             raise NotImplementedError
         self.H = hessian
         self.eta = indicator
@@ -141,7 +137,7 @@ class AnisotropicMetricDriver():
     def check_p1metric_exists(self):
         try:
             assert hasattr(self, 'p1metric')
-        except ValueError:
+        except AssertionError:
             raise ValueError("Vertexwise metric does not exist. Please choose an adaptation strategy.")
 
     def adapt_mesh(self, hessian=None, indicator=None):

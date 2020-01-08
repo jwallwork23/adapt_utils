@@ -30,7 +30,7 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         self.domain_width = 1000.0
         try:
             os.path.exists(self.meshfile)
-        except ValueError:
+        except OSError:
             raise ValueError("Mesh fine not generated.")
         self.default_mesh = Mesh(self.meshfile)
         self.bathymetry.assign(50.0)

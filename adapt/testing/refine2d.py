@@ -25,7 +25,7 @@ amd.adapt_mesh()
 try:
     assert np.allclose(coords.dat.data, amd.mesh.coordinates.dat.data)
     assert len(amd.P1.boundary_nodes(1, method)) == len(amd.P1.boundary_nodes(3, method))
-except:
+except AssertionError:
     fail(amd, "FAIL: Hard-coded metric")
 
 # Check isotropic metric does the same thing
@@ -36,7 +36,7 @@ amd.adapt_mesh()
 try:
     assert np.allclose(coords.dat.data, amd.mesh.coordinates.dat.data)
     assert len(amd.P1.boundary_nodes(1, method)) == len(amd.P1.boundary_nodes(3, method))
-except:
+except AssertionError:
     fail(amd, "FAIL: Isotropic metric")
 
 # Check anistropic refinement in x-direction
@@ -48,7 +48,7 @@ amd.adapt_mesh()
 try:
     assert amd.mesh.num_vertices() == 6
     assert len(amd.P1.boundary_nodes(1, method)) < len(amd.P1.boundary_nodes(3, method))
-except:
+except AssertionError:
     fail(amd, "FAIL: Anisotropic metric 0")
 
 # Check anistropic refinement in y-direction
@@ -60,7 +60,7 @@ amd.adapt_mesh()
 try:
     assert amd.mesh.num_vertices() == 6
     assert len(amd.P1.boundary_nodes(1, method)) > len(amd.P1.boundary_nodes(3, method))
-except:
+except AssertionError:
     fail(amd, "FAIL: Anisotropic metric 1")
 
 # Check metric intersection combines these appropriately
@@ -73,7 +73,7 @@ amd.adapt_mesh()
 try:
     assert amd.mesh.num_vertices() == 9
     assert len(amd.P1.boundary_nodes(1, method)) == len(amd.P1.boundary_nodes(3, method))
-except:
+except AssertionError:
     fail(amd, "FAIL: Metric intersection")
 
 print("All tests passed!")

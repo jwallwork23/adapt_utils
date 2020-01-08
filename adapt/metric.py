@@ -215,10 +215,10 @@ def metric_with_boundary(f=None, mesh=None, H=None, op=Options()):
     P1_ten = H.function_space()
     mesh = P1_ten.mesh()
     dim = mesh.topological_dimension()
-    #assert dim in (2, 3)
     try:
+        # assert dim in (2, 3)
         assert dim == 2
-    except:
+    except AssertionError:
         raise NotImplementedError  # TODO
 
     # Functions to hold metric and boundary Hessian
@@ -230,10 +230,10 @@ def metric_with_boundary(f=None, mesh=None, H=None, op=Options()):
     detM_bdy = Function(P1)
 
     # Set parameters
-    #assert op.normalisation in ('complexity', 'error')
     try:
+        # assert op.normalisation in ('complexity', 'error')
         assert op.normalisation == 'complexity'
-    except:
+    except AssertionError:
         raise NotImplementedError  # TODO
     rescale = op.target
     p = op.norm_order

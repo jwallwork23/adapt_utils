@@ -1,7 +1,7 @@
 from firedrake import op2
 try:
     from firedrake.slate.slac.compiler import PETSC_ARCH
-except:
+except ImportError:
     import os
 
     PETSC_ARCH = os.environ.get('PETSC_ARCH')
@@ -311,13 +311,13 @@ void matscale_sum(double B_[9], const double * A1_, const double * A2_, const do
     else:
         raise NotImplementedError
 
-def polar(d):
+def singular_value_decomposition(d):
     return """
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
-void polar(double A_[%d], const double * B_) {
+void singular_value_decomposition(double A_[%d], const double * B_) {
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
   Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
   JacobiSVD<Matrix<double, %d, %d, RowMajor> > svd(B, ComputeFullV);

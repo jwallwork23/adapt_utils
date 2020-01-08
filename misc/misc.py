@@ -1,7 +1,7 @@
 from firedrake import *
 try:
     import firedrake.cython.dmplex as dmplex
-except:
+except ImportError:
     import firedrake.dmplex as dmplex
 from firedrake.petsc import PETSc
 

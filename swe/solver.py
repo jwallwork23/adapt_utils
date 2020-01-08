@@ -351,7 +351,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         PETSc.Sys.Print("Interpolating solution across meshes...")
         try:
             prolong(self.prev_solution, self.interpolated_solution)
-        except:
+        except:  # TODO: Remove bare exception
             u_interp, eta_interp = self.interpolated_solution.split()
             u_, eta_ = self.prev_solution.split()
             u_interp.project(u_)
@@ -439,7 +439,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if self.stab is not None:
             try:
                 assert self.stab == 'lax_friedrichs'
-            except:
+            except AssertionError:
                 raise NotImplementedError
 
         # Classification

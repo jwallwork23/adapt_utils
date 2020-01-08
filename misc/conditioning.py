@@ -29,7 +29,7 @@ class BaseConditionCheck():
         self._get_wrk(*args)
         try:
             from slepc4py import SLEPc
-        except:
+        except ImportError:
             # If SLEPc is not available, use SciPy
             self._get_csr()
             eigval = sla.eigs(self.csr)[0]
@@ -83,7 +83,7 @@ class UnnestedConditionCheck(BaseConditionCheck):
         super(UnnestedConditionCheck, self).__init__(bilinear_form)
         try:
             assert self.A.getType() != 'nest'
-        except:
+        except AssertionError:
             raise ValueError("Matrix type 'nest' not supported. Use `NestedConditionCheck` instead.")
 
     def _get_wrk(self):
@@ -96,7 +96,7 @@ class NestedConditionCheck(BaseConditionCheck):
         super(NestedConditionCheck, self).__init__(bilinear_form)
         try:
             assert self.A.getType() == 'nest'
-        except:
+        except AssertionError:
             raise ValueError("Matrix type {:} not supported.".format(self.A.getType()))
         m, n = self.A.getNestSize()
         self.submatrices = {}

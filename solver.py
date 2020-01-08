@@ -126,7 +126,7 @@ class SteadyProblem():
     def solve_discrete_adjoint(self):
         try:
             assert hasattr(self, 'lhs')
-        except ValueError:
+        except AssertionError:
             raise ValueError("Cannot compute discrete adjoint since LHS unknown.")
         dFdu = derivative(self.lhs, self.solution, TrialFunction(self.V))
         dFdu_form = adjoint(dFdu)
@@ -397,7 +397,7 @@ class SteadyProblem():
             if self.approach == 'carpio_isotropic_both':
                 self.dwr_indication(adjoint=not 'adjoint' in self.approach)
                 eta = Function(self.P0).interpolate(eta + self.indicator)
-            amd = AnisotropicMetricDriver(self.mesh, indicator=eta, op=self.op)
+            amd = AnisotropicMetricDriver(self.am, indicator=eta, op=self.op)
             amd.get_isotropic_metric()
             self.M = amd.p1metric
         elif self.approach == 'carpio_both':
@@ -409,19 +409,19 @@ class SteadyProblem():
             self.get_hessian_metric(noscale=False, degree=1, adjoint=True)
             self.indicator.interpolate(i + self.indicator)
             self.M = metric_intersection(self.M, M)
-            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicator, op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric
         elif 'carpio' in self.approach:
             self.dwr_indication(adjoint='adjoint' in self.approach)
             self.get_hessian_metric(noscale=True, degree=1, adjoint=adjoint)
-            amd = AnisotropicMetricDriver(self.mesh, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicator, op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric
         else:
             try:
                 assert hasattr(self, 'custom_adapt')
-            except:
+            except AssertionError:
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
             PETSc.Sys.Print("Using custom metric '{:s}'".format(self.approach))
             self.custom_adapt()
@@ -464,7 +464,7 @@ class SteadyProblem():
         """
         try:
             assert hasattr(self, 'lhs')
-        except:
+        except AssertionError:
             msg = "Cannot determine condition number since {:s} does not know the LHS."
             raise ValueError(msg.format(self.__class__.__name__))
         if hasattr(self.V, 'num_sub_spaces'):

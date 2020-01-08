@@ -118,10 +118,10 @@ def construct_boundary_hessian(f, mesh=None, op=Options()):
     if mesh is None:
         mesh = f.function_space().mesh()
     dim = mesh.topological_dimension()
-    #assert dim in (2, 3)
     try:
+        # assert dim in (2, 3)
         assert dim == 2
-    except:
+    except AssertionError:
         raise NotImplementedError  # TODO
 
     P1 = FunctionSpace(mesh, "CG", 1)

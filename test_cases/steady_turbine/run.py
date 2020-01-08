@@ -111,11 +111,11 @@ for i in range(op.num_adapt):
 
         # Compute metric
         if tp.approach == 'carpio_isotropic':
-            amd = AnisotropicMetricDriver(tp.mesh, indicator=tp.indicator, op=tp.op)
+            amd = AnisotropicMetricDriver(tp.am, indicator=tp.indicator, op=tp.op)
             amd.get_isotropic_metric()
         elif tp.approach == 'carpio':
             tp.get_hessian_metric(noscale=True)
-            amd = AnisotropicMetricDriver(tp.mesh, hessian=tp.M, indicator=tp.indicator, op=tp.op)
+            amd = AnisotropicMetricDriver(tp.am, hessian=tp.M, indicator=tp.indicator, op=tp.op)
             amd.get_anisotropic_metric()
         else:
             raise NotImplementedError

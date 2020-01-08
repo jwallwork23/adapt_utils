@@ -1,13 +1,12 @@
 from firedrake import *
-from firedrake.slate.slac.compiler import PETSC_DIR
 try:
     import firedrake.cython.dmplex as dmplex
-except:
+except ImportError:
     import firedrake.dmplex as dmplex  # Older Firedrake version
 
 import numpy as np
 
-from adapt_utils.adapt.kernels import eigen_kernel, polar
+from adapt_utils.adapt.kernels import eigen_kernel, singular_value_decomposition
 
 
 __all__ = ["anisotropic_stabilisation"]
@@ -25,7 +24,7 @@ def cell_metric(mesh, metric=None):
     P0_ten = TensorFunctionSpace(mesh, "DG", 0)
     J = interpolate(Jacobian(mesh), P0_ten)
     metric = metric or Function(P0_ten, name="CellMetric")
-    kernel = eigen_kernel(polar, dim)
+    kernel = eigen_kernel(singular_value_decomposition, dim)
     op2.par_loop(kernel, P0_ten.node_set, metric.dat(op2.INC), J.dat(op2.READ))
     return metric
 

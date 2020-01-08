@@ -21,7 +21,7 @@ M.interpolate(as_matrix([[1/np.sqrt(2), 0, 0], [0, 1/np.sqrt(2), 0], [0, 0, 1/np
 mesh2 = AnisotropicAdaptation(mesh, M).adapted_mesh
 try:
     assert np.max(mesh.coordinates.dat.data - mesh2.coordinates.dat.data) < 1e-8
-except:
+except AssertionError:
     print("FAIL: Hard-coded metric")
     exit(0)
 
@@ -32,7 +32,7 @@ M = isotropic_metric(f, noscale=True)
 mesh2 = AnisotropicAdaptation(mesh, M).adapted_mesh
 try:
     assert np.max(mesh.coordinates.dat.data - mesh2.coordinates.dat.data) < 1e-8
-except:
+except AssertionError:
     print("FAIL: Isotropic metric")
     exit(0)
 
@@ -43,7 +43,7 @@ mesh2 = AnisotropicAdaptation(mesh, M2).adapted_mesh
 try:
     assert mesh2.num_vertices() == 12
     # TODO: check there are more cells in x-direction
-except:
+except AssertionError:
     print("FAIL: Anisotropic metric 0")
     exit(0)
 
@@ -55,7 +55,7 @@ mesh2 = AnisotropicAdaptation(mesh, M3).adapted_mesh
 try:
     assert mesh2.num_vertices() == 12
     # TODO: check there are more cells in y-direction
-except:
+except AssertionError:
     print("FAIL: Anisotropic metric 1")
     exit(0)
 
@@ -67,7 +67,7 @@ mesh2 = AnisotropicAdaptation(mesh, M4).adapted_mesh
 try:
     assert mesh2.num_vertices() == 12
     # TODO: check there are more cells in z-direction
-except:
+except AssertionError:
     print("FAIL: Anisotropic metric 2")
     exit(0)
 
@@ -78,7 +78,7 @@ M5 = metric_intersection(M5, M4)
 mesh2 = AnisotropicAdaptation(mesh, M5).adapted_mesh
 try:
     assert mesh2.num_vertices() == 27  # FIXME
-except:
+except AssertionError:
     print("FAIL: Metric intersection")
     exit(0)
 
