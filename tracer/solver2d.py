@@ -39,13 +39,14 @@ class SteadyTracerProblem2d(SteadyProblem):
                  prev_solution=None,
                  levels=1):
         super(SteadyTracerProblem2d, self).__init__(op, mesh, finite_element, discrete_adjoint, prev_solution, levels)
+        self.nonlinear = False
 
-        # Extract parameters from Options class
-        self.nu = op.set_diffusivity(self.P1)
-        self.u = op.set_velocity(self.P1_vec)
+    def set_fields(self):
+        self.nu = self.op.set_diffusivity(self.P1)
+        self.u = self.op.set_velocity(self.P1_vec)
         self.divergence_free = np.allclose(norm(div(self.u)), 0.0)
-        self.source = op.set_source(self.P1)
-        self.kernel = op.set_qoi_kernel(self.P0)
+        self.source = self.op.set_source(self.P1)
+        self.kernel = self.op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Stabilisation
@@ -60,9 +61,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Rename solution fields
         self.solution.rename('Tracer concentration')
         self.adjoint_solution.rename('Adjoint tracer concentration')
-
-        # Classification
-        self.nonlinear = False
 
     def solve_forward(self):
         phi = self.trial
@@ -139,12 +137,16 @@ class SteadyTracerProblem2d(SteadyProblem):
         R = self.source - dot(self.u, grad(self.solution)) + div(self.nu*grad(self.solution))
         self.indicators['cell_res_forward'] = assemble(self.p0test*abs(R)*dx)
         self.indicator = interpolate(self.indicators['cell_res_forward'], self.P1)
+        # self.indicator = interpolate(R, self.P1)
+        # self.indicator = interpolate(abs(self.indicator), self.P1)
         self.indicator.rename('forward strong residual')
 
     def get_strong_residual_adjoint(self):
         R = self.kernel + div(self.u*self.adjoint_solution) + div(self.nu*grad(self.adjoint_solution))
         self.indicators['cell_res_adjoint'] = assemble(self.p0test*abs(R)*dx)
         self.indicator = interpolate(self.indicators['cell_res_adjoint'], self.P1)
+        # self.indicator = interpolate(R, self.P1)
+        # self.indicator = interpolate(abs(self.indicator), self.P1)
         self.indicator.rename('adjoint strong residual')
 
     def get_dwr_residual_forward(self, sol, adjoint_sol):  # FIXME: Inputs are unused
@@ -303,6 +305,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         M2 = steady_metric(None, H=M2, op=self.op)
         M2.rename("Metric for y-component of conservative terms")
         M = combine_metrics(M1, M2, average=relax)
+        # self.M = combine_metrics(M1, M2, average=relax)
 
         # Account for source term
         Mf = Function(self.P1_ten).assign(0.0)

@@ -42,6 +42,7 @@ class SteadyProblem():
             self.create_enriched_problem()
         self.create_function_spaces()
         self.create_solutions()
+        self.set_fields()
         self.boundary_conditions = op.set_boundary_conditions(self.V)
 
         # Outputs
@@ -328,21 +329,22 @@ class SteadyProblem():
         """
         self.get_strong_residual(adjoint=adjoint)
         H = self.get_hessian(adjoint=not adjoint)
-        H_scaled = Function(self.P1_ten).assign(np.finfo(0.0).min)
-        dim = self.mesh.topological_dimension()
-        kernel = eigen_kernel(matscale, dim)
+        H_scaled = Function(self.P1_ten).assign(0.0)
+        kernel = eigen_kernel(matscale, self.mesh.topological_dimension())
         op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.indicator.dat(op2.READ))
         self.M = steady_metric(self.solution if adjoint else self.adjoint_solution, H=H, op=self.op)
 
     def plot(self):
         """
-        Plot current mesh and indicator field, if available.
+        Plot current mesh and indicator fields, if available.
         """
         File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
         if hasattr(self, 'indicator'):
             name = self.indicator.dat.name
             self.indicator.rename(' '.join([name, 'indicator']))
             File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator)
+        for key in self.indicators:
+            File(os.path.join(self.di, key + '.pvd')).write(self.indicators[key])
 
     def indicate_error(self):  # TODO: Change 'relax' to 'average'
         """
@@ -455,6 +457,8 @@ class SteadyProblem():
         # Re-initialise problem
         self.create_function_spaces()
         self.create_solutions()
+        self.set_fields()
+        self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
     def check_conditioning(self, submatrices=None):
         """
