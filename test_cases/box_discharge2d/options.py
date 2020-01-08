@@ -28,12 +28,14 @@ class PowerOptions(TracerOptions):
         self.region_of_interest = [(3., 2., 0.1)] if centred else [(3., 2.5, 0.1)]
         self.base_diffusivity = 1.
 
-        # Boundary conditions  # TODO: make Thetis-conforming
-        self.boundary_conditions[1] = {'value': Constant(0.0)}
-        #self.boundary_conditions[2] = {'diff_flux': Constant(0.0)}
+    def set_boundary_conditions(self, fs):
+        zero = Constant(0.0, domain=fs.mesh())
+        self.boundary_conditions[1] = {'value': zero}
+        #self.boundary_conditions[2] = {'diff_flux': zero}
         self.boundary_conditions[2] = {}
-        self.boundary_conditions[3] = {'diff_flux': Constant(0.0)}
-        self.boundary_conditions[4] = {'diff_flux': Constant(0.0)}
+        self.boundary_conditions[3] = {'diff_flux': zero}
+        self.boundary_conditions[4] = {'diff_flux': zero}
+        return self.boundary_conditions
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)

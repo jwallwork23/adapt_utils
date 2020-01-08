@@ -42,18 +42,19 @@ class LeVequeOptions(TracerOptions):
             self.region_of_interest = [(0.5, 0.75, 0.175)]
         self.base_diffusivity = 0.
 
-        # Boundary conditions
-        #q_in = Constant(1.0)
-        q_in = Constant(0.0)
-        for i in range(1, 5):
-            self.boundary_conditions[i] = {i: {'value': q_in}}
-            self.adjoint_boundary_conditions[i] = {i: {'diff_flux': q_in}}
-
         # Time integration
         self.dt = pi/300.0
         self.end_time = 2*pi + self.dt
         self.dt_per_export = 10
         self.dt_per_remesh = 10
+
+    def set_boundary_conditions(self, fs):
+        # zero = Constant(1.0, domain=fs.mesh())
+        zero = Constant(0.0, domain=fs.mesh())
+        for i in range(1, 5):
+            self.boundary_conditions[i] = {i: {'value': zero}}
+            self.adjoint_boundary_conditions[i] = {i: {'diff_flux': zero}}
+        return self.boundary_conditions
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)

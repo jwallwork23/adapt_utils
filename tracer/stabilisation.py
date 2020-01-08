@@ -7,7 +7,7 @@ except:
 
 import numpy as np
 
-from adapt_utils.adapt.kernels import *
+from adapt_utils.adapt.kernels import eigen_kernel, polar
 
 
 __all__ = ["anisotropic_stabilisation"]
@@ -25,7 +25,7 @@ def cell_metric(mesh, metric=None):
     P0_ten = TensorFunctionSpace(mesh, "DG", 0)
     J = interpolate(Jacobian(mesh), P0_ten)
     metric = metric or Function(P0_ten, name="CellMetric")
-    kernel = mykernel(polar_kernel(dim), "polar")
+    kernel = eigen_kernel(polar, dim)
     op2.par_loop(kernel, P0_ten.node_set, metric.dat(op2.INC), J.dat(op2.READ))
     return metric
 

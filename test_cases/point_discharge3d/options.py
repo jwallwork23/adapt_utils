@@ -37,17 +37,19 @@ class Telemac3dOptions(TracerOptions):
         self.source_discharge = 0.1
         self.base_diffusivity = 0.1
 
-        # Boundary conditions
-        self.boundary_conditions[1] = {'value': Constant(0.0)}
-        self.boundary_conditions[2] = {}
-        self.boundary_conditions[3] = {'diff_flux': Constant(0.0)}
-        self.boundary_conditions[4] = {'diff_flux': Constant(0.0)}
-        self.boundary_conditions[5] = {'diff_flux': Constant(0.0)}
-        self.boundary_conditions[6] = {'diff_flux': Constant(0.0)}
-
         # Metric normalisation
         self.normalisation = 'error'
         self.norm_order = 1
+
+    def set_boundary_conditions(self, fs):
+        zero = Constant(0.0, domain=fs.mesh())
+        self.boundary_conditions[1] = {'value': zero}
+        self.boundary_conditions[2] = {}
+        self.boundary_conditions[3] = {'diff_flux': zero}
+        self.boundary_conditions[4] = {'diff_flux': zero}
+        self.boundary_conditions[5] = {'diff_flux': zero}
+        self.boundary_conditions[6] = {'diff_flux': zero}
+        return self.boundary_conditions
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)

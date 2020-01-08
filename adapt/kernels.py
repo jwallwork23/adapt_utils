@@ -13,19 +13,22 @@ except:
 from adapt_utils.options import * 
 
 
-__all__ = ["mykernel", "get_eigendecomposition_kernel", "get_reordered_eigendecomposition_kernel",
-           "set_eigendecomposition_kernel", "intersect_kernel", "anisotropic_refinement_kernel",
-           "metric_from_hessian_kernel", "scale_metric_kernel", "include_dir",
-           "gemv_kernel", "matscale_kernel", "matscale_sum_kernel", "polar_kernel", ]
+__all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecomposition",
+           "set_eigendecomposition", "intersect", "anisotropic_refinement",
+           "metric_from_hessian", "scale_metric", "include_dir",
+           "gemv", "matscale", "matscale_sum", "polar", ]
 
 
 include_dir = ["%s/include/eigen3" % PETSC_ARCH]
 
 
-def mykernel(kernel, name):
-    return op2.Kernel(kernel, name, cpp=True, include_dirs=include_dir)
+def eigen_kernel(kernel, *args, **kwargs):
+    """
+    Helper function to easily pass Eigen kernels to Firedrake via PyOP2.
+    """
+    return op2.Kernel(kernel(*args, **kwargs), kernel.__name__, cpp=True, include_dirs=include_dir)
 
-def get_eigendecomposition_kernel(d):
+def get_eigendecomposition(d):
     return """
 #include <Eigen/Dense>
 
@@ -43,7 +46,8 @@ void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double *
 }
 """ % (d*d, d, d, d, d, d, d, d, d, d, d, d)
 
-get_reordered_eigendecomposition_kernel_2d = """
+def get_reordered_eigendecomposition_2d():
+    return  """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -73,13 +77,13 @@ void get_reordered_eigendecomposition(double EVecs_[4], double EVals_[2], const 
 }
 """
 
-def get_reordered_eigendecomposition_kernel(d):
+def get_reordered_eigendecomposition(d):
     if d == 2:
-        return get_reordered_eigendecomposition_kernel_2d
+        return get_reordered_eigendecomposition_2d()
     else:
         raise NotImplementedError  # TODO: 3d case
 
-def set_eigendecomposition_kernel(d):
+def set_eigendecomposition(d):
     return """
 #include <Eigen/Dense>
 
@@ -93,7 +97,7 @@ void set_eigendecomposition(double M_[%d], const double * EVecs_, const double *
 }
 """ % (d*d, d, d, d, d, d)
 
-def intersect_kernel(d):
+def intersect(d):
     return """
 #include <Eigen/Dense>
 
@@ -115,7 +119,7 @@ void intersect(double M_[%d], const double * A_, const double * B_) {
 }
 """ % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d)
 
-def anisotropic_refinement_kernel(d, direction):
+def anisotropic_refinement(d, direction):
     assert d in (2, 3)
     scale = 4 if d == 2 else 8
     return """
@@ -123,7 +127,7 @@ def anisotropic_refinement_kernel(d, direction):
 
 using namespace Eigen;
 
-void anisotropic(double A_[%d]) {
+void anisotropic_refinement(double A_[%d]) {
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(A);
   Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
@@ -134,15 +138,14 @@ void anisotropic(double A_[%d]) {
 }
 """ % (d*d, d, d, d, d, d, d, d, d, direction, scale)
 
-def metric_from_hessian_kernel(d, noscale=False, op=Options()):
-    p = op.norm_order
-    scale = 'false' if noscale or op.normalisation == 'error' else 'true'
-    if p is None:
-        return linf_metric_from_hessian_kernel(d, scale)
+def metric_from_hessian(d, noscale=False, op=Options()):
+    scale = 'false' if noscale else 'true'
+    if op.norm_order is None:
+        return linf_metric_from_hessian(d, scale)
     else:
-        return lp_metric_from_hessian_kernel(d, scale, p)
+        return lp_metric_from_hessian(d, scale, op.norm_order)
 
-def linf_metric_from_hessian_kernel(d, scale):
+def linf_metric_from_hessian(d, scale):
     return """
 #include <Eigen/Dense>
 
@@ -178,7 +181,7 @@ void metric_from_hessian(double A_[%d], double * f, const double * B_)
 }
 """ % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d)
 
-def lp_metric_from_hessian_kernel(d, scale, p):
+def lp_metric_from_hessian(d, scale, p):
     return """
 #include <Eigen/Dense>
 
@@ -210,13 +213,13 @@ void metric_from_hessian(double A_[%d], double * f, const double * B_)
     double det = 1.0;
     for (i=0; i<%d; i++) det *= D(i);
     scaling = pow(det, -1 / (2 * %d + 2));
-    *f += pow(det, %d / (2 * %d + 2));
+    *f += pow(det, %d / (2 * %d + %d));
   }
   A += scaling * Q * D.asDiagonal() * Q.transpose();
 }
-""" % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d, p, p, p)
+""" % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d, p, p, p, d)
 
-def scale_metric_kernel(d, op=Options()):
+def scale_metric(d, op=Options()):
     return """
 #include <Eigen/Dense>
 
@@ -236,7 +239,7 @@ void scale_metric(double A_[%d])
 }
 """ % (d*d, d, d, d, d, d, d, d, d, pow(op.h_min, -2), pow(op.h_max, -2), d, d, pow(op.max_anisotropy, -2))
 
-def gemv_kernel(d, alpha=1.0, beta=0.0, tol=1e-8):
+def gemv(d, alpha=1.0, beta=0.0, tol=1e-8):
     return """
 #include <Eigen/Dense>
 
@@ -259,7 +262,7 @@ void gemv(double y_[%d], const double * A_, const double * x_) {
 }
 """ % (d, d, d, d, d, alpha, beta, tol)
 
-def matscale_kernel(d):
+def matscale(d):
     return """
 #include <Eigen/Dense>
 
@@ -272,7 +275,7 @@ void matscale(double B_[%d], const double * A_, const double * alpha_) {
 }
 """ % (d*d, d, d, d, d)
 
-def matscale_sum_kernel(d):
+def matscale_sum(d):
     if d == 2:
         return """
 #include <Eigen/Dense>
@@ -308,14 +311,16 @@ void matscale_sum(double B_[9], const double * A1_, const double * A2_, const do
     else:
         raise NotImplementedError
 
-def polar_kernel(d):
+def polar(d):
     return """
 #include <Eigen/Dense>
 
+using namespace Eigen;
+
 void polar(double A_[%d], const double * B_) {
-  Eigen::Map<Eigen::Matrix<double, %d, %d, Eigen::RowMajor> > A((double *)A_);
-  Eigen::Map<Eigen::Matrix<double, %d, %d, Eigen::RowMajor> > B((double *)B_);
-  Eigen::JacobiSVD<Eigen::Matrix<double, %d, %d, Eigen::RowMajor> > svd(B, Eigen::ComputeFullV);
+  Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+  JacobiSVD<Matrix<double, %d, %d, RowMajor> > svd(B, ComputeFullV);
 
   A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
 }""" % (d*d, d, d, d, d, d, d)

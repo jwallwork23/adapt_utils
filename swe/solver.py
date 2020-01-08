@@ -18,11 +18,11 @@ class SteadyShallowWaterProblem(SteadyProblem):
     General solver object for stationary shallow water problems.
     """
     def __init__(self,
-                 mesh=None,
                  op=ShallowWaterOptions(),
+                 mesh=None,
                  discrete_adjoint=True,
                  prev_solution=None,
-                 hierarchy=False):  # TODO: Make hierarchy consistent with tracer solver
+                 levels=1):
         if op.family == 'dg-dg' and op.degree in (1, 2):
             element = VectorElement("DG", triangle, op.degree)*FiniteElement("DG", triangle, op.degree)
         elif op.family == 'dg-cg':
@@ -31,14 +31,11 @@ class SteadyShallowWaterProblem(SteadyProblem):
             raise NotImplementedError
         super(SteadyShallowWaterProblem, self).__init__(op, mesh, element, discrete_adjoint, prev_solution, 1)
         if prev_solution is not None:
-            self.interpolate_solution(hierarchy)  # TODO: Make consistent
+            self.interpolate_solution()
 
         # Physical fields
         self.set_fields()
         physical_constants['g_grav'].assign(op.g)
-
-        # BCs
-        self.boundary_conditions = op.set_boundary_conditions(self.V)
 
         # Parameters for adjoint computation
         z, zeta = self.adjoint_solution.split()
@@ -346,15 +343,15 @@ class SteadyShallowWaterProblem(SteadyProblem):
             z, zeta = self.adjoint_solution.split()
             self.adjoint_solution_file.write(z, zeta)
 
-    def interpolate_solution(self, hierarchy=False):
+    def interpolate_solution(self):
         """
         Here we only need interpolate the velocity.
         """
         self.interpolated_solution = Function(self.V)
         PETSc.Sys.Print("Interpolating solution across meshes...")
-        if hierarchy:
+        try:
             prolong(self.prev_solution, self.interpolated_solution)
-        else:
+        except:
             u_interp, eta_interp = self.interpolated_solution.split()
             u_, eta_ = self.prev_solution.split()
             u_interp.project(u_)

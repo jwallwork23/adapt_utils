@@ -5,7 +5,7 @@ import numpy as np
 from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.kernels import *
+from adapt_utils.adapt.kernels import eigen_kernel, matscale, matscale_sum
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.p0_metric import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
@@ -84,7 +84,7 @@ class SteadyTracerProblem2d(SteadyProblem):
             raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
-        bcs = self.op.boundary_conditions
+        bcs = self.boundary_conditions
         dbcs = []
         for i in bcs.keys():
             if bcs[i] == {}:
@@ -122,7 +122,7 @@ class SteadyTracerProblem2d(SteadyProblem):
             raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
-        bcs = self.op.boundary_conditions
+        bcs = self.boundary_conditions
         dbcs = []
         for i in bcs.keys():
             if not 'diff_flux' in bcs[i]:
@@ -180,7 +180,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         # NOTES:
         #   * For CG methods, Dirichlet error is zero, by construction.
         #   * Negative sign in `flux`.
-        bcs = tpe.op.boundary_conditions
+        bcs = tpe.boundary_conditions
         for j in bcs.keys():
             if 'diff_flux' in bcs[j]:
                 flux_terms += i*(dwr + bcs[j]['diff_flux']*self.adjoint_error)*ds(j)
@@ -223,7 +223,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         flux_terms = ((i*dwr)('+') + (i*dwr)('-'))*dS
 
         # Account for boundary conditions
-        bcs = tpe.op.boundary_conditions
+        bcs = tpe.boundary_conditions
         for j in bcs.keys():
             if not 'value' in bcs[j]:
                 flux_terms += i*dwr*ds(j)  # Robin BC in adjoint
@@ -277,7 +277,7 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         # Hessian for conservative part
         M = Function(self.P1_ten).assign(0.0)
-        kernel = mykernel(matscale_sum_kernel(2), "matscale_sum")
+        kernel = eigen_kernel(matscale_sum, 2)
         op2.par_loop(kernel,
                      self.P1_ten.node_set,
                      M.dat(op2.RW),
@@ -287,7 +287,7 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         # Account for source term
         Mf = Function(self.P1_ten).assign(0.0)
-        kernel = mykernel(matscale_kernel(2), "matscale")
+        kernel = eigen_kernel(matscale, 2)
         op2.par_loop(kernel,
                      self.P1_ten.node_set,
                      Mf.dat(op2.RW),

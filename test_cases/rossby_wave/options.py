@@ -112,15 +112,16 @@ class BoydOptions(ShallowWaterOptions):
         eta[26] = -0.1178252e-21
         self.hermite_coeffs = {'u': u, 'v': v, 'eta': eta}
 
-    def set_boundary_conditions(self):
+    def set_boundary_conditions(self, fs):
         """
         Set no slip boundary conditions uv = 0 along North and South boundaries.
         """
-        self.boundary_conditions[1] = {'uv': Constant(as_vector([0., 0.]))}
-        self.boundary_conditions[2] = {'uv': Constant(as_vector([0., 0.]))}
+        zero = Constant(as_vector([0., 0.]), domain=fs.mesh())
+        self.boundary_conditions[1] = {'uv': zero}
+        self.boundary_conditions[2] = {'uv': zero}
         if not self.periodic:
-            self.boundary_conditions[3] = {'uv': Constant(as_vector([0., 0.]))}
-            self.boundary_conditions[4] = {'uv': Constant(as_vector([0., 0.]))}
+            self.boundary_conditions[3] = {'uv': zero}
+            self.boundary_conditions[4] = {'uv': zero}
         return self.boundary_conditions
 
     def polynomials(self):

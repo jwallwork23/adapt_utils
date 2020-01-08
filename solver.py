@@ -10,7 +10,7 @@ from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
-from adapt_utils.adapt.kernels import *
+from adapt_utils.adapt.kernels import eigen_kernel, matscale
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem"]
@@ -42,6 +42,7 @@ class SteadyProblem():
             self.create_enriched_problem()
         self.create_function_spaces()
         self.create_solutions()
+        self.boundary_conditions = op.set_boundary_conditions(self.V)
 
         # Outputs
         self.di = create_directory(self.op.di)
@@ -329,7 +330,7 @@ class SteadyProblem():
         H = self.get_hessian(adjoint=not adjoint)
         H_scaled = Function(self.P1_ten).assign(np.finfo(0.0).min)
         dim = self.mesh.topological_dimension()
-        kernel = mykernel(matscale_kernel(dim), "matscale")
+        kernel = eigen_kernel(matscale, dim)
         op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.indicator.dat(op2.READ))
         self.M = steady_metric(self.solution if adjoint else self.adjoint_solution, H=H, op=self.op)
 

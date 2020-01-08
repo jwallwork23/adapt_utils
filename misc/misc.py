@@ -4,13 +4,43 @@ try:
 except:
     import firedrake.dmplex as dmplex
 from firedrake.petsc import PETSc
+
 import numpy as np
 import numpy.linalg as la
 
+from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
-__all__ = ["index_string", "subdomain_indicator", "get_boundary_nodes", "print_doc",
+
+__all__ = ["check_spd", "index_string", "subdomain_indicator", "get_boundary_nodes", "print_doc",
            "bessi0", "bessk0"]
 
+
+def check_spd(matrix):
+    """
+    Verify that a tensor field `matrix` is symmetric positive-definite (SPD) and hence a Riemannian
+    metric.
+    """
+    fs = matrix.function_space()
+
+    # Check symmetric
+    diff = interpolate(matrix - transpose(matrix), fs)
+    try:
+        assert norm(diff) < 1e-8
+    except AssertionError:
+        raise ValueError("Matrix is not symmetric!")
+
+    # Check positive definite
+    el = fs.ufl_element()
+    evecs = Function(fs)
+    evals = Function(VectorFunctionSpace(fs.mesh(), el.family(), el.degree()))
+    dim = matrix.function_space().mesh().topological_dimension()
+    kernel = eigen_kernel(get_eigendecomposition, dim)
+    op2.par_loop(kernel, matrix.function_space().node_set, evecs.dat(op2.RW), evals.dat(op2.RW), matrix.dat(op2.READ))
+    try:
+        assert evals.vector().gather().min() > 0.0
+    except AssertionError:
+        raise ValueError("Matrix is not positive definite!")
+    PETSc.Sys.Print("Matrix is indeed SPD.\n")
 
 def index_string(index):
     """

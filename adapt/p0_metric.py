@@ -60,7 +60,7 @@ class AnisotropicMetricDriver():
         """
         JJt = Function(self.P0_ten)
         JJt.interpolate(self.J*self.J.T)
-        kernel = mykernel(get_eigendecomposition_kernel(self.dim), "get_eigendecomposition")
+        kernel = eigen_kernel(get_eigendecomposition, self.dim)
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), JJt.dat(op2.READ))
         self.eval.interpolate(as_vector([1/self.eval[0], 1/self.eval[1]]))  # TODO: avoid interp?
 
@@ -69,7 +69,7 @@ class AnisotropicMetricDriver():
         Extract eigenpairs related to provided Hessian.
         """
         assert self.p0hessian is not None
-        kernel = mykernel(get_reordered_eigendecomposition_kernel(self.dim), "get_reordered_eigendecomposition")
+        kernel = eigen_kernel(get_reordered_eigendecomposition, self.dim)
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), self.p0hessian.dat(op2.READ))
         s = sqrt(abs(self.eval[0]/self.eval[1]))
         self.eval.interpolate(as_vector([abs(self.K_hat/self.K_opt/s), abs(self.K_hat/self.K_opt*s)]))
@@ -197,6 +197,6 @@ class AnisotropicMetricDriver():
         fs = self.p1metric.function_space()
         for direction in range(dim):
             M = Function(self.p1metric)  # FIXME: Copy doesn't seem to work for tensor fields
-            kernel = mykernel(anisotropic_refinement_kernel(dim, direction), "anisotropic")
+            kernel = eigen_kernel(anisotropic_refinement, dim, direction)
             op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
             self.component_stretch_metrics.append(M)

@@ -7,7 +7,7 @@ from adapt_utils.tracer.solver2d import SteadyTracerProblem2d
 from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.kernels import *
+from adapt_utils.adapt.kernels import eigen_kernel, matscale, matscale_sum
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.p0_metric import *
 
@@ -55,7 +55,7 @@ class SteadyTracerProblem3d(SteadyTracerProblem2d):
 
         # Hessian for conservative part
         M = Function(self.P1_ten).assign(0.0)
-        kernel = mykernel(matscale_sum_kernel(3), "matscale_sum")
+        kernel = eigen_kernel(matscale_sum, 3)
         op2.par_loop(kernel,
                      self.P1_ten.node_set,
                      M.dat(op2.RW),
@@ -66,7 +66,7 @@ class SteadyTracerProblem3d(SteadyTracerProblem2d):
 
         # Hessian for source term
         Mf = Function(self.P1_ten).assign(0.0)
-        kernel = mykernel(matscale_kernel(3), "matscale")
+        kernel = eigen_kernel(matscale, 3)
         op2.par_loop(kernel,
                      self.P1_ten.node_set,
                      Mf.dat(op2.RW),

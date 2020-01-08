@@ -41,11 +41,11 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options
     assert op.normalisation in ('complexity', 'error')
 
     # Functions to hold metric and its determinant
-    M = Function(V)
-    detH = Function(FunctionSpace(mesh, "CG", 1))
+    M = Function(V).assign(0.0)
+    detH = Function(FunctionSpace(mesh, "CG", 1)).assign(0.0)
 
     # Turn Hessian into a metric
-    kernel = mykernel(metric_from_hessian_kernel(dim, noscale=noscale, op=op), "metric_from_hessian")
+    kernel = eigen_kernel(metric_from_hessian, dim, noscale=noscale, op=op)
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW), detH.dat(op2.RW), H.dat(op2.READ))
 
     if noscale:
@@ -61,7 +61,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options
         if op.norm_order is not None:
             assert det > 1e-8
             M *= pow(det, 1/op.norm_order)
-    kernel = mykernel(scale_metric_kernel(dim, op=op), "scale_metric")
+    kernel = eigen_kernel(scale_metric, dim, op=op)
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW))
 
     return M
@@ -141,7 +141,7 @@ def metric_intersection(M1, M2, bdy=None):
     M12 = M1.copy()
     # FIXME: boundary intersection does not work
     node_set = V.boundary_nodes(bdy, 'topological') if bdy is not None else V.node_set
-    kernel = mykernel(intersect_kernel(dim), "intersect")
+    kernel = eigen_kernel(intersect, dim)
     op2.par_loop(kernel, node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
     return M12
 
