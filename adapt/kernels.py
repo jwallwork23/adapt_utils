@@ -16,7 +16,7 @@ from adapt_utils.options import *
 __all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecomposition",
            "set_eigendecomposition", "intersect", "anisotropic_refinement",
            "metric_from_hessian", "scale_metric", "include_dir",
-           "gemv", "matscale", "matscale_sum", "singular_value_decomposition"]
+           "gemv", "matscale", "singular_value_decomposition"]
 
 
 include_dir = ["%s/include/eigen3" % PETSC_ARCH]
@@ -274,42 +274,6 @@ void matscale(double B_[%d], const double * A_, const double * alpha_) {
   B += *alpha_ * A;
 }
 """ % (d*d, d, d, d, d)
-
-def matscale_sum(d):
-    if d == 2:
-        return """
-#include <Eigen/Dense>
-
-using namespace Eigen;
-
-void matscale_sum(double B_[4], const double * A1_, const double * A2_, const double * x_) {
-  Map<Matrix<double, 2, 2, RowMajor> > A1((double *)A1_);
-  Map<Matrix<double, 2, 2, RowMajor> > A2((double *)A2_);
-  Map<Matrix<double, 2, 2, RowMajor> > B((double *)B_);
-  Map<Vector2d> x((double *)x_);
-  B += x[0] * A1;
-  B += x[1] * A2;
-}
-"""
-    elif d == 3:
-        return """
-#include <Eigen/Dense>
-
-using namespace Eigen;
-
-void matscale_sum(double B_[9], const double * A1_, const double * A2_, const double * A3_, const double * x_) {
-  Map<Matrix<double, 3, 3, RowMajor> > A1((double *)A1_);
-  Map<Matrix<double, 3, 3, RowMajor> > A2((double *)A2_);
-  Map<Matrix<double, 3, 3, RowMajor> > A3((double *)A3_);
-  Map<Matrix<double, 3, 3, RowMajor> > B((double *)B_);
-  Map<Vector3d> x((double *)x_);
-  B += x[0] * A1;
-  B += x[1] * A2;
-  B += x[2] * A3;
-}
-"""
-    else:
-        raise NotImplementedError
 
 def singular_value_decomposition(d):
     return """
