@@ -117,12 +117,13 @@ class BoydOptions(ShallowWaterOptions):
         Set no slip boundary conditions uv = 0 along North and South boundaries.
         """
         zero = Constant(as_vector([0., 0.]), domain=fs.mesh())
-        self.boundary_conditions[1] = {'uv': zero}
-        self.boundary_conditions[2] = {'uv': zero}
+        boundary_conditions = {}
+        boundary_conditions[1] = {'uv': zero}
+        boundary_conditions[2] = {'uv': zero}
         if not self.periodic:
-            self.boundary_conditions[3] = {'uv': zero}
-            self.boundary_conditions[4] = {'uv': zero}
-        return self.boundary_conditions
+            boundary_conditions[3] = {'uv': zero}
+            boundary_conditions[4] = {'uv': zero}
+        return boundary_conditions
 
     def polynomials(self):
         """

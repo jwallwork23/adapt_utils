@@ -86,11 +86,10 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         self.set_boundary_surface(fs.sub(1))
         inflow_tag = 4
         outflow_tag = 2
-        if not hasattr(self, 'boundary_conditions'):
-            self.boundary_conditions = {}
-        self.boundary_conditions[inflow_tag] = {'elev': self.elev_in}
-        self.boundary_conditions[outflow_tag] = {'elev': self.elev_out}
-        return self.boundary_conditions
+        boundary_conditions = {}
+        boundary_conditions[inflow_tag] = {'elev': self.elev_in}
+        boundary_conditions[outflow_tag] = {'elev': self.elev_out}
+        return boundary_conditions
 
     def set_initial_condition(self, fs):
         self.initial_condition = Function(fs)

@@ -102,16 +102,17 @@ def construct_hessian(f, mesh=None, degree=1, op=Options()):
 
     return H
 
-def construct_boundary_hessian(f, mesh=None, op=Options()):
+def construct_boundary_hessian(f, mesh=None, degree=1, op=Options()):
     """
     Recover the Hessian of `f` on the domain boundary. That is, the Hessian in the direction
     tangential to the boundary. In two dimensions this gives a scalar field, whereas in three
     dimensions it gives a 2D field on the surface. The resulting field should only be considered on
     the boundary and is set arbitrarily to 1/h_max in the interior.
 
-    :arg f: scalar solution field.
-    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
+    :arg f: Scalar solution field.
+    :kwarg mesh: Mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
                  Function, but a ufl expression.
+    :kwarg degree: Polynomial degree of Hessian.
     :param op: `Options` class object providing max cell size value.
     :return: reconstructed boundary Hessian associated with `f`.
     """
@@ -124,9 +125,9 @@ def construct_boundary_hessian(f, mesh=None, op=Options()):
     except AssertionError:
         raise NotImplementedError  # TODO
 
-    P1 = FunctionSpace(mesh, "CG", 1)
-    h = TrialFunction(P1)
-    v = TestFunction(P1)
+    V = FunctionSpace(mesh, "CG", degree)
+    h = TrialFunction(V)
+    v = TestFunction(V)
 
     # Normal vector and tangent vector
     n = FacetNormal(mesh)
@@ -135,7 +136,7 @@ def construct_boundary_hessian(f, mesh=None, op=Options()):
     # Arbitrary value in domain interior
     a = v*h*dx
     L = v*Constant(pow(op.h_max, -2))*dx
-    h_ = Function(P1)
+    h_ = Function(V)
 
     # Hessian on boundary
     bc = EquationBC(v*h*ds == -(s[0]*v.dx(0)*f.dx(0) + s[1]*v.dx(1)*f.dx(1))*ds, h_, 'on_boundary')

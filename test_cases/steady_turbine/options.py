@@ -49,13 +49,12 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         left_tag = 1
         right_tag = 2
         top_bottom_tag = 3
-        if not hasattr(self, 'boundary_conditions'):
-            self.boundary_conditions = {}
+        boundary_conditions = {}
         if not hasattr(self, 'inflow'):
             self.set_inflow(fs.sub()[0])
-        self.boundary_conditions[left_tag] = {'uv': self.inflow}
-        self.boundary_conditions[right_tag] = {'elev': Constant(0.)}
-        return self.boundary_conditions
+        boundary_conditions[left_tag] = {'uv': self.inflow}
+        boundary_conditions[right_tag] = {'elev': Constant(0.)}
+        return boundary_conditions
 
 
 class Steady2TurbineOffsetOptions(Steady2TurbineOptions):

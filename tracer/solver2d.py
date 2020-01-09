@@ -183,11 +183,13 @@ class SteadyTracerProblem2d(SteadyProblem):
         #   * For CG methods, Dirichlet error is zero, by construction.
         #   * Negative sign in `flux`.
         bcs = tpe.boundary_conditions
-        for j in bcs.keys():
+        for j in bcs:
             if 'diff_flux' in bcs[j]:
-                flux_terms += i*(dwr + bcs[j]['diff_flux']*self.adjoint_error)*ds(j)
+                # flux_terms += i*(dwr + bcs[j]['diff_flux']*self.adjoint_error)*ds(j)
+                flux_terms += i*(dwr + Constant(0.0, domain=tpe.mesh)*self.adjoint_error)*ds(j)
                 if self.stab == "SUPG":
-                    flux_terms += i*bcs[j]['diff_flux']*coeff*ds(j)
+                    # flux_terms += i*bcs[j]['diff_flux']*coeff*ds(j)
+                    flux_terms += i*Constant(0.0, domain=tpe.mesh)*coeff*ds(j)
 
         # Solve auxiliary FEM problem
         edge_res = Function(tpe.P0)
@@ -320,9 +322,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Combine contributions
         self.M = combine_metrics(M, Mf, average=relax)
         self.M.rename("Loseille metric")
-
-        # TODO: Remove (it's for debugging)
-        File(self.di + '/loseille_metrics.pvd').write(H1, H2, Hf, M1, M2, Mf, adj, adj_diff, self.M)
 
         # Account for boundary contributions  # TODO: Use EquationBC
         # bdy_contributions = i*(F1*n[0] + F2*n[1])*ds
