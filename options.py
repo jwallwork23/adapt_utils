@@ -51,6 +51,7 @@ class Options(FrozenConfigurable):
 
     # Finite element space  # TODO: use a notation which is more general
     family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
+    degree_increase = NonNegativeInteger(1, help="Polynomial degree increase in enriched space").tag(config=True)
 
     # PDE / optimisation
     boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)

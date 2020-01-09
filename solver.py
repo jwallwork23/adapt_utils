@@ -63,21 +63,22 @@ class SteadyProblem():
         self.am = AdaptiveMesh(mesh, levels=self.levels)
         self.mesh = self.am.mesh
 
-    def create_enriched_problem(self, degree_increase=1):  # TODO: degree_increase=0 for SW
+    def create_enriched_problem(self):
         """
         Create equivalent problem in iso-P2 refined space.
         """
         fe = FiniteElement(self.finite_element.family(),
                            self.finite_element.cell(),
-                           self.finite_element.degree() + degree_increase)
-        self.tp_enriched = type(self)(self.op, self.am.refined_mesh, fe,self. discrete_adjoint, self.prev_solution, self.levels-1)
+                           self.finite_element.degree() + self.op.degree_increase)
+        self.tp_enriched = type(self)(self.op, self.am.refined_mesh, fe, self.discrete_adjoint, self.prev_solution, self.levels-1)
 
     def create_function_spaces(self):
         """
         Build the finite element space, `V`, for the prognostic solution, along with various other
         useful spaces and test functions and trial functions based upon them.
         """
-        self.V = FunctionSpace(self.mesh, self.finite_element)
+        fe = self.finite_element
+        self.V = FunctionSpace(self.mesh, fe)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
         self.P2 = FunctionSpace(self.mesh, "CG", 2)
@@ -135,29 +136,42 @@ class SteadyProblem():
         solve(dFdu_form == dJdu, self.adjoint_solution, solver_parameters=self.op.adjoint_params)
         self.plot()
 
-    def solve_high_order(self, adjoint=True):  # TODO: Account for nonlinear case
+    def solve_high_order(self, adjoint=True, solve_forward=False):
         """
         Solve the problem using linear and quadratic approximations on a refined mesh, take the
         difference and project back into the original space.
         """
-        # Solve adjoint problem on fine mesh using quadratic elements
-        self.tp_enriched.solve(adjoint=adjoint)
-        # TODO: For adjoint case, what if nonlinear?
-        sol_p2 = self.tp_enriched.get_solution(adjoint=adjoint)
+        tpe = self.tp_enriched
+        solve_forward &= self.nonlinear  # (Adjoint of linear PDE independent of forward)
+
+        # Solve on a fine mesh using elements of higher order
+        if adjoint:
+            if solve_forward:
+                tpe.solve_forward()
+            elif self.nonlinear:
+                tpe.project_solution(self.solution, adjoint=False)  # FIXME: prolong
+        tpe.solve(adjoint=adjoint)
+        sol_p2 = tpe.get_solution(adjoint=adjoint)
 
         # Project into P1 to get linear approximation, too
-        sol_p1 = self.project_solution(self.tp_enriched.P1, adjoint=adjoint)
-        # sol_p1 = Function(self.tp_enriched.P1)
+        sol_p1 = tpe.project(self.get_solution(adjoint=adjoint))
+        # sol_p1 = Function(tpe.P1)
         # prolong(sol, sol_p1)  # FIXME: Maybe the hierarchy isn't recognised?
 
         # Evaluate difference in enriched space
-        self.set_error(interpolate(sol_p2 - sol_p1, self.tp_enriched.P2), adjoint=adjoint)
+        self.set_error(tpe.interpolate(tpe.difference(sol_p2, sol_p1)), adjoint=adjoint)
 
     def get_solution(self, adjoint=False):
         """
         Retrieve forward or adjoint solution, as specified by boolean kwarg `adjoint`.
         """
         return self.adjoint_solution if adjoint else self.solution
+
+    def get_error(self, adjoint=False):
+        """
+        Retrieve forward or adjoint error, as specified by boolean kwarg `adjoint`.
+        """
+        return self.adjoint_error if adjoint else self.error
 
     def set_solution(self, val, adjoint=False):
         """
@@ -177,17 +191,40 @@ class SteadyProblem():
         else:
             self.error = val
 
-    def get_solution_label(self, adjoint=False):
-        return 'adjoint_solution' if adjoint else 'solution'
-
-    def project_solution(self, space, adjoint=False):
+    def difference(self, u, v):  # TODO: Overload in SW
         """
-        Project forward or adjoint solution into `space` space, as specified by the boolean kwarg
+        Take the difference of two functions `u` and `v` defined on `self.mesh`.
+        """
+        assert u.function_space() == v.function_space()
+        out = Function(u.function_space()).assign(u)
+        out -= v
+        return out
+
+    def interpolate(self, val):  # TODO: Overload in SW
+        """
+        Interpolate a function in `self.V`.
+        """
+        return interpolate(val, self.V)
+
+    def project(self, val):  # TODO: Overload in SW
+        """
+        Project a function in `V`.
+        """
+        return project(val, self.V)
+
+    def interpolate_solution(self, val, adjoint=False):  # TODO: Overload in SW
+        """
+        Interpolate forward or adjoint solution, as specified by the boolean kwarg
         `adjoint`.
         """
-        if not hasattr(self, self.get_solution_label(adjoint)):
-            self.solve(adjoint)
-        return project(self.get_solution(adjoint), space)
+        self.get_solution(adjoint=adjoint).interpolate(val)
+
+    def project_solution(self, val, adjoint=False):  # TODO: Overload in SW
+        """
+        Project forward or adjoint solution, as specified by the boolean kwarg
+        `adjoint`.
+        """
+        self.get_solution(adjoint=adjoint).project(val)
 
     def get_qoi_kernel(self):
         """

@@ -30,6 +30,10 @@ class ShallowWaterOptions(Options):
     adapt_field = Unicode('speed_avg_elevation', help="Adaptation field of interest.").tag(config=True)
     region_of_interest = List(default_value=[]).tag(config=True)
 
+    def __init__(self, approach='fixed_mesh'):
+        super(ShallowWaterOptions, self).__init__(approach=approach)
+        self.degree_increase = 0
+
     def set_viscosity(self, fs):
         raise NotImplementedError
 
