@@ -353,6 +353,8 @@ class SteadyProblem():
         # Indicate error in P1 space
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators[cell_label] + self.indicators[flux_label]))
+        self.indicators[label] = Function(self.P0, name=label)
+        self.indicators[label].interpolate(abs(self.indicators[cell_label] + self.indicators[flux_label]))
 
         # Estimate error
         if not label in self.estimators:
@@ -446,90 +448,127 @@ class SteadyProblem():
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
         """
+        approach = self.approach
+        adjoint = 'adjoint' in approach
+        average = 'relax' in approach
         # TODO:
         #  * Change 'relax' to 'average'
         #  * Remove all author names
         #  * Integrate AnisotropicMetricDriver
-        if self.approach == 'fixed_mesh':
+
+        # No adaptation
+        if approach == 'fixed_mesh':  # TODO: Special case estimator convergence
             return
-        elif self.approach == 'uniform':
+
+        # Global AMR
+        elif approach == 'uniform':  # TODO: Special case estimator convergence
             return
-        elif 'hessian' in self.approach:
-            if self.approach in ('hessian', 'hessian_adjoint'):
-                self.get_hessian_metric(adjoint='adjoint' in self.approach)
+
+        # Anisotropic Hessian-based adaptation
+        elif 'hessian' in approach:  # TODO: Special case estimator convergence
+            if approach in ('hessian', 'hessian_adjoint'):
+                self.get_hessian_metric(adjoint=adjoint)
             else:
                 self.get_hessian_metric(adjoint=False)
                 M = self.M.copy()
                 self.get_hessian_metric(adjoint=True)
-                self.M = combine_metrics(M, self.M, average='relax' in self.approach)
-        elif self.approach == 'dwp':
+                self.M = combine_metrics(M, self.M, average=average)
+
+        # Isotropic 'Dual Weighted Primal' (see [Davis & LeVeque, 2016])
+        elif approach == 'dwp':
             self.dwp_indication()
             self.get_isotropic_metric()
-        elif 'dwr' in self.approach:
-            self.dwr_indication(adjoint='adjoint' in self.approach)
+
+        # Isotropic Dual Weighted Residual (see [Becker & Rannacher, 2001])
+        elif 'dwr' in approach:
+            self.dwr_indication(adjoint=adjoint)
             self.get_isotropic_metric()
             if not self.approach in ('dwr', 'dwr_adjoint'):
                 i = self.indicator.copy()
                 M = self.M.copy()
-                self.dwr_indication(adjoint=not 'adjoint' in self.approach)
+                self.dwr_indication(adjoint=not adjoint)
+                if not approach in self.estimators:
+                    self.estimators[approach] = []
                 self.get_isotropic_metric()
-                if self.approach in ('dwr_both', 'dwr_averaged'):
+                if approach in ('dwr_both', 'dwr_averaged'):
                     self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
                     self.get_isotropic_metric()
                 else:
-                    self.M = combine_metrics(M, self.M, average='relax' in self.approach)
-        elif 'loseille' in self.approach:
-            self.get_loseille_metric(adjoint='adjoint' in self.approach)
-            if not self.approach in ('loseille', 'loseille_adjoint'):
+                    self.M = combine_metrics(M, self.M, average=average)
+                estimator = self.estimators['dwr'][-1] + self.estimators['dwr_adjoint'][-1]
+                self.estimators[approach].append(estimator)
+
+        # Anisotropic a priori (see [Loseille et al., 2010])
+        elif 'loseille' in approach:  # TODO: Special case estimator convergence
+            self.get_loseille_metric(adjoint=adjoint)
+            if not approach in ('loseille', 'loseille_adjoint'):
                 M = self.M.copy()
-                self.get_loseille_metric(adjoint=not 'adjoint' in self.approach)
-                self.M = combine_metrics(M, self.M, average='relax' in self.approach)
-        elif 'power' in self.approach:
-            self.get_power_metric(adjoint='adjoint' in self.approach)
-            if not self.approach in ('power', 'power_adjoint'):
+                self.get_loseille_metric(adjoint=not adjoint)
+                self.M = combine_metrics(M, self.M, average=average)
+
+        # Anisotropic a posteriori (see [Power et al., 2006])
+        elif 'power' in approach:
+            self.get_power_metric(adjoint=adjoint)
+            self.indicators[approach] = self.indicators['_'.join(['cell_residual', 'adjoint' if adjoint else 'forward'])].copy()
+            if not approach in ('power', 'power_adjoint'):
                 M = self.M.copy()
-                self.get_power_metric(adjoint=not 'adjoint' in self.approach)
-                self.M = combine_metrics(M, self.M, average='relax' in self.approach)
-        elif 'carpio_isotropic' in self.approach:
-            self.dwr_indication(adjoint='adjoint' in self.approach)
-            eta = self.indicator.copy()
-            if self.approach == 'carpio_isotropic_both':
-                self.dwr_indication(adjoint=not 'adjoint' in self.approach)
-                eta = Function(self.P0).interpolate(eta + self.indicator)
-            amd = AnisotropicMetricDriver(self.am, indicator=eta, op=self.op)
+                self.get_power_metric(adjoint=not adjoint)
+                self.indicators[approach] += self.indicators['_'.join(['cell_residual', 'adjoint' if not adjoint else 'forward'])].copy()
+                self.M = combine_metrics(M, self.M, average=average)
+            self.estimate_error()
+
+        # Isotropic a posteriori (see Carpio et al., 2013])
+        elif 'carpio_isotropic' in approach:
+            self.dwr_indication(adjoint=adjoint)
+            self.indicators[approach] = Function(self.P0)
+            self.indicators[approach] += self.indicators['dwr_adjoint' if adjoint else 'dwr']
+            if approach == 'carpio_isotropic_both':
+                self.dwr_indication(adjoint=not adjoint)
+                self.indicators[approach] += self.indicators['dwr_adjoint' if not adjoint else 'dwr']
+            amd = AnisotropicMetricDriver(self.am, indicator=self.indicators[approach], op=self.op)
             amd.get_isotropic_metric()
             self.M = amd.p1metric
-        elif self.approach == 'carpio_both':
-            self.dwr_indication()
-            i = self.indicator.copy()
+            self.estimate_error()
+
+        # Aniotropic a posteriori (see Carpio et al., 2013])
+        elif approach == 'carpio_both':
+            self.dwr_indication(adjoint=False)
+            self.indicators[approach] = self.indicators['dwr'].copy()
             self.get_hessian_metric(noscale=False, degree=1)  # NOTE: degree 0 doesn't work
             M = self.M.copy()
             self.dwr_indication(adjoint=True)
+            self.indicators[approach] += self.indicators['dwr_adjoint']
             self.get_hessian_metric(noscale=False, degree=1, adjoint=True)
-            self.indicator.interpolate(i + self.indicator)
             self.M = metric_intersection(self.M, M)
-            amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicators[approach], op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric
-        elif 'carpio' in self.approach:
-            self.dwr_indication(adjoint='adjoint' in self.approach)
+            self.estimate_error()
+        elif 'carpio' in approach:
+            self.dwr_indication(adjoint=adjoint)
+            self.indicators[approach] = self.indicators['dwr_adjoint' if adjoint else 'dwr']
             self.get_hessian_metric(noscale=True, degree=1, adjoint=adjoint)
-            amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicator, op=self.op)
+            amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicators[approach], op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric
+            self.estimate_error()
+
+        # User specified adaptation methods
         else:
             try:
                 assert hasattr(self, 'custom_adapt')
             except AssertionError:
-                raise ValueError("Adaptivity mode {:s} not regcognised.".format(self.approach))
-            PETSc.Sys.Print("Using custom metric '{:s}'".format(self.approach))
+                raise ValueError("Adaptivity mode {:s} not regcognised.".format(approach))
+            PETSc.Sys.Print("Using custom metric '{:s}'".format(approach))
             self.custom_adapt()
 
-    def estimate_error(self, approach):
+    def estimate_error(self, approach=None):
         """
         Compute error estimator associated with `approach` by summing the corresponding error
         indicator over all elements.
         """
+        if approach is None:
+            approach = self.approach
         assert approach in self.indicators
         if not approach in self.estimators:
             self.estimators[approach] = []
@@ -579,7 +618,8 @@ class SteadyProblem():
         estimator_old = np.finfo(float).min
         PETSc.Sys.Print("Number of mesh elements: %d" % self.mesh.num_cells())
         for i in range(op.num_adapt):
-            PETSc.Sys.Print("\nAdaptation loop, iteration %d.\n" % (i+1))
+            PETSc.Sys.Print("\n  Adaptation loop, iteration %d." % (i+1))
+            PETSc.Sys.Print("==================================\n")
             self.solve_forward()
             qoi = self.quantity_of_interest()
             self.qois.append(qoi)
@@ -605,13 +645,14 @@ class SteadyProblem():
             qoi_old = qoi
             num_cells_old = num_cells
             estimator_old = estimator
+        dofs = sum(list(self.V.dof_count))  # TODO: parallelise
         PETSc.Sys.Print('\n' + 80*'#')
         PETSc.Sys.Print("SUMMARY")
         PETSc.Sys.Print('\n' + 80*'#')
         PETSc.Sys.Print("Approach:             '%s'" % self.approach)
         PETSc.Sys.Print("Target:               %.2e" % op.target)
         PETSc.Sys.Print("Number of elements:   %d" % num_cells)
-        PETSc.Sys.Print("DOF count:            %d" % sum(self.V.dof_count))  # TODO: parallelise
+        PETSc.Sys.Print("DOF count:            %d" % dofs)
         PETSc.Sys.Print("Quantity of interest: %.4e" % qoi)
         PETSc.Sys.Print('\n' + 80*'#')
 
