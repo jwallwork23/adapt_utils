@@ -62,76 +62,65 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.solution.rename('Tracer concentration')
         self.adjoint_solution.rename('Adjoint tracer concentration')
 
-    def solve_forward(self):
+    def setup_solver_forward(self):
         phi = self.trial
         psi = self.test
 
         # Finite element problem
-        a = psi*dot(self.u, grad(phi))*dx + self.nu*inner(grad(phi), grad(psi))*dx
-        L = self.source*psi*dx
+        self.lhs = psi*dot(self.u, grad(phi))*dx + self.nu*inner(grad(phi), grad(psi))*dx
+        self.rhs = self.source*psi*dx
 
         # Stabilisation
         if self.stab in ("SU", "SUPG"):
             coeff = self.stabilisation*dot(self.u, grad(psi))
-            a += coeff*dot(self.u, grad(phi))*dx
+            self.lhs += coeff*dot(self.u, grad(phi))*dx
             if self.stab == "SUPG":
-                a += coeff*-div(self.nu*grad(phi))*dx
-                L += coeff*self.source*dx
+                self.lhs += coeff*-div(self.nu*grad(phi))*dx
+                self.rhs += coeff*self.source*dx
                 psi = psi + coeff
         elif not self.stab is None:
             raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
         bcs = self.boundary_conditions
-        dbcs = []
+        self.dbcs = []
         for i in bcs.keys():
             if bcs[i] == {}:
-                a += -self.nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
+                self.lhs += -self.nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
             if 'diff_flux' in bcs[i]:
-                a += -self.nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
-                L += -psi*bcs[i]['diff_flux']*ds(i)
+                self.lhs += -self.nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
+                self.rhs += -psi*bcs[i]['diff_flux']*ds(i)
             if 'value' in bcs[i]:
-                dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))
+                self.dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))
 
-        # For condition number studies  # TODO: account for RHS
-        self.lhs = a
-
-        # Solve
-        solve(a == L, self.solution, bcs=dbcs, solver_parameters=self.op.params)
-        self.solution_file.write(self.solution)
-
-    def solve_continuous_adjoint(self):
+    def setup_solver_adjoint(self):
         lam = self.trial
         psi = self.test
 
         # Adjoint finite element problem
-        a = lam*dot(self.u, grad(psi))*dx + self.nu*inner(grad(lam), grad(psi))*dx
-        L = self.kernel*psi*dx
+        self.lhs_adjoint = lam*dot(self.u, grad(psi))*dx + self.nu*inner(grad(lam), grad(psi))*dx
+        self.rhs_adjoint = self.kernel*psi*dx
 
         # Stabilisation
         if self.stab in ("SU", "SUPG"):
             coeff = -self.stabilisation*div(self.u*psi)
-            a += -coeff*div(self.u*lam)*dx
+            self.lhs_adjoint += -coeff*div(self.u*lam)*dx
             if self.stab == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
-                a += coeff*-div(self.nu*grad(lam))*dx
-                L += coeff*self.kernel*dx
+                self.lhs_adjoint += coeff*-div(self.nu*grad(lam))*dx
+                self.rhs_adjoint += coeff*self.kernel*dx
                 psi = psi + coeff
         elif not self.stab is None:
             raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
         bcs = self.boundary_conditions
-        dbcs = []
+        self.dbcs_adjoint = []
         for i in bcs.keys():
             if not 'diff_flux' in bcs[i]:
-                dbcs.append(DirichletBC(self.V, 0, i))  # Dirichlet BC in adjoint
+                self.dbcs_adjoint.append(DirichletBC(self.V, 0, i))  # Dirichlet BC in adjoint
             if not 'value' in bcs[i]:
-                a += -lam*psi*(dot(self.u, self.n))*ds(i)
-                a += -self.nu*psi*dot(self.n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
-
-        # Solve
-        solve(a == L, self.adjoint_solution, bcs=dbcs, solver_parameters=self.op.params)
-        self.adjoint_solution_file.write(self.adjoint_solution)
+                self.lhs_adjoint += -lam*psi*(dot(self.u, self.n))*ds(i)
+                self.lhs_adjoint += -self.nu*psi*dot(self.n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
 
     def get_strong_residual_forward(self):
         R = self.source - dot(self.u, grad(self.solution)) + div(self.nu*grad(self.solution))

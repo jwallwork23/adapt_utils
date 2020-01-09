@@ -99,6 +99,21 @@ class SteadyProblem():
         self.solution = Function(self.V, name='Solution')
         self.adjoint_solution = Function(self.V, name='Adjoint solution')
 
+    def setup_solver(self, adjoint=False):
+        """
+        Setup solver for forward or adjoint PDE, as specified by the boolean kwarg, `adjoint`.
+        """
+        if adjoint:
+            self.setup_solver_adjoint()
+        else:
+            self.setup_solver_forward()
+
+    def setup_solver_forward(self):
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def setup_solver_adjoint(self):
+        raise NotImplementedError("Should be implemented in derived class.")
+
     def solve(self, adjoint=False):
         """
         Solve the forward or adjoint PDE, as specified by the boolean kwarg, `adjoint`.
@@ -109,7 +124,11 @@ class SteadyProblem():
             self.solve_forward()
 
     def solve_forward(self):
-        raise NotImplementedError("Should be implemented in derived class.")
+        self.setup_solver_forward()
+        if self.nonlinear:
+            self.rhs = 0
+        solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
+        self.solution_file.write(self.solution)
 
     def solve_adjoint(self):
         """
@@ -123,7 +142,11 @@ class SteadyProblem():
             self.solve_continuous_adjoint()
 
     def solve_continuous_adjoint(self):
-        raise NotImplementedError("Should be implemented in derived class.")
+        self.setup_solver_adjoint()
+        if self.nonlinear:
+            self.rhs_adjoint = 0
+        solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.params)  # TODO: account for different params
+        self.adjoint_solution_file.write(self.adjoint_solution)
 
     def solve_discrete_adjoint(self):
         try:
