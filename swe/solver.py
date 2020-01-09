@@ -31,7 +31,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             raise NotImplementedError
         super(SteadyShallowWaterProblem, self).__init__(op, mesh, element, discrete_adjoint, prev_solution, 1)
         if prev_solution is not None:
-            self.interpolate_solution()
+            self.interpolate_solution(prev_solution)
 
         # Physical fields
         self.set_fields()
@@ -82,7 +82,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.polynomial_degree = op.degree
         options.horizontal_viscosity = self.nu
         options.quadratic_drag_coefficient = self.drag_coefficient
-        options.use_lax_friedrichs_velocity = op.stabilisation == 'lax_friedrichs'
+        options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = op.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
@@ -95,7 +95,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
 
-        # Initial conditions
+        # Initial conditions  # TODO: will this work over mesh iterations?
         if self.prev_solution is not None:
             interp = self.interpolated_solution
             u_interp, eta_interp = self.interpolated_solution.split()
@@ -108,8 +108,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.solution = self.solver_obj.fields.solution_2d
 
     def solve_forward(self):
-        if not hasattr(self, 'solver_obj'):
-            self.setup_solver()
+        self.setup_solver()
         self.solver_obj.iterate()
         self.solution = self.solver_obj.fields.solution_2d
         if hasattr(self, 'cb'):
@@ -150,52 +149,48 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
-        i = tpe.p0test
-
-        tpe.project_solution(self.solution)
+        tpe.project_solution(self.solution)  # FIXME: prolong
         u, eta = tpe.solution.split()
         z, zeta = self.adjoint_error.split()
 
-        op = self.op
-        i = self.p0test
-        b = op.bathymetry
-        nu = op.viscosity
-        f = None if not hasattr(op, 'coriolis') else op.coriolis
-        C_d = None if not hasattr(op, 'drag_coefficient') else op.drag_coefficient
+        b = tpe.bathymetry
+        nu = tpe.viscosity
+        f = None if not hasattr(tpe, 'coriolis') else tpe.coriolis
+        C_d = None if not hasattr(tpe, 'drag_coefficient') else tpe.drag_coefficient
         H = b + eta
 
-        F = -op.g*inner(z, grad(eta))                        # ExternalPressureGradient
-        F += -zeta*div(H*u)                                  # HUDiv
-        F += -inner(z, dot(u, nabla_grad(u)))                # HorizontalAdvection
+        dwr = -self.op.g*inner(z, grad(eta))                   # ExternalPressureGradient
+        dwr += -zeta*div(H*u)                                  # HUDiv
+        dwr += -inner(z, dot(u, nabla_grad(u)))                # HorizontalAdvection
         if f is not None:
-            F += -inner(z, f*as_vector((-u[1], u[0])))       # Coriolis
+            dwr += -inner(z, f*as_vector((-u[1], u[0])))       # Coriolis
         if C_d is not None:
-            F += -C_d*sqrt(dot(u, u))*inner(z, u)/H          # QuadraticDrag
+            dwr += -C_d*sqrt(dot(u, u))*inner(z, u)/H          # QuadraticDrag
 
         # HorizontalViscosity
         stress = 2*nu*sym(grad(u)) if op.grad_div_viscosity else nu*grad(u)
-        F += inner(z, div(stress))
+        dwr += inner(z, div(stress))
         if op.grad_depth_viscosity:
-            F += inner(z, dot(grad(H)/H, stress))
+            dwr += inner(z, dot(grad(H)/H, stress))
 
         if hasattr(self, 'extra_residual_terms'):
-            F += self.extra_residual_terms(u, eta, z, zeta)
+            dwr += self.extra_residual_terms(u, eta, z, zeta)  # TODO: does it need to be tpe?
 
-        self.estimators['dwr_cell'] = assemble(F*dx)
-        self.indicators['dwr_cell'] = assemble(i*F*dx)
+        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
+        self.estimate_error('dwr_cell')
 
     def get_dwr_flux_forward(self)
-        # TODO
-        u, eta = sol.split()
-        z, zeta = adjoint_sol.split()
+        tpe = self.tp_enriched
+        i = tpe.p0test
+        tpe.project_solution(self.solution)  # FIXME: prolong
+        u, eta = tpe.solution.split()
+        z, zeta = tpe.adjoint_error.split()
 
-        op = self.op
-        i = self.p0test
-        b = op.bathymetry
-        nu = op.viscosity
+        b = tpe.bathymetry
+        nu = tpe.viscosity
         H = b + eta
-        g = op.g
-        n = self.n
+        g = self.g
+        n = tpe.n
 
         # HorizontalAdvection
         u_up = avg(u)
@@ -235,7 +230,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         # NOTE: This ^^^ is an influential term for steady turbine
 
         # HorizontalViscosity
-        if op.grad_div_viscosity:
+        if self.op.grad_div_viscosity:
             stress = 2*nu*sym(grad(u))
             stress_jump = 2*avg(nu)*sym(tensor_jump(u, n))
         else:
@@ -289,7 +284,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
                     if u_ext is u:
                         continue
                     delta_u = u - u_ext
-                    if op.grad_div_viscosity:
+                    if self.op.grad_div_viscosity:
                         stress_jump = 2*nu*sym(outer(delta_u, n))
                     else:
                         stress_jump = nu*outer(delta_u, n)
@@ -314,14 +309,14 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
 
         if hasattr(self, 'extra_flux_terms'):
-            flux_terms += self.extra_flux_terms()
+            flux_terms += self.extra_flux_terms()  # TODO: should this be tpe?
 
         # Solve auxiliary finite element problem to get traces on particular element
-        mass_term = i*self.p0trial*dx
-        res = Function(self.P0)
+        mass_term = i*tpe.p0trial*dx
+        res = Function(tpe.P0)
         solve(mass_term == flux_terms, res)
-        self.estimators['dwr_flux'] = assemble(res*dx)
-        self.indicators['dwr_flux'] = res
+        self.indicators['dwr_flux'] = project(assemble(i*res*dx), self.P0)
+        self.estimate_error('dwr_flux')
 
     def custom_adapt(self):
         if self.approach == 'vorticity':
@@ -329,32 +324,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
             self.indicator.interpolate(curl(self.solution.split()[0]))
             self.get_isotropic_metric()
 
-    def plot(self):
-        """
-        Plot current mesh and indicator field, if available.
-        """
-        File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
-        if hasattr(self, 'indicator'):
-            name = self.indicator.dat.name
-            self.indicator.rename(name + ' indicator')
-            File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator)
-        if hasattr(self, 'adjoint_solution'):
+    def plot_solution(self, adjoint=False):
+        if adjoint:
             z, zeta = self.adjoint_solution.split()
             self.adjoint_solution_file.write(z, zeta)
-
-    def interpolate_solution(self):
-        """
-        Here we only need interpolate the velocity.
-        """
-        self.interpolated_solution = Function(self.V)
-        PETSc.Sys.Print("Interpolating solution across meshes...")
-        try:
-            prolong(self.prev_solution, self.interpolated_solution)
-        except:  # TODO: Remove bare exception
-            u_interp, eta_interp = self.interpolated_solution.split()
-            u_, eta_ = self.prev_solution.split()
-            u_interp.project(u_)
-            eta_interp.project(eta_)
+        else:
+            u, eta = self.solution.split()
+            self.solution_file.write(u, eta)
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
         field = self.op.adapt_field
@@ -461,7 +437,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         z.rename("Adjoint fluid velocity")
         zeta.rename("Adjoint elevation")
 
-    def set_fields(self):
+    def set_fields(self):  # TODO: might need updating
         self.viscosity = self.op.set_viscosity(self.P1)
         self.drag_coefficient = Constant(self.op.drag_coefficient)
         self.op.set_boundary_surface(self.V.sub(1))
@@ -598,9 +574,3 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             self.indicator = Function(self.P1, name='vorticity')
             self.indicator.interpolate(curl(self.solution.split()[0]))
             self.get_isotropic_metric()
-
-    def interpolate_solution(self):
-        raise NotImplementedError  # TODO
-
-    def interpolate_adjoint_solution(self):
-        raise NotImplementedError  # TODO

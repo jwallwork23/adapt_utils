@@ -142,27 +142,22 @@ class SteadyTracerProblem2d(SteadyProblem):
 
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
-        phi = project(self.solution, tpe.V)  # FIXME: prolong
-        if not hasattr(self, 'adjoint_error'):
-            self.solve_high_order(adjoint=True)
-        strong_residual = tpe.source - dot(tpe.u, grad(phi)) + div(tpe.nu*grad(phi))
+        tpe.project_solution(self.solution)  # FIXME: prolong
+        strong_residual = tpe.source - dot(tpe.u, grad(tpe.solution)) + div(tpe.nu*grad(tpe.solution))
         dwr = strong_residual*self.adjoint_error
         if self.stab == 'SUPG':  # Account for stabilisation error
             dwr += strong_residual*tpe.stabilisation*dot(tpe.u, grad(self.adjoint_error))
-        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*dwr*dx), self.P0)  # FIXME: inject?
-        self.indicators['dwr_cell'].interpolate(abs(self.indicators['dwr_cell']))
+        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
         self.estimate_error('dwr_cell')
 
     def get_dwr_flux_forward(self):
         tpe = self.tp_enriched
         i = tpe.p0test
-        phi = project(self.solution, tpe.V)  # FIXME: prolong
-        if not hasattr(self, 'adjoint_error'):
-            self.solve_high_order(adjoint=True)
+        tpe.project_solution(self.solution)  # FIXME: prolong
 
         # Flux terms (arising from integration by parts)
         mass_term = i*tpe.p0trial*dx
-        flux = -tpe.nu*dot(tpe.n, nabla_grad(phi))
+        flux = -tpe.nu*dot(tpe.n, nabla_grad(tpe.solution))
         dwr = flux*self.adjoint_error
         if self.stab == 'SUPG':  # Account for stabilisation error
             coeff = tpe.stabilisation*dot(tpe.u, grad(self.adjoint_error))
@@ -183,33 +178,27 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Solve auxiliary FEM problem
         edge_res = Function(tpe.P0)
         solve(mass_term == flux_terms, edge_res)
-        self.indicators['dwr_flux'] = project(edge_res, self.P0)  # FIXME: inject?
-        self.indicators['dwr_flux'].interpolate(abs(self.indicators['dwr_flux']))
+        self.indicators['dwr_flux'] = project(assemble(i*abs(edge_res)*dx), self.P0)
         self.estimate_error('dwr_flux')
 
     def get_dwr_residual_adjoint(self):
         tpe = self.tp_enriched
-        lam = project(self.adjoint_solution, tpe.V)  # FIXME: prolong
-        if not hasattr(self, 'error'):
-            self.solve_high_order(adjoint=False)
-        strong_residual = tpe.op.box(tpe.P0) + div(tpe.u*lam) + div(tpe.nu*grad(lam))
+        tpe.project_solution(self.adjoint_solution, adjoint=True)  # FIXME: prolong
+        strong_residual = tpe.op.box(tpe.P0) + div(tpe.u*tpe.adjoint_solution) + div(tpe.nu*grad(tpe.adjoint_solution))
         dwr = strong_residual*self.error
         if self.stab == 'SUPG':  # Account for stabilisation error
             dwr += strong_residual*tpe.stabilisation*dot(tpe.u, grad(self.error))
-        self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*dwr*dx), self.P0)  # FIXME: inject?
-        self.indicators['dwr_cell_adjoint'].interpolate(abs(self.indicators['dwr_cell_adjoint']))
+        self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
         self.estimate_error('dwr_cell_adjoint')
         
     def get_dwr_flux_adjoint(self):
         tpe = self.tp_enriched
         i = tpe.p0test
-        lam = project(self.adjoint_solution, tpe.V)  # FIXME: prolong
-        if not hasattr(self, 'error'):
-            self.solve_high_order(adjoint=False)
+        tpe.project_solution(self.adjoint_solution, adjoint=True)  # FIXME: prolong
 
         # Edge residual
         mass_term = i*tpe.p0trial*dx
-        flux = -(lam*dot(tpe.u, tpe.n) + tpe.nu*dot(tpe.n, nabla_grad(lam)))
+        flux = -(tpe.adjoint_solution*dot(tpe.u, tpe.n) + tpe.nu*dot(tpe.n, nabla_grad(tpe.adjoint_solution)))
         dwr = flux*self.error
         if self.stab == 'SUPG':  # Account for stabilisation error
             dwr += flux*tpe.stabilisation*dot(tpe.u, grad(self.error))
@@ -224,8 +213,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Solve auxiliary FEM problem
         edge_res_adjoint = Function(tpe.P0)
         solve(mass_term == flux_terms, edge_res_adjoint)
-        self.indicators['dwr_flux_adjoint'] = project(edge_res_adjoint, self.P0)  # FIXME: inject?
-        self.indicators['dwr_flux_adjoint'].interpolate(abs(self.indicators['dwr_flux_adjoint']))
+        self.indicators['dwr_flux_adjoint'] = project(assemble(i*abs(edge_res_adjoint)*dx), self.P0)
         self.estimate_error('dwr_flux_adjoint')
 
     def get_hessian_metric(self, adjoint=False, noscale=False):

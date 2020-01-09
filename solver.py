@@ -38,8 +38,6 @@ class SteadyProblem():
 
         # Setup problem
         self.set_mesh(mesh)
-        if levels > 0:
-            self.create_enriched_problem()
         self.create_function_spaces()
         self.create_solutions()
         self.set_fields()
@@ -51,11 +49,12 @@ class SteadyProblem():
         self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
 
-        # Storage over mesh optimisation loop
+        # Storage over mesh adaptation loop
         self.indicators = {}
         self.estimators = {}
         self.num_cells = []
         self.num_vertices = []
+        self.qois = []
 
     def set_mesh(self, mesh):
         """
@@ -64,6 +63,8 @@ class SteadyProblem():
         mesh = self.op.default_mesh if mesh is None else mesh
         self.am = AdaptiveMesh(mesh, levels=self.levels)
         self.mesh = self.am.mesh
+        if self.levels > 0:
+            self.create_enriched_problem()
 
     def create_enriched_problem(self):
         """
@@ -130,25 +131,25 @@ class SteadyProblem():
         if self.nonlinear:
             self.rhs = 0
         solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
-        self.solution_file.write(self.solution)
+        self.plot_solution(adjoint=False)
 
     def solve_adjoint(self):
         """
         Solve adjoint problem using method specified by `discrete_adjoint` boolean kwarg.
         """
         if self.discrete_adjoint:
-            PETSc.Sys.Print("Solving discrete adjoint problem...")
+            PETSc.Sys.Print("Solving discrete adjoint problem on mesh with %d elements" % self.mesh.num_cells())
             self.solve_discrete_adjoint()
         else:
-            PETSc.Sys.Print("Solving continuous adjoint problem...")
+            PETSc.Sys.Print("Solving continuous adjoint problem on mesh with %d elements" % self.mesh.num_cells())
             self.solve_continuous_adjoint()
+        self.plot_solution(adjoint=True)
 
     def solve_continuous_adjoint(self):
         self.setup_solver_adjoint()
         if self.nonlinear:
             self.rhs_adjoint = 0
         solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.params)  # TODO: account for different params
-        self.adjoint_solution_file.write(self.adjoint_solution)
 
     def solve_discrete_adjoint(self):
         try:
@@ -159,7 +160,6 @@ class SteadyProblem():
         dFdu_form = adjoint(dFdu)
         dJdu = derivative(self.quantity_of_interest_form(), self.solution, TestFunction(self.V))
         solve(dFdu_form == dJdu, self.adjoint_solution, solver_parameters=self.op.adjoint_params)
-        self.plot()
 
     def solve_high_order(self, adjoint=True, solve_forward=False):
         """
@@ -346,14 +346,13 @@ class SteadyProblem():
             flux_label += '_adjoint'
 
         # Compute DWR residual and flux terms
-        #   NOTE: Doing so requires solving auxiliary FEM problems in an enriched space.
+        self.solve_high_order(adjoint=not adjoint)
         self.get_dwr_residual(adjoint=adjoint)
         self.get_dwr_flux(adjoint=adjoint)
 
-        # Indicate error
+        # Indicate error in P1 space
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators[cell_label] + self.indicators[flux_label]))
-        self.indicators[label] = self.indicator
 
         # Estimate error
         if not label in self.estimators:
@@ -429,6 +428,16 @@ class SteadyProblem():
         File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
         for key in self.indicators:
             File(os.path.join(self.di, key + '.pvd')).write(self.indicators[key])
+
+    def plot_solution(self, adjoint=False):
+        """
+        Plot solution of forward or adjoint PDE to .vtu, as specified by the boolean kwarg
+        `adjoint`.
+        """
+        if adjoint:
+            self.adjoint_solution_file.write(self.adjoint_solution)
+        else:
+            self.solution_file.write(self.solution)
 
     def indicate_error(self):
         """
@@ -543,11 +552,8 @@ class SteadyProblem():
             self.mesh = self.am.hierarchy[1]
             return
         else:
-            if not hasattr(self, 'M'):
-                PETSc.Sys.Print("Metric not found. Computing it now.")
-                self.indicate_error()
             self.am.adapt(self.M)
-            self.mesh = self.am.mesh
+            self.set_mesh(self.am.mesh)
         PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.num_cells.append(self.mesh.num_cells())
         self.num_vertices.append(self.mesh.num_vertices())
@@ -559,7 +565,57 @@ class SteadyProblem():
         self.set_fields()
         self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
-    def check_conditioning(self, submatrices=None):
+    def adaptation_loop(self):
+        """
+        Run mesh adaptation loop to convergence, with the following convergence criteria:
+          * Relative difference in quantity of interest < `self.op.qoi_rtol`;
+          * Relative difference in number of mesh elements < `self.op.element_rtol`;
+          * Relative difference in error estimator < `self.op.estimator_rtol`;
+          * Maximum iterations `self.op.num_adapt`.
+        """
+        op = self.op
+        qoi_old = np.finfo(float).min
+        num_cells_old = np.iinfo(int).min
+        estimator_old = np.finfo(float).min
+        PETSc.Sys.Print("Number of mesh elements: %d" % self.mesh.num_cells())
+        for i in range(op.num_adapt):
+            PETSc.Sys.Print("\nAdaptation loop, iteration %d.\n" % (i+1))
+            self.solve_forward()
+            qoi = self.quantity_of_interest()
+            self.qois.append(qoi)
+            PETSc.Sys.Print("Quantity of interest: %.4e" % qoi)
+            if i > 0 and np.abs(qoi - qoi_old) < op.qoi_rtol*qoi_old:
+                PETSc.Sys.Print("Converged quantity of interest!")
+                break
+            self.solve_adjoint()
+            self.indicate_error()
+            estimator = self.estimators[self.approach][-1]
+            PETSc.Sys.Print("Error estimator '%s': %.4e" % (self.approach, estimator))
+            if i > 0 and np.abs(estimator - estimator_old) < op.estimator_rtol*estimator_old:
+                PETSc.Sys.Print("Converged error estimator!")
+                break
+            self.adapt_mesh()
+            num_cells = self.mesh.num_cells()
+            PETSc.Sys.Print("Number of mesh elements: %d" % num_cells)
+            if i > 0 and np.abs(num_cells - num_cells_old) < op.element_rtol*num_cells_old:
+                PETSc.Sys.Print("Converged number of mesh elements!")
+                break
+            if i == op.num_adapt-1 or num_cells < 200:
+                raise ConvergenceError("Adaptation loop failed to converge in {:d} iterations".format(i+1))
+            qoi_old = qoi
+            num_cells_old = num_cells
+            estimator_old = estimator
+        PETSc.Sys.Print('\n' + 80*'#')
+        PETSc.Sys.Print("SUMMARY")
+        PETSc.Sys.Print('\n' + 80*'#')
+        PETSc.Sys.Print("Approach:             '%s'" % self.approach)
+        PETSc.Sys.Print("Target:               %.2e" % op.target)
+        PETSc.Sys.Print("Number of elements:   %d" % num_cells)
+        PETSc.Sys.Print("DOF count:            %d" % sum(self.V.dof_count))  # TODO: parallelise
+        PETSc.Sys.Print("Quantity of interest: %.4e" % qoi)
+        PETSc.Sys.Print('\n' + 80*'#')
+
+    def check_conditioning(self, submatrices=None):  # TODO: Account for RHS
         """
         Check condition number of LHS matrix, or submatrices thereof.
 
