@@ -25,7 +25,8 @@ class Options(FrozenConfigurable):
     h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
 
     # Stabilisation
-    stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach.").tag(config=True)
+    stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.").tag(config=True)
+    stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0), help="Scalar stabilisation parameter.").tag(config=True)
 
     # Metric
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)

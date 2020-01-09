@@ -46,15 +46,17 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.nonlinear = True
 
     def set_fields(self):
-        self.op.set_viscosity(self.P1)
+        self.nu = self.op.set_viscosity(self.P1)
+        self.bathymetry = self.op.bathymetry
         self.inflow = self.op.set_inflow(self.P1_vec)
+        self.drag_coefficient = self.op.drag_coefficient
 
     def setup_solver(self):
         """
         Create a Thetis FlowSolver2d object for solving the shallow water equations.
         """
         op = self.op
-        self.solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.bathymetry)
         options = self.solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
@@ -78,10 +80,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
         options.polynomial_degree = op.degree
-        options.horizontal_viscosity = op.viscosity
-        options.quadratic_drag_coefficient = op.drag_coefficient
-        options.use_lax_friedrichs_velocity = op.lax_friedrichs
-        options.lax_friedrichs_velocity_scaling_factor = op.lax_friedrichs_scaling_factor
+        options.horizontal_viscosity = self.nu
+        options.quadratic_drag_coefficient = self.drag_coefficient
+        options.use_lax_friedrichs_velocity = op.stabilisation == 'lax_friedrichs'
+        options.lax_friedrichs_velocity_scaling_factor = op.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
         self.solver_obj.create_equations()
@@ -146,13 +148,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
             raise Exception('Unsupported boundary type {:}'.format(funcs.keys()))
         return eta, u
 
-    def get_dwr_residual(self, sol, adjoint_sol, adjoint=False):
-        if not adjoint:
-            raise NotImplementedError  # TODO
-        assert sol.function_space() == self.solution.function_space()
-        assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
-        u, eta = sol.split()
-        z, zeta = adjoint_sol.split()
+    def get_dwr_residual_forward(self):
+        tpe = self.tp_enriched
+        i = tpe.p0test
+
+        tpe.project_solution(self.solution)
+        u, eta = tpe.solution.split()
+        z, zeta = self.adjoint_error.split()
 
         op = self.op
         i = self.p0test
@@ -182,11 +184,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimators['dwr_cell'] = assemble(F*dx)
         self.indicators['dwr_cell'] = assemble(i*F*dx)
 
-    def get_dwr_flux(self, sol, adjoint_sol, adjoint=False):
-        if not adjoint:
-            raise NotImplementedError  # TODO
-        assert sol.function_space() == self.solution.function_space()
-        assert adjoint_sol.function_space() == self.adjoint_solution.function_space()
+    def get_dwr_flux_forward(self)
+        # TODO
         u, eta = sol.split()
         z, zeta = adjoint_sol.split()
 

@@ -124,21 +124,23 @@ class SteadyTracerProblem2d(SteadyProblem):
 
     def get_strong_residual_forward(self):
         R = self.source - dot(self.u, grad(self.solution)) + div(self.nu*grad(self.solution))
-        self.indicators['cell_res_forward'] = assemble(self.p0test*abs(R)*dx)
-        self.indicator = interpolate(self.indicators['cell_res_forward'], self.P1)
+        self.indicators['cell_residual_forward'] = assemble(self.p0test*abs(R)*dx)
+        self.indicator = interpolate(self.indicators['cell_residual_forward'], self.P1)
         # self.indicator = interpolate(R, self.P1)
         # self.indicator = interpolate(abs(self.indicator), self.P1)
         self.indicator.rename('forward strong residual')
+        self.estimate_error('cell_residual_forward')
 
     def get_strong_residual_adjoint(self):
         R = self.kernel + div(self.u*self.adjoint_solution) + div(self.nu*grad(self.adjoint_solution))
-        self.indicators['cell_res_adjoint'] = assemble(self.p0test*abs(R)*dx)
-        self.indicator = interpolate(self.indicators['cell_res_adjoint'], self.P1)
+        self.indicators['cell_residual_adjoint'] = assemble(self.p0test*abs(R)*dx)
+        self.indicator = interpolate(self.indicators['cell_residual_adjoint'], self.P1)
         # self.indicator = interpolate(R, self.P1)
         # self.indicator = interpolate(abs(self.indicator), self.P1)
         self.indicator.rename('adjoint strong residual')
+        self.estimate_error('cell_residual_adjoint')
 
-    def get_dwr_residual_forward(self, sol, adjoint_sol):  # FIXME: Inputs are unused
+    def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
         phi = project(self.solution, tpe.V)  # FIXME: prolong
         if not hasattr(self, 'adjoint_error'):
@@ -149,9 +151,9 @@ class SteadyTracerProblem2d(SteadyProblem):
             dwr += strong_residual*tpe.stabilisation*dot(tpe.u, grad(self.adjoint_error))
         self.indicators['dwr_cell'] = project(assemble(tpe.p0test*dwr*dx), self.P0)  # FIXME: inject?
         self.indicators['dwr_cell'].interpolate(abs(self.indicators['dwr_cell']))
-        self.estimators['dwr_cell'] = self.indicators['dwr_cell'].vector().gather().sum()
+        self.estimate_error('dwr_cell')
 
-    def get_dwr_flux_forward(self, sol, adjoint_sol):  # FIXME: Inputs are unused
+    def get_dwr_flux_forward(self):
         tpe = self.tp_enriched
         i = tpe.p0test
         phi = project(self.solution, tpe.V)  # FIXME: prolong
@@ -174,20 +176,18 @@ class SteadyTracerProblem2d(SteadyProblem):
         bcs = tpe.boundary_conditions
         for j in bcs:
             if 'diff_flux' in bcs[j]:
-                # flux_terms += i*(dwr + bcs[j]['diff_flux']*self.adjoint_error)*ds(j)
-                flux_terms += i*(dwr + Constant(0.0, domain=tpe.mesh)*self.adjoint_error)*ds(j)
+                flux_terms += i*(dwr + bcs[j]['diff_flux']*self.adjoint_error)*ds(j)
                 if self.stab == "SUPG":
-                    # flux_terms += i*bcs[j]['diff_flux']*coeff*ds(j)
-                    flux_terms += i*Constant(0.0, domain=tpe.mesh)*coeff*ds(j)
+                    flux_terms += i*bcs[j]['diff_flux']*coeff*ds(j)
 
         # Solve auxiliary FEM problem
         edge_res = Function(tpe.P0)
         solve(mass_term == flux_terms, edge_res)
         self.indicators['dwr_flux'] = project(edge_res, self.P0)  # FIXME: inject?
         self.indicators['dwr_flux'].interpolate(abs(self.indicators['dwr_flux']))
-        self.estimators['dwr_flux'] = self.indicators['dwr_flux'].vector().gather().sum()
+        self.estimate_error('dwr_flux')
 
-    def get_dwr_residual_adjoint(self, sol, adjoint_sol):  # FIXME: Inputs are unused
+    def get_dwr_residual_adjoint(self):
         tpe = self.tp_enriched
         lam = project(self.adjoint_solution, tpe.V)  # FIXME: prolong
         if not hasattr(self, 'error'):
@@ -198,9 +198,9 @@ class SteadyTracerProblem2d(SteadyProblem):
             dwr += strong_residual*tpe.stabilisation*dot(tpe.u, grad(self.error))
         self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*dwr*dx), self.P0)  # FIXME: inject?
         self.indicators['dwr_cell_adjoint'].interpolate(abs(self.indicators['dwr_cell_adjoint']))
-        self.estimators['dwr_cell_adjoint'] = self.indicators['dwr_cell_adjoint'].vector().gather().sum()
+        self.estimate_error('dwr_cell_adjoint')
         
-    def get_dwr_flux_adjoint(self, sol, adjoint_sol):  # FIXME: Inputs are unused
+    def get_dwr_flux_adjoint(self):
         tpe = self.tp_enriched
         i = tpe.p0test
         lam = project(self.adjoint_solution, tpe.V)  # FIXME: prolong
@@ -226,7 +226,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         solve(mass_term == flux_terms, edge_res_adjoint)
         self.indicators['dwr_flux_adjoint'] = project(edge_res_adjoint, self.P0)  # FIXME: inject?
         self.indicators['dwr_flux_adjoint'].interpolate(abs(self.indicators['dwr_flux_adjoint']))
-        self.estimators['dwr_flux_adjoint'] = self.indicators['dwr_flux_adjoint'].vector().gather().sum()
+        self.estimate_error('dwr_flux_adjoint')
 
     def get_hessian_metric(self, adjoint=False, noscale=False):
         self.M = steady_metric(self.get_solution(adjoint), mesh=self.mesh, noscale=noscale, op=self.op)

@@ -33,14 +33,19 @@ class ShallowWaterOptions(Options):
     def __init__(self, approach='fixed_mesh'):
         super(ShallowWaterOptions, self).__init__(approach=approach)
         self.degree_increase = 0
+        self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_parameter = Constant(1.0)
+
+    def set_bathymetry(self, fs):
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def set_viscosity(self, fs):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def set_inflow(self, fs):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def set_coriolis(self, fs):
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")
 
 # TODO: UnsteadyShallowWaterOptions, inheriting from the above

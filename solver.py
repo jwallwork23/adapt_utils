@@ -296,39 +296,39 @@ class SteadyProblem():
     def get_strong_residual_adjoint(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def get_dwr_residual(self, sol, adjoint_sol, adjoint=False):
+    def get_dwr_residual(self, adjoint=False):
         """
         Evaluate the cellwise component of the forward or adjoint Dual Weighted Residual (DWR) error
         estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg `adjoint`.
         """
         if adjoint:
-            self.get_dwr_residual_adjoint(sol, adjoint_sol)
+            self.get_dwr_residual_adjoint()
         else:
-            self.get_dwr_residual_forward(sol, adjoint_sol)
+            self.get_dwr_residual_forward()
 
-    def get_dwr_residual_forward(self, sol, adjoint_sol):
+    def get_dwr_residual_forward(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def get_dwr_residual_adjoint(self, sol, adjoint_sol):
+    def get_dwr_residual_adjoint(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def get_dwr_flux(self, sol, adjoint_sol, adjoint=False):
+    def get_dwr_flux(self, adjoint=False):
         """
         Evaluate the edgewise component of the forward or adjoint Dual Weighted Residual (DWR) error
         estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg `adjoint`.
         """
         if adjoint:
-            self.get_dwr_flux_adjoint(sol, adjoint_sol)
+            self.get_dwr_flux_adjoint()
         else:
-            self.get_dwr_flux_forward(sol, adjoint_sol)
+            self.get_dwr_flux_forward()
 
-    def get_dwr_flux_forward(self, sol, adjoint_sol):
+    def get_dwr_flux_forward(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def get_dwr_flux_adjoint(self, sol, adjoint_sol):
+    def get_dwr_flux_adjoint(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def dwr_indication(self, adjoint=False):  # TODO: Change inputs for consistency
+    def dwr_indication(self, adjoint=False):
         """
         Indicate errors in the quantity of interest by the Dual Weighted Residual (DWR) method of
         [Becker and Rannacher, 2001].
@@ -342,8 +342,13 @@ class SteadyProblem():
             label += '_adjoint'
             cell_label += '_adjoint'
             flux_label += '_adjoint'
-        self.get_dwr_residual(self.solution, self.adjoint_solution, adjoint=adjoint)
-        self.get_dwr_flux(self.solution, self.adjoint_solution, adjoint=adjoint)
+
+        # Compute DWR residual and flux terms
+        #   NOTE: Doing so requires solving auxiliary FEM problems in an enriched space.
+        self.get_dwr_residual(adjoint=adjoint)
+        self.get_dwr_flux(adjoint=adjoint)
+
+        # Form error indicators
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators[cell_label] + self.indicators[flux_label]))
         self.estimators[label] = self.estimators[cell_label] + self.estimators[flux_label]
@@ -359,6 +364,7 @@ class SteadyProblem():
         self.indicators['dwp'] = assemble(self.p0test*prod*dx)
         self.indicator = interpolate(prod, self.P1)
         self.indicator.rename('dwp')
+        self.estimate_error('dwp')
 
     def get_hessian_metric(self, adjoint=False):
         """
@@ -415,20 +421,20 @@ class SteadyProblem():
         Plot current mesh and indicator fields, if available.
         """
         File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
-        if hasattr(self, 'indicator'):
-            name = self.indicator.dat.name
-            self.indicator.rename(' '.join([name, 'indicator']))
-            File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator)
         for key in self.indicators:
             File(os.path.join(self.di, key + '.pvd')).write(self.indicators[key])
 
-    def indicate_error(self):  # TODO: Change 'relax' to 'average'
+    def indicate_error(self):
         """
         Evaluate error estimation strategy of choice in order to obtain a metric field for mesh
         adaptation.
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
         """
+        # TODO:
+        #  * Change 'relax' to 'average'
+        #  * Remove all author names
+        #  * Integrate AnisotropicMetricDriver
         if self.approach == 'fixed_mesh':
             return
         elif self.approach == 'uniform':
@@ -504,9 +510,13 @@ class SteadyProblem():
             PETSc.Sys.Print("Using custom metric '{:s}'".format(self.approach))
             self.custom_adapt()
 
-        # Assemble global error estimator
-        if hasattr(self, 'indicator'):
-            self.estimator = self.indicator.vector().gather().sum()
+    def estimate_error(self, approach):
+        """
+        Compute error estimator associated with `approach` by summing the corresponding error
+        indicator over all elements.
+        """
+        assert approach in self.indicators
+        self.estimators[approach] = self.indicators[approach].vector().gather().sum()
 
     def adapt_mesh(self):
         """
