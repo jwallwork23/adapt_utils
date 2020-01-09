@@ -191,40 +191,56 @@ class SteadyProblem():
         else:
             self.error = val
 
-    def difference(self, u, v):  # TODO: Overload in SW
+    def difference(self, u, v, out=None):
         """
         Take the difference of two functions `u` and `v` defined on `self.mesh`.
         """
         assert u.function_space() == v.function_space()
-        out = Function(u.function_space()).assign(u)
+        if out is None:
+            out = Function(u.function_space())
+        else:
+            assert out.function_space() == u.function_space()
+        out.assign(u)
         out -= v
         return out
 
-    def interpolate(self, val):  # TODO: Overload in SW
+    def interpolate(self, val, out=None):
         """
         Interpolate a function in `self.V`.
         """
-        return interpolate(val, self.V)
+        if out is None:
+            out = Function(self.V)
+        else:
+            assert out.function_space() == self.V
+        for outi, vi in zip(out.split(), val.split()):
+            outi.interpolate(vi)
+        return out
 
-    def project(self, val):  # TODO: Overload in SW
+    def project(self, val, out=None):
         """
         Project a function in `V`.
         """
-        return project(val, self.V)
+        if out is None:
+            out = Function(self.V)
+        else:
+            assert out.function_space() == self.V
+        for outi, vi in zip(out.split(), val.split()):
+            outi.project(vi)
+        return out
 
-    def interpolate_solution(self, val, adjoint=False):  # TODO: Overload in SW
+    def interpolate_solution(self, val, adjoint=False):
         """
         Interpolate forward or adjoint solution, as specified by the boolean kwarg
         `adjoint`.
         """
-        self.get_solution(adjoint=adjoint).interpolate(val)
+        self.interpolate(val, out=self.get_solution(adjoint=adjoint))
 
-    def project_solution(self, val, adjoint=False):  # TODO: Overload in SW
+    def project_solution(self, val, adjoint=False):
         """
         Project forward or adjoint solution, as specified by the boolean kwarg
         `adjoint`.
         """
-        self.get_solution(adjoint=adjoint).project(val)
+        self.project(val, out=self.get_solution(adjoint=adjoint))
 
     def get_qoi_kernel(self):
         """
