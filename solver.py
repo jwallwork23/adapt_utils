@@ -51,9 +51,11 @@ class SteadyProblem():
         self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
 
-        # Error estimator/indicator storage
-        self.estimators = {}
+        # Storage over mesh optimisation loop
         self.indicators = {}
+        self.estimators = {}
+        self.num_cells = []
+        self.num_vertices = []
 
     def set_mesh(self, mesh):
         """
@@ -348,11 +350,15 @@ class SteadyProblem():
         self.get_dwr_residual(adjoint=adjoint)
         self.get_dwr_flux(adjoint=adjoint)
 
-        # Form error indicators
+        # Indicate error
         self.indicator = Function(self.P1, name=label)
         self.indicator.interpolate(abs(self.indicators[cell_label] + self.indicators[flux_label]))
-        self.estimators[label] = self.estimators[cell_label] + self.estimators[flux_label]
         self.indicators[label] = self.indicator
+
+        # Estimate error
+        if not label in self.estimators:
+            self.estimators[label] = []
+        self.estimators[label].append(self.estimators[cell_label][-1] + self.estimators[flux_label][-1])
 
     def dwp_indication(self):
         """
@@ -516,7 +522,12 @@ class SteadyProblem():
         indicator over all elements.
         """
         assert approach in self.indicators
-        self.estimators[approach] = self.indicators[approach].vector().gather().sum()
+        if not approach in self.estimators:
+            self.estimators[approach] = []
+        self.estimators[approach].append(self.indicators[approach].vector().gather().sum())
+
+    def plot_error_estimate(self, approach):
+        raise NotImplementedError  # TOD
 
     def adapt_mesh(self):
         """
@@ -538,6 +549,8 @@ class SteadyProblem():
             self.am.adapt(self.M)
             self.mesh = self.am.mesh
         PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
+        self.num_cells.append(self.mesh.num_cells())
+        self.num_vertices.append(self.mesh.num_vertices())
         self.plot()
 
         # Re-initialise problem
