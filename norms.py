@@ -1,7 +1,9 @@
 from firedrake import *
 
 
-__all__ = ["local_norm", "local_edge_integral", "local_interior_edge_integral", "local_boundary_integral", "local_edge_norm", "local_interior_edge_norm", "local_boundary_norm"]
+__all__ = ["local_norm", "local_edge_integral", "local_interior_edge_integral",
+           "local_boundary_integral", "local_edge_norm", "local_interior_edge_norm",
+           "local_boundary_norm"]
 
 
 def local_norm(f, norm_type='L2'):
@@ -43,8 +45,9 @@ def local_edge_integral(f, mesh=None):
     if mesh is None:
         mesh = f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
-    i = TestFunction(P0)
-    return project(assemble(((f*i)('+') + (f*i)('-'))*dS + f*i*ds), P0)
+    test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
+    solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS + test*f*ds, integral)
+    return integral
 
 def local_interior_edge_integral(f, mesh=None):
     """
@@ -53,8 +56,9 @@ def local_interior_edge_integral(f, mesh=None):
     if mesh is None:
         mesh = f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
-    i = TestFunction(P0)
-    return project(assemble(((f*i)('+') + (f*i)('-'))*dS), P0)
+    test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
+    solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS, integral)
+    return integral
 
 def local_boundary_integral(f, mesh=None):
     """
@@ -63,8 +67,9 @@ def local_boundary_integral(f, mesh=None):
     if mesh is None:
         mesh = f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
-    i = TestFunction(P0)
-    return project(assemble(f*i*ds), P0)
+    test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
+    solve(test*trial*dx == test*f*ds, integral)
+    return integral
 
 def local_edge_norm(f, mesh=None):
     if mesh is None:
