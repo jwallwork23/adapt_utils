@@ -11,9 +11,23 @@ import numpy.linalg as la
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["check_spd", "index_string", "subdomain_indicator", "get_boundary_nodes", "print_doc",
-           "bessi0", "bessk0"]
+__all__ = ["check_spd", "get_edge_lengths", "index_string", "subdomain_indicator",
+           "get_boundary_nodes", "print_doc", "bessi0", "bessk0"]
 
+
+def get_edge_lengths(mesh):
+    """
+    Compute edge lengths, stored in a HDiv trace field.
+
+    NOTE: The plus sign is arbitrary and could equally well be chosen as minus.
+    """
+    HDivTrace = FunctionSpace(mesh, "HDiv Trace", 0)
+    v, u = TestFunction(HDivTrace), TrialFunction(HDivTrace)
+    edge_lengths = Function(HDivTrace, name="Edge lengths")
+    mass_term = v('+')*u('+')*dS + v*u*ds
+    rhs = v('+')*FacetArea(mesh)*dS + v*FacetArea(mesh)*ds
+    solve(mass_term == rhs, edge_lengths)
+    return edge_lengths
 
 def check_spd(matrix):
     """

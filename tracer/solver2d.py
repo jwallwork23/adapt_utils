@@ -54,7 +54,7 @@ class SteadyTracerProblem2d(SteadyProblem):
             self.stab = 'SUPG'
         assert self.stab in ('no', 'SU', 'SUPG', 'lax_friedrichs')
         if self.stab in ('SU', 'SUPG'):  # FIXME
-            #self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
+            # self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
             self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
             #self.stabilisation = anisotropic_stabilisation(self.u, mesh=self.mesh)
 

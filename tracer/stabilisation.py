@@ -5,8 +5,10 @@ except ImportError:
     import firedrake.dmplex as dmplex  # Older Firedrake version
 
 import numpy as np
+import numpy.linalg as la
 
 from adapt_utils.adapt.kernels import eigen_kernel, singular_value_decomposition
+from adapt_utils.misc.misc import get_edge_lengths
 
 
 __all__ = ["anisotropic_stabilisation"]
@@ -50,9 +52,9 @@ def supg_coefficient(u, nu, mesh=None, anisotropic=False):
 
     In isotropic mode, we use the cell diameter as our measure of element size :math:`h_K`.
 
-    In anisotropic mode, we loop over each element of the mesh, project the edge of maximal length
-    into a vector space spanning the velocity field `u` and take the length of this projected
-    edge as the measure of element size.
+    In anisotropic mode, we follow [Nguyen et al., 2009] in looping over each element of the mesh,
+    projecting the edge of maximal length into a vector space spanning the velocity field `u` and
+    taking the length of this projected edge as the measure of element size.
 
     In both cases, we compute the stabilisation coefficent as
 
@@ -73,63 +75,48 @@ def supg_coefficient(u, nu, mesh=None, anisotropic=False):
 
 
 def anisotropic_h(u, mesh=None):
+    """
+    Measure of element size recommended in [Nguyen et al., 2009]: maximum edge length, projected onto
+    the velocity field `u`.
+    """
     if mesh is None:
         mesh = u.function_space().mesh()
-    plex = mesh._plex
-    func = isinstance(u, Function)  # determine if u is a Function or a Constant
+    func = isinstance(u, Function)  # Determine if u is a Function or a Constant
+    if not func:
+        try:
+            assert isinstance(u, Constant)
+        except AssertionError:
+            raise ValueError("Velocity field shouuld be either `Function` or `Constant`.")
+    # edge_lengths = get_edge_lengths(mesh)  # TODO: Extend this to compute vectors, too
 
-    # create section describing global numbering of vertices
-    dim = mesh.topological_dimension()
-    entity_dofs = np.zeros(dim+1, dtype=np.int32)
-    entity_dofs[0] = mesh.geometric_dimension()
-    section = dmplex.create_section(mesh, entity_dofs)
+    coords = mesh.coordinates.dat.data_ro_with_halos
+    cell_to_vertices = mesh.coordinates.cell_node_map().values_with_halo
+    global_max_edge_length = np.finfo(float).min
+    global_max_edge_vector = None
 
-    # extract strata from plex
-    v_start, v_end = plex.getHeightStratum(2)  # vertices
-    f_start, f_end = plex.getHeightStratum(1)  # edges/facets
-    c_start, c_end = plex.getHeightStratum(0)  # cells/elements
+    # Loop over all elements and find the edge with maximum length
+    for c in range(len(cell_to_vertices)):
+        endpoints = [coords[v] for v in cell_to_vertices[c]]
+        vectors = []
+        lengths = []
+        for i in range(3):
+            vector = endpoints[(i+1) % 3] - endpoints[i] 
+            vectors.append(vector)
+            lengths.append(la.norm(vector))
+        j = np.argmax(lengths)
 
-    dat = {}
-    for c in range(c_start, c_end):                           # loop over elements
-        dat[c] = {}
-        max_norm = 0.
-        edges = plex.getCone(c)                               # get edges of element
-        for f in edges:                                       # loop over edge of element
-            assert f >= f_start and f < f_end
-            vertices = plex.getCone(f)                        # get vertices of edge
-            crds = []
-            if func:
-                func_vals = []
-            for v in vertices:                                # loop over vertices of edge
-                assert v >= v_start and v < v_end
-                off = section.getOffset(v)//2
-                crds.append(mesh.coordinates.dat.data[off])   # get coordinates of vertex
-                if func:
-                    func_vals.append(u.dat.data[off])         # get corresp. values of u
-            vec = crds[1] - crds[0]                           # get vector describing edge
-            nrm = np.sqrt(np.dot(vec, vec))                   # take norm of vector
-            if func:
-                avg_func = (0.5*func_vals[0] + func_vals[1])  # take average along edge
+        # Take maximum over all edges  # TODO: Spatially varying version
+        if lengths[j] > global_max_edge_length:
+            global_max_edge_length = lengths[j]
+            global_max_edge_vector = vectors[j]
 
-            if nrm >= max_norm:                               # find edge with max length
-                dat[c]['edge'] = vec
-                if func:
-                    func_val = avg_func
-        dat[c]['u'] = func_val if func else u.dat.data
-
-    # create section describing global numbering of elements
-    entity_dofs = np.zeros(dim+1, dtype=np.int32)
-    entity_dofs[2] = mesh.geometric_dimension()
-    section = dmplex.create_section(mesh, entity_dofs)
-
-    # project edge with max length into vector space spanned by velocity field
-    P0 = FunctionSpace(mesh, "DG", 0)
-    h = Function(P0)
-    for c in dat.keys():
-        e = dat[c]['edge']
-        u_e = dat[c]['u']
-        projected_edge = np.array([e[0]*abs(u_e[0]), e[1]*abs(u_e[1])])
-        idx = section.getOffset(c)//2
-        h.dat.data[idx] = np.sqrt(np.dot(projected_edge, projected_edge))
+    v = global_max_edge_vector
+    if func:
+        fs = FunctionSpace(mesh, u.ufl_element().family(), u.ufl_element().degree())
+        h = interpolate((u[0]*v[0] + u[1]*v[1])/sqrt(dot(u, u)), fs)
+        h = h.vector().gather().max()  # TODO: Spatially varying version
+    else:
+        udat = u.dat.data[0]
+        h = Constant(udat[0]*v[0] + udat[1]*v[1])
 
     return h
