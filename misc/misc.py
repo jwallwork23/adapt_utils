@@ -11,11 +11,11 @@ import numpy.linalg as la
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["check_spd", "get_edge_lengths", "index_string", "subdomain_indicator",
-           "get_boundary_nodes", "print_doc", "bessi0", "bessk0"]
+__all__ = ["check_spd", "get_edge_lengths", "get_edge_vectors", "index_string",
+           "subdomain_indicator", "get_boundary_nodes", "print_doc", "bessi0", "bessk0"]
 
 
-def get_edge_lengths(mesh):
+def get_edge_lengths(mesh):  # TODO: Put in AdaptiveMesh class
     """
     Compute edge lengths, stored in a HDiv trace field.
 
@@ -28,6 +28,30 @@ def get_edge_lengths(mesh):
     rhs = v('+')*FacetArea(mesh)*dS + v*FacetArea(mesh)*ds
     solve(mass_term == rhs, edge_lengths)
     return edge_lengths
+
+def get_edge_vectors(mesh):  # TODO: Put in AdaptiveMesh class
+    """
+    Compute edge vectors, stored in a HDiv trace field.
+
+    NOTES:
+      * The plus sign is arbitrary and could equally well be chosen as minus.
+      * The sign of the returned vectors is arbitrary and could equally well take the minus sign.
+    """
+    dim = mesh.topological_dimension()
+    n = FacetNormal(mesh)
+    if dim == 2:
+        s = as_vector([-n[1], n[0]])  # Tangent vector
+    elif dim == 3:
+        raise NotImplementedError  # TODO: Get a tangent vector in 3D
+    else:
+        raise NotImplementedError
+    HDivTrace_vec = VectorFunctionSpace(mesh, "HDiv Trace", 0)
+    v, u = TestFunction(HDivTrace_vec), TrialFunction(HDivTrace_vec)
+    edge_vectors = Function(HDivTrace_vec, name="Edge vectors")
+    mass_term = inner(v('+'), u('+'))*dS + inner(v, u)*ds
+    rhs = inner(v('+'), s('+')*FacetArea(mesh))*dS + inner(v, s*FacetArea(mesh))*ds
+    solve(mass_term == rhs, edge_vectors)
+    return edge_vectors
 
 def check_spd(matrix):
     """
