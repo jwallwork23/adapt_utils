@@ -56,7 +56,7 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         else:
             options.no_exports = True
         options.solve_tracer = True
-        options.lax_friedrichs_tracer = self.stab == 'lax_friedrichs'
+        options.lax_friedrichs_tracer = self.stabilisation == 'lax_friedrichs'
         options.tracer_only = True
         options.horizontal_diffusivity = self.nu
         options.tracer_source_2d = self.source
@@ -210,7 +210,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
         elif not adjoint:
             options.no_exports = True
         options.solve_tracer = True
-        options.lax_friedrichs_tracer = self.stab == 'lax_friedrichs'
+        options.lax_friedrichs_tracer = self.stabilisation == 'lax_friedrichs'
         options.tracer_only = True
         options.horizontal_diffusivity = self.nu
         if hasattr(self, 'source'):
@@ -276,7 +276,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
         options.simulation_end_time = 0.9*op.dt
         options.fields_to_export = []
         options.solve_tracer = True
-        options.lax_friedrichs_tracer = self.stab == 'lax_friedrichs'
+        options.lax_friedrichs_tracer = self.stabilisation == 'lax_friedrichs'
         options.tracer_only = True
         options.horizontal_diffusivity = self.nu
         if hasattr(self, 'source'):

@@ -51,6 +51,14 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.inflow = self.op.set_inflow(self.P1_vec)
         self.drag_coefficient = self.op.drag_coefficient
 
+        # Stabilisation
+        if self.stabilisation is None:
+            self.stabilisation = 'no'
+        if self.stabilisation == 'lax_friedrichs':
+            self.stabilisation_parameter = op.stabilisation_parameter
+        elif self.stabilisation != 'no':
+            raise ValueError("Stabilisation method {:s} not recognised".format(self.stabilisation))
+
     def setup_solver(self):
         """
         Create a Thetis FlowSolver2d object for solving the shallow water equations.
@@ -82,8 +90,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.polynomial_degree = op.degree
         options.horizontal_viscosity = self.nu
         options.quadratic_drag_coefficient = self.drag_coefficient
-        options.use_lax_friedrichs_velocity = self.stab == 'lax_friedrichs'
-        options.lax_friedrichs_velocity_scaling_factor = op.stabilisation_parameter
+        options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
+        options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
         self.solver_obj.create_equations()
@@ -411,11 +419,10 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         super(UnsteadyShallowWaterProblem, self).__init__(mesh, op, element, discrete_adjoint)
 
         # Stabilisation
-        if self.stab is not None:
-            try:
-                assert self.stab == 'lax_friedrichs'
-            except AssertionError:
-                raise NotImplementedError
+        try:
+            assert self.stabilisation in ('no', 'lax_friedrichs')
+        except AssertionError:
+            raise NotImplementedError
 
         # Classification
         self.nonlinear = True

@@ -2,7 +2,6 @@ from firedrake import *
 
 import numpy as np
 
-from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
@@ -42,25 +41,56 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.nonlinear = False
 
     def set_fields(self):
-        self.nu = self.op.set_diffusivity(self.P1)
-        self.u = self.op.set_velocity(self.P1_vec)
+        self.nu = op.set_diffusivity(self.P1)
+        self.u = op.set_velocity(self.P1_vec)
         self.divergence_free = np.allclose(norm(div(self.u)), 0.0)
-        self.source = self.op.set_source(self.P1)
-        self.kernel = self.op.set_qoi_kernel(self.P0)
+        self.source = op.set_source(self.P1)
+        self.kernel = op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Stabilisation
-        if self.stab is None:
-            self.stab = 'SUPG'
-        assert self.stab in ('no', 'SU', 'SUPG', 'lax_friedrichs')
-        if self.stab in ('SU', 'SUPG'):  # FIXME
-            # self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=True)
-            self.stabilisation = supg_coefficient(self.u, self.nu, mesh=self.mesh, anisotropic=False)
-            #self.stabilisation = anisotropic_stabilisation(self.u, mesh=self.mesh)
+        if self.stabilisation is None:
+            self.stabilisation = 'SUPG'
+        if self.stabilisation in ('SU', 'SUPG'):  # TODO: Anisotropic, spatially varying
+            self.supg_coefficient(anisotropic=False, use_cell_metric=False)
+            # self.supg_coefficient(anisotropic=True, use_cell_metric=False)
+            # self.supg_coefficient(anisotropic=True, use_cell_metric=True)
+        elif self.stabilisation == 'lax_friedrichs':
+            self.stabilisation_parameter = op.stabilisaton_parameter
+        elif self.stabilisation != 'no':
+            raise ValueError("Stabilisation method {:s} not recognised".format(self.stabilisation))
 
         # Rename solution fields
         self.solution.rename('Tracer concentration')
         self.adjoint_solution.rename('Adjoint tracer concentration')
+
+    def supg_coefficient(self, anisotropic=False, use_cell_metric=False):
+        r"""
+        Compute SUPG stabilisation coefficent for the advection diffusion problem. There are two
+        modes in which this can be calculated, as determined by the Boolean parameter `anisotropic`:
+
+        In isotropic mode, we use the cell diameter as our measure of element size :math:`h_K`.
+
+        In anisotropic mode, we follow [Nguyen et al., 2009] in looping over each element of the
+        mesh, projecting the edge of maximal length into a vector space spanning the velocity field
+        `u` and taking the length of this projected edge as the measure of element size.
+
+        In both cases, we compute the stabilisation coefficent as
+
+    ..  math::
+        \tau = \frac{h_K}{2\|\textbf{u}\|}
+
+        :kwarg anisotropic: toggle between isotropic and anisotropic mode.
+        :kwarg use_cell_metric: toggle alternative formulation which uses the cell metric.
+        """
+        if use_cell_metric:
+            self.am.get_cell_metric()
+            h = dot(self.u, dot(self.am.cell_metric, self.u))
+        else:
+            h = self.am.anisotropic_h(self.u) if anisotropic else self.h
+        Pe = 0.5*sqrt(inner(self.u, self.u))*h/self.nu
+        tau = 0.5*h/sqrt(inner(self.u, self.u))
+        self.stabilisation_parameter = tau*min_value(1, Pe/3)
 
     def setup_solver_forward(self):
         phi = self.trial
@@ -71,14 +101,14 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.rhs = self.source*psi*dx
 
         # Stabilisation
-        if self.stab in ("SU", "SUPG"):
-            coeff = self.stabilisation*dot(self.u, grad(psi))
+        if self.stabilisation in ("SU", "SUPG"):
+            coeff = self.stabilisation_parameter*dot(self.u, grad(psi))
             self.lhs += coeff*dot(self.u, grad(phi))*dx
-            if self.stab == "SUPG":
+            if self.stabilisation == "SUPG":
                 self.lhs += coeff*-div(self.nu*grad(phi))*dx
                 self.rhs += coeff*self.source*dx
                 psi = psi + coeff
-        elif not self.stab is None:
+        elif not self.stabilisation is None:
             raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
@@ -102,14 +132,14 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.rhs_adjoint = self.kernel*psi*dx
 
         # Stabilisation
-        if self.stab in ("SU", "SUPG"):
-            coeff = -self.stabilisation*div(self.u*psi)
+        if self.stabilisation in ("SU", "SUPG"):
+            coeff = -self.stabilisation_parameter*div(self.u*psi)
             self.lhs_adjoint += -coeff*div(self.u*lam)*dx
-            if self.stab == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
+            if self.stabilisation == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
                 self.lhs_adjoint += coeff*-div(self.nu*grad(lam))*dx
                 self.rhs_adjoint += coeff*self.kernel*dx
                 psi = psi + coeff
-        elif not self.stab is None:
+        elif not self.stabilisation is None:
             raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
@@ -145,8 +175,8 @@ class SteadyTracerProblem2d(SteadyProblem):
         tpe.project_solution(self.solution)  # FIXME: prolong
         strong_residual = tpe.source - dot(tpe.u, grad(tpe.solution)) + div(tpe.nu*grad(tpe.solution))
         dwr = strong_residual*self.adjoint_error
-        if self.stab == 'SUPG':  # Account for stabilisation error
-            dwr += strong_residual*tpe.stabilisation*dot(tpe.u, grad(self.adjoint_error))
+        if self.stabilisation == 'SUPG':  # Account for stabilisation error
+            dwr += strong_residual*tpe.stabilisation_parameter*dot(tpe.u, grad(self.adjoint_error))
         self.indicators['dwr_cell'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
         self.estimate_error('dwr_cell')
 
@@ -159,8 +189,8 @@ class SteadyTracerProblem2d(SteadyProblem):
         mass_term = i*tpe.p0trial*dx
         flux = -tpe.nu*dot(tpe.n, nabla_grad(tpe.solution))
         dwr = flux*self.adjoint_error
-        if self.stab == 'SUPG':  # Account for stabilisation error
-            coeff = tpe.stabilisation*dot(tpe.u, grad(self.adjoint_error))
+        if self.stabilisation == 'SUPG':  # Account for stabilisation error
+            coeff = tpe.stabilisation_parameter*dot(tpe.u, grad(self.adjoint_error))
             dwr += coeff*flux
         flux_terms = ((i*dwr)('+') + (i*dwr)('-'))*dS
 
@@ -172,7 +202,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         for j in bcs:
             if 'diff_flux' in bcs[j]:
                 flux_terms += i*(dwr + bcs[j]['diff_flux']*self.adjoint_error)*ds(j)
-                if self.stab == "SUPG":
+                if self.stabilisation == "SUPG":
                     flux_terms += i*bcs[j]['diff_flux']*coeff*ds(j)
 
         # Solve auxiliary FEM problem
@@ -186,8 +216,8 @@ class SteadyTracerProblem2d(SteadyProblem):
         tpe.project_solution(self.adjoint_solution, adjoint=True)  # FIXME: prolong
         strong_residual = tpe.op.box(tpe.P0) + div(tpe.u*tpe.adjoint_solution) + div(tpe.nu*grad(tpe.adjoint_solution))
         dwr = strong_residual*self.error
-        if self.stab == 'SUPG':  # Account for stabilisation error
-            dwr += strong_residual*tpe.stabilisation*dot(tpe.u, grad(self.error))
+        if self.stabilisation == 'SUPG':  # Account for stabilisation error
+            dwr += strong_residual*tpe.stabilisation_parameter*dot(tpe.u, grad(self.error))
         self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
         self.estimate_error('dwr_cell_adjoint')
         
@@ -200,8 +230,8 @@ class SteadyTracerProblem2d(SteadyProblem):
         mass_term = i*tpe.p0trial*dx
         flux = -(tpe.adjoint_solution*dot(tpe.u, tpe.n) + tpe.nu*dot(tpe.n, nabla_grad(tpe.adjoint_solution)))
         dwr = flux*self.error
-        if self.stab == 'SUPG':  # Account for stabilisation error
-            dwr += flux*tpe.stabilisation*dot(tpe.u, grad(self.error))
+        if self.stabilisation == 'SUPG':  # Account for stabilisation error
+            dwr += flux*tpe.stabilisation_parameter*dot(tpe.u, grad(self.error))
         flux_terms = ((i*dwr)('+') + (i*dwr)('-'))*dS
 
         # Account for boundary conditions

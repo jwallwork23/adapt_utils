@@ -1,15 +1,9 @@
 from firedrake import *
 
-import numpy as np
-
-from adapt_utils.tracer.options import *
 from adapt_utils.tracer.solver2d import SteadyTracerProblem2d
-from adapt_utils.tracer.stabilisation import supg_coefficient, anisotropic_stabilisation
-from adapt_utils.adapt.adaptation import *
-from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.metric import steady_metric, combine_metrics
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
-from adapt_utils.adapt.recovery import *
-from adapt_utils.adapt.p0_metric import *
+from adapt_utils.adapt.recovery import construct_gradient
 
 
 __all__ = ["SteadyTracerProblem3d"]

@@ -289,13 +289,9 @@ void singular_value_decomposition(double A_[%d], const double * B_) {
   A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
 }""" % (d*d, d, d, d, d, d, d)
 
-def get_maximum_length_edge(edges, vectors):
-    mesh = edges.function_space().mesh()
-    assert mesh == vectors.function_space().mesh()
-    dim = mesh.topological_dimension()
-    max_edge = Function(VectorFunctionSpace(mesh, "DG", 0))
-    if dim == 2:
-        kernel = """
+def get_maximum_length_edge(d):
+    if d == 2:
+        return """
 for (int i=0; i<max_vector.dofs; i++) {
   int max_index = 0;
   if (edges[1] > edges[max_index]) max_index = 1;
@@ -304,9 +300,7 @@ for (int i=0; i<max_vector.dofs; i++) {
   max_vector[1] = vectors[2*max_index+1];
 }
 """
-        par_loop(kernel, dx, {'edges': (edges, READ), 'vectors': (vectors, READ), 'max_vector': (max_edge, RW)})
-        return max_edge
-    elif dim == 3:
+    elif d == 3:
         raise NotImplementedError  # TODO
     else:
         raise NotImplementedError

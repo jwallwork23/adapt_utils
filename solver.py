@@ -30,7 +30,7 @@ class SteadyProblem():
         # Read args and kwargs
         self.op = op
         self.finite_element = finite_element
-        self.stab = op.stabilisation
+        self.stabilisation = op.stabilisation
         self.discrete_adjoint = discrete_adjoint
         self.prev_solution = prev_solution
         self.approach = op.approach
@@ -65,6 +65,8 @@ class SteadyProblem():
         self.mesh = self.am.mesh
         if self.levels > 0:
             self.create_enriched_problem()
+        self.n = FacetNormal(self.mesh)  # TODO: use version in AdaptiveMesh
+        self.h = CellSize(self.mesh)     # TODO: use version in AdaptiveMesh
 
     def create_enriched_problem(self):
         """
@@ -92,8 +94,6 @@ class SteadyProblem():
         self.trial = TrialFunction(self.V)
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
-        self.n = FacetNormal(self.mesh)
-        self.h = CellSize(self.mesh)
 
     def create_solutions(self):
         """
