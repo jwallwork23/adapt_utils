@@ -41,3 +41,16 @@ class AdaptiveMesh():
 
     def copy(self):
         return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
+
+    def get_edge_lengths(self):
+        """
+        Compute edge lengths, stored in a HDiv trace field.
+
+         NOTE: The plus sign is arbitrary and could equally well be chosen as minus.
+        """
+        HDivTrace = FunctionSpace(self.mesh, "HDiv Trace", 0)
+        v, u = TestFunction(HDivTrace), TrialFunction(HDivTrace)
+        self.edge_lengths = Function(HDivTrace, name="Edge lengths")
+        mass_term = v('+')*u('+')*dS + v*u*ds
+        rhs = v('+')*FacetArea(self.mesh)*dS + v*FacetArea(self.mesh)*ds
+        solve(mass_term == rhs, self.edge_lengths)

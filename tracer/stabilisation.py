@@ -8,7 +8,7 @@ import numpy as np
 import numpy.linalg as la
 
 from adapt_utils.adapt.kernels import eigen_kernel, singular_value_decomposition
-from adapt_utils.misc.misc import get_edge_lengths
+from adapt_utils.adapt.adaptation import AdaptiveMesh
 
 
 __all__ = ["anisotropic_stabilisation"]
@@ -80,14 +80,17 @@ def anisotropic_h(u, mesh=None):
     the velocity field `u`.
     """
     if mesh is None:
-        mesh = u.function_space().mesh()
+        mesh = AdaptiveMesh(u.function_space().mesh())
+    else:
+        assert isinstance(mesh, AdaptiveMesh)
     func = isinstance(u, Function)  # Determine if u is a Function or a Constant
     if not func:
         try:
             assert isinstance(u, Constant)
         except AssertionError:
             raise ValueError("Velocity field shouuld be either `Function` or `Constant`.")
-    # edge_lengths = get_edge_lengths(mesh)  # TODO: Extend this to compute vectors, too
+    # mesh.get_edge_lengths()  # TODO: Extend this to compute vectors, too
+    # edge_lengths = mesh.edge_lengths
 
     coords = mesh.coordinates.dat.data_ro_with_halos
     cell_to_vertices = mesh.coordinates.cell_node_map().values_with_halo
