@@ -79,23 +79,19 @@ def anisotropic_h(u, mesh=None):
     Measure of element size recommended in [Nguyen et al., 2009]: maximum edge length, projected onto
     the velocity field `u`.
     """
-    if mesh is None:
-        mesh = AdaptiveMesh(u.function_space().mesh())
-    else:
-        assert isinstance(mesh, AdaptiveMesh)
     func = isinstance(u, Function)  # Determine if u is a Function or a Constant
     if not func:
         try:
             assert isinstance(u, Constant)
         except AssertionError:
-            raise ValueError("Velocity field shouuld be either `Function` or `Constant`.")
-    # mesh.get_edge_lengths()  # TODO: Extend this to compute vectors, too
-    # edge_lengths = mesh.edge_lengths
-
-    coords = mesh.coordinates.dat.data_ro_with_halos
-    cell_to_vertices = mesh.coordinates.cell_node_map().values_with_halo
-    global_max_edge_length = np.finfo(float).min
-    global_max_edge_vector = None
+            raise ValueError("Velocity field should be either `Function` or `Constant`.")
+    if mesh is None:
+        mesh = AdaptiveMesh(u.function_space().mesh())
+    else:
+        assert isinstance(mesh, AdaptiveMesh)
+    # edge_lengths = get_edge_lengths(mesh)
+    # edge_vectors = get_edge_vectors(mesh)
+    # TODO: Write a par_loop to get minimum length edge of each element
 
     # Loop over all elements and find the edge with maximum length
     for c in range(len(cell_to_vertices)):
@@ -116,7 +112,7 @@ def anisotropic_h(u, mesh=None):
     v = global_max_edge_vector
     if func:
         fs = FunctionSpace(mesh, u.ufl_element().family(), u.ufl_element().degree())
-        h = interpolate((u[0]*v[0] + u[1]*v[1])/sqrt(dot(u, u)), fs)
+        h = interpolate((u[0]*v[0] + u[1]*v[1])/sqrt(dot(u, u)), P0)
         h = h.vector().gather().max()  # TODO: Spatially varying version
     else:
         udat = u.dat.data[0]
