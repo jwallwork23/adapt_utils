@@ -11,22 +11,39 @@ __all__ = ["Options"]
 class Options(FrozenConfigurable):
     name = 'Common parameters for mesh adaptive simulations'
 
+    # Spatial discretisation  # TODO: use a notation which is more general
+    family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
+    degree_increase = NonNegativeInteger(1, help="Polynomial degree increase in enriched space").tag(config=True)
+    degree = NonNegativeInteger(1, help="Order of function space").tag(config=True)
+
+    # Time discretisation
+    timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
+    dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
+    start_time = NonNegativeFloat(0., help="Start of time window of interest.").tag(config=True)
+    end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
+    dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
+    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation.").tag(config=True)
+
+    # Boundary conditions
+    boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)
+    adjoint_boundary_conditions = PETScSolverParameters({}, help="Boundary conditions for adjoint problem expressed as a dictionary.").tag(config=True)
+
+    # Stabilisation
+    stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.").tag(config=True)
+    stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0), help="Scalar stabilisation parameter.").tag(config=True)
+
     # Outputs
     debug = Bool(False, help="Toggle debugging mode for more verbose screen output.").tag(config=True)
     plot_pvd = Bool(False, help="Toggle plotting of fields.").tag(config=True)
     save_hdf5 = Bool(False, help="Toggle saving fields to HDF5.").tag(config=True)
 
-    # Adapt
+    # Adaptation
     approach = Unicode('fixed_mesh', help="Mesh adaptive approach.").tag(config=True)
     num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
     rescaling = PositiveFloat(0.85, help="Scaling parameter for target number of vertices.").tag(config=True)
     convergence_rate = PositiveInteger(6, help="Convergence rate parameter used in approach of [Carpio et al. 2013].").tag(config=True)
     h_min = PositiveFloat(1e-10, help="Minimum tolerated element size.").tag(config=True)
     h_max = PositiveFloat(5., help="Maximum tolerated element size.").tag(config=True)
-
-    # Stabilisation
-    stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.").tag(config=True)
-    stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0), help="Scalar stabilisation parameter.").tag(config=True)
 
     # Metric
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
@@ -42,34 +59,34 @@ class Options(FrozenConfigurable):
                                                        'ksp_gmres_restart': 20,
                                                        'pc_type': 'sor'}).tag(config=True)
 
-    # Time discretisation
-    timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
-    dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
-    start_time = NonNegativeFloat(0., help="Start of time window of interest.").tag(config=True)
-    end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
-    dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
-    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation.").tag(config=True)
-
-    # Finite element space  # TODO: use a notation which is more general
-    family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
-    degree_increase = NonNegativeInteger(1, help="Polynomial degree increase in enriched space").tag(config=True)
-
-    # PDE / optimisation
-    boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)
-    adjoint_boundary_conditions = PETScSolverParameters({}, help="Boundary conditions for adjoint problem expressed as a dictionary.").tag(config=True)
-    degree = NonNegativeInteger(1, help="Order of function space").tag(config=True)
+    # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
+
+    # Adaptation loop
     element_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in mesh element count").tag(config=True)
     qoi_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in quantity of interest.").tag(config=True)
     estimator_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in error estimator.").tag(config=True)
+    target_base = PositiveFloat(10.0, help="Base for exponential increase/decay of target complexity/error within outer mesh adaptation loop.").tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
         self.approach = approach
         self.di = os.path.join('outputs', self.approach)
         self.end_time -= 0.5*self.dt
 
+    def set_all_rtols(self, tol):
+        """Set all relative tolerances to a single value, `tol`."""
+        self.element_rtol = tol
+        self.qoi_rtol = tol
+        self.estimator_rtol = tol
+
     def ball(self, fs, scale=1., source=False):
-        """Ball indicator function associated with region(s) of interest"""
+        """
+        Ball indicator function associated with region(s) of interest
+
+        :arg fs: Desired `FunctionSpace`.
+        :kwarg scale: Scale factor for indicator.
+        :kwarg source: Toggle source term or region of interest location.
+        """
         mesh = fs.mesh()
         dim = mesh.topological_dimension()
         assert dim in (2, 3)
@@ -95,7 +112,13 @@ class Options(FrozenConfigurable):
         return indi
 
     def bump(self, fs, scale=1., source=False):
-        """Bump function associated with region(s) of interest"""
+        """
+        Rectangular bump function associated with region(s) of interest
+
+        :arg fs: Desired `FunctionSpace`.
+        :kwarg scale: Scale factor for indicator.
+        :kwarg source: Toggle source term or region of interest location.
+        """
         mesh = fs.mesh()
         dim = mesh.topological_dimension()
         assert dim in (2, 3)
@@ -130,7 +153,13 @@ class Options(FrozenConfigurable):
         return bump
 
     def gaussian(self, fs, scale=1., source=False):
-        """Gaussian function associated with region(s) of interest"""
+        """
+        Gaussian function associated with region(s) of interest
+
+        :arg fs: Desired `FunctionSpace`.
+        :kwarg scale: Scale factor for indicator.
+        :kwarg source: Toggle source term or region of interest location.
+        """
         mesh = fs.mesh()
         dim = mesh.topological_dimension()
         assert dim in (2, 3)
@@ -154,7 +183,13 @@ class Options(FrozenConfigurable):
         return bump
 
     def box(self, fs, scale=1., source=False):
-        """Box function associated with region(s) of interest"""
+        """
+        Rectangular indicator function associated with region(s) of interest
+
+        :arg fs: Desired `FunctionSpace`.
+        :kwarg scale: Scale factor for indicator.
+        :kwarg source: Toggle source term or region of interest location.
+        """
         mesh = fs.mesh()
         dim = mesh.topological_dimension()
         assert dim in (2, 3)
