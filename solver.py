@@ -1,6 +1,6 @@
 from firedrake import *
 from firedrake.petsc import PETSc
-from thetis import create_directory
+from thetis import create_directory, print_output
 
 import os
 import numpy as np
@@ -49,12 +49,18 @@ class SteadyProblem():
         self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
 
-        # Storage over mesh adaptation loop
+        # Storage during inner mesh adaptation loop
         self.indicators = {}
         self.estimators = {}
-        self.num_cells = []
-        self.num_vertices = []
+        self.num_cells = [self.mesh.num_cells()]
+        self.num_vertices = [self.mesh.num_vertices()]
         self.qois = []
+
+        # Storage during outer mesh adaptation loop
+        self.outer_estimators = []
+        self.outer_num_cells = []
+        self.outer_num_vertices = []
+        self.outer_qois = []
 
     def set_mesh(self, mesh):
         """
@@ -604,7 +610,7 @@ class SteadyProblem():
         self.set_fields()
         self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
-    def adaptation_loop(self):
+    def adaptation_loop(self, outer_iteration=None):
         """
         Run mesh adaptation loop to convergence, with the following convergence criteria:
           * Relative difference in quantity of interest < `self.op.qoi_rtol`;
@@ -616,45 +622,59 @@ class SteadyProblem():
         qoi_old = np.finfo(float).min
         num_cells_old = np.iinfo(int).min
         estimator_old = np.finfo(float).min
-        PETSc.Sys.Print("Number of mesh elements: %d" % self.mesh.num_cells())
+        print_output("Number of mesh elements: %d" % self.mesh.num_cells())
         for i in range(op.num_adapt):
-            PETSc.Sys.Print("\n  Adaptation loop, iteration %d." % (i+1))
-            PETSc.Sys.Print("==================================\n")
+            if outer_iteration is None:
+                print_output("\n  Adaptation loop, iteration %d." % (i+1))
+            else:
+                print_output("\n  Adaptation loop %d, iteration %d." % (outer_iteration, i+1))
+            print_output("====================================\n")
             self.solve_forward()
             qoi = self.quantity_of_interest()
             self.qois.append(qoi)
-            PETSc.Sys.Print("Quantity of interest: %.4e" % qoi)
+            print_output("Quantity of interest: %.4e" % qoi)
             if i > 0 and np.abs(qoi - qoi_old) < op.qoi_rtol*qoi_old:
-                PETSc.Sys.Print("Converged quantity of interest!")
+                print_output("Converged quantity of interest!")
                 break
             self.solve_adjoint()
             self.indicate_error()
             estimator = self.estimators[self.approach][-1]
-            PETSc.Sys.Print("Error estimator '%s': %.4e" % (self.approach, estimator))
+            print_output("Error estimator '%s': %.4e" % (self.approach, estimator))
             if i > 0 and np.abs(estimator - estimator_old) < op.estimator_rtol*estimator_old:
-                PETSc.Sys.Print("Converged error estimator!")
+                print_output("Converged error estimator!")
                 break
             self.adapt_mesh()
             num_cells = self.mesh.num_cells()
-            PETSc.Sys.Print("Number of mesh elements: %d" % num_cells)
+            print_output("Number of mesh elements: %d" % num_cells)
             if i > 0 and np.abs(num_cells - num_cells_old) < op.element_rtol*num_cells_old:
-                PETSc.Sys.Print("Converged number of mesh elements!")
+                print_output("Converged number of mesh elements!")
                 break
             if i == op.num_adapt-1 or num_cells < 200:
-                raise ConvergenceError("Adaptation loop failed to converge in {:d} iterations".format(i+1))
+                print_output("Adaptation loop failed to converge in {:d} iterations".format(i+1))
+                return
             qoi_old = qoi
             num_cells_old = num_cells
             estimator_old = estimator
-        dofs = sum(list(self.V.dof_count))  # TODO: parallelise
-        PETSc.Sys.Print('\n' + 80*'#')
-        PETSc.Sys.Print("SUMMARY")
-        PETSc.Sys.Print('\n' + 80*'#')
-        PETSc.Sys.Print("Approach:             '%s'" % self.approach)
-        PETSc.Sys.Print("Target:               %.2e" % op.target)
-        PETSc.Sys.Print("Number of elements:   %d" % num_cells)
-        PETSc.Sys.Print("DOF count:            %d" % dofs)
-        PETSc.Sys.Print("Quantity of interest: %.4e" % qoi)
-        PETSc.Sys.Print('\n' + 80*'#')
+        print_output('\n' + 80*'#' + '\n' + 37*' ' + 'SUMMARY\n' + 80*'#')
+        print_output("Approach:             '%s'" % self.approach)
+        print_output("Target:               %.2e" % op.target)
+        print_output("Number of elements:   %d" % num_cells)
+        print_output("DOF count:            %d" % self.V.dof_count)  # TODO: parallelise
+        print_output("Quantity of interest: %.4e" % qoi)
+        print_output('\n' + 80*'#')
+        self.outer_estimators.append(self.estimators[self.approach][-1])
+        self.outer_num_cells.append(self.num_cells[-1])
+        self.outer_num_vertices.append(self.num_vertices[-1])
+        self.outer_qois.append(self.qois[-1])
+
+    def outer_adaptation_loop(self):
+        op = self.op
+        initial_target = op.target
+        for i in range(op.outer_iterations):
+            op.target = initial_target*op.target_base**i
+            self.set_mesh(op.default_mesh)
+            self.adaptation_loop(outer_iteration=i+1)
+            # TODO: Test!
 
     def check_conditioning(self, submatrices=None):  # TODO: Account for RHS
         """
