@@ -41,6 +41,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.nonlinear = False
 
     def set_fields(self):
+        op = self.op
         self.nu = op.set_diffusivity(self.P1)
         self.u = op.set_velocity(self.P1_vec)
         self.divergence_free = np.allclose(norm(div(self.u)), 0.0)
@@ -51,10 +52,8 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Stabilisation
         if self.stabilisation is None:
             self.stabilisation = 'SUPG'
-        if self.stabilisation in ('SU', 'SUPG'):  # TODO: Anisotropic, spatially varying
-            self.supg_coefficient(anisotropic=False, use_cell_metric=False)
-            # self.supg_coefficient(anisotropic=True, use_cell_metric=False)
-            # self.supg_coefficient(anisotropic=True, use_cell_metric=True)
+        if self.stabilisation in ('SU', 'SUPG'):
+            self.supg_coefficient(mode='nguyen')
         elif self.stabilisation == 'lax_friedrichs':
             self.stabilisation_parameter = op.stabilisaton_parameter
         elif self.stabilisation != 'no':
@@ -64,32 +63,29 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.solution.rename('Tracer concentration')
         self.adjoint_solution.rename('Adjoint tracer concentration')
 
-    def supg_coefficient(self, anisotropic=False, use_cell_metric=False):
+    def supg_coefficient(self, mode='nguyen'):
         r"""
-        Compute SUPG stabilisation coefficent for the advection diffusion problem. There are two
-        modes in which this can be calculated, as determined by the Boolean parameter `anisotropic`:
+        Compute SUPG stabilisation coefficent for the advection diffusion problem. There are three
+        modes in which this can be calculated, as determined by the kwarg `mode`:
 
-        In isotropic mode, we use the cell diameter as our measure of element size :math:`h_K`.
+        In 'diameter' mode, we use the cell diameter as our measure of element size.
 
-        In anisotropic mode, we follow [Nguyen et al., 2009] in looping over each element of the
-        mesh, projecting the edge of maximal length into a vector space spanning the velocity field
-        `u` and taking the length of this projected edge as the measure of element size.
+        In 'nguyen' mode, we follow [Nguyen et al., 2009] in projecting the edge of maximal length
+        into a vector space spanning the velocity field `u` and taking the length of this projected
+        edge as the measure of element size.
 
-        In both cases, we compute the stabilisation coefficent as
+        In 'cell_metric' mode, we use the cell metric :math:`M` to give the measure
+    ..  math::
+            h = u^T M u
+
+        In each case, we compute the stabilisation coefficent as
 
     ..  math::
-        \tau = \frac{h_K}{2\|\textbf{u}\|}
-
-        :kwarg anisotropic: toggle between isotropic and anisotropic mode.
-        :kwarg use_cell_metric: toggle alternative formulation which uses the cell metric.
+            \tau = \frac h{2\|\textbf{u}\|}
         """
-        if use_cell_metric:
-            self.am.get_cell_metric()
-            h = dot(self.u, dot(self.am.cell_metric, self.u))
-        else:
-            h = self.am.anisotropic_h(self.u) if anisotropic else self.h
-        Pe = 0.5*sqrt(inner(self.u, self.u))*h/self.nu
-        tau = 0.5*h/sqrt(inner(self.u, self.u))
+        self.am.get_cell_size(self.u, mode=mode)
+        Pe = 0.5*sqrt(inner(self.u, self.u))*self.am.cell_size/self.nu
+        tau = 0.5*self.am.cell_size/sqrt(inner(self.u, self.u))
         self.stabilisation_parameter = tau*min_value(1, Pe/3)
 
     def setup_solver_forward(self):
@@ -101,14 +97,14 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.rhs = self.source*psi*dx
 
         # Stabilisation
-        if self.stabilisation in ("SU", "SUPG"):
+        if self.stabilisation in ('SU', 'SUPG'):
             coeff = self.stabilisation_parameter*dot(self.u, grad(psi))
             self.lhs += coeff*dot(self.u, grad(phi))*dx
-            if self.stabilisation == "SUPG":
+            if self.stabilisation == 'SUPG':
                 self.lhs += coeff*-div(self.nu*grad(phi))*dx
                 self.rhs += coeff*self.source*dx
                 psi = psi + coeff
-        elif not self.stabilisation is None:
+        elif self.stabilisation != 'no':
             raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
@@ -132,14 +128,14 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.rhs_adjoint = self.kernel*psi*dx
 
         # Stabilisation
-        if self.stabilisation in ("SU", "SUPG"):
+        if self.stabilisation in ('SU', 'SUPG'):
             coeff = -self.stabilisation_parameter*div(self.u*psi)
             self.lhs_adjoint += -coeff*div(self.u*lam)*dx
             if self.stabilisation == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
                 self.lhs_adjoint += coeff*-div(self.nu*grad(lam))*dx
                 self.rhs_adjoint += coeff*self.kernel*dx
                 psi = psi + coeff
-        elif not self.stabilisation is None:
+        elif self.stabilisation != 'no':
             raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions

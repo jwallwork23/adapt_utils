@@ -22,9 +22,9 @@ class AdaptiveMesh():
         if levels > 0:
             self.refined_mesh = self.hierarchy[1]
 
-        self.normal = FacetNormal(self.mesh)
+        self.n = FacetNormal(self.mesh)
         if self.dim == 2:
-            self.tangent = as_vector([-self.normal[1], self.normal[0]])  # Tangent vector
+            self.tangent = as_vector([-self.n[1], self.n[0]])  # Tangent vector
         elif self.dim == 3:
             raise NotImplementedError  # TODO: Get a tangent vector in 3D
         else:
@@ -77,7 +77,7 @@ class AdaptiveMesh():
           * The plus sign is arbitrary and could equally well be chosen as minus.
           * The sign of the returned vectors is arbitrary and could equally well take the minus sign.
         """
-        HDivTrace_vec = VectorFunctionSpace(mesh, "HDiv Trace", 0)
+        HDivTrace_vec = VectorFunctionSpace(self.mesh, "HDiv Trace", 0)
         v, u = TestFunction(HDivTrace_vec), TrialFunction(HDivTrace_vec)
         self.edge_vectors = Function(HDivTrace_vec, name="Edge vectors")
         mass_term = inner(v('+'), u('+'))*dS + inner(v, u)*ds
@@ -98,7 +98,7 @@ class AdaptiveMesh():
                                                          'max_vector': (self.maximum_length_edge, RW)
                                                         })
 
-    def get_cell_metric(self):
+    def get_cell_metric(self):  # FIXME: Something doesn't seem right
         """
         Compute cell metric associated with mesh.
 
@@ -107,21 +107,27 @@ class AdaptiveMesh():
         P0_ten = TensorFunctionSpace(self.mesh, "DG", 0)
         J = interpolate(Jacobian(self.mesh), P0_ten)
         self.cell_metric = Function(P0_ten, name="Cell metric")
-        kernel = eigen_kernel(singular_value_decomposition, dim)
+        kernel = eigen_kernel(singular_value_decomposition, self.dim)
         op2.par_loop(kernel, P0_ten.node_set, self.cell_metric.dat(op2.INC), J.dat(op2.READ))
 
-    def anisotropic_h(self, u):
+    def get_cell_size(self, u, mode='nguyen'):
         """
         Measure of element size recommended in [Nguyen et al., 2009]: maximum edge length, projected
         onto the velocity field `u`.
         """
+        P0 = FunctionSpace(self.mesh, "DG", 0)
         try:
             assert isinstance(u, Constant) or isinstance(u, Function)
         except AssertionError:
             raise ValueError("Velocity field should be either `Function` or `Constant`.")
-        self.get_maximum_length_edge()
-        v = self.maximum_length_edge
-        P0 = FunctionSpace(self.mesh, "DG", 0)
-        h = interpolate((u[0]*v[0] + u[1]*v[1])/sqrt(dot(u, u)), P0)
-        return h.vector().gather().max()  # TODO: Spatially varying version
-
+        if mode == 'diameter':
+            self.cell_size = interpolate(self.h, P0)
+        elif mode == 'nguyen':
+            self.get_maximum_length_edge()
+            v = self.maximum_length_edge
+            self.cell_size = interpolate(abs((u[0]*v[0] + u[1]*v[1]))/sqrt(dot(u, u)), P0)
+        elif mode == 'cell_metric':
+            self.get_cell_metric()
+            self.cell_size = interpolate(dot(u, dot(self.cell_metric, u)), P0)
+        else:
+            raise ValueError("Element measure must be chosen from {'diameter', 'nguyen', 'cell_metric'}.")
