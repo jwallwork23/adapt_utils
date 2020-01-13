@@ -26,7 +26,7 @@ class TelemacOptions(TracerOptions):
     """
     def __init__(self, approach='fixed_mesh', offset=0., centred=False):
         super(TelemacOptions, self).__init__(approach)
-        self.default_mesh = RectangleMesh(100, 20, 50, 10)
+        self.set_default_mesh()
         self.offset = offset
 
         # Source / receiver
@@ -46,6 +46,9 @@ class TelemacOptions(TracerOptions):
         # Metric normalisation
         self.normalisation = 'error'
         self.norm_order = 1
+
+    def set_default_mesh(self):  # TODO: Temporary fix
+        self.default_mesh = RectangleMesh(100, 20, 50, 10)
 
     def set_boundary_conditions(self, fs):
         zero = Constant(0.0, domain=fs.mesh())

@@ -4,6 +4,7 @@ from thetis import create_directory, print_output
 
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 
 from adapt_utils.misc.misc import index_string
 from adapt_utils.misc.conditioning import *
@@ -617,6 +618,9 @@ class SteadyProblem():
           * Relative difference in number of mesh elements < `self.op.element_rtol`;
           * Relative difference in error estimator < `self.op.estimator_rtol`;
           * Maximum iterations `self.op.num_adapt`.
+
+        Error estimator, QoI, element count and vertex count are stored, unless the maximum
+        iteration count is reached, or the element count goes below 200.
         """
         op = self.op
         qoi_old = np.finfo(float).min
@@ -655,26 +659,46 @@ class SteadyProblem():
             qoi_old = qoi
             num_cells_old = num_cells
             estimator_old = estimator
-        print_output('\n' + 80*'#' + '\n' + 37*' ' + 'SUMMARY\n' + 80*'#')
-        print_output("Approach:             '%s'" % self.approach)
-        print_output("Target:               %.2e" % op.target)
-        print_output("Number of elements:   %d" % num_cells)
-        print_output("DOF count:            %d" % self.V.dof_count)  # TODO: parallelise
-        print_output("Quantity of interest: %.4e" % qoi)
-        print_output('\n' + 80*'#')
+        if outer_iteration is None:
+            print_output('\n' + 80*'#' + '\n' + 37*' ' + 'SUMMARY\n' + 80*'#')
+            print_output("Approach:             '%s'" % self.approach)
+            print_output("Target:               %.2e" % op.target)
+            print_output("Number of elements:   %d" % num_cells)
+            print_output("DOF count:            %d" % self.V.dof_count)  # TODO: parallelise
+            print_output("Quantity of interest: %.4e" % qoi)
+            print_output('\n' + 80*'#')
         self.outer_estimators.append(self.estimators[self.approach][-1])
         self.outer_num_cells.append(self.num_cells[-1])
         self.outer_num_vertices.append(self.num_vertices[-1])
         self.outer_qois.append(self.qois[-1])
 
     def outer_adaptation_loop(self):
+        """
+        Perform multiple adaptation loops, with the target complexity/error increasing/decaying by
+        a constant factor.
+        """
         op = self.op
         initial_target = op.target
         for i in range(op.outer_iterations):
             op.target = initial_target*op.target_base**i
+            op.set_default_mesh()  # TODO: Temporary
             self.set_mesh(op.default_mesh)
+            self.create_function_spaces()
+            self.create_solutions()
+            self.set_fields()
+            self.boundary_conditions = op.set_boundary_conditions(self.V)
             self.adaptation_loop(outer_iteration=i+1)
-            # TODO: Test!
+            if i < op.outer_iterations-1:
+                print_output('\n************************************\n')
+
+    def plot_qoi_convergence(self):
+        """
+        Convergence plot of QoI against number of elements, taken over an outer adaptation loop.
+        """
+        # TODO: Nicer formatting
+        plt.semilogx(self.outer_num_cells, self.outer_qois)
+        plt.xlabel("Number of elements")
+        plt.ylabel("Quantity of interest")
 
     def check_conditioning(self, submatrices=None):  # TODO: Account for RHS
         """
