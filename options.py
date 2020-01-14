@@ -74,6 +74,11 @@ class Options(FrozenConfigurable):
         self.di = os.path.join('outputs', self.approach)
         self.end_time -= 0.5*self.dt
 
+    def copy(self):
+        copy = type(self)()
+        copy.update(self)
+        return copy
+
     def set_all_rtols(self, tol):
         """Set all relative tolerances to a single value, `tol`."""
         self.element_rtol = tol

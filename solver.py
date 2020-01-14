@@ -38,10 +38,15 @@ class SteadyProblem():
         self.levels = levels
 
         # Setup problem
+        print_output("Building mesh...")
         self.set_mesh(mesh)
+        print_output("Building function spaces...")
         self.create_function_spaces()
+        print_output("Building solutions...")
         self.create_solutions()
+        print_output("Building fields...")
         self.set_fields()
+        print_output("Setting boundary conditions...")
         self.boundary_conditions = op.set_boundary_conditions(self.V)
 
         # Outputs
@@ -79,7 +84,9 @@ class SteadyProblem():
         """
         Create equivalent problem in iso-P2 refined space.
         """
-        self.op.degree += self.op.degree_increase
+        print_output("Creating enriched finite element space...")
+        op_enriched = op.copy()
+        op_enriched.degree += self.op.degree_increase
         self.tp_enriched = type(self)(self.op, self.am.refined_mesh, self.discrete_adjoint, self.prev_solution, self.levels-1)
 
     def create_function_spaces(self):
