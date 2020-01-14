@@ -68,6 +68,7 @@ class Options(FrozenConfigurable):
     estimator_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in error estimator.").tag(config=True)
     target_base = PositiveFloat(10.0, help="Base for exponential increase/decay of target complexity/error within outer mesh adaptation loop.").tag(config=True)
     outer_iterations = PositiveInteger(1, help="Number of iterations in outer adaptation loop.").tag(config=True)
+    indent = Unicode('').tag(config=True)  # TODO: doc
 
     def __init__(self, approach='fixed_mesh'):
         self.approach = approach
