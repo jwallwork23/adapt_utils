@@ -1,6 +1,8 @@
 from firedrake import *
 from thetis.configuration import *
+
 from scipy.special import kn
+import numpy as np
 
 from adapt_utils.tracer.options import TracerOptions
 from adapt_utils.misc.misc import *
@@ -28,6 +30,8 @@ class TelemacOptions(TracerOptions):
         super(TelemacOptions, self).__init__(approach)
         self.set_default_mesh()
         self.offset = offset
+        self.family = 'cg'
+        self.stabilisation = 'SUPG'
 
         # Source / receiver
         # NOTE: It isn't obvious how to represent a delta function on a finite element mesh. The
@@ -70,18 +74,17 @@ class TelemacOptions(TracerOptions):
 
     def set_source(self, fs):
         x0, y0, r0 = self.source_loc[0]
-        self.source = Function(fs)
-        nrm=assemble(self.ball(fs, source=True)*dx)
-        scaling = pi*r0*r0/nrm if nrm != 0 else 1
+        nrm = assemble(self.ball(fs, source=True)*dx)
+        scaling = pi*r0*r0/nrm if np.allclose(nrm, 0.0) else 1.0
         scaling *= 0.5*self.source_value
-        self.source.interpolate(self.ball(fs, source=True, scale=scaling))
+        self.source = self.ball(fs, source=True, scale=scaling)
         return self.source
 
     def set_qoi_kernel(self, fs):
         b = self.ball(fs, source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
-        rescaling = area_exact/area if area != 0. else 1
+        rescaling = area_exact/area if np.allclose(area, 0.0) else 1.0
         self.kernel = rescaling*b
         return self.kernel
 
@@ -92,7 +95,7 @@ class TelemacOptions(TracerOptions):
         x0, y0, r = self.source_loc[0]
         u = self.set_velocity(VectorFunctionSpace(fs.mesh(), fs.ufl_element()))
         nu = self.set_diffusivity(fs)
-        #q = 0.01  # sediment discharge of source (kg/s)
+        # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
         self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
@@ -107,7 +110,7 @@ class TelemacOptions(TracerOptions):
         x0, y0, r = self.source_loc[0]
         u = self.set_velocity(VectorFunctionSpace(fs1.mesh(), fs1.ufl_element()))
         nu = self.set_diffusivity(fs1)
-        #q = 0.01  # sediment discharge of source (kg/s)
+        # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
         sol = 0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu)

@@ -7,8 +7,6 @@ num_levels = 5
 data = {}
 for offset in (False, True):
     op = Steady2TurbineOffsetOptions() if offset else Steady2TurbineOptions()
-    op.family = 'dg-cg'
-
     tp = SteadyTurbineProblem(op, levels=num_levels-1)  # FIXME: Parallel not working
     data[offset] = {'qois': [], 'num_cells': [], 'dofs': []}
     for level in range(num_levels):
@@ -23,6 +21,7 @@ for offset in (False, True):
         if level < num_levels-1:
             tp = tp.tp_enriched
 
+# TODO: Write to logfile
 for offset in (False, True):
     print_output("="*80 + "\nLevel  Elements     DOFs        J{:d}".format(2 if offset else 1))
     for level in range(num_levels):

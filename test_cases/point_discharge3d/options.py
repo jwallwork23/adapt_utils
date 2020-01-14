@@ -28,6 +28,8 @@ class Telemac3dOptions(TracerOptions):
         super(Telemac3dOptions, self).__init__(approach)
         self.default_mesh = BoxMesh(100, 20, 20, 50, 10, 10)
         self.offset = offset
+        self.family = 'cg'
+        self.stabilisation = 'SUPG'
 
         # Source / receiver
         calibrated_r = 0.07980 if centred else 0.07972  # TODO: calibrate for 3d case

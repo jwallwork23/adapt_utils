@@ -46,14 +46,14 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.u = op.set_velocity(self.P1_vec)
         self.divergence_free = np.allclose(norm(div(self.u)), 0.0)
         self.source = op.set_source(self.P1)
-        self.kernel = op.set_qoi_kernel(self.P0)
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Stabilisation
         if self.stabilisation is None:
             self.stabilisation = 'SUPG'
         if self.stabilisation in ('SU', 'SUPG'):
-            self.supg_coefficient(mode='nguyen')
+            self.supg_coefficient(mode='diameter')
+            # self.supg_coefficient(mode='nguyen')
         elif self.stabilisation == 'lax_friedrichs':
             self.stabilisation_parameter = op.stabilisaton_parameter
         elif self.stabilisation != 'no':
@@ -84,8 +84,9 @@ class SteadyTracerProblem2d(SteadyProblem):
             \tau = \frac h{2\|\textbf{u}\|}
         """
         self.am.get_cell_size(self.u, mode=mode)
-        Pe = 0.5*sqrt(inner(self.u, self.u))*self.am.cell_size/self.nu
-        tau = 0.5*self.am.cell_size/sqrt(inner(self.u, self.u))
+        unorm = sqrt(inner(self.u, self.u))
+        Pe = 0.5*unorm*self.am.cell_size/self.nu
+        tau = 0.5*self.am.cell_size/unorm
         self.stabilisation_parameter = tau*min_value(1, Pe/3)
 
     def setup_solver_forward(self):
@@ -93,8 +94,8 @@ class SteadyTracerProblem2d(SteadyProblem):
         psi = self.test
 
         # Finite element problem
-        self.lhs = psi*dot(self.u, grad(phi))*dx + self.nu*inner(grad(phi), grad(psi))*dx
-        self.rhs = self.source*psi*dx
+        self.lhs = psi*dot(self.u, grad(phi))*dx + self.nu*inner(grad(psi), grad(phi))*dx
+        self.rhs = psi*self.source*dx
 
         # Stabilisation
         if self.stabilisation in ('SU', 'SUPG'):
@@ -103,7 +104,6 @@ class SteadyTracerProblem2d(SteadyProblem):
             if self.stabilisation == 'SUPG':
                 self.lhs += coeff*-div(self.nu*grad(phi))*dx
                 self.rhs += coeff*self.source*dx
-                psi = psi + coeff
         elif self.stabilisation != 'no':
             raise ValueError("Unrecognised stabilisation method.")
 
@@ -114,8 +114,7 @@ class SteadyTracerProblem2d(SteadyProblem):
             if bcs[i] == {}:
                 self.lhs += -self.nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
             if 'diff_flux' in bcs[i]:
-                self.lhs += -self.nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
-                self.rhs += -psi*bcs[i]['diff_flux']*ds(i)
+                self.rhs += psi*bcs[i]['diff_flux']*ds(i)
             if 'value' in bcs[i]:
                 self.dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))
 
@@ -134,7 +133,6 @@ class SteadyTracerProblem2d(SteadyProblem):
             if self.stabilisation == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
                 self.lhs_adjoint += coeff*-div(self.nu*grad(lam))*dx
                 self.rhs_adjoint += coeff*self.kernel*dx
-                psi = psi + coeff
         elif self.stabilisation != 'no':
             raise ValueError("Unrecognised stabilisation method.")
 
@@ -147,6 +145,9 @@ class SteadyTracerProblem2d(SteadyProblem):
             if not 'value' in bcs[i]:
                 self.lhs_adjoint += -lam*psi*(dot(self.u, self.n))*ds(i)
                 self.lhs_adjoint += -self.nu*psi*dot(self.n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
+
+    def get_qoi_kernel(self):
+        self.kernel = self.op.set_qoi_kernel(self.P0)
 
     def get_strong_residual_forward(self):
         R = self.source - dot(self.u, grad(self.solution)) + div(self.nu*grad(self.solution))
@@ -185,9 +186,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         mass_term = i*tpe.p0trial*dx
         flux = -tpe.nu*dot(tpe.n, nabla_grad(tpe.solution))
         dwr = flux*self.adjoint_error
-        if self.stabilisation == 'SUPG':  # Account for stabilisation error
-            coeff = tpe.stabilisation_parameter*dot(tpe.u, grad(self.adjoint_error))
-            dwr += coeff*flux
         flux_terms = ((i*dwr)('+') + (i*dwr)('-'))*dS
 
         # Account for boundary conditions
@@ -198,8 +196,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         for j in bcs:
             if 'diff_flux' in bcs[j]:
                 flux_terms += i*(dwr + bcs[j]['diff_flux']*self.adjoint_error)*ds(j)
-                if self.stabilisation == "SUPG":
-                    flux_terms += i*bcs[j]['diff_flux']*coeff*ds(j)
 
         # Solve auxiliary FEM problem
         edge_res = Function(tpe.P0)
@@ -212,8 +208,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         tpe.project_solution(self.adjoint_solution, adjoint=True)  # FIXME: prolong
         strong_residual = tpe.op.box(tpe.P0) + div(tpe.u*tpe.adjoint_solution) + div(tpe.nu*grad(tpe.adjoint_solution))
         dwr = strong_residual*self.error
-        if self.stabilisation == 'SUPG':  # Account for stabilisation error
-            dwr += strong_residual*tpe.stabilisation_parameter*dot(tpe.u, grad(self.error))
         self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
         self.estimate_error('dwr_cell_adjoint')
         
@@ -226,8 +220,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         mass_term = i*tpe.p0trial*dx
         flux = -(tpe.adjoint_solution*dot(tpe.u, tpe.n) + tpe.nu*dot(tpe.n, nabla_grad(tpe.adjoint_solution)))
         dwr = flux*self.error
-        if self.stabilisation == 'SUPG':  # Account for stabilisation error
-            dwr += flux*tpe.stabilisation_parameter*dot(tpe.u, grad(self.error))
         flux_terms = ((i*dwr)('+') + (i*dwr)('-'))*dS
 
         # Account for boundary conditions

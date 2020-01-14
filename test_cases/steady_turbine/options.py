@@ -24,6 +24,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.domain_width = 300.0
         if os.path.exists(self.mesh_path):
             self.default_mesh = Mesh(self.mesh_path)
+        self.family = 'dg-cg'
 
         # Tidal farm
         D = self.turbine_diameter
