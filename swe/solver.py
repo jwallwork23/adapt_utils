@@ -157,7 +157,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         z, zeta = self.adjoint_error.split()
 
         b = tpe.bathymetry
-        nu = tpe.viscosity
+        nu = tpe.nu
         f = None if not hasattr(tpe, 'coriolis') else tpe.coriolis
         C_d = None if not hasattr(tpe, 'drag_coefficient') else tpe.drag_coefficient
         H = b + eta
@@ -171,13 +171,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
             dwr += -C_d*sqrt(dot(u, u))*inner(z, u)/H          # QuadraticDrag
 
         # HorizontalViscosity
-        stress = 2*nu*sym(grad(u)) if op.grad_div_viscosity else nu*grad(u)
+        stress = 2*nu*sym(grad(u)) if self.op.grad_div_viscosity else nu*grad(u)
         dwr += inner(z, div(stress))
-        if op.grad_depth_viscosity:
+        if self.op.grad_depth_viscosity:
             dwr += inner(z, dot(grad(H)/H, stress))
 
         if hasattr(self, 'extra_residual_terms'):
-            dwr += self.extra_residual_terms(u, eta, z, zeta)  # TODO: does it need to be tpe?
+            dwr += tpe.extra_residual_terms()
 
         self.indicators['dwr_cell'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
         self.estimate_error('dwr_cell')
@@ -187,13 +187,14 @@ class SteadyShallowWaterProblem(SteadyProblem):
         i = tpe.p0test
         tpe.project_solution(self.solution)  # FIXME: prolong
         u, eta = tpe.solution.split()
-        z, zeta = tpe.adjoint_error.split()
+        z, zeta = self.adjoint_error.split()
 
         b = tpe.bathymetry
-        nu = tpe.viscosity
+        nu = tpe.nu
         H = b + eta
-        g = self.g
+        g = self.op.g
         n = tpe.n
+        h = tpe.h
 
         # HorizontalAdvection
         u_up = avg(u)
@@ -203,8 +204,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         loc = -i*z[1]
         flux_terms += jump(u[0], n[0])*dot(u_up[1], loc('+') + loc('-'))*dS
         flux_terms += jump(u[1], n[1])*dot(u_up[1], loc('+') + loc('-'))*dS
-        if op.stabilisation == 'lax_friedrichs':
-            gamma = 0.5*abs(dot(u_up, n('-')))*op.stabilisation_parameter
+        if self.op.stabilisation == 'lax_friedrichs':
+            gamma = 0.5*abs(dot(u_up, n('-')))*self.op.stabilisation_parameter
             loc = -i*z
             flux_terms += gamma*dot(loc('+') + loc('-'), jump(u))*dS
 
@@ -242,7 +243,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         alpha = self.sipg_parameter
         assert alpha is not None
         loc = i*outer(z, n)
-        flux_terms += -alpha/avg(self.h)*inner(loc('+') + loc('-'), stress_jump)*dS
+        flux_terms += -alpha/avg(h)*inner(loc('+') + loc('-'), stress_jump)*dS
         flux_terms += inner(loc('+') + loc('-'), avg(stress))*dS
         loc = i*grad(z)
         flux_terms += 0.5*inner(loc('+') + loc('-'), stress_jump)*dS
@@ -255,7 +256,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             funcs = bcs.get(j)
 
             if funcs is not None:
-                eta_ext, u_ext = self.get_bdy_functions(eta, u, j)
+                eta_ext, u_ext = tpe.get_bdy_functions(eta, u, j)
 
                 # ExternalPressureGradient
                 un_jump = inner(u - u_ext, n)
@@ -291,7 +292,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
                         stress_jump = 2*nu*sym(outer(delta_u, n))
                     else:
                         stress_jump = nu*outer(delta_u, n)
-                flux_terms += -i*alpha/self.h*inner(outer(z, n), stress_jump)*ds(j)
+                flux_terms += -i*alpha/h*inner(outer(z, n), stress_jump)*ds(j)
                 flux_terms += i*inner(grad(z), stress_jump)*ds(j)
                 flux_terms += i*inner(outer(z, n), stress)*ds(j)
 
@@ -307,12 +308,12 @@ class SteadyShallowWaterProblem(SteadyProblem):
                 # HorizontalAdvection
                 if self.op.stabilisation == 'lax_friedrichs':
                     u_ext = u - 2*dot(u, n)*n
-                    gamma = 0.5*abs(dot(u_old, n))*op.stabilisation_parameter
+                    gamma = 0.5*abs(dot(u_old, n))*self.op.stabilisation_parameter
                     flux_terms += -i*gamma*dot(z, u - u_ext)*ds(j)
 
 
         if hasattr(self, 'extra_flux_terms'):
-            flux_terms += self.extra_flux_terms()  # TODO: should this be tpe?
+            flux_terms += tpe.extra_flux_terms()
 
         # Solve auxiliary finite element problem to get traces on particular element
         mass_term = i*tpe.p0trial*dx
@@ -330,9 +331,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def plot_solution(self, adjoint=False):
         if adjoint:
             z, zeta = self.adjoint_solution.split()
+            z.rename("Adjoint fluid velocity")
+            zeta.rename("Adjoint elevation")
             self.adjoint_solution_file.write(z, zeta)
         else:
             u, eta = self.solution.split()
+            u.rename("Fluid velocity")
+            eta.rename("Elevation")
             self.solution_file.write(u, eta)
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
@@ -408,8 +413,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
         else:
             raise NotImplementedError
-        if mesh is None:
-            mesh = op.default_mesh
+        mesh = mesh or op.default_mesh  # TODO: redundant
         self.load_index = load_index
         super(UnsteadyShallowWaterProblem, self).__init__(mesh, op, element, discrete_adjoint)
 

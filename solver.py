@@ -74,7 +74,7 @@ class SteadyProblem():
         """
         Build `AdaptiveMesh` object.
         """
-        mesh = self.op.default_mesh if mesh is None else mesh
+        mesh = mesh or self.op.default_mesh
         self.am = AdaptiveMesh(mesh, levels=self.levels)
         self.mesh = self.am.mesh
         if self.levels > 0:
@@ -192,6 +192,8 @@ class SteadyProblem():
                 tpe.solve_forward()
             elif self.nonlinear:
                 tpe.project_solution(self.solution, adjoint=False)  # FIXME: prolong
+                if hasattr(tpe, 'setup_solver'):
+                    tpe.setup_solver()
         tpe.solve(adjoint=adjoint)
         sol_p2 = tpe.get_solution(adjoint=adjoint)
 
@@ -219,10 +221,12 @@ class SteadyProblem():
         """
         Set forward or adjoint solution, as specified by boolean kwarg `adjoint`.
         """
+        name = self.get_solution(adjoint).dat.name
         if adjoint:
             self.adjoint_solution = val
         else:
             self.solution = val
+        self.get_solution(adjoint).rename(name)
 
     def set_error(self, val, adjoint=False):
         """
@@ -238,10 +242,8 @@ class SteadyProblem():
         Take the difference of two functions `u` and `v` defined on `self.mesh`.
         """
         assert u.function_space() == v.function_space()
-        if out is None:
-            out = Function(u.function_space())
-        else:
-            assert out.function_space() == u.function_space()
+        out = out or Function(u.function_space())
+        assert out.function_space() == u.function_space()
         out.assign(u)
         out -= v
         return out
@@ -250,10 +252,8 @@ class SteadyProblem():
         """
         Interpolate a function in `self.V`.
         """
-        if out is None:
-            out = Function(self.V)
-        else:
-            assert out.function_space() == self.V
+        out = out or Function(self.V)
+        assert out.function_space() == self.V
         for outi, vi in zip(out.split(), val.split()):
             outi.interpolate(vi)
         return out
@@ -262,10 +262,7 @@ class SteadyProblem():
         """
         Project a function in `V`.
         """
-        if out is None:
-            out = Function(self.V)
-        else:
-            assert out.function_space() == self.V
+        out = out or Function(self.V)
         for outi, vi in zip(out.split(), val.split()):
             outi.project(vi)
         return out
@@ -584,8 +581,7 @@ class SteadyProblem():
         Compute error estimator associated with `approach` by summing the corresponding error
         indicator over all elements.
         """
-        if approach is None:
-            approach = self.approach
+        approach = approach or self.approach
         assert approach in self.indicators
         if not approach in self.estimators:
             self.estimators[approach] = []
@@ -669,13 +665,15 @@ class SteadyProblem():
             qoi_old = qoi
             num_cells_old = num_cells
             estimator_old = estimator
+            dofs = self.V.dof_count
+            dofs = dofs if isinstance(dofs, int) else sum(dofs)  # TODO: parallelise
         if outer_iteration is None:
             print_output('\n' + 80*'#' + '\n' + 37*' ' + 'SUMMARY\n' + 80*'#')
-            print_output("Approach:             '%s'" % self.approach)
-            print_output("Target:               %.2e" % op.target)
-            print_output("Number of elements:   %d" % num_cells)
-            print_output("DOF count:            %d" % self.V.dof_count)  # TODO: parallelise
-            print_output("Quantity of interest: %.4e" % qoi)
+            print_output("Approach:             '{:s}'".format(self.approach))
+            print_output("Target:               {:.2e}".format(op.target))
+            print_output("Number of elements:   {:d}".format(num_cells))
+            print_output("DOF count:            {:d}".format(dofs))
+            print_output("Quantity of interest: {:.4e}".format(qoi))
             print_output('\n' + 80*'#')
         self.outer_estimators.append(self.estimators[self.approach][-1])
         self.outer_num_cells.append(self.num_cells[-1])
@@ -733,11 +731,11 @@ class SteadyProblem():
             for s in submatrices:
                 kappa = cc.condition_number(s[0], s[1])
                 self.condition_number[s] = kappa
-                PETSc.Sys.Print("Condition number %1d,%1d: %.4e" % (s[0], s[1], kappa))
+                print_output("Condition number {:1d},{:1d}: {:.4e}".format(s[0], s[1], kappa))
         else:
             cc = UnnestedConditionCheck(self.lhs)
             self.condition_number = cc.condition_number()
-            PETSc.Sys.Print("Condition number: %.4e" % self.condition_number)
+            print_output("Condition number: {:.4e}".format(self.condition_number))
 
 
 class UnsteadyProblem(SteadyProblem):

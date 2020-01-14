@@ -14,7 +14,7 @@ class AnisotropicMetricDriver():
     """
     def __init__(self, adaptive_mesh, hessian=None, indicator=None, op=Options()):
         self.am = adaptive_mesh
-        self.mesh = adaptive_mesh
+        self.mesh = self.am.mesh
         self.dim = self.mesh.topological_dimension()
         try:
             assert self.dim == 2
@@ -98,7 +98,7 @@ class AnisotropicMetricDriver():
 
         NOTE: Assumes eigevalues are already squared.
         """
-        kernel = kernel(set_eigendecomposition_kernel(self.dim), "set_eigendecomposition")
+        kernel = eigen_kernel(set_eigendecomposition, self.dim)
         op2.par_loop(kernel, self.P0_ten.node_set, self.p0metric.dat(op2.RW), self.evec.dat(op2.READ), self.eval.dat(op2.READ))
 
     def project_metric(self):

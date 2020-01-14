@@ -3,6 +3,7 @@ steady_turbine/screenshots/
 steady_turbine/__pycache__/
 steady_turbine/stephan.py
 steady_turbine/stephan-noid.py
+steady_turbine/run.py
 unsteady_turbine/output/
 unsteady_turbine/outputs/
 unsteady_turbine/screenshots/
@@ -14,6 +15,7 @@ box_discharge2d/__pycache__/
 point_discharge2d/outputs/
 point_discharge2d/screenshots/
 point_discharge2d/__pycache__/
+point_discharge2d/uniform_convergence_log
 point_discharge3d/outputs/
 point_discharge3d/screenshots/
 point_discharge3d/__pycache__/

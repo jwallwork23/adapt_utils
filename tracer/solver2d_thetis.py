@@ -218,7 +218,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
         solver_obj.i_export = self.remesh_step
         solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
         solver_obj.iteration = self.remesh_step*op.dt_per_remesh
-        solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh if time is None else time
+        solver_obj.simulation_time = time or self.remesh_step*op.dt*op.dt_per_remesh
         for e in solver_obj.exporters.values():
             e.set_next_export_ix(solver_obj.i_export)
 

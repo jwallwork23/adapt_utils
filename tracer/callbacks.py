@@ -15,10 +15,7 @@ class TracerCallback(callback.AccumulatorCallback):
         :arg parameters: class containing parameters, including time period of interest.
         :arg **kwargs: any additional keyword arguments, see DiagnosticCallback
         """
-        if parameters is None:
-            self.parameters = TracerOptions()
-        else:
-            self.parameters = parameters
+        self.parameters = parameters or TracerOptions()
 
         def qoi():
             """

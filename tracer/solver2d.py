@@ -49,8 +49,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
 
         # Stabilisation
-        if self.stabilisation is None:
-            self.stabilisation = 'SUPG'
+        self.stabilisation = self.stabilisation or 'SUPG'
         if self.stabilisation in ('SU', 'SUPG'):
             self.supg_coefficient(mode='diameter')
             # self.supg_coefficient(mode='nguyen')
