@@ -15,8 +15,8 @@ args = parser.parse_args()
 if args.debug is not None and bool(args.debug):
     set_log_level(DEBUG)
 
-approach = 'fixed_mesh' if args.approach is None else args.approach
-just_plot = False if args.just_plot is None else bool(args.just_plot)
+approach = args.approach or 'fixed_mesh'
+just_plot = bool(args.just_plot or False)
 
 op = Unsteady15TurbineOptions(approach=approach)
 op.plot_pvd = True

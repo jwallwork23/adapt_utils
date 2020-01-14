@@ -16,9 +16,9 @@ parser.add_argument("-num_adapt")
 parser.add_argument("-desired_error")
 args = parser.parse_args()
 
-approach = 'fixed_mesh' if args.approach is None else args.approach
-adj = False if args.solve_adjoint is None else bool(args.solve_adjoint)
-i = 0 if args.init_res is None else int(args.init_res)
+approach = args.approach or 'fixed_mesh'
+adj = bool(args.solve_adjoint or False)
+i = int(args.init_res or 0)
 
 # Create parameter class
 n = 2**i
@@ -34,9 +34,9 @@ op.set_qoi_kernel(P1DG)
 
 # Adaptation parameters
 op.normalisation = 'error'
-op.num_adapt = 3 if args.num_adapt is None else int(args.num_adapt)
+op.num_adapt = int(args.num_adapt or 3)
 op.norm_order = 1
-desired_error = 0.1 if args.desired_error is None else float(args.desired_error)
+desired_error = float(args.desired_error or 0.1)
 op.target = 1/desired_error
 
 # Run model

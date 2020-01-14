@@ -42,8 +42,7 @@ def local_edge_integral(f, mesh=None):
     """
     Integrates `f` over all edges elementwise, giving a P0 field. 
     """
-    if mesh is None:
-        mesh = f.function_space().mesh()
+    mesh = mesh or f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
     test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
     solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS + test*f*ds, integral)
@@ -53,8 +52,7 @@ def local_interior_edge_integral(f, mesh=None):
     """
     Integrates `f` over all interior edges elementwise, giving a P0 field. 
     """
-    if mesh is None:
-        mesh = f.function_space().mesh()
+    mesh = mesh or f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
     test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
     solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS, integral)
@@ -64,24 +62,20 @@ def local_boundary_integral(f, mesh=None):
     """
     Integrates `f` over all exterior edges elementwise, giving a P0 field. 
     """
-    if mesh is None:
-        mesh = f.function_space().mesh()
+    mesh = mesh or f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
     test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
     solve(test*trial*dx == test*f*ds, integral)
     return integral
 
 def local_edge_norm(f, mesh=None):
-    if mesh is None:
-        mesh = f.function_space().mesh()
+    mesh = mesh or f.function_space().mesh()
     return local_edge_integral(f*f, mesh)  # TODO: Norms other than L2
 
 def local_interior_edge_norm(f, mesh=None):
-    if mesh is None:
-        mesh = f.function_space().mesh()
+    mesh = mesh or f.function_space().mesh()
     return local_interior_edge_integral(f*f, mesh)  # TODO: Norms other than L2
 
 def local_boundary_norm(f, mesh=None):
-    if mesh is None:
-        mesh = f.function_space().mesh()
+    mesh = mesh or f.function_space().mesh()
     return local_boundary_integral(f*f, mesh  # TODO: Norms other than L2)

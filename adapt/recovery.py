@@ -20,8 +20,7 @@ def construct_gradient(f, mesh=None, op=Options()):
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
    """
-    if mesh is None:
-        mesh = f.function_space().mesh()
+    mesh = mesh or f.function_space().mesh()
     P1_vec = VectorFunctionSpace(mesh, "CG", 1)
     g = TrialFunction(P1_vec)
     φ = TestFunction(P1_vec)
@@ -57,8 +56,7 @@ def construct_hessian(f, mesh=None, degree=1, op=Options()):
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed Hessian associated with `f`.
     """
-    if mesh is None:
-        mesh = f.function_space().mesh()
+    mesh = mesh or f.function_space().mesh()
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
     if degree == 0:
@@ -116,8 +114,7 @@ def construct_boundary_hessian(f, mesh=None, degree=1, op=Options()):
     :param op: `Options` class object providing max cell size value.
     :return: reconstructed boundary Hessian associated with `f`.
     """
-    if mesh is None:
-        mesh = f.function_space().mesh()
+    mesh = mesh or f.function_space().mesh()
     dim = mesh.topological_dimension()
     try:
         # assert dim in (2, 3)

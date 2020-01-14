@@ -34,8 +34,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options
         except AssertionError:
             raise ValueError("Please supply either field for recovery, or Hessian thereof.")
     elif H is None:
-        if mesh is None:
-            mesh = f.function_space().mesh()
+        mesh = mesh or f.function_space().mesh()
         H = construct_hessian(f, mesh=mesh, degree=degree, op=op)
     V = H.function_space()
     mesh = V.mesh()
@@ -207,10 +206,8 @@ def metric_with_boundary(f=None, H=None, h=None, mesh=None, degree=1, op=Options
         except AssertionError:
             raise ValueError("Please supply either field for recovery, or Hessians thereof.")
     else:
-        if mesh is None:
-            mesh = f.function_space().mesh()
-        if H is None:
-            H = construct_hessian(f, mesh=mesh, degree=degree, op=op)
+        mesh = mesh or f.function_space().mesh()
+        H = H or construct_hessian(f, mesh=mesh, degree=degree, op=op)
         if h is None:
             h = construct_boundary_hessian(f, mesh=mesh, degree=degree, op=op)
             h.interpolate(abs(h))

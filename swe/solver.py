@@ -48,8 +48,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.drag_coefficient = self.op.drag_coefficient
 
         # Stabilisation
-        if self.stabilisation is None:
-            self.stabilisation = 'no'
+        self.stabilisation = self.stabilisation or 'no'
         if self.stabilisation in ('no', 'lax_friedrichs'):
             self.stabilisation_parameter = self.op.stabilisation_parameter
         else:

@@ -26,10 +26,7 @@ levels = 3
 for op.normalisation in modes:
     for op.norm_order in orders:
         normalisation = op.normalisation
-        if normalisation == 'error':
-            normalisation += 'l-inf' if op.norm_order is None else 'l{:d}'.format(op.norm_order)
-        else:
-            normalisation += 'l-inf' if op.norm_order is None else 'l{:d}'.format(op.norm_order)
+        normalisation += 'l-inf' if op.norm_order is None else 'l{:d}'.format(op.norm_order)
         for i in range(4):
             for k in range(levels):
                 print("\nNormalisation {:s}  Sensor {:d}  Iteration {:d}".format(normalisation, i, k))

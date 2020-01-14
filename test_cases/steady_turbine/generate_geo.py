@@ -20,7 +20,7 @@ args = parser.parse_args()
 
 levels = ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
 level = args.level
-offset = None if args.offset is None else bool(offset)
+offset = bool(args.offset or False)
 
 if level is not None:
     make_geo(level, offset)
