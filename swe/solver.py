@@ -17,19 +17,15 @@ class SteadyShallowWaterProblem(SteadyProblem):
     """
     General solver object for stationary shallow water problems.
     """
-    def __init__(self,
-                 op=ShallowWaterOptions(),
-                 mesh=None,
-                 discrete_adjoint=True,
-                 prev_solution=None,
-                 levels=1):
-        if op.family == 'dg-dg' and op.degree >= 0:
-            element = VectorElement("DG", triangle, op.degree)*FiniteElement("DG", triangle, op.degree)
-        elif op.family == 'dg-cg' and op.degree >= 0:
-            element = VectorElement("DG", triangle, op.degree)*FiniteElement("Lagrange", triangle, op.degree+1)
+    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=1):
+        p = op.degree
+        if op.family == 'dg-dg' and p >= 0:
+            fe = VectorElement("DG", triangle, op.degree)*FiniteElement("DG", triangle, p)
+        elif op.family == 'dg-cg' and p >= 0:
+            fe = VectorElement("DG", triangle, op.degree)*FiniteElement("Lagrange", triangle, p+1)
         else:
             raise NotImplementedError
-        super(SteadyShallowWaterProblem, self).__init__(op, mesh, element, discrete_adjoint, prev_solution, 1)
+        super(SteadyShallowWaterProblem, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
         if prev_solution is not None:
             self.interpolate_solution(prev_solution)
 
@@ -55,7 +51,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if self.stabilisation is None:
             self.stabilisation = 'no'
         if self.stabilisation == 'lax_friedrichs':
-            self.stabilisation_parameter = op.stabilisation_parameter
+            self.stabilisation_parameter = self.op.stabilisation_parameter
         elif self.stabilisation != 'no':
             raise ValueError("Stabilisation method {:s} not recognised".format(self.stabilisation))
 
@@ -94,8 +90,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
-        self.solver_obj.create_equations()
-        self.sipg_parameter = options.sipg_parameter
 
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
@@ -112,15 +106,15 @@ class SteadyShallowWaterProblem(SteadyProblem):
             u_interp, eta_interp = interp.split()
             u_interp.interpolate(self.inflow)
         self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+
         self.lhs = self.solver_obj.timestepper.F
         self.solution = self.solver_obj.fields.solution_2d
+        self.sipg_parameter = options.sipg_parameter
 
     def solve_forward(self):
         self.setup_solver()
         self.solver_obj.iterate()
         self.solution = self.solver_obj.fields.solution_2d
-        if hasattr(self, 'cb'):
-            self.get_callbacks(self.cb)
 
     def get_bdy_functions(self, eta_in, u_in, bdy_id):
         b = self.op.bathymetry

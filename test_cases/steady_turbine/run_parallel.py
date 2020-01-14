@@ -3,15 +3,14 @@ from adapt_utils.test_cases.steady_turbine.options import *
 from adapt_utils.turbine.solver import *
 
 offset = False
-# level = 0
+level = 0
 
 op = Steady2TurbineOffsetOptions() if offset else Steady2TurbineOptions()
 # mh = MeshHierarchy(op.default_mesh, level)
 op.family = 'dg-cg'
 
 # tp = SteadyTurbineProblem(op, mesh=mh[level])
-tp = SteadyTurbineProblem(op)
-exit(0)
+tp = SteadyTurbineProblem(op, levels=level)
 tp.solve()
 J = tp.quantity_of_interest()/1000.0
 print_output("Mesh {:d} in the hierarchy".format(level))

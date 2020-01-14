@@ -27,6 +27,7 @@ class SteadyProblem():
         * adapt mesh based on some error estimator of choice.
     """
     def __init__(self, op, mesh, finite_element, discrete_adjoint=False, prev_solution=None, levels=1):
+        print_output("{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
         self.op = op
@@ -67,6 +68,7 @@ class SteadyProblem():
         self.outer_num_cells = []
         self.outer_num_vertices = []
         self.outer_qois = []
+        print_output("{:s} initialisation complete!\n".format(self.__class__.__name__))
 
     def set_mesh(self, mesh):
         """
@@ -84,10 +86,12 @@ class SteadyProblem():
         """
         Create equivalent problem in iso-P2 refined space.
         """
-        print_output("Creating enriched finite element space...")
-        op_enriched = op.copy()
-        op_enriched.degree += self.op.degree_increase
-        self.tp_enriched = type(self)(self.op, self.am.refined_mesh, self.discrete_adjoint, self.prev_solution, self.levels-1)
+        self.op_enriched = self.op.copy()
+        self.op_enriched.degree += self.op.degree_increase
+        print_output("Creating enriched finite element space of degree {:d}...".format(self.op_enriched.degree))
+        self.tp_enriched = type(self)(self.op_enriched, mesh=self.am.refined_mesh,
+                                      discrete_adjoint=self.discrete_adjoint,
+                                      prev_solution=self.prev_solution, levels=self.levels-1)
 
     def create_function_spaces(self):
         """
