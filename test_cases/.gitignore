@@ -1,6 +1,8 @@
 steady_turbine/outputs/
 steady_turbine/screenshots/
 steady_turbine/__pycache__/
+steady_turbine/stephan.py
+steady_turbine/stephan-noid.py
 unsteady_turbine/output/
 unsteady_turbine/outputs/
 unsteady_turbine/screenshots/

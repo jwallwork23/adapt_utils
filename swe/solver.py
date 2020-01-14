@@ -20,9 +20,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=1):
         p = op.degree
         if op.family == 'dg-dg' and p >= 0:
-            fe = VectorElement("DG", triangle, op.degree)*FiniteElement("DG", triangle, p)
+            fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p)
         elif op.family == 'dg-cg' and p >= 0:
-            fe = VectorElement("DG", triangle, op.degree)*FiniteElement("Lagrange", triangle, p+1)
+            fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1)
         else:
             raise NotImplementedError
         super(SteadyShallowWaterProblem, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
@@ -50,10 +50,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         # Stabilisation
         if self.stabilisation is None:
             self.stabilisation = 'no'
-        if self.stabilisation == 'lax_friedrichs':
+        if self.stabilisation in ('no', 'lax_friedrichs'):
             self.stabilisation_parameter = self.op.stabilisation_parameter
-        elif self.stabilisation != 'no':
-            raise ValueError("Stabilisation method {:s} not recognised".format(self.stabilisation))
+        else:
+            raise ValueError("Stabilisation method {:s} for {:s} not recognised".format(self.stabilisation, self.__class__.__name__))
 
     def setup_solver(self):
         """
@@ -105,6 +105,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             interp = Function(self.V)
             u_interp, eta_interp = interp.split()
             u_interp.interpolate(self.inflow)
+            eta_interp.assign(0.0)
         self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
 
         self.lhs = self.solver_obj.timestepper.F
@@ -202,8 +203,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         loc = -i*z[1]
         flux_terms += jump(u[0], n[0])*dot(u_up[1], loc('+') + loc('-'))*dS
         flux_terms += jump(u[1], n[1])*dot(u_up[1], loc('+') + loc('-'))*dS
-        if op.lax_friedrichs:
-            gamma = 0.5*abs(dot(u_up, n('-')))*op.lax_friedrichs_scaling_factor
+        if op.stabilisation == 'lax_friedrichs':
+            gamma = 0.5*abs(dot(u_up, n('-')))*op.stabilisation_parameter
             loc = -i*z
             flux_terms += gamma*dot(loc('+') + loc('-'), jump(u))*dS
 
@@ -304,9 +305,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
             if funcs is None:
 
                 # HorizontalAdvection
-                if self.op.lax_friedrichs:
+                if self.op.stabilisation == 'lax_friedrichs':
                     u_ext = u - 2*dot(u, n)*n
-                    gamma = 0.5*abs(dot(u_old, n))*op.lax_friedrichs_scaling_factor
+                    gamma = 0.5*abs(dot(u_old, n))*op.stabilisation_parameter
                     flux_terms += -i*gamma*dot(z, u - u_ext)*ds(j)
 
 
@@ -474,7 +475,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.horizontal_viscosity = op.viscosity
         options.quadratic_drag_coefficient = op.drag_coefficient
         options.coriolis_frequency = op.set_coriolis(self.P1)
-        options.use_lax_friedrichs_velocity = op.lax_friedrichs
+        options.use_lax_friedrichs_velocity = op.stabilisation
+        options.lax_friedrichs_velocity_scaling_factor = op.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
 

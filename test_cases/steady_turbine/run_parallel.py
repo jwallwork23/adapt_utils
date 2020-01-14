@@ -7,6 +7,7 @@ level = 0
 
 op = Steady2TurbineOffsetOptions() if offset else Steady2TurbineOptions()
 op.family = 'dg-cg'
+op.plot_pvd = True  # TODO: temp
 
 tp = SteadyTurbineProblem(op, levels=level)
 for i in range(level):

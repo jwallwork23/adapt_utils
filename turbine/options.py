@@ -44,7 +44,6 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.end_time = num_iterations*self.dt - 0.2
         self.bathymetry = Constant(40.0)
         self.viscosity = Constant(self.base_viscosity)
-        self.lax_friedrichs = True
         self.drag_coefficient = Constant(0.0025)
 
         # Adaptivity
@@ -56,7 +55,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         return self.viscosity
 
     def set_inflow(self, fs):
-        self.inflow = Function(fs).interpolate(as_vector([3., 0.]))
+        self.inflow = interpolate(as_vector([3., 0.]), fs)
         return self.inflow
 
     def get_max_depth(self):

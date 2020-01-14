@@ -34,6 +34,8 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
         num_turbines = len(op.region_of_interest)
         scaling = num_turbines/assemble(op.bump(self.P1)*dx)
         self.turbine_density = op.bump(self.P1, scale=scaling)
+        # scaling = num_turbines/assemble(op.box(self.P0)*dx)
+        # self.turbine_density = op.box(self.P0, scale=scaling)
         self.farm_options = TidalTurbineFarmOptions()
         self.farm_options.turbine_density = self.turbine_density
         self.farm_options.turbine_options.diameter = op.turbine_diameter

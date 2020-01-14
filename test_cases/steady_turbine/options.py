@@ -44,16 +44,18 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
             self.viscosity.interpolate(self.base_viscosity + exp(ramp*(x-xmax+eps)))
         else:
             self.viscosity.assign(self.base_viscosity)
+        return self.viscosity
 
     def set_boundary_conditions(self, fs):
         left_tag = 1
         right_tag = 2
-        top_bottom_tag = 3
+        wall_tag = 3
         boundary_conditions = {}
         if not hasattr(self, 'inflow'):
             self.set_inflow(fs.sub()[0])
         boundary_conditions[left_tag] = {'uv': self.inflow}
         boundary_conditions[right_tag] = {'elev': Constant(0.)}
+        boundary_conditions[wall_tag] = {'un': Constant(0.)}
         return boundary_conditions
 
 
