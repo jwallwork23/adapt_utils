@@ -30,14 +30,14 @@ class SteadyTracerProblem2d(SteadyProblem):
         * Dirichlet;
         * outflow.
     """
-    def __init__(self,
-                 op,
-                 mesh=None,
-                 finite_element=FiniteElement("Lagrange", triangle, 1),
-                 discrete_adjoint=False,
-                 prev_solution=None,
-                 levels=1):
-        super(SteadyTracerProblem2d, self).__init__(op, mesh, finite_element, discrete_adjoint, prev_solution, levels)
+    def __init__(self, op, mesh=None, discrete_adjoint=False, prev_solution=None, levels=1):
+        if op.family in ("Lagrange", "CG", "cg"):
+            fe = FiniteElement("Lagrange", triangle, op.degree)
+        elif op.family in ("Discontinuous Lagrange", "DG", "dg"):
+            fe = FiniteElement("Discontinuous Lagrange", triangle, op.degree)
+        else:
+            raise NotImplementedError
+        super(SteadyTracerProblem2d, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
         self.nonlinear = False
 
     def set_fields(self):

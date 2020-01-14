@@ -79,10 +79,8 @@ class SteadyProblem():
         """
         Create equivalent problem in iso-P2 refined space.
         """
-        fe = FiniteElement(self.finite_element.family(),
-                           self.finite_element.cell(),
-                           self.finite_element.degree() + self.op.degree_increase)
-        self.tp_enriched = type(self)(self.op, self.am.refined_mesh, fe, self.discrete_adjoint, self.prev_solution, self.levels-1)
+        self.op.degree += self.op.degree_increase
+        self.tp_enriched = type(self)(self.op, self.am.refined_mesh, self.discrete_adjoint, self.prev_solution, self.levels-1)
 
     def create_function_spaces(self):
         """

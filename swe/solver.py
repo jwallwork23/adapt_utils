@@ -23,9 +23,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
                  discrete_adjoint=True,
                  prev_solution=None,
                  levels=1):
-        if op.family == 'dg-dg' and op.degree in (1, 2):
+        if op.family == 'dg-dg' and op.degree >= 0:
             element = VectorElement("DG", triangle, op.degree)*FiniteElement("DG", triangle, op.degree)
-        elif op.family == 'dg-cg':
+        elif op.family == 'dg-cg' and op.degree >= 0:
             element = VectorElement("DG", triangle, op.degree)*FiniteElement("Lagrange", triangle, op.degree+1)
         else:
             raise NotImplementedError
@@ -187,7 +187,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.indicators['dwr_cell'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
         self.estimate_error('dwr_cell')
 
-    def get_dwr_flux_forward(self)
+    def get_dwr_flux_forward(self):
         tpe = self.tp_enriched
         i = tpe.p0test
         tpe.project_solution(self.solution)  # FIXME: prolong

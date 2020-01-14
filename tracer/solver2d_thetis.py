@@ -25,25 +25,12 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
     for (prescribed) velocity :math:`\textbf{u}`, diffusivity :math:`\nu \geq 0`, source :math:`f`
     and (prognostic) concentration :math:`\phi`.
     """
-    def __init__(self,
-                 op=TracerOptions(),
-                 stab='lax_friedrichs',
-                 mesh=None,
-                 discrete_adjoint=True,
-                 high_order=False,
-                 prev_solution=None):
-        if op.family == 'dg':
-             finite_element = FiniteElement("Discontinuous Lagrange", triangle, 1)
-        else:
-             raise NotImplementedError
-        if mesh is None:
-            mesh = op.default_mesh
-        super(SteadyTracerProblem2d_Thetis, self).__init__(mesh,
-                                                           op,
-                                                           discrete_adjoint,
-                                                           finite_element,
-                                                           None)
-        assert(finite_element.family() == "Discontinuous Lagrange")
+    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=1):
+        try:
+            assert op.family in ("Discontinuous Lagrange", "DG", "dg")
+        except AssertionError:
+            raise ValueError("Finite element '{:s}' not supported in Thetis tracer model.".format(op.family))
+        super(SteadyTracerProblem2d_Thetis, self).__init__(mesh, op, discrete_adjoint, fe, prev_solution, levels)
 
     def solve(self):
         solver_obj = solver2d.FlowSolver2d(self.mesh, Constant(1.))
