@@ -1,18 +1,9 @@
 from firedrake import *
-try:
-    import firedrake.cython.dmplex as dmplex
-except ImportError:
-    import firedrake.dmplex as dmplex
-from firedrake.petsc import PETSc
-
-import numpy as np
-import numpy.linalg as la
 
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["check_spd", "index_string", "subdomain_indicator", "get_boundary_nodes", "print_doc",
-           "bessi0", "bessk0"]
+__all__ = ["check_spd", "get_boundary_nodes", "index_string", "bessi0", "bessk0"]
 
 
 def check_spd(matrix):
@@ -40,7 +31,7 @@ def check_spd(matrix):
         assert evals.vector().gather().min() > 0.0
     except AssertionError:
         raise ValueError("Matrix is not positive definite!")
-    PETSc.Sys.Print("Matrix is indeed SPD.\n")
+    print_output("Matrix is indeed SPD.")
 
 def index_string(index):
     """
@@ -49,24 +40,12 @@ def index_string(index):
     """
     return (5 - len(str(index)))*'0' + str(index)
 
-def subdomain_indicator(mesh, subdomain_id):
-    """
-    Creates a P0 indicator function relating with `subdomain_id`.
-    """
-    return assemble(TestFunction(FunctionSpace(mesh, "DG", 0))*dx(subdomain_id))
-
 def get_boundary_nodes(fs, segment='on_boundary'):
     """
     :arg fs: function space to get boundary nodes for.
     :kwarg segment: segment of boundary to get nodes of (default 'on_boundary').
     """
     return fs.boundary_nodes(segment, 'topological')
-
-def print_doc(anything):
-    """
-    Print the docstring of any class or function.
-    """
-    print(anything.__doc__)
 
 def bessi0(x):
     """

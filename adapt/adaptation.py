@@ -131,3 +131,8 @@ class AdaptiveMesh():
             self.cell_size = interpolate(dot(u, dot(self.cell_metric, u)), P0)
         else:
             raise ValueError("Element measure must be chosen from {'diameter', 'nguyen', 'cell_metric'}.")
+
+    def subdomain_indicator(self, subdomain_id):
+        """Creates a P0 indicator function relating with `subdomain_id`."""
+        P0 = FunctionSpace(self.mesh, "DG", 0)
+        return assemble(TestFunction(P0)*dx(subdomain_id))
