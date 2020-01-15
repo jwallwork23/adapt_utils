@@ -17,9 +17,9 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
     mesh_path = Unicode('xcoarse.msh').tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
+        super(Steady2TurbineOptions, self).__init__(approach)
         # self.base_viscosity = 1.3e-3
         self.base_viscosity = 1.0
-        super(Steady2TurbineOptions, self).__init__(approach)
         self.domain_length = 1000.0
         self.domain_width = 300.0
         if os.path.exists(self.mesh_path):

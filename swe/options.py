@@ -46,4 +46,7 @@ class ShallowWaterOptions(Options):
     def set_coriolis(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
+    def set_drag_coefficient(self, fs):
+        raise NotImplementedError("Should be implemented in derived class.")
+
 # TODO: UnsteadyShallowWaterOptions, inheriting from the above

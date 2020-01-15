@@ -43,9 +43,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
     def set_fields(self):
         self.nu = self.op.set_viscosity(self.P1)
-        self.bathymetry = self.op.bathymetry
+        self.bathymetry = self.op.set_bathymetry(self.P1)
         self.inflow = self.op.set_inflow(self.P1_vec)
-        self.drag_coefficient = self.op.drag_coefficient
+        self.drag_coefficient = self.op.set_drag_coefficient(self.P1)
 
         # Stabilisation
         self.stabilisation = self.stabilisation or 'no'

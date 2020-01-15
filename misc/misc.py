@@ -3,7 +3,7 @@ from firedrake import *
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["check_spd", "get_boundary_nodes", "index_string", "bessi0", "bessk0"]
+__all__ = ["check_spd", "get_boundary_nodes", "index_string", "bessi0", "bessk0", "heavyside_approx"]
 
 
 def check_spd(matrix):
@@ -48,9 +48,7 @@ def get_boundary_nodes(fs, segment='on_boundary'):
     return fs.boundary_nodes(segment, 'topological')
 
 def bessi0(x):
-    """
-    Modified Bessel function of the first kind. Code taken from 'Numerical recipes in C'.
-    """
+    """Modified Bessel function of the first kind. Code taken from 'Numerical recipes in C'."""
     ax = abs(x)
     y1 = x/3.75
     y1 *= y1
@@ -60,11 +58,12 @@ def bessi0(x):
     return conditional(le(ax, 3.75), expr1, expr2)
 
 def bessk0(x):
-    """
-    Modified Bessel function of the second kind. Code taken from 'Numerical recipes in C'.
-    """
+    """Modified Bessel function of the second kind. Code taken from 'Numerical recipes in C'."""
     y1 = x*x/4.0
     expr1 = (-ln(x/2.0)*bessi0(x)) + (-0.57721566 + y1*(0.42278420 + y1*(0.23069756 + y1*(0.3488590e-1 + y1*(0.262698e-2 + y1*(0.10750e-3 + y1*0.74e-5))))))
     y2 = 2.0/x
     expr2 = (exp(-x)/sqrt(x))*(1.25331414 + y2*(-0.7832358e-1 + y2*(0.2189568e-1 + y2*(-0.1062446e-1 + y2*(0.587872e-2 + y2*(-0.251540e-2 + y2*0.53208e-3))))))
     return conditional(ge(x, 2), expr2, expr1)
+
+def heavyside_approx(H, alpha):
+    return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5

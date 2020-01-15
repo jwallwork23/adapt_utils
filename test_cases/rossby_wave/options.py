@@ -23,7 +23,6 @@ class BoydOptions(ShallowWaterOptions):
         :kwarg n: mesh resolution
         """
         super(BoydOptions, self).__init__(approach)
-        self.approach = approach
         self.periodic = periodic
         self.n = n
         self.order = order
@@ -111,6 +110,12 @@ class BoydOptions(ShallowWaterOptions):
         eta[24] =  0.1066277e-19
         eta[26] = -0.1178252e-21
         self.hermite_coeffs = {'u': u, 'v': v, 'eta': eta}
+
+    def set_bathymetry(self, fs):
+        raise NotImplementedError  # TODO
+
+    def set_viscosity(self, fs):
+        raise NotImplementedError  # TODO
 
     def set_boundary_conditions(self, fs):
         """

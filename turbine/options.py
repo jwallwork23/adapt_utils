@@ -42,9 +42,6 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.timestepper = 'SteadyState'
         self.dt = 20.
         self.end_time = num_iterations*self.dt - 0.2
-        self.bathymetry = Constant(40.0)
-        self.viscosity = Constant(self.base_viscosity)
-        self.drag_coefficient = Constant(0.0025)
 
         # Adaptivity
         self.h_min = 1e-5
@@ -66,6 +63,14 @@ class SteadyTurbineOptions(ShallowWaterOptions):
             self.max_depth = self.bathymetry.vector().gather().max()
         else:
             raise ValueError("Bathymetry format cannot be understood.")
+
+    def set_bathymetry(self, fs):
+        self.bathymetry = Constant(40.0)
+        return self.bathymetry
+
+    def set_drag_coefficient(self, fs):
+        self.drag_coefficient = Constant(0.0025)
+        return self.drag_coefficient
 
     def thrust_coefficient_correction(self):
         """
