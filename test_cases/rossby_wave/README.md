@@ -1,5 +1,6 @@
 ## Equatorial Rossby wave test case
-"Rossby equatorial soliton", Huang et al., FVCOM validation experiments (2008), pp. 3-6.
+
+"Rossby equatorial soliton" test case, as described in [1].
 
 ### Original problem
 
@@ -33,3 +34,4 @@
 * Illustrates a situation where adjoint based error estimators are not useful.
 * Flow is constrained to a band... suitable candidate for mesh optimisation?
 
+[1] Huang et al., FVCOM validation experiments (2008), pp. 3-6.

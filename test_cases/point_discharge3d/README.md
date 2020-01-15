@@ -25,8 +25,8 @@ Integral of tracer concentration over region of interest, given by a sphere of r
   * Offset case: (20.0, 7.5, 7.5)
 
 
-[1] Riadh A., Cedric G., Jean M. "TELEMAC modeling system: 2D hydrodynamics TELEMAC-2D software
-    release 7.0 user manual." Paris:  R&D, Electricite de France, p. 134, 2014.
+[1] A. Riadh, G. Cedric, M. Jean, "TELEMAC modeling system: 2D hydrodynamics TELEMAC-2D software
+    release 7.0 user manual." Paris:  R&D, Electricite de France, p. 134 (2014).
 
-[2]  Wallwork, J., Barral, N., Ham, D., Piggott, M.: Anisotropic goal-oriented mesh adaptation in
-     Firedrake. In: 28th Intl Meshing Roundtable (2019). (to appear)
+[2] J.G. Wallwork, N. Barral, D.A. Ham, M.D. Piggott, "Anisotropic goal-oriented mesh adaptation in
+    Firedrake". In: 28th Intl Meshing Roundtable (2019). (to appear)

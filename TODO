@@ -9,7 +9,6 @@ Time-dependent goal-oriented adaptation
 Consistency of test cases / avoid duplicate code
 ================================================
 
-  * Use `AdaptiveMesh` structure throughout.
   * Extend `AnisotropicMetricDriver` to vertex-based case and include common metrics as methods.
   * Use Thetis for advection-diffusion solver.
   * Include `Options` files for all test cases, including beach. Include proper references.
