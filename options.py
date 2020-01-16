@@ -243,3 +243,15 @@ class Options(FrozenConfigurable):
 
     def exact_qoi(self):
         raise NotImplementedError("Should be implemented in derived class.")
+
+    def get_update_forcings(self, solver_obj):
+        """Should be implemented in derived class."""
+        def update_forcings(t):
+            return
+        return update_forcings
+
+    def get_export_func(self, solver_obj):
+        """Should be implemented in derived class."""
+        def export_func():
+            return
+        return export_func

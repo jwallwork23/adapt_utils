@@ -91,7 +91,3 @@ class UnsteadyTurbineOptions(SteadyTurbineOptions):
     def __init__(self, approach='fixed_mesh'):
         super(UnsteadyTurbineOptions, self).__init__(approach)
         self.timestepper = 'CrankNicolson'
-
-    def set_boundary_surface(self, fs):
-        self.elev_in = Function(fs)
-        self.elev_out = Function(fs)

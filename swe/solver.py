@@ -42,10 +42,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.nonlinear = True
 
     def set_fields(self):
-        self.nu = self.op.set_viscosity(self.P1)
+        self.viscosity = self.op.set_viscosity(self.P1)
+        self.diffusivity = self.op.set_diffusivity(self.P1)
         self.bathymetry = self.op.set_bathymetry(self.P1)
         self.inflow = self.op.set_inflow(self.P1_vec)
+        self.coriolis = self.op.set_coriolis(self.P1)
         self.drag_coefficient = self.op.set_drag_coefficient(self.P1)
+        self.manning_coefficient = self.op.set_manning_coefficient(self.P1)
 
         # Stabilisation
         self.stabilisation = self.stabilisation or 'no'
@@ -83,12 +86,19 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
         options.polynomial_degree = op.degree
-        options.horizontal_viscosity = self.nu
+        options.horizontal_viscosity = self.viscosity
+        options.horizontal_diffusivity = self.diffusivity
         options.quadratic_drag_coefficient = self.drag_coefficient
+        options.manning_drag_coefficient = self.manning_coefficient
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
+        options.use_wetting_and_drying = op.wetting_and_drying
+        options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
+        options.solve_tracer = op.solve_tracer
+        if op.solve_tracer:
+            raise NotImplementedError  # TODO
 
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
@@ -156,7 +166,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         z, zeta = self.adjoint_error.split()
 
         b = tpe.bathymetry
-        nu = tpe.nu
+        nu = tpe.viscosity
         f = None if not hasattr(tpe, 'coriolis') else tpe.coriolis
         C_d = None if not hasattr(tpe, 'drag_coefficient') else tpe.drag_coefficient
         H = b + eta
@@ -189,7 +199,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         z, zeta = self.adjoint_error.split()
 
         b = tpe.bathymetry
-        nu = tpe.nu
+        nu = tpe.viscosity
         H = b + eta
         g = self.op.g
         n = tpe.n
@@ -442,10 +452,21 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         z.rename("Adjoint fluid velocity")
         zeta.rename("Adjoint elevation")
 
-    def set_fields(self):  # TODO: might need updating
+    def set_fields(self):
         self.viscosity = self.op.set_viscosity(self.P1)
-        self.drag_coefficient = Constant(self.op.drag_coefficient)
-        self.op.set_boundary_surface(self.V.sub(1))
+        self.bathymetry = self.op.set_bathymetry(self.P1)
+        self.inflow = self.op.set_inflow(self.P1_vec)
+        self.coriolis = self.op.set_coriolis(self.P1)
+        self.drag_coefficient = self.op.set_drag_coefficient(self.P1)
+        self.manning_coefficient = self.op.set_manning_coefficient(self.P1)
+        self.op.set_boundary_surface(self.V.sub(1))  # TODO
+
+        # Stabilisation
+        self.stabilisation = self.stabilisation or 'no'
+        if self.stabilisation in ('no', 'lax_friedrichs'):
+            self.stabilisation_parameter = self.op.stabilisation_parameter
+        else:
+            raise ValueError("Stabilisation method {:s} for {:s} not recognised".format(self.stabilisation, self.__class__.__name__))
 
     def solve_step(self, **kwargs):
         self.set_fields()
@@ -475,17 +496,23 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         # Parameters
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
-        options.horizontal_viscosity = op.viscosity
-        options.quadratic_drag_coefficient = op.drag_coefficient
-        options.coriolis_frequency = op.set_coriolis(self.P1)
+        options.horizontal_viscosity = self.viscosity
+        options.quadratic_drag_coefficient = self.drag_coefficient
+        options.coriolis_frequency = self.coriolis
         options.use_lax_friedrichs_velocity = op.stabilisation
         options.lax_friedrichs_velocity_scaling_factor = op.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
+        options.use_wetting_and_drying = op.wetting_and_drying
+        options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
+        options.solve_tracer = op.solve_tracer
+        if op.solve_tracer:
+            raise NotImplementedError  # TODO
 
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
-        self.update_forcings = self.get_update_forcings()
+        update_forcings = op.get_update_forcings()
+        export_func = op.get_export_func()
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
@@ -508,11 +535,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
                 e.set_next_export_ix(self.solver_obj.i_export)
 
         # Solve
-        self.solver_obj.iterate(update_forcings=self.update_forcings)
+        self.solver_obj.iterate(update_forcings=update_forcings, export_func=export_func)
         self.solution.assign(self.solver_obj.fields.solution_2d)
-
-    def get_update_forcings(self):
-        pass
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
         field = self.op.adapt_field

@@ -11,10 +11,12 @@ class ShallowWaterOptions(Options):
     """
     Parameters for shallow water solver.
     """
+    solve_tracer = Bool(False).tag(config=True)
 
     # Physical
     bathymetry = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
-    base_viscosity = NonNegativeFloat(None, allow_none=True).tag(config=True)
+    base_viscosity = NonNegativeFloat(0.0).tag(config=True)
+    base_diffusivity = NonNegativeFloat(0.0).tag(config=True)
     viscosity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
     drag_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
@@ -38,15 +40,43 @@ class ShallowWaterOptions(Options):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_viscosity(self, fs):
-        raise NotImplementedError("Should be implemented in derived class.")
+        """Should be implemented in derived class."""
+        self.viscosity = Constant(self.base_viscosity)
+        return self.viscosity
+
+    def set_diffusivity(self, fs):
+        """Should be implemented in derived class."""
+        self.diffusivity = Constant(self.base_diffusivity)
+        return self.diffusivity
 
     def set_inflow(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_coriolis(self, fs):
-        raise NotImplementedError("Should be implemented in derived class.")
+        """Should be implemented in derived class."""
+        self.coriolis = Constant(0.0)
+        return self.coriolis
 
     def set_drag_coefficient(self, fs):
-        raise NotImplementedError("Should be implemented in derived class.")
+        """Should be implemented in derived class."""
+        self.drag_coefficient = Constant(0.0)
+        return self.drag_coefficient
 
-# TODO: UnsteadyShallowWaterOptions, inheriting from the above
+    def set_manning_coefficient(self, fs):
+        """Should be implemented in derived class."""
+        self.manning_coefficient = Constant(0.0)
+        return self.manning_coefficient
+
+    def get_initial_depth(self, fs):
+        if not hasattr(self, 'bathymetry'):
+            self.set_bathymetry(fs.sub(1))
+        if not hasattr(self, 'initial_value'):
+            self.set_initial_value(fs)
+        eta = self.initial_value.split()[1]
+        self.depth = self.bathymetry + eta
+        return self.depth
+
+    def set_boundary_surface(self):
+        """Should be implemented in derived class."""
+        self.elev_in = Constant(0.0)
+        self.elev_out = Constant(0.0)
