@@ -170,17 +170,21 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         b = tpe.bathymetry
         nu = tpe.viscosity
-        f = None if not hasattr(tpe, 'coriolis') else tpe.coriolis
-        C_d = None if not hasattr(tpe, 'quadratic_drag_coefficient') else tpe.quadratic_drag_coefficient
         H = b + eta
 
         dwr = -self.op.g*inner(z, grad(eta))                   # ExternalPressureGradient
         dwr += -zeta*div(H*u)                                  # HUDiv
         dwr += -inner(z, dot(u, nabla_grad(u)))                # HorizontalAdvection
-        if f is not None:
-            dwr += -inner(z, f*as_vector((-u[1], u[0])))       # Coriolis
-        if C_d is not None:
-            dwr += -C_d*sqrt(dot(u, u))*inner(z, u)/H          # QuadraticDrag
+        if hasattr(tpe, 'coriolis'):
+            dwr += -inner(z, tpe.coriolis*as_vector((-u[1], u[0])))       # Coriolis
+
+        # QuadraticDrag
+        if hasattr(tpe, 'quadratic_drag_coefficient'):
+            C_D = tpe.quadratic_drag_coefficient
+            dwr += -C_D*sqrt(dot(u, u))*inner(z, u)/H
+        elif hasattr(tpe, 'manning_drag_coefficient'):
+            C_D = op.g*tpe.manning_drag_coefficient**2/pow(H, 1/3)
+            dwr += -C_D*sqrt(dot(u, u))*inner(z, u)/H
 
         # HorizontalViscosity
         stress = 2*nu*sym(grad(u)) if self.op.grad_div_viscosity else nu*grad(u)
