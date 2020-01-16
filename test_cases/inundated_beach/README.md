@@ -1,7 +1,8 @@
 ### Inundated beach test case
 
-"1D uniformly sloping basin" test case as described on p.92 of [1]. Many thanks to Mariana Clare for
-contributing this test case.
+"1D uniformly sloping basin" test case as described on p.92 of [1].
+
+Many thanks to Mariana Clare for coding the fixed mesh version of this test case.
 
 ### Original problem:
   * Domain length: 13,800m.
