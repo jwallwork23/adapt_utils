@@ -98,15 +98,20 @@ class BalzanoOptions(ShallowWaterOptions):
         self.viscosity.assign(self.base_viscosity)
         return self.viscosity
 
-    def set_boundary_conditions(self, fs, t=0.0):
+    def set_boundary_conditions(self, fs):
         if not hasattr(self, 'elev_in'):
             self.set_boundary_surface()
         self.elev_in.assign(self.elev_func(0.0))
         inflow_tag = 1
-        outflow_tag = 2
+        wall_tag = 2
+        outflow_tag = 3
         boundary_conditions = {}
-        boundary_conditions[inflow_tag] = {'elev': self.elev_in if 6*3600 <= t <= 18*3600 else 0.0}
+        boundary_conditions[inflow_tag] = {'elev': self.elev_in}
+        boundary_conditions[wall_tag] = {'un': Constant(0.0)}
         return boundary_conditions
+
+    def update_boundary_conditions(self, t=0.0):
+        self.elev_in.assign(self.elev_func(t) if 6*3600 <= t <= 18*3600 else 0.0)
 
     def set_initial_condition(self, fs):
         """
@@ -125,8 +130,7 @@ class BalzanoOptions(ShallowWaterOptions):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
 
         def update_forcings(t):
-            # Update boundary conditions
-            self.set_boundary_conditions(solver_obj.function_spaces.V_2d, t=t)
+            self.update_boundary_conditions(t=t)
 
             # Update bathymetry and friction
             if self.friction == 'nikuradse':

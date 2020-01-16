@@ -72,6 +72,7 @@ class ShallowWaterOptions(Options):
         pass
 
     def get_initial_depth(self, fs):
+        """Compute the initial total water depth, using the bathymetry and initial elevation."""
         if not hasattr(self, 'bathymetry'):
             self.set_bathymetry(fs.sub(1))
         if not hasattr(self, 'initial_value'):
@@ -81,6 +82,6 @@ class ShallowWaterOptions(Options):
         return self.depth
 
     def set_boundary_surface(self):
-        """Should be implemented in derived class."""
+        """Set the initial displacement of the boundary elevation."""
         self.elev_in = Constant(0.0)
         self.elev_out = Constant(0.0)
