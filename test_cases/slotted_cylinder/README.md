@@ -4,6 +4,8 @@ Original problem, as described in [1], concerns the advection of three solid bod
 fluid: a Gaussian bell, a cone and a slotted cylinder. In this test case, we seek to advect the
 slotted cylinder conservatively and are not interested in the advection of the other bodies.
 
+A fixed mesh version of this test case was coded in Firedrake as [demo][1].
+
 ### Original problem
 
 * Unsteady advection diffusion
@@ -17,7 +19,7 @@ slotted cylinder conservatively and are not interested in the advection of the o
 
 ### This implementation
 
-* P1DG with upwinding (see Colin's Firedrake demo)
+* P1DG with upwinding (see [demo][1]).
 
 ### Remarks
 
@@ -26,3 +28,5 @@ slotted cylinder conservatively and are not interested in the advection of the o
 
 
 [1] R. LeVeque, "High-resolution conservative algorithms for advection in incompressible flow" (1996)
+
+[1]: https://firedrakeproject.org/demos/DG_advection.py.html "this demo"

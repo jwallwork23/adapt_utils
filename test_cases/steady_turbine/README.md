@@ -4,6 +4,9 @@ Test case as described in [1], modelling two turbines positioned in a channel. T
 configurations are considered: one in which the turbines are aligned and another where they are
 offset.
 
+Many thanks to [Stephan Kramer][1] for coding the original fixed mesh version of this test case in
+Firedrake.
+
 
 ### Parameters:
   * Domain: [0, 1000]x[0, 300]
@@ -31,3 +34,5 @@ drag coefficient and divided by water depth).
 
 [2] S.C. Kramer, M.D. Piggott, "A correction to the enhanced bottom drag parameterisation of
     tidal turbines." Renewable Energy 92 (2016): 385-396.
+
+[1]: https://www.imperial.ac.uk/people/s.kramer "Stephan Kramer"

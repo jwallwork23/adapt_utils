@@ -2,7 +2,8 @@
 
 "1D uniformly sloping basin" test case as described on p.92 of [1].
 
-Many thanks to [Mariana Clare][1] for coding the fixed mesh version of this test case.
+Many thanks to [Mariana Clare][1] for coding the original fixed mesh version of this test case in
+Firedrake.
 
 ### Original problem:
   * Domain length: 13,800m.
