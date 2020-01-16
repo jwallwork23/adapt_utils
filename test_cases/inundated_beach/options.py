@@ -15,7 +15,7 @@ class BalzanoOptions(ShallowWaterOptions):
     """ # TODO: cite
 
     def __init__(self, approach='fixed_mesh', friction='manning'):
-        super(BoydOptions, self).__init__(approach)
+        super(BalzanoOptions, self).__init__(approach)
         self.plot_pvd = True
 
         # Initial mesh
@@ -29,7 +29,7 @@ class BalzanoOptions(ShallowWaterOptions):
         self.base_viscosity = 1e-6
         self.base_diffusivity = 0.15
         self.wetting_and_drying = True
-        self.wetting_and_drying_alpha = 0.43
+        self.wetting_and_drying_alpha = Constant(0.43)
         try:
             assert friction in ('nikuradse', 'manning')
         except AssertionError:
@@ -49,7 +49,7 @@ class BalzanoOptions(ShallowWaterOptions):
         # Time integration
         self.dt = 600.0
         self.end_time = 24*3600.0
-        self.dt_per_export = np.round(self.end_time/40, 0)
+        self.dt_per_export = 6
         self.dt_per_remesh = 20
         self.timestepper = 'CrankNicolson'
         # self.implicitness_theta = 0.5  # TODO
@@ -65,14 +65,16 @@ class BalzanoOptions(ShallowWaterOptions):
         self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
         self.eta_tilde = Function(P1DG, name='Modified elevation')
 
-    def set_drag_coefficient(self, fs, V):
-        nikuradse = self.friction == 'nikuradse'
-        self.drag_coefficient = interpolate(self.get_cfactor(), fs) if nikuradse else Constant(0.0)
+    def set_drag_coefficient(self, fs):
+        if self.friction == 'nikuradse':
+            self.drag_coefficient = interpolate(self.get_cfactor(), fs)
         return self.drag_coefficient
 
-    def get_cfactor(self
-        if not hasattr(self, 'depth'):
-            self.get_initial_depth(V)
+    def get_cfactor(self):
+        try:
+            assert hasattr(self, 'depth')
+        except AssertionError:
+            raise ValueError("Depth is undefined.")
         ksp = Constant(3*self.average_size)
         hc = conditional(self.depth > 0.001, self.depth, 0.001)
         aux = max_value(11.036*hc/ksp, 1.001)
@@ -81,8 +83,6 @@ class BalzanoOptions(ShallowWaterOptions):
     def set_manning_coefficient(self, fs):
         if self.friction == 'manning':
             self.manning_coefficient = Constant(self.friction_coeff or 0.02)
-        else:
-            self.manning_coefficient = Constant(0.0)
         return self.manning_coefficient
 
     def set_bathymetry(self, fs):
@@ -98,7 +98,7 @@ class BalzanoOptions(ShallowWaterOptions):
         self.viscosity.assign(self.base_viscosity)
         return self.viscosity
 
-    def set_boundary_conditions(self, t=0.0):
+    def set_boundary_conditions(self, fs, t=0.0):
         if not hasattr(self, 'elev_in'):
             self.set_boundary_surface()
         self.elev_in.assign(self.elev_func(0.0))
@@ -116,8 +116,8 @@ class BalzanoOptions(ShallowWaterOptions):
         """
         self.initial_value = Function(fs, name="Initial condition")
         u, eta = self.initial_value.split()
-        u.assign(0.0)
-        eta.assign(as_vector([1.0e-7, 0.0]))
+        u.interpolate(as_vector([1.0e-7, 0.0]))
+        eta.assign(0.0)
         return self.initial_value
 
     def get_update_forcings(self, solver_obj):
@@ -126,7 +126,7 @@ class BalzanoOptions(ShallowWaterOptions):
 
         def update_forcings(t):
             # Update boundary conditions
-            self.set_boundary_conditions(t=t)
+            self.set_boundary_conditions(solver_obj.function_spaces.V_2d, t=t)
 
             # Update bathymetry and friction
             if self.friction == 'nikuradse':
@@ -139,7 +139,19 @@ class BalzanoOptions(ShallowWaterOptions):
     def get_export_func(self, solver_obj):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
         eta = solver_obj.fields.elev_2d
-        self.moving_bath.project(self.bathymetry + bathymetry_displacement(eta))
-        self.wd_bath_file.write(self.moving_bath)
+        def export_func():
+            self.moving_bath.project(self.bathymetry + bathymetry_displacement(eta))
+            self.wd_bath_file.write(self.moving_bath)
+            self.eta_tilde.project(eta + bathymetry_displacement(eta))
+            self.eta_tilde_file.write(self.eta_tilde)
+        return export_func
+
+    def set_qoi_kernel(self, solver_obj):  # TODO: Could play around with this a bit
+        self.kernel = Function(solver_obj.function_spaces.V_2d)
+        k_eta = self.kernel.split()[1]
+        dry = conditional(ge(self.bathymetry, 0), 0, 1)
+        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+        eta = solver_obj.fields.elev_2d
         self.eta_tilde.project(eta + bathymetry_displacement(eta))
-        self.eta_tilde_file.write(self.eta_tilde)
+        k_eta.interpolate(dry*(self.eta_tilde-self.bathymetry)/eta)
+        return self.kernel

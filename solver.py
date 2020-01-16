@@ -221,12 +221,13 @@ class SteadyProblem():
         """
         Set forward or adjoint solution, as specified by boolean kwarg `adjoint`.
         """
-        name = self.get_solution(adjoint).dat.name
+        # TODO: Update names in mixed space
+        # name = self.get_solution(adjoint).dat.name
         if adjoint:
             self.adjoint_solution = val
         else:
             self.solution = val
-        self.get_solution(adjoint).rename(name)
+        # self.get_solution(adjoint).rename(name)
 
     def set_error(self, val, adjoint=False):
         """
@@ -762,7 +763,7 @@ class UnsteadyProblem(SteadyProblem):
         self.adjoint_solution_old = Function(self.V, name='Old adjoint solution')
 
     def set_start_condition(self, adjoint=False):
-        self.set_solution(self.op.set_final_condition(self.V), adjoint)
+        self.set_solution(self.op.set_start_condition(self.V, adjoint=adjoint), adjoint)
 
     def solve_step(self, adjoint=False):
         """

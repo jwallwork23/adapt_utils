@@ -427,7 +427,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             raise NotImplementedError
         self.load_index = load_index
-        super(UnsteadyShallowWaterProblem, self).__init__(mesh, op, fe, discrete_adjoint, prev_solution, levels)
+        super(UnsteadyShallowWaterProblem, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
         if prev_solution is not None:
             self.interpolate_solution(prev_solution)
 
@@ -460,13 +460,14 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             raise ValueError("Stabilisation method {:s} for {:s} not recognised".format(self.stabilisation, self.__class__.__name__))
 
-        # Set initial conditions
-        self.solution.interpolate(op.set_initial_condition(self.V))
-
-    def solve_step(self):
+    def solve_step(self, adjoint=False):
+        try:
+            assert not adjoint
+        except AssertionError:
+            raise NotImplementedError  # TODO
         self.setup_solver()
-        self.solver_obj.iterate(update_forcings=self.op.get_update_forcings(),
-                                export_func=self.op.get_export_func())
+        self.solver_obj.iterate(update_forcings=self.op.get_update_forcings(self.solver_obj),
+                                export_func=self.op.get_export_func(self.solver_obj))
         self.solution = self.solver_obj.fields.solution_2d
 
     def setup_solver(self):
@@ -499,7 +500,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.horizontal_viscosity = self.viscosity
         options.horizontal_diffusivity = self.diffusivity
         options.quadratic_drag_coefficient = self.drag_coefficient
-        options.manning_coefficient = self.manning_coefficient
+        options.manning_drag_coefficient = self.manning_coefficient
         options.coriolis_frequency = self.coriolis
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
@@ -535,6 +536,9 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
         for e in self.solver_obj.exporters.values():
             e.set_next_export_ix(self.solver_obj.i_export)
+
+    def get_qoi_kernel(self):
+        self.kernel = self.op.set_qoi_kernel(self.solver_obj)
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
         field = self.op.adapt_field

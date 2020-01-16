@@ -32,6 +32,10 @@ class Options(FrozenConfigurable):
     stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.").tag(config=True)
     stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0), help="Scalar stabilisation parameter.").tag(config=True)
 
+    # Solver parameters
+    params = PETScSolverParameters({}).tag(config=True)
+    adjoint_params = PETScSolverParameters({}).tag(config=True)
+
     # Outputs
     debug = Bool(False, help="Toggle debugging mode for more verbose screen output.").tag(config=True)
     plot_pvd = Bool(False, help="Toggle plotting of fields.").tag(config=True)
@@ -226,7 +230,16 @@ class Options(FrozenConfigurable):
         box.interpolate(expr)
         return box
 
+    def set_start_condition(self, fs, adjoint=False):
+        if adjoint:
+            return self.set_final_condition(fs)
+        else:
+            return self.set_initial_condition(fs)
+
     def set_initial_condition(self, fs):
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def set_final_condition(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_boundary_conditions(self, fs):

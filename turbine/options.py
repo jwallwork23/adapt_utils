@@ -33,10 +33,6 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     Base class holding parameters for steady state tidal turbine problems.
     """
 
-    # Solver parameters
-    params = PETScSolverParameters(default_params).tag(config=True)
-    adjoint_params = PETScSolverParameters(default_adjoint_params).tag(config=True)
-
     # Turbine parametrisation
     turbine_diameter = PositiveFloat(18.).tag(config=True)
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
@@ -47,6 +43,10 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.timestepper = 'SteadyState'
         self.dt = 20.
         self.end_time = num_iterations*self.dt - 0.2
+
+        # Solver parameters
+        self.params = default_params
+        self.adjoint_params = default_adjoint_params
 
         # Adaptivity
         self.h_min = 1e-5
