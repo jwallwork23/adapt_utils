@@ -2,7 +2,7 @@
 
 "1D uniformly sloping basin" test case as described on p.92 of [1].
 
-Many thanks to Mariana Clare for coding the fixed mesh version of this test case.
+Many thanks to [Mariana Clare][1] for coding the fixed mesh version of this test case.
 
 ### Original problem:
   * Domain length: 13,800m.
@@ -24,3 +24,5 @@ Integral of modified surface elevation over the originally dry region in both sp
 
 [1] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in shallow
     water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
+
+[1]: http://www.imperial.ac.uk/people/m.clare17 "Mariana Clare"

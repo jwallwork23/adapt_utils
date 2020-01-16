@@ -8,6 +8,8 @@ adaptation is achieved using [PRAgMaTIc][4]. A continuous adjoint solver is prov
 solutions for more general problems. This is research of the Applied Modelling and Computation Group
 ([AMCG][6]) at Imperial College London.
 
+[My personal webpage][7]
+
 ### Versions
 
 * `v1.0`: 'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3358565.svg)](https://doi.org/10.5281/zenodo.3358565)
@@ -30,3 +32,4 @@ solutions for more general problems. This is research of the Applied Modelling a
 [4]: https://github.com/meshadaptation/pragmatic "PRAgMaTIc"
 [5]: https://bitbucket.org/dolfin-adjoint/pyadjoint/src "Pyadjoint"
 [6]: http://www.imperial.ac.uk/earth-science/research/research-groups/amcg/ "AMCG"
+[7]: http://www.imperial.ac.uk/people/j.wallwork16 "My personal webpage."
