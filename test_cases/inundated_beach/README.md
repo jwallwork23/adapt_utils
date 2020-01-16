@@ -1,6 +1,6 @@
 ### Inundated beach test case
 
-"1D uniformly sloping basin" test case as described on p.92 of [1].
+"1D uniformly sloping basin" test case as described on p.92 of [Balzano].
 
 Many thanks to [Mariana Clare][1] for coding the original fixed mesh version of this test case in
 Firedrake.
@@ -23,7 +23,7 @@ Sinusoidal variation of elevation at the open boundary, with amplitude 0.5m and 
 ### Quantity of interest:
 Integral of modified surface elevation over the originally dry region in both space and time.
 
-[1] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in shallow
-    water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
+[Balzano] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in
+shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
 
 [1]: http://www.imperial.ac.uk/people/m.clare17 "Mariana Clare"

@@ -8,8 +8,6 @@ adaptation is achieved using [PRAgMaTIc][4]. A continuous adjoint solver is prov
 solutions for more general problems. This is research of the Applied Modelling and Computation Group
 ([AMCG][6]) at Imperial College London.
 
-[My personal webpage][7]
-
 ### Versions
 
 * `v1.0`: 'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3358565.svg)](https://doi.org/10.5281/zenodo.3358565)
@@ -25,6 +23,8 @@ solutions for more general problems. This is research of the Applied Modelling a
 	* Download Firedrake using [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3568997.svg)](https://doi.org/10.5281/zenodo.3568997), with the flags `--install thetis --install pyadjoint --honour-petsc-dir`.
 
 #### For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
+
+[My personal webpage][7]
 
 [1]: http://firedrakeproject.org/ "Firedrake"
 [2]: http://thetisproject.org/index.html "Thetis"

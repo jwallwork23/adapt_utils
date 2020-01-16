@@ -1,8 +1,8 @@
 ## "Point Discharge with Diffusion 3D"
 
 Extension of "Point Discharge with Diffusion" test case (as described in TELEMAC-2D validation
-document version 7.0 [1]) to the 3D case. Again, the source is offset by one unit away from the
-boundary. 3D extension as described in [2].
+document version 7.0 [Riadh et al.]) to the 3D case. Again, the source is offset by one unit away
+from the boundary. 3D extension as described in [Wallwork et al.].
 
 
 ### Parameters:
@@ -25,8 +25,8 @@ Integral of tracer concentration over region of interest, given by a sphere of r
   * Offset case: (20.0, 7.5, 7.5)
 
 
-[1] A. Riadh, G. Cedric, M. Jean, "TELEMAC modeling system: 2D hydrodynamics TELEMAC-2D software
-    release 7.0 user manual." Paris:  R&D, Electricite de France, p. 134 (2014).
+[Riadh et al.] A. Riadh, G. Cedric, M. Jean, "TELEMAC modeling system: 2D hydrodynamics TELEMAC-2D
+software release 7.0 user manual." Paris:  R&D, Electricite de France, p. 134 (2014).
 
-[2] J.G. Wallwork, N. Barral, D.A. Ham, M.D. Piggott, "Anisotropic goal-oriented mesh adaptation in
-    Firedrake". In: 28th Intl Meshing Roundtable (2019). (to appear)
+[Wallwork et al.] J.G. Wallwork, N. Barral, D.A. Ham, M.D. Piggott, "Anisotropic goal-oriented mesh
+adaptation in Firedrake". In: 28th Intl Meshing Roundtable (2019). (to appear)

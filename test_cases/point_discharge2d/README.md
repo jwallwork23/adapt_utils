@@ -1,6 +1,6 @@
 ### "Point Discharge with Diffusion"
 
-Test case as described in TELEMAC-2D validation document version 7.0 [1].
+Test case as described in TELEMAC-2D validation document version 7.0 [Riadh et al.].
 
 
 ### Parameters:
@@ -23,5 +23,5 @@ Integral of tracer concentration over region of interest, given by a circle of r
   * Offset case: (20.0, 7.5)
 
 
-[1] A. Riadh, G. Cedric, M. Jean, "TELEMAC modeling system: 2D hydrodynamics TELEMAC-2D software
-    release 7.0 user manual." Paris:  R&D, Electricite de France, p. 134 (2014).
+[Riadh et al.] A. Riadh, G. Cedric, M. Jean, "TELEMAC modeling system: 2D hydrodynamics TELEMAC-2D
+software release 7.0 user manual." Paris:  R&D, Electricite de France, p. 134 (2014).

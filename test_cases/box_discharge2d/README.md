@@ -1,6 +1,6 @@
 ### Box Discharge with Diffusion
 
-Test case as described in [1].
+Test case as described in [Power et al.].
 
 
 ### Parameters:
@@ -23,5 +23,5 @@ Integral of tracer concentration over region of interest, given by a box of radi
   * Offset case: (3.0, 2.5)
 
 
-[1] P.W. Power et al. "Adjoint a posteriori error measures for anisotropic mesh optimisation."
-    Computers & Mathematics with Applications 52.8-9 (2006): 1213-1242.
+[Power et al.] P.W. Power et al. "Adjoint a posteriori error measures for anisotropic mesh
+optimisation", Computers & Mathematics with Applications 52.8-9 (2006): 1213-1242.
