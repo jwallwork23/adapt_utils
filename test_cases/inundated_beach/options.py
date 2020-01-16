@@ -31,6 +31,7 @@ class BalzanoOptions(ShallowWaterOptions):
             raise ValueError("Mesh does not exist or cannot be found. Please build it.")
         self.default_mesh = Mesh('strip.msh')
         self.basin_x = 13800.0  # Length of wet region
+        self.num_hours = 24
 
         # Physical
         self.base_viscosity = 1e-6
@@ -49,13 +50,13 @@ class BalzanoOptions(ShallowWaterOptions):
         self.stabilisation = 'no'
 
         # Boundary conditions
-        h_amp = 0.5    # Ocean boundary forcing amplitude
-        h_T = 12*3600  # Ocean boundary forcing period
+        h_amp = 0.5  # Ocean boundary forcing amplitude
+        h_T = self.num_hours/2*3600  # Ocean boundary forcing period
         self.elev_func = lambda t: h_amp*(-cos(2*pi*(t-(6*3600))/h_T)+1)
 
         # Time integration
         self.dt = 600.0
-        self.end_time = 24*3600.0
+        self.end_time = self.num_hours*3600.0
         self.dt_per_export = 6
         self.dt_per_remesh = 20
         self.timestepper = 'CrankNicolson'
@@ -74,9 +75,10 @@ class BalzanoOptions(ShallowWaterOptions):
 
         # Timeseries
         self.wd_obs = []
-        self.trange = []
+        self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
         tol = 1e-8  # FIXME: Point evaluation hack
         self.xrange = np.linspace(tol, 1.5*self.basin_x-tol, 20)
+        self.qois = []
 
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
@@ -150,39 +152,62 @@ class BalzanoOptions(ShallowWaterOptions):
                     self.depth.project(eta + bathymetry_displacement(eta) + self.bathymetry)
                 self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
 
-            # Store modified bathymetry timeseries
-            if self.plot_timeseries:
-                P1DG = solver_obj.function_spaces.P1DG_2d
-                wd = project(heavyside_approx(-eta-self.bathymetry, self.wetting_and_drying_alpha), P1DG)
-                self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
-                self.trange.append(t)
-
         return update_forcings
 
     def get_export_func(self, solver_obj):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-        eta = solver_obj.fields.elev_2d
+        solution = solver_obj.fields.solution_2d
+        eta = solution.split()[1]
         def export_func():
             self.moving_bath.project(self.bathymetry + bathymetry_displacement(eta))
             self.wd_bath_file.write(self.moving_bath)
             self.eta_tilde.project(eta + bathymetry_displacement(eta))
             self.eta_tilde_file.write(self.eta_tilde)
+
+            if self.plot_timeseries:
+
+                # Store modified bathymetry timeseries
+                P1DG = solver_obj.function_spaces.P1DG_2d
+                wd = project(heavyside_approx(-eta-self.bathymetry, self.wetting_and_drying_alpha), P1DG)
+                self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
+
+                # Store QoI timeseries
+                self.set_qoi_kernel(solver_obj)
+                # self.qois.append(assemble(inner(self.kernel, solution)*dx(degree=12)))
+                k_eta = self.kernel.split()[1]
+                self.qois.append(assemble(k_eta*dx(degree=12)))  # FIXME: What's the kernel?
         return export_func
 
     # TODO: Choose appropriately
     # TODO: Make time-dependent
-    # TODO: Plot timeseries
+    # TODO: THIS IS NOT REALLY A KERNEL
     def set_qoi_kernel(self, solver_obj):
+        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
         self.kernel = Function(solver_obj.function_spaces.V_2d)
         k_eta = self.kernel.split()[1]
         eta = solver_obj.fields.elev_2d
-        # dry = conditional(ge(self.bathymetry, 0), 0, 1)
-        # k_eta.interpolate(dry*(eta-self.bathymetry)/eta)
-        k_eta.interpolate((eta-self.bathymetry)/eta)
+        dry = conditional(ge(self.bathymetry, 0), 0, 1)
+        eta_init = self.initial_value.split()[1]
+        eta_tilde_init = eta_init + bathymetry_displacement(eta_init)
+        k_eta.interpolate(dry*(self.eta_tilde - eta_tilde_init))
         return self.kernel
 
-    def get_timeseries_plot(self):
-        # TODO: doc
+    def evaluate_qoi(self):  # TODO: Do time-dep QoI properly
+        f = self.qois
+        N = len(f)
+        assert N > 0
+        h = self.dt*self.dt_per_export
+        qoi = 0.5*h*(f[0] + f[N-1])
+        for i in range(1, N-1):
+            qoi += h*f[i]
+        return qoi
+
+    def plot(self):
+        self.plot_heavyside()
+        self.plot_qoi()
+
+    def plot_heavyside(self):
+        """Timeseries plot of approximate Heavyside function."""
         scaling = 0.7
         plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
         plt.gcf().subplots_adjust(bottom=0.15)
@@ -199,4 +224,17 @@ class BalzanoOptions(ShallowWaterOptions):
         plt.ylim(min(X[0]), max(X[0]))
         plt.xlabel("Time [$\mathrm h$]")
         plt.ylabel("$x$ [$\mathrm m$]")
-        plt.savefig(os.path.join(self.di, "timeseries.pdf"))
+        plt.savefig(os.path.join(self.di, "heavyside_timeseries.pdf"))
+
+    def plot_qoi(self):
+        """Timeseries plot of instantaneous QoI."""
+        plt.figure(2)
+        T = self.trange/3600
+        qois = [q/1.0e9 for q in self.qois]
+        qoi = self.evaluate_qoi()/1.0e9
+        plt.plot(T, qois, linestyle='dashed', color='b', marker='x')
+        plt.fill_between(T, np.zeros_like(qois), qois)
+        plt.xlabel("Time [$\mathrm h$]")
+        plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
+        plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
+        plt.savefig(os.path.join(self.di, "qoi_timeseries.pdf"))
