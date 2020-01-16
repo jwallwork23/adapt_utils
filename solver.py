@@ -747,8 +747,8 @@ class UnsteadyProblem(SteadyProblem):
         * solve adjoint PDE;
         * adapt mesh based on some error estimator of choice.
     """
-    def __init__(self, op, mesh, finite_element, discrete_adjoint=False, levels=1):
-        super(UnsteadyProblem, self).__init__(op, mesh, finite_element, discrete_adjoint, None, levels)
+    def __init__(self, op, mesh, finite_element, discrete_adjoint=False, prev_solution=None, levels=1):
+        super(UnsteadyProblem, self).__init__(op, mesh, finite_element, discrete_adjoint, prev_solution, levels)
         self.set_start_condition()
         self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
         self.estimators = {}
@@ -764,7 +764,7 @@ class UnsteadyProblem(SteadyProblem):
     def set_start_condition(self, adjoint=False):
         self.set_solution(self.op.set_final_condition(self.V), adjoint)
 
-    def solve_step(self, adjoint=False, **kwargs):
+    def solve_step(self, adjoint=False):
         """
         Solve forward PDE on a particular mesh.
         """

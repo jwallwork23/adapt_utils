@@ -72,8 +72,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.simulation_export_time = op.dt
         options.simulation_end_time = op.end_time
         options.timestepper_type = op.timestepper
-        options.timestepper_options.solver_parameters = op.params
+        if op.params != {}:
+            options.timestepper_options.solver_parameters = op.params
         if op.debug:
+            options.timestepper_options.solver_parameters['snes_monitor'] = None
             PETSc.Sys.Print(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
 
@@ -88,6 +90,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.polynomial_degree = op.degree
         options.horizontal_viscosity = self.viscosity
         options.horizontal_diffusivity = self.diffusivity
+        options.coriolis_frequency = self.coriolis
         options.quadratic_drag_coefficient = self.drag_coefficient
         options.manning_drag_coefficient = self.manning_coefficient
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
@@ -415,51 +418,40 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
     """
     General solver object for time-dependent shallow water problems.
     """
-    def __init__(self, op, mesh=None, discrete_adjoint=True, load_index=0):
-        if op.family == 'dg-dg' and op.degree in (1, 2):
-            element = VectorElement("DG", triangle, 1)*FiniteElement("DG", triangle, op.degree)
-        elif op.family == 'dg-cg':
-            element = VectorElement("DG", triangle, 1)*FiniteElement("Lagrange", triangle, 2)
+    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=1, load_index=0):
+        p = op.degree
+        if op.family == 'dg-dg' and p >= 0:
+            fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p)
+        elif op.family == 'dg-cg' and p >= 0:
+            fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1)
         else:
             raise NotImplementedError
-        mesh = mesh or op.default_mesh  # TODO: redundant
         self.load_index = load_index
-        super(UnsteadyShallowWaterProblem, self).__init__(mesh, op, element, discrete_adjoint)
-
-        # Stabilisation
-        try:
-            assert self.stabilisation in ('no', 'lax_friedrichs')
-        except AssertionError:
-            raise NotImplementedError
-
-        # Classification
-        self.nonlinear = True
-
-        # Set ICs
-        self.solution = Function(self.V)
-        self.solution.assign(op.set_initial_condition(self.V))
-        if op.plot_pvd:
-            u, eta = self.solution.split()
-            File(os.path.join(op.di, 'init.pvd')).write(u, eta)
+        super(UnsteadyShallowWaterProblem, self).__init__(mesh, op, fe, discrete_adjoint, prev_solution, levels)
+        if prev_solution is not None:
+            self.interpolate_solution(prev_solution)
 
         # Physical fields
         self.set_fields()
         physical_constants['g_grav'].assign(op.g)
 
         # Parameters for adjoint computation
-        self.gradient_field = self.op.bathymetry
         z, zeta = self.adjoint_solution.split()
         z.rename("Adjoint fluid velocity")
         zeta.rename("Adjoint elevation")
 
+        # Classification
+        self.nonlinear = True
+
     def set_fields(self):
         self.viscosity = self.op.set_viscosity(self.P1)
+        self.diffusivity = self.op.set_diffusivity(self.P1)
         self.bathymetry = self.op.set_bathymetry(self.P1)
         self.inflow = self.op.set_inflow(self.P1_vec)
         self.coriolis = self.op.set_coriolis(self.P1)
         self.drag_coefficient = self.op.set_drag_coefficient(self.P1)
         self.manning_coefficient = self.op.set_manning_coefficient(self.P1)
-        self.op.set_boundary_surface(self.V.sub(1))  # TODO
+        self.op.set_boundary_surface()
 
         # Stabilisation
         self.stabilisation = self.stabilisation or 'no'
@@ -468,10 +460,18 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             raise ValueError("Stabilisation method {:s} for {:s} not recognised".format(self.stabilisation, self.__class__.__name__))
 
-    def solve_step(self, **kwargs):
-        self.set_fields()
+        # Set initial conditions
+        self.solution.interpolate(op.set_initial_condition(self.V))
+
+    def solve_step(self):
+        self.setup_solver()
+        self.solver_obj.iterate(update_forcings=self.op.get_update_forcings(),
+                                export_func=self.op.get_export_func())
+        self.solution = self.solver_obj.fields.solution_2d
+
+    def setup_solver(self):
         op = self.op
-        self.solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.bathymetry)
         options = self.solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
@@ -497,10 +497,12 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
         options.horizontal_viscosity = self.viscosity
+        options.horizontal_diffusivity = self.diffusivity
         options.quadratic_drag_coefficient = self.drag_coefficient
+        options.manning_coefficient = self.manning_coefficient
         options.coriolis_frequency = self.coriolis
-        options.use_lax_friedrichs_velocity = op.stabilisation
-        options.lax_friedrichs_velocity_scaling_factor = op.stabilisation_parameter
+        options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
+        options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = True
         options.use_wetting_and_drying = op.wetting_and_drying
@@ -511,8 +513,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
-        update_forcings = op.get_update_forcings()
-        export_func = op.get_export_func()
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
@@ -521,22 +521,20 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if self.load_index > 0:
             self.solver_obj.load_state(self.load_index)
 
-            # TODO: Adaptive case. Will need to save mesh.
+            raise NotImplementedError  # TODO: Adaptive case. Will need to save mesh.
+        elif self.prev_solution is not None:
+            u_interp, eta_interp = self.interpolated_solution.split()
         else:
-            uv, elev = self.solution.split()
-            self.solver_obj.assign_initial_conditions(uv=uv, elev=elev)
+            u_interp, eta_interp = self.solution.split()
+        self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
 
-            # Ensure correct iteration count
-            self.solver_obj.i_export = self.remesh_step
-            self.solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
-            self.solver_obj.iteration = self.remesh_step*op.dt_per_remesh
-            self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
-            for e in self.solver_obj.exporters.values():
-                e.set_next_export_ix(self.solver_obj.i_export)
-
-        # Solve
-        self.solver_obj.iterate(update_forcings=update_forcings, export_func=export_func)
-        self.solution.assign(self.solver_obj.fields.solution_2d)
+        # Ensure correct iteration count
+        self.solver_obj.i_export = self.remesh_step
+        self.solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
+        self.solver_obj.iteration = self.remesh_step*op.dt_per_remesh
+        self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
+        for e in self.solver_obj.exporters.values():
+            e.set_next_export_ix(self.solver_obj.i_export)
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
         field = self.op.adapt_field

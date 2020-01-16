@@ -11,19 +11,22 @@ __all__ = ["Steady2TurbineOptions", "Steady2TurbineOffsetOptions"]
 class Steady2TurbineOptions(SteadyTurbineOptions):
     """Parameters for the steady 2 turbine problem"""
 
-    # Turbine parameters
-    turbine_diameter = PositiveFloat(18.).tag(config=True)
-    thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
     mesh_path = Unicode('xcoarse.msh').tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):
         super(Steady2TurbineOptions, self).__init__(approach)
-        # self.base_viscosity = 1.3e-3
-        self.base_viscosity = 1.0
+
+        # Domain
         self.domain_length = 1000.0
         self.domain_width = 300.0
         if os.path.exists(self.mesh_path):
             self.default_mesh = Mesh(self.mesh_path)
+
+        # Physical
+        # self.base_viscosity = 1.3e-3
+        self.base_viscosity = 1.0
+
+        # Model
         self.family = 'dg-cg'
 
         # Tidal farm
@@ -32,6 +35,10 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         W = self.domain_width
         self.region_of_interest = [(L/2-8*D, W/2, D/2), (L/2+8*D, W/2, D/2)]
         self.thrust_coefficient_correction()
+
+    def set_bathymetry(self, fs):
+        self.bathymetry = Constant(40.0)
+        return self.bathymetry
 
     def set_viscosity(self, fs):
         sponge = False

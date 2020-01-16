@@ -18,13 +18,18 @@ class ShallowWaterOptions(Options):
     base_viscosity = NonNegativeFloat(0.0).tag(config=True)
     base_diffusivity = NonNegativeFloat(0.0).tag(config=True)
     viscosity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
+    diffusivity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
     drag_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    manning_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
+    coriolis = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
 
     # Model
     grad_div_viscosity = Bool(False).tag(config=True)
     grad_depth_viscosity = Bool(False).tag(config=True)
     family = Enum(['dg-dg', 'rt-dg', 'dg-cg'], default_value='dg-dg').tag(config=True)
+    wetting_and_drying = Bool(False).tag(config=True)
+    wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
 
     # Adaptation
     adapt_field = Unicode('speed_avg_elevation', help="Adaptation field of interest.").tag(config=True)
@@ -54,18 +59,15 @@ class ShallowWaterOptions(Options):
 
     def set_coriolis(self, fs):
         """Should be implemented in derived class."""
-        self.coriolis = Constant(0.0)
-        return self.coriolis
+        pass
 
     def set_drag_coefficient(self, fs):
         """Should be implemented in derived class."""
-        self.drag_coefficient = Constant(0.0)
-        return self.drag_coefficient
+        pass
 
     def set_manning_coefficient(self, fs):
         """Should be implemented in derived class."""
-        self.manning_coefficient = Constant(0.0)
-        return self.manning_coefficient
+        pass
 
     def get_initial_depth(self, fs):
         if not hasattr(self, 'bathymetry'):
