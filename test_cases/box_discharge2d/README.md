@@ -22,6 +22,7 @@ Integral of tracer concentration over region of interest, given by a box of radi
   * Centred case: (3.0, 2.0)
   * Offset case: (3.0, 2.5)
 
+### References
 
 [Power et al.] P.W. Power et al. "Adjoint a posteriori error measures for anisotropic mesh
 optimisation", Computers & Mathematics with Applications 52.8-9 (2006): 1213-1242.

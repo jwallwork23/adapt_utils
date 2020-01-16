@@ -23,6 +23,8 @@ Sinusoidal variation of elevation at the open boundary, with amplitude 0.5m and 
 ### Quantity of interest:
 Integral of modified surface elevation over the originally dry region in both space and time.
 
+### References
+
 [Balzano] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in
 shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
 

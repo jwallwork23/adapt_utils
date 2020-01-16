@@ -27,6 +27,7 @@ A fixed mesh version of this test case was coded in Firedrake as [demo][1].
 * Adjoint based error esimators not particularly useful.
 * Metric advection could be very useful
 
+### References
 
 [LeVeque] R. LeVeque, "High-resolution conservative algorithms for advection in incompressible flow"
 (1996)

@@ -15,6 +15,8 @@ Firedrake.
 Power output (integral over turbine footprints and time period of cubed fluid speed, scaled by
 turbine drag coefficient and divided by water depth).
 
+### References
+
 [Divett et al.] T. Divett, R. Vennell, and C. Stevens. "Optimization of multiple turbine arrays in a
 channel with tidally reversing flow by numerical modelling with adaptive mesh." Philosophical
 Transactions of the Royal Society A: Mathematical, Physical and Engineering Sciences 371.1985

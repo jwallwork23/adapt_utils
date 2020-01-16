@@ -22,6 +22,7 @@ Integral of tracer concentration over region of interest, given by a circle of r
   * Centred case: (20.0, 5.0)
   * Offset case: (20.0, 7.5)
 
+### References
 
 [Riadh et al.] A. Riadh, G. Cedric, M. Jean, "TELEMAC modeling system: 2D hydrodynamics TELEMAC-2D
 software release 7.0 user manual." Paris:  R&D, Electricite de France, p. 134 (2014).

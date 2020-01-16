@@ -34,6 +34,8 @@
 * Illustrates a situation where adjoint based error estimators are not useful.
 * Flow is constrained to a band... suitable candidate for mesh optimisation?
 
+### References
+
 [Huang et al.] H. Huang, C. Chen, G.W. Cowles, C.D. Winant, R.C. Beardsley, K.S. Hedstrom and
 D.B. Haidvogel, "FVCOM validation experiments: Comparisons with ROMS for three idealized barotropic
 test problems", Journal of Geophysical Research: Oceans, 113(C7). (2008), pp. 3-6.

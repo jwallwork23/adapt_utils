@@ -28,6 +28,8 @@ Power output (integral over turbine footprints of cubed fluid speed, scaled by t
 drag coefficient and divided by water depth).
 
 
+### References
+
 [Wallwork et al.] J.G. Wallwork, N. Barral, S.C. Kramer, D.A. Ham, M.D. Piggott, "Goal-oriented error
 estimation and mesh adaptation for shallow water modelling" (2019). (submitted to Springer Applied
 Natural Sciences)
