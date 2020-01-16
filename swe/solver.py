@@ -47,8 +47,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.bathymetry = self.op.set_bathymetry(self.P1)
         self.inflow = self.op.set_inflow(self.P1_vec)
         self.coriolis = self.op.set_coriolis(self.P1)
-        self.drag_coefficient = self.op.set_drag_coefficient(self.P1)
-        self.manning_coefficient = self.op.set_manning_coefficient(self.P1)
+        self.quadratic_drag_coefficient = self.op.set_quadratic_drag_coefficient(self.P1)
+        self.manning_drag_coefficient = self.op.set_manning_drag_coefficient(self.P1)
 
         # Stabilisation
         self.stabilisation = self.stabilisation or 'no'
@@ -91,8 +91,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.horizontal_viscosity = self.viscosity
         options.horizontal_diffusivity = self.diffusivity
         options.coriolis_frequency = self.coriolis
-        options.quadratic_drag_coefficient = self.drag_coefficient
-        options.manning_drag_coefficient = self.manning_coefficient
+        options.quadratic_drag_coefficient = self.quadratic_drag_coefficient
+        options.manning_drag_coefficient = self.manning_drag_coefficient
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
@@ -171,7 +171,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         b = tpe.bathymetry
         nu = tpe.viscosity
         f = None if not hasattr(tpe, 'coriolis') else tpe.coriolis
-        C_d = None if not hasattr(tpe, 'drag_coefficient') else tpe.drag_coefficient
+        C_d = None if not hasattr(tpe, 'quadratic_drag_coefficient') else tpe.quadratic_drag_coefficient
         H = b + eta
 
         dwr = -self.op.g*inner(z, grad(eta))                   # ExternalPressureGradient
@@ -449,8 +449,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.bathymetry = self.op.set_bathymetry(self.P1)
         self.inflow = self.op.set_inflow(self.P1_vec)
         self.coriolis = self.op.set_coriolis(self.P1)
-        self.drag_coefficient = self.op.set_drag_coefficient(self.P1)
-        self.manning_coefficient = self.op.set_manning_coefficient(self.P1)
+        self.quadratic_drag_coefficient = self.op.set_quadratic_drag_coefficient(self.P1)
+        self.manning_drag_coefficient = self.op.set_manning_drag_coefficient(self.P1)
         self.op.set_boundary_surface()
 
         # Stabilisation
@@ -499,8 +499,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.element_family = op.family
         options.horizontal_viscosity = self.viscosity
         options.horizontal_diffusivity = self.diffusivity
-        options.quadratic_drag_coefficient = self.drag_coefficient
-        options.manning_drag_coefficient = self.manning_coefficient
+        options.quadratic_drag_coefficient = self.quadratic_drag_coefficient
+        options.manning_drag_coefficient = self.manning_drag_coefficient
         options.coriolis_frequency = self.coriolis
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter

@@ -65,10 +65,10 @@ class BalzanoOptions(ShallowWaterOptions):
         self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
         self.eta_tilde = Function(P1DG, name='Modified elevation')
 
-    def set_drag_coefficient(self, fs):
+    def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
-            self.drag_coefficient = interpolate(self.get_cfactor(), fs)
-        return self.drag_coefficient
+            self.quadratic_drag_coefficient = interpolate(self.get_cfactor(), fs)
+        return self.quadratic_drag_coefficient
 
     def get_cfactor(self):
         try:
@@ -80,10 +80,10 @@ class BalzanoOptions(ShallowWaterOptions):
         aux = max_value(11.036*hc/ksp, 1.001)
         return 2*(0.4**2)/(ln(aux)**2)
 
-    def set_manning_coefficient(self, fs):
+    def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
-            self.manning_coefficient = Constant(self.friction_coeff or 0.02)
-        return self.manning_coefficient
+            self.manning_drag_coefficient = Constant(self.friction_coeff or 0.02)
+        return self.manning_drag_coefficient
 
     def set_bathymetry(self, fs):
         max_depth = 5.0
@@ -132,7 +132,7 @@ class BalzanoOptions(ShallowWaterOptions):
             if self.friction == 'nikuradse':
                 if self.wetting_and_drying:
                     self.depth.project(eta + bathymetry_displacement(eta) + self.bathymetry)
-                self.drag_coefficient.interpolate(self.get_cfactor())
+                self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
 
         return update_forcings
 

@@ -19,8 +19,8 @@ class ShallowWaterOptions(Options):
     base_diffusivity = NonNegativeFloat(0.0).tag(config=True)
     viscosity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
     diffusivity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
-    drag_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
-    manning_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    quadratic_drag_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    manning_drag_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     inflow = FiredrakeVectorExpression(None, allow_none=True).tag(config=True)
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
     coriolis = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
@@ -63,11 +63,11 @@ class ShallowWaterOptions(Options):
         """Should be implemented in derived class."""
         pass
 
-    def set_drag_coefficient(self, fs):
+    def set_quadratic_drag_coefficient(self, fs):
         """Should be implemented in derived class."""
         pass
 
-    def set_manning_coefficient(self, fs):
+    def set_manning_drag_coefficient(self, fs):
         """Should be implemented in derived class."""
         pass
 

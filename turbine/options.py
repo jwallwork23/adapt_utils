@@ -73,9 +73,9 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.bathymetry = Constant(40.0)
         return self.bathymetry
 
-    def set_drag_coefficient(self, fs):
-        self.drag_coefficient = Constant(0.0025)
-        return self.drag_coefficient
+    def set_quadratic_drag_coefficient(self, fs):
+        self.quadratic_drag_coefficient = Constant(0.0025)
+        return self.quadratic_drag_coefficient
 
     def thrust_coefficient_correction(self):
         """
