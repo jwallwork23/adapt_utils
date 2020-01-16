@@ -2,8 +2,13 @@ from thetis import *
 from thetis.configuration import *
 
 from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.misc.misc import heavyside_approx
 
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import rc
+
+rc('text', usetex=True)
 
 
 __all__ = ["BalzanoOptions"]
@@ -14,9 +19,10 @@ class BalzanoOptions(ShallowWaterOptions):
     Parameters for test case in [...].
     """ # TODO: cite
 
-    def __init__(self, approach='fixed_mesh', friction='manning'):
+    def __init__(self, approach='fixed_mesh', friction='manning', plot_timeseries=False):
         super(BalzanoOptions, self).__init__(approach)
         self.plot_pvd = True
+        self.plot_timeseries = plot_timeseries
 
         # Initial mesh
         try:
@@ -24,6 +30,7 @@ class BalzanoOptions(ShallowWaterOptions):
         except AssertionError:
             raise ValueError("Mesh does not exist or cannot be found. Please build it.")
         self.default_mesh = Mesh('strip.msh')
+        self.basin_x = 13800.0  # Length of wet region
 
         # Physical
         self.base_viscosity = 1e-6
@@ -65,6 +72,12 @@ class BalzanoOptions(ShallowWaterOptions):
         self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
         self.eta_tilde = Function(P1DG, name='Modified elevation')
 
+        # Timeseries
+        self.wd_obs = []
+        self.trange = []
+        tol = 1e-8  # FIXME: Point evaluation hack
+        self.xrange = np.linspace(tol, 1.5*self.basin_x-tol, 20)
+
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
             self.quadratic_drag_coefficient = interpolate(self.get_cfactor(), fs)
@@ -87,10 +100,9 @@ class BalzanoOptions(ShallowWaterOptions):
 
     def set_bathymetry(self, fs):
         max_depth = 5.0
-        basin_x = 13800.0
         x, y = SpatialCoordinate(fs.mesh())
         self.bathymetry = Function(fs, name="Bathymetry")
-        self.bathymetry.interpolate((1.0 - x/basin_x)*max_depth)
+        self.bathymetry.interpolate((1.0 - x/self.basin_x)*max_depth)
         return self.bathymetry
 
     def set_viscosity(self, fs):
@@ -138,6 +150,13 @@ class BalzanoOptions(ShallowWaterOptions):
                     self.depth.project(eta + bathymetry_displacement(eta) + self.bathymetry)
                 self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
 
+            # Store modified bathymetry timeseries
+            if self.plot_timeseries:
+                P1DG = solver_obj.function_spaces.P1DG_2d
+                wd = project(heavyside_approx(-eta-self.bathymetry, self.wetting_and_drying_alpha), P1DG)
+                self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
+                self.trange.append(t)
+
         return update_forcings
 
     def get_export_func(self, solver_obj):
@@ -150,12 +169,34 @@ class BalzanoOptions(ShallowWaterOptions):
             self.eta_tilde_file.write(self.eta_tilde)
         return export_func
 
-    def set_qoi_kernel(self, solver_obj):  # TODO: Could play around with this a bit
+    # TODO: Choose appropriately
+    # TODO: Make time-dependent
+    # TODO: Plot timeseries
+    def set_qoi_kernel(self, solver_obj):
         self.kernel = Function(solver_obj.function_spaces.V_2d)
         k_eta = self.kernel.split()[1]
-        dry = conditional(ge(self.bathymetry, 0), 0, 1)
-        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
         eta = solver_obj.fields.elev_2d
-        self.eta_tilde.project(eta + bathymetry_displacement(eta))
-        k_eta.interpolate(dry*(self.eta_tilde-self.bathymetry)/eta)
+        # dry = conditional(ge(self.bathymetry, 0), 0, 1)
+        # k_eta.interpolate(dry*(eta-self.bathymetry)/eta)
+        k_eta.interpolate((eta-self.bathymetry)/eta)
         return self.kernel
+
+    def get_timeseries_plot(self):
+        # TODO: doc
+        scaling = 0.7
+        plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
+        plt.gcf().subplots_adjust(bottom=0.15)
+        T = [[t/3600]*20 for t in self.trange]
+        X = [self.xrange for t in T]
+
+        cset1 = plt.contourf(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
+        plt.clim(0.0, 1.2)
+        cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
+        plt.clim(0.0, 1.2)
+        cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels = [0.5])
+        cb = plt.colorbar(cset1, ticks=np.linspace(0, 1, 6))
+        cb.set_label("$\mathcal H(\eta-b)$")
+        plt.ylim(min(X[0]), max(X[0]))
+        plt.xlabel("Time [$\mathrm h$]")
+        plt.ylabel("$x$ [$\mathrm m$]")
+        plt.savefig(os.path.join(self.di, "timeseries.pdf"))
