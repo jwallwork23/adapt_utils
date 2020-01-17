@@ -1,7 +1,16 @@
 all: clean mesh
 
 mesh:
-	gmsh -2 strip.geo
+	@echo "Generating mesh for inundated beach..."
+	@gmsh -2 strip.geo
+	@echo "Done!"
+
+fixed_mesh:
+	@echo "Solving inundated beach problem on a fixed mesh..."
+	@python3 run_fixed_mesh.py
+	@echo "Done!"
 
 clean:
-	rm -Rf *.msh
+	@echo "Cleaning directory..."
+	@rm -Rf *.msh
+	@echo "Done!"
