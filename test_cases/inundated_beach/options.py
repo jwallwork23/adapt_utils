@@ -175,7 +175,7 @@ class BalzanoOptions(ShallowWaterOptions):
                 self.set_qoi_kernel(solver_obj)
                 # self.qois.append(assemble(inner(self.kernel, solution)*dx(degree=12)))
                 k_eta = self.kernel.split()[1]
-                self.qois.append(assemble(k_eta*dx(degree=12)))  # FIXME: What's the kernel?
+                self.qois.append(assemble(k_eta*dx(degree=12)))  # FIXME: Not really a kernel
         return export_func
 
     # TODO: Choose appropriately
@@ -187,9 +187,10 @@ class BalzanoOptions(ShallowWaterOptions):
         k_eta = self.kernel.split()[1]
         eta = solver_obj.fields.elev_2d
         dry = conditional(ge(self.bathymetry, 0), 0, 1)
+        f = heavyside_approx(eta + self.bathymetry, self.wetting_and_drying_alpha)
         eta_init = self.initial_value.split()[1]
-        eta_tilde_init = eta_init + bathymetry_displacement(eta_init)
-        k_eta.interpolate(dry*(self.eta_tilde - eta_tilde_init))
+        f_init = heavyside_approx(eta_init + self.bathymetry, self.wetting_and_drying_alpha)
+        k_eta.interpolate(dry*(eta + f - f_init))
         return self.kernel
 
     def evaluate_qoi(self):  # TODO: Do time-dep QoI properly
