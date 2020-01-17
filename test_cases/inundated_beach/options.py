@@ -66,6 +66,9 @@ class BalzanoOptions(ShallowWaterOptions):
         self.h_min = 1e-8
         self.h_max = 10.
 
+        # Goal-Oriented
+        self.qoi_mode = 'inundation_volume'
+
         # Outputs
         self.wd_bath_file = File(os.path.join(self.di, 'moving_bath.pvd'))
         P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
@@ -172,40 +175,54 @@ class BalzanoOptions(ShallowWaterOptions):
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
                 # Store QoI timeseries
-                self.set_qoi_kernel(solver_obj)
+                self.evaluate_qoi_form(solver_obj)
+                # self.set_qoi_kernel(solver_obj)
                 # self.qois.append(assemble(inner(self.kernel, solution)*dx(degree=12)))
-                k_eta = self.kernel.split()[1]
-                self.qois.append(assemble(k_eta*dx(degree=12)))  # FIXME: Not really a kernel
+                self.qois.append(assemble(self.qoi_form))
         return export_func
 
-    # TODO: Choose appropriately
-    # TODO: Make time-dependent
-    # TODO: THIS IS NOT REALLY A KERNEL
     def set_qoi_kernel(self, solver_obj):
+        J = self.evaluate_qoi_form(solver_obj)
+        eta = solver_obj.fields.solution_2d.split()[1]
+        dJdeta = derivative(J, eta, TestFunction(eta.function_space()))  # TODO: test
+
+    def evaluate_qoi_form(self, solver_obj):
+        try:
+            assert self.qoi_mode in ('inundation_volume', 'maximum_inundation', 'overtopping_volume')
+        except AssertionError:
+            raise ValueError("QoI mode '{:s}' not recognised.".format(self.qoi_mode))
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-        self.kernel = Function(solver_obj.function_spaces.V_2d)
-        k_eta = self.kernel.split()[1]
         eta = solver_obj.fields.elev_2d
         dry = conditional(ge(self.bathymetry, 0), 0, 1)
-        f = heavyside_approx(eta + self.bathymetry, self.wetting_and_drying_alpha)
-        eta_init = self.initial_value.split()[1]
-        f_init = heavyside_approx(eta_init + self.bathymetry, self.wetting_and_drying_alpha)
-        k_eta.interpolate(dry*(eta + f - f_init))
-        return self.kernel
+        if 'inundation' in self.qoi_mode:
+            f = heavyside_approx(eta + self.bathymetry, self.wetting_and_drying_alpha)
+            eta_init = self.initial_value.split()[1]
+            f_init = heavyside_approx(eta_init + self.bathymetry, self.wetting_and_drying_alpha)
+            self.qoi_form = dry*(eta + f - f_init)*dx(degree=12)
+        elif self.qoi_mode == 'overtopping_volume':
+            raise NotImplementedError  # TODO: Flux over coast. (Needs an internal boundary.)
+        else:
+            raise NotImplementedError  # TODO: Consider others. (Speak to Branwen.)
+        return self.qoi_form
 
     def evaluate_qoi(self):  # TODO: Do time-dep QoI properly
         f = self.qois
         N = len(f)
         assert N > 0
-        h = self.dt*self.dt_per_export
-        qoi = 0.5*h*(f[0] + f[N-1])
-        for i in range(1, N-1):
-            qoi += h*f[i]
+        if 'maximum' in self.qoi_mode:
+            qoi = np.max(f)
+        else:  # Trapezium rule
+            h = self.dt*self.dt_per_export
+            qoi = 0.5*h*(f[0] + f[N-1])
+            for i in range(1, N-1):
+                qoi += h*f[i]
         return qoi
 
     def plot(self):
         self.plot_heavyside()
-        self.plot_qoi()
+        if 'volume' in self.qoi_mode:
+            self.plot_qoi()
+        print_output("QoI '{:s}' = {:.4e}".format(self.qoi_mode, self.evaluate_qoi()))
 
     def plot_heavyside(self):
         """Timeseries plot of approximate Heavyside function."""
@@ -238,4 +255,4 @@ class BalzanoOptions(ShallowWaterOptions):
         plt.xlabel("Time [$\mathrm h$]")
         plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
         plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
-        plt.savefig(os.path.join(self.di, "qoi_timeseries.pdf"))
+        plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))

@@ -166,7 +166,7 @@ class SteadyProblem():
         self.setup_solver_adjoint()
         if self.nonlinear:
             self.rhs_adjoint = 0
-        solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.params)  # TODO: account for different params
+        solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
 
     def solve_discrete_adjoint(self):
         try:
