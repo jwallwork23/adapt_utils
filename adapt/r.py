@@ -1,11 +1,13 @@
 from firedrake import *
+from thetis import print_output
 
 import os
+import numpy as np
 
 from adapt_utils.options import Options
 
 
-__all__ = []
+__all__ = ["MeshMover"]
 
 
 class MeshMover():
@@ -14,7 +16,7 @@ class MeshMover():
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
         try:
-            assert self.dim == 2:
+            assert self.dim == 2
         except AssertionError:
             raise NotImplementedError("r-adaptation only currently considered in 2D.")
         self.monitor_function = monitor_function
@@ -56,7 +58,6 @@ class MeshMover():
         self.volume = Function(self.P0, name="Mesh volume").assign(assemble(self.p0test*dx))
         self.grad_phi_cts = Function(self.P1_vec, name="L2 projected gradient")
         self.grad_phi_dg = Function(self.mesh.coordinates, name="Discontinuous gradient")
-        self.total_volume = assemble(Constant(1.0)*dx(domain=self.mesh))
 
     def update_monitor(self):
         self.monitor.interpolate(self.monitor_function(self.mesh))
@@ -81,7 +82,7 @@ class MeshMover():
 
     def setup_tensor_solver(self):
         sigma, tau = TrialFunction(self.V_ten), TestFunction(self.V_ten)
-        n = FacetNormal(mesh)
+        n = FacetNormal(self.mesh)
         a = inner(tau, sigma)*dx
         L = -dot(div(tau), grad(self.phi_new))*dx
         # FIXME: Neumann condition doesn't seem to work!
@@ -98,7 +99,51 @@ class MeshMover():
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def adapt(self):
+        L_p0 = self.p0test*self.monitor*dx
+        original_volume = assemble(self.p0test*dx)
+        total_volume = assemble(Constant(1.0)*dx(domain=self.mesh))
+
         maxit = self.op.r_adapt_maxit
         tol = self.op.r_adapt_rtol
-        
-        raise NotImplementedError  # TODO
+        msg = "Iteration {:4d}   Min/Max {:10.4e}   Residual {:10.4e}   Equidistribution {:10.4e}"
+        for i in range(maxit):
+
+            # Perform L2 projection and generate coordinates appropriately
+            self.l2_projector.solve()
+            par_loop(('{[i, j] : 0 <= i < cg.dofs and 0 <= j < 2}', 'dg[i, j] = cg[i, j]'), dx,
+                     {'cg': (self.grad_phi_cts, READ), 'dg': (self.grad_phi_dg, WRITE)},
+                     is_loopy_kernel=True)
+            self.x.assign(self.ξ + self.grad_phi_dg)  # x = ξ + grad(phi)
+
+            # Update monitor function
+            self.mesh.coordinates.assign(self.x)
+            self.update_monitor()
+            assemble(L_p0, tensor=self.volume)  # For equidistribution measure
+            self.volume /= original_volume
+            if i % 10 == 0:
+                self.monitor_file.write(self.monitor)
+                self.volume_file.write(self.volume)
+            self.mesh.coordinates.assign(self.ξ)
+
+            # Evaluate theta
+            self.theta.assign(assemble(self.theta_form)/total_volume)
+
+            # Convergence criteria
+            residual_l2 = assemble(self.residual_l2_form).dat.norm
+            norm_l2 = assemble(self.norm_l2_form).dat.norm
+            residual_l2_norm = residual_l2 / norm_l2
+            if i == 0:
+                initial_norm = residual_l2_norm  # Store to check for divergence
+            minmax = self.volume.vector().gather().min()/self.volume.vector().gather().max()
+            equi = np.std(self.volume.dat.data)/np.mean(self.volume.dat.data)  # TODO: PyOP2
+            if i % 10 == 0 and self.op.debug:
+                print_output(msg.format(i, minmax, residual_l2_norm, equi))
+            if residual_l2_norm < tol:
+                print_output("r-adaptation converged in {:d} iterations.".format(i+1))
+                break
+            if residual_l2_norm > 2.0*initial_norm:
+                raise ConvergenceError("r-adaptation failed to converge in {:d} iterations.".format(i+1))
+            self.scalar_solver.solve()
+            self.tensor_solver.solve()
+            self.phi_old.assign(self.phi_new)
+            self.sigma_old.assign(self.sigma_new)
