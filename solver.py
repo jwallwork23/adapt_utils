@@ -11,6 +11,7 @@ from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
+from adapt_utils.adapt.r import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
 
 
@@ -568,6 +569,9 @@ class SteadyProblem():
             self.M = amd.p1metric
             self.estimate_error()
 
+        elif self.approach == 'monge_ampere':
+            return
+
         # User specified adaptation methods
         else:
             try:
@@ -600,10 +604,17 @@ class SteadyProblem():
         if self.approach == 'fixed_mesh':
             return
         elif self.approach == 'uniform':
-            if self.am.levels > 1:
+            if self.am.levels == 0:
                 raise ValueError("Cannot perform uniform refinement because `AdaptiveMesh` object is not hierarchical.")
             self.mesh = self.am.hierarchy[1]
             return
+        elif self.approach == 'monge_ampere':
+            try:
+                assert hasattr(self, 'monitor_function')
+            except AssertionError:
+                raise ValueError("Please supply a monitor function.")
+            mesh_mover = MeshMover(self.mesh, self.monitor_function, op=self.op)
+            mesh_mover.adapt()
         else:
             self.am.adapt(self.M)
             self.set_mesh(self.am.mesh)

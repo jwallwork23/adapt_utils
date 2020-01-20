@@ -53,10 +53,11 @@ class MeshMover():
         self.setup_l2_projector()
 
         # Outputs
-        self.monitor_file = File(os.path.join(op.di, 'monitor.pvd'))
-        self.monitor_file.write(self.monitor)
-        self.volume_file = File(os.path.join(op.di, 'volume.pvd'))
-        self.volume_file.write(self.volume)
+        if self.op.debug:
+            self.monitor_file = File(os.path.join(op.di, 'monitor.pvd'))
+            self.monitor_file.write(self.monitor)
+            self.volume_file = File(os.path.join(op.di, 'volume.pvd'))
+            self.volume_file.write(self.volume)
 
     def create_function_spaces(self):
         self.V = FunctionSpace(self.mesh, "CG", self.op.degree)
@@ -139,7 +140,7 @@ class MeshMover():
             self.update_monitor()
             assemble(L_p0, tensor=self.volume)  # For equidistribution measure
             self.volume /= original_volume
-            if i % 10 == 0:
+            if i % 10 == 0 and self.op.debug:
                 self.monitor_file.write(self.monitor)
                 self.volume_file.write(self.volume)
             self.mesh.coordinates.assign(self.ξ)
@@ -153,8 +154,13 @@ class MeshMover():
             residual_l2_norm = residual_l2 / norm_l2
             if i == 0:
                 initial_norm = residual_l2_norm  # Store to check for divergence
-            minmax = self.volume.vector().gather().min()/self.volume.vector().gather().max()
-            equi = np.std(self.volume.dat.data)/np.mean(self.volume.dat.data)  # TODO: PyOP2
+            v = self.volume.vector().gather()
+            minmax = v.min()/v.max()
+            mean = v.sum()/v.size
+            w = v.copy() - mean
+            w *= w
+            std = sqrt(w.sum()/w.size)
+            equi = std/mean
             if i % 10 == 0 and self.op.debug:
                 print_output(msg.format(i, minmax, residual_l2_norm, equi))
             if residual_l2_norm < tol:
