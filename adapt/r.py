@@ -48,8 +48,8 @@ class MeshMover():
         # Create functions and solvers
         self.create_function_spaces()
         self.create_functions()
-        self.setup_scalar_solver()
-        self.setup_tensor_solver()
+        self.setup_pseudotimestepper()
+        self.setup_equidistributor()
         self.setup_l2_projector()
 
         # Outputs
@@ -67,54 +67,54 @@ class MeshMover():
         self.p0test = TestFunction(self.P0)
 
     def create_functions(self):
-        self.phi_old = Function(self.V)
-        self.phi_new = Function(self.V)
-        self.sigma_old = Function(self.V_ten)
-        self.sigma_new = Function(self.V_ten)
-        self.theta = Constant(0.0)  # Normalisation parameter
+        self.φ_old = Function(self.V)
+        self.φ_new = Function(self.V)
+        self.σ_old = Function(self.V_ten)
+        self.σ_new = Function(self.V_ten)
+        self.θ = Constant(0.0)  # Normalisation parameter
         self.monitor = Function(self.P1, name="Monitor function")
         self.update_monitor()
         self.volume = Function(self.P0, name="Mesh volume").assign(assemble(self.p0test*dx))
-        self.grad_phi_cts = Function(self.P1_vec, name="L2 projected gradient")
-        self.grad_phi_dg = Function(self.mesh.coordinates, name="Discontinuous gradient")
+        self.grad_φ_cts = Function(self.P1_vec, name="L2 projected gradient")
+        self.grad_φ_dg = Function(self.mesh.coordinates, name="Discontinuous gradient")
 
     def update_monitor(self):
         self.monitor.interpolate(self.monitor_function(self.mesh))
 
-    def setup_scalar_solver(self):
-        phi, v = TrialFunction(self.V), TestFunction(self.V)
-        a = dot(grad(v), grad(phi))*dx
-        L = dot(grad(v), grad(self.phi_old))*dx
-        L += self.dt*v*(self.monitor*det(self.I + self.sigma_old) - self.theta)*dx
-        prob = LinearVariationalProblem(a, L, self.phi_new)
+    def setup_pseudotimestepper(self):
+        φ, ψ = TrialFunction(self.V), TestFunction(self.V)
+        a = dot(grad(ψ), grad(φ))*dx
+        L = dot(grad(ψ), grad(self.φ_old))*dx
+        L += self.dt*ψ*(self.monitor*det(self.I + self.σ_old) - self.θ)*dx
+        prob = LinearVariationalProblem(a, L, self.φ_new)
         nullspace = VectorSpaceBasis(constant=True)
-        self.scalar_solver = LinearVariationalSolver(prob, nullspace=nullspace,
-                                                     transpose_nullspace=nullspace,
-                                                     solver_parameters={'ksp_type': 'cg',
-                                                                        'pc_type': 'gamg'})
+        self.pseudotimestepper = LinearVariationalSolver(prob, nullspace=nullspace,
+                                                         transpose_nullspace=nullspace,
+                                                         solver_parameters={'ksp_type': 'cg',
+                                                                            'pc_type': 'gamg'})
 
         # Setup residuals
-        self.theta_form = self.monitor*det(self.I + self.sigma_old)*dx
-        residual_form = self.monitor*det(self.I + self.sigma_old) - self.theta
-        self.residual_l2_form = v*residual_form*dx
-        self.norm_l2_form = v*self.theta*dx
+        self.θ_form = self.monitor*det(self.I + self.σ_old)*dx
+        residual_form = self.monitor*det(self.I + self.σ_old) - self.θ
+        self.residual_l2_form = ψ*residual_form*dx
+        self.norm_l2_form = ψ*self.θ*dx
 
-    def setup_tensor_solver(self):
-        sigma, tau = TrialFunction(self.V_ten), TestFunction(self.V_ten)
+    def setup_equidistributor(self):
+        σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
         n = FacetNormal(self.mesh)
-        a = inner(tau, sigma)*dx
-        L = -dot(div(tau), grad(self.phi_new))*dx
+        a = inner(τ, σ)*dx
+        L = -dot(div(τ), grad(self.φ_new))*dx
         # FIXME: Neumann condition doesn't seem to work!
-        L += (tau[0, 1]*n[1]*self.phi_new.dx(0) + tau[1, 0]*n[0]*self.phi_new.dx(1))*ds
-        L += (-tau[0, 0]*n[1]*self.phi_new.dx(1) + tau[1, 1]*n[1]*self.phi_new.dx(1))*ds
-        prob = LinearVariationalProblem(a, L, self.sigma_new)
-        self.tensor_solver = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
+        L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
+        L += (-τ[0, 0]*n[1]*self.φ_new.dx(1) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
+        prob = LinearVariationalProblem(a, L, self.σ_new)
+        self.equidistributor = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def setup_l2_projector(self):
         u_cts, v_cts = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
         a = dot(v_cts, u_cts)*dx
-        L = dot(v_cts, grad(self.phi_old))*dx
-        prob = LinearVariationalProblem(a, L, self.grad_phi_cts)
+        L = dot(v_cts, grad(self.φ_old))*dx
+        prob = LinearVariationalProblem(a, L, self.grad_φ_cts)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def adapt(self):
@@ -130,9 +130,9 @@ class MeshMover():
             # Perform L2 projection and generate coordinates appropriately
             self.l2_projector.solve()
             par_loop(('{[i, j] : 0 <= i < cg.dofs and 0 <= j < 2}', 'dg[i, j] = cg[i, j]'), dx,
-                     {'cg': (self.grad_phi_cts, READ), 'dg': (self.grad_phi_dg, WRITE)},
+                     {'cg': (self.grad_φ_cts, READ), 'dg': (self.grad_φ_dg, WRITE)},
                      is_loopy_kernel=True)
-            self.x.assign(self.ξ + self.grad_phi_dg)  # x = ξ + grad(phi)
+            self.x.assign(self.ξ + self.grad_φ_dg)  # x = ξ + grad(φ)
 
             # Update monitor function
             self.mesh.coordinates.assign(self.x)
@@ -144,8 +144,8 @@ class MeshMover():
                 self.volume_file.write(self.volume)
             self.mesh.coordinates.assign(self.ξ)
 
-            # Evaluate theta
-            self.theta.assign(assemble(self.theta_form)/total_volume)
+            # Evaluate normalisation coefficient
+            self.θ.assign(assemble(self.θ_form)/total_volume)
 
             # Convergence criteria
             residual_l2 = assemble(self.residual_l2_form).dat.norm
@@ -162,7 +162,7 @@ class MeshMover():
                 break
             if residual_l2_norm > 2.0*initial_norm:
                 raise ConvergenceError("r-adaptation failed to converge in {:d} iterations.".format(i+1))
-            self.scalar_solver.solve()
-            self.tensor_solver.solve()
-            self.phi_old.assign(self.phi_new)
-            self.sigma_old.assign(self.sigma_new)
+            self.pseudotimestepper.solve()
+            self.equidistributor.solve()
+            self.φ_old.assign(self.φ_new)
+            self.σ_old.assign(self.σ_new)
