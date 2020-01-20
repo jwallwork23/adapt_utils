@@ -55,7 +55,7 @@ class Options(FrozenConfigurable):
     # Metric
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
     normalisation = Unicode('complexity', help="Metric normalisation approach, from {'complexity', 'error'}.").tag(config=True)
-    target = PositiveFloat(1e+2, help="Target complexity / inverse desired error for normalisation, as appropriate.").tag(config=True)
+    target = PositiveFloat(1.0e2, help="Target complexity / inverse desired error for normalisation, as appropriate.").tag(config=True)
     norm_order = NonNegativeInteger(None, allow_none=True, help="Degree p of Lp norm used in 'error' normalisation approach. Use 'None' to specify infinity norm.").tag(config=True)
     intersect_boundary = Bool(False, help="Intersect with initial boundary metric.").tag(config=True)
 

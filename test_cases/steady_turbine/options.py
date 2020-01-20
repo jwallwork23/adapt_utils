@@ -19,8 +19,9 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         # Domain
         self.domain_length = 1000.0
         self.domain_width = 300.0
-        if os.path.exists(self.mesh_path):
-            self.default_mesh = Mesh(self.mesh_path)
+        abspath = os.path.realpath(__file__)
+        self.mesh_path = abspath.replace('options.py', self.mesh_path)
+        self.default_mesh = Mesh(self.mesh_path)
 
         # Physical
         # self.base_viscosity = 1.3e-3

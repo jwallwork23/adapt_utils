@@ -33,7 +33,7 @@ class ShallowWaterOptions(Options):
     wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
 
     # Adaptation
-    adapt_field = Unicode('speed_avg_elevation', help="Adaptation field of interest.").tag(config=True)
+    adapt_field = Unicode('all_avg', help="Adaptation field of interest.").tag(config=True)
     region_of_interest = List(default_value=[]).tag(config=True)
 
     def __init__(self, approach='fixed_mesh'):

@@ -175,14 +175,14 @@ class SteadyShallowWaterProblem(SteadyProblem):
         dwr = -self.op.g*inner(z, grad(eta))                   # ExternalPressureGradient
         dwr += -zeta*div(H*u)                                  # HUDiv
         dwr += -inner(z, dot(u, nabla_grad(u)))                # HorizontalAdvection
-        if hasattr(tpe, 'coriolis'):
+        if tpe.coriolis is not None:
             dwr += -inner(z, tpe.coriolis*as_vector((-u[1], u[0])))       # Coriolis
 
         # QuadraticDrag
-        if hasattr(tpe, 'quadratic_drag_coefficient'):
+        if tpe.quadratic_drag_coefficient is not None:
             C_D = tpe.quadratic_drag_coefficient
             dwr += -C_D*sqrt(dot(u, u))*inner(z, u)/H
-        elif hasattr(tpe, 'manning_drag_coefficient'):
+        elif tpe.manning_drag_coefficient is not None:
             C_D = op.g*tpe.manning_drag_coefficient**2/pow(H, 1/3)
             dwr += -C_D*sqrt(dot(u, u))*inner(z, u)/H
 
@@ -396,9 +396,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if field in metrics:
             self.M = metrics[field]()
         elif field == 'all_avg':
-            self.M += metrics['velocity_x']()/3.0
-            self.M += metrics['velocity_y']()/3.0
-            self.M += metrics['elevation']()/3.0
+            self.M += metrics['velocity_x']()
+            self.M += metrics['velocity_y']()
+            self.M += metrics['elevation']()
+            self.M /= 3.0
         elif field == 'all_int':
             self.M = metric_intersection(metrics['velocity_x'](), metrics['velocity_y']())
             self.M = metric_intersection(self.M, metrics['elevation']())
@@ -407,8 +408,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         elif 'avg' in field:
             fields = field.split('_avg_')
             num_fields = len(fields)
+            print(fields, num_fields)
             for i in range(num_fields):
-                self.M += metrics[fields[i]]()/num_fields
+                self.M += metrics[fields[i]]()
+            self.M /= num_fields
         elif 'int' in field:
             fields = field.split('_int_')
             self.M = metrics[fields[0]]()

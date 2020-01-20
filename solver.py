@@ -589,7 +589,7 @@ class SteadyProblem():
         self.estimators[approach].append(self.indicators[approach].vector().gather().sum())
 
     def plot_error_estimate(self, approach):
-        raise NotImplementedError  # TOD
+        raise NotImplementedError  # TODO
 
     def adapt_mesh(self):
         """
