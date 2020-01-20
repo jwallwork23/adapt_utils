@@ -58,7 +58,7 @@ class BalzanoOptions(ShallowWaterOptions):
         self.dt = 600.0
         self.end_time = self.num_hours*3600.0
         self.dt_per_export = 6
-        self.dt_per_remesh = 20
+        self.dt_per_remesh = 6
         self.timestepper = 'CrankNicolson'
         # self.implicitness_theta = 0.5  # TODO
 

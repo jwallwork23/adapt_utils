@@ -587,9 +587,10 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if field in metrics:
             self.M = metrics[field]()
         elif field == 'all_avg':
-            self.M += metrics['velocity_x']()/3.0
-            self.M += metrics['velocity_y']()/3.0
-            self.M += metrics['elevation']()/3.0
+            self.M += metrics['velocity_x']()
+            self.M += metrics['velocity_y']()
+            self.M += metrics['elevation']()
+            self.M /= 3.0
         elif field == 'all_int':
             self.M = metric_intersection(metrics['velocity_x'](), metrics['velocity_y']())
             self.M = metric_intersection(self.M, metrics['elevation']())
@@ -599,7 +600,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             fields = field.split('_avg_')
             num_fields = len(fields)
             for i in range(num_fields):
-                self.M += metrics[fields[i]]()/num_fields
+                self.M += metrics[fields[i]]()
+            self.M /= num_fields
         elif 'int' in field:
             fields = field.split('_int_')
             self.M = metrics[fields[0]]()

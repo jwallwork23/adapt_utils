@@ -56,6 +56,7 @@ class SteadyProblem():
         self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
         self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+        self.monitor_file = File(os.path.join(self.di, 'monitor.pvd'))
 
         # Storage during inner mesh adaptation loop
         self.indicators = {}
@@ -446,6 +447,10 @@ class SteadyProblem():
         File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
         for key in self.indicators:
             File(os.path.join(self.di, key + '.pvd')).write(self.indicators[key])
+        if hasattr(self, 'monitor_function'):
+            m = interpolate(self.monitor_function(self.mesh), self.P1)
+            m.rename("Monitor function")
+            self.monitor_file.write(m)
 
     def plot_solution(self, adjoint=False):
         """
@@ -601,7 +606,7 @@ class SteadyProblem():
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
         """
-        if self.approach == 'fixed_mesh':
+        if 'fixed_mesh' in self.approach:
             return
         elif self.approach == 'uniform':
             if self.am.levels == 0:
@@ -795,7 +800,7 @@ class UnsteadyProblem(SteadyProblem):
         self.remesh_step = 0
 
         # Adapt w.r.t. initial conditions a few times before the solver loop
-        if self.approach != 'fixed_mesh':
+        if not ('fixed_mesh' in self.approach or self.approach == 'hessian'):
             for i in range(max(self.op.num_adapt, 2)):
                 self.get_adjoint_state()
                 self.adapt_mesh()
@@ -808,9 +813,12 @@ class UnsteadyProblem(SteadyProblem):
         while self.step_end <= self.op.end_time:
 
             # Fixed mesh case
-            if self.approach == 'fixed_mesh':
+            # NOTE:
+            #  * Use 'fixed_mesh_plot' to call `plot` at each export.
+            if 'fixed_mesh' in self.approach:
                 self.solve_step(adjoint=adjoint)
-                break
+                if self.approach == 'fixed_mesh':
+                    break
 
             # Adaptive mesh case
             for i in range(self.op.num_adapt):
@@ -825,12 +833,13 @@ class UnsteadyProblem(SteadyProblem):
                     self.solution.project(solution_old)
 
                 # Solve PDE on new mesh
-                self.op.plot_pvd = True if i == 0 else False
-                time = None if i == 0 else self.step_end - self.op.dt
-                self.solve_step(adjoint=adjoint, time=time)
+                self.op.plot_pvd = i == 0
+                # time = None if i == 0 else self.step_end - self.op.dt
+                # self.solve_step(adjoint=adjoint, time=time)
+                self.solve_step(adjoint=adjoint)
 
                 # Store solutions from last two steps on first mesh in sequence
-                if i == 0:
+                if i == 0 and not 'fixed_mesh' in self.approach:
                     solution = Function(self.V)
                     solution.assign(self.solution)
                     solution_old = Function(self.V)
@@ -843,7 +852,7 @@ class UnsteadyProblem(SteadyProblem):
             self.remesh_step += 1
 
         # Evaluate QoI
-        if self.approach != 'fixed_mesh':
+        if not 'fixed_mesh' in self.approach:
             self.solution.project(solution)
         self.get_qoi_kernel()
 
