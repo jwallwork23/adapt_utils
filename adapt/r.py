@@ -11,7 +11,26 @@ __all__ = ["MeshMover"]
 
 
 class MeshMover():
-    # TODO: doc  x:Ω_C→ Ω_P
+    """
+    A class dedicated to performing mesh r-adaptation. Given a source mesh and a monitor function
+    :math: `m`, the new mesh is established by relocating the vertices of the original mesh. That is,
+    the topology remains unchanged.
+
+    At present, the mesh movement is determined by solving the Monge-Ampère type equation
+
+..  math::
+        m(x)\det(I + H(\phi)) = \theta,
+
+    for a scalar potential :math:`\phi`, where :math:`I` is the identity, :math:`\theta` is a
+    normalising constant and :math:`H(\phi)` denotes the Hessian of :math:`\phi` with respect to
+    coordinates on the computational mesh.
+
+    The implementation is an objective-oriented version of that given in [1].
+
+    [1] A.T.T. McRae, C.J. Cotter, and C.J. Budd, "Optimal-transport--based mesh adaptivity on the
+        plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
+        A1121-A1148.
+    """
     def __init__(self, mesh, monitor_function, op=Options()):
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
