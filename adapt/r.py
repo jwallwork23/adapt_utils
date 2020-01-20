@@ -54,9 +54,9 @@ class MeshMover():
 
         # Outputs
         if self.op.debug:
-            self.monitor_file = File(os.path.join(op.di, 'monitor.pvd'))
+            self.monitor_file = File(os.path.join(op.di, 'monitor_debug.pvd'))
             self.monitor_file.write(self.monitor)
-            self.volume_file = File(os.path.join(op.di, 'volume.pvd'))
+            self.volume_file = File(os.path.join(op.di, 'volume_debug.pvd'))
             self.volume_file.write(self.volume)
 
     def create_function_spaces(self):

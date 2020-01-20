@@ -478,6 +478,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solution = self.solver_obj.fields.solution_2d
 
     def setup_solver(self):
+        if not hasattr(self, 'remesh_step'):
+            self.remesh_step = 0
         op = self.op
         self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.bathymetry)
         options = self.solver_obj.options

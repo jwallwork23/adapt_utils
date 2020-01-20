@@ -42,6 +42,7 @@ class SteadyProblem():
         # Setup problem
         print_output(op.indent+"Building mesh...")
         self.set_mesh(mesh)
+        self.am_init = self.am.copy()
         print_output(op.indent+"Building function spaces...")
         self.create_function_spaces()
         print_output(op.indent+"Building solutions...")
@@ -613,13 +614,15 @@ class SteadyProblem():
                 raise ValueError("Cannot perform uniform refinement because `AdaptiveMesh` object is not hierarchical.")
             self.mesh = self.am.hierarchy[1]
             return
-        elif self.approach == 'monge_ampere':
+        elif self.approach == 'monge_ampere':  # TODO: Integrate into AdaptiveMesh
             try:
                 assert hasattr(self, 'monitor_function')
             except AssertionError:
                 raise ValueError("Please supply a monitor function.")
-            mesh_mover = MeshMover(self.mesh, self.monitor_function, op=self.op)
+            mesh_mover = MeshMover(self.am_init.mesh, self.monitor_function, op=self.op)
             mesh_mover.adapt()
+            self.mesh.coordinates.dat.data[:] = mesh_mover.x.dat.data  # TODO: temp
+            # self.set_mesh(self.mesh)
         else:
             self.am.adapt(self.M)
             self.set_mesh(self.am.mesh)
@@ -793,14 +796,16 @@ class UnsteadyProblem(SteadyProblem):
         """
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def solve(self, adjoint=False):
+    def solve(self, adjoint=False, uses_adjoint=True):
         """
         Solve PDE using mesh adaptivity.
         """
         self.remesh_step = 0
+        uses_adjoint &= not 'fixed_mesh' in self.approach
+        uses_adjoint &= self.approach != 'hessian'
 
         # Adapt w.r.t. initial conditions a few times before the solver loop
-        if not ('fixed_mesh' in self.approach or self.approach == 'hessian'):
+        if uses_adjoint:
             for i in range(max(self.op.num_adapt, 2)):
                 self.get_adjoint_state()
                 self.adapt_mesh()
@@ -815,10 +820,9 @@ class UnsteadyProblem(SteadyProblem):
             # Fixed mesh case
             # NOTE:
             #  * Use 'fixed_mesh_plot' to call `plot` at each export.
-            if 'fixed_mesh' in self.approach:
+            if self.approach == 'fixed_mesh':
                 self.solve_step(adjoint=adjoint)
-                if self.approach == 'fixed_mesh':
-                    break
+                break
 
             # Adaptive mesh case
             for i in range(self.op.num_adapt):
@@ -828,9 +832,9 @@ class UnsteadyProblem(SteadyProblem):
                 if self.remesh_step == 0:
                     self.set_start_condition(adjoint)
                 elif i == 0:
-                    self.solution.project(solution)
+                    self.project_solution(solution, adjoint=adjoint)
                 else:
-                    self.solution.project(solution_old)
+                    self.project_solution(solution_old, adjoint=adjoint)
 
                 # Solve PDE on new mesh
                 self.op.plot_pvd = i == 0
@@ -839,21 +843,19 @@ class UnsteadyProblem(SteadyProblem):
                 self.solve_step(adjoint=adjoint)
 
                 # Store solutions from last two steps on first mesh in sequence
-                if i == 0 and not 'fixed_mesh' in self.approach:
-                    solution = Function(self.V)
-                    solution.assign(self.solution)
-                    solution_old = Function(self.V)
-                    solution_old.assign(self.solution_old)
+                if i == 0:
+                    solution = Function(self.solution)
+                    solution_old = Function(self.solution_old)
                     if self.step_end + self.op.dt*self.op.dt_per_remesh > self.op.end_time:
                         break  # No need to do adapt for final timestep
-            self.plot()
+            # self.plot()  # TODO: Temporary. It is called at end of adapt_mesh
 
             self.step_end += self.op.dt*self.op.dt_per_remesh
             self.remesh_step += 1
 
         # Evaluate QoI
-        if not 'fixed_mesh' in self.approach:
-            self.solution.project(solution)
+        if uses_adjoint:
+            self.project_solution(solution)
         self.get_qoi_kernel()
 
     def quantity_of_interest(self):
