@@ -105,9 +105,9 @@ class MeshMover():
         n = FacetNormal(self.mesh)
         a = inner(τ, σ)*dx
         L = -dot(div(τ), grad(self.φ_new))*dx
-        # FIXME: Neumann condition doesn't seem to work!
-        L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(0))*ds
-        L += (-τ[0, 0]*n[1]*self.φ_new.dx(1) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
+        # NOTE: Neumann condition doesn't seem to do anything. Need postproc step below.
+        # L += (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
+        L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
         prob = LinearVariationalProblem(a, L, self.σ_new)
         self.equidistributor = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
@@ -117,7 +117,7 @@ class MeshMover():
         L = dot(v_cts, grad(self.φ_old))*dx
         bcs = [DirichletBC(self.P1_vec.sub(0), 0.0, 1),
                DirichletBC(self.P1_vec.sub(1), 0.0, 2),
-               DirichletBC(self.P1_vec.sub(0), 0.0, 3)]  # TODO: Generalise
+               DirichletBC(self.P1_vec.sub(0), 0.0, 3)]  # TODO: Generalise. Perhaps use rotation matrix?
         prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bcs)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
