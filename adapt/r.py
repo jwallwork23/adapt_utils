@@ -106,7 +106,7 @@ class MeshMover():
         a = inner(τ, σ)*dx
         L = -dot(div(τ), grad(self.φ_new))*dx
         # FIXME: Neumann condition doesn't seem to work!
-        L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
+        L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(0))*ds
         L += (-τ[0, 0]*n[1]*self.φ_new.dx(1) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
         prob = LinearVariationalProblem(a, L, self.σ_new)
         self.equidistributor = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
@@ -115,7 +115,10 @@ class MeshMover():
         u_cts, v_cts = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
         a = dot(v_cts, u_cts)*dx
         L = dot(v_cts, grad(self.φ_old))*dx
-        prob = LinearVariationalProblem(a, L, self.grad_φ_cts)
+        bcs = [DirichletBC(self.P1_vec.sub(0), 0.0, 1),
+               DirichletBC(self.P1_vec.sub(1), 0.0, 2),
+               DirichletBC(self.P1_vec.sub(0), 0.0, 3)]  # TODO: Generalise
+        prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bcs)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def adapt(self):
