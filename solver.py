@@ -621,7 +621,9 @@ class SteadyProblem():
                 raise ValueError("Please supply a monitor function.")
             mesh_mover = MeshMover(self.am_init.mesh, self.monitor_function, op=self.op)
             mesh_mover.adapt()
-            self.mesh.coordinates.dat.data[:] = mesh_mover.x.dat.data  # TODO: temp
+            x = Function(self.mesh.coordinates)
+            x.dat.data[:] = mesh_mover.x.dat.data  # TODO: PyOP2
+            self.mesh.coordinates.assign(x)  # TODO: May need to modify coords of hierarchy, too
             # self.set_mesh(self.mesh)
         else:
             self.am.adapt(self.M)

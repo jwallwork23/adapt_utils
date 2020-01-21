@@ -11,11 +11,15 @@ op.num_adapt = 1
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 
-def monitor_function(mesh, alpha=1.0, beta=0.001):  # NOTE: Need be defined on COMPUTATIONAL mesh
+# FIXME: There needs to be some interpolation!!
+def monitor_function(mesh, alpha=1.0, beta=1.0):  # NOTE: Need be defined on COMPUTATIONAL mesh
+    P1DG = FunctionSpace(mesh, "DG", 1)
+    #diff = project(swp.solution.split()[1], P1DG)
     eta = swp.solution.split()[1]
-    b = -swp.bathymetry
-    diff = project(eta, FunctionSpace(mesh, "DG", 1))  # FIXME: Projection not working
-    diff -= b.values()[0]  # TODO: What if not constant?
+    b = swp.bathymetry
+    diff = Function(P1DG)
+    diff.dat.data[:] += eta.dat.data - (-b.dat.data)
+    # diff = project(eta, FunctionSpace(mesh, "DG", 1))  # FIXME: Projection not working
     # x, y = SpatialCoordinate(mesh)
     # return 1.0 + alpha*pow(cosh(beta*abs(x-13800)), -2)
     return 1.0 + alpha*pow(cosh(beta*abs(diff)), -2)

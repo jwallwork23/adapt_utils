@@ -44,7 +44,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def set_fields(self):
         self.viscosity = self.op.set_viscosity(self.P1)
         self.diffusivity = self.op.set_diffusivity(self.P1)
-        self.bathymetry = self.op.set_bathymetry(self.P1)
+        self.bathymetry = self.op.set_bathymetry(self.P1DG)
         self.inflow = self.op.set_inflow(self.P1_vec)
         self.coriolis = self.op.set_coriolis(self.P1)
         self.quadratic_drag_coefficient = self.op.set_quadratic_drag_coefficient(self.P1)
@@ -453,7 +453,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
     def set_fields(self):
         self.viscosity = self.op.set_viscosity(self.P1)
         self.diffusivity = self.op.set_diffusivity(self.P1)
-        self.bathymetry = self.op.set_bathymetry(self.P1)
+        self.bathymetry = self.op.set_bathymetry(self.P1DG)
         self.inflow = self.op.set_inflow(self.P1_vec)
         self.coriolis = self.op.set_coriolis(self.P1)
         self.quadratic_drag_coefficient = self.op.set_quadratic_drag_coefficient(self.P1)
@@ -482,6 +482,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             self.remesh_step = 0
         op = self.op
         self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.bathymetry)
+        if self.remesh_step > 0:
+            self.solver_obj.export_initial_state = False
         options = self.solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
