@@ -120,12 +120,14 @@ class BalzanoOptions(ShallowWaterOptions):
             self.set_boundary_surface()
         self.elev_in.assign(self.elev_func(0.0))
         inflow_tag = 1
-        wall_tag = 2
-        outflow_tag = 3
+        outflow_tag = 2
+        bottom_wall_tag = 3
+        top_wall_tag = 4
         boundary_conditions = {}
         boundary_conditions[inflow_tag] = {'elev': self.elev_in}
         boundary_conditions[outflow_tag] = {'un': Constant(0.0)}
-        boundary_conditions[wall_tag] = {'un': Constant(0.0)}
+        boundary_conditions[bottom_wall_tag] = {'un': Constant(0.0)}
+        boundary_conditions[top_wall_tag] = {'un': Constant(0.0)}
         return boundary_conditions
 
     def update_boundary_conditions(self, t=0.0):
