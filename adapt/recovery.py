@@ -6,7 +6,7 @@ from adapt_utils.options import *
 __all__ = ["construct_gradient", "construct_hessian", "construct_boundary_hessian"]
 
 
-def construct_gradient(f, mesh=None, op=Options()):
+def construct_gradient(f, mesh=None, bcs=None, op=Options()):
     r"""
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
@@ -17,6 +17,7 @@ def construct_gradient(f, mesh=None, op=Options()):
     :arg f: (scalar) P1 solution field.
     :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
                  Function, but a ufl expression.
+    :kwarg bcs: boundary conditions for L2 projection.
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
    """
@@ -24,12 +25,11 @@ def construct_gradient(f, mesh=None, op=Options()):
     P1_vec = VectorFunctionSpace(mesh, "CG", 1)
     g = TrialFunction(P1_vec)
     φ = TestFunction(P1_vec)
-    # TODO: include an option to swap between these two: 'parts' vs 'L2'
-    a = inner(g, φ)*dx
-    # L = inner(grad(f), φ)*dx
-    L = f*dot(φ, FacetNormal(mesh))*ds - f*div(φ)*dx  # enables f to be P0
-    g = Function(P1_vec)
-    solve(a == L, g, solver_parameters=op.hessian_solver_parameters)
+    a = inner(φ, g)*dx
+    # L = inner(φ, grad(f))*dx
+    L = f*dot(φ, FacetNormal(mesh))*ds - div(φ)*f*dx  # enables f to be P0
+    g = Function(P1_vec, name="Recovered gradient")
+    solve(a == L, g, bcs=bcs, solver_parameters=op.hessian_solver_parameters)
     return g
 
 

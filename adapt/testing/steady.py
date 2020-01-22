@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 
 # Sensor tests considered in [Olivier 2011].
 
+# TODO: Rewrite this test in a nicer way
+
 def sensor(i, mesh):
     x, y = SpatialCoordinate(mesh)
     return [x*x+y*y,

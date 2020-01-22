@@ -124,6 +124,7 @@ class BalzanoOptions(ShallowWaterOptions):
         outflow_tag = 3
         boundary_conditions = {}
         boundary_conditions[inflow_tag] = {'elev': self.elev_in}
+        boundary_conditions[outflow_tag] = {'un': Constant(0.0)}
         boundary_conditions[wall_tag] = {'un': Constant(0.0)}
         return boundary_conditions
 

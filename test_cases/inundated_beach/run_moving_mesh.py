@@ -5,8 +5,7 @@ from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 
 op = BalzanoOptions(approach='monge_ampere', plot_timeseries=False)
 op.qoi_mode = 'inundation_volume'
-op.debug = True
-op.num_adapt = 1
+# op.debug = True
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 

@@ -619,6 +619,7 @@ class SteadyProblem():
                 assert hasattr(self, 'monitor_function')
             except AssertionError:
                 raise ValueError("Please supply a monitor function.")
+            self.op.num_adapt = 1
             mesh_mover = MeshMover(self.am_init.mesh, self.monitor_function, op=self.op)
             mesh_mover.adapt()
             x = Function(self.mesh.coordinates)

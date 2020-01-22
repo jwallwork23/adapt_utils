@@ -3,7 +3,7 @@ from firedrake import *
 
 __all__ = ["local_norm", "local_edge_integral", "local_interior_edge_integral",
            "local_boundary_integral", "local_edge_norm", "local_interior_edge_norm",
-           "local_boundary_norm", "frobenius_norm", "frobenius_norm"]
+           "local_boundary_norm", "frobenius_norm", "local_frobenius_norm"]
 
 
 def local_norm(f, norm_type='L2'):
@@ -89,12 +89,12 @@ def frobenius_norm(matrix, mesh=None):
             f += matrix[i, j]*matrix[i, j]
     return sqrt(assemble(f*dx))
 
-def local_frobenius_norm(matrix, mesh=None):
+def local_frobenius_norm(matrix, mesh=None, space=None):
     mesh = mesh or matrix.function_space().mesh()
-    P0 = FunctionSpace(mesh, "DG", 0)
+    space = space or FunctionSpace(mesh, "DG", 0)
     dim = mesh.topological_dimension()
     f = 0
     for i in range(dim):
         for j in range(dim):
             f += matrix[i, j]*matrix[i, j]
-    return sqrt(assemble(TestFunction(P0)*f*dx))
+    return sqrt(assemble(TestFunction(space)*f*dx))
