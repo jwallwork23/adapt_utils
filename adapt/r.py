@@ -49,7 +49,7 @@ class MeshMover():
         self.create_function_spaces()
         self.create_functions()
         self.setup_pseudotimestepper()
-        self.setup_equidistributor()
+        self.setup_equidistribution()
         self.setup_l2_projector()
 
         # Outputs
@@ -100,7 +100,7 @@ class MeshMover():
         self.residual_l2_form = ψ*residual_form*dx
         self.norm_l2_form = ψ*self.θ*dx
 
-    def setup_equidistributor(self):
+    def setup_equidistribution(self):  # TODO: Other options, e.g. MMPDE
         σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
         n = FacetNormal(self.mesh)
         a = inner(τ, σ)*dx
@@ -109,15 +109,23 @@ class MeshMover():
         # L += (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
         L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
         prob = LinearVariationalProblem(a, L, self.σ_new)
-        self.equidistributor = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
+        self.equidistribution = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def setup_l2_projector(self):
         u_cts, v_cts = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
         a = dot(v_cts, u_cts)*dx
         L = dot(v_cts, grad(self.φ_old))*dx
-        bcs = [DirichletBC(self.P1_vec.sub(0), 0.0, 1),
-               DirichletBC(self.P1_vec.sub(1), 0.0, 2),
-               DirichletBC(self.P1_vec.sub(0), 0.0, 3)]  # TODO: Generalise. Perhaps use rotation matrix?
+        bcs = []
+        for i in self.mesh.exterior_facets.unique_markers:
+            n = [assemble(FacetNormal(self.mesh)[0]*ds(i)), assemble(FacetNormal(self.mesh)[1]*ds(i))]
+            if np.allclose(n[0], 0.0) and np.allclose(n[1], 0.0):
+                raise ValueError("Invalid normal vector {:}".format(n))
+            elif np.allclose(n[0], 0.0):
+                bcs.append(DirichletBC(self.P1_vec.sub(1), 0.0, i))
+            elif np.allclose(n[1], 0.0):
+                bcs.append(DirichletBC(self.P1_vec.sub(0), 0.0, i))
+            else:
+                raise NotImplementedError("Have not yet considered non-axes-aligned boundaries.")  # TODO
         prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bcs)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
@@ -172,6 +180,6 @@ class MeshMover():
             if residual_l2_norm > 2.0*initial_norm:
                 raise ConvergenceError("r-adaptation failed to converge in {:d} iterations.".format(i+1))
             self.pseudotimestepper.solve()
-            self.equidistributor.solve()
+            self.equidistribution.solve()
             self.φ_old.assign(self.φ_new)
             self.σ_old.assign(self.σ_new)
