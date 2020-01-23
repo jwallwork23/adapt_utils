@@ -1,13 +1,15 @@
 from thetis import *
 
 from adapt_utils.test_cases.rossby_wave.options import BoydOptions
+from adapt_utils.test_cases.rossby_wave.monitors import *
 from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 
 
 # NOTE: It seems as though [Huang et al 2008] considers n = 4, 8, 20
 n_coarse = 1
 n_fine = 30  # TODO: 50
-refine_equator = False
+# initial_monitor = None
+initial_monitor = equator_monitor
 
 op = BoydOptions(n=n_coarse, order=1)
 op.debug = True
@@ -19,9 +21,9 @@ op.dt_per_remesh = 10*n_coarse
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 
-if refine_equator:
+if initial_monitor is not None:
     swp.approach = 'monge_ampere'
-    swp.monitor_function = equator_monitor
+    swp.monitor_function = initial_monitor
     swp.adapt_mesh()
     # op.approach = 'fixed_mesh'  # TODO: check if needed
     swp.__init__(op, mesh=swp.mesh, levels=swp.levels)
