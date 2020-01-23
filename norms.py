@@ -14,28 +14,28 @@ def local_norm(f, norm_type='L2'):
     mesh = f.function_space().mesh()
     i = TestFunction(FunctionSpace(mesh, "DG", 0))
 
-    if isinstance(f, FiredrakeFunction):
+    if isinstance(f, Function):
         if typ == 'l2':
-            form = i * inner(f, f) * dx
+            form = i*inner(f, f)*dx
         elif typ == 'h1':
-            form = i * (inner(f, f) * dx + inner(grad(f), grad(f))) * dx
+            form = i*inner(f, f)*dx + i*inner(grad(f), grad(f))*dx
         elif typ == "hdiv":
-            form = i * (inner(f, f) * dx + div(f) * div(f)) * dx
+            form = i*inner(f, f)*dx + i*div(f)*div(f)*dx
         elif typ == "hcurl":
-            form = i * (inner(f, f) * dx + inner(curl(f), curl(f))) * dx
+            form = i*inner(f, f)*dx + i*inner(curl(f), curl(f))*dx
         else:
-            raise RuntimeError("Unknown norm type '%s'" % norm_type)
+            raise RuntimeError("Unknown norm type '{:s}'".format(norm_type))
     else:
         if typ == 'l2':
-            form = i * sum(inner(fi, fi) for fi in f) * dx
+            form = i*sum(inner(fi, fi) for fi in f)*dx
         elif typ == 'h1':
-            form = i * sum(inner(fi, fi) * dx + inner(grad(fi), grad(fi)) for fi in f) * dx
+            form = i*sum(inner(fi, fi)*dx + inner(grad(fi), grad(fi)) for fi in f)*dx
         elif typ == "hdiv":
-            form = i * sum(inner(fi, fi) * dx + div(fi) * div(fi) for fi in f) * dx
+            form = i*sum(inner(fi, fi)*dx + div(fi) * div(fi) for fi in f)*dx
         elif typ == "hcurl":
-            form = i * sum(inner(fi, fi) * dx + inner(curl(fi), curl(fi)) for fi in f) * dx
+            form = i*sum(inner(fi, fi)*dx + inner(curl(fi), curl(fi)) for fi in f)*dx
         else:
-            raise RuntimeError("Unknown norm type '%s'" % norm_type)
+            raise RuntimeError("Unknown norm type '{:s}'".format(norm_type))
     return sqrt(assemble(form))
 
 def local_edge_integral(f, mesh=None):
