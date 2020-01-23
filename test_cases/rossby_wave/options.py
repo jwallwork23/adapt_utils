@@ -238,6 +238,7 @@ class BoydOptions(ShallowWaterOptions):
         :kwarg t: current time.
         """
         assert self.order in (0, 1)
+        self.print_debug("Computing order {:d} asymptotic solution on mesh with {:d} elements...".format(self.order+1, fs.mesh().num_cells()))
         if self.order == 0:
             self.zeroth_order_terms(t)
         else:
@@ -264,10 +265,10 @@ class BoydOptions(ShallowWaterOptions):
         """
         Set up a non-periodic, very fine mesh on the PDE domain.
         """
-        if self.debug:
-            N = 2*n*n*self.lx*self.ly
-            print_output("Generating reference mesh with {:d} elements...".format(N))
-        reference_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly,
+        nx = self.lx*n
+        ny = self.ly*n
+        self.print_debug("Generating reference mesh with {:d} elements...".format(2*nx*ny))
+        reference_mesh = RectangleMesh(nx, ny, self.lx, self.ly,
                                        distribution_parameters=self.distribution_parameters)
         x, y = SpatialCoordinate(reference_mesh)
         reference_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
@@ -303,13 +304,11 @@ class BoydOptions(ShallowWaterOptions):
 
         :arg sol_periodic: Numerical solution of PDE.
         """
-        if op.debug:
-            print_output("Generating non-periodic counterpart of periodic function...")
+        self.print_debug("Generating non-periodic counterpart of periodic function...")
         sol = self.remove_periodicity(sol_periodic)
 
         # Split Northern and Southern halves of domain
-        if op.debug:
-            print_output("Splitting Northern and Southern halves of domain...")
+        self.print_debug("Splitting Northern and Southern halves of domain...")
         mesh = sol.function_space().mesh()
         y = SpatialCoordinate(mesh)[1]
         upper = Function(sol.function_space())
@@ -323,8 +322,7 @@ class BoydOptions(ShallowWaterOptions):
 
         # Project solution into a reference space on a fine mesh
         reference_mesh = self.get_reference_mesh(n=reference_mesh_resolution)
-        if op.debug:
-            print_output("Projecting solution onto fine mesh...")
+        self.print_debug("Projecting solution onto fine mesh...")
         fs = FunctionSpace(reference_mesh, sol.ufl_element())
         reference_mesh._parallel_compatible = {weakref.ref(mesh)}  # Mark meshes as compatible
         sol_proj = Function(fs)
@@ -337,8 +335,7 @@ class BoydOptions(ShallowWaterOptions):
         xcoords.interpolate(reference_mesh.coordinates[0])
 
         # Get relative mean peak height
-        if op.debug:
-            print_output("Extracting relative mean peak height...")
+        self.print_debug("Extracting relative mean peak height...")
         with sol_upper_proj.dat.vec_ro as vu:
             i_upper, self.h_upper = vu.max()
         with sol_lower_proj.dat.vec_ro as vl:
@@ -347,20 +344,18 @@ class BoydOptions(ShallowWaterOptions):
         self.h_lower /= 0.1567020
 
         # Get relative mean phase speed
-        if op.debug:
+        if self.debug:
             print_output("Extracting relative mean phase speed...")
         xdat = xcoords.vector().gather()
         self.c_upper = (48 - xdat[i_upper])/47.18
         self.c_lower = (48 - xdat[i_lower])/47.18
 
         # Calculate RMS error
-        if op.debug:
-            print_output("Calculating root mean square error...")
+        self.print_debug("Calculating root mean square error...")
         init = self.remove_periodicity(self.initial_value.split()[1])
         init_proj = Function(fs)
         init_proj.project(init)
         sol_proj -= init_proj
         sol_proj *= sol_proj
         self.rms = sqrt(np.mean(sol_proj.vector().gather()))
-        if op.debug:
-            print_output("Done!")
+        self.print_debug("Done!")

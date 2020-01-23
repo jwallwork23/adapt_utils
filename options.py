@@ -271,3 +271,7 @@ class Options(FrozenConfigurable):
         def export_func():
             return
         return export_func
+
+    def print_debug(self, msg):
+        if self.debug:
+            print_output(msg)
