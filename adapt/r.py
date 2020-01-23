@@ -31,7 +31,7 @@ class MeshMover():
         plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
         A1121-A1148.
     """
-    def __init__(self, mesh, monitor_function, op=Options()):
+    def __init__(self, mesh, monitor_function, method='quasi_newton', op=Options()):
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
         try:
@@ -39,6 +39,8 @@ class MeshMover():
         except AssertionError:
             raise NotImplementedError("r-adaptation only currently considered in 2D.")
         self.monitor_function = monitor_function
+        assert method in ('quasi_newton', 'relaxation')
+        self.method = method
         self.op = op
         self.ξ = Function(self.mesh.coordinates)  # Computational coordinates
         self.x = Function(self.mesh.coordinates)  # Physical coordinates
@@ -48,7 +50,6 @@ class MeshMover():
         # Create functions and solvers
         self.create_function_spaces()
         self.create_functions()
-        self.setup_pseudotimestepper()
         self.setup_equidistribution()
         self.setup_l2_projector()
 
@@ -61,17 +62,25 @@ class MeshMover():
 
     def create_function_spaces(self):
         self.V = FunctionSpace(self.mesh, "CG", self.op.degree)
+        self.V_nullspace = VectorSpaceBasis(constant=True)
         self.V_ten = TensorFunctionSpace(self.mesh, "CG", self.op.degree)
+        self.W = self.V*self.V_ten
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
         self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.p0test = TestFunction(self.P0)
 
     def create_functions(self):
-        self.φ_old = Function(self.V)
-        self.φ_new = Function(self.V)
-        self.σ_old = Function(self.V_ten)
-        self.σ_new = Function(self.V_ten)
+        if self.method == 'relaxation':
+            self.φ_old = Function(self.V)
+            self.φ_new = Function(self.V)
+            self.σ_old = Function(self.V_ten)
+            self.σ_new = Function(self.V_ten)
+        else:
+            self.φσ = Function(self.W)
+            self.φ_new, self.σ_new = split(self.φσ)
+            self.φσ_temp = Function(self.W)
+            self.φ_old, self.σ_old = split(self.φσ_temp)
         self.θ = Constant(0.0)  # Normalisation parameter
         self.monitor = Function(self.P1, name="Monitor function")
         self.update_monitor()
@@ -83,33 +92,115 @@ class MeshMover():
         self.monitor.interpolate(self.monitor_function(self.mesh))
 
     def setup_pseudotimestepper(self):
+        assert self.method == 'relaxation'
         φ, ψ = TrialFunction(self.V), TestFunction(self.V)
         a = dot(grad(ψ), grad(φ))*dx
         L = dot(grad(ψ), grad(self.φ_old))*dx
         L += self.dt*ψ*(self.monitor*det(self.I + self.σ_old) - self.θ)*dx
         prob = LinearVariationalProblem(a, L, self.φ_new)
-        nullspace = VectorSpaceBasis(constant=True)
-        self.pseudotimestepper = LinearVariationalSolver(prob, nullspace=nullspace,
-                                                         transpose_nullspace=nullspace,
+        self.pseudotimestepper = LinearVariationalSolver(prob, nullspace=self.V_nullspace,
+                                                         transpose_nullspace=self.V_nullspace,
                                                          solver_parameters={'ksp_type': 'cg',
                                                                             'pc_type': 'gamg'})
 
-        # Setup residuals
+    def setup_residuals(self):
+        ψ = TestFunction(self.V)
         self.θ_form = self.monitor*det(self.I + self.σ_old)*dx
         residual_form = self.monitor*det(self.I + self.σ_old) - self.θ
         self.residual_l2_form = ψ*residual_form*dx
         self.norm_l2_form = ψ*self.θ*dx
 
     def setup_equidistribution(self):  # TODO: Other options, e.g. MMPDE
+        n = FacetNormal(self.mesh)
+        if self.method == 'relaxation':
+            self.setup_pseudotimestepper()
+            σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
+            a = inner(τ, σ)*dx
+            L = -dot(div(τ), grad(self.φ_new))*dx
+            # L += (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
+            L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
+            prob = LinearVariationalProblem(a, L, self.σ_new)
+            self.equidistribution = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
+        else:
+            φ, σ = TrialFunctions(self.W)
+            ψ, τ = TestFunctions(self.W)
+            F = inner(τ, self.σ_new)*dx + dot(div(τ), grad(self.φ_new))*dx
+            # F -= (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
+            F -= (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
+            F -= ψ*(self.monitor*det(self.I + self.σ_new) - self.θ)*dx
+
+            total_volume = assemble(Constant(1.0)*dx(domain=self.mesh))
+
+            def generate_m(cursol):
+                with self.φσ_temp.dat.vec as v:
+                    cursol.copy(v)
+
+                # Perform L2 projection and generate coordinates appropriately
+                self.l2_projector.solve()
+                par_loop(('{[i, j] : 0 <= i < cg.dofs and 0 <= j < 2}', 'dg[i, j] = cg[i, j]'), dx,
+                         {'cg': (self.grad_φ_cts, READ), 'dg': (self.grad_φ_dg, WRITE)},
+                         is_loopy_kernel=True)
+                self.x.assign(self.ξ + self.grad_φ_dg)  # x = ξ + grad(φ)
+
+                self.mesh.coordinates.assign(self.x)
+                self.update_monitor()
+                self.mesh.coordinates.assign(self.ξ)
+
+                # Evaluate normalisation coefficient
+                self.θ.assign(assemble(self.θ_form)/total_volume)
+
+            self.generate_m = generate_m
+
+            # Custom preconditioning matrix
+            Jp = inner(τ, σ)*dx + φ*ψ*dx + dot(grad(φ), grad(ψ))*dx
+
+            prob = NonlinearVariationalProblem(F, self.φσ, Jp=Jp)
+            nullspace = MixedVectorSpaceBasis(self.W, [self.V_nullspace, self.W.sub(1)])
+
+            params = {"ksp_type": "gmres",
+                      "pc_type": "fieldsplit",
+                      "pc_fieldsplit_type": "multiplicative",
+                      "pc_fieldsplit_off_diag_use_amat": True,
+                      "fieldsplit_0_pc_type": "gamg",
+                      "fieldsplit_0_ksp_type": "preonly",
+                      "fieldsplit_0_mg_levels_ksp_max_it": 5,
+                      # "fieldsplit_0_mg_levels_pc_type": "bjacobi",  # parallel
+                      # "fieldsplit_0_mg_levels_sub_ksp_type": "preonly",  # parallel
+                      # "fieldsplit_0_mg_levels_sub_pc_type": "ilu",  # parallel
+                      "fieldsplit_0_mg_levels_pc_type": "ilu",  # serial
+                      # "fieldsplit_1_pc_type": "bjacobi",  # parallel
+                      # "fieldsplit_1_sub_ksp_type": "preonly",  # parallel
+                      # "fieldsplit_1_sub_pc_type": "ilu",  # parallel
+                      "fieldsplit_1_pc_type": "ilu",  # serial
+                      "fieldsplit_1_ksp_type": "preonly",
+                      "ksp_max_it": 200,
+                      "snes_max_it": 125,
+                      "ksp_gmres_restart": 200,
+                      "snes_rtol": self.op.r_adapt_rtol,
+                      "snes_linesearch_type": "l2",
+                      "snes_linesearch_max_it": 5,
+                      "snes_linesearch_maxstep": 1.05,
+                      "snes_linesearch_damping": 0.8,
+                      # "ksp_monitor": True,
+                      # "snes_monitor": True,
+                      # "snes_linesearch_monitor": True,
+                      "snes_lag_preconditioner": -1}
+
+            self.equidistribution = NonlinearVariationalSolver(prob, nullspace=nullspace,
+                                                               transpose_nullspace=nullspace,
+                                                               pre_jacobian_callback=self.generate_m,
+                                                               pre_function_callback=self.generate_m,
+                                                               solver_parameters=params)
+        self.setup_residuals()
+
+    def initialise_sigma(self):
         σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
         n = FacetNormal(self.mesh)
         a = inner(τ, σ)*dx
         L = -dot(div(τ), grad(self.φ_new))*dx
-        # NOTE: Neumann condition doesn't seem to do anything. Need postproc step below.
         # L += (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
         L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
-        prob = LinearVariationalProblem(a, L, self.σ_new)
-        self.equidistribution = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
+        solve(a == L, self.σ_new, solver_parameters={'ksp_type': 'cg'})
 
     def setup_l2_projector(self):
         u_cts, v_cts = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
@@ -130,12 +221,17 @@ class MeshMover():
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def adapt(self):
+        if self.method == 'relaxation':
+            self.run_relaxation()
+        else:
+            self.run_quasi_newton()
+
+    def run_relaxation(self):
         L_p0 = self.p0test*self.monitor*dx
         original_volume = assemble(self.p0test*dx)
         total_volume = assemble(Constant(1.0)*dx(domain=self.mesh))
 
         maxit = self.op.r_adapt_maxit
-        tol = self.op.r_adapt_rtol
         msg = "Iteration {:4d}   Min/Max {:10.4e}   Residual {:10.4e}   Equidistribution {:10.4e}"
         for i in range(maxit):
 
@@ -174,7 +270,7 @@ class MeshMover():
             equi = std/mean
             if i % 10 == 0 and self.op.debug:
                 print_output(msg.format(i, minmax, residual_l2_norm, equi))
-            if residual_l2_norm < tol:
+            if residual_l2_norm < self.op.r_adapt_rtol:
                 print_output("r-adaptation converged in {:d} iterations.".format(i+1))
                 break
             if residual_l2_norm > 2.0*initial_norm:
@@ -183,3 +279,37 @@ class MeshMover():
             self.equidistribution.solve()
             self.φ_old.assign(self.φ_new)
             self.σ_old.assign(self.σ_new)
+
+    def run_quasi_newton(self):
+        assert self.method == 'quasi_newton'
+        L_p0 = self.p0test*self.monitor*dx
+        original_volume = assemble(self.p0test*dx)
+        msg = "Iteration {:4d}   Min/Max {:10.4e}   Residual {:10.4e}   Equidistribution {:10.4e}"
+
+        def fakemonitor(snes, i, rnorm):
+            cursol = snes.getSolution()
+            self.generate_m(cursol)  # Updates monitor function and normalisation constant
+
+            self.mesh.coordinates.assign(self.x)
+            assemble(L_p0, tensor=self.volume)  # For equidistribution measure
+            self.volume /= original_volume
+            if self.op.debug:
+                self.volume_file.write(self.volume)
+            self.mesh.coordinates.assign(self.ξ)
+
+            # Convergence criteria
+            residual_l2 = assemble(self.residual_l2_form).dat.norm
+            norm_l2 = assemble(self.norm_l2_form).dat.norm
+            residual_l2_norm = residual_l2 / norm_l2
+            v = self.volume.vector().gather()
+            minmax = v.min()/v.max()
+            mean = v.sum()/v.size
+            w = v.copy() - mean
+            w *= w
+            std = sqrt(w.sum()/w.size)
+            equi = std/mean
+            if self.op.debug:
+                print_output(msg.format(i, minmax, residual_l2_norm, equi))
+
+        self.equidistribution.snes.setMonitor(fakemonitor)
+        self.equidistribution.solve()

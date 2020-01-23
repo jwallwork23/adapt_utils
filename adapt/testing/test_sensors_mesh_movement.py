@@ -13,6 +13,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-n")
 parser.add_argument("-debug")
 parser.add_argument("-monitor")
+parser.add_argument("-method")
 args = parser.parse_args()
 
 op = Options()
@@ -29,12 +30,14 @@ elif n == 3:
     sensor = multiscale
 elif n == 4:
     sensor = interweaved
-    op.r_adapt_rtol = 5.0e-4  # TODO: Try Quasi-Newton approach
+    # op.r_adapt_rtol = 5.0e-4  # TODO: Try Quasi-Newton approach
 else:
     raise ValueError
 m = args.monitor or 'sensor'
+method = args.method or 'relaxation'
 try:
     assert m in ('sensor', 'frobenius')
+    assert method in ('relaxation', 'quasi_newton')
 except AssertionError:
     raise NotImplementedError
 op.di = os.path.join(op.di, sensor.__name__, m)
@@ -62,6 +65,6 @@ if m == 'sensor':
 elif m == 'frobenius':
     monitor = monitor_frobenius
 
-mm = MeshMover(mesh, monitor, op=op)
+mm = MeshMover(mesh, monitor, method=method, op=op)
 mm.adapt()
 mesh.coordinates.assign(mm.x)
