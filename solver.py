@@ -84,6 +84,7 @@ class SteadyProblem():
             self.create_enriched_problem()
         self.n = FacetNormal(self.mesh)  # TODO: use version in AdaptiveMesh
         self.h = CellSize(self.mesh)     # TODO: use version in AdaptiveMesh
+        self.op.print_debug("Number of mesh elements: {:d}".format(mesh.num_cells()))
 
     def create_enriched_problem(self):
         """
@@ -601,7 +602,7 @@ class SteadyProblem():
     def plot_error_estimate(self, approach):
         raise NotImplementedError  # TODO
 
-    def adapt_mesh(self):
+    def adapt_mesh(self):  # TODO: option for r-adaptation every *timestep*, rather than every export
         """
         Adapt mesh using metric constructed in error estimation step.
 
