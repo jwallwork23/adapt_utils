@@ -242,6 +242,7 @@ class MeshMover():
                 assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
                 self.volume /= self.original_volume
                 if self.op.debug:
+                    self.monitor_file.write(self.monitor)
                     self.volume_file.write(self.volume)
                 self.mesh.coordinates.assign(self.ξ)
 

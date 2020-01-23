@@ -112,10 +112,12 @@ class BoydOptions(ShallowWaterOptions):
         self.hermite_coeffs = {'u': u, 'v': v, 'eta': eta}
 
     def set_bathymetry(self, fs):
-        raise NotImplementedError  # TODO
+        self.bathymetry = Constant(1.0, domain=fs.mesh())
+        return self.bathymetry
 
     def set_viscosity(self, fs):
-        raise NotImplementedError  # TODO
+        self.viscosity = Constant(0.0, domain=fs.mesh())
+        return self.viscosity
 
     def set_boundary_conditions(self, fs):
         """
@@ -224,6 +226,10 @@ class BoydOptions(ShallowWaterOptions):
         self.coriolis.interpolate(y)
         return self.coriolis
 
+    def set_qoi_kernel(self, fs):
+        # raise NotImplementedError  # TODO: Kelvin wave?
+        return
+
     def get_exact_solution(self, fs, t=0.):
         """
         Evaluate asymptotic solution of chosen order.
@@ -258,17 +264,20 @@ class BoydOptions(ShallowWaterOptions):
         """
         Set up a non-periodic, very fine mesh on the PDE domain.
         """
+        if self.debug:
+            N = 2*n*n*self.lx*self.ly
+            print_output("Generating reference mesh with {:d} elements...".format(N))
         reference_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly,
                                        distribution_parameters=self.distribution_parameters)
         x, y = SpatialCoordinate(reference_mesh)
         reference_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
-
         return reference_mesh
 
     def remove_periodicity(self, sol):
         """
         :arg sol: Function to remove periodicity of.
         """
+
         # Generate an identical non-periodic mesh
         nonperiodic_mesh = RectangleMesh(self.lx*self.n, self.ly*self.n, self.lx, self.ly,
                                          distribution_parameters=self.distribution_parameters)
@@ -282,7 +291,6 @@ class BoydOptions(ShallowWaterOptions):
         V = FunctionSpace(nonperiodic_mesh, sol.ufl_element())
         sol_np = Function(V)
         sol_np.project(sol)
-
         return sol_np
 
     def get_peaks(self, sol_periodic, reference_mesh_resolution=50):
@@ -295,9 +303,13 @@ class BoydOptions(ShallowWaterOptions):
 
         :arg sol_periodic: Numerical solution of PDE.
         """
+        if op.debug:
+            print_output("Generating non-periodic counterpart of periodic function...")
         sol = self.remove_periodicity(sol_periodic)
 
         # Split Northern and Southern halves of domain
+        if op.debug:
+            print_output("Splitting Northern and Southern halves of domain...")
         mesh = sol.function_space().mesh()
         y = SpatialCoordinate(mesh)[1]
         upper = Function(sol.function_space())
@@ -311,6 +323,8 @@ class BoydOptions(ShallowWaterOptions):
 
         # Project solution into a reference space on a fine mesh
         reference_mesh = self.get_reference_mesh(n=reference_mesh_resolution)
+        if op.debug:
+            print_output("Projecting solution onto fine mesh...")
         fs = FunctionSpace(reference_mesh, sol.ufl_element())
         reference_mesh._parallel_compatible = {weakref.ref(mesh)}  # Mark meshes as compatible
         sol_proj = Function(fs)
@@ -323,6 +337,8 @@ class BoydOptions(ShallowWaterOptions):
         xcoords.interpolate(reference_mesh.coordinates[0])
 
         # Get relative mean peak height
+        if op.debug:
+            print_output("Extracting relative mean peak height...")
         with sol_upper_proj.dat.vec_ro as vu:
             i_upper, self.h_upper = vu.max()
         with sol_lower_proj.dat.vec_ro as vl:
@@ -331,14 +347,20 @@ class BoydOptions(ShallowWaterOptions):
         self.h_lower /= 0.1567020
 
         # Get relative mean phase speed
+        if op.debug:
+            print_output("Extracting relative mean phase speed...")
         xdat = xcoords.vector().gather()
         self.c_upper = (48 - xdat[i_upper])/47.18
         self.c_lower = (48 - xdat[i_lower])/47.18
 
         # Calculate RMS error
+        if op.debug:
+            print_output("Calculating root mean square error...")
         init = self.remove_periodicity(self.initial_value.split()[1])
         init_proj = Function(fs)
         init_proj.project(init)
         sol_proj -= init_proj
         sol_proj *= sol_proj
         self.rms = sqrt(np.mean(sol_proj.vector().gather()))
+        if op.debug:
+            print_output("Done!")
