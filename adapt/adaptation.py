@@ -1,6 +1,12 @@
 from firedrake import *
 
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+
 from adapt_utils.adapt.kernels import *
+from adapt_utils.options import Options
 
 
 __all__ = ["AdaptiveMesh"]
@@ -10,7 +16,7 @@ class AdaptiveMesh():
     """
     Wrapper which adds extra features to mesh.
     """
-    def __init__(self, mesh, levels=0):
+    def __init__(self, mesh, levels=0, op=Options()):
         """
         `AdaptMesh` object is initialised as the basis of a `MeshHierarchy`.
         """
@@ -31,6 +37,7 @@ class AdaptiveMesh():
             raise NotImplementedError
         self.facet_area = FacetArea(self.mesh)
         self.h = CellSize(self.mesh)
+        self.jacobian_sign = sign(JacobianDeterminant(mesh))
 
     def copy(self):
         return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
@@ -48,12 +55,42 @@ class AdaptiveMesh():
         assert self.dim == 2
         P0 = FunctionSpace(self.mesh, "DG", 0)
         J = Jacobian(self.mesh)
+        detJ = self.jacobian_sign*JacobianDeterminant(self.mesh)
         edge1 = as_vector([J[0, 0], J[1, 0]])
         edge2 = as_vector([J[0, 1], J[1, 1]])
         norm1 = sqrt(dot(edge1, edge1))
         norm2 = sqrt(dot(edge2, edge2))
-        self.scaled_jacobian = interpolate(-JacobianDeterminant(self.mesh)/(norm1*norm2), P0)
+
+        # TODO: This hack is probably insufficient. It was designed to ensure each element of a
+        #       uniform mesh has the same quality.
+        edge1 = conditional(le(abs(norm1-norm2), 1e-8), edge1, edge1-edge2)
+        norm1 = sqrt(dot(edge1, edge1))
+
+        self.scaled_jacobian = interpolate(detJ/(norm1*norm2), P0)
         return self.scaled_jacobian
+
+    def plot_quality(self):
+        """
+        Plot scaled Jacobian using a discretised scale:
+          * green   : high quality elements (over 75%);
+          * yellow  : medium quality elements (50 - 75%);
+          * blue    : low quality elements (0 - 50%);
+          * magenta : inverted elements (quality < 0).
+        """
+        cmap = plt.get_cmap('viridis', 20)
+        newcolours = cmap(np.linspace(0, 1, 40))
+        magenta = np.array([1, 0, 1, 1])
+        green = np.array([0, 1, 0, 1])
+        yellow = np.array([1, 1, 0, 1])
+        cyan = np.array([0, 1, 1, 1])
+        newcolours[:20, :] = magenta
+        newcolours[20:30, :] = cyan
+        newcolours[30:35, :] = yellow
+        newcolours[35:, :] = green
+        newcmap = ListedColormap(newcolours)
+        cax = plot(self.scaled_jacobian, vmin=-1, vmax=1, cmap=newcmap)
+        plt.title("Scaled Jacobian")
+        plt.savefig(os.path.join(self.op.di, 'scaled_jacobian.pdf'))
 
     def save_plex(self, filename):
         """
