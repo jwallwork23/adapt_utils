@@ -32,6 +32,29 @@ class AdaptiveMesh():
         self.facet_area = FacetArea(self.mesh)
         self.h = CellSize(self.mesh)
 
+    def copy(self):
+        return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
+
+    def get_quality(self):
+        """
+        Compute the scaled Jacobian for each mesh element:
+    ..  math::
+            Q(K) = \frac{\det(J_K)}{\|\mathbf e_1\|\,\|\mathbf e2\|},
+
+        where element :math:`K` is defined by edges :math:`\mathbf e_1` and :math:`\mathbf e_2`.
+
+        NOTE that :math:`J_K = [\mathbf e_1, \mathbf e_2]`.
+        """
+        assert self.dim == 2
+        P0 = FunctionSpace(self.mesh, "DG", 0)
+        J = Jacobian(self.mesh)
+        edge1 = as_vector([J[0, 0], J[1, 0]])
+        edge2 = as_vector([J[0, 1], J[1, 1]])
+        norm1 = sqrt(dot(edge1, edge1))
+        norm2 = sqrt(dot(edge2, edge2))
+        self.scaled_jacobian = interpolate(-JacobianDeterminant(self.mesh)/(norm1*norm2), P0)
+        return self.scaled_jacobian
+
     def save_plex(self, filename):
         """
         Save mesh in DMPlex format.
@@ -47,14 +70,11 @@ class AdaptiveMesh():
         newplex.createFromFile(filename)
         self.__init__(Mesh(newplex), levels=self.levels)
 
-    def adapt(self, metric):
+    def adapt(self, metric):  # TODO: Rename so that it's Pragmatic specific
         """
         Adapt mesh using a specified metric. The `MeshHierarchy` is reinstated.
         """
         self.__init__(adapt(self.mesh, metric), levels=self.levels)
-
-    def copy(self):
-        return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
 
     def get_edge_lengths(self):
         """
