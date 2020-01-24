@@ -4,6 +4,7 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import ListedColormap
+import warnings
 
 from adapt_utils.adapt.kernels import *
 from adapt_utils.options import Options
@@ -21,6 +22,7 @@ class AdaptiveMesh():
         `AdaptMesh` object is initialised as the basis of a `MeshHierarchy`.
         """
         self.levels = levels
+        self.op = op
         self.hierarchy = MeshHierarchy(mesh, levels)
         self.mesh = self.hierarchy[0]
         self.dim = self.mesh.topological_dimension()
@@ -66,8 +68,16 @@ class AdaptiveMesh():
         edge1 = conditional(le(abs(norm1-norm2), 1e-8), edge1, edge1-edge2)
         norm1 = sqrt(dot(edge1, edge1))
 
+        # FIXME: Inverted elements do not show!
+
         self.scaled_jacobian = interpolate(detJ/(norm1*norm2), P0)
         return self.scaled_jacobian
+
+    def check_inverted(self):
+        if not hasattr(self, 'scaled_jacobian'):
+            self.get_quality()
+        if self.scaled.jacobian.vector().gather().min() < 0:
+            warnings.warn("WARNING! Mesh has inverted elements!")
 
     def plot_quality(self):
         """
