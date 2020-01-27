@@ -32,7 +32,7 @@ class MeshMover():
         plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
         A1121-A1148.
     """
-    def __init__(self, mesh, monitor_function, method='quasi_newton', op=Options()):
+    def __init__(self, mesh, monitor_function, method='monge_ampere', nonlinear_method='quasi_newton', bc=None, op=Options()):
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
         try:
@@ -40,8 +40,11 @@ class MeshMover():
         except AssertionError:
             raise NotImplementedError("r-adaptation only currently considered in 2D.")
         self.monitor_function = monitor_function
-        assert method in ('quasi_newton', 'relaxation')
+        assert method in ('monge_ampere', 'laplacian_smoothing')
         self.method = method
+        assert nonlinear_method in ('quasi_newton', 'relaxation')
+        self.nonlinear_method = nonlinear_method
+        self.bc = bc
         self.op = op
         self.ξ = Function(self.mesh.coordinates)  # Computational coordinates
         self.x = Function(self.mesh.coordinates)  # Physical coordinates
@@ -74,7 +77,7 @@ class MeshMover():
         self.p0test = TestFunction(self.P0)
 
     def create_functions(self):
-        if self.method == 'relaxation':
+        if self.nonlinear_method == 'relaxation':
             self.φ_old = Function(self.V)
             self.φ_new = Function(self.V)
             self.σ_old = Function(self.V_ten)
@@ -94,11 +97,19 @@ class MeshMover():
         self.grad_φ_cts = Function(self.P1_vec, name="L2 projected gradient")
         self.grad_φ_dg = Function(self.mesh.coordinates, name="Discontinuous gradient")
 
+    def laplacian_smoothing(self):
+        assert self.bc is not None
+        v, v_test = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
+        n = FacetNormal(self.mesh)
+        a = -inner(grad(v_test), grad(v))*dx + inner(dot(grad(v), v_test), n)*ds
+        L = inner(v_test, Constant(as_vector([0.0, 0.0])))*dx
+        solve(a == L, self.grad_φ_cts, bcs=self.bc)
+
     def update_monitor(self):
         self.monitor.interpolate(self.monitor_function(self.mesh))
 
     def setup_pseudotimestepper(self):
-        assert self.method == 'relaxation'
+        assert self.nonlinear_method == 'relaxation'
         φ, ψ = TrialFunction(self.V), TestFunction(self.V)
         a = dot(grad(ψ), grad(φ))*dx
         L = dot(grad(ψ), grad(self.φ_old))*dx
@@ -148,7 +159,7 @@ class MeshMover():
     def setup_equidistribution(self):  # TODO: Other options, e.g. MMPDE
         """
         Setup solvers for nonlinear iteration. Two approaches are considered, as specified by
-        `self.method` - either a relaxation using pseudo-timestepping ('relaxation'), or a
+        `self.nonlinear_method` - either a relaxation using pseudo-timestepping ('relaxation'), or a
         quasi-Newton nonlinear solver ('quasi_newton').
 
         The former approach solves linear systems at each pseudo-timestep. Whilst each of these
@@ -159,7 +170,7 @@ class MeshMover():
         nonlinear iterations.
         """
         n = FacetNormal(self.mesh)
-        if self.method == 'relaxation':
+        if self.nonlinear_method == 'relaxation':
             self.setup_pseudotimestepper()
             σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
             a = inner(τ, σ)*dx
@@ -285,12 +296,21 @@ class MeshMover():
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def adapt(self):
-        if self.method == 'quasi_newton':
+        if self.method == 'laplacian_smoothing':
+            self.laplacian_smoothing()
+            self.apply_map()
+        elif self.method == 'monge_ampere':
+            self.adapt_monge_ampere()
+        else:
+            raise NotImplementedError  # TODO
+
+    def adapt_monge_ampere(self):
+        if self.nonlinear_method == 'quasi_newton':
             self.equidistribution.snes.setMonitor(self.fakemonitor)
             self.equidistribution.solve()
             return
 
-        assert self.method == 'relaxation'
+        assert self.nonlinear_method == 'relaxation'
         maxit = self.op.r_adapt_maxit
         for i in range(maxit):
 
