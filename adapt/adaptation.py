@@ -39,7 +39,8 @@ class AdaptiveMesh():
             raise NotImplementedError
         self.facet_area = FacetArea(self.mesh)
         self.h = CellSize(self.mesh)
-        self.jacobian_sign = sign(JacobianDeterminant(mesh))
+        P0 = FunctionSpace(self.mesh, "DG", 0)
+        self.jacobian_sign = interpolate(sign(JacobianDeterminant(mesh)), P0)
 
     def copy(self):
         return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
@@ -56,8 +57,15 @@ class AdaptiveMesh():
         """
         assert self.dim == 2
         P0 = FunctionSpace(self.mesh, "DG", 0)
-        J = Jacobian(self.mesh)
-        detJ = self.jacobian_sign*JacobianDeterminant(self.mesh)
+        P0_ten = TensorFunctionSpace(self.mesh, "DG", 0)
+        J = interpolate(Jacobian(self.mesh), P0_ten)
+        unswapped = as_matrix([[J[0, 0], J[0, 1]], [J[1, 0], J[1, 1]]])
+        swapped = as_matrix([[J[1, 0], J[1, 1]], [J[0, 0], J[0, 1]]])
+        sgn = Function(P0)
+        sgn.dat.data[:] = self.jacobian_sign.dat.data
+        # J.interpolate(conditional(ge(self.jacobian_sign, 0), unswapped, swapped))
+        J.interpolate(conditional(ge(sgn, 0), unswapped, swapped))
+        detJ = det(J)
         edge1 = as_vector([J[0, 0], J[1, 0]])
         edge2 = as_vector([J[0, 1], J[1, 1]])
         norm1 = sqrt(dot(edge1, edge1))
@@ -65,10 +73,8 @@ class AdaptiveMesh():
 
         # TODO: This hack is probably insufficient. It was designed to ensure each element of a
         #       uniform mesh has the same quality.
-        edge1 = conditional(le(abs(norm1-norm2), 1e-8), edge1, edge1-edge2)
-        norm1 = sqrt(dot(edge1, edge1))
-
-        # FIXME: Inverted elements do not show!
+        # edge1 = conditional(le(abs(norm1-norm2), 1e-8), edge1, edge1-edge2)
+        # norm1 = sqrt(dot(edge1, edge1))
 
         self.scaled_jacobian = interpolate(detJ/(norm1*norm2), P0)
         return self.scaled_jacobian
@@ -76,7 +82,7 @@ class AdaptiveMesh():
     def check_inverted(self):
         if not hasattr(self, 'scaled_jacobian'):
             self.get_quality()
-        if self.scaled.jacobian.vector().gather().min() < 0:
+        if self.scaled_jacobian.vector().gather().min() < 0:
             warnings.warn("WARNING! Mesh has inverted elements!")
 
     def plot_quality(self):
@@ -87,19 +93,23 @@ class AdaptiveMesh():
           * blue    : low quality elements (0 - 50%);
           * magenta : inverted elements (quality < 0).
         """
-        cmap = plt.get_cmap('viridis', 20)
-        newcolours = cmap(np.linspace(0, 1, 40))
-        magenta = np.array([1, 0, 1, 1])
-        green = np.array([0, 1, 0, 1])
-        yellow = np.array([1, 1, 0, 1])
-        cyan = np.array([0, 1, 1, 1])
-        newcolours[:20, :] = magenta
-        newcolours[20:30, :] = cyan
-        newcolours[30:35, :] = yellow
-        newcolours[35:, :] = green
+
+        # FIXME: Inverted elements do not show! Tried making transparent but it didn't do anything.
+        cmap = plt.get_cmap('viridis', 30)
+        newcolours = cmap(np.linspace(0, 1, 30))
+        newcolours[:10] = np.array([1, 0, 1, 1])    # Magenta
+        newcolours[10:20] = np.array([0, 1, 1, 1])  # Cyan
+        newcolours[20:25] = np.array([1, 1, 0, 1])  # Yellow
+        newcolours[25:] = np.array([0, 1, 0, 1])    # Green
         newcmap = ListedColormap(newcolours)
-        cax = plot(self.scaled_jacobian, vmin=-1, vmax=1, cmap=newcmap)
-        plt.title("Scaled Jacobian")
+
+        fig = plt.figure()
+        ax = plt.gca()
+        # ax = plt.subplot(121)
+        cax = plot(self.scaled_jacobian, vmin=-0.5, vmax=1, cmap=newcmap, axes=ax)
+        ax.set_title("Scaled Jacobian")
+        # ax = plt.subplot(122)
+        plot(self.mesh, axes=ax)
         plt.savefig(os.path.join(self.op.di, 'scaled_jacobian.pdf'))
 
     def save_plex(self, filename):
