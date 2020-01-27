@@ -8,8 +8,8 @@ from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 # NOTE: It seems as though [Huang et al 2008] considers n = 4, 8, 20
 n_coarse = 1
 n_fine = 30  # TODO: 50
-# initial_monitor = None
-initial_monitor = equator_monitor
+initial_monitor = None
+# initial_monitor = equator_monitor
 
 op = BoydOptions(n=n_coarse, order=1)
 op.debug = True
