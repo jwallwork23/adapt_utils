@@ -39,8 +39,10 @@ class AdaptiveMesh():
             raise NotImplementedError
         self.facet_area = FacetArea(self.mesh)
         self.h = CellSize(self.mesh)
-        P0 = FunctionSpace(self.mesh, "DG", 0)
-        self.jacobian_sign = interpolate(sign(JacobianDeterminant(mesh)), P0)
+        self.P0 = FunctionSpace(self.mesh, "DG", 0)
+        self.P0_vec = VectorFunctionSpace(self.mesh, "DG", 0)
+        self.P0_ten = TensorFunctionSpace(self.mesh, "DG", 0)
+        self.jacobian_sign = interpolate(sign(JacobianDeterminant(mesh)), self.P0)
 
     def copy(self):
         return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
@@ -56,12 +58,10 @@ class AdaptiveMesh():
         NOTE that :math:`J_K = [\mathbf e_1, \mathbf e_2]`.
         """
         assert self.dim == 2
-        P0 = FunctionSpace(self.mesh, "DG", 0)
-        P0_ten = TensorFunctionSpace(self.mesh, "DG", 0)
-        J = interpolate(Jacobian(self.mesh), P0_ten)
+        J = interpolate(Jacobian(self.mesh), self.P0_ten)
         unswapped = as_matrix([[J[0, 0], J[0, 1]], [J[1, 0], J[1, 1]]])
         swapped = as_matrix([[J[1, 0], J[1, 1]], [J[0, 0], J[0, 1]]])
-        sgn = Function(P0)
+        sgn = Function(self.P0)
         sgn.dat.data[:] = self.jacobian_sign.dat.data
         # J.interpolate(conditional(ge(self.jacobian_sign, 0), unswapped, swapped))
         J.interpolate(conditional(ge(sgn, 0), unswapped, swapped))
@@ -71,21 +71,19 @@ class AdaptiveMesh():
         norm1 = sqrt(dot(edge1, edge1))
         norm2 = sqrt(dot(edge2, edge2))
 
-        # TODO: This hack is probably insufficient. It was designed to ensure each element of a
-        #       uniform mesh has the same quality.
-        # edge1 = conditional(le(abs(norm1-norm2), 1e-8), edge1, edge1-edge2)
-        # norm1 = sqrt(dot(edge1, edge1))
-
-        self.scaled_jacobian = interpolate(detJ/(norm1*norm2), P0)
+        self.scaled_jacobian = interpolate(detJ/(norm1*norm2), self.P0)
         return self.scaled_jacobian
 
-    def check_inverted(self):
+    def check_inverted(self, error=False):
         if not hasattr(self, 'scaled_jacobian'):
             self.get_quality()
         if self.scaled_jacobian.vector().gather().min() < 0:
-            warnings.warn("WARNING! Mesh has inverted elements!")
+            if error:
+                raise ValueError("ERROR! Mesh has inverted elements!")
+            else:
+                warnings.warn("WARNING! Mesh has inverted elements!")
 
-    def plot_quality(self):
+    def plot_quality(self, ax=None, savefig=True):
         """
         Plot scaled Jacobian using a discretised scale:
           * green   : high quality elements (over 75%);
@@ -93,6 +91,8 @@ class AdaptiveMesh():
           * blue    : low quality elements (0 - 50%);
           * magenta : inverted elements (quality < 0).
         """
+        if not hasattr(self, 'scaled_jacobian'):
+            self.get_quality()
 
         # FIXME: Inverted elements do not show! Tried making transparent but it didn't do anything.
         cmap = plt.get_cmap('viridis', 30)
@@ -103,14 +103,14 @@ class AdaptiveMesh():
         newcolours[25:] = np.array([0, 1, 0, 1])    # Green
         newcmap = ListedColormap(newcolours)
 
-        fig = plt.figure()
-        ax = plt.gca()
-        # ax = plt.subplot(121)
+        if ax is None:
+            fig = plt.figure()
+            ax = plt.gca()
         cax = plot(self.scaled_jacobian, vmin=-0.5, vmax=1, cmap=newcmap, axes=ax)
         ax.set_title("Scaled Jacobian")
-        # ax = plt.subplot(122)
         plot(self.mesh, axes=ax)
-        plt.savefig(os.path.join(self.op.di, 'scaled_jacobian.pdf'))
+        if savefig:
+            plt.savefig(os.path.join(self.op.di, 'scaled_jacobian.pdf'))
 
     def save_plex(self, filename):
         """
@@ -168,8 +168,7 @@ class AdaptiveMesh():
         """
         self.get_edge_lengths()
         self.get_edge_vectors()
-        P0_vec = VectorFunctionSpace(self.mesh, "DG", 0)
-        self.maximum_length_edge = Function(P0_vec, name="Maximum length edge")
+        self.maximum_length_edge = Function(self.P0_vec, name="Maximum length edge")
         par_loop(get_maximum_length_edge(self.dim), dx, {'edges': (self.edge_lengths, READ),
                                                          'vectors': (self.edge_vectors, READ),
                                                          'max_vector': (self.maximum_length_edge, RW)
@@ -181,35 +180,32 @@ class AdaptiveMesh():
 
         Based on code by Lawrence Mitchell.
         """
-        P0_ten = TensorFunctionSpace(self.mesh, "DG", 0)
-        J = interpolate(Jacobian(self.mesh), P0_ten)
-        self.cell_metric = Function(P0_ten, name="Cell metric")
+        J = interpolate(Jacobian(self.mesh), self.P0_ten)
+        self.cell_metric = Function(self.P0_ten, name="Cell metric")
         kernel = eigen_kernel(singular_value_decomposition, self.dim)
-        op2.par_loop(kernel, P0_ten.node_set, self.cell_metric.dat(op2.INC), J.dat(op2.READ))
+        op2.par_loop(kernel, self.P0_ten.node_set, self.cell_metric.dat(op2.INC), J.dat(op2.READ))
 
     def get_cell_size(self, u, mode='nguyen'):
         """
         Measure of element size recommended in [Nguyen et al., 2009]: maximum edge length, projected
         onto the velocity field `u`.
         """
-        P0 = FunctionSpace(self.mesh, "DG", 0)
         try:
             assert isinstance(u, Constant) or isinstance(u, Function)
         except AssertionError:
             raise ValueError("Velocity field should be either `Function` or `Constant`.")
         if mode == 'diameter':
-            self.cell_size = interpolate(self.h, P0)
+            self.cell_size = interpolate(self.h, self.P0)
         elif mode == 'nguyen':
             self.get_maximum_length_edge()
             v = self.maximum_length_edge
-            self.cell_size = interpolate(abs((u[0]*v[0] + u[1]*v[1]))/sqrt(dot(u, u)), P0)
+            self.cell_size = interpolate(abs((u[0]*v[0] + u[1]*v[1]))/sqrt(dot(u, u)), self.P0)
         elif mode == 'cell_metric':
             self.get_cell_metric()
-            self.cell_size = interpolate(dot(u, dot(self.cell_metric, u)), P0)
+            self.cell_size = interpolate(dot(u, dot(self.cell_metric, u)), self.P0)
         else:
             raise ValueError("Element measure must be chosen from {'diameter', 'nguyen', 'cell_metric'}.")
 
     def subdomain_indicator(self, subdomain_id):
         """Creates a P0 indicator function relating with `subdomain_id`."""
-        P0 = FunctionSpace(self.mesh, "DG", 0)
-        return assemble(TestFunction(P0)*dx(subdomain_id))
+        return assemble(TestFunction(self.P0)*dx(subdomain_id))
