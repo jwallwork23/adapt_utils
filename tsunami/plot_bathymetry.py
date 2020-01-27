@@ -3,6 +3,7 @@ from thetis import *
 import os
 import scipy.interpolate as si
 from scipy.io.netcdf import NetCDFFile
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -27,7 +28,8 @@ lat_max = np.max(lat)
 num_lat = len(lat)
 
 x0, y0 = lonlat_to_utm(lat, lon, force_zone_number=54)
-ax.contourf(x0, y0, elev)
+cs = ax.contourf(x0, y0, elev, 20, cmap=matplotlib.cm.get_cmap('RdBu_r'))
+plt.colorbar(cs)
 plt.title("Original data")
 
 # mesh = RectangleMesh(num_lon, num_lat, lon_max-lon_min, lat_max-lat_min)
