@@ -3,19 +3,12 @@ from firedrake import *
 import numpy as np
 
 
-def degrees(rad):
-    return 180.0*rad/pi
-
-def radians(deg):
-    return pi*deg/180.0
-
-
 # Top matter courtesy of Tobias Bieniek, 2012.
 class OutOfRangeError(ValueError):
     pass
 
 __all__ = ["to_latlon", "from_latlon", "latitude_to_zone_letter", "latlon_to_zone_number",
-           "zone_number_to_central_longitude", "earth_radius", "lonlat_to_utm"]
+           "zone_number_to_central_longitude", "earth_radius", "lonlat_to_utm", "degrees", "radians"]
 
 K0 = 0.9996
 
@@ -46,7 +39,17 @@ R = 6378137
 ZONE_LETTERS = "CDEFGHJKLMNPQRSTUVWXX"
 
 
-def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, force_longitude=False):
+def degrees(rad):
+    rad *= 180.0/pi
+    return rad
+
+
+def radians(deg):
+    deg *= pi/180.0
+    return deg
+
+
+def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, force_longitude=False, radians=False):
     """
     Convert UTM coordinates to latitude-longitude, courtesy of Tobias Bieniek, 2012 (with some minor edits).
     
@@ -66,10 +69,11 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
     if not force_longitude:
         if not 100000 <= easting < 1000000:
             raise OutOfRangeError('easting out of range (must be between 100,000 m and 999,999 m)')
-    if not 0 <= northing <= 10000000:
-        raise OutOfRangeError('northing out of range (must be between 0 m and 10,000,000 m)')
-    if not 1 <= zone_number <= 60:
-        raise OutOfRangeError('zone number out of range (must be between 1 and 60)')
+    # FIXME
+    # if not 0 <= northing <= 10000000:
+    #     raise OutOfRangeError('northing out of range (must be between 0 m and 10,000,000 m)')
+    # if not 1 <= zone_number <= 60:
+    #     raise OutOfRangeError('zone number out of range (must be between 1 and 60)')
 
     if zone_letter:
         zone_letter = zone_letter.upper()

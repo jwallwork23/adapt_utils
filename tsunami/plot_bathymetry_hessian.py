@@ -1,7 +1,5 @@
 import firedrake
-from thetis import create_directory
 
-import os
 import matplotlib as mpl
 import numpy as np
 
@@ -26,7 +24,7 @@ for i in range(op.num_adapt):
     mesh = firedrake.adapt(mesh, steady_metric(op.bathymetry, op=op))
     P1 = firedrake.FunctionSpace(mesh, "CG", 1)
     op.set_bathymetry(P1)
-    op.set_initial_condition(P1)
+    op.set_initial_surface(P1)
 
 # Plot adapted mesh
 ax1 = axes.flat[0]
@@ -45,8 +43,7 @@ ax2.set_title("Adapted mesh interpolant")
 # Save adapted mesh and interpolant
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
 cb.set_label("Bathymetry $[\mathrm k\mathrm m]$")
-di = create_directory('outputs/tohoku')
-mpl.pyplot.savefig(os.path.join(di, 'metric_adapt_bathymetry_{:d}.pdf'.format(mesh.num_cells())))
+mpl.pyplot.savefig('outputs/metric_adapt_bathymetry_{:d}.pdf'.format(mesh.num_cells()))
 
 # New figure for initial free surface
 lon, lat, elev = op.read_surface_file()
@@ -62,7 +59,7 @@ ax1.set_title("Adapted mesh")
 
 # Plot bathymetry data interpolated onto adapted mesh
 ax2 = axes.flat[1]
-ax2 = firedrake.plot(op.initial_value, axes=ax2, colorbar=False)
+ax2 = firedrake.plot(op.initial_surface, axes=ax2, colorbar=False)
 ax2.set_xlabel("Degrees longitude")
 ax2.set_ylabel("Degrees latitude")
 ax2.set_title("Adapted mesh interpolant")
@@ -70,6 +67,4 @@ ax2.set_title("Adapted mesh interpolant")
 # Save adapted mesh and interpolant
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
 cb.set_label("Initial free surface $[\mathrm m]$")
-di = create_directory('outputs/tohoku')
-mpl.pyplot.savefig(os.path.join(di, 'metric_adapt_ic_{:d}.pdf'.format(mesh.num_cells())))
-mpl.pyplot.show()
+mpl.pyplot.savefig('outputs/metric_adapt_ic_{:d}.pdf'.format(mesh.num_cells()))
