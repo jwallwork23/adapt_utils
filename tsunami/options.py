@@ -29,6 +29,7 @@ class TohokuOptions(ShallowWaterOptions):
         P1 = FunctionSpace(self.default_mesh, "CG", 1)
         self.set_bathymetry(P1, dat=(lon, lat, elev))
         self.set_bathymetry(P1)
+        self.set_initial_condition(P1)
 
     def read_bathymetry_file(self, km=False):
         nc = NetCDFFile('tohoku.nc', mmap=False)
@@ -38,7 +39,16 @@ class TohokuOptions(ShallowWaterOptions):
         nc.close()
         return lon, lat, elev
 
+    def read_surface_file(self):
+        nc = NetCDFFile('surf_zeroed.nc', mmap=False)
+        lon = nc.variables['lon'][:]
+        lat = nc.variables['lat'][:]
+        elev = nc.variables['z'][:,:]
+        nc.close()
+        return lon, lat, elev
+
     def set_bathymetry(self, fs, dat=None):
+        """Initial surface data courtesy of GEBCO."""
         assert fs.ufl_element().degree() == 1 and fs.ufl_element().family() == 'Lagrange'
         x0, y0, elev = dat or self.read_bathymetry_file()
         if self.utm:
@@ -53,3 +63,20 @@ class TohokuOptions(ShallowWaterOptions):
             self.print_debug(msg.format(xy[0], xy[1], self.bathymetry.dat.data[i]/1000))
         self.print_debug("Done!")
         return self.bathymetry
+
+    def set_initial_condition(self, fs):
+        """Initial suface data courtesy of Saito."""
+        assert fs.ufl_element().degree() == 1 and fs.ufl_element().family() == 'Lagrange'
+        x0, y0, elev = self.read_surface_file()
+        if self.utm:
+            x0, y0 = lonlat_to_utm(y0, x0, force_zone_number=54)
+        surf_interp = si.RectBivariateSpline(y0, x0, elev)
+        self.initial_value = Function(fs, name="Initial free surface")
+        self.print_debug("Interpolating initial surface...")
+        msg = "Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
+        for i in range(fs.mesh().num_vertices()):
+            xy = fs.mesh().coordinates.dat.data[i] 
+            self.initial_value.dat.data[i] = surf_interp(xy[1], xy[0])
+            self.print_debug(msg.format(xy[0], xy[1], self.initial_value.dat.data[i]))
+        self.print_debug("Done!")
+        return self.initial_value
