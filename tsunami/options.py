@@ -92,7 +92,7 @@ class TohokuOptions(ShallowWaterOptions):
         u.assign(0.0)
 
         # Interpolate free surface from inversion data
-        eta.interpolate(self.set_initial_suface(FunctionSpace(fs.mesh(), "CG", 1)))
+        eta.interpolate(self.set_initial_surface(FunctionSpace(fs.mesh(), "CG", 1)))
 
         return self.initial_value
 
@@ -102,3 +102,7 @@ class TohokuOptions(ShallowWaterOptions):
         lat = to_latlon(x, y, 54, northern=True, force_longitude=True)[0] if self.utm else y
         self.coriolis.interpolate(2*self.Omega*sin(radians(lat)))
         return self.coriolis
+
+    def set_boundary_conditions(self, fs):
+        self.boundary_conditions = {}
+        return self.boundary_conditions
