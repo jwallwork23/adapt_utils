@@ -77,9 +77,8 @@ class Options(FrozenConfigurable):
     outer_iterations = PositiveInteger(1, help="Number of iterations in outer adaptation loop.").tag(config=True)
     indent = Unicode('').tag(config=True)  # TODO: doc
 
-    def __init__(self, approach='fixed_mesh', debug=False):
-        self.approach = approach
-        self.debug = debug
+    def __init__(self, **kwargs):
+        self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)
         self.end_time -= 0.5*self.dt
 
