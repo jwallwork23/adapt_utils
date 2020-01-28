@@ -7,6 +7,7 @@ import numpy as np
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.tsunami.conversion import lonlat_to_utm, to_latlon, radians
+from adapt_utils.adapt.metric import steady_metric
 
 
 __all__ = ["TohokuOptions"]
@@ -52,7 +53,7 @@ class TohokuOptions(ShallowWaterOptions):
         # TODO: gauges
 
     def read_bathymetry_file(self, km=False):
-        nc = NetCDFFile('tohoku.nc', mmap=False)
+        nc = NetCDFFile('resources/tohoku.nc', mmap=False)
         lon = nc.variables['lon'][:]
         lat = nc.variables['lat'][:-1]
         elev = nc.variables['elevation'][:-1,:]/1000 if km else nc.variables['elevation'][:-1,:]
@@ -60,7 +61,7 @@ class TohokuOptions(ShallowWaterOptions):
         return lon, lat, elev
 
     def read_surface_file(self):
-        nc = NetCDFFile('surf_zeroed.nc', mmap=False)
+        nc = NetCDFFile('resources/surf_zeroed.nc', mmap=False)
         lon = nc.variables['lon'][:]
         lat = nc.variables['lat'][:]
         elev = nc.variables['z'][:,:]
@@ -100,6 +101,13 @@ class TohokuOptions(ShallowWaterOptions):
             self.print_debug(msg.format(xy[0], xy[1], self.initial_surface.dat.data[i]))
         self.print_debug("Done!")
         return self.initial_surface
+
+    def adapt_to_bathymetry_hessian(self):
+        for i in range(self.num_adapt):
+            self.default_mesh = adapt(self.default_mesh, steady_metric(self.bathymetry, op=self))
+            P1 = FunctionSpace(self.default_mesh, "CG", 1)
+            self.set_bathymetry(P1)
+            self.set_initial_surface(P1)
 
     def set_initial_condition(self, fs):
         self.initial_value = Function(fs)

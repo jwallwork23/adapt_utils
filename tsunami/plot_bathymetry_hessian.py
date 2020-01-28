@@ -20,11 +20,9 @@ fig, axes = mpl.pyplot.subplots(nrows=1, ncols=2, sharex=True)
 # Adapt mesh to Hessian of bathymetry
 op.target = 1e3
 op.num_adapt = 4
-for i in range(op.num_adapt):
-    mesh = firedrake.adapt(mesh, steady_metric(op.bathymetry, op=op))
-    P1 = firedrake.FunctionSpace(mesh, "CG", 1)
-    op.set_bathymetry(P1)
-    op.set_initial_surface(P1)
+op.adapt_to_bathymetry_hessian()
+P1 = op.bathymetry.function_space()
+mesh = op.default_mesh
 
 # Plot adapted mesh
 ax1 = axes.flat[0]
