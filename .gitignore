@@ -1,7 +1,6 @@
 # Directories
 __pycache__/*
 desalination/*
-misc/*
 tracer/*
 tsunami/*
 turbine/*
