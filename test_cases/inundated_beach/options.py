@@ -19,8 +19,8 @@ class BalzanoOptions(ShallowWaterOptions):
     Parameters for test case in [...].
     """ # TODO: cite
 
-    def __init__(self, approach='fixed_mesh', friction='manning', plot_timeseries=False):
-        super(BalzanoOptions, self).__init__(approach)
+    def __init__(self, friction='manning', plot_timeseries=False, **kwargs):
+        super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True
         self.plot_timeseries = plot_timeseries
 

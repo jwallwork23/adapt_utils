@@ -10,8 +10,8 @@ __all__ = ["BubbleOptions"]
 # TODO: 3d version
 class BubbleOptions(TracerOptions):
     # TODO: doc
-    def __init__(self, approach='fixed_mesh', n=0):
-        super(BubbleOptions, self).__init__(approach)
+    def __init__(self, n=0, **kwargs):
+        super(BubbleOptions, self).__init__(**kwargs)
         self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
 
         # Source / receiver

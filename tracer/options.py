@@ -40,8 +40,8 @@ class TracerOptions(Options):
     diffusivity = FiredrakeScalarExpression(Constant(1e-1), help="(Scalar) diffusivity field for tracer problem.").tag(config=True)
     fluid_velocity = FiredrakeVectorExpression(None, allow_none=True, help="Vector fluid velocity field for tracer problem.").tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', dt=0.1):
-        super(TracerOptions, self).__init__(approach)
+    def __init__(self, dt=0.1, **kwargs):
+        super(TracerOptions, self).__init__(**kwargs)
         self.dt = dt
         self.start_time = 0.
         self.end_time = 60. - 0.5*self.dt

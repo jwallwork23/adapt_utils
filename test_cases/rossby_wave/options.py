@@ -16,13 +16,13 @@ class BoydOptions(ShallowWaterOptions):
     """
     soliton_amplitude = PositiveFloat(0.395).tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', periodic=True, n=1, order=0, compute_metrics=True):
+    def __init__(self, periodic=True, n=1, order=0, compute_metrics=True, **kwargs):
         """
         :kwarg approach: mesh adaptation approach
         :kwarg periodic: toggle periodic boundary in x-direction
         :kwarg n: mesh resolution
         """
-        super(BoydOptions, self).__init__(approach)
+        super(BoydOptions, self).__init__(**kwargs)
         self.periodic = periodic
         self.n = n
         self.order = order

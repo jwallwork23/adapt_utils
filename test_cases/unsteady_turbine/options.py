@@ -23,9 +23,9 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
     meshfile = Unicode(os.path.join(rootdir, 'test_cases', 'unsteady_turbine', 'channel.msh')).tag(config=True)
     params = PETScSolverParameters({}).tag(config=True)  # TODO
 
-    def __init__(self, approach='fixed_mesh'):
+    def __init__(self, **kwargs):
         self.base_viscosity = 3.0
-        super(Unsteady15TurbineOptions, self).__init__(approach)
+        super(Unsteady15TurbineOptions, self).__init__(**kwargs)
         self.domain_length = 3000.0
         self.domain_width = 1000.0
         try:

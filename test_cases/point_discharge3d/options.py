@@ -24,8 +24,8 @@ class Telemac3dOptions(TracerOptions):
     :kwarg offset: Shift in x-direction for source location.
     :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
-    def __init__(self, approach='fixed_mesh', offset=0., centred=False):
-        super(Telemac3dOptions, self).__init__(approach)
+    def __init__(self, offset=0., centred=False, **kwargs):
+        super(Telemac3dOptions, self).__init__(**kwargs)
         self.default_mesh = BoxMesh(100, 20, 20, 50, 10, 10)
         self.offset = offset
         self.family = 'cg'

@@ -13,8 +13,8 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
 
     mesh_path = Unicode('xcoarse.msh').tag(config=True)
 
-    def __init__(self, approach='fixed_mesh'):
-        super(Steady2TurbineOptions, self).__init__(approach)
+    def __init__(self, **kwargs):
+        super(Steady2TurbineOptions, self).__init__(**kwargs)
 
         # Domain
         self.domain_length = 1000.0
@@ -69,12 +69,12 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
 
 
 class Steady2TurbineOffsetOptions(Steady2TurbineOptions):
-    def __init__(self, approach='fixed_mesh', spacing=1.0):
+    def __init__(self, spacing=1.0, **kwargs):
         """
         :kwarg spacing: number of turbine widths to offset in each direction.
         """
         self.mesh_path = 'xcoarse_offset.msh'
-        super(Steady2TurbineOffsetOptions, self).__init__(approach)
+        super(Steady2TurbineOffsetOptions, self).__init__(**kwargs)
         D = self.turbine_diameter
         L = self.domain_length
         W = self.domain_width

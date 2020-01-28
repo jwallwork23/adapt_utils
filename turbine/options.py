@@ -37,9 +37,9 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     turbine_diameter = PositiveFloat(18.).tag(config=True)
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
 
-    def __init__(self, approach='fixed_mesh', num_iterations=1):
+    def __init__(self, num_iterations=1, **kwargs):
         self.bathymetry = Constant(40.0)  # TODO: Set bathymetry
-        super(SteadyTurbineOptions, self).__init__(approach)
+        super(SteadyTurbineOptions, self).__init__(**kwargs)
         self.timestepper = 'SteadyState'
         self.dt = 20.
         self.end_time = num_iterations*self.dt - 0.2
@@ -92,6 +92,6 @@ class SteadyTurbineOptions(ShallowWaterOptions):
 
 
 class UnsteadyTurbineOptions(SteadyTurbineOptions):
-    def __init__(self, approach='fixed_mesh'):
-        super(UnsteadyTurbineOptions, self).__init__(approach)
+    def __init__(self, **kwargs):
+        super(UnsteadyTurbineOptions, self).__init__(**kwargs)
         self.timestepper = 'CrankNicolson'

@@ -19,8 +19,8 @@ class PowerOptions(TracerOptions):
 
     :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
-    def __init__(self, approach='fixed_mesh', centred=True):
-        super(PowerOptions, self).__init__(approach)
+    def __init__(self, centred=True, **kwargs):
+        super(PowerOptions, self).__init__(**kwargs)
         self.default_mesh = SquareMesh(40, 40, 4, 4)
 
         # Source / receiver
