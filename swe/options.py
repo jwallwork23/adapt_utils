@@ -36,8 +36,8 @@ class ShallowWaterOptions(Options):
     adapt_field = Unicode('all_avg', help="Adaptation field of interest.").tag(config=True)
     region_of_interest = List(default_value=[]).tag(config=True)
 
-    def __init__(self, approach='fixed_mesh'):
-        super(ShallowWaterOptions, self).__init__(approach=approach)
+    def __init__(self, **kwargs):
+        super(ShallowWaterOptions, self).__init__(**kwargs)
         self.degree_increase = 0
         self.stabilisation = 'lax_friedrichs'
         self.stabilisation_parameter = Constant(1.0)
