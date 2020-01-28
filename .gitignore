@@ -1,5 +1,18 @@
 # Directories
 __pycache__/
+desalination/
+misc/
+tracer/
+tsunami/
+turbine/
+test_cases/box_discharge2d/
+test_cases/bubble_shear/
+test_cases/point_discharge2d/
+test_cases/point_discharge3d/
+test_cases/rossby_wave/
+test_cases/slotted_cylinder/
+test_cases/steady_turbine/
+test_cases/unsteady_turbine/
 
 # Specific files
 adapt/interpolation.py
