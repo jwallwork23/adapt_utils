@@ -15,6 +15,7 @@ class TohokuOptions(ShallowWaterOptions):
     # TODO: doc
     def __init__(self, approach='fixed_mesh', utm=True):
         super(TohokuOptions, self).__init__(approach=approach)
+        self.utm = utm
         lon, lat, elev = self.read_bathymetry_file()
         lon_min = np.min(lon)
         lon_max = np.max(lon)
@@ -26,7 +27,8 @@ class TohokuOptions(ShallowWaterOptions):
         if utm:
             self.default_mesh.coordinates.interpolate(as_vector(lonlat_to_utm(y, x, force_zone_number=54)))
         P1 = FunctionSpace(self.default_mesh, "CG", 1)
-        self.set_bathymetry(P1, dat=(lat, lon, elev), utm=utm)
+        self.set_bathymetry(P1, dat=(lon, lat, elev))
+        self.set_bathymetry(P1)
 
     def read_bathymetry_file(self, km=False):
         nc = NetCDFFile('tohoku.nc', mmap=False)
@@ -36,13 +38,18 @@ class TohokuOptions(ShallowWaterOptions):
         nc.close()
         return lon, lat, elev
 
-    def set_bathymetry(self, fs, dat=None, utm=True):
-        y0, x0, elev = dat or self.read_bathymetry_file()
-        if utm:
+    def set_bathymetry(self, fs, dat=None):
+        assert fs.ufl_element().degree() == 1 and fs.ufl_element().family() == 'Lagrange'
+        x0, y0, elev = dat or self.read_bathymetry_file()
+        if self.utm:
             x0, y0 = lonlat_to_utm(y0, x0, force_zone_number=54)
         bathy_interp = si.RectBivariateSpline(y0, x0, elev)
         self.bathymetry = Function(fs, name="Bathymetry")
+        self.print_debug("Interpolating bathymetry...")
+        msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
         for i in range(fs.mesh().num_vertices()):
             xy = fs.mesh().coordinates.dat.data[i] 
             self.bathymetry.dat.data[i] = bathy_interp(xy[1], xy[0])
+            self.print_debug(msg.format(xy[0], xy[1], self.bathymetry.dat.data[i]/1000))
+        self.print_debug("Done!")
         return self.bathymetry
