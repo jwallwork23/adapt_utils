@@ -2,7 +2,7 @@ from thetis import *
 
 import argparse
 
-from adapt_utils.tsunami.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.tsunami.solver import TsunamiProblem
 
 parser = argparse.ArgumentParser()

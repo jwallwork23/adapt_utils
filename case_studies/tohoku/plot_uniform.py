@@ -2,9 +2,8 @@ import firedrake
 
 import matplotlib
 import matplotlib.pyplot as plt
-import numpy as np
 
-from adapt_utils.tsunami.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options import TohokuOptions
 
 
 matplotlib.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
