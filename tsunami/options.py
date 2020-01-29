@@ -13,7 +13,9 @@ __all__ = ["TsunamiOptions"]
 
 
 class TsunamiOptions(ShallowWaterOptions):
-    # TODO: doc
+    """
+    Parameter class for general tsunami propagation problems.
+    """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
     def __init__(self, utm=True, **kwargs):
@@ -82,13 +84,6 @@ class TsunamiOptions(ShallowWaterOptions):
             self.print_debug(msg.format(xy[0], xy[1], self.initial_surface.dat.data[i]))
         self.print_debug("Done!")
         return self.initial_surface
-
-    def adapt_to_bathymetry_hessian(self):  # TODO: This should be done in swp
-        for i in range(self.num_adapt):
-            self.default_mesh = adapt(self.default_mesh, steady_metric(self.bathymetry, op=self))
-            P1 = FunctionSpace(self.default_mesh, "CG", 1)
-            self.set_bathymetry(P1)
-            self.set_initial_surface(P1)
 
     def set_initial_condition(self, fs):
         self.initial_value = Function(fs)

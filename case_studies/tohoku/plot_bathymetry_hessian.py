@@ -4,6 +4,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
+from adapt_utils.tsunami.solver import TsunamiProblem
 
 
 mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
@@ -11,7 +12,6 @@ mpl.rc('text', usetex=True)
 
 # Setup Tohoku domain
 op = TohokuOptions(utm=False)
-mesh = op.default_mesh
 lon, lat, elev = op.read_bathymetry_file(km=True)
 cs = mpl.pyplot.contourf(lon, lat, elev, 50, vmin=-9, vmax=2, cmap=mpl.cm.coolwarm)  # Get colorbar
 xlim = plt.gca().get_xlim()
@@ -21,13 +21,14 @@ fig, axes = mpl.pyplot.subplots(nrows=1, ncols=2, sharex=True)
 # Adapt mesh to Hessian of bathymetry
 op.target = 1e3
 op.num_adapt = 4
-op.adapt_to_bathymetry_hessian()
-P1 = op.bathymetry.function_space()
-mesh = op.default_mesh
+op.adapt_field = 'bathymetry'
+op.approach = 'hessian'
+tp = TsunamiProblem(op, levels=0)
+tp.initialise_mesh()
 
 # Plot adapted mesh
 ax1 = axes.flat[0]
-ax1 = firedrake.plot(firedrake.Function(P1), axes=ax1, colorbar=False, cmap=mpl.cm.binary, edgecolors='dimgray')
+ax1 = firedrake.plot(firedrake.Function(tp.P1), axes=ax1, colorbar=False, cmap=mpl.cm.binary, edgecolors='dimgray')
 ax1.set_xlabel("Degrees longitude")
 ax1.set_ylabel("Degrees latitude")
 ax1.set_xlim(xlim)
@@ -50,7 +51,7 @@ cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.
 xlim = plt.gca().get_xlim()
 ylim = plt.gca().get_ylim()
 cb.set_label("Bathymetry $[\mathrm k\mathrm m]$")
-mpl.pyplot.savefig('outputs/metric_adapt_bathymetry_{:d}.pdf'.format(mesh.num_cells()))
+mpl.pyplot.savefig('outputs/metric_adapt_bathymetry_{:d}.pdf'.format(tp.num_cells[-1]))
 
 # New figure for initial free surface
 lon, lat, elev = op.read_surface_file()
@@ -59,7 +60,7 @@ fig, axes = mpl.pyplot.subplots(nrows=1, ncols=2, sharex=True)
 
 # Plot adapted mesh
 ax1 = axes.flat[0]
-ax1 = firedrake.plot(firedrake.Function(P1), axes=ax1, colorbar=False, cmap=mpl.cm.binary, edgecolors='dimgray')
+ax1 = firedrake.plot(firedrake.Function(tp.P1), axes=ax1, colorbar=False, cmap=mpl.cm.binary, edgecolors='dimgray')
 ax1.set_xlabel("Degrees longitude")
 ax1.set_ylabel("Degrees latitude")
 ax1.set_xlim(xlim)
@@ -80,4 +81,4 @@ ax2.set_title("Adapted mesh interpolant")
 # Save adapted mesh and interpolant
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
 cb.set_label("Initial free surface $[\mathrm m]$")
-mpl.pyplot.savefig('outputs/metric_adapt_ic_{:d}.pdf'.format(mesh.num_cells()))
+mpl.pyplot.savefig('outputs/metric_adapt_ic_{:d}.pdf'.format(tp.num_cells[-1]))

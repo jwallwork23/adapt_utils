@@ -628,6 +628,10 @@ class SteadyProblem():
             self.mesh.coordinates.assign(x)  # TODO: May need to modify coords of hierarchy, too
             # self.set_mesh(self.mesh)
         else:
+            try:
+                assert hasattr(self, 'M')
+            except AssertionError:
+                raise ValueError("Please supply a metric.")
             self.am.adapt(self.M)
             self.set_mesh(self.am.mesh)
         PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
@@ -640,6 +644,18 @@ class SteadyProblem():
         self.create_solutions()
         self.set_fields()
         self.boundary_conditions = self.op.set_boundary_conditions(self.V)
+
+    def initialise_mesh(self):
+        """
+        Repeatedly apply mesh adaptation in order to give a suitable initial mesh. A common usage
+        is when bathymetry is interpolated from raw data and we want its anisotropy to align with
+        that of the mesh.
+
+        NOTE: `self.set_fields` will be called after each adaptation step.
+        """
+        for i in range(self.op.num_adapt):
+            self.indicate_error()
+            self.adapt_mesh()
 
     def adaptation_loop(self, outer_iteration=None):
         """
