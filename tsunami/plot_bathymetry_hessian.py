@@ -36,6 +36,8 @@ ax2 = axes.flat[1]
 ax2 = firedrake.plot(op.bathymetry, axes=ax2, colorbar=False)
 ax2.set_xlabel("Degrees longitude")
 ax2.set_ylabel("Degrees latitude")
+ax2.yaxis.set_label_position("right")
+ax2.yaxis.tick_right()
 ax2.set_title("Adapted mesh interpolant")
 
 # Save adapted mesh and interpolant
@@ -60,6 +62,8 @@ ax2 = axes.flat[1]
 ax2 = firedrake.plot(op.initial_surface, axes=ax2, colorbar=False)
 ax2.set_xlabel("Degrees longitude")
 ax2.set_ylabel("Degrees latitude")
+ax2.yaxis.set_label_position("right")
+ax2.yaxis.tick_right()
 ax2.set_title("Adapted mesh interpolant")
 
 # Save adapted mesh and interpolant
