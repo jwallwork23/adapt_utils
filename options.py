@@ -51,6 +51,7 @@ class Options(FrozenConfigurable):
     pseudo_dt = PositiveFloat(0.1, help="Pseudo-timstep used in r-adaptation.").tag(config=True)
     r_adapt_maxit = PositiveInteger(1000, help="Maximum number of iterations in r-adaptation loop.").tag(config=True)
     r_adapt_rtol = PositiveFloat(1.0e-8, help="Relative tolerance for residual in r-adaptation loop.").tag(config=True)
+    nonlinear_method = Unicode('quasi_newton', help="Method for solving nonlinear system under r-adaptation.").tag(config=True)
 
     # Metric
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
@@ -77,8 +78,8 @@ class Options(FrozenConfigurable):
     outer_iterations = PositiveInteger(1, help="Number of iterations in outer adaptation loop.").tag(config=True)
     indent = Unicode('').tag(config=True)  # TODO: doc
 
-    def __init__(self, approach='fixed_mesh'):
-        self.approach = approach
+    def __init__(self, **kwargs):
+        self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)
         self.end_time -= 0.5*self.dt
 
