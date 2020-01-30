@@ -76,9 +76,9 @@ class ShallowWaterOptions(Options):
         if not hasattr(self, 'bathymetry'):
             self.set_bathymetry(fs.sub(1))
         if not hasattr(self, 'initial_value'):
-            self.set_initial_value(fs)
+            self.set_initial_condition(fs)
         eta = self.initial_value.split()[1]
-        self.depth = self.bathymetry + eta
+        self.depth = interpolate(self.bathymetry + eta, eta.function_space())
         return self.depth
 
     def set_boundary_surface(self):
