@@ -82,6 +82,8 @@ class Options(FrozenConfigurable):
         self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)
         self.end_time -= 0.5*self.dt
+        if self.debug:
+            set_log_level(DEBUG)
 
     def copy(self):
         copy = type(self)()

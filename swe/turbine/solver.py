@@ -2,7 +2,7 @@ from thetis import *
 from firedrake.petsc import PETSc
 
 from adapt_utils.swe.solver import *
-from adapt_utils.turbine.options import *
+from adapt_utils.swe.turbine.options import *
 from adapt_utils.adapt.recovery import *
 from adapt_utils.adapt.metric import *
 

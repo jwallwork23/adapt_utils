@@ -1,6 +1,6 @@
 from thetis import *
 from adapt_utils.test_cases.steady_turbine.options import *
-from adapt_utils.turbine.solver import SteadyTurbineProblem
+from adapt_utils.swe.turbine.solver import SteadyTurbineProblem
 
 import argparse
 

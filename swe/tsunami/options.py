@@ -5,7 +5,7 @@ import scipy.interpolate as si
 import numpy as np
 
 from adapt_utils.swe.options import ShallowWaterOptions
-from adapt_utils.tsunami.conversion import lonlat_to_utm, to_latlon, radians
+from adapt_utils.swe.tsunami.conversion import lonlat_to_utm, to_latlon, radians
 from adapt_utils.adapt.metric import steady_metric
 
 

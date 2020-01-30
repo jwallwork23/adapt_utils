@@ -2,7 +2,7 @@ from thetis import *
 from thetis.configuration import *
 import os
 
-from adapt_utils.turbine.options import UnsteadyTurbineOptions
+from adapt_utils.swe.turbine.options import UnsteadyTurbineOptions
 
 
 __all__ = ["Unsteady15TurbineOptions"]
@@ -20,7 +20,7 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
     array_length = PositiveInteger(5).tag(config=True)
     array_width = PositiveInteger(3).tag(config=True)
     thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
-    meshfile = Unicode(os.path.join(rootdir, 'test_cases', 'unsteady_turbine', 'channel.msh')).tag(config=True)
+    meshfile = os.path.realpath(__file__).replace('options.py', 'channel.msh')
     params = PETScSolverParameters({}).tag(config=True)  # TODO
 
     def __init__(self, **kwargs):

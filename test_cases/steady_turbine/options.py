@@ -2,7 +2,7 @@ from thetis import *
 from thetis.configuration import *
 import os
 
-from adapt_utils.turbine.options import SteadyTurbineOptions
+from adapt_utils.swe.turbine.options import SteadyTurbineOptions
 
 
 __all__ = ["Steady2TurbineOptions", "Steady2TurbineOffsetOptions"]

@@ -3,7 +3,7 @@ from thetis import *
 import argparse
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
-from adapt_utils.tsunami.solver import TsunamiProblem
+from adapt_utils.swe.tsunami.solver import TsunamiProblem
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-initial_adapt")
