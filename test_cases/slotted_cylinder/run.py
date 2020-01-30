@@ -1,5 +1,4 @@
 from thetis import *
-from firedrake.petsc import PETSc
 
 import argparse
 
@@ -53,31 +52,31 @@ elif adj:
     op.approach = args.approach
 # TODO: initial solves and adapts to get good initial mesh
 tp.solve()
-PETSc.Sys.Print("\nElement count : %d" % tp.mesh.num_cells())
+print_output("\nElement count : {:d}".format(tp.mesh.num_cells()))
 
 # QoIs
-PETSc.Sys.Print("\nGaussian\n")
-PETSc.Sys.Print("Analytic QoI  : %.8e" % op.exact_qoi())
-PETSc.Sys.Print("Quadrature QoI: %.8e" % op.quadrature_qoi(tp.P0))
-PETSc.Sys.Print("Calculated QoI: %.8e" % tp.quantity_of_interest())
+print_output("\nGaussian\n")
+print_output("Analytic QoI  : {:.8e}".format(op.exact_qoi()))
+print_output("Quadrature QoI: {:.8e}".format(op.quadrature_qoi(tp.P0)))
+print_output("Calculated QoI: {:.8e}".format(tp.quantity_of_interest()))
 op.__init__(approach=approach, shape=1)
 tp.get_qoi_kernel()
-PETSc.Sys.Print("\nCone\n")
-PETSc.Sys.Print("Analytic QoI  : %.8e" % op.exact_qoi())
-PETSc.Sys.Print("Quadrature QoI: %.8e" % op.quadrature_qoi(tp.P0))
-PETSc.Sys.Print("Calculated QoI: %.8e" % tp.quantity_of_interest())
+print_output("\nCone\n")
+print_output("Analytic QoI  : {:.8e}".format(op.exact_qoi()))
+print_output("Quadrature QoI: {:.8e}".format(op.quadrature_qoi(tp.P0)))
+print_output("Calculated QoI: {:.8e}".format(tp.quantity_of_interest()))
 op.__init__(approach=approach, shape=2)
 tp.get_qoi_kernel()
-PETSc.Sys.Print("\nSlotted Cylinder\n")
-PETSc.Sys.Print("Analytic QoI  : %.8e" % op.exact_qoi())
-PETSc.Sys.Print("Quadrature QoI: %.8e" % op.quadrature_qoi(tp.P0))
-PETSc.Sys.Print("Calculated QoI: %.8e" % tp.quantity_of_interest())
+print_output("\nSlotted Cylinder\n")
+print_output("Analytic QoI  : {:.8e}".format(op.exact_qoi()))
+print_output("Quadrature QoI: {:.8e}".format(op.quadrature_qoi(tp.P0)))
+print_output("Calculated QoI: {:.8e}".format(tp.quantity_of_interest()))
 
 # Relative Lp errors
 if approach != 'fixed_mesh':
     op.set_initial_condition(tp.P1DG)
 L1_err, L2_err, L_inf_err = op.lp_errors(tp.solution)
-PETSc.Sys.Print("\nLp errors")  # FIXME: Are these computed properly? They seem quite large...
-PETSc.Sys.Print("Relative L1 error      : %.8e" % L1_err)
-PETSc.Sys.Print("Relative L2 error      : %.8e" % L2_err)
-PETSc.Sys.Print("Relative L_inf error   : %.8e" % L_inf_err)
+print_output("\nLp errors")  # FIXME: Are these computed properly? They seem quite large...
+print_output("Relative L1 error      : {:.8e}".format(L1_err))
+print_output("Relative L2 error      : {:.8e}".format(L2_err))
+print_output("Relative L_inf error   : {:.8e}".format(L_inf_err))

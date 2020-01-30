@@ -1,9 +1,8 @@
 from firedrake import *
 from thetis.configuration import *
-from scipy.special import kn
+# from scipy.special import kn
 
-from adapt_utils.tracer.options import TracerOptions
-from adapt_utils.misc.misc import *
+from adapt_utils.tracer.options import *
 
 
 __all__ = ["Telemac3dOptions"]

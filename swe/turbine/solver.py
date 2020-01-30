@@ -1,5 +1,4 @@
 from thetis import *
-from firedrake.petsc import PETSc
 
 from adapt_utils.swe.solver import *
 from adapt_utils.swe.turbine.options import *
@@ -11,6 +10,7 @@ import matplotlib.pyplot as plt
 from matplotlib import rc
 import h5py
 import os
+
 
 rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 rc('text', usetex=True)

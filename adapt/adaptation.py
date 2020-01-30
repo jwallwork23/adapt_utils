@@ -128,7 +128,7 @@ class AdaptiveMesh():
         newplex.createFromFile(filename)
         self.__init__(Mesh(newplex), levels=self.levels)
 
-    def adapt(self, metric):  # TODO: Rename so that it's Pragmatic specific
+    def pragmatic_adapt(self, metric):
         """
         Adapt mesh using a specified metric. The `MeshHierarchy` is reinstated.
         """

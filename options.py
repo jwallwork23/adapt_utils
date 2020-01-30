@@ -2,7 +2,6 @@ from thetis import *
 from thetis.configuration import *
 
 import os
-import numpy as np
 
 
 __all__ = ["Options"]

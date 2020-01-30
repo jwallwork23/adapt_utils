@@ -2,11 +2,9 @@ from firedrake import *
 
 import numpy as np
 
-from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
 from adapt_utils.adapt.recovery import *
-from adapt_utils.adapt.p0_metric import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
 

@@ -2,7 +2,6 @@ from thetis import *
 from thetis.configuration import *
 
 from adapt_utils.swe.options import ShallowWaterOptions
-from adapt_utils.misc.misc import heavyside_approx
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -171,7 +170,7 @@ class BalzanoOptions(ShallowWaterOptions):
 
                 # Store modified bathymetry timeseries
                 P1DG = solver_obj.function_spaces.P1DG_2d
-                wd = project(heavyside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
+                wd = project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
                 # Store QoI timeseries
@@ -194,9 +193,9 @@ class BalzanoOptions(ShallowWaterOptions):
         b = solver_obj.fields.bathymetry_2d
         dry = conditional(ge(b, 0), 0, 1)
         if 'inundation' in self.qoi_mode:
-            f = heavyside_approx(eta + b, self.wetting_and_drying_alpha)
+            f = heaviside_approx(eta + b, self.wetting_and_drying_alpha)
             eta_init = project(self.initial_value.split()[1], eta.function_space())
-            f_init = heavyside_approx(eta_init + b, self.wetting_and_drying_alpha)
+            f_init = heaviside_approx(eta_init + b, self.wetting_and_drying_alpha)
             self.qoi_form = dry*(eta + f - f_init)*dx(degree=12)
         elif self.qoi_mode == 'overtopping_volume':
             raise NotImplementedError  # TODO: Flux over coast. (Needs an internal boundary.)
@@ -218,12 +217,12 @@ class BalzanoOptions(ShallowWaterOptions):
         return qoi
 
     def plot(self):
-        self.plot_heavyside()
+        self.plot_heaviside()
         if 'volume' in self.qoi_mode:
             self.plot_qoi()
         print_output("QoI '{:s}' = {:.4e}".format(self.qoi_mode, self.evaluate_qoi()))
 
-    def plot_heavyside(self):
+    def plot_heaviside(self):
         """Timeseries plot of approximate Heavyside function."""
         scaling = 0.7
         plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
@@ -241,7 +240,7 @@ class BalzanoOptions(ShallowWaterOptions):
         plt.ylim(min(X[0]), max(X[0]))
         plt.xlabel("Time [$\mathrm h$]")
         plt.ylabel("$x$ [$\mathrm m$]")
-        plt.savefig(os.path.join(self.di, "heavyside_timeseries.pdf"))
+        plt.savefig(os.path.join(self.di, "heaviside_timeseries.pdf"))
 
     def plot_qoi(self):
         """Timeseries plot of instantaneous QoI."""
@@ -255,3 +254,7 @@ class BalzanoOptions(ShallowWaterOptions):
         plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
         plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
+
+def heaviside_approx(H, alpha):
+    return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5
+

@@ -1,11 +1,9 @@
 from thetis import *
 from thetis.physical_constants import *
-from firedrake.petsc import PETSc
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.p0_metric import *
 
 import os
 
@@ -85,7 +83,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             options.timestepper_options.solver_parameters = op.params
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
-            PETSc.Sys.Print(options.timestepper_options.solver_parameters)
+            print_output(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs
@@ -518,7 +516,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             options.timestepper_options.solver_parameters = op.params
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
-            PETSc.Sys.Print(options.timestepper_options.solver_parameters)
+            print_output(options.timestepper_options.solver_parameters)
         # options.timestepper_options.implicitness_theta = 1.0
 
         # Outputs

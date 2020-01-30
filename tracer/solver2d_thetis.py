@@ -1,15 +1,9 @@
 from thetis import *
-from firedrake.petsc import PETSc
-
-import numpy as np
 
 from adapt_utils.tracer.options import *
 from adapt_utils.tracer.solver2d import *
-from adapt_utils.misc.misc import index_string
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.p0_metric import *
-from adapt_utils.adapt.recovery import construct_gradient
-from adapt_utils.solver import SteadyProblem, UnsteadyProblem
+from adapt_utils.misc import index_string
 
 
 __all__ = ["SteadyTracerProblem2d_Thetis", "UnsteadyTracerProblem2d_Thetis"]
