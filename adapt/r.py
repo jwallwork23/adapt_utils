@@ -285,26 +285,28 @@ class MeshMover():
 
     def setup_l2_projector(self):
         u_cts, v_cts = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
+        bcs = []
+        n = FacetNormal(self.mesh)    # Normal vector
+        s = as_vector([n[1], -n[0]])  # Tangent vector
+
+        # FEM problem for L2 projection
         a = dot(v_cts, u_cts)*dx
         L = dot(v_cts, grad(self.φ_old))*dx
-        bcs = []
-        n = FacetNormal(self.mesh)
-        for i in self.mesh.exterior_facets.unique_markers:
-            normal = [assemble(n[0]*ds(i)), assemble(n[1]*ds(i))]
-            if np.allclose(normal[0], 0.0) and np.allclose(normal[1], 0.0):
-                raise ValueError("Invalid normal vector {:}".format(normal))
-            elif np.allclose(normal[0], 0.0):
-                bcs.append(DirichletBC(self.P1_vec.sub(1), 0.0, i))
-            elif np.allclose(normal[1], 0.0):
-                bcs.append(DirichletBC(self.P1_vec.sub(0), 0.0, i))
-            else:
-                raise NotImplementedError("Have not yet considered non-axes-aligned boundaries.")
 
-        # FIXME: More general approach
-        # a_bc = dot(u_cts, n)*(v_cts[0] + v_cts[1])*ds
-        # L_bc = inner(Constant(as_vector([0.0, 0.0])), v_cts)*ds
-        # bcs = (EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary'),)
+        # Enforce no mesh movement normal to boundaries
+        a_bc = dot(u_cts, n)*dot(v_cts, n)*ds
+        L_bc = Constant(0.0)*dot(v_cts, n)*ds
+        bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary'))
 
+        # Need an additional constraint for solvability
+        a_bc = dot(u_cts, s)*dot(v_cts, s)*ds
+        if self.op.allow_boundary_movement:  # FIXME: better solution
+            L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
+        else:
+            L_bc = Constant(0.0)*dot(v_cts, s)*ds  # doesn't allow tangential movement
+        bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary'))
+
+        # Create solver
         prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bcs)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
