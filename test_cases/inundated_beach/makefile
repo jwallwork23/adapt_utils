@@ -1,9 +1,4 @@
-all: clean mesh
-
-mesh:
-	@echo "Generating mesh for inundated beach..."
-	@gmsh -2 strip.geo
-	@echo "Done!"
+all: clean fixed_mesh
 
 fixed_mesh:
 	@echo "Solving inundated beach problem on a fixed mesh..."

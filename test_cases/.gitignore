@@ -24,6 +24,7 @@ point_discharge3d/__pycache__/
 inundated_beach/outputs/
 inundated_beach/screenshots/
 inundated_beach/__pycache__/
+inundated_beach/strip.geo
 rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/__pycache__/

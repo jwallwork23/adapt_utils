@@ -16,23 +16,19 @@ __all__ = ["BalzanoOptions"]
 
 class BalzanoOptions(ShallowWaterOptions):
     """
-    Parameters for test case in [...].
-    """ # TODO: cite
+    Parameters for test case described in [1].
+
+    [1] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in
+        shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
+    """
 
     def __init__(self, friction='manning', plot_timeseries=False, **kwargs):
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True
         self.plot_timeseries = plot_timeseries
 
-        # Initial mesh
-        # meshfile = os.path.realpath(__file__).replace('options.py', 'strip.msh')
-        # try:
-        #     assert os.path.exists(meshfile)
-        # except AssertionError:
-        #     raise ValueError("Mesh does not exist or cannot be found. Please build it.")
-        # self.default_mesh = Mesh(meshfile)
-        self.default_mesh = RectangleMesh(17, 1, 1.5*13800.0, 1200.0)
         self.basin_x = 13800.0  # Length of wet region
+        self.default_mesh = RectangleMesh(17, 1, 1.5*self.basin_x, 1200.0)
         self.num_hours = 24
 
         # Physical
@@ -165,8 +161,7 @@ class BalzanoOptions(ShallowWaterOptions):
 
     def get_export_func(self, solver_obj):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-        solution = solver_obj.fields.solution_2d
-        eta = solution.split()[1]
+        eta = solver_obj.fields.elev_2d
         b = solver_obj.fields.bathymetry_2d
         def export_func():
             self.eta_tilde.project(eta + bathymetry_displacement(eta))
@@ -181,8 +176,6 @@ class BalzanoOptions(ShallowWaterOptions):
 
                 # Store QoI timeseries
                 self.evaluate_qoi_form(solver_obj)
-                # self.set_qoi_kernel(solver_obj)
-                # self.qois.append(assemble(inner(self.kernel, solution)*dx(degree=12)))
                 self.qois.append(assemble(self.qoi_form))
         return export_func
 
@@ -202,7 +195,7 @@ class BalzanoOptions(ShallowWaterOptions):
         dry = conditional(ge(b, 0), 0, 1)
         if 'inundation' in self.qoi_mode:
             f = heavyside_approx(eta + b, self.wetting_and_drying_alpha)
-            eta_init = interpolate(self.initial_value.split()[1], eta.function_space())
+            eta_init = project(self.initial_value.split()[1], eta.function_space())
             f_init = heavyside_approx(eta_init + b, self.wetting_and_drying_alpha)
             self.qoi_form = dry*(eta + f - f_init)*dx(degree=12)
         elif self.qoi_mode == 'overtopping_volume':
