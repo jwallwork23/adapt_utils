@@ -3,14 +3,13 @@ from thetis import *
 from adapt_utils.test_cases.inundated_beach.options import BalzanoOptions
 from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 
-op = BalzanoOptions(approach='monge_ampere', plot_timeseries=False)
+op = BalzanoOptions(approach='monge_ampere', plot_timeseries=False, plot_pvd=True, debug=True)
 op.qoi_mode = 'inundation_volume'
-# op.debug = True
+# op.nonlinear_method = 'relaxation'
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 
-# FIXME: Doesn't there need to be some interpolation?
-def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):
+def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME
     """
     Monitor function focused around the wet-dry interface.
 
@@ -19,12 +18,18 @@ def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):
     :kwarg alpha: controls the size of the dense region surrounding the coast.
     :kwarg beta: controls the level of refinement in this region.
     """
-    P1DG = FunctionSpace(mesh, "DG", 1)
+    P1 = FunctionSpace(mesh, "CG", 1)
     eta = swp.solution.split()[1]
     b = swp.bathymetry
-    diff = Function(P1DG)
-    diff.dat.data[:] += eta.dat.data - (-b.dat.data)
-    return 1.0 + alpha*pow(cosh(beta*diff), -2)
+    current_mesh = eta.function_space().mesh()
+    P1_current = FunctionSpace(current_mesh, "CG", 1)
+    diff = interpolate(eta + b, P1_current)
+    diff_proj = project(diff, P1)
+    return 1.0 + alpha*pow(cosh(beta*diff_proj), -2)
 
-swp.monitor_function = wet_dry_interface_monitor
+def monitor_tmp(mesh):
+    return Constant(1.0)
+swp.monitor_function = monitor_tmp
+
+# swp.monitor_function = wet_dry_interface_monitor
 swp.solve(uses_adjoint=False)

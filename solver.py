@@ -49,6 +49,7 @@ class SteadyProblem():
         self.create_solutions()
         print_output(op.indent+"Building fields...")
         self.set_fields()
+        self.set_stabilisation()
         print_output(op.indent+"Setting boundary conditions...")
         self.boundary_conditions = op.set_boundary_conditions(self.V)
 
@@ -122,6 +123,24 @@ class SteadyProblem():
         """
         self.solution = Function(self.V, name='Solution')
         self.adjoint_solution = Function(self.V, name='Adjoint solution')
+
+    def set_fields(self):
+        """
+        Set velocity field, viscosity, etc.
+        """
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def project_fields(self, prob):
+        """
+        Project velocity field, viscosity, etc. from another Problem.
+        """
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def set_stabilisation(self):
+        """
+        Set stabilisation mode and parameter.
+        """
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def setup_solver(self, adjoint=False):
         """
@@ -257,6 +276,8 @@ class SteadyProblem():
         """
         Interpolate a function in `self.V`.
         """
+        if isinstance(val, Constant) or val is None:
+            return val
         out = out or Function(self.V)
         assert out.function_space() == self.V
         for outi, vi in zip(out.split(), val.split()):
@@ -267,6 +288,8 @@ class SteadyProblem():
         """
         Project a function in `V`.
         """
+        if isinstance(val, Constant) or val is None:
+            return val
         out = out or Function(self.V)
         for outi, vi in zip(out.split(), val.split()):
             outi.project(vi)
@@ -620,13 +643,39 @@ class SteadyProblem():
                 assert hasattr(self, 'monitor_function')
             except AssertionError:
                 raise ValueError("Please supply a monitor function.")
+
+            # Create MeshMover object and establish coordinate transformation
             self.op.num_adapt = 1
             mesh_mover = MeshMover(self.am_init.mesh, self.monitor_function, op=self.op)
             mesh_mover.adapt()
-            x = Function(self.mesh.coordinates)
+
+            # Create a temporary Problem based on the new mesh
+            am_copy = self.am.copy()
+            tmp = type(self)(self.op, mesh=am_copy.mesh, discrete_adjoint=self.discrete_adjoint,
+                             prev_solution=self.prev_solution, levels=self.levels)
+            x = Function(tmp.mesh.coordinates)
             x.dat.data[:] = mesh_mover.x.dat.data  # TODO: PyOP2
-            self.mesh.coordinates.assign(x)  # TODO: May need to modify coords of hierarchy, too
-            # self.set_mesh(self.mesh)
+            tmp.mesh.coordinates.assign(x)  # TODO: May need to modify coords of hierarchy, too
+
+            # Project fields and solutions onto temporary Problem
+            tmp.project_fields(self)
+            tmp.project_solution(self.solution)
+            tmp.project_solution(self.adjoint_solution, adjoint=True)
+
+            # Update self.mesh and function spaces, etc.
+            # self.mesh.coordinates.assign(x)
+            #print(self.bathymetry.function_space())
+            self.mesh.coordinates.dat.data[:] = x.dat.data
+            self.create_function_spaces()
+            self.create_solutions()
+            self.boundary_conditions = self.op.set_boundary_conditions(self.V)
+            self.project_fields(tmp)
+            self.project_solution(tmp.solution)
+            self.project_solution(tmp.adjoint_solution, adjoint=True)
+            #print(self.bathymetry.function_space())
+            #print(self.solver_obj.fields.bathymetry_2d.function_space())
+            # self.setup_solver()
+            #print(self.solver_obj.fields.bathymetry_2d.function_space())
         else:
             try:
                 assert hasattr(self, 'M')
@@ -634,16 +683,18 @@ class SteadyProblem():
                 raise ValueError("Please supply a metric.")
             self.am.adapt(self.M)
             self.set_mesh(self.am.mesh)
-        PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
-        self.num_cells.append(self.mesh.num_cells())
-        self.num_vertices.append(self.mesh.num_vertices())
-        self.plot()
 
-        # Re-initialise problem
-        self.create_function_spaces()
-        self.create_solutions()
-        self.set_fields()
-        self.boundary_conditions = self.op.set_boundary_conditions(self.V)
+        if self.approach != 'monge_ampere':
+            PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
+            self.num_cells.append(self.mesh.num_cells())
+            self.num_vertices.append(self.mesh.num_vertices())
+            self.plot()
+
+            # Re-initialise problem
+            self.create_function_spaces()
+            self.create_solutions()
+            self.set_fields()
+            self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
     def initialise_mesh(self):
         """
@@ -807,12 +858,6 @@ class UnsteadyProblem(SteadyProblem):
     def solve_step(self, adjoint=False):
         """
         Solve forward PDE on a particular mesh.
-        """
-        raise NotImplementedError("Should be implemented in derived class.")
-
-    def set_fields(self):
-        """
-        Set velocity field, viscosity, QoI kernel, etc.
         """
         raise NotImplementedError("Should be implemented in derived class.")
 

@@ -25,11 +25,13 @@ class BalzanoOptions(ShallowWaterOptions):
         self.plot_timeseries = plot_timeseries
 
         # Initial mesh
-        try:
-            assert os.path.exists('strip.msh')  # TODO: abspath
-        except AssertionError:
-            raise ValueError("Mesh does not exist or cannot be found. Please build it.")
-        self.default_mesh = Mesh('strip.msh')
+        # meshfile = os.path.realpath(__file__).replace('options.py', 'strip.msh')
+        # try:
+        #     assert os.path.exists(meshfile)
+        # except AssertionError:
+        #     raise ValueError("Mesh does not exist or cannot be found. Please build it.")
+        # self.default_mesh = Mesh(meshfile)
+        self.default_mesh = RectangleMesh(17, 1, 1.5*13800.0, 1200.0)
         self.basin_x = 13800.0  # Length of wet region
         self.num_hours = 24
 
@@ -69,12 +71,13 @@ class BalzanoOptions(ShallowWaterOptions):
         # Goal-Oriented
         self.qoi_mode = 'inundation_volume'
 
-        # Outputs
-        self.wd_bath_file = File(os.path.join(self.di, 'moving_bath.pvd'))
         P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
-        self.moving_bath = Function(P1DG, name='Moving bathymetry')
+        V = VectorFunctionSpace(self.default_mesh, "CG", 2)*P1DG  # FIXME
+
+        # Outputs
         self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
         self.eta_tilde = Function(P1DG, name='Modified elevation')
+        self.get_initial_depth(V)
 
         # Timeseries
         self.wd_obs = []
@@ -164,9 +167,8 @@ class BalzanoOptions(ShallowWaterOptions):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
         solution = solver_obj.fields.solution_2d
         eta = solution.split()[1]
+        b = solver_obj.fields.bathymetry_2d
         def export_func():
-            self.moving_bath.project(self.bathymetry + bathymetry_displacement(eta))
-            self.wd_bath_file.write(self.moving_bath)
             self.eta_tilde.project(eta + bathymetry_displacement(eta))
             self.eta_tilde_file.write(self.eta_tilde)
 
@@ -174,7 +176,7 @@ class BalzanoOptions(ShallowWaterOptions):
 
                 # Store modified bathymetry timeseries
                 P1DG = solver_obj.function_spaces.P1DG_2d
-                wd = project(heavyside_approx(-eta-self.bathymetry, self.wetting_and_drying_alpha), P1DG)
+                wd = project(heavyside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
                 # Store QoI timeseries
@@ -196,11 +198,12 @@ class BalzanoOptions(ShallowWaterOptions):
             raise ValueError("QoI mode '{:s}' not recognised.".format(self.qoi_mode))
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
         eta = solver_obj.fields.elev_2d
-        dry = conditional(ge(self.bathymetry, 0), 0, 1)
+        b = solver_obj.fields.bathymetry_2d
+        dry = conditional(ge(b, 0), 0, 1)
         if 'inundation' in self.qoi_mode:
-            f = heavyside_approx(eta + self.bathymetry, self.wetting_and_drying_alpha)
+            f = heavyside_approx(eta + b, self.wetting_and_drying_alpha)
             eta_init = self.initial_value.split()[1]
-            f_init = heavyside_approx(eta_init + self.bathymetry, self.wetting_and_drying_alpha)
+            f_init = heavyside_approx(eta_init + b, self.wetting_and_drying_alpha)
             self.qoi_form = dry*(eta + f - f_init)*dx(degree=12)
         elif self.qoi_mode == 'overtopping_volume':
             raise NotImplementedError  # TODO: Flux over coast. (Needs an internal boundary.)
