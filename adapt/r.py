@@ -32,18 +32,21 @@ class MeshMover():
         plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
         A1121-A1148.
     """
-    def __init__(self, mesh, monitor_function, method='monge_ampere', nonlinear_method='quasi_newton', bc=None, op=Options()):
+    def __init__(self, mesh, monitor_function, method='monge_ampere', bc=None, op=Options()):
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
         try:
             assert self.dim == 2
         except AssertionError:
             raise NotImplementedError("r-adaptation only currently considered in 2D.")
+        try:
+            assert op.num_adapt == 1
+        except AssertionError:
+            raise ValueError
         self.monitor_function = monitor_function
         assert method in ('monge_ampere', 'laplacian_smoothing')
         self.method = method
-        assert nonlinear_method in ('quasi_newton', 'relaxation')
-        self.nonlinear_method = nonlinear_method
+        assert op.nonlinear_method in ('quasi_newton', 'relaxation')
         self.bc = bc
         self.op = op
         self.ξ = Function(self.mesh.coordinates)  # Computational coordinates
@@ -77,7 +80,7 @@ class MeshMover():
         self.p0test = TestFunction(self.P0)
 
     def create_functions(self):
-        if self.nonlinear_method == 'relaxation':
+        if self.op.nonlinear_method == 'relaxation':
             self.φ_old = Function(self.V)
             self.φ_new = Function(self.V)
             self.σ_old = Function(self.V_ten)
@@ -109,7 +112,7 @@ class MeshMover():
         self.monitor.interpolate(self.monitor_function(self.mesh))
 
     def setup_pseudotimestepper(self):
-        assert self.nonlinear_method == 'relaxation'
+        assert self.op.nonlinear_method == 'relaxation'
         φ, ψ = TrialFunction(self.V), TestFunction(self.V)
         a = dot(grad(ψ), grad(φ))*dx
         L = dot(grad(ψ), grad(self.φ_old))*dx
@@ -170,7 +173,7 @@ class MeshMover():
         nonlinear iterations.
         """
         n = FacetNormal(self.mesh)
-        if self.nonlinear_method == 'relaxation':
+        if self.op.nonlinear_method == 'relaxation':
             self.setup_pseudotimestepper()
             σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
             a = inner(τ, σ)*dx
@@ -275,7 +278,10 @@ class MeshMover():
         L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
         σ_init = Function(self.V_ten)
         solve(a == L, σ_init, solver_parameters={'ksp_type': 'cg'})
-        self.φσ.sub(1).assign(σ_init)
+        if self.op.nonlinear_method == 'quasi_newton':
+            self.φσ.sub(1).assign(σ_init)
+        else:
+            self.σ_new.assign(σ_init)
 
     def setup_l2_projector(self):
         u_cts, v_cts = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
@@ -305,12 +311,12 @@ class MeshMover():
             raise NotImplementedError  # TODO
 
     def adapt_monge_ampere(self):
-        if self.nonlinear_method == 'quasi_newton':
+        if self.op.nonlinear_method == 'quasi_newton':
             self.equidistribution.snes.setMonitor(self.fakemonitor)
             self.equidistribution.solve()
             return
 
-        assert self.nonlinear_method == 'relaxation'
+        assert self.op.nonlinear_method == 'relaxation'
         maxit = self.op.r_adapt_maxit
         for i in range(maxit):
 

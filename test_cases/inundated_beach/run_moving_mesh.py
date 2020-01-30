@@ -3,13 +3,17 @@ from thetis import *
 from adapt_utils.test_cases.inundated_beach.options import BalzanoOptions
 from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 
-op = BalzanoOptions(approach='monge_ampere', plot_timeseries=False, plot_pvd=True, debug=True)
-op.qoi_mode = 'inundation_volume'
-# op.nonlinear_method = 'relaxation'
+op = BalzanoOptions(approach='monge_ampere',
+                    plot_timeseries=False,
+                    plot_pvd=True,
+                    debug=True,
+                    nonlinear_method='relaxation',  # FIXME: quasi-newton
+                    num_adapt=1,
+                    qoi_mode='inundation_volume')
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 
-def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME
+def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this projection is expensive!
     """
     Monitor function focused around the wet-dry interface.
 
@@ -27,9 +31,5 @@ def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME
     diff_proj = project(diff, P1)
     return 1.0 + alpha*pow(cosh(beta*diff_proj), -2)
 
-def monitor_tmp(mesh):
-    return Constant(1.0)
-swp.monitor_function = monitor_tmp
-
-# swp.monitor_function = wet_dry_interface_monitor
+swp.monitor_function = wet_dry_interface_monitor
 swp.solve(uses_adjoint=False)

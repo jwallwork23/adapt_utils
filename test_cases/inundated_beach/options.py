@@ -202,7 +202,7 @@ class BalzanoOptions(ShallowWaterOptions):
         dry = conditional(ge(b, 0), 0, 1)
         if 'inundation' in self.qoi_mode:
             f = heavyside_approx(eta + b, self.wetting_and_drying_alpha)
-            eta_init = self.initial_value.split()[1]
+            eta_init = interpolate(self.initial_value.split()[1], eta.function_space())
             f_init = heavyside_approx(eta_init + b, self.wetting_and_drying_alpha)
             self.qoi_form = dry*(eta + f - f_init)*dx(degree=12)
         elif self.qoi_mode == 'overtopping_volume':
