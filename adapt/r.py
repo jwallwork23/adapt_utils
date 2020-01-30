@@ -288,16 +288,23 @@ class MeshMover():
         a = dot(v_cts, u_cts)*dx
         L = dot(v_cts, grad(self.φ_old))*dx
         bcs = []
+        n = FacetNormal(self.mesh)
         for i in self.mesh.exterior_facets.unique_markers:
-            n = [assemble(FacetNormal(self.mesh)[0]*ds(i)), assemble(FacetNormal(self.mesh)[1]*ds(i))]
-            if np.allclose(n[0], 0.0) and np.allclose(n[1], 0.0):
-                raise ValueError("Invalid normal vector {:}".format(n))
-            elif np.allclose(n[0], 0.0):
+            normal = [assemble(n[0]*ds(i)), assemble(n[1]*ds(i))]
+            if np.allclose(normal[0], 0.0) and np.allclose(normal[1], 0.0):
+                raise ValueError("Invalid normal vector {:}".format(normal))
+            elif np.allclose(normal[0], 0.0):
                 bcs.append(DirichletBC(self.P1_vec.sub(1), 0.0, i))
-            elif np.allclose(n[1], 0.0):
+            elif np.allclose(normal[1], 0.0):
                 bcs.append(DirichletBC(self.P1_vec.sub(0), 0.0, i))
             else:
-                raise NotImplementedError("Have not yet considered non-axes-aligned boundaries.")  # TODO
+                raise NotImplementedError("Have not yet considered non-axes-aligned boundaries.")
+
+        # FIXME: More general approach
+        # a_bc = dot(u_cts, n)*(v_cts[0] + v_cts[1])*ds
+        # L_bc = inner(Constant(as_vector([0.0, 0.0])), v_cts)*ds
+        # bcs = (EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary'),)
+
         prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bcs)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 

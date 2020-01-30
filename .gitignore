@@ -2,8 +2,6 @@
 __pycache__/
 
 # Specific files
-adapt/interpolation.py
-plots/.ipynb_checkpoints
 FIXME
 adjoint.py
 
