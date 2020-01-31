@@ -10,8 +10,14 @@ op = BalzanoOptions(approach='monge_ampere',
                     nonlinear_method='relaxation',  # FIXME: quasi-newton
                     num_adapt=1,
                     qoi_mode='inundation_volume')
+
+#op.default_mesh = RectangleMesh(17, 10, 1.5*op.basin_x, 1200.0)
+op.r_adapt_rtol = 1.0e-3
+
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
+
+
 
 def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this projection is expensive!
     """
