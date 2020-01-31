@@ -21,6 +21,7 @@ cs = ax1.contourf(lon, lat, elev, 50, vmin=-9, vmax=2, cmap=matplotlib.cm.coolwa
 ax1.set_xlabel("Degrees longitude")
 ax1.set_ylabel("Degrees latitude")
 ax1.set_title("Original data")
+op.annotate_plot(ax1, gauges=False)
 xlim = ax1.get_xlim()
 ylim = ax1.get_ylim()
 
@@ -31,6 +32,7 @@ ax2.set_xlabel("Degrees longitude")
 ax2.set_ylabel("Degrees latitude")
 ax2.set_xlim(xlim)
 ax2.set_ylim(ylim)
+op.annotate_plot(ax2, gauges=True)
 ax2.yaxis.set_label_position("right")
 ax2.yaxis.tick_right()
 ax2.set_title("Uniform mesh interpolant")
@@ -39,6 +41,7 @@ ax2.set_title("Uniform mesh interpolant")
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
 cb.set_label("Bathymetry $[\mathrm k\mathrm m]$")
 plt.savefig('outputs/uniform_bathymetry_{:d}.pdf'.format(mesh.num_cells()))
+plt.show();exit(0)
 
 # Setup Tohoku domain
 lon, lat, elev = op.read_surface_file()

@@ -30,26 +30,41 @@ class TohokuOptions(TsunamiOptions):
 
         # Gauge locations
         self.gauges = {
-            "P02": {"latlon": (38.5002, 142.5016)},
-            "P06": {"latlon": (38.6340, 142.5838)}
+            "P02": {"lonlat": (142.5016, 38.5002)},
+            "P06": {"lonlat": (142.5838, 38.6340)}
         }
 
         # Coastal locations of interest, including major cities and nuclear power plants
         self.locations_of_interest = {
-            "Fukushima Daiichi": {"latlon": (37.4213, 141.0281)},
-            "Onagawa": {"latlon": (38.3995, 141.5008)},
-            "Fukushima Daini": {"latlon": (37.3166, 141.0249)},
-            "Tokai": {"latlon": (36.4664, 140.6067)},
-            "Hamaoka": {"latlon": (34.6229, 138.1433)},
-            "Tohoku": {"latlon": (41.1800, 141.3903)},
-            "Tokyo": {"latlon": (35.6895, 139.6917)}
+            "Fukushima Daiichi": {"lonlat": (141.0281, 37.4213)},
+            "Onagawa": {"lonlat": (141.5008, 38.3995)},
+            "Fukushima Daini": {"lonlat": (141.0249, 37.3166)},
+            "Tokai": {"lonlat": (140.6067, 36.4664)},
+            "Hamaoka": {"lonlat": (138.1433, 34.6229)},
+            "Tohoku": {"lonlat": (141.3903, 41.1800)},
+            "Tokyo": {"lonlat": (139.6917, 35.6895)}
         }
         for g in self.gauges:
-            lat, lon = self.gauges[g]["latlon"]
+            lat, lon = self.gauges[g]["lonlat"]
             self.gauges[g]["utm"] = from_latlon(lat, lon, force_zone_number=54)
         for l in self.locations_of_interest:
-            lat, lon = self.locations_of_interest[l]["latlon"]
-            self.rois[r]["utm"] = from_latlon(lat, lon, force_zone_number=54)
+            lat, lon = self.locations_of_interest[l]["lonlat"]
+            self.locations_of_interest[l]["utm"] = from_latlon(lat, lon, force_zone_number=54)
+
+    def annotate_plot(self, axes, coords="lonlat", gauges=False):
+        """
+        Annotate a plot on axes `axes` in coordinate system `coords` with all gauges or locations of
+        interest, as determined by the Boolean kwarg `gauges`.
+        """
+        assert coords in ("lonlat", "utm")
+        dat = self.gauges if gauges else self.locations_of_interest
+        for loc in dat:
+            if loc == "Fukushima Daini":
+                continue
+            x, y = dat[loc][coords]
+            axes.annotate("Fukushima" if loc == "Fukushima Daiichi" else loc,
+                          xy=(x, y), xytext=(x+2, y if loc == "P02" else y-2),
+                          arrowprops={'arrowstyle': '->'})
 
     def read_bathymetry_file(self, km=False):
         nc = NetCDFFile('resources/tohoku.nc', mmap=False)
