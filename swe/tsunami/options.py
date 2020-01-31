@@ -104,3 +104,9 @@ class TsunamiOptions(ShallowWaterOptions):
         lat = to_latlon(x, y, self.force_zone_number, northern=True, force_longitude=True)[0] if self.utm else y
         self.coriolis.interpolate(2*self.Omega*sin(radians(lat)))
         return self.coriolis
+
+    def plot_coastline(self, axes):
+        """
+        Plot the coastline accordin to `bathymetry` on `axes`.
+        """
+        plot(self.bathymetry, vmin=-0.01, vmax=0.01, levels=0, axes=axes, cmap=None, colors='k', contour=True)

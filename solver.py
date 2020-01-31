@@ -708,33 +708,45 @@ class SteadyProblem():
         that of the mesh.
 
         NOTE: `self.set_fields` will be called after each adaptation step.
+
+        :kwarg approach: choose from 'monge_ampere', 'hessian' and 'isotropic'.
+        :kwarg adapt_field: field for adaptation, chosen from the solver fields, optionally appended
+                            with '_frobenius', for use in the Monge-Ampere case.
+        :kwarg num_adapt: number of mesh adaptation steps.
+        :kwargs alpha, beta: tuning parameters for Monge-Ampere monitor function.
         """
         field = self.op.adapt_field
         self.op.adapt_field = adapt_field or 'bathymetry'
         num_adapt = num_adapt or self.op.num_adapt
         if approach == 'monge_ampere':
-            if self.op.adapt_field == 'bathymetry':
+            if self.op.adapt_field in self.fields:
                 def monitor(mesh):
                     P1 = FunctionSpace(mesh, "CG", 1)
-                    b = project(self.bathymetry, P1)
+                    b = project(self.fields[self.op.adapt_field], P1)
                     return 1.0 + Constant(alpha)*pow(cosh(Constant(beta)*b), -2)
-            elif self.op.adapt_field == 'bathymetry_hessian':
+            elif 'frobenius' in self.op.adapt_field:
+                ff = self.op.adapt_field.split('_')
+                assert len(ff) == 2
+                f = ff[0]
                 def monitor(mesh):
                     P1 = FunctionSpace(mesh, "CG", 1)
-                    b = project(self.bathymetry, P1)
+                    b = project(self.fields[f], P1)
                     H = construct_hessian(b, op=self.op)
                     return 1.0 + alpha*local_frobenius_norm(H, mesh=mesh, space=P1)
             else:
-                raise NotImplementedError  # TODO: use fields dict
+                raise ValueError
             self.monitor_function = monitor
         elif approach == 'isotropic':
-            # TODO: get field
-            # TODO: whack it in an isotropic metric
-            raise NotImplementedError
+            if self.op.adapt_field in self.fields:
+                f = self.fields[self.op.adapt_field]
+                self.M = isotropic_metric(1/sqrt(dot(f, f)), op=self.op)  # TODO: test!
+            else:
+                raise ValueError
         elif approach != 'hessian':
             raise ValueError("Mesh initialisation requires 'approach' in ('hessian', 'monge_ampere', 'isotropic')")
         for i in range(num_adapt):
-            self.indicate_error(approach=approach)
+            if approach != 'isotropic':
+                self.indicate_error(approach=approach)
             self.adapt_mesh(approach=approach)
         self.op.adapt_field = field
 
