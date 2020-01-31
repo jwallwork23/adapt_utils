@@ -145,7 +145,7 @@ class AnisotropicMetricDriver():
         Adapt mesh using vertexwise metric.
         """
         self.check_p1metric_exists()
-        self.am.adapt(self.p1metric)
+        self.am.pragmatic_adapt(self.p1metric)
         self.__init__(self.am, hessian=hessian, indicator=indicator, op=self.op)
 
     def Lij(self, i, j):

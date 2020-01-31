@@ -11,7 +11,6 @@ Consistency of test cases / avoid duplicate code
 
   * Extend `AnisotropicMetricDriver` to vertex-based case and include common metrics as methods.
   * Use Thetis for advection-diffusion solver.
-  * Include `Options` files for all test cases, including beach. Include proper references.
   * Run scripts / tests for all test cases. e.g. Check convergence of TELEMAC-2D test case under
     uniform refinement.
 

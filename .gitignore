@@ -1,5 +1,6 @@
 # Directories
 __pycache__/*
+case_studies/*
 desalination/*
 tracer/*
 tsunami/*
@@ -13,10 +14,10 @@ test_cases/slotted_cylinder/*
 test_cases/steady_turbine/*
 test_cases/unsteady_turbine/*
 test_cases/tsunami/*
+swe/tsunami/*
+swe/turbine/*
 
 # Specific files
-adapt/interpolation.py
-plots/.ipynb_checkpoints
 FIXME
 adjoint.py
 

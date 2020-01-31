@@ -2,7 +2,6 @@ from thetis import *
 from thetis.configuration import *
 
 import os
-import numpy as np
 
 
 __all__ = ["Options"]
@@ -82,6 +81,9 @@ class Options(FrozenConfigurable):
         self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)
         self.end_time -= 0.5*self.dt
+        if self.debug:
+            # set_log_level(DEBUG)
+            set_log_level(INFO)
 
     def copy(self):
         copy = type(self)()

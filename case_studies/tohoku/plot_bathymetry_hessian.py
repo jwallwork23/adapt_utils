@@ -4,7 +4,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
-from adapt_utils.tsunami.solver import TsunamiProblem
+from adapt_utils.swe.tsunami.solver import TsunamiProblem
 
 
 mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})

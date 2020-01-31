@@ -1,18 +1,16 @@
 from firedrake import *
-from firedrake.petsc import PETSc
 from thetis import create_directory, print_output
 
 import os
 import numpy as np
 import matplotlib.pyplot as plt
 
-from adapt_utils.misc.misc import index_string
-from adapt_utils.misc.conditioning import *
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
 from adapt_utils.adapt.r import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
+from adapt_utils.misc import *
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem"]
@@ -178,10 +176,10 @@ class SteadyProblem():
         Solve adjoint problem using method specified by `discrete_adjoint` boolean kwarg.
         """
         if self.discrete_adjoint:
-            PETSc.Sys.Print("Solving discrete adjoint problem on mesh with %d elements" % self.mesh.num_cells())
+            print_output("Solving discrete adjoint problem on mesh with {:d} elements".format(self.mesh.num_cells()))
             self.solve_discrete_adjoint()
         else:
-            PETSc.Sys.Print("Solving continuous adjoint problem on mesh with %d elements" % self.mesh.num_cells())
+            print_output("Solving continuous adjoint problem on mesh with {:d} elements".format(self.mesh.num_cells()))
             self.solve_continuous_adjoint()
         self.plot_solution(adjoint=True)
 
@@ -472,10 +470,6 @@ class SteadyProblem():
         File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
         for key in self.indicators:
             File(os.path.join(self.di, key + '.pvd')).write(self.indicators[key])
-        if hasattr(self, 'monitor_function'):
-            m = interpolate(self.monitor_function(self.mesh), self.P1)
-            m.rename("Monitor function")
-            self.monitor_file.write(m)
 
     def plot_solution(self, adjoint=False):
         """
@@ -608,7 +602,7 @@ class SteadyProblem():
                 assert hasattr(self, 'custom_adapt')
             except AssertionError:
                 raise ValueError("Adaptivity mode {:s} not regcognised.".format(approach))
-            PETSc.Sys.Print("Using custom metric '{:s}'".format(approach))
+            print_output("Using custom metric '{:s}'".format(approach))
             self.custom_adapt()
 
     def estimate_error(self, approach=None):
@@ -653,8 +647,8 @@ class SteadyProblem():
             tmp = type(self)(self.op, mesh=am_copy.mesh, discrete_adjoint=self.discrete_adjoint,
                              prev_solution=self.prev_solution, levels=self.levels)
             x = Function(tmp.mesh.coordinates)
-            x.dat.data[:] = mesh_mover.x.dat.data  # TODO: PyOP2
-            tmp.mesh.coordinates.assign(x)  # TODO: May need to modify coords of hierarchy, too
+            x.dat.data[:] = mesh_mover.x.dat.data  # FIXME: Not parallel
+            tmp.mesh.coordinates.assign(x)  # TODO: Need to modify coords of hierarchy, too
 
             # Project fields and solutions onto temporary Problem
             tmp.project_fields(self)
@@ -662,29 +656,28 @@ class SteadyProblem():
             tmp.project_solution(self.adjoint_solution, adjoint=True)
 
             # Update self.mesh and function spaces, etc.
-            # self.mesh.coordinates.assign(x)
-            #print(self.bathymetry.function_space())
-            self.mesh.coordinates.dat.data[:] = x.dat.data
+            self.mesh.coordinates.dat.data[:] = x.dat.data  # FIXME: Not parallel
             self.create_function_spaces()
             self.create_solutions()
             self.boundary_conditions = self.op.set_boundary_conditions(self.V)
             self.project_fields(tmp)
             self.project_solution(tmp.solution)
             self.project_solution(tmp.adjoint_solution, adjoint=True)
-            #print(self.bathymetry.function_space())
-            #print(self.solver_obj.fields.bathymetry_2d.function_space())
-            # self.setup_solver()
-            #print(self.solver_obj.fields.bathymetry_2d.function_space())
+
+            # Plot monitor function
+            m = interpolate(self.monitor_function(self.mesh), self.P1)
+            m.rename("Monitor function")
+            self.monitor_file.write(m)
         else:
             try:
                 assert hasattr(self, 'M')
             except AssertionError:
                 raise ValueError("Please supply a metric.")
-            self.am.adapt(self.M)
+            self.am.pragmatic_adapt(self.M)
             self.set_mesh(self.am.mesh)
 
         if self.approach != 'monge_ampere':
-            PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
+            print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
             self.num_cells.append(self.mesh.num_cells())
             self.num_vertices.append(self.mesh.num_vertices())
             self.plot()
