@@ -298,13 +298,17 @@ class MeshMover():
         L_bc = Constant(0.0)*dot(v_cts, n)*ds
         bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary'))
 
-        # Need an additional constraint for solvability
+        # Need an additional constraint for solvability:
+        #   Allow tangential movement, but only up until the end of boundary segments
         a_bc = dot(u_cts, s)*dot(v_cts, s)*ds
-        if self.op.allow_boundary_movement:  # FIXME: better solution
-            L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
-        else:
-            L_bc = Constant(0.0)*dot(v_cts, s)*ds  # doesn't allow tangential movement
-        bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary'))
+        L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
+        # corners = []
+        # for i in self.mesh.exterior_facets.unique_markers:
+        #     for j in self.mesh.exterior_facets.unique_markers:
+        #         corners.append((i, j))
+        # bbc = DirichletBC(self.P1_vec, 0, corners)
+        bbc = DirichletBC(self.P1_vec, 0, ((1, 3), (1, 4), (2, 3), (2, 4)))  # TODO: generalise
+        bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=bbc))
 
         # Create solver
         prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bcs)

@@ -21,13 +21,13 @@ class BalzanoOptions(ShallowWaterOptions):
         shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
     """
 
-    def __init__(self, friction='manning', plot_timeseries=False, **kwargs):
+    def __init__(self, friction='manning', plot_timeseries=False, n=1, **kwargs):
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True
         self.plot_timeseries = plot_timeseries
 
         self.basin_x = 13800.0  # Length of wet region
-        self.default_mesh = RectangleMesh(17, 1, 1.5*self.basin_x, 1200.0)
+        self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
         self.num_hours = 24
 
         # Physical

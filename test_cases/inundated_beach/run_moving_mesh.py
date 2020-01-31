@@ -9,7 +9,9 @@ op = BalzanoOptions(approach='monge_ampere',
                     debug=True,
                     nonlinear_method='relaxation',  # FIXME: quasi-newton
                     num_adapt=1,
-                    qoi_mode='inundation_volume')
+                    qoi_mode='inundation_volume',
+                    n=2,
+                    r_adapt_rtol=1.0e-3)
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 
