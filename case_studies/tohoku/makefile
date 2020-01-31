@@ -10,9 +10,14 @@ uniform:
 	@python3 plot_uniform.py
 	@echo "Done!"
 
-bathymetry_hessian:
+metric_based:
 	@echo "Plotting bathymetry and initial surface on mesh adapted to bathymetry Hessian..."
-	@python3 plot_bathymetry_hessian.py
+	@python3 plot_metric_based.py
+	@echo "Done!"
+
+monitor_based:
+	@echo "Plotting bathymetry and initial surface on mesh adapted to bathymetry Hessian..."
+	@python3 plot_monitor_based.py
 	@echo "Done!"
 
 fixed_mesh:
