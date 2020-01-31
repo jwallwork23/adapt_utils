@@ -4,6 +4,7 @@ from thetis.configuration import *
 from scipy.io.netcdf import NetCDFFile
 
 from adapt_utils.swe.tsunami.options import TsunamiOptions
+from adapt_utils.swe.tsunami.conversion import from_latlon
 
 
 __all__ = ["TohokuOptions"]
@@ -27,7 +28,28 @@ class TohokuOptions(TsunamiOptions):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
 
-        # TODO: gauges
+        # Gauge locations
+        self.gauges = {
+            "P02": {"latlon": (38.5002, 142.5016)},
+            "P06": {"latlon": (38.6340, 142.5838)}
+        }
+
+        # Coastal locations of interest, including major cities and nuclear power plants
+        self.locations_of_interest = {
+            "Fukushima Daiichi": {"latlon": (37.4213, 141.0281)},
+            "Onagawa": {"latlon": (38.3995, 141.5008)},
+            "Fukushima Daini": {"latlon": (37.3166, 141.0249)},
+            "Tokai": {"latlon": (36.4664, 140.6067)},
+            "Hamaoka": {"latlon": (34.6229, 138.1433)},
+            "Tohoku": {"latlon": (41.1800, 141.3903)},
+            "Tokyo": {"latlon": (35.6895, 139.6917)}
+        }
+        for g in self.gauges:
+            lat, lon = self.gauges[g]["latlon"]
+            self.gauges[g]["utm"] = from_latlon(lat, lon, force_zone_number=54)
+        for l in self.locations_of_interest:
+            lat, lon = self.locations_of_interest[l]["latlon"]
+            self.rois[r]["utm"] = from_latlon(lat, lon, force_zone_number=54)
 
     def read_bathymetry_file(self, km=False):
         nc = NetCDFFile('resources/tohoku.nc', mmap=False)
