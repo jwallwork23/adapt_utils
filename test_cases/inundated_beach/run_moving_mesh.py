@@ -27,7 +27,7 @@ def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this pro
     """
     P1 = FunctionSpace(mesh, "CG", 1)
     eta = swp.solution.split()[1]
-    b = swp.bathymetry
+    b = swp.fields['bathymetry']
     current_mesh = eta.function_space().mesh()
     P1_current = FunctionSpace(current_mesh, "CG", 1)
     diff = interpolate(eta + b, P1_current)

@@ -28,7 +28,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
             self.interpolate_solution(prev_solution)
 
         # Physical fields
-        self.set_fields()
         physical_constants['g_grav'].assign(op.g)
 
         # Parameters for adjoint computation
@@ -39,23 +38,15 @@ class SteadyShallowWaterProblem(SteadyProblem):
         # Classification
         self.nonlinear = True
 
-    def set_fields(self):  # TODO: store in dict
-        self.viscosity = self.op.set_viscosity(self.P1)
-        self.diffusivity = self.op.set_diffusivity(self.P1)
-        self.bathymetry = self.op.set_bathymetry(self.P1DG)
-        self.inflow = self.op.set_inflow(self.P1_vec)
-        self.coriolis = self.op.set_coriolis(self.P1)
-        self.quadratic_drag_coefficient = self.op.set_quadratic_drag_coefficient(self.P1)
-        self.manning_drag_coefficient = self.op.set_manning_drag_coefficient(self.P1)
-
-    def interpolate_fields(self, prob):  # TODO: dict storage => more general loop
-        self.viscosity = self.project(prob.viscosity, Function(self.P1))
-        self.diffusivity = self.project(prob.diffusivity, Function(self.P1))
-        self.bathymetry = self.project(prob.bathymetry, Function(self.P1DG))
-        self.inflow = self.project(prob.inflow, Function(self.P1_vec))
-        self.coriolis = self.project(prob.coriolis, Function(self.P1))
-        self.quadratic_drag_coefficient = self.project(prob.quadratic_drag_coefficient, Function(self.P1))
-        self.manning_drag_coefficient = self.project(prob.manning_drag_coefficient, Function(self.P1))
+    def set_fields(self):
+        self.fields = {}
+        self.fields['viscosity'] = self.op.set_viscosity(self.P1)
+        self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)
+        self.fields['bathymetry'] = self.op.set_bathymetry(self.P1DG)
+        self.fields['inflow'] = self.op.set_inflow(self.P1_vec)
+        self.fields['coriolis'] = self.op.set_coriolis(self.P1)
+        self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
+        self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
 
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
@@ -69,7 +60,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         Create a Thetis FlowSolver2d object for solving the shallow water equations.
         """
         op = self.op
-        self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.bathymetry)
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.fields['bathymetry'])
         options = self.solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
@@ -95,11 +86,11 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
         options.polynomial_degree = op.degree
-        options.horizontal_viscosity = self.viscosity
-        options.horizontal_diffusivity = self.diffusivity
-        options.coriolis_frequency = self.coriolis
-        options.quadratic_drag_coefficient = self.quadratic_drag_coefficient
-        options.manning_drag_coefficient = self.manning_drag_coefficient
+        options.horizontal_viscosity = self.fields['viscosity']
+        options.horizontal_diffusivity = self.fields['diffusivity']
+        options.coriolis_frequency = self.fields['coriolis']
+        options.quadratic_drag_coefficient = self.fields['quadratic_drag_coefficient']
+        options.manning_drag_coefficient = self.fields['manning_drag_coefficient']
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
@@ -123,7 +114,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         else:
             interp = Function(self.V)
             u_interp, eta_interp = interp.split()
-            u_interp.interpolate(self.inflow)
+            u_interp.interpolate(self.fields['inflow'])
             eta_interp.assign(0.0)
         self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
 
@@ -175,22 +166,22 @@ class SteadyShallowWaterProblem(SteadyProblem):
         u, eta = tpe.solution.split()
         z, zeta = self.adjoint_error.split()
 
-        b = tpe.bathymetry
-        nu = tpe.viscosity
+        b = tpe.fields['bathymetry']
+        nu = tpe.fields['viscosity']
         H = b + eta
 
         dwr = -self.op.g*inner(z, grad(eta))                   # ExternalPressureGradient
         dwr += -zeta*div(H*u)                                  # HUDiv
         dwr += -inner(z, dot(u, nabla_grad(u)))                # HorizontalAdvection
-        if tpe.coriolis is not None:
-            dwr += -inner(z, tpe.coriolis*as_vector((-u[1], u[0])))       # Coriolis
+        if tpe.fields['coriolis'] is not None:
+            dwr += -inner(z, tpe.fields['coriolis']*as_vector((-u[1], u[0])))       # Coriolis
 
         # QuadraticDrag
-        if tpe.quadratic_drag_coefficient is not None:
-            C_D = tpe.quadratic_drag_coefficient
+        if tpe.fields['quadratic_drag_coefficient'] is not None:
+            C_D = tpe.fields['quadratic_drag_coefficient']
             dwr += -C_D*sqrt(dot(u, u))*inner(z, u)/H
-        elif tpe.manning_drag_coefficient is not None:
-            C_D = op.g*tpe.manning_drag_coefficient**2/pow(H, 1/3)
+        elif tpe.fields['manning_drag_coefficient'] is not None:
+            C_D = op.g*tpe.fields['manning_drag_coefficient']**2/pow(H, 1/3)
             dwr += -C_D*sqrt(dot(u, u))*inner(z, u)/H
 
         # HorizontalViscosity
@@ -212,8 +203,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         u, eta = tpe.solution.split()
         z, zeta = self.adjoint_error.split()
 
-        b = tpe.bathymetry
-        nu = tpe.viscosity
+        b = tpe.fields['bathymetry']
+        nu = tpe.fields['viscosity']
         H = b + eta
         g = self.op.g
         n = tpe.n
@@ -446,7 +437,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             self.interpolate_solution(prev_solution)
 
         # Physical fields
-        self.set_fields()
         physical_constants['g_grav'].assign(op.g)
 
         # Parameters for adjoint computation
@@ -457,27 +447,16 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         # Classification
         self.nonlinear = True
 
-    def set_fields(self):  # TODO: store in dict
-        self.viscosity = self.op.set_viscosity(self.P1)
-        self.diffusivity = self.op.set_diffusivity(self.P1)
-        self.bathymetry = self.op.set_bathymetry(self.P1DG)
-        self.inflow = self.op.set_inflow(self.P1_vec)
-        self.coriolis = self.op.set_coriolis(self.P1)
-        self.quadratic_drag_coefficient = self.op.set_quadratic_drag_coefficient(self.P1)
-        self.manning_drag_coefficient = self.op.set_manning_drag_coefficient(self.P1)
+    def set_fields(self):
+        self.fields = {}
+        self.fields['viscosity'] = self.op.set_viscosity(self.P1)
+        self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)
+        self.fields['bathymetry'] = self.op.set_bathymetry(self.P1DG)
+        self.fields['inflow'] = self.op.set_inflow(self.P1_vec)
+        self.fields['coriolis'] = self.op.set_coriolis(self.P1)
+        self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
+        self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
         self.op.set_boundary_surface()
-
-
-    def project_fields(self, prob):  # TODO: dict storage => more general loop
-        self.viscosity = self.project(prob.viscosity, Function(self.P1))
-        self.diffusivity = self.project(prob.diffusivity, Function(self.P1))
-        self.bathymetry = self.project(prob.bathymetry, Function(self.P1DG))
-        self.op.bathymetry = self.bathymetry
-        self.inflow = self.project(prob.inflow, Function(self.P1_vec))
-        self.coriolis = self.project(prob.coriolis, Function(self.P1))
-        self.quadratic_drag_coefficient = self.project(prob.quadratic_drag_coefficient, Function(self.P1))
-        self.manning_drag_coefficient = self.project(prob.manning_drag_coefficient, Function(self.P1))
-        self.op.depth = project(self.op.depth, self.P1)
 
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
@@ -500,7 +479,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if not hasattr(self, 'remesh_step'):
             self.remesh_step = 0
         op = self.op
-        self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.bathymetry)
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.fields['bathymetry'])
         if self.remesh_step > 0:
             self.solver_obj.export_initial_state = False
         options = self.solver_obj.options
@@ -527,11 +506,11 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         # Parameters
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
-        options.horizontal_viscosity = self.viscosity
-        options.horizontal_diffusivity = self.diffusivity
-        options.quadratic_drag_coefficient = self.quadratic_drag_coefficient
-        options.manning_drag_coefficient = self.manning_drag_coefficient
-        options.coriolis_frequency = self.coriolis
+        options.horizontal_viscosity = self.fields['viscosity']
+        options.horizontal_diffusivity = self.fields['diffusivity']
+        options.quadratic_drag_coefficient = self.fields['quadratic_drag_coefficient']
+        options.manning_drag_coefficient = self.fields['manning_drag_coefficient']
+        options.coriolis_frequency = self.fields['coriolis']
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
@@ -589,15 +568,16 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             return steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
 
         def inflow():
-            v = interpolate(inner(u, self.inflow), self.P1)  # TODO: Do we need to interpolate?
+            v = interpolate(inner(u, self.fields['inflow']), self.P1)  # TODO: Do we need to interpolate?
             return steady_metric(v, noscale=noscale, degree=degree, op=self.op)
 
         def bathymetry():
-            return steady_metric(self.bathymetry, noscale=noscale, degree=degree, op=self.op)
+            return steady_metric(self.fields['bathymetry'], noscale=noscale, degree=degree, op=self.op)
 
         def viscosity():
-            return steady_metric(self.viscosity, noscale=noscale, degree=degree, op=self.op)
+            return steady_metric(self.fields['viscosity'], noscale=noscale, degree=degree, op=self.op)
 
+        # TODO: This will all be simpler when fields dict is implemented
         metrics = {'elevation': elevation, 'velocity_x': velocity_x, 'velocity_y': velocity_y,
                    'speed': speed, 'inflow': inflow,
                    'bathymetry': bathymetry, 'viscosity': viscosity}

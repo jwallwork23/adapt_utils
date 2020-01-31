@@ -18,7 +18,7 @@ class TsunamiOptions(ShallowWaterOptions):
     """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
-    def __init__(self, utm=True, **kwargs):
+    def __init__(self, utm=True, n=40, **kwargs):
         super(TsunamiOptions, self).__init__(**kwargs)
         self.utm = utm
         if not hasattr(self, 'force_zone_number'):
@@ -30,7 +30,7 @@ class TsunamiOptions(ShallowWaterOptions):
         lon_max = np.max(lon)
         lat_min = np.min(lat)
         lat_max = np.max(lat)
-        self.default_mesh = RectangleMesh(40, 40, lon_max-lon_min, lat_max-lat_min)
+        self.default_mesh = RectangleMesh(n, n, lon_max-lon_min, lat_max-lat_min)
         x, y = SpatialCoordinate(self.default_mesh)
         self.default_mesh.coordinates.interpolate(as_vector([x+lon_min, y+lat_min]))
         if utm:
@@ -93,8 +93,7 @@ class TsunamiOptions(ShallowWaterOptions):
         u.assign(0.0)
 
         # Interpolate free surface from inversion data
-        if not hasattr(self, 'initial_surface'):
-            self.set_initial_surface(FunctionSpace(fs.mesh(), "CG", 1))
+        self.set_initial_surface(FunctionSpace(fs.mesh(), "CG", 1))
         eta.interpolate(self.initial_surface)
 
         return self.initial_value

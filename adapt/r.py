@@ -239,7 +239,7 @@ class MeshMover():
                       "snes_lag_preconditioner": -1}
             if self.op.debug:
                 # params["ksp_monitor"] = None
-                params["ksp_monitor_singular_value"] = None
+                # params["ksp_monitor_singular_value"] = None
                 params["snes_monitor"] = None
                 # params["snes_linesearch_monitor"] = None
 
