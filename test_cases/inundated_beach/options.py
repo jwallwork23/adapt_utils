@@ -27,6 +27,7 @@ class BalzanoOptions(ShallowWaterOptions):
         self.plot_timeseries = plot_timeseries
 
         self.basin_x = 13800.0  # Length of wet region
+        #self.default_mesh = RectangleMesh(17, 10, 1.5*self.basin_x, 1200.0)
         self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
         self.num_hours = 24
 

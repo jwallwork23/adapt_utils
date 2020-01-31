@@ -24,6 +24,7 @@ class ShallowWaterOptions(Options):
     inflow = FiredrakeVectorExpression(None, allow_none=True).tag(config=True)
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
     coriolis = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    source = FiredrakeScalarExpression(None, allow_none=True, help="Scalar source term for tracer problem.").tag(config=True)
 
     # Model
     grad_div_viscosity = Bool(False).tag(config=True)
@@ -49,11 +50,20 @@ class ShallowWaterOptions(Options):
         """Should be implemented in derived class."""
         self.viscosity = Constant(self.base_viscosity)
         return self.viscosity
+    
+    def set_source_tracer(self, fs):
+        """Should be implemented in derived class."""
+        if source is not None:
+            self.source = Function(fs).project(source)
+        else:
+            self.source = source
+        return self.source
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
         self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity
+    
 
     def set_inflow(self, fs):
         """Should be implemented in derived class."""

@@ -10,17 +10,12 @@ op = BalzanoOptions(approach='monge_ampere',
                     nonlinear_method='relaxation',
                     # nonlinear_method='quasi_newton',  # FIXME
                     num_adapt=1,
-<<<<<<< HEAD
-                    qoi_mode='inundation_volume')
-
-#op.default_mesh = RectangleMesh(17, 10, 1.5*op.basin_x, 1200.0)
-op.r_adapt_rtol = 1.0e-3
-
-=======
                     qoi_mode='inundation_volume',
                     n=2,
                     r_adapt_rtol=1.0e-3)
->>>>>>> 7627eb52646ba96d807d01f00152e2713f4328c6
+
+#op.default_mesh = RectangleMesh(17, 2, 1.5*op.basin_x, 1200.0)
+
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 

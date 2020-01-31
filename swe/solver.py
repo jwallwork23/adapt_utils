@@ -107,8 +107,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_wetting_and_drying = op.wetting_and_drying
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
         options.solve_tracer = op.solve_tracer
-        if op.solve_tracer:
-            raise NotImplementedError  # TODO
+        #if op.solve_tracer:
+            #raise NotImplementedError  # TODO
 
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
@@ -466,6 +466,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.quadratic_drag_coefficient = self.op.set_quadratic_drag_coefficient(self.P1)
         self.manning_drag_coefficient = self.op.set_manning_drag_coefficient(self.P1)
         self.op.set_boundary_surface()
+        self.source = self.op.set_source_tracer(self.P1DG)
+        
 
 
     def project_fields(self, prob):  # TODO: dict storage => more general loop
@@ -478,6 +480,12 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.quadratic_drag_coefficient = self.project(prob.quadratic_drag_coefficient, Function(self.P1))
         self.manning_drag_coefficient = self.project(prob.manning_drag_coefficient, Function(self.P1))
         self.op.depth = project(self.op.depth, self.P1)
+        #self.conv_vel =project(prob.conv, self.P1_vec)
+        
+        if prob.source is not None:
+            self.source = self.project(prob.source, Function(self.P1DG))
+        else:
+            self.source = None
 
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
@@ -521,8 +529,13 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
         # Outputs
         options.output_directory = self.di
-        options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
-        options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []
+        
+        if op.solve_tracer:
+            options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d', 'bathymetry_2d'] if op.plot_pvd else []
+            options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d', 'tracer_2d', 'bathymetry_2d'] if op.save_hdf5 else []
+        else:
+            options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
+            options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []
 
         # Parameters
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
@@ -540,10 +553,13 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
         options.solve_tracer = op.solve_tracer
         if op.solve_tracer:
-            raise NotImplementedError  # TODO
-
+            #options.tracer_advective_velocity = op.conv_vel
+            options.tracer_source_2d = op.source
+        
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
+        if op.solve_tracer:
+            self.solver_obj.bnd_functions['tracer'] = op.set_boundary_conditions_tracer(self.V)
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
@@ -557,7 +573,14 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             u_interp, eta_interp = self.interpolated_solution.split()
         else:
             u_interp, eta_interp = self.solution.split()
-        self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+            
+        if op.solve_tracer:
+            
+            if self.op.tracer_init_value is not None:
+                self.solver_obj.assign_initial_conditions(uv = u_interp, elev = eta_interp, tracer = self.op.tracer_init_value)
+        else:
+            self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+        
 
         # Ensure correct iteration count
         self.solver_obj.i_export = self.remesh_step
