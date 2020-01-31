@@ -20,11 +20,8 @@ fig, axes = mpl.pyplot.subplots(nrows=1, ncols=2, sharex=True)
 
 # Adapt mesh to Hessian of bathymetry
 op.target = 1e3
-op.num_adapt = 4
-op.adapt_field = 'bathymetry'
-op.approach = 'hessian'
 tp = TsunamiProblem(op, levels=0)
-tp.initialise_mesh()
+tp.initialise_mesh(num_adapt=4, approach='hessian', adapt_field='bathymetry')
 
 # Plot adapted mesh
 ax1 = axes.flat[0]

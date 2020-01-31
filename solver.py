@@ -619,20 +619,21 @@ class SteadyProblem():
     def plot_error_estimate(self, approach):
         raise NotImplementedError  # TODO
 
-    def adapt_mesh(self):  # TODO: option for r-adaptation every *timestep*, rather than every export
+    def adapt_mesh(self, approach=None):  # TODO: option for r-adaptation every *timestep*, rather than every export
         """
         Adapt mesh using metric constructed in error estimation step.
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
         """
-        if 'fixed_mesh' in self.approach:
+        approach = approach or self.approach
+        if 'fixed_mesh' in approach:
             return
-        elif self.approach == 'uniform':
+        elif approach == 'uniform':
             if self.am.levels == 0:
                 raise ValueError("Cannot perform uniform refinement because `AdaptiveMesh` object is not hierarchical.")
             self.mesh = self.am.hierarchy[1]
             return
-        elif self.approach == 'monge_ampere':  # TODO: Integrate into AdaptiveMesh
+        elif approach == 'monge_ampere':  # TODO: Integrate into AdaptiveMesh
             try:
                 assert hasattr(self, 'monitor_function')
             except AssertionError:
@@ -676,7 +677,7 @@ class SteadyProblem():
             self.am.pragmatic_adapt(self.M)
             self.set_mesh(self.am.mesh)
 
-        if self.approach != 'monge_ampere':
+        if approach != 'monge_ampere':
             print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
             self.num_cells.append(self.mesh.num_cells())
             self.num_vertices.append(self.mesh.num_vertices())
@@ -688,7 +689,7 @@ class SteadyProblem():
             self.set_fields()
             self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
-    def initialise_mesh(self):
+    def initialise_mesh(self, approach='hessian', adapt_field=None, num_adapt=1):
         """
         Repeatedly apply mesh adaptation in order to give a suitable initial mesh. A common usage
         is when bathymetry is interpolated from raw data and we want its anisotropy to align with
@@ -696,9 +697,14 @@ class SteadyProblem():
 
         NOTE: `self.set_fields` will be called after each adaptation step.
         """
-        for i in range(self.op.num_adapt):
-            self.indicate_error()
-            self.adapt_mesh()
+        if approach != 'hessian':
+            raise NotImplementedError  # TODO: r-adapt
+        field = self.op.adapt_field
+        self.op.adapt_field = adapt_field or 'bathymetry'
+        for i in range(num_adapt):
+            self.get_hessian_metric()
+            self.adapt_mesh(approach=approach)
+        self.op.adapt_field = field
 
     def adaptation_loop(self, outer_iteration=None):
         """

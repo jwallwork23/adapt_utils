@@ -579,28 +579,24 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             return steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
 
         def velocity_x():
-            s = Function(self.P1).interpolate(u[0])
-            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+            return steady_metric(u[0], noscale=noscale, degree=degree, op=self.op)
 
         def velocity_y():
-            s = Function(self.P1).interpolate(u[1])
-            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
+            return steady_metric(u[1], noscale=noscale, degree=degree, op=self.op)
 
         def speed():
-            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
+            spd = interpolate(sqrt(inner(u, u)), self.P1)  # TODO: Do we need to interpolate?
             return steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
 
         def inflow():
-            v = Function(self.P1).interpolate(inner(u, self.op.inflow))
+            v = interpolate(inner(u, self.inflow), self.P1)  # TODO: Do we need to interpolate?
             return steady_metric(v, noscale=noscale, degree=degree, op=self.op)
 
         def bathymetry():
-            b = Function(self.P1).interpolate(self.op.bathymetry)
-            return steady_metric(b, noscale=noscale, degree=degree, op=self.op)
+            return steady_metric(self.bathymetry, noscale=noscale, degree=degree, op=self.op)
 
         def viscosity():
-            nu = Function(self.P1).interpolate(self.op.viscosity)
-            return steady_metric(nu, noscale=noscale, degree=degree, op=self.op)
+            return steady_metric(self.viscosity, noscale=noscale, degree=degree, op=self.op)
 
         metrics = {'elevation': elevation, 'velocity_x': velocity_x, 'velocity_y': velocity_y,
                    'speed': speed, 'inflow': inflow,

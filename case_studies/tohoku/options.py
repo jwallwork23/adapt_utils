@@ -3,7 +3,7 @@ from thetis.configuration import *
 
 from scipy.io.netcdf import NetCDFFile
 
-from adapt_utils.tsunami.options import TsunamiOptions
+from adapt_utils.swe.tsunami.options import TsunamiOptions
 
 
 __all__ = ["TohokuOptions"]

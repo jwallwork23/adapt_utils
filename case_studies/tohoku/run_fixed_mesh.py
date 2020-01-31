@@ -12,11 +12,9 @@ args = parser.parse_args()
 op = TohokuOptions(utm=True, plot_pvd=True, num_adapt=4)
 
 swp = TsunamiProblem(op, levels=0)
-if args.initial_adapt is not None:  # TODO: neaten this
-    swp.approach = 'hessian'
-    swp.op.approach = 'hessian'
-    swp.op.adapt_field = 'bathymetry'
-    swp.initialise_mesh()
+if args.initial_adapt is not None:
+    swp.initialise_mesh(adapt_field='bathymetry', num_adapt=int(args.initial_adapt))
+exit()  # TODO: temp
 swp.solve()
 
 # TODO: Plot gauge measurements
