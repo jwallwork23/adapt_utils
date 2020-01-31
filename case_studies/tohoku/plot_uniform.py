@@ -18,21 +18,23 @@ fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True)
 # Plot raw bathymetry data
 ax1 = axes.flat[0]
 cs = ax1.contourf(lon, lat, elev, 50, vmin=-9, vmax=2, cmap=matplotlib.cm.coolwarm)
+ax1.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
 ax1.set_xlabel("Degrees longitude")
 ax1.set_ylabel("Degrees latitude")
 ax1.set_title("Original data")
-op.annotate_plot(ax1, gauges=False)
+# op.annotate_plot(ax1, gauges=False)
 xlim = ax1.get_xlim()
 ylim = ax1.get_ylim()
 
 # Plot bathymetry data interpolated onto a uniform mesh
 ax2 = axes.flat[1]
 firedrake.plot(op.bathymetry, cmap=matplotlib.cm.coolwarm, axes=ax2)
+op.plot_coastline(ax2)
 ax2.set_xlabel("Degrees longitude")
 ax2.set_ylabel("Degrees latitude")
 ax2.set_xlim(xlim)
 ax2.set_ylim(ylim)
-op.annotate_plot(ax2, gauges=True)
+# op.annotate_plot(ax2, gauges=True)
 ax2.yaxis.set_label_position("right")
 ax2.yaxis.tick_right()
 ax2.set_title("Uniform mesh interpolant")
@@ -41,15 +43,15 @@ ax2.set_title("Uniform mesh interpolant")
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
 cb.set_label("Bathymetry $[\mathrm k\mathrm m]$")
 plt.savefig('outputs/uniform_bathymetry_{:d}.pdf'.format(mesh.num_cells()))
-plt.show();exit(0)
 
 # Setup Tohoku domain
-lon, lat, elev = op.read_surface_file()
+lon1, lat1, elev1 = op.read_surface_file()
 fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True)
 
 # Plot raw surface data
 ax1 = axes.flat[0]
-cs = ax1.contourf(lon, lat, elev, 50, cmap=matplotlib.cm.coolwarm)
+cs = ax1.contourf(lon1, lat1, elev1, 50, cmap=matplotlib.cm.coolwarm)
+ax1.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
 ax1.set_xlabel("Degrees longitude")
 ax1.set_ylabel("Degrees latitude")
 ax1.set_title("Original data")
@@ -57,6 +59,7 @@ ax1.set_title("Original data")
 # Plot surface data interpolated onto a uniform mesh
 ax2 = axes.flat[1]
 firedrake.plot(op.initial_surface, cmap=matplotlib.cm.coolwarm, axes=ax2)
+op.plot_coastline(ax2)
 ax2.set_xlabel("Degrees longitude")
 ax2.set_ylabel("Degrees latitude")
 ax2.set_xlim(xlim)

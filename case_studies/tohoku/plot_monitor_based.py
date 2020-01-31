@@ -24,10 +24,9 @@ xlim = plt.gca().get_xlim()
 ylim = plt.gca().get_ylim()
 fig, axes = mpl.pyplot.subplots(nrows=1, ncols=2, sharex=True)
 
-# Adapt mesh to Hessian of bathymetry
 # adapt_field = 'bathymetry'
-adapt_field = 'bathymetry_hessian'
 # alpha = 10.0
+adapt_field = 'bathymetry_frobenius'  # Adapt mesh to Frobenius norm of Hessian of bathymetry
 alpha = 0.001
 tp = TsunamiProblem(op, levels=0)
 tp.initialise_mesh(num_adapt=4,
@@ -39,6 +38,7 @@ tp.initialise_mesh(num_adapt=4,
 # Plot adapted mesh
 ax1 = axes.flat[0]
 ax1 = firedrake.plot(firedrake.Function(tp.P1), axes=ax1, colorbar=False, cmap=mpl.cm.binary, edgecolors='dimgray')
+op.plot_coastline(ax1)
 ax1.set_xlabel("Degrees longitude")
 ax1.set_ylabel("Degrees latitude")
 ax1.set_xlim(xlim)
@@ -48,6 +48,7 @@ ax1.set_title("Adapted mesh")
 # Plot bathymetry data interpolated onto adapted mesh
 ax2 = axes.flat[1]
 ax2 = firedrake.plot(op.bathymetry, axes=ax2, colorbar=False)
+op.plot_coastline(ax2)
 ax2.set_xlabel("Degrees longitude")
 ax2.set_ylabel("Degrees latitude")
 ax2.set_xlim(xlim)
@@ -72,15 +73,17 @@ fig, axes = mpl.pyplot.subplots(nrows=1, ncols=2, sharex=True)
 # Plot adapted mesh
 ax1 = axes.flat[0]
 ax1 = firedrake.plot(firedrake.Function(tp.P1), axes=ax1, colorbar=False, cmap=mpl.cm.binary, edgecolors='dimgray')
+op.plot_coastline(ax1)
 ax1.set_xlabel("Degrees longitude")
 ax1.set_ylabel("Degrees latitude")
 ax1.set_xlim(xlim)
 ax1.set_ylim(ylim)
 ax1.set_title("Adapted mesh")
 
-# Plot bathymetry data interpolated onto adapted mesh
+# Plot initial free surface data interpolated onto adapted mesh
 ax2 = axes.flat[1]
 ax2 = firedrake.plot(op.initial_surface, axes=ax2, colorbar=False)
+op.plot_coastline(ax2)
 ax2.set_xlabel("Degrees longitude")
 ax2.set_ylabel("Degrees latitude")
 ax2.set_xlim(xlim)
