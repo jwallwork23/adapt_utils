@@ -2,7 +2,6 @@ from firedrake import *
 from thetis import print_output
 
 import os
-import numpy as np
 
 from adapt_utils.options import Options
 
@@ -237,10 +236,12 @@ class MeshMover():
                       "snes_linesearch_max_it": 5,
                       "snes_linesearch_maxstep": 1.05,
                       "snes_linesearch_damping": 0.8,
-                      # "ksp_monitor": True,
-                      # "snes_monitor": True,
-                      # "snes_linesearch_monitor": True,
                       "snes_lag_preconditioner": -1}
+            if self.op.debug:
+                # params["ksp_monitor"] = None
+                params["ksp_monitor_singular_value"] = None
+                params["snes_monitor"] = None
+                # params["snes_linesearch_monitor"] = None
 
             self.equidistribution = NonlinearVariationalSolver(prob, nullspace=nullspace,
                                                                transpose_nullspace=nullspace,
