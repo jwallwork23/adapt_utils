@@ -284,30 +284,41 @@ class MeshMover():
             self.σ_new.assign(σ_init)
 
     def setup_l2_projector(self):
+        """
+        Setup solver which L2 projects the gradient of `φ_old` into P1 space as `grad_φ_cts`.
+
+        It is at this stage where we enforce that the domain boundary should not be changed. This is
+        done by imposing an `EquationBC` constraint on the normal component of `grad_φ_cts` being
+        zero. For solvability of the resulting system, we need to enforce an additional constraint.
+        For this, we say that the tangential component of `grad_φ_cts` should be equal to the
+        tangential component of `grad(φ_old)`. However, on it's own, this condition is insufficient
+        to avoid boundary deformation at the intersection between boundary segments. As such, we
+        need apply a Dirichlet condition at each intersection, stating that the tangential component
+        is zero.
+
+        NOTE: This implementation assumes all boundary segments are straight lines, meaning boundary
+              deformation may occur if this is not the case.
+        """
         u_cts, v_cts = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
         bcs = []
-        n = FacetNormal(self.mesh)    # Normal vector
-        s = as_vector([n[1], -n[0]])  # Tangent vector
 
         # FEM problem for L2 projection
         a = dot(v_cts, u_cts)*dx
         L = dot(v_cts, grad(self.φ_old))*dx
 
         # Enforce no mesh movement normal to boundaries
+        n = FacetNormal(self.mesh)
         a_bc = dot(u_cts, n)*dot(v_cts, n)*ds
         L_bc = Constant(0.0)*dot(v_cts, n)*ds
         bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary'))
 
-        # Need an additional constraint for solvability:
-        #   Allow tangential movement, but only up until the end of boundary segments
+        # Allow tangential movement, but only up until the end of boundary segments
+        s = as_vector([n[1], -n[0]])
         a_bc = dot(u_cts, s)*dot(v_cts, s)*ds
         L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
-        # corners = []
-        # for i in self.mesh.exterior_facets.unique_markers:
-        #     for j in self.mesh.exterior_facets.unique_markers:
-        #         corners.append((i, j))
-        # bbc = DirichletBC(self.P1_vec, 0, corners)
-        bbc = DirichletBC(self.P1_vec, 0, ((1, 3), (1, 4), (2, 3), (2, 4)))  # TODO: generalise
+        edges = set(self.mesh.exterior_facets.unique_markers)
+        corners = [(i, j) for i in edges for j in edges.difference([i])]
+        bbc = DirichletBC(self.P1_vec, 0, corners)
         bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=bbc))
 
         # Create solver

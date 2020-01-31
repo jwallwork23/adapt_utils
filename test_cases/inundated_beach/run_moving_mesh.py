@@ -7,7 +7,8 @@ op = BalzanoOptions(approach='monge_ampere',
                     plot_timeseries=False,
                     plot_pvd=True,
                     debug=True,
-                    nonlinear_method='relaxation',  # FIXME: quasi-newton
+                    nonlinear_method='relaxation',
+                    # nonlinear_method='quasi_newton',  # FIXME
                     num_adapt=1,
                     qoi_mode='inundation_volume',
                     n=2,
