@@ -41,7 +41,7 @@ ax2.set_title("Uniform mesh interpolant")
 
 # Save raw bathymetry and uniform interpolant
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
-cb.set_label("Bathymetry $[\mathrm k\mathrm m]$")
+cb.set_label(r"Bathymetry $[\mathrm{km}]$")
 plt.savefig('outputs/uniform_bathymetry_{:d}.pdf'.format(mesh.num_cells()))
 
 # Setup Tohoku domain
@@ -54,6 +54,7 @@ cs = ax1.contourf(lon1, lat1, elev1, 50, cmap=matplotlib.cm.coolwarm)
 ax1.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
 ax1.set_xlabel("Degrees longitude")
 ax1.set_ylabel("Degrees latitude")
+op.annotate_plot(ax1, gauges=False)
 ax1.set_title("Original data")
 
 # Plot surface data interpolated onto a uniform mesh
@@ -64,6 +65,7 @@ ax2.set_xlabel("Degrees longitude")
 ax2.set_ylabel("Degrees latitude")
 ax2.set_xlim(xlim)
 ax2.set_ylim(ylim)
+op.annotate_plot(ax2, gauges=True)
 ax2.yaxis.set_label_position("right")
 ax2.yaxis.tick_right()
 ax2.set_title("Uniform mesh interpolant")
@@ -77,6 +79,7 @@ fig = plt.figure()
 axes = fig.gca()
 P1 = op.bathymetry.function_space()
 axes, cb = firedrake.plot(op.set_coriolis(P1), axes=axes, cmap=matplotlib.cm.coolwarm, colorbar=True)
+op.plot_coastline(axes)
 axes.set_xlabel("Degrees longitude")
 axes.set_ylabel("Degrees latitude")
 axes.set_xlim(xlim)

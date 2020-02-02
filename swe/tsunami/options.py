@@ -3,6 +3,8 @@ from thetis.configuration import *
 
 import scipy.interpolate as si
 import numpy as np
+import matplotlib
+import matplotlib.pyplot as plt
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import lonlat_to_utm, to_latlon, radians
@@ -10,6 +12,10 @@ from adapt_utils.adapt.metric import steady_metric
 
 
 __all__ = ["TsunamiOptions"]
+
+
+matplotlib.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+matplotlib.rc('text', usetex=True)
 
 
 class TsunamiOptions(ShallowWaterOptions):
@@ -52,6 +58,9 @@ class TsunamiOptions(ShallowWaterOptions):
         self.dt_per_export = 10
         self.dt_per_remesh = 10
         self.end_time = 1800.0
+
+        self.gauges = {}
+        self.locations_of_interest = {}
 
     def set_bathymetry(self, fs, dat=None):
         assert fs.ufl_element().degree() == 1 and fs.ufl_element().family() == 'Lagrange'
@@ -105,8 +114,35 @@ class TsunamiOptions(ShallowWaterOptions):
         self.coriolis.interpolate(2*self.Omega*sin(radians(lat)))
         return self.coriolis
 
+    def get_export_func(self, solver_obj):
+        eta = solver_obj.fields.elev_2d
+
+        def export_func():
+            # for loc in (self.gauges, self.locations_of_interest):
+            for loc in (self.gauges,):
+                for l in loc:
+                    xy = loc[l]["utm" if self.utm else "lonlat"]
+                    loc[l]["timeseries"].append(float(eta.at(xy)))
+
+        return export_func
+
     def plot_coastline(self, axes):
         """
-        Plot the coastline accordin to `bathymetry` on `axes`.
+        Plot the coastline according to `bathymetry` on `axes`.
         """
         plot(self.bathymetry, vmin=-0.01, vmax=0.01, levels=0, axes=axes, cmap=None, colors='k', contour=True)
+
+    def plot_timeseries(self):
+        """
+        Plot gauge timeseries data.
+        """
+        N = len(self.gauges["P02"]["timeseries"])
+        assert N > 0
+        t = np.linspace(0, self.end_time/60.0, N)
+        for g in self.gauges:
+            y = np.array(self.gauges[g]["timeseries"])-self.gauges[g]["timeseries"][0]
+            plt.plot(t, y, label=g, linestyle='dashed', marker='*')
+        plt.xlabel(r"Time $[\mathrm{min}]$")
+        plt.ylabel("Free surface displacement $[\mathrm m]$")
+        plt.legend()
+        plt.savefig(os.path.join(self.di, "gauge_timeseries.pdf"))

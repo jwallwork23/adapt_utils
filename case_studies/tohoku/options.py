@@ -29,27 +29,25 @@ class TohokuOptions(TsunamiOptions):
         super(TohokuOptions, self).__init__(**kwargs)
 
         # Gauge locations
-        self.gauges = {
-            "P02": {"lonlat": (142.5016, 38.5002)},
-            "P06": {"lonlat": (142.5838, 38.6340)}
-        }
+        self.gauges["P02"] = {"lonlat": (142.5016, 38.5002)}
+        self.gauges["P06"] = {"lonlat": (142.5838, 38.6340)}
 
         # Coastal locations of interest, including major cities and nuclear power plants
-        self.locations_of_interest = {
-            "Fukushima Daiichi": {"lonlat": (141.0281, 37.4213)},
-            "Onagawa": {"lonlat": (141.5008, 38.3995)},
-            "Fukushima Daini": {"lonlat": (141.0249, 37.3166)},
-            "Tokai": {"lonlat": (140.6067, 36.4664)},
-            "Hamaoka": {"lonlat": (138.1433, 34.6229)},
-            "Tohoku": {"lonlat": (141.3903, 41.1800)},
-            "Tokyo": {"lonlat": (139.6917, 35.6895)}
-        }
-        for g in self.gauges:
-            lat, lon = self.gauges[g]["lonlat"]
-            self.gauges[g]["utm"] = from_latlon(lat, lon, force_zone_number=54)
-        for l in self.locations_of_interest:
-            lat, lon = self.locations_of_interest[l]["lonlat"]
-            self.locations_of_interest[l]["utm"] = from_latlon(lat, lon, force_zone_number=54)
+        self.locations_of_interest["Fukushima Daiichi"] = {"lonlat": (141.0281, 37.4213)}
+        self.locations_of_interest["Onagawa"] = {"lonlat": (141.5008, 38.3995)}
+        self.locations_of_interest["Fukushima Daini"] = {"lonlat": (141.0249, 37.3166)}
+        self.locations_of_interest["Tokai"] = {"lonlat": (140.6067, 36.4664)}
+        self.locations_of_interest["Hamaoka"] = {"lonlat": (138.1433, 34.6229)}
+        self.locations_of_interest["Tohoku"] = {"lonlat": (141.3903, 41.1800)}
+        self.locations_of_interest["Tokyo"] = {"lonlat": (139.6917, 35.6895)}
+
+        # Convert coordinates to UTM and create timeseries array
+        for loc in (self.gauges, self.locations_of_interest):
+            for l in loc:
+                loc[l]["timeseries"] = []
+                if self.utm:
+                    lon, lat = loc[l]["lonlat"]
+                    loc[l]["utm"] = from_latlon(lat, lon, force_zone_number=54)
 
     def annotate_plot(self, axes, coords="lonlat", gauges=False):
         """
