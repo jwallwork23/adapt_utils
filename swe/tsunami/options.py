@@ -55,9 +55,9 @@ class TsunamiOptions(ShallowWaterOptions):
         # Timestepping
         self.timestepper = 'CrankNicolson'
         self.dt = 5.0
-        self.dt_per_export = 10
-        self.dt_per_remesh = 10
-        self.end_time = 1800.0
+        self.dt_per_export = 12
+        self.dt_per_remesh = 12
+        self.end_time = 1500.0
 
         self.gauges = {}
         self.locations_of_interest = {}
@@ -132,17 +132,27 @@ class TsunamiOptions(ShallowWaterOptions):
         """
         plot(self.bathymetry, vmin=-0.01, vmax=0.01, levels=0, axes=axes, cmap=None, colors='k', contour=True)
 
-    def plot_timeseries(self):
+    def plot_timeseries(self, gauge):
         """
         Plot gauge timeseries data.
         """
-        N = len(self.gauges["P02"]["timeseries"])
-        assert N > 0
-        t = np.linspace(0, self.end_time/60.0, N)
-        for g in self.gauges:
-            y = np.array(self.gauges[g]["timeseries"])-self.gauges[g]["timeseries"][0]
-            plt.plot(t, y, label=g, linestyle='dashed', marker='*')
+        try:
+            assert gauge in self.gauges
+        except AssertionError:
+            raise ValueError("Gauge '{:s}' is not valid. Choose from {:}.".format(gauge, self.gauges.keys()))
+        N = int(self.end_time/self.dt/self.dt_per_export)
+        t = np.linspace(0, self.end_time/60.0, N+1)
+        y = self.gauges[gauge]["data"]
+
+        fig = plt.figure()
+        ax = plt.gca()
+        ax.plot(t, y, label='Data', linestyle='solid')
+        if len(self.gauges[gauge]["timeseries"]) > 0:
+            y = np.array(self.gauges[gauge]["timeseries"])-self.gauges[gauge]["timeseries"][0]
+            ax.plot(t, y, label=self.approach.replace('_', ' ').title(), linestyle='dashed', marker='x')
         plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.ylabel("Free surface displacement $[\mathrm m]$")
         plt.legend()
-        plt.savefig(os.path.join(self.di, "gauge_timeseries.pdf"))
+        fname = "gauge_timeseries_{:s}_{:d}".format(gauge, self.default_mesh.num_cells())
+        fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
+        fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))

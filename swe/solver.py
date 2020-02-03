@@ -480,8 +480,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             self.remesh_step = 0
         op = self.op
         self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.fields['bathymetry'])
-        if self.remesh_step > 0:
-            self.solver_obj.export_initial_state = False
+        self.solver_obj.export_initial_state = self.remesh_step == 0
         options = self.solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True

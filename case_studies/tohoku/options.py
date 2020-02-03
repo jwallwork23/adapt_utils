@@ -28,9 +28,21 @@ class TohokuOptions(TsunamiOptions):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
 
+        # Timestepping: export once per minute for 25 minutes
+        self.dt_per_export = 12
+        self.dt_per_remesh = 12
+        self.end_time = 1500.0
+
         # Gauge locations
-        self.gauges["P02"] = {"lonlat": (142.5016, 38.5002)}
-        self.gauges["P06"] = {"lonlat": (142.5838, 38.6340)}
+        self.gauges["P02"] = {"lonlat": (142.5016, 38.5002),
+                              "data": [0.0, 0.06579547, 0.11848581, 0.457701, 0.85, 1.2, 1.55, 1.9,
+                                       2.25, 2.5, 2.8, 3.1, 3.9, 4.8, 4.4622684, 2.25, -0.44525364,
+                                       -0.16555799, -1.6, -0.82093376, -0.44265625, -0.25972426,
+                                       -0.0767923, 0.13218126, 0.41927955, 0.70641154]}
+        self.gauges["P06"] = {"lonlat": (142.5838, 38.6340),
+                              "data": [0.0, 0.1, 0.3, 0.65, 1.05, 1.35, 1.65, 1.95, 2.25, 2.55, 2.9,
+                                       3.5, 4.5, 4.85, 3.9, 1.55, -0.35, -1.05, -0.65, -0.3, -0.15,
+                                       0.05, 0.18, 0.35, 0.53, 0.74]}
 
         # Coastal locations of interest, including major cities and nuclear power plants
         self.locations_of_interest["Fukushima Daiichi"] = {"lonlat": (141.0281, 37.4213)}
