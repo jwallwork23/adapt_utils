@@ -121,31 +121,35 @@ class TsunamiOptions(ShallowWaterOptions):
         """
         plot(self.bathymetry, vmin=-0.01, vmax=0.01, levels=0, axes=axes, cmap=None, colors='k', contour=True)
 
-    def plot_timeseries(self, gauge):  # TODO: Plot multiple mesh approaches
+    def plot_timeseries(self, gauge, resolutions=None):  # TODO: Plot multiple mesh approaches
         """
-        Plot gauge timeseries data.
+        Plot timeseries for `gauge` under a range of mesh resolutions.
         """
         try:
             assert gauge in self.gauges
         except AssertionError:
             raise ValueError("Gauge '{:s}' is not valid. Choose from {:}.".format(gauge, self.gauges.keys()))
-        N = int(self.end_time/self.dt/self.dt_per_export)
-        t = np.linspace(0, self.end_time/60.0, N+1)
-        y = self.gauges[gauge]["data"]
 
         fig = plt.figure()
         ax = plt.gca()
+
+        y = self.gauges[gauge]["data"]  # TODO: Higher precision; store in a HDF5 file
+        N = int(self.end_time/self.dt/self.dt_per_export)
+        t = np.linspace(0, self.end_time/60.0, N+1)  # TODO: Read from 'time' in HDF5 file
         ax.plot(t, y, label='Data', linestyle='solid')
 
-        num_cells = self.default_mesh.num_cells()
-        f = h5py.File(os.path.join(self.di, "diagnostic_gauges_{:d}.hdf5".format(num_cells)), 'r')
-        y = f[gauge][()]
-        ax.plot(t, y-y[0], label=self.approach.replace('_', ' ').title(), linestyle='dashed', marker='x')
-        f.close()
+        resolutions = list(resolutions or [self.default_mesh.num_cells()])
+        approach = 'uniform' if self.approach == 'fixed_mesh' else self.approach
+        for res in resolutions:
+            f = h5py.File(os.path.join(self.di, "diagnostic_gauges_{:d}.hdf5".format(res)), 'r')
+            y = f[gauge][()]
+            label = ' '.join([approach.replace('_', ' '), "({:d} cells)".format(res)]).title()
+            ax.plot(t, y-y[0], label=label, linestyle='dashed', marker='x')
+            f.close()
         plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.ylabel("Free surface displacement $[\mathrm m]$")
         plt.ylim([-2, 5])
         plt.legend()
-        fname = "gauge_timeseries_{:s}_{:d}".format(gauge, num_cells)
+        fname = "gauge_timeseries_{:s}".format(gauge)
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
