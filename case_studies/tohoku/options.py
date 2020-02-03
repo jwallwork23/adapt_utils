@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from scipy.io.netcdf import NetCDFFile
+import netCDF4
 
 from adapt_utils.swe.tsunami.options import TsunamiOptions
 from adapt_utils.swe.tsunami.conversion import from_latlon
@@ -24,8 +24,9 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, **kwargs):
+    def __init__(self, offset=475, **kwargs):
         self.force_zone_number = 54
+        self.offset = offset
         super(TohokuOptions, self).__init__(**kwargs)
 
         # Timestepping: export once per minute for 25 minutes
@@ -84,18 +85,20 @@ class TohokuOptions(TsunamiOptions):
                           arrowprops={'arrowstyle': '->'})
 
     def read_bathymetry_file(self, km=False):
-        nc = NetCDFFile('resources/tohoku.nc', mmap=False)
-        lon = nc.variables['lon'][:]
-        lat = nc.variables['lat'][:-1]
-        elev = nc.variables['elevation'][:-1,:]/1000 if km else nc.variables['elevation'][:-1,:]
+        nc = netCDF4.Dataset('resources/tohoku.nc', 'r')
+        o = self.offset
+        lon = nc.variables['lon'][o:]
+        lat = nc.variables['lat'][:]
+        rescale = 1000.0 if km else 1.0
+        elev = nc.variables['elevation'][:, o:]/rescale
         nc.close()
         return lon, lat, elev
 
     def read_surface_file(self):
-        nc = NetCDFFile('resources/surf_zeroed.nc', mmap=False)
+        nc = netCDF4.Dataset('resources/surf_zeroed.nc', 'r')
         lon = nc.variables['lon'][:]
         lat = nc.variables['lat'][:]
-        elev = nc.variables['z'][:,:]
+        elev = nc.variables['z'][:, :]
         nc.close()
         return lon, lat, elev
 

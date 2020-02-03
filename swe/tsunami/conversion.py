@@ -240,7 +240,7 @@ def zone_number_to_central_longitude(zone_number):
     return (zone_number - 1) * 6 - 180 + 3
 
 
-def lonlat_to_utm(latitude, longitude, force_zone_number):
+def latlon_to_utm(latitude, longitude, force_zone_number):
     """
     General conversion of longitude-latitude coordinate pairs to UTM coordinates.
     
@@ -260,11 +260,14 @@ def numpy_lonlat_to_utm(latitude, longitude, force_zone_number):
     """
     Convert a numpy array of longitude-latitude coordinate pairs to UTM coordinates.
     """
-    x = np.zeros((len(longitude)))
-    y = np.zeros((len(latitude)))
-    assert (len(x) == len(y))
-    for i in range(len(x)):
-        x[i], y[i] = from_latlon(latitude[i], longitude[i], force_zone_number=force_zone_number)
+    nlon = len(longitude)
+    nlat = len(latitude)
+    x = np.zeros((nlon*nlat))
+    y = np.zeros((nlon*nlat))
+    for i in range(nlon):
+        for j in range(nlat):
+            k = i*nlat + j
+            x[k], y[k] = from_latlon(latitude[j], longitude[i], force_zone_number=force_zone_number)
     return x, y
 
 

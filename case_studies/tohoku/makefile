@@ -1,4 +1,4 @@
-all: dir uniform bathymetry_hessian fixed_mesh
+all: dir convert uniform metric_based monitor_based fixed_mesh
 
 dir:
 	@echo "Creating output directory..."

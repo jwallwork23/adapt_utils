@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import h5py
 
 from adapt_utils.swe.options import ShallowWaterOptions
-from adapt_utils.swe.tsunami.conversion import lonlat_to_utm, to_latlon, radians
+from adapt_utils.swe.tsunami.conversion import latlon_to_utm, to_latlon, radians
 from adapt_utils.adapt.metric import steady_metric
 from adapt_utils.misc import find
 
@@ -26,28 +26,31 @@ class TsunamiOptions(ShallowWaterOptions):
     """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
-    def __init__(self, utm=True, n=40, **kwargs):
-        super(TsunamiOptions, self).__init__(**kwargs)
+    def __init__(self, utm=True, n=30, **kwargs):
         self.utm = utm
+        super(TsunamiOptions, self).__init__(**kwargs)
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False
 
-        # Setup default domain
-        lon, lat, elev = self.read_bathymetry_file()
-        lon_min = np.min(lon)
-        lon_max = np.max(lon)
-        lat_min = np.min(lat)
-        lat_max = np.max(lat)
-        self.default_mesh = RectangleMesh(n, n, lon_max-lon_min, lat_max-lat_min)
+        # Setup longitude-latitude domain
+        b_lon, b_lat, b = self.read_bathymetry_file()
+        lon_min = np.min(b_lon)
+        lon_diff = np.max(b_lon) - lon_min
+        lat_min = np.min(b_lat)
+        lat_diff = np.max(b_lat) - lat_min
+        self.lonlat_mesh = RectangleMesh(n, n*int(np.round(lon_diff/lat_diff)), lon_diff, lat_diff)
+        lon, lat = SpatialCoordinate(self.lonlat_mesh)
+        self.lonlat_mesh.coordinates.interpolate(as_vector([lon + lon_min, lat + lat_min]))
+
+        # Setup problem domain
+        self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
         x, y = SpatialCoordinate(self.default_mesh)
-        self.default_mesh.coordinates.interpolate(as_vector([x+lon_min, y+lat_min]))
-        if utm:
-            self.default_mesh.coordinates.interpolate(as_vector(lonlat_to_utm(y, x, force_zone_number=self.force_zone_number)))
+        if self.utm:
+            self.default_mesh.coordinates.interpolate(as_vector(latlon_to_utm(y, x, force_zone_number=self.force_zone_number)))
 
         # Set fields
-        P1 = FunctionSpace(self.default_mesh, "CG", 1)
-        self.set_bathymetry(P1, dat=(lon, lat, elev))
-        self.set_initial_surface(P1)
+        self.set_bathymetry(dat=(b_lon, b_lat, b))
+        self.set_initial_surface()
         self.base_viscosity = 1.0e-3
 
         # Wetting and drying
@@ -69,33 +72,40 @@ class TsunamiOptions(ShallowWaterOptions):
         self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
         self.eta_tilde = Function(P1DG, name='Modified elevation')
 
-    def set_bathymetry(self, fs, dat=None):
-        assert fs.ufl_element().degree() == 1 and fs.ufl_element().family() == 'Lagrange'
+    def get_lonlat_mesh(self):
+        raise NotImplementedError  # TODO
+
+    def set_bathymetry(self, fs=None, dat=None):
+        P1 = fs or FunctionSpace(self.default_mesh, "CG", 1)
+        self.bathymetry = Function(P1, name="Bathymetry")
+
+        # Interpolate bathymetry data *in lonlat space*
         x0, y0, elev = dat or self.read_bathymetry_file()
-        if self.utm:
-            x0, y0 = lonlat_to_utm(y0, x0, force_zone_number=self.force_zone_number)
-        bathy_interp = si.RectBivariateSpline(y0, x0, elev)
-        self.bathymetry = Function(fs, name="Bathymetry")
+        bath_interp = si.RectBivariateSpline(y0, x0, elev)
+
+        # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating bathymetry...")
         msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
-        for i in range(fs.mesh().num_vertices()):
-            xy = fs.mesh().coordinates.dat.data[i] 
-            self.bathymetry.dat.data[i] = bathy_interp(xy[1], xy[0])
+        for i in range(self.lonlat_mesh.num_vertices()):
+            xy = self.lonlat_mesh.coordinates.dat.data[i] 
+            self.bathymetry.dat.data[i] = -bath_interp(xy[1], xy[0])
             self.print_debug(msg.format(xy[0], xy[1], self.bathymetry.dat.data[i]/1000))
         self.print_debug("Done!")
         return self.bathymetry
 
-    def set_initial_surface(self, fs):
-        assert fs.ufl_element().degree() == 1 and fs.ufl_element().family() == 'Lagrange'
+    def set_initial_surface(self, fs=None):
+        P1 = fs or FunctionSpace(self.default_mesh, "CG", 1)
+        self.initial_surface = Function(P1, name="Initial free surface")
+
+        # Interpolate bathymetry data *in lonlat space*
         x0, y0, elev = self.read_surface_file()
-        if self.utm:
-            x0, y0 = lonlat_to_utm(y0, x0, force_zone_number=self.force_zone_number)
         surf_interp = si.RectBivariateSpline(y0, x0, elev)
-        self.initial_surface = Function(fs, name="Initial free surface")
+
+        # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating initial surface...")
         msg = "Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
-        for i in range(fs.mesh().num_vertices()):
-            xy = fs.mesh().coordinates.dat.data[i] 
+        for i in range(self.lonlat_mesh.num_vertices()):
+            xy = self.lonlat_mesh.coordinates.dat.data[i] 
             self.initial_surface.dat.data[i] = surf_interp(xy[1], xy[0])
             self.print_debug(msg.format(xy[0], xy[1], self.initial_surface.dat.data[i]))
         self.print_debug("Done!")

@@ -10,7 +10,7 @@ matplotlib.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 matplotlib.rc('text', usetex=True)
 
 # Setup Tohoku domain
-op = TohokuOptions(utm=False)
+op = TohokuOptions(utm=False, offset=0, n=40)
 mesh = op.default_mesh
 lon, lat, elev = op.read_bathymetry_file(km=True)
 fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True)
@@ -28,6 +28,7 @@ ylim = ax1.get_ylim()
 
 # Plot bathymetry data interpolated onto a uniform mesh
 ax2 = axes.flat[1]
+op.bathymetry *= -1
 firedrake.plot(op.bathymetry, cmap=matplotlib.cm.coolwarm, axes=ax2)
 op.plot_coastline(ax2)
 ax2.set_xlabel("Degrees longitude")
@@ -42,7 +43,9 @@ ax2.set_title("Uniform mesh interpolant")
 # Save raw bathymetry and uniform interpolant
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
 cb.set_label(r"Bathymetry $[\mathrm{km}]$")
-plt.savefig('outputs/uniform_bathymetry_{:d}.pdf'.format(mesh.num_cells()))
+fname = 'outputs/uniform_bathymetry_{:d}'.format(mesh.num_cells())
+plt.savefig(fname + '.png')
+plt.savefig(fname + '.pdf')
 
 # Setup Tohoku domain
 lon1, lat1, elev1 = op.read_surface_file()
@@ -73,7 +76,9 @@ ax2.set_title("Uniform mesh interpolant")
 # Save raw surface and uniform interpolant
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
 cb.set_label("Initial free surface $[\mathrm m]$")
-plt.savefig('outputs/uniform_ic_{:d}.pdf'.format(mesh.num_cells()))
+fname = 'outputs/uniform_ic_{:d}'.format(mesh.num_cells())
+plt.savefig(fname + '.png')
+plt.savefig(fname + '.pdf')
 
 fig = plt.figure()
 axes = fig.gca()
@@ -87,4 +92,6 @@ axes.set_ylim(ylim)
 cb.set_label(r"Coriolis parameter ($\times10^{-5}$)")
 cb.set_ticks([0.000075, 0.000080, 0.000085, 0.000090, 0.000095, 0.000100])
 cb.ax.set_yticklabels(['{:.1f}'.format(t*1.0e+5) for t in cb.get_ticks()])
-plt.savefig('outputs/uniform_coriolis_{:d}.pdf'.format(mesh.num_cells()))
+fname = 'outputs/uniform_coriolis_{:d}.pdf'.format(mesh.num_cells())
+plt.savefig(fname + '.png')
+plt.savefig(fname + '.pdf')

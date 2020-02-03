@@ -12,6 +12,8 @@ mpl.rc('text', usetex=True)
 
 # Setup Tohoku domain
 op = TohokuOptions(utm=False,
+                   n=80,
+                   offset=0,
                    num_adapt=1,
                    debug=True, plot_pvd=True,
                    # nonlinear_method='relaxation',

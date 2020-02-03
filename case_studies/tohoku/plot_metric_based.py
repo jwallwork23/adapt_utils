@@ -11,7 +11,7 @@ mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 mpl.rc('text', usetex=True)
 
 # Setup Tohoku domain
-op = TohokuOptions(utm=False)
+op = TohokuOptions(utm=False, offset=0, n=80)
 lon, lat, elev = op.read_bathymetry_file(km=True)
 cs = mpl.pyplot.contourf(lon, lat, elev, 50, vmin=-9, vmax=2, cmap=mpl.cm.coolwarm)  # Get colorbar
 xlim = plt.gca().get_xlim()
