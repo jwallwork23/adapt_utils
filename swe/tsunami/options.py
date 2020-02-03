@@ -10,6 +10,7 @@ import h5py
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import lonlat_to_utm, to_latlon, radians
 from adapt_utils.adapt.metric import steady_metric
+from adapt_utils.misc import find
 
 
 __all__ = ["TsunamiOptions"]
@@ -121,9 +122,9 @@ class TsunamiOptions(ShallowWaterOptions):
         """
         plot(self.bathymetry, vmin=-0.01, vmax=0.01, levels=0, axes=axes, cmap=None, colors='k', contour=True)
 
-    def plot_timeseries(self, gauge, resolutions=None):  # TODO: Plot multiple mesh approaches
+    def plot_timeseries(self, gauge):  # TODO: Plot multiple mesh approaches
         """
-        Plot timeseries for `gauge` under a range of mesh resolutions.
+        Plot timeseries for `gauge` under all stored mesh resolutions.
         """
         try:
             assert gauge in self.gauges
@@ -138,10 +139,12 @@ class TsunamiOptions(ShallowWaterOptions):
         t = np.linspace(0, self.end_time/60.0, N+1)  # TODO: Read from 'time' in HDF5 file
         ax.plot(t, y, label='Data', linestyle='solid')
 
-        resolutions = list(resolutions or [self.default_mesh.num_cells()])
         approach = 'uniform' if self.approach == 'fixed_mesh' else self.approach
+        fnames = find('diagnostic_gauges_*.hdf5', self.di)
+        resolutions = [int(fname.split('_')[-1][:-5]) for fname in fnames]
+        resolutions.sort()
         for res in resolutions:
-            f = h5py.File(os.path.join(self.di, "diagnostic_gauges_{:d}.hdf5".format(res)), 'r')
+            f = h5py.File(os.path.join(self.di, 'diagnostic_gauges_{:d}.hdf5'.format(res)), 'r')
             y = f[gauge][()]
             label = ' '.join([approach.replace('_', ' '), "({:d} cells)".format(res)]).title()
             ax.plot(t, y-y[0], label=label, linestyle='dashed', marker='x')
