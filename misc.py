@@ -1,6 +1,8 @@
 from thetis import *
 from firedrake.petsc import PETSc
 
+import os
+import fnmatch
 import numpy as np
 import numpy.linalg as la
 import scipy.sparse as sp
@@ -9,9 +11,18 @@ import scipy.sparse.linalg as sla
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["check_spd", "get_boundary_nodes", "index_string",
+__all__ = ["find", "check_spd", "get_boundary_nodes", "index_string",
            "UnnestedConditionCheck", "NestedConditionCheck"]
 
+
+def find(pattern, path):
+    """Find all files with a specified pattern."""
+    result = []
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            if fnmatch.fnmatch(name, pattern):
+                result.append(os.path.join(root, name))
+    return result
 
 def check_spd(matrix):
     """
