@@ -8,7 +8,8 @@ class OutOfRangeError(ValueError):
     pass
 
 __all__ = ["to_latlon", "from_latlon", "latitude_to_zone_letter", "latlon_to_zone_number",
-           "zone_number_to_central_longitude", "earth_radius", "lonlat_to_utm", "degrees", "radians"]
+           "zone_number_to_central_longitude", "degrees", "radians",
+           "lonlat_to_utm", "utm_to_lonlat"]
 
 K0 = 0.9996
 
@@ -49,7 +50,7 @@ def radians(deg):
     return deg
 
 
-def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, force_longitude=False, radians=False):
+def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, force_longitude=False):
     """
     Convert UTM coordinates to latitude-longitude, courtesy of Tobias Bieniek, 2012 (with some minor edits).
     
@@ -240,49 +241,48 @@ def zone_number_to_central_longitude(zone_number):
     return (zone_number - 1) * 6 - 180 + 3
 
 
-def latlon_to_utm(latitude, longitude, force_zone_number):
+def lonlat_to_utm(longitude, latitude, force_zone_number, **kwargs):
     """
     General conversion of longitude-latitude coordinate pairs to UTM coordinates.
     
-    :arg latitude: northward anglular position, origin at the Equator.
     :arg longitude: eastward angular position, with origin at the Grenwich Meridian.
-    :param force_zone_number: 
-    :return: force coordinates to fall within a particular UTM zone.
+    :arg latitude: northward anglular position, origin at the Equator.
+    :param force_zone_number: force coordinates to fall within a particular UTM zone.
     """
+    z = force_zone_number
     if isinstance(latitude, np.ndarray):
         assert(isinstance(longitude, np.ndarray))
-        return numpy_lonlat_to_utm(latitude, longitude, force_zone_number)
+        nlon = len(longitude)
+        nlat = len(latitude)
+        x = np.zeros((nlon*nlat))
+        y = np.zeros((nlon*nlat))
+        for i in range(nlon):
+            for j in range(nlat):
+                k = i*nlat + j
+                x[k], y[k] = from_latlon(latitude[j], longitude[i], force_zone_number=z, **kwargs)
+        return x, y
     else:
-        return ufl_lonlat_to_utm(latitude, longitude, force_zone_number)
+        return from_latlon(latitude, longitude, force_zone_number=z, **kwargs)
 
 
-def numpy_lonlat_to_utm(latitude, longitude, force_zone_number):
+def utm_to_lonlat(x, y, zone_number, **kwargs):
     """
-    Convert a numpy array of longitude-latitude coordinate pairs to UTM coordinates.
-    """
-    nlon = len(longitude)
-    nlat = len(latitude)
-    x = np.zeros((nlon*nlat))
-    y = np.zeros((nlon*nlat))
-    for i in range(nlon):
-        for j in range(nlat):
-            k = i*nlat + j
-            x[k], y[k] = from_latlon(latitude[j], longitude[i], force_zone_number=force_zone_number)
-    return x, y
+    General conversion of UTM coordinate pairs to longitude-latitude coordinates.
 
-
-def ufl_lonlat_to_utm(latitude, longitude, force_zone_number):
+    :args x,y: UTM coordinates.
+    :arg zone_number: UTM zone.
     """
-    Convert a UFL expression of longitude-latitude coordinate pairs to UTM coordinates.
-    """
-    return from_latlon(latitude, longitude, force_zone_number=force_zone_number)
-
-
-def earth_radius(latitude):
-    """
-    :arg latitude: latitudinal coordinate.
-    :return: radius of the Earth at this latitude.
-    """
-    k = 1. / 298.257  # Earth flatness constant
-    a = 6378136.3  # Semi-major axis of the Earth (m)
-    return (1 - k * (sin(radians(latitude)) ** 2)) * a
+    if isinstance(x, np.ndarray):
+        assert(isinstance(y, np.ndarray))
+        nx = len(x)
+        ny = len(y)
+        lon = np.zeros((nx*ny))
+        lat = np.zeros((nx*ny))
+        for i in range(nx):
+            for j in range(ny):
+                k = i*ny + j
+                lat[k], lon[k] = to_latlon(x[i], y[j], zone_number, **kwargs)
+        return lon, lat
+    else:
+        lat, lon = to_latlon(x, y, zone_number, **kwargs)
+        return lon, lat

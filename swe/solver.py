@@ -38,7 +38,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         # Classification
         self.nonlinear = True
 
-    def set_fields(self):
+    def set_fields(self, adapted=False):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)

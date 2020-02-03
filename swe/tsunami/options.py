@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 import h5py
 
 from adapt_utils.swe.options import ShallowWaterOptions
-from adapt_utils.swe.tsunami.conversion import latlon_to_utm, to_latlon, radians
+from adapt_utils.swe.tsunami.conversion import *
 from adapt_utils.adapt.metric import steady_metric
 from adapt_utils.misc import find
 
@@ -44,12 +44,11 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Setup problem domain
         self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
-        x, y = SpatialCoordinate(self.default_mesh)
         if self.utm:
-            self.default_mesh.coordinates.interpolate(as_vector(latlon_to_utm(y, x, force_zone_number=self.force_zone_number)))
+            self.get_utm_mesh()
 
         # Set fields
-        self.set_bathymetry(dat=(b_lon, b_lat, b))
+        self.set_bathymetry(dat=(b_lon, b_lat, b), adapted=False)
         self.set_initial_surface()
         self.base_viscosity = 1.0e-3
 
@@ -72,24 +71,38 @@ class TsunamiOptions(ShallowWaterOptions):
         self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
         self.eta_tilde = Function(P1DG, name='Modified elevation')
 
-    def get_lonlat_mesh(self):
-        raise NotImplementedError  # TODO
+    def get_utm_mesh(self):
+        zone = self.force_zone_number
+        self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
+        lon, lat = SpatialCoordinate(self.default_mesh)
+        self.default_mesh.coordinates.interpolate(as_vector(lonlat_to_utm(lon, lat, zone)))
 
-    def set_bathymetry(self, fs=None, dat=None):
-        P1 = fs or FunctionSpace(self.default_mesh, "CG", 1)
+    def get_lonlat_mesh(self, northern=True):
+        zone = self.force_zone_number
+        self.lonlat_mesh = Mesh(Function(self.default_mesh.coordinates))
+        if self.utm:
+            x, y = SpatialCoordinate(self.lonlat_mesh)
+            self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
+
+    def set_bathymetry(self, fs=None, dat=None, adapted=False):
+        if fs is not None:
+            self.default_mesh = fs.mesh()
+        P1 = FunctionSpace(self.default_mesh, "CG", 1)
         self.bathymetry = Function(P1, name="Bathymetry")
+        if adapted:
+            self.get_lonlat_mesh()
 
         # Interpolate bathymetry data *in lonlat space*
-        x0, y0, elev = dat or self.read_bathymetry_file()
-        bath_interp = si.RectBivariateSpline(y0, x0, elev)
+        lon, lat, elev = dat or self.read_bathymetry_file()
+        bath_interp = si.RectBivariateSpline(lat, lon, elev)
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating bathymetry...")
         msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
         for i in range(self.lonlat_mesh.num_vertices()):
-            xy = self.lonlat_mesh.coordinates.dat.data[i] 
-            self.bathymetry.dat.data[i] = -bath_interp(xy[1], xy[0])
-            self.print_debug(msg.format(xy[0], xy[1], self.bathymetry.dat.data[i]/1000))
+            lonlat = self.lonlat_mesh.coordinates.dat.data[i] 
+            self.bathymetry.dat.data[i] = -bath_interp(lonlat[1], lonlat[0])
+            self.print_debug(msg.format(lonlat[0], lonlat[1], self.bathymetry.dat.data[i]/1000))
         self.print_debug("Done!")
         return self.bathymetry
 

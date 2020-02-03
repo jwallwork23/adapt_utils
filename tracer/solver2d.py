@@ -38,7 +38,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         super(SteadyTracerProblem2d, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
         self.nonlinear = False
 
-    def set_fields(self):
+    def set_fields(self, adapted=False):
         op = self.op
         self.nu = op.set_diffusivity(self.P1)
         self.u = op.set_velocity(self.P1_vec)

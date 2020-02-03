@@ -124,7 +124,7 @@ class SteadyProblem():
         self.solution = Function(self.V, name='Solution')
         self.adjoint_solution = Function(self.V, name='Adjoint solution')
 
-    def set_fields(self):
+    def set_fields(self, adapted=False):
         """
         Set velocity field, viscosity, etc.
         """
@@ -698,7 +698,7 @@ class SteadyProblem():
             # Re-initialise problem
             self.create_function_spaces()
             self.create_solutions()
-            self.set_fields()
+            self.set_fields(adapted=True)
             self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
     def initialise_mesh(self, approach='hessian', adapt_field=None, num_adapt=None, alpha=1.0, beta=1.0):

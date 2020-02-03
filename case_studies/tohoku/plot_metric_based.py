@@ -2,6 +2,7 @@ import firedrake
 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
+import argparse
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
@@ -10,8 +11,16 @@ from adapt_utils.swe.tsunami.solver import TsunamiProblem
 mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
 mpl.rc('text', usetex=True)
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-num_adapt")
+parser.add_argument("-n")
+args = parser.parse_args()
+
+n = int(args.n or 80)
+num_adapt = int(args.num_adapt or 4)
+
 # Setup Tohoku domain
-op = TohokuOptions(utm=False, offset=0, n=80)
+op = TohokuOptions(utm=False, offset=0, n=n)
 lon, lat, elev = op.read_bathymetry_file(km=True)
 cs = mpl.pyplot.contourf(lon, lat, elev, 50, vmin=-9, vmax=2, cmap=mpl.cm.coolwarm)  # Get colorbar
 xlim = plt.gca().get_xlim()
@@ -21,7 +30,7 @@ fig, axes = mpl.pyplot.subplots(nrows=1, ncols=2, sharex=True)
 # Adapt mesh to Hessian of bathymetry
 op.target = 1e3
 tp = TsunamiProblem(op, levels=0)
-tp.initialise_mesh(num_adapt=4, approach='hessian', adapt_field='bathymetry')
+tp.initialise_mesh(num_adapt=num_adapt, approach='hessian', adapt_field='bathymetry')
 
 # Plot adapted mesh
 ax1 = axes.flat[0]
@@ -35,6 +44,7 @@ ax1.set_title("Adapted mesh")
 
 # Plot bathymetry data interpolated onto adapted mesh
 ax2 = axes.flat[1]
+op.bathymetry *= -1
 ax2 = firedrake.plot(op.bathymetry, axes=ax2, colorbar=False)
 op.plot_coastline(ax2)
 ax2.set_xlabel("Degrees longitude")
