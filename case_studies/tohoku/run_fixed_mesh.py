@@ -17,5 +17,5 @@ swp = TsunamiProblem(op, levels=0)
 if args.num_initial_adapt is not None:
     swp.initialise_mesh(adapt_field='bathymetry', num_adapt=int(args.num_initial_adapt))  # FIXME
 swp.solve()
-op.plot_timeseries("P02")  # TODO: Save data to log so we can plot later
+op.plot_timeseries("P02")
 op.plot_timeseries("P06")

@@ -104,9 +104,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
 
-        if hasattr(self, 'extra_setup'):
-            self.extra_setup()
-
         # Initial conditions  # TODO: will this work over mesh iterations?
         if self.prev_solution is not None:
             interp = self.interpolated_solution
@@ -117,6 +114,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
             u_interp.interpolate(self.fields['inflow'])
             eta_interp.assign(0.0)
         self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+
+        if hasattr(self, 'extra_setup'):
+            self.extra_setup()
 
         self.lhs = self.solver_obj.timestepper.F
         self.solution = self.solver_obj.fields.solution_2d
@@ -523,9 +523,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
 
-        if hasattr(self, 'extra_setup'):
-            self.extra_setup()
-
         # Initial conditions
         if self.load_index > 0:
             self.solver_obj.load_state(self.load_index)
@@ -536,6 +533,9 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             u_interp, eta_interp = self.solution.split()
         self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+
+        if hasattr(self, 'extra_setup'):
+            self.extra_setup()
 
         # Ensure correct iteration count
         self.solver_obj.i_export = self.remesh_step

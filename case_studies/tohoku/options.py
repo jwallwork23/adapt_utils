@@ -60,13 +60,20 @@ class TohokuOptions(TsunamiOptions):
                 if self.utm:
                     lon, lat = loc[l]["lonlat"]
                     loc[l]["utm"] = from_latlon(lat, lon, force_zone_number=54)
+                    loc[l]["coords"] = loc[l]["utm"]
+                else:
+                    loc[l]["coords"] = loc[l]["lonlat"]
 
-    def annotate_plot(self, axes, coords="lonlat", gauges=False):
+    def annotate_plot(self, axes, coords=None, gauges=False):
         """
         Annotate a plot on axes `axes` in coordinate system `coords` with all gauges or locations of
         interest, as determined by the Boolean kwarg `gauges`.
         """
-        assert coords in ("lonlat", "utm")
+        coords = coords or "lonlat"
+        try:
+            assert coords in ("lonlat", "utm")
+        except AssertionError:
+            raise ValueError("Coordinate system {:s} not recognised.".format(coords))
         dat = self.gauges if gauges else self.locations_of_interest
         for loc in dat:
             if loc == "Fukushima Daini":

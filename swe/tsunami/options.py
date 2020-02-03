@@ -5,6 +5,7 @@ import scipy.interpolate as si
 import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
+import h5py
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import lonlat_to_utm, to_latlon, radians
@@ -114,25 +115,13 @@ class TsunamiOptions(ShallowWaterOptions):
         self.coriolis.interpolate(2*self.Omega*sin(radians(lat)))
         return self.coriolis
 
-    def get_export_func(self, solver_obj):
-        eta = solver_obj.fields.elev_2d
-
-        def export_func():
-            # for loc in (self.gauges, self.locations_of_interest):
-            for loc in (self.gauges,):
-                for l in loc:
-                    xy = loc[l]["utm" if self.utm else "lonlat"]
-                    loc[l]["timeseries"].append(float(eta.at(xy)))
-
-        return export_func
-
     def plot_coastline(self, axes):
         """
         Plot the coastline according to `bathymetry` on `axes`.
         """
         plot(self.bathymetry, vmin=-0.01, vmax=0.01, levels=0, axes=axes, cmap=None, colors='k', contour=True)
 
-    def plot_timeseries(self, gauge):
+    def plot_timeseries(self, gauge):  # TODO: Plot multiple mesh approaches
         """
         Plot gauge timeseries data.
         """
@@ -147,12 +136,16 @@ class TsunamiOptions(ShallowWaterOptions):
         fig = plt.figure()
         ax = plt.gca()
         ax.plot(t, y, label='Data', linestyle='solid')
-        if len(self.gauges[gauge]["timeseries"]) > 0:
-            y = np.array(self.gauges[gauge]["timeseries"])-self.gauges[gauge]["timeseries"][0]
-            ax.plot(t, y, label=self.approach.replace('_', ' ').title(), linestyle='dashed', marker='x')
+
+        num_cells = self.default_mesh.num_cells()
+        f = h5py.File(os.path.join(self.di, "diagnostic_gauges_{:d}.hdf5".format(num_cells)), 'r')
+        y = f[gauge][()]
+        ax.plot(t, y-y[0], label=self.approach.replace('_', ' ').title(), linestyle='dashed', marker='x')
+        f.close()
         plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.ylabel("Free surface displacement $[\mathrm m]$")
+        plt.ylim([-2, 5])
         plt.legend()
-        fname = "gauge_timeseries_{:s}_{:d}".format(gauge, self.default_mesh.num_cells())
+        fname = "gauge_timeseries_{:s}_{:d}".format(gauge, num_cells)
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
