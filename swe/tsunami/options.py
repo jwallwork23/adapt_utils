@@ -64,6 +64,11 @@ class TsunamiOptions(ShallowWaterOptions):
         self.gauges = {}
         self.locations_of_interest = {}
 
+        # Outputs
+        P1DG = FunctionSpace(self.default_mesh, "DG", 1)
+        self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
+        self.eta_tilde = Function(P1DG, name='Modified elevation')
+
     def set_bathymetry(self, fs, dat=None):
         assert fs.ufl_element().degree() == 1 and fs.ufl_element().family() == 'Lagrange'
         x0, y0, elev = dat or self.read_bathymetry_file()
@@ -121,6 +126,17 @@ class TsunamiOptions(ShallowWaterOptions):
         Plot the coastline according to `bathymetry` on `axes`.
         """
         plot(self.bathymetry, vmin=-0.01, vmax=0.01, levels=0, axes=axes, cmap=None, colors='k', contour=True)
+
+    def get_eta_tilde(self, solver_obj):
+        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+        eta = solver_obj.fields.elev_2d
+        self.eta_tilde.project(eta + bathymetry_displacement(eta))
+
+    def get_export_func(self, solver_obj):
+        def export_func():
+            self.get_eta_tilde(solver_obj)
+            self.eta_tilde_file.write(self.eta_tilde)
+        return export_func
 
     def plot_timeseries(self, gauge):  # TODO: Plot multiple mesh approaches
         """

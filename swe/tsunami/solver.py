@@ -20,12 +20,19 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
         # self.op.set_boundary_surface()
 
-    def extra_setup(self):
+    def extra_setup(self):  # TODO: Plot eta_tilde, not elev_2d
+        op = self.op
+
+        # Don't bother plotting velocity
+        self.solver_obj.options.fields_to_export = ['elev_2d'] if op.plot_pvd else []
+        self.solver_obj.options.fields_to_export_hdf5 = ['elev_2d'] if op.save_hdf5 else []
+
+        # Set callbacks to save gauge timeseries to HDF5
         self.callbacks = {}
-        locs = [self.op.gauges[g]["coords"] for g in self.op.gauges]
-        names = list(self.op.gauges.keys())
+        locs = [op.gauges[g]["coords"] for g in op.gauges]
+        names = list(op.gauges.keys())
         fname = "gauges_{:d}".format(self.num_cells[-1])
-        for g in self.op.gauges:
+        for g in op.gauges:
             self.callbacks[g] = callback.DetectorsCallback(self.solver_obj, locs, ['elev_2d'],
                                                            fname, names)
             self.solver_obj.add_callback(self.callbacks[g], 'export')
