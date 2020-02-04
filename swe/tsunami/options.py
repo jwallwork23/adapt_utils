@@ -175,7 +175,7 @@ class TsunamiOptions(ShallowWaterOptions):
             raise ValueError("Gauge '{:s}' is not valid. Choose from {:}.".format(gauge, self.gauges.keys()))
 
         fig = plt.figure()
-        ax = plt.gca()
+        ax = fig.add_subplot(111)
 
         print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
         y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
@@ -222,7 +222,7 @@ class TsunamiOptions(ShallowWaterOptions):
         plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.ylabel("Free surface displacement $[\mathrm m]$")
         plt.ylim([-2, 5])
-        plt.legend()
+        ax.legend()
         fname = "gauge_timeseries_{:s}".format(gauge)
         if extension is not None:
             fname = '_'.join([fname, str(extension)])
@@ -232,7 +232,7 @@ class TsunamiOptions(ShallowWaterOptions):
         # Plot relative errors
         for key in errors:
             fig = plt.figure()
-            ax = plt.gca()
+            ax = fig.add_subplot(111)
             ax.semilogx(resolutions, 100.0*np.array(errors[key]['rel']), marker='o')
             plt.xlabel("Number of elements")
             plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
