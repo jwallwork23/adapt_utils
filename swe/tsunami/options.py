@@ -163,7 +163,8 @@ class TsunamiOptions(ShallowWaterOptions):
             self.eta_tilde_file.write(self.eta_tilde)
         return export_func
 
-    def plot_timeseries(self, gauge, extension=None):  # TODO: Plot multiple mesh approaches
+    # TODO: Plot multiple mesh approaches
+    def plot_timeseries(self, gauge, extension=None, plot_lp=False):
         """
         Plot timeseries for `gauge` under all stored mesh resolutions.
         """
@@ -182,9 +183,11 @@ class TsunamiOptions(ShallowWaterOptions):
         ax.plot(t, y_data, label='Data', linestyle='solid')
 
         # Dictionary for norms and errors of timeseries
-        errors = {'tv': {'data': total_variation(y_data)}}
-        for p in ('l1', 'l2', 'linf'):
-            errors[p] = {'data': lp_norm(y_data, p=p)}
+        errors = {'tv': {'data': total_variation(y_data), 'name': 'total variation'}}
+        if plot_lp:
+            for p in ('l1', 'l2', 'linf'):
+                errors[p] = {'data': lp_norm(y_data, p=p),
+                             'name': '$\ell_\infty$' if p == 'linf' else '$\el{:s}$'.format(p)}
         for key in errors:
             errors[key]['abs'] = []
             errors[key]['rel'] = []
@@ -208,8 +211,9 @@ class TsunamiOptions(ShallowWaterOptions):
 
             # Compute absolute and relative errors
             error = np.array(y) - np.array(y_data)
-            for p in ('l1', 'l2', 'linf'):
-                errors[p]['abs'].append(lp_norm(error, p=p))
+            if plot_lp:
+                for p in ('l1', 'l2', 'linf'):
+                    errors[p]['abs'].append(lp_norm(error, p=p))
             errors['tv']['abs'].append(total_variation(error))
             for key in errors:
                 errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
@@ -223,16 +227,15 @@ class TsunamiOptions(ShallowWaterOptions):
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
-        # Plot total variation
-        fig = plt.figure()
-        ax = plt.gca()
-        ax.semilogx(resolutions, 100.0*np.array(errors['tv']['rel']), marker='o')
-        plt.xlabel("Number of elements")
-        plt.ylabel("Relative total variation error (\%)")
-        fname = "gauge_tv_error_{:s}".format(gauge)
-        if extension is not None:
-            fname = '_'.join([fname, str(extension)])
-        fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
-        fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
-
-        # TODO: Optionally do something with lp errors
+        # Plot relative errors
+        for key in errors:
+            fig = plt.figure()
+            ax = plt.gca()
+            ax.semilogx(resolutions, 100.0*np.array(errors[key]['rel']), marker='o')
+            plt.xlabel("Number of elements")
+            plt.ylabel(r"Relative {:s} error (\%)".format(errors[key]['name']))
+            fname = "gauge_{:s}_error_{:s}".format(key, gauge)
+            if extension is not None:
+                fname = '_'.join([fname, str(extension)])
+            fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
+            fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
