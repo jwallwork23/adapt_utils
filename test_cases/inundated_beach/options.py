@@ -3,11 +3,14 @@ from thetis.configuration import *
 
 from adapt_utils.swe.tsunami.options import TsunamiOptions, heaviside_approx
 
+import os
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import rc
 
-rc('text', usetex=True)
+
+matplotlib.rc('text', usetex=True)
+matplotlib.rc('font', family='serif')
 
 
 __all__ = ["BalzanoOptions"]
@@ -22,17 +25,20 @@ class BalzanoOptions(TsunamiOptions):
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, n=1, bathymetry_type=1, **kwargs):
-        try:
-            assert bathymetry_type in (1, 2, 3)
-        except AssertionError:
-            raise ValueError("`bathymetry_type` should be chosen from (1, 2, 3).")
-        self.bathymetry_type = bathymetry_type
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
         self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True
         self.num_hours = 24
+
+        # Three possible bathymetries
+        try:
+            assert bathymetry_type in (1, 2, 3)
+        except AssertionError:
+            raise ValueError("`bathymetry_type` should be chosen from (1, 2, 3).")
+        self.bathymetry_type = bathymetry_type
+        self.di = os.path.join(self.di, 'bathymetry{:d}'.format(self.bathymetry_type))
 
         # Physical
         self.base_viscosity = 1e-6
@@ -78,6 +84,9 @@ class BalzanoOptions(TsunamiOptions):
         self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
         tol = 1e-8  # FIXME: Point evaluation hack
         self.xrange = np.linspace(tol, 1.5*self.basin_x-tol, 20)
+
+        # Outputs  (NOTE: self.di has changed)
+        self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
 
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
