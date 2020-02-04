@@ -21,7 +21,12 @@ class BalzanoOptions(TsunamiOptions):
         shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
     """
 
-    def __init__(self, friction='manning', plot_timeseries=False, n=1, **kwargs):
+    def __init__(self, friction='manning', plot_timeseries=False, n=1, bathymetry_type=1, **kwargs):
+        try:
+            assert bathymetry_type in (1, 2, 3)
+        except AssertionError:
+            raise ValueError("`bathymetry_type` should be chosen from (1, 2, 3).")
+        self.bathymetry_type = bathymetry_type
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
         self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
@@ -98,7 +103,20 @@ class BalzanoOptions(TsunamiOptions):
         max_depth = 5.0
         x, y = SpatialCoordinate(fs.mesh())
         self.bathymetry = Function(fs, name="Bathymetry")
-        self.bathymetry.interpolate((1.0 - x/self.basin_x)*max_depth)
+        L = self.basin_x
+        ξ = lambda X: L - X  # Coordinate transformation
+        b1 = ξ(x)/L*max_depth
+        if self.bathymetry_type == 1:
+            self.bathymetry.interpolate(b1)
+        elif self.bathymetry_type == 2:
+            self.bathymetry.interpolate(
+                conditional(le(abs(ξ(x) - 4000.0), 1000.0),
+                            conditional(ge(ξ(x), 4000.0),
+                                        (3000.0 + 2*(ξ(x) - 4000.0))/L*max_depth,
+                                        3000.0/L*max_depth),
+                            b1))
+        else:
+            raise NotImplementedError  # TODO
         return self.bathymetry
 
     def set_viscosity(self, fs):
