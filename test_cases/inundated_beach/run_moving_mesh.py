@@ -1,10 +1,10 @@
 from thetis import *
 
 from adapt_utils.test_cases.inundated_beach.options import BalzanoOptions
-from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
+from adapt_utils.swe.tsunami.solver import TsunamiProblem
 
 op = BalzanoOptions(approach='monge_ampere',
-                    plot_timeseries=False,
+                    plot_timeseries=False,  # FIXME
                     plot_pvd=True,
                     debug=True,
                     nonlinear_method='relaxation',
@@ -13,7 +13,7 @@ op = BalzanoOptions(approach='monge_ampere',
                     qoi_mode='inundation_volume',
                     n=2,
                     r_adapt_rtol=1.0e-3)
-swp = UnsteadyShallowWaterProblem(op, levels=0)
+swp = TsunamiProblem(op, levels=0)
 swp.setup_solver()
 
 def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this projection is expensive!

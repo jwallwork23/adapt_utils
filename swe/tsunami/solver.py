@@ -20,7 +20,7 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
         # self.op.set_boundary_surface()
 
-    def extra_setup(self):  # TODO: Plot eta_tilde, not elev_2d
+    def extra_setup(self):  # TODO: Plot eta_tilde, too
         op = self.op
 
         # Don't bother plotting velocity

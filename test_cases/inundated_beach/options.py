@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.swe.tsunami.options import TsunamiOptions, heaviside_approx
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,7 +13,7 @@ rc('text', usetex=True)
 __all__ = ["BalzanoOptions"]
 
 
-class BalzanoOptions(ShallowWaterOptions):
+class BalzanoOptions(TsunamiOptions):
     """
     Parameters for test case described in [1].
 
@@ -22,12 +22,11 @@ class BalzanoOptions(ShallowWaterOptions):
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, n=1, **kwargs):
-        super(BalzanoOptions, self).__init__(**kwargs)
-        self.plot_pvd = True
         self.plot_timeseries = plot_timeseries
-
         self.basin_x = 13800.0  # Length of wet region
         self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
+        super(BalzanoOptions, self).__init__(**kwargs)
+        self.plot_pvd = True
         self.num_hours = 24
 
         # Physical
@@ -67,12 +66,7 @@ class BalzanoOptions(ShallowWaterOptions):
         self.qoi_mode = 'inundation_volume'
 
         P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
-        V = VectorFunctionSpace(self.default_mesh, "CG", 2)*P1DG  # FIXME
-
-        # Outputs
-        self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
-        self.eta_tilde = Function(P1DG, name='Modified elevation')
-        self.get_initial_depth(V)
+        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*P1DG)  # FIXME
 
         # Timeseries
         self.wd_obs = []
@@ -101,7 +95,7 @@ class BalzanoOptions(ShallowWaterOptions):
             self.manning_drag_coefficient = Constant(self.friction_coeff or 0.02)
         return self.manning_drag_coefficient
 
-    def set_bathymetry(self, fs):
+    def set_bathymetry(self, fs, **kwargs):
         max_depth = 5.0
         x, y = SpatialCoordinate(fs.mesh())
         self.bathymetry = Function(fs, name="Bathymetry")
@@ -112,6 +106,9 @@ class BalzanoOptions(ShallowWaterOptions):
         self.viscosity = Function(fs)
         self.viscosity.assign(self.base_viscosity)
         return self.viscosity
+
+    def set_coriolis(self, fs):
+        return
 
     def set_boundary_conditions(self, fs):
         if not hasattr(self, 'elev_in'):
@@ -162,6 +159,8 @@ class BalzanoOptions(ShallowWaterOptions):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
         eta = solver_obj.fields.elev_2d
         b = solver_obj.fields.bathymetry_2d
+        if not hasattr(self, 'qoi_form'):
+            self.get_qoi_form()
         def export_func():
             self.eta_tilde.project(eta + bathymetry_displacement(eta))
             self.eta_tilde_file.write(self.eta_tilde)
@@ -174,87 +173,5 @@ class BalzanoOptions(ShallowWaterOptions):
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
                 # Store QoI timeseries
-                self.evaluate_qoi_form(solver_obj)
-                self.qois.append(assemble(self.qoi_form))
+                self.qois.append(assemble(self.qoi_form(solver_obj)))
         return export_func
-
-    def set_qoi_kernel(self, solver_obj):
-        J = self.evaluate_qoi_form(solver_obj)
-        eta = solver_obj.fields.solution_2d.split()[1]
-        dJdeta = derivative(J, eta, TestFunction(eta.function_space()))  # TODO: test
-
-    def evaluate_qoi_form(self, solver_obj):
-        try:
-            assert self.qoi_mode in ('inundation_volume', 'maximum_inundation', 'overtopping_volume')
-        except AssertionError:
-            raise ValueError("QoI mode '{:s}' not recognised.".format(self.qoi_mode))
-        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-        eta = solver_obj.fields.elev_2d
-        b = solver_obj.fields.bathymetry_2d
-        dry = conditional(ge(b, 0), 0, 1)
-        if 'inundation' in self.qoi_mode:
-            f = heaviside_approx(eta + b, self.wetting_and_drying_alpha)
-            eta_init = project(self.initial_value.split()[1], eta.function_space())
-            f_init = heaviside_approx(eta_init + b, self.wetting_and_drying_alpha)
-            self.qoi_form = dry*(eta + f - f_init)*dx(degree=12)
-        elif self.qoi_mode == 'overtopping_volume':
-            raise NotImplementedError  # TODO: Flux over coast. (Needs an internal boundary.)
-        else:
-            raise NotImplementedError  # TODO: Consider others. (Speak to Branwen.)
-        return self.qoi_form
-
-    def evaluate_qoi(self):  # TODO: Do time-dep QoI properly
-        f = self.qois
-        N = len(f)
-        assert N > 0
-        if 'maximum' in self.qoi_mode:
-            qoi = np.max(f)
-        else:  # Trapezium rule
-            h = self.dt*self.dt_per_export
-            qoi = 0.5*h*(f[0] + f[N-1])
-            for i in range(1, N-1):
-                qoi += h*f[i]
-        return qoi
-
-    def plot(self):
-        self.plot_heaviside()
-        if 'volume' in self.qoi_mode:
-            self.plot_qoi()
-        print_output("QoI '{:s}' = {:.4e}".format(self.qoi_mode, self.evaluate_qoi()))
-
-    def plot_heaviside(self):
-        """Timeseries plot of approximate Heavyside function."""
-        scaling = 0.7
-        plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
-        plt.gcf().subplots_adjust(bottom=0.15)
-        T = [[t/3600]*20 for t in self.trange]
-        X = [self.xrange for t in T]
-
-        cset1 = plt.contourf(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
-        plt.clim(0.0, 1.2)
-        cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
-        plt.clim(0.0, 1.2)
-        cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels = [0.5])
-        cb = plt.colorbar(cset1, ticks=np.linspace(0, 1, 6))
-        cb.set_label("$\mathcal H(\eta-b)$")
-        plt.ylim(min(X[0]), max(X[0]))
-        plt.xlabel("Time [$\mathrm h$]")
-        plt.ylabel("$x$ [$\mathrm m$]")
-        plt.savefig(os.path.join(self.di, "heaviside_timeseries.pdf"))
-
-    def plot_qoi(self):
-        """Timeseries plot of instantaneous QoI."""
-        plt.figure(2)
-        T = self.trange/3600
-        qois = [q/1.0e9 for q in self.qois]
-        qoi = self.evaluate_qoi()/1.0e9
-        plt.plot(T, qois, linestyle='dashed', color='b', marker='x')
-        plt.fill_between(T, np.zeros_like(qois), qois)
-        plt.xlabel("Time [$\mathrm h$]")
-        plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
-        plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
-        plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
-
-def heaviside_approx(H, alpha):
-    return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5
-

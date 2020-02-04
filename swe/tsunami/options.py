@@ -34,23 +34,24 @@ class TsunamiOptions(ShallowWaterOptions):
             self.force_zone_number = False
 
         # Setup longitude-latitude domain
-        b_lon, b_lat, b = self.read_bathymetry_file()
-        lon_min = np.min(b_lon)
-        lon_diff = np.max(b_lon) - lon_min
-        lat_min = np.min(b_lat)
-        lat_diff = np.max(b_lat) - lat_min
-        self.lonlat_mesh = RectangleMesh(n, n*int(np.round(lon_diff/lat_diff)), lon_diff, lat_diff)
-        lon, lat = SpatialCoordinate(self.lonlat_mesh)
-        self.lonlat_mesh.coordinates.interpolate(as_vector([lon + lon_min, lat + lat_min]))
+        if not hasattr(self, 'default_mesh'):
+            b_lon, b_lat, b = self.read_bathymetry_file()
+            lon_min = np.min(b_lon)
+            lon_diff = np.max(b_lon) - lon_min
+            lat_min = np.min(b_lat)
+            lat_diff = np.max(b_lat) - lat_min
+            self.lonlat_mesh = RectangleMesh(n, n*int(np.round(lon_diff/lat_diff)), lon_diff, lat_diff)
+            lon, lat = SpatialCoordinate(self.lonlat_mesh)
+            self.lonlat_mesh.coordinates.interpolate(as_vector([lon + lon_min, lat + lat_min]))
 
-        # Setup problem domain
-        self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
-        if self.utm:
-            self.get_utm_mesh()
+            # Setup problem domain
+            self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
+            if self.utm:
+                self.get_utm_mesh()
 
-        # Set fields
-        self.set_bathymetry(dat=(b_lon, b_lat, b), adapted=False)
-        self.set_initial_surface()
+            # Set fields
+            self.set_bathymetry(dat=(b_lon, b_lat, b), adapted=False)
+            self.set_initial_surface()
         self.base_viscosity = 1.0e-3
 
         # Wetting and drying
@@ -161,6 +162,10 @@ class TsunamiOptions(ShallowWaterOptions):
         def export_func():
             self.get_eta_tilde(solver_obj)
             self.eta_tilde_file.write(self.eta_tilde)
+
+            if hasattr(self, 'evaluate_qoi_form') and hasattr(self, 'qois'):
+                self.evaluate_qoi_form(solver_obj)
+                self.qois.append(assemble(self.qoi_form))
         return export_func
 
     # TODO: Plot multiple mesh approaches
@@ -240,3 +245,86 @@ class TsunamiOptions(ShallowWaterOptions):
                 fname = '_'.join([fname, str(extension)])
             fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
             fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
+
+    def set_qoi_kernel(self, solver_obj):
+        if not hasattr(self, 'qoi_form'):
+            self.get_qoi_form()
+        J = self.qoi_form(solver_obj)
+        eta = solver_obj.fields.solution_2d.split()[1]
+        dJdeta = derivative(J, eta, TestFunction(eta.function_space()))  # TODO: test
+
+    def get_qoi_form(self):
+        try:
+            assert self.qoi_mode in ('inundation_volume', 'maximum_inundation', 'overtopping_volume')
+        except AssertionError:
+            raise ValueError("QoI mode '{:s}' not recognised.".format(self.qoi_mode))
+
+        def qoi_form(solver_obj):
+            eta = solver_obj.fields.elev_2d
+            b = solver_obj.fields.bathymetry_2d
+            dry = conditional(ge(b, 0), 0, 1)
+            if 'inundation' in self.qoi_mode:
+                f = heaviside_approx(eta + b, self.wetting_and_drying_alpha)
+                eta_init = project(self.initial_value.split()[1], eta.function_space())
+                f_init = heaviside_approx(eta_init + b, self.wetting_and_drying_alpha)
+                qoi = dry*(eta + f - f_init)*dx(degree=12)
+            elif self.qoi_mode == 'overtopping_volume':
+                raise NotImplementedError  # TODO: Flux over coast. (Needs an internal boundary.)
+            # TODO: Consider other QoIs. (Speak to Branwen.)
+            return qoi
+        self.qoi_form = qoi_form
+
+    def evaluate_qoi(self):  # TODO: Use AccumulatorCallback instead
+        f = self.qois
+        N = len(f)
+        assert N > 0
+        if 'maximum' in self.qoi_mode:
+            qoi = np.max(f)
+        else:  # Trapezium rule
+            h = self.dt*self.dt_per_export
+            qoi = 0.5*h*(f[0] + f[N-1])
+            for i in range(1, N-1):
+                qoi += h*f[i]
+        return qoi
+
+    def plot(self):
+        self.plot_heaviside()
+        if 'volume' in self.qoi_mode:
+            self.plot_qoi()
+        print_output("QoI '{:s}' = {:.4e}".format(self.qoi_mode, self.evaluate_qoi()))
+
+    def plot_heaviside(self):
+        """Timeseries plot of approximate Heavyside function."""
+        scaling = 0.7
+        plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
+        plt.gcf().subplots_adjust(bottom=0.15)
+        T = [[t/3600]*20 for t in self.trange]
+        X = [self.xrange for t in T]
+
+        cset1 = plt.contourf(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
+        plt.clim(0.0, 1.2)
+        cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
+        plt.clim(0.0, 1.2)
+        cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels = [0.5])
+        cb = plt.colorbar(cset1, ticks=np.linspace(0, 1, 6))
+        cb.set_label("$\mathcal H(\eta-b)$")
+        plt.ylim(min(X[0]), max(X[0]))
+        plt.xlabel("Time [$\mathrm h$]")
+        plt.ylabel("$x$ [$\mathrm m$]")
+        plt.savefig(os.path.join(self.di, "heaviside_timeseries.pdf"))
+
+    def plot_qoi(self):
+        """Timeseries plot of instantaneous QoI."""
+        plt.figure(2)
+        T = self.trange/3600
+        qois = [q/1.0e9 for q in self.qois]
+        qoi = self.evaluate_qoi()/1.0e9
+        plt.plot(T, qois, linestyle='dashed', color='b', marker='x')
+        plt.fill_between(T, np.zeros_like(qois), qois)
+        plt.xlabel("Time [$\mathrm h$]")
+        plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
+        plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
+        plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
+
+def heaviside_approx(H, alpha):
+    return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5
