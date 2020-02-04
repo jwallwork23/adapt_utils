@@ -27,6 +27,7 @@ class BalzanoOptions(ShallowWaterOptions):
         self.plot_timeseries = plot_timeseries
 
         self.basin_x = 13800.0  # Length of wet region
+
         #self.default_mesh = RectangleMesh(17, 10, 1.5*self.basin_x, 1200.0)
         self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
         self.num_hours = 24
@@ -171,7 +172,7 @@ class BalzanoOptions(ShallowWaterOptions):
 
                 # Store modified bathymetry timeseries
                 P1DG = solver_obj.function_spaces.P1DG_2d
-                wd = project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
+                wd = project(heavyside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
                 # Store QoI timeseries
@@ -194,9 +195,9 @@ class BalzanoOptions(ShallowWaterOptions):
         b = solver_obj.fields.bathymetry_2d
         dry = conditional(ge(b, 0), 0, 1)
         if 'inundation' in self.qoi_mode:
-            f = heaviside_approx(eta + b, self.wetting_and_drying_alpha)
+            f = heavyside_approx(eta + b, self.wetting_and_drying_alpha)
             eta_init = project(self.initial_value.split()[1], eta.function_space())
-            f_init = heaviside_approx(eta_init + b, self.wetting_and_drying_alpha)
+            f_init = heavyside_approx(eta_init + b, self.wetting_and_drying_alpha)
             self.qoi_form = dry*(eta + f - f_init)*dx(degree=12)
         elif self.qoi_mode == 'overtopping_volume':
             raise NotImplementedError  # TODO: Flux over coast. (Needs an internal boundary.)

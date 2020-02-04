@@ -647,8 +647,9 @@ class SteadyProblem():
             tmp = type(self)(self.op, mesh=am_copy.mesh, discrete_adjoint=self.discrete_adjoint,
                              prev_solution=self.prev_solution, levels=self.levels)
             x = Function(tmp.mesh.coordinates)
-            x.dat.data[:] = mesh_mover.x.dat.data  # FIXME: Not parallel
-            tmp.mesh.coordinates.assign(x)  # TODO: Need to modify coords of hierarchy, too
+
+            x.dat.data[:] = mesh_mover.x.dat.data  # TODO: PyOP2
+            tmp.mesh.coordinates.assign(x)  # TODO: May need to modify coords of hierarchy, too
 
             # Project fields and solutions onto temporary Problem
             tmp.project_fields(self)
@@ -656,28 +657,49 @@ class SteadyProblem():
             tmp.project_solution(self.adjoint_solution, adjoint=True)
 
             # Update self.mesh and function spaces, etc.
+<<<<<<< HEAD
             self.mesh.coordinates.dat.data[:] = x.dat.data  # FIXME: Not parallel
+=======
+            # self.mesh.coordinates.assign(x)
+            #print(self.bathymetry.function_space())
+            self.mesh.coordinates.dat.data[:] = x.dat.data
+>>>>>>> 5982d91e63114eae176e311df7e579ad4fc3b86f
             self.create_function_spaces()
             self.create_solutions()
             self.boundary_conditions = self.op.set_boundary_conditions(self.V)
             self.project_fields(tmp)
             self.project_solution(tmp.solution)
             self.project_solution(tmp.adjoint_solution, adjoint=True)
+<<<<<<< HEAD
 
             # Plot monitor function
             m = interpolate(self.monitor_function(self.mesh), self.P1)
             m.rename("Monitor function")
             self.monitor_file.write(m)
+=======
+            #print(self.bathymetry.function_space())
+            #print(self.solver_obj.fields.bathymetry_2d.function_space())
+            # self.setup_solver()
+            #print(self.solver_obj.fields.bathymetry_2d.function_space())
+>>>>>>> 5982d91e63114eae176e311df7e579ad4fc3b86f
         else:
             try:
                 assert hasattr(self, 'M')
             except AssertionError:
                 raise ValueError("Please supply a metric.")
+<<<<<<< HEAD
             self.am.pragmatic_adapt(self.M)
             self.set_mesh(self.am.mesh)
 
         if self.approach != 'monge_ampere':
             print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
+=======
+            self.am.adapt(self.M)
+            self.set_mesh(self.am.mesh)
+
+        if self.approach != 'monge_ampere':
+            PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
+>>>>>>> 5982d91e63114eae176e311df7e579ad4fc3b86f
             self.num_cells.append(self.mesh.num_cells())
             self.num_vertices.append(self.mesh.num_vertices())
             self.plot()

@@ -487,6 +487,18 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             self.source = None
 
+    def project_fields(self, prob):  # TODO: dict storage => more general loop
+        self.viscosity = self.project(prob.viscosity, Function(self.P1))
+        self.diffusivity = self.project(prob.diffusivity, Function(self.P1))
+        self.bathymetry = self.project(prob.bathymetry, Function(self.P1DG))
+        self.op.bathymetry = self.bathymetry
+        self.inflow = self.project(prob.inflow, Function(self.P1_vec))
+        self.coriolis = self.project(prob.coriolis, Function(self.P1))
+        self.quadratic_drag_coefficient = self.project(prob.quadratic_drag_coefficient, Function(self.P1))
+        self.manning_drag_coefficient = self.project(prob.manning_drag_coefficient, Function(self.P1))
+        self.op.depth = project(self.op.depth, self.P1)
+
+
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
         if self.stabilisation in ('no', 'lax_friedrichs'):

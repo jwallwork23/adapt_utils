@@ -20,7 +20,6 @@ swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 
 
-
 def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this projection is expensive!
     """
     Monitor function focused around the wet-dry interface.
