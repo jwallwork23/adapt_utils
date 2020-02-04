@@ -251,6 +251,10 @@ class Options(FrozenConfigurable):
     def set_boundary_conditions(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
+    def set_boundary_surface(self):
+        """Should be implemented in derived class."""
+        pass
+
     def set_source(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 

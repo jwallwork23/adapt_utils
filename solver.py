@@ -7,10 +7,12 @@ import matplotlib.pyplot as plt
 
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.recovery import construct_hessian
 from adapt_utils.adapt.p0_metric import *
 from adapt_utils.adapt.r import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
 from adapt_utils.misc import *
+from adapt_utils.norms import *
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem"]
@@ -122,7 +124,7 @@ class SteadyProblem():
         self.solution = Function(self.V, name='Solution')
         self.adjoint_solution = Function(self.V, name='Adjoint solution')
 
-    def set_fields(self):
+    def set_fields(self, adapted=False):
         """
         Set velocity field, viscosity, etc.
         """
@@ -130,9 +132,19 @@ class SteadyProblem():
 
     def project_fields(self, prob):
         """
-        Project velocity field, viscosity, etc. from another Problem.
+        Project all fields from Problem `prob` onto the corresponding function spaces in `self`.
         """
-        raise NotImplementedError("Should be implemented in derived class.")
+        for i in self.fields:
+            if isinstance(prob.fields[i], Function):
+                self.fields[i] = self.project(prob.fields[i], Function(self.fields[i].function_space()))
+            elif isinstance(prob.fields[i], Constant):
+                self.fields[i] = prob.fields[i]
+            elif prob.fields[i] is None:
+                self.fields[i] = None
+            else:
+                raise ValueError
+        self.op.bathymetry = self.fields['bathymetry']  # TODO: needed?
+        self.op.set_boundary_surface()
 
     def set_stabilisation(self):
         """
@@ -481,14 +493,14 @@ class SteadyProblem():
         else:
             self.solution_file.write(self.solution)
 
-    def indicate_error(self):
+    def indicate_error(self, approach=None):
         """
         Evaluate error estimation strategy of choice in order to obtain a metric field for mesh
         adaptation.
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
         """
-        approach = self.approach
+        approach = approach or self.approach
         adjoint = 'adjoint' in approach
         average = 'relax' in approach
         # TODO:
@@ -593,7 +605,7 @@ class SteadyProblem():
             self.M = amd.p1metric
             self.estimate_error()
 
-        elif self.approach == 'monge_ampere':
+        elif approach == 'monge_ampere':
             return
 
         # User specified adaptation methods
@@ -619,20 +631,21 @@ class SteadyProblem():
     def plot_error_estimate(self, approach):
         raise NotImplementedError  # TODO
 
-    def adapt_mesh(self):  # TODO: option for r-adaptation every *timestep*, rather than every export
+    def adapt_mesh(self, approach=None):  # TODO: option for r-adaptation every *timestep*, rather than every export
         """
         Adapt mesh using metric constructed in error estimation step.
 
         NOTE: User-provided metrics may be applied by defining a `custom_adapt` method.
         """
-        if 'fixed_mesh' in self.approach:
+        approach = approach or self.approach
+        if 'fixed_mesh' in approach:
             return
-        elif self.approach == 'uniform':
+        elif approach == 'uniform':
             if self.am.levels == 0:
                 raise ValueError("Cannot perform uniform refinement because `AdaptiveMesh` object is not hierarchical.")
             self.mesh = self.am.hierarchy[1]
             return
-        elif self.approach == 'monge_ampere':  # TODO: Integrate into AdaptiveMesh
+        elif approach == 'monge_ampere':  # TODO: Integrate into AdaptiveMesh
             try:
                 assert hasattr(self, 'monitor_function')
             except AssertionError:
@@ -657,49 +670,31 @@ class SteadyProblem():
             tmp.project_solution(self.adjoint_solution, adjoint=True)
 
             # Update self.mesh and function spaces, etc.
-<<<<<<< HEAD
-            self.mesh.coordinates.dat.data[:] = x.dat.data  # FIXME: Not parallel
-=======
             # self.mesh.coordinates.assign(x)
             #print(self.bathymetry.function_space())
             self.mesh.coordinates.dat.data[:] = x.dat.data
->>>>>>> 5982d91e63114eae176e311df7e579ad4fc3b86f
+
             self.create_function_spaces()
             self.create_solutions()
             self.boundary_conditions = self.op.set_boundary_conditions(self.V)
             self.project_fields(tmp)
             self.project_solution(tmp.solution)
             self.project_solution(tmp.adjoint_solution, adjoint=True)
-<<<<<<< HEAD
 
             # Plot monitor function
             m = interpolate(self.monitor_function(self.mesh), self.P1)
             m.rename("Monitor function")
             self.monitor_file.write(m)
-=======
-            #print(self.bathymetry.function_space())
-            #print(self.solver_obj.fields.bathymetry_2d.function_space())
-            # self.setup_solver()
-            #print(self.solver_obj.fields.bathymetry_2d.function_space())
->>>>>>> 5982d91e63114eae176e311df7e579ad4fc3b86f
         else:
             try:
                 assert hasattr(self, 'M')
             except AssertionError:
                 raise ValueError("Please supply a metric.")
-<<<<<<< HEAD
             self.am.pragmatic_adapt(self.M)
             self.set_mesh(self.am.mesh)
 
-        if self.approach != 'monge_ampere':
+        if approach != 'monge_ampere':
             print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
-=======
-            self.am.adapt(self.M)
-            self.set_mesh(self.am.mesh)
-
-        if self.approach != 'monge_ampere':
-            PETSc.Sys.Print("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
->>>>>>> 5982d91e63114eae176e311df7e579ad4fc3b86f
             self.num_cells.append(self.mesh.num_cells())
             self.num_vertices.append(self.mesh.num_vertices())
             self.plot()
@@ -707,20 +702,57 @@ class SteadyProblem():
             # Re-initialise problem
             self.create_function_spaces()
             self.create_solutions()
-            self.set_fields()
+            self.set_fields(adapted=True)
             self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
-    def initialise_mesh(self):
+    def initialise_mesh(self, approach='hessian', adapt_field=None, num_adapt=None, alpha=1.0, beta=1.0):
         """
         Repeatedly apply mesh adaptation in order to give a suitable initial mesh. A common usage
         is when bathymetry is interpolated from raw data and we want its anisotropy to align with
         that of the mesh.
 
         NOTE: `self.set_fields` will be called after each adaptation step.
+
+        :kwarg approach: choose from 'monge_ampere', 'hessian' and 'isotropic'.
+        :kwarg adapt_field: field for adaptation, chosen from the solver fields, optionally appended
+                            with '_frobenius', for use in the Monge-Ampere case.
+        :kwarg num_adapt: number of mesh adaptation steps.
+        :kwargs alpha, beta: tuning parameters for Monge-Ampere monitor function.
         """
-        for i in range(self.op.num_adapt):
-            self.indicate_error()
-            self.adapt_mesh()
+        field = self.op.adapt_field
+        self.op.adapt_field = adapt_field or 'bathymetry'
+        num_adapt = num_adapt or self.op.num_adapt
+        if approach == 'monge_ampere':
+            if self.op.adapt_field in self.fields:
+                def monitor(mesh):
+                    P1 = FunctionSpace(mesh, "CG", 1)
+                    b = project(self.fields[self.op.adapt_field], P1)
+                    return 1.0 + Constant(alpha)*pow(cosh(Constant(beta)*b), -2)
+            elif 'frobenius' in self.op.adapt_field:
+                ff = self.op.adapt_field.split('_')
+                assert len(ff) == 2
+                f = ff[0]
+                def monitor(mesh):
+                    P1 = FunctionSpace(mesh, "CG", 1)
+                    b = project(self.fields[f], P1)
+                    H = construct_hessian(b, op=self.op)
+                    return 1.0 + alpha*local_frobenius_norm(H, mesh=mesh, space=P1)
+            else:
+                raise ValueError
+            self.monitor_function = monitor
+        elif approach == 'isotropic':
+            if self.op.adapt_field in self.fields:
+                f = self.fields[self.op.adapt_field]
+                self.M = isotropic_metric(1/sqrt(dot(f, f)), op=self.op)  # TODO: test!
+            else:
+                raise ValueError
+        elif approach != 'hessian':
+            raise ValueError("Mesh initialisation requires 'approach' in ('hessian', 'monge_ampere', 'isotropic')")
+        for i in range(num_adapt):
+            if approach != 'isotropic':
+                self.indicate_error(approach=approach)
+            self.adapt_mesh(approach=approach)
+        self.op.adapt_field = field
 
     def adaptation_loop(self, outer_iteration=None):
         """

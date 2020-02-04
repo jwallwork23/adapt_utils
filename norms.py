@@ -1,15 +1,45 @@
 from firedrake import *
 
+import numpy as np
 
-__all__ = ["local_norm", "local_edge_integral", "local_interior_edge_integral",
-           "local_boundary_integral", "local_edge_norm", "local_interior_edge_norm",
-           "local_boundary_norm", "frobenius_norm", "local_frobenius_norm"]
 
+__all__ = ["lp_norm", "total_variation", "local_norm", "frobenius_norm", "local_frobenius_norm",
+           "local_edge_integral", "local_interior_edge_integral", "local_boundary_integral"]
+
+
+def lp_norm(f, p=2):
+    """
+    Calculate the lp norm of a 1D array `f`, where `p` is either `None` or `'infty'` (denoting the
+    infinity norm), or `p >= 1`.
+    """
+    if p is None or 'inf' in p:
+        return f.max()
+    if 'l' in p:
+        p = float(p[1:])
+    if p == 1 or np.allclose(p, 1.0):
+        return np.sum(np.abs(fi) for fi in f)
+    else:
+        assert p > 1
+        return pow(np.sum(pow(np.abs(fi), p) for fi in f), 1/p)
+
+def total_variation(f):
+    """Calculate the total variation of a 1D array f."""
+    n = len(f)
+    tv = 0.0
+    i0 = 0
+    sign_ = np.sign(f[1] - f[i0])
+    for i in range(2, n):
+        sign = np.sign(f[i] - f[i-1])
+        if sign != sign_:
+            tv += np.abs(f[i-1] - f[i0])
+            i0 = i-1
+        if i == n-1:
+            tv += np.abs(f[i] - f[i0])
+        sign_ = sign
+    return tv
 
 def local_norm(f, norm_type='L2'):
-    """
-    Calculate the `norm_type`-norm of `f` separately on each element of the mesh.
-    """
+    """Calculate the `norm_type`-norm of `f` separately on each element of the mesh."""
     typ = norm_type.lower()
     mesh = f.function_space().mesh()
     i = TestFunction(FunctionSpace(mesh, "DG", 0))
@@ -38,49 +68,8 @@ def local_norm(f, norm_type='L2'):
             raise RuntimeError("Unknown norm type '{:s}'".format(norm_type))
     return sqrt(assemble(form))
 
-def local_edge_integral(f, mesh=None):
-    """
-    Integrates `f` over all edges elementwise, giving a P0 field. 
-    """
-    mesh = mesh or f.function_space().mesh()
-    P0 = FunctionSpace(mesh, 'DG', 0)
-    test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
-    solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS + test*f*ds, integral)
-    return integral
-
-def local_interior_edge_integral(f, mesh=None):
-    """
-    Integrates `f` over all interior edges elementwise, giving a P0 field. 
-    """
-    mesh = mesh or f.function_space().mesh()
-    P0 = FunctionSpace(mesh, 'DG', 0)
-    test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
-    solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS, integral)
-    return integral
-
-def local_boundary_integral(f, mesh=None):
-    """
-    Integrates `f` over all exterior edges elementwise, giving a P0 field. 
-    """
-    mesh = mesh or f.function_space().mesh()
-    P0 = FunctionSpace(mesh, 'DG', 0)
-    test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
-    solve(test*trial*dx == test*f*ds, integral)
-    return integral
-
-def local_edge_norm(f, mesh=None):
-    mesh = mesh or f.function_space().mesh()
-    return local_edge_integral(f*f, mesh)  # TODO: Norms other than L2
-
-def local_interior_edge_norm(f, mesh=None):
-    mesh = mesh or f.function_space().mesh()
-    return local_interior_edge_integral(f*f, mesh)  # TODO: Norms other than L2
-
-def local_boundary_norm(f, mesh=None):
-    mesh = mesh or f.function_space().mesh()
-    return local_boundary_integral(f*f, mesh)  # TODO: Norms other than L2)
-
 def frobenius_norm(matrix, mesh=None):
+    """Calculate the Frobenius norm of `matrix`."""
     mesh = mesh or matrix.function_space().mesh()
     dim = mesh.topological_dimension()
     f = 0
@@ -90,6 +79,7 @@ def frobenius_norm(matrix, mesh=None):
     return sqrt(assemble(f*dx))
 
 def local_frobenius_norm(matrix, mesh=None, space=None):
+    """Calculate the Frobenius norm of `matrix` separately on each element of the mesh."""
     mesh = mesh or matrix.function_space().mesh()
     space = space or FunctionSpace(mesh, "DG", 0)
     dim = mesh.topological_dimension()
@@ -98,3 +88,27 @@ def local_frobenius_norm(matrix, mesh=None, space=None):
         for j in range(dim):
             f += matrix[i, j]*matrix[i, j]
     return sqrt(assemble(TestFunction(space)*f*dx))
+
+def local_edge_integral(f, mesh=None):
+    """Integrate `f` over all edges elementwise, giving a P0 field."""
+    mesh = mesh or f.function_space().mesh()
+    P0 = FunctionSpace(mesh, 'DG', 0)
+    test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
+    solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS + test*f*ds, integral)
+    return integral
+
+def local_interior_edge_integral(f, mesh=None):
+    """Integrate `f` over all interior edges elementwise, giving a P0 field."""
+    mesh = mesh or f.function_space().mesh()
+    P0 = FunctionSpace(mesh, 'DG', 0)
+    test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
+    solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS, integral)
+    return integral
+
+def local_boundary_integral(f, mesh=None):
+    """Integrate `f` over all exterior edges elementwise, giving a P0 field."""
+    mesh = mesh or f.function_space().mesh()
+    P0 = FunctionSpace(mesh, 'DG', 0)
+    test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
+    solve(test*trial*dx == test*f*ds, integral)
+    return integral
