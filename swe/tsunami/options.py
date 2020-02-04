@@ -186,9 +186,9 @@ class TsunamiOptions(ShallowWaterOptions):
         # Dictionary for norms and errors of timeseries
         errors = {'tv': {'data': total_variation(y_data), 'name': 'total variation'}}
         if plot_lp:
-            for p in ('l1', 'l2', 'linf'):
-                errors[p] = {'data': lp_norm(y_data, p=p),
-                             'name': '$\ell_\infty$' if p == 'linf' else '$\el{:s}$'.format(p)}
+            errors['l1'] = {'data': lp_norm(y_data, p=1), 'name': '$\ell_1$ error'}
+            errors['l2'] = {'data': lp_norm(y_data, p=2), 'name': '$\ell_2$ error'}
+            errors['linf'] = {'data': lp_norm(y_data, p='inf'), 'name': '$\ell_\infty$ error'}
         for key in errors:
             errors[key]['abs'] = []
             errors[key]['rel'] = []
@@ -235,7 +235,7 @@ class TsunamiOptions(ShallowWaterOptions):
             ax = plt.gca()
             ax.semilogx(resolutions, 100.0*np.array(errors[key]['rel']), marker='o')
             plt.xlabel("Number of elements")
-            plt.ylabel(r"Relative {:s} error (\%)".format(errors[key]['name']))
+            plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
             fname = "gauge_{:s}_error_{:s}".format(key, gauge)
             if extension is not None:
                 fname = '_'.join([fname, str(extension)])
