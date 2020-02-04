@@ -13,8 +13,8 @@ op = BalzanoOptions(approach='monge_ampere',
                     qoi_mode='inundation_volume',
                     n=2,
                     r_adapt_rtol=1.0e-3)
-swp = TsunamiProblem(op, levels=0)
-swp.setup_solver()
+tp = TsunamiProblem(op, levels=0)
+tp.setup_solver()
 
 def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this projection is expensive!
     """
@@ -34,5 +34,6 @@ def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this pro
     diff_proj = project(diff, P1)
     return 1.0 + alpha*pow(cosh(beta*diff_proj), -2)
 
-swp.monitor_function = wet_dry_interface_monitor
-swp.solve(uses_adjoint=False)
+tp.monitor_function = wet_dry_interface_monitor
+tp.solve(uses_adjoint=False)
+# TODO: Evaluate QoI properly, accounting for mesh adaptation

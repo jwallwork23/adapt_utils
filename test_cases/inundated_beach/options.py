@@ -73,7 +73,6 @@ class BalzanoOptions(TsunamiOptions):
         self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
         tol = 1e-8  # FIXME: Point evaluation hack
         self.xrange = np.linspace(tol, 1.5*self.basin_x-tol, 20)
-        self.qois = []
 
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
@@ -129,11 +128,6 @@ class BalzanoOptions(TsunamiOptions):
         self.elev_in.assign(self.elev_func(t) if 6*3600 <= t <= 18*3600 else 0.0)
 
     def set_initial_condition(self, fs):
-        """
-        Set initial elevation and velocity using asymptotic solution.
-
-        :arg fs: `FunctionSpace` in which the initial condition should live.
-        """
         self.initial_value = Function(fs, name="Initial condition")
         u, eta = self.initial_value.split()
         u.interpolate(as_vector([1.0e-7, 0.0]))
@@ -159,8 +153,6 @@ class BalzanoOptions(TsunamiOptions):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
         eta = solver_obj.fields.elev_2d
         b = solver_obj.fields.bathymetry_2d
-        if not hasattr(self, 'qoi_form'):
-            self.get_qoi_form()
         def export_func():
             self.eta_tilde.project(eta + bathymetry_displacement(eta))
             self.eta_tilde_file.write(self.eta_tilde)
@@ -171,7 +163,4 @@ class BalzanoOptions(TsunamiOptions):
                 P1DG = solver_obj.function_spaces.P1DG_2d
                 wd = project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
-
-                # Store QoI timeseries
-                self.qois.append(assemble(self.qoi_form(solver_obj)))
         return export_func

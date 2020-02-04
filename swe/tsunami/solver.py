@@ -1,6 +1,7 @@
 from thetis import *
 
 from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
+from adapt_utils.swe.tsunami.qois import InundationCallback
 
 
 __all__ = ["TsunamiProblem"]
@@ -36,3 +37,7 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
             self.callbacks[g] = callback.DetectorsCallback(self.solver_obj, locs, ['elev_2d'],
                                                            fname, names)
             self.solver_obj.add_callback(self.callbacks[g], 'export')
+
+        # Set callback for QoI evaluation
+        self.callbacks["qoi"] = InundationCallback(self.solver_obj)
+        self.solver_obj.add_callback(self.callbacks["qoi"])

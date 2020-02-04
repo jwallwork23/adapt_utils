@@ -162,10 +162,6 @@ class TsunamiOptions(ShallowWaterOptions):
         def export_func():
             self.get_eta_tilde(solver_obj)
             self.eta_tilde_file.write(self.eta_tilde)
-
-            if hasattr(self, 'evaluate_qoi_form') and hasattr(self, 'qois'):
-                self.evaluate_qoi_form(solver_obj)
-                self.qois.append(assemble(self.qoi_form))
         return export_func
 
     # TODO: Plot multiple mesh approaches
@@ -247,51 +243,13 @@ class TsunamiOptions(ShallowWaterOptions):
             fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
     def set_qoi_kernel(self, solver_obj):
-        if not hasattr(self, 'qoi_form'):
-            self.get_qoi_form()
-        J = self.qoi_form(solver_obj)
-        eta = solver_obj.fields.solution_2d.split()[1]
-        dJdeta = derivative(J, eta, TestFunction(eta.function_space()))  # TODO: test
-
-    def get_qoi_form(self):
-        try:
-            assert self.qoi_mode in ('inundation_volume', 'maximum_inundation', 'overtopping_volume')
-        except AssertionError:
-            raise ValueError("QoI mode '{:s}' not recognised.".format(self.qoi_mode))
-
-        def qoi_form(solver_obj):
-            eta = solver_obj.fields.elev_2d
-            b = solver_obj.fields.bathymetry_2d
-            dry = conditional(ge(b, 0), 0, 1)
-            if 'inundation' in self.qoi_mode:
-                f = heaviside_approx(eta + b, self.wetting_and_drying_alpha)
-                eta_init = project(self.initial_value.split()[1], eta.function_space())
-                f_init = heaviside_approx(eta_init + b, self.wetting_and_drying_alpha)
-                qoi = dry*(eta + f - f_init)*dx(degree=12)
-            elif self.qoi_mode == 'overtopping_volume':
-                raise NotImplementedError  # TODO: Flux over coast. (Needs an internal boundary.)
-            # TODO: Consider other QoIs. (Speak to Branwen.)
-            return qoi
-        self.qoi_form = qoi_form
-
-    def evaluate_qoi(self):  # TODO: Use AccumulatorCallback instead
-        f = self.qois
-        N = len(f)
-        assert N > 0
-        if 'maximum' in self.qoi_mode:
-            qoi = np.max(f)
-        else:  # Trapezium rule
-            h = self.dt*self.dt_per_export
-            qoi = 0.5*h*(f[0] + f[N-1])
-            for i in range(1, N-1):
-                qoi += h*f[i]
-        return qoi
+        pass  # TODO
 
     def plot(self):
         self.plot_heaviside()
         if 'volume' in self.qoi_mode:
             self.plot_qoi()
-        print_output("QoI '{:s}' = {:.4e}".format(self.qoi_mode, self.evaluate_qoi()))
+        # print_output("QoI '{:s}' = {:.4e}".format(self.qoi_mode, self.evaluate_qoi()))
 
     def plot_heaviside(self):
         """Timeseries plot of approximate Heavyside function."""
@@ -315,6 +273,8 @@ class TsunamiOptions(ShallowWaterOptions):
 
     def plot_qoi(self):
         """Timeseries plot of instantaneous QoI."""
+        print_output("#### TODO: Update plotting to use callback")
+        return  # TODO: temp
         plt.figure(2)
         T = self.trange/3600
         qois = [q/1.0e9 for q in self.qois]
