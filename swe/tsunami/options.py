@@ -176,7 +176,7 @@ class TsunamiOptions(ShallowWaterOptions):
         fig = plt.figure()
         ax = plt.gca()
 
-        print_output("#### TODO: Get gauge data in higher precision")
+        print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
         y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
         N = int(self.end_time/self.dt/self.dt_per_export)
         t = np.linspace(0, self.end_time/60.0, N+1)  # TODO: Read from 'time' in HDF5 file
@@ -203,6 +203,7 @@ class TsunamiOptions(ShallowWaterOptions):
             f = h5py.File(os.path.join(self.di, 'diagnostic_gauges_{:d}.hdf5'.format(res)), 'r')
             y = f[gauge][()].reshape(N+1,)
             y -= y[0]
+            y = np.round(y, 2)  # Ensure consistent precision
 
             # Plot timeseries for current mesh resolution
             label = ' '.join([approach.replace('_', ' '), "({:d} cells)".format(res)]).title()
