@@ -12,11 +12,11 @@ def lp_norm(f, p=2):
     Calculate the lp norm of a 1D array `f`, where `p` is either `None` or `'infty'` (denoting the
     infinity norm), or `p >= 1`.
     """
-    f = np.array(f)
-    assert len(np.shape(f)) == 1
-    if p is None or p == 'infty':
+    if p is None or 'inf' in p:
         return f.max()
-    elif p == 1:
+    if 'l' in p:
+        p = float(p[1:])
+    if p == 1 or np.allclose(p, 1.0):
         return np.sum(np.abs(fi) for fi in f)
     else:
         assert p > 1
@@ -24,8 +24,6 @@ def lp_norm(f, p=2):
 
 def total_variation(f):
     """Calculate the total variation of a 1D array f."""
-    f = np.array(f)
-    assert len(np.shape(f)) == 1
     n = len(f)
     tv = 0.0
     i0 = 0

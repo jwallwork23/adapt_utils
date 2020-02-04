@@ -10,6 +10,7 @@ import h5py
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import *
 from adapt_utils.adapt.metric import steady_metric
+from adapt_utils.norms import total_variation, lp_norm
 from adapt_utils.misc import find
 
 
@@ -54,7 +55,8 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Wetting and drying
         self.wetting_and_drying = True
-        self.wetting_and_drying_alpha = Constant(0.43)
+        # self.wetting_and_drying_alpha = Constant(0.43)
+        self.wetting_and_drying_alpha = Constant(1.5)
 
         # Timestepping
         self.timestepper = 'CrankNicolson'
@@ -161,7 +163,7 @@ class TsunamiOptions(ShallowWaterOptions):
             self.eta_tilde_file.write(self.eta_tilde)
         return export_func
 
-    def plot_timeseries(self, gauge):  # TODO: Plot multiple mesh approaches
+    def plot_timeseries(self, gauge, extension=None):  # TODO: Plot multiple mesh approaches
         """
         Plot timeseries for `gauge` under all stored mesh resolutions.
         """
@@ -173,25 +175,64 @@ class TsunamiOptions(ShallowWaterOptions):
         fig = plt.figure()
         ax = plt.gca()
 
-        y = self.gauges[gauge]["data"]  # TODO: Higher precision; store in a HDF5 file
+        print_output("#### TODO: Get gauge data in higher precision")
+        y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
         N = int(self.end_time/self.dt/self.dt_per_export)
         t = np.linspace(0, self.end_time/60.0, N+1)  # TODO: Read from 'time' in HDF5 file
-        ax.plot(t, y, label='Data', linestyle='solid')
+        ax.plot(t, y_data, label='Data', linestyle='solid')
 
+        # Dictionary for norms and errors of timeseries
+        errors = {'tv': {'data': total_variation(y_data)}}
+        for p in ('l1', 'l2', 'linf'):
+            errors[p] = {'data': lp_norm(y_data, p=p)}
+        for key in errors:
+            errors[key]['abs'] = []
+            errors[key]['rel'] = []
+
+        # Find all relevant HDF5 files and sort by ascending mesh resolution
         approach = 'uniform' if self.approach == 'fixed_mesh' else self.approach
         fnames = find('diagnostic_gauges_*.hdf5', self.di)
         resolutions = [int(fname.split('_')[-1][:-5]) for fname in fnames]
         resolutions.sort()
+
+        # Loop over all available mesh resolutions
         for res in resolutions:
             f = h5py.File(os.path.join(self.di, 'diagnostic_gauges_{:d}.hdf5'.format(res)), 'r')
-            y = f[gauge][()]
+            y = f[gauge][()].reshape(N+1,)
+            y -= y[0]
+
+            # Plot timeseries for current mesh resolution
             label = ' '.join([approach.replace('_', ' '), "({:d} cells)".format(res)]).title()
-            ax.plot(t, y-y[0], label=label, linestyle='dashed', marker='x')
+            ax.plot(t, y, label=label, linestyle='dashed', marker='x')
             f.close()
+
+            # Compute absolute and relative errors
+            error = np.array(y) - np.array(y_data)
+            for p in ('l1', 'l2', 'linf'):
+                errors[p]['abs'].append(lp_norm(error, p=p))
+            errors['tv']['abs'].append(total_variation(error))
+            for key in errors:
+                errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
         plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.ylabel("Free surface displacement $[\mathrm m]$")
         plt.ylim([-2, 5])
         plt.legend()
         fname = "gauge_timeseries_{:s}".format(gauge)
+        if extension is not None:
+            fname = '_'.join([fname, str(extension)])
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
+
+        # Plot total variation
+        fig = plt.figure()
+        ax = plt.gca()
+        ax.semilogx(resolutions, 100.0*np.array(errors['tv']['rel']), marker='o')
+        plt.xlabel("Number of elements")
+        plt.ylabel("Relative total variation error (\%)")
+        fname = "gauge_tv_error_{:s}".format(gauge)
+        if extension is not None:
+            fname = '_'.join([fname, str(extension)])
+        fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
+        fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
+
+        # TODO: Optionally do something with lp errors
