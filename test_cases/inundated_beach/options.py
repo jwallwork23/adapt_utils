@@ -116,7 +116,12 @@ class BalzanoOptions(TsunamiOptions):
                                         3000.0/L*max_depth),
                             b1))
         else:
-            raise NotImplementedError  # TODO
+            self.bathymetry.interpolate(
+                conditional(le(abs(ξ(x) - 4000.0), 1000.0),
+                            conditional(ge(ξ(x), 4000.0),
+                                        (2000.0 + 3*(ξ(x) - 4000.0))/L*max_depth,
+                                        (3000.0 - (ξ(x) - 3000.0))/L*max_depth),
+                            b1))
         return self.bathymetry
 
     def set_viscosity(self, fs):
