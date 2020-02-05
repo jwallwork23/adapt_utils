@@ -2,6 +2,7 @@ from thetis import *
 from thetis.configuration import *
 
 import netCDF4
+import matplotlib.pyplot as plt
 
 from adapt_utils.swe.tsunami.options import TsunamiOptions
 from adapt_utils.swe.tsunami.conversion import from_latlon
@@ -43,6 +44,11 @@ class TohokuOptions(TsunamiOptions):
                               "data": [0.00, 0.10, 0.30, 0.65, 1.05, 1.35, 1.65, 1.95, 2.25, 2.55,
                                        2.90, 3.50, 4.50, 4.85, 3.90, 1.55, -0.35, -1.05, -0.65,
                                        -0.30, -0.15, 0.05, 0.18, 0.35, 0.53, 0.74]}
+        self.gauges["801"] = {"lonlat": (141.6856, 38.2325)}
+        self.gauges["802"] = {"lonlat": (142.0969, 39.2586)}
+        self.gauges["803"] = {"lonlat": (141.8944, 38.8578)}
+        self.gauges["804"] = {"lonlat": (142.1867, 39.6272)}
+        self.gauges["806"] = {"lonlat": (141.1856, 36.9714)}
 
         # Coastal locations of interest, including major cities and nuclear power plants
         self.locations_of_interest["Fukushima Daiichi"] = {"lonlat": (141.0281, 37.4213)}
@@ -79,9 +85,12 @@ class TohokuOptions(TsunamiOptions):
             if loc == "Fukushima Daini":
                 continue
             x, y = dat[loc][coords]
-            axes.annotate("Fukushima" if loc == "Fukushima Daiichi" else loc,
-                          xy=(x, y), xytext=(x+2, y if loc == "P02" else y-2),
-                          arrowprops={'arrowstyle': '->'})
+            circle = plt.Circle((x, y), 0.1, color='r')
+            axes.add_patch(circle)
+            axes.annotate("Fukushima" if loc == "Fukushima Daiichi" else loc, xy=(x, y),
+                          xytext=(x+0.7 if "P0" in loc else x-1.2, y+0.5 if loc == "P06" else y),
+                          fontsize=6, color='r', ha="center")
+
 
     def read_bathymetry_file(self, km=False):
         nc = netCDF4.Dataset('resources/tohoku.nc', 'r')
