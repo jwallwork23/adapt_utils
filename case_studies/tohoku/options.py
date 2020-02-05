@@ -82,14 +82,25 @@ class TohokuOptions(TsunamiOptions):
             raise ValueError("Coordinate system {:s} not recognised.".format(coords))
         dat = self.gauges if gauges else self.locations_of_interest
         for loc in dat:
-            if loc == "Fukushima Daini":
-                continue
             x, y = dat[loc][coords]
-            circle = plt.Circle((x, y), 0.1, color='r')
+            xy_text = (x - 1.2, y)
+            color = "indigo"
+            if loc == "P02":
+                color = "navy"
+                xytext = (x + 0.5, y - 0.4)
+            elif loc == "P06":
+                color = "navy"
+                xytext = (x + 0.5, y + 0.2)
+            elif "80" in loc:
+                color = "darkgreen"
+                xytext = (x - 0.8, y)
+            elif loc == "Fukushima Daini":
+                continue
+            elif loc == "Fukushima Daiichi":
+                loc = "Fukushima"
+            axes.annotate(loc, xy=(x, y), xytext=xytext, fontsize=10, color=color, ha="center")
+            circle = plt.Circle((x, y), 0.1, color=color)
             axes.add_patch(circle)
-            axes.annotate("Fukushima" if loc == "Fukushima Daiichi" else loc, xy=(x, y),
-                          xytext=(x+0.7 if "P0" in loc else x-1.2, y+0.5 if loc == "P06" else y),
-                          fontsize=6, color='r', ha="center")
 
 
     def read_bathymetry_file(self, km=False):
@@ -102,10 +113,13 @@ class TohokuOptions(TsunamiOptions):
         nc.close()
         return lon, lat, elev
 
-    def read_surface_file(self):
-        nc = netCDF4.Dataset('resources/surf_zeroed.nc', 'r')
-        lon = nc.variables['lon'][:]
-        lat = nc.variables['lat'][:]
+    def read_surface_file(self, zeroed=True):
+        fname = 'resources/surf'
+        if zeroed:
+            fname = '_'.join([fname, 'zeroed'])
+        nc = netCDF4.Dataset(fname + '.nc', 'r')
+        lon = nc.variables['lon' if zeroed else 'x'][:]
+        lat = nc.variables['lat' if zeroed else 'y'][:]
         elev = nc.variables['z'][:, :]
         nc.close()
         return lon, lat, elev

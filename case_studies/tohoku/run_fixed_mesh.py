@@ -13,7 +13,7 @@ num_adapt = int(args.num_initial_adapt or 0)
 
 op = TohokuOptions(utm=True, plot_pvd=True, n=n, offset=0)  # TODO: Use offset
 
-# NOTE: wd alpha current = 1.5
+op.wetting_and_drying_alpha.assign(0.3)  # FIXME
 
 swp = TsunamiProblem(op, levels=0)
 ext = None
