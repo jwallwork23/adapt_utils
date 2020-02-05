@@ -83,7 +83,7 @@ class TohokuOptions(TsunamiOptions):
         dat = self.gauges if gauges else self.locations_of_interest
         for loc in dat:
             x, y = dat[loc][coords]
-            xy_text = (x - 1.2, y)
+            xytext = (x + 0.3, y)
             color = "indigo"
             if loc == "P02":
                 color = "navy"
@@ -98,7 +98,10 @@ class TohokuOptions(TsunamiOptions):
                 continue
             elif loc == "Fukushima Daiichi":
                 loc = "Fukushima"
-            axes.annotate(loc, xy=(x, y), xytext=xytext, fontsize=10, color=color, ha="center")
+            elif loc in ("Tokyo", "Hamaoka"):
+                xytext = (x + 0.3, y-0.6)
+            ha = "center" if gauges else "left"
+            axes.annotate(loc, xy=(x, y), xytext=xytext, fontsize=10, color=color, ha=ha)
             circle = plt.Circle((x, y), 0.1, color=color)
             axes.add_patch(circle)
 

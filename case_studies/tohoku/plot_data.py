@@ -18,11 +18,11 @@ ax = fig.add_subplot(111)
 
 # Plot raw bathymetry data
 cs = ax.contourf(lon, lat, elev, 50, vmin=-9, vmax=2, cmap=matplotlib.cm.coolwarm)
-ax.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
+ax.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k', linewidths=1.0)
 ax.set_xlabel("Degrees longitude")
 ax.set_ylabel("Degrees latitude")
 # ax.set_title("Original data")
-op.annotate_plot(ax, gauges=True)
+op.annotate_plot(ax, gauges=False)
 xlim = ax.get_xlim()
 ylim = ax.get_ylim()
 
@@ -40,12 +40,12 @@ ax = fig.add_subplot(111)
 
 # Plot raw surface data
 cs = ax.contourf(lon1, lat1, elev1, 50, cmap=matplotlib.cm.coolwarm)
-ax.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
+ax.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k', linewidths=1.0)
 ax.set_xlabel("Degrees longitude")
 ax.set_ylabel("Degrees latitude")
 ax.set_xlim(xlim)
 ax.set_ylim(ylim)
-# op.annotate_plot(ax, gauges=False)
+op.annotate_plot(ax, gauges=True)
 # ax.set_title("Original data")
 
 # Save raw surface and uniform interpolant
