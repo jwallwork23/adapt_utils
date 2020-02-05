@@ -183,15 +183,15 @@ class TsunamiOptions(ShallowWaterOptions):
             y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
             ax.plot(t, y_data, label='Data', linestyle='solid')
 
-        # Dictionary for norms and errors of timeseries
-        errors = {'tv': {'data': total_variation(y_data), 'name': 'total variation'}}
-        if plot_lp:
-            errors['l1'] = {'data': lp_norm(y_data, p=1), 'name': '$\ell_1$ error'}
-            errors['l2'] = {'data': lp_norm(y_data, p=2), 'name': '$\ell_2$ error'}
-            errors['linf'] = {'data': lp_norm(y_data, p='inf'), 'name': '$\ell_\infty$ error'}
-        for key in errors:
-            errors[key]['abs'] = []
-            errors[key]['rel'] = []
+            # Dictionary for norms and errors of timeseries
+            errors = {'tv': {'data': total_variation(y_data), 'name': 'total variation'}}
+            if plot_lp:
+                errors['l1'] = {'data': lp_norm(y_data, p=1), 'name': '$\ell_1$ error'}
+                errors['l2'] = {'data': lp_norm(y_data, p=2), 'name': '$\ell_2$ error'}
+                errors['linf'] = {'data': lp_norm(y_data, p='inf'), 'name': '$\ell_\infty$ error'}
+            for key in errors:
+                errors[key]['abs'] = []
+                errors[key]['rel'] = []
 
         # Find all relevant HDF5 files and sort by ascending mesh resolution
         approach = 'uniform' if self.approach == 'fixed_mesh' else self.approach
@@ -212,13 +212,14 @@ class TsunamiOptions(ShallowWaterOptions):
             f.close()
 
             # Compute absolute and relative errors
-            error = np.array(y) - np.array(y_data)
-            if plot_lp:
-                for p in ('l1', 'l2', 'linf'):
-                    errors[p]['abs'].append(lp_norm(error, p=p))
-            errors['tv']['abs'].append(total_variation(error))
-            for key in errors:
-                errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
+            if 'data' in self.gauges[gauge]:
+                error = np.array(y) - np.array(y_data)
+                if plot_lp:
+                    for p in ('l1', 'l2', 'linf'):
+                        errors[p]['abs'].append(lp_norm(error, p=p))
+                errors['tv']['abs'].append(total_variation(error))
+                for key in errors:
+                    errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
         plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.ylabel("Free surface displacement $[\mathrm m]$")
         plt.ylim([-2, 5])
@@ -231,6 +232,8 @@ class TsunamiOptions(ShallowWaterOptions):
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
         # Plot relative errors
+        if not 'data' in self.gauges[gauge]:
+            return
         for key in errors:
             fig = plt.figure(figsize=[3.2, 4.8])
             ax = fig.add_subplot(111)

@@ -5,6 +5,6 @@ import matplotlib.pyplot as plt
 
 op = TohokuOptions(utm=True)
 swp = TsunamiProblem(op, levels=0)
-op.plot_timeseries("P02")
-op.plot_timeseries("P06")
+for g in op.gauges:
+    op.plot_timeseries(g)
 plt.show()
