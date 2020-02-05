@@ -56,8 +56,7 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Wetting and drying
         self.wetting_and_drying = True
-        # self.wetting_and_drying_alpha = Constant(0.43)
-        self.wetting_and_drying_alpha = Constant(1.5)
+        self.wetting_and_drying_alpha = Constant(0.43)
 
         # Timestepping
         self.timestepper = 'CrankNicolson'
