@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.swe.tsunami.options import TsunamiOptions, heaviside_approx
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,7 +13,7 @@ rc('text', usetex=True)
 __all__ = ["BalzanoOptions"]
 
 
-class BalzanoOptions(ShallowWaterOptions):
+class BalzanoOptions(TsunamiOptions):
     """
     Parameters for test case described in [1].
 
@@ -22,12 +22,14 @@ class BalzanoOptions(ShallowWaterOptions):
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
-        super(BalzanoOptions, self).__init__(**kwargs)
-        self.plot_pvd = True
         self.plot_timeseries = plot_timeseries
-
         self.basin_x = 13800.0  # Length of wet region
+
         self.default_mesh = RectangleMesh(17*nx, ny, 1.5*self.basin_x, 1200.0)
+        self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
+        super(BalzanoOptions, self).__init__(**kwargs)
+        self.plot_pvd = True        
+                
         self.num_hours = 24
 
         # Physical
@@ -68,14 +70,8 @@ class BalzanoOptions(ShallowWaterOptions):
         # Goal-Oriented
         self.qoi_mode = 'inundation_volume'
 
-        P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
-        V = VectorFunctionSpace(self.default_mesh, "CG", 2)*P1DG  # FIXME
 
-        # Outputs
-        self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
-        self.eta_tilde = Function(P1DG, name='Modified elevation')
-        self.set_initial_condition(V)
-        self.get_initial_depth(V)
+        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)
 
         # Timeseries
         self.wd_obs = []
@@ -109,7 +105,7 @@ class BalzanoOptions(ShallowWaterOptions):
             self.manning_drag_coefficient = Constant(self.friction_coeff or 0.02)
         return self.manning_drag_coefficient
 
-    def set_bathymetry(self, fs):
+    def set_bathymetry(self, fs, **kwargs):
         max_depth = 5.0
         x, y = SpatialCoordinate(fs.mesh())
         self.bathymetry = Function(fs, name="Bathymetry")
@@ -120,6 +116,9 @@ class BalzanoOptions(ShallowWaterOptions):
         self.viscosity = Function(fs)
         self.viscosity.assign(self.base_viscosity)
         return self.viscosity
+
+    def set_coriolis(self, fs):
+        return
 
     def set_boundary_conditions(self, fs):
         if not hasattr(self, 'elev_in'):
@@ -167,6 +166,7 @@ class BalzanoOptions(ShallowWaterOptions):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
 
         def update_forcings(t):
+            self.source = Function(self.P1DG).project(self.source)
             self.update_boundary_conditions(t=t)
 
             # Update bathymetry and friction

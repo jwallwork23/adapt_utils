@@ -457,13 +457,13 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
         self.op.set_boundary_surface()
-        self.source = self.op.set_source_tracer(self.P1DG)
+        self.fields['source'] = self.op.set_source_tracer(self.P1DG)
 
 
-        if prob.source is not None:
-            self.source = self.project(prob.source, Function(self.P1DG))
-        else:
-            self.source = None
+        #if self.fields['source'] is not None:
+        #    self.source = self.project(self.source, Function(self.P1DG))
+        #else:
+        #    self.source = None
 
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
@@ -531,7 +531,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.solve_tracer = op.solve_tracer
         if op.solve_tracer:
             #options.tracer_advective_velocity = op.conv_vel
-            options.tracer_source_2d = op.source
+            options.tracer_source_2d = self.fields['source']
         
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)

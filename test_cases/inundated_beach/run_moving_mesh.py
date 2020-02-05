@@ -13,16 +13,9 @@ op = BalzanoOptions(approach='monge_ampere',
                     qoi_mode='inundation_volume',
                     n=2,
                     r_adapt_rtol=1.0e-3)
-<<<<<<< HEAD
 
-#op.default_mesh = RectangleMesh(17, 2, 1.5*op.basin_x, 1200.0)
-
-swp = UnsteadyShallowWaterProblem(op, levels=0)
-swp.setup_solver()
-=======
 tp = TsunamiProblem(op, levels=0)
 tp.setup_solver()
->>>>>>> upstream/master
 
 
 def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this projection is expensive!
@@ -35,8 +28,8 @@ def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this pro
     :kwarg beta: controls the level of refinement in this region.
     """
     P1 = FunctionSpace(mesh, "CG", 1)
-    eta = swp.solution.split()[1]
-    b = swp.fields['bathymetry']
+    eta = tp.solution.split()[1]
+    b = tp.fields['bathymetry']
     current_mesh = eta.function_space().mesh()
     P1_current = FunctionSpace(current_mesh, "CG", 1)
     diff = interpolate(eta + b, P1_current)

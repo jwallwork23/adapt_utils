@@ -53,10 +53,6 @@ class ShallowWaterOptions(Options):
     
     def set_source_tracer(self, fs):
         """Should be implemented in derived class."""
-        if source is not None:
-            self.source = Function(fs).project(source)
-        else:
-            self.source = source
         return self.source
 
     def set_diffusivity(self, fs):
