@@ -37,7 +37,7 @@ class Options(FrozenConfigurable):
 
     # Outputs
     debug = Bool(False, help="Toggle debugging mode for more verbose screen output.").tag(config=True)
-    plot_pvd = Bool(False, help="Toggle plotting of fields.").tag(config=True)
+    plot_pvd = Bool(True, help="Toggle plotting of fields.").tag(config=True)
     save_hdf5 = Bool(False, help="Toggle saving fields to HDF5.").tag(config=True)
 
     # Adaptation

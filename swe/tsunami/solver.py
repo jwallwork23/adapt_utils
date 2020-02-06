@@ -27,8 +27,8 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         op = self.op
 
         # Don't bother plotting velocity
-        self.solver_obj.options.fields_to_export = ['elev_2d'] if op.plot_pvd else []
-        self.solver_obj.options.fields_to_export_hdf5 = ['elev_2d'] if op.save_hdf5 else []
+        #self.solver_obj.options.fields_to_export = ['elev_2d'] if op.plot_pvd else []
+        #self.solver_obj.options.fields_to_export_hdf5 = ['elev_2d'] if op.save_hdf5 else []
 
         # Set callbacks to save gauge timeseries to HDF5
         self.callbacks = {}

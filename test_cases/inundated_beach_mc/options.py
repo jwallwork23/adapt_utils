@@ -27,6 +27,7 @@ class BalzanoOptions(TsunamiOptions):
 
         self.default_mesh = RectangleMesh(17*nx, ny, 1.5*self.basin_x, 1200.0)
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
+        self.V = FunctionSpace(self.default_mesh, "CG", 1)
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True        
                 
@@ -35,6 +36,7 @@ class BalzanoOptions(TsunamiOptions):
         # Physical
         self.base_viscosity = 1e-6
         self.base_diffusivity = 0.15
+        self.tracer_init_value = Constant(1e-5)
         
         self.solve_tracer = True
         self.wetting_and_drying = True
@@ -46,6 +48,8 @@ class BalzanoOptions(TsunamiOptions):
         self.friction = friction
         self.average_size = 200e-6  # Average sediment size
         self.friction_coeff = 0.025
+
+        self.set_up_suspended()
 
         # Stabilisation
         self.stabilisation = 'no'
@@ -87,7 +91,7 @@ class BalzanoOptions(TsunamiOptions):
         return self.quadratic_drag_coefficient
 
     def set_source_tracer(self, fs):
-        self.source = Function(fs).interpolate(Constant(1.0))
+        self.source = Function(fs).project(self.testtracer + Constant(0.0001)))
         return self.source
 
     def get_cfactor(self):
@@ -141,7 +145,7 @@ class BalzanoOptions(TsunamiOptions):
         bottom_wall_tag = 3
         top_wall_tag = 4
         boundary_conditions = {}
-        boundary_conditions[inflow_tag] = {'value': Constant(1e-05)}
+        boundary_conditions[inflow_tag] = {'value': self.tracer_init_value}
         return boundary_conditions
 
     def update_boundary_conditions(self, t=0.0):
@@ -157,7 +161,7 @@ class BalzanoOptions(TsunamiOptions):
         u, eta = self.initial_value.split()
         u.interpolate(as_vector([1.0e-7, 0.0]))
         eta.assign(0.0)
-        self.tracer_init_value = Function(eta.function_space(), name="Tracer Initial condition").project(Constant(1e-05))
+        self.tracer_init = Function(eta.function_space(), name="Tracer Initial condition").project(self.tracer_init_value)
         
         return self.initial_value#, self.tracer_init_value
 
@@ -166,7 +170,12 @@ class BalzanoOptions(TsunamiOptions):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
 
         def update_forcings(t):
-            self.source = Function(self.P1DG).project(self.source)
+            
+            self.old_bathymetry_2d = project(solver_obj.fields.bathymetry_2d, solver_obj.fields.bathymetry_2d.function_space())
+
+            self.bathymetry.project(self.old_bathymetry_2d+(solver_obj.fields.tracer_2d))            
+            
+            #self.source.project(self.source*self.test_mc)
             self.update_boundary_conditions(t=t)
 
             # Update bathymetry and friction
@@ -273,6 +282,11 @@ class BalzanoOptions(TsunamiOptions):
         plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
         plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
+        
+    def set_up_suspended(self):
+        self.testracer = Function(self.P1DG).project(self.tracer_init_value)
+        self.source = self.set_source_tracer()
+        
 
 def heaviside_approx(H, alpha):
     return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5

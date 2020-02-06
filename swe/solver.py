@@ -460,11 +460,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields['source'] = self.op.set_source_tracer(self.P1DG)
 
 
-        #if self.fields['source'] is not None:
-        #    self.source = self.project(self.source, Function(self.P1DG))
-        #else:
-        #    self.source = None
-
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
         if self.stabilisation in ('no', 'lax_friedrichs'):
@@ -550,8 +545,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             
         if op.solve_tracer:
             
-            if self.op.tracer_init_value is not None:
-                self.solver_obj.assign_initial_conditions(uv = u_interp, elev = eta_interp, tracer = self.op.tracer_init_value)
+            if self.op.tracer_init is not None:
+                self.solver_obj.assign_initial_conditions(uv = u_interp, elev = eta_interp, tracer = self.op.tracer_init)
         else:
             self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
         
