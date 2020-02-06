@@ -30,6 +30,7 @@ class Options(FrozenConfigurable):
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.").tag(config=True)
     stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0), help="Scalar stabilisation parameter.").tag(config=True)
+    sipg_parameter = FiredrakeScalarExpression(None, allow_none=True, help="Value for parameter used in symmetric interior penalty method. Chosen automatically if set to None.").tag(config=True)
 
     # Solver parameters
     params = PETScSolverParameters({}).tag(config=True)
