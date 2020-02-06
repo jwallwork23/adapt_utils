@@ -28,6 +28,7 @@ class BalzanoOptions(TsunamiOptions):
         self.default_mesh = RectangleMesh(17*nx, ny, 1.5*self.basin_x, 1200.0)
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
         self.V = FunctionSpace(self.default_mesh, "CG", 1)
+        self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True        
                 
@@ -37,6 +38,8 @@ class BalzanoOptions(TsunamiOptions):
         self.base_viscosity = 1e-6
         self.base_diffusivity = 0.15
         self.tracer_init_value = Constant(1e-5)
+        self.gravity = Constant(9.81)
+        self.porosity = Constant(0.4)
         
         self.solve_tracer = True
         self.wetting_and_drying = True
@@ -161,6 +164,9 @@ class BalzanoOptions(TsunamiOptions):
         u, eta = self.initial_value.split()
         u.interpolate(as_vector([1.0e-7, 0.0]))
         eta.assign(0.0)
+        self.u_cg = Function(self.vector_cg).project(u)
+        self.horizontal_velocity = Function(self.V).project(self.u_cg[0])
+        self.vertical_velocity = Function(self.V).project(self.u_cg[1])
         self.tracer_init = Function(eta.function_space(), name="Tracer Initial condition").project(self.tracer_init_value)
         
         return self.initial_value#, self.tracer_init_value
@@ -284,6 +290,31 @@ class BalzanoOptions(TsunamiOptions):
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
         
     def set_up_suspended(self):
+        
+        R = Constant(2650/1000 - 1)
+        self.dstar = Constant(self.average_size*((self.g*R)/(self.base_viscosity**2))**(1/3))
+        if max(self.dstar.dat.data[:] < 1):
+            print('ERROR: dstar value less than 1')
+        elif max(self.dstar.dat.data[:] < 4):
+            self.thetacr = Constant(0.24*(self.dstar**(-1)))
+        elif max(self.dstar.dat.data[:] < 10):
+            self.thetacr = Constant(0.14*(self.dstar**(-0.64)))
+        elif max(self.dstar.dat.data[:] < 20):
+            self.thetacr = Constant(0.04*(self.dstar**(-0.1)))
+        elif max(self.dstar.dat.data[:] < 150):
+            self.thetacr = Constant(0.013*(self.dstar**(0.29)))        
+        else:
+            self.thetacr = Constant(0.055)
+            
+        self.taucr = Constant((2650-1000)*self.gravity*self.average_size*self.thetacr)
+        
+        if self.average_size <= 100*(10**(-6)):
+            self.settling_velocity = Constant(9.81*(self.average_size**2)*((2650/1000)-1)/(18*self.base_viscosity))
+        elif self.average_size <= 1000*(10**(-6)):
+            self.settling_velocity = Constant((10*self.base_viscosity/self.average_size)*(sqrt(1 + 0.01*((((2650/1000) - 1)*9.81*(self.average_size**3))/(self.base_viscosity**2)))-1))
+        else:
+            self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
+        
         self.testracer = Function(self.P1DG).project(self.tracer_init_value)
         self.source = self.set_source_tracer()
         
