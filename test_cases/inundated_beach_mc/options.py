@@ -191,7 +191,7 @@ class BalzanoOptions(TsunamiOptions):
 
             self.bathymetry.project(self.old_bathymetry_2d+(solver_obj.fields.tracer_2d))       """     
             
-            self.update_forcings()
+            #self.update_forcings()
             
             #self.source.project(self.source*self.test_mc)
             self.update_boundary_conditions(t=t)
