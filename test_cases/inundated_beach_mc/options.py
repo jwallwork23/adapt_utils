@@ -29,7 +29,7 @@ class BalzanoOptions(TsunamiOptions):
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
         self.V = FunctionSpace(self.default_mesh, "CG", 1)
         self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
-        self.vector_P1DG = VectorFunctionSpace(self.default_mesh, "DG", 1)
+        
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True        
                 
@@ -53,9 +53,12 @@ class BalzanoOptions(TsunamiOptions):
         self.average_size = 200e-6  # Average sediment size
         self.friction_coeff = 0.025
 
-        tmp = self.set_initial_conditions(self.vector_P1DG)
         self.set_up_suspended()
 
+        # Initial
+        self.uv_init = as_vector([1.0e-7, 0.0])
+        self.eta_init = Constant(0.0)
+        
         # Stabilisation
         self.stabilisation = 'no'
 
@@ -164,11 +167,8 @@ class BalzanoOptions(TsunamiOptions):
         """
         self.initial_value = Function(fs, name="Initial condition")
         u, eta = self.initial_value.split()
-        u.interpolate(as_vector([1.0e-7, 0.0]))
-        eta.assign(0.0)
-        self.u_cg = Function(self.vector_cg).project(u)
-        self.horizontal_velocity = Function(self.V).project(self.u_cg[0])
-        self.vertical_velocity = Function(self.V).project(self.u_cg[1])
+        u.interpolate(self.uv_init)
+        eta.assign(self.eta_init)
         self.tracer_init = Function(eta.function_space(), name="Tracer Initial condition").project(self.tracer_init_value)
         
         return self.initial_value#, self.tracer_init_value
@@ -316,7 +316,11 @@ class BalzanoOptions(TsunamiOptions):
             self.settling_velocity = Constant((10*self.base_viscosity/self.average_size)*(sqrt(1 + 0.01*((((2650/1000) - 1)*9.81*(self.average_size**3))/(self.base_viscosity**2)))-1))
         else:
             self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
-        
+
+        self.u_cg = Function(self.vector_cg).project(self.uv_init)
+        self.horizontal_velocity = Function(self.V).project(self.u_cg[0])
+        self.vertical_velocity = Function(self.V).project(self.u_cg[1])
+            
         self.unorm = Function(self.P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
         
         self.qfc = self.get_cfactor(self.P1DG)
