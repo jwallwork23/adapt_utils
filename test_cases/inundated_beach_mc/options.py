@@ -196,11 +196,11 @@ class BalzanoOptions(TsunamiOptions):
                 self.depth.project(eta + self.bathymetry)
                 
             self.update_boundary_conditions(t=t)
-            self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
+            self.qfc.interpolate(self.get_cfactor())
             
             # calculate skin friction coefficient
-            hclip.interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
-            cfactor.interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*hclip/self.ksp))**(-2)), Constant(0.0)))
+            self.hclip.interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
+            self.cfactor.interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*self.hclip/self.ksp))**(-2)), Constant(0.0)))
 
         return update_forcings
 
@@ -335,7 +335,7 @@ class BalzanoOptions(TsunamiOptions):
     
         self.unorm = Function(self.P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
 
-        self.qfc = self.get_cfactor()
+        self.qfc = Function(self.P1DG).project(self.get_cfactor())
         self.TOB = Function(self.V).project(1000*0.5*self.qfc*self.unorm)
         
         
@@ -350,7 +350,7 @@ class BalzanoOptions(TsunamiOptions):
         self.B = Function(self.P1DG).interpolate(conditional(self.a > self.depth, 1, self.a/self.depth))
         self.ustar = Function(self.P1DG).interpolate(sqrt(0.5*self.qfc*self.unorm))
         self.exp1 = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
-        coefftest = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), B*(1-B**self.exp1)/self.exp1, -B*ln(B)))
+        self.coefftest = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), self.B*(1-self.B**self.exp1)/self.exp1, -self.B*ln(self.B)))
         self.coeff = Function(self.P1DG).interpolate(conditional(self.coefftest>0, 1/self.coefftest, 0))
         
         
