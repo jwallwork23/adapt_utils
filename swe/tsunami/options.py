@@ -176,14 +176,18 @@ class TsunamiOptions(ShallowWaterOptions):
         fig = plt.figure(figsize=[6.4, 4.8])
         ax = fig.add_subplot(111)
 
+        # Plot measurements
         print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
         N = int(self.end_time/self.dt/self.dt_per_export)
         if 'data' in self.gauges[gauge]:
             y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
-            t = np.linspace(0, float(len(y_data)-1), len(y_data))  # TODO: Read from 'time' in HDF5 file
-            ax.plot(t, y_data, label='Data', linestyle='solid')
+        else:
+            y_data = np.array([])
+        t = np.linspace(0, float(len(y_data)-1), len(y_data))  # TODO: Read from 'time' in HDF5 file
+        ax.plot(t, y_data, label='Data', linestyle='solid')
 
-            # Dictionary for norms and errors of timeseries
+        # Dictionary for norms and errors of timeseries
+        if 'data' in self.gauges[gauge]:
             errors = {'tv': {'data': total_variation(y_data), 'name': 'total variation'}}
             if plot_lp:
                 errors['l1'] = {'data': lp_norm(y_data, p=1), 'name': '$\ell_1$ error'}
