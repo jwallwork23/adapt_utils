@@ -184,8 +184,8 @@ class BalzanoOptions(TsunamiOptions):
     def get_update_forcings(self, solver_obj):
 
         def update_forcings(t):
-            uv1, eta = solver_obj.fields.solution_2d.spit()
-            uv_cg.project(uv1)
+            uv1, eta = solver_obj.fields.solution_2d.split()
+            self.u_cg.project(uv1)
             elev_cg.project(eta)
             bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
             
@@ -330,7 +330,9 @@ class BalzanoOptions(TsunamiOptions):
         self.u_cg = Function(self.vector_cg).project(self.uv_init)
         self.horizontal_velocity = Function(self.V).project(self.u_cg[0])
         self.vertical_velocity = Function(self.V).project(self.u_cg[1])
-            
+        elev_cg = Function(self.V).project(self.eta_init)
+
+    
         self.unorm = Function(self.P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
 
         self.qfc = self.get_cfactor()
@@ -360,7 +362,7 @@ class BalzanoOptions(TsunamiOptions):
         self.source = self.set_source_tracer(self.P1DG, solver_obj = None, init = True)   
         qbsourcedepth = Function(self.V).project(self.source * self.depth)
         
-    def update_suspended(self):
+    #def update_suspended(self):
 
 
 def heaviside_approx(H, alpha):
