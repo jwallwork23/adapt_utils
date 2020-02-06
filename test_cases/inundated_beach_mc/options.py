@@ -360,7 +360,7 @@ class BalzanoOptions(TsunamiOptions):
         self.source = self.set_source_tracer(self.P1DG, solver_obj = None, init = True)   
         qbsourcedepth = Function(self.V).project(self.source * self.depth)
         
-    def update_suspended(self):
+    #def update_suspended(self):
 
 
 def heaviside_approx(H, alpha):
