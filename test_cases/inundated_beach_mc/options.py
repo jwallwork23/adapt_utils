@@ -53,16 +53,12 @@ class BalzanoOptions(TsunamiOptions):
         self.average_size = 200e-6  # Average sediment size
         self.friction_coeff = 0.025
 
-<<<<<<< HEAD
-        tmp = self.set_initial_condition(self.vector_P1DG)
-
-=======
->>>>>>> 712ddbd1537a9391b6b4f6056477bb7b96d8cc4c
-        self.set_up_suspended()
 
         # Initial
         self.uv_init = as_vector([1.0e-7, 0.0])
         self.eta_init = Constant(0.0)
+
+        self.set_up_suspended()
         
         # Stabilisation
         self.stabilisation = 'no'
@@ -328,7 +324,7 @@ class BalzanoOptions(TsunamiOptions):
             
         self.unorm = Function(self.P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
 
-        self.qfc = self.get_cfactor(self.P1DG)
+        self.qfc = self.get_cfactor()
         self.TOB = Function(self.V).project(1000*0.5*self.qfc*self.unorm)
         
         self.testtracer = Function(self.P1DG).project(self.tracer_init_value)
