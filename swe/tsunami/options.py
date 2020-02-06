@@ -164,7 +164,7 @@ class TsunamiOptions(ShallowWaterOptions):
         return export_func
 
     # TODO: Plot multiple mesh approaches
-    def plot_timeseries(self, gauge, extension=None, plot_lp=False):
+    def plot_timeseries(self, gauge, extension=None, plot_lp=False, cutoff=25):
         """
         Plot timeseries for `gauge` under all stored mesh resolutions.
         """
@@ -178,9 +178,9 @@ class TsunamiOptions(ShallowWaterOptions):
 
         print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
         N = int(self.end_time/self.dt/self.dt_per_export)
-        t = np.linspace(0, self.end_time/60.0, N+1)  # TODO: Read from 'time' in HDF5 file
         if 'data' in self.gauges[gauge]:
             y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
+            t = np.linspace(0, float(len(y_data)-1), len(y_data))  # TODO: Read from 'time' in HDF5 file
             ax.plot(t, y_data, label='Data', linestyle='solid')
 
             # Dictionary for norms and errors of timeseries
@@ -202,9 +202,12 @@ class TsunamiOptions(ShallowWaterOptions):
         # Loop over all available mesh resolutions
         for res in resolutions:
             f = h5py.File(os.path.join(self.di, 'diagnostic_gauges_{:d}.hdf5'.format(res)), 'r')
-            y = f[gauge][()].reshape(N+1,)
+            y = f[gauge][()]
+            y = y.reshape(len(y),)[:cutoff+1]
             y -= y[0]
             y = np.round(y, 2)  # Ensure consistent precision  # TODO: Update according to above
+            t = f["time"][()]
+            t = t.reshape(len(t),)[:cutoff+1]/60.0
 
             # Plot timeseries for current mesh resolution
             label = ' '.join([approach.replace('_', ' '), "({:d} cells)".format(res)]).title()
@@ -213,7 +216,8 @@ class TsunamiOptions(ShallowWaterOptions):
 
             # Compute absolute and relative errors
             if 'data' in self.gauges[gauge]:
-                error = np.array(y) - np.array(y_data)
+                y_cutoff = np.array(y[:len(y_data)])
+                error = y_cutoff - np.array(y_data)
                 if plot_lp:
                     for p in ('l1', 'l2', 'linf'):
                         errors[p]['abs'].append(lp_norm(error, p=p))
@@ -222,6 +226,7 @@ class TsunamiOptions(ShallowWaterOptions):
                     errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
         plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.ylabel("Free surface displacement $[\mathrm m]$")
+        plt.xlim([0, cutoff])
         plt.ylim([-2, 5])
         plt.grid(True)
         ax.legend()

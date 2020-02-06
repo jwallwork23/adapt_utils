@@ -34,6 +34,7 @@ class TohokuOptions(TsunamiOptions):
         self.dt_per_export = 12
         self.dt_per_remesh = 12
         self.end_time = 1500.0
+        # self.end_time = 3600.0
 
         # Gauge locations
         self.gauges["P02"] = {"lonlat": (142.5016, 38.5002),
