@@ -166,12 +166,16 @@ class TsunamiOptions(ShallowWaterOptions):
             self.set_initial_condition(fs)
         eta = self.initial_value.split()[1]
         if self.wetting_and_drying:
-            bathymetry_displacement = shallowwater_eq.ShallowWaterTerm.wd_bathymetry_displacement(eta)
+            bathymetry_displacement = self.wd_dispacement_mc(eta)
             self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta, eta.function_space())
         else:
             self.depth = interpolate(self.bathymetry + eta, eta.function_space())
         return self.depth        
 
+    def wd_dispacement_mc(self, eta):
+        H = self.bathymetry + eta
+        return 0.5 * (sqrt(H ** 2 + self.wetting_and_drying_alpha ** 2) - H)        
+    
     def get_export_func(self, solver_obj):
         def export_func():
             self.get_eta_tilde(solver_obj)
