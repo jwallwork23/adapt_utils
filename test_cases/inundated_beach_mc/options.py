@@ -29,6 +29,7 @@ class BalzanoOptions(TsunamiOptions):
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
         self.V = FunctionSpace(self.default_mesh, "CG", 1)
         self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
+        self.vector_P1DG = VectorFunctionSpace(self.default_mesh, "DG", 1)
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True        
                 
@@ -52,7 +53,8 @@ class BalzanoOptions(TsunamiOptions):
         self.average_size = 200e-6  # Average sediment size
         self.friction_coeff = 0.025
 
-        tmp = self.set_initial_condition(self.P1DG)
+        tmp = self.set_initial_condition(self.vector_P1DG)
+
         self.set_up_suspended()
 
         # Stabilisation
