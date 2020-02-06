@@ -100,7 +100,7 @@ class BalzanoOptions(TsunamiOptions):
         return self.quadratic_drag_coefficient
 
     def set_source_tracer(self, fs):
-        self.source = Function(fs).project(self.testtracer + Constant(0.0001))
+        self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.testtracer/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
         return self.source
 
     def get_cfactor(self):
@@ -327,14 +327,12 @@ class BalzanoOptions(TsunamiOptions):
         self.qfc = self.get_cfactor()
         self.TOB = Function(self.V).project(1000*0.5*self.qfc*self.unorm)
         
-        self.testtracer = Function(self.P1DG).project(self.tracer_init_value)
-        #self.source = self.set_source_tracer(self.P1DG)
         
         # skin friction coefficient
         hclip = Function(P1_2d).interpolate(conditional(self.ksp > self.depth, ksp, self.depth))
         cfactor = Function(P1_2d).interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*hclip/self.ksp))**(-2)), Constant(0.0)))
         # mu - ratio between skin friction and normal friction
-        mu = Function(P1_2d).interpolate(conditional(self.qfc > 0, cfactor/self.qfc, 0))
+        self.mu = Function(P1_2d).interpolate(conditional(self.qfc > 0, cfactor/self.qfc, 0))
         
         
         a = (self.ks)/2
@@ -342,12 +340,16 @@ class BalzanoOptions(TsunamiOptions):
         ustar = Function(self.P1DG).interpolate(sqrt(0.5*self.qfc*self.unorm))
         exp1 = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
         coefftest = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), B*(1-B**exp1)/exp1, -B*ln(B)))
-        coeff = Function(self.P1DG).interpolate(conditional(coefftest>0, 1/coefftest, 0))
+        self.coeff = Function(self.P1DG).interpolate(conditional(coefftest>0, 1/coefftest, 0))
         
         
         # erosion flux - for vanrijn
         s0 = Function(self.P1DG).interpolate((conditional(1000*0.5*self.qfc*self.unorm*mu > 0, 1000*0.5*self.qfc*self.unorm*mu, 0) - self.taucr)/self.taucr)
-        ceq = Function(self.P1DG).interpolate(0.015*(self.average_size/a) * ((conditional(s0 < 0, 0, s0))**(1.5))/(self.dstar**0.3))
+        self.ceq = Function(self.P1DG).interpolate(0.015*(self.average_size/a) * ((conditional(s0 < 0, 0, s0))**(1.5))/(self.dstar**0.3))
+        
+        self.testtracer = Function(self.P1DG).project(self.tracer_init_value)
+        self.source = self.set_source_tracer(self.P1DG)   
+        qbsourcedepth = Function(self.V).project(self.source * self.depth)
 
 def heaviside_approx(H, alpha):
     return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5
