@@ -94,7 +94,7 @@ class BalzanoOptions(TsunamiOptions):
         return self.quadratic_drag_coefficient
 
     def set_source_tracer(self, fs):
-        self.source = Function(fs).project(self.testtracer + Constant(0.0001)))
+        self.source = Function(fs).project(self.testtracer + Constant(0.0001))
         return self.source
 
     def get_cfactor(self):
@@ -315,8 +315,8 @@ class BalzanoOptions(TsunamiOptions):
         else:
             self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
         
-        self.testracer = Function(self.P1DG).project(self.tracer_init_value)
-        self.source = self.set_source_tracer()
+        self.testtracer = Function(self.P1DG).project(self.tracer_init_value)
+        self.source = self.set_source_tracer(self.P1DG)
         
 
 def heaviside_approx(H, alpha):
