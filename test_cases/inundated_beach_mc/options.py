@@ -41,7 +41,8 @@ class BalzanoOptions(TsunamiOptions):
         self.tracer_init_value = Constant(1e-5)
         self.gravity = Constant(9.81)
         self.porosity = Constant(0.4)
-        
+        self.ks = 0.025
+
         self.solve_tracer = True
         self.wetting_and_drying = True
         self.wetting_and_drying_alpha = Constant(0.43)
@@ -108,9 +109,9 @@ class BalzanoOptions(TsunamiOptions):
             assert hasattr(self, 'depth')
         except AssertionError:
             raise ValueError("Depth is undefined.")
-        ksp = Constant(3*self.average_size)
+        self.ksp = Constant(3*self.average_size)
         hc = conditional(self.depth > 0.001, self.depth, 0.001)
-        aux = max_value(11.036*hc/ksp, 1.001)
+        aux = max_value(11.036*hc/self.ksp, 1.001)
         return 2*(0.4**2)/(ln(aux)**2)
 
     def set_manning_drag_coefficient(self, fs):
@@ -329,22 +330,22 @@ class BalzanoOptions(TsunamiOptions):
         
         
         # skin friction coefficient
-        hclip = Function(P1_2d).interpolate(conditional(self.ksp > self.depth, ksp, self.depth))
-        cfactor = Function(P1_2d).interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*hclip/self.ksp))**(-2)), Constant(0.0)))
+        hclip = Function(self.P1DG).interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
+        cfactor = Function(self.P1DG).interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*hclip/self.ksp))**(-2)), Constant(0.0)))
         # mu - ratio between skin friction and normal friction
-        self.mu = Function(P1_2d).interpolate(conditional(self.qfc > 0, cfactor/self.qfc, 0))
+        self.mu = Function(self.P1DG).interpolate(conditional(self.qfc > 0, cfactor/self.qfc, 0))
         
         
         a = (self.ks)/2
-        B = Function(self.P1DG).interpolate(conditional(self.a > self.depth, 1, self.a/self.depth))
+        B = Function(self.P1DG).interpolate(conditional(a > self.depth, 1, a/self.depth))
         ustar = Function(self.P1DG).interpolate(sqrt(0.5*self.qfc*self.unorm))
-        exp1 = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
-        coefftest = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), B*(1-B**exp1)/exp1, -B*ln(B)))
+        exp1 = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*ustar)) - 1 > 0, (self.settling_velocity/(0.4*ustar)) -1, -(self.settling_velocity/(0.4*ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*ustar))-1), 0))
+        coefftest = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*ustar)) - 1 > 0, (self.settling_velocity/(0.4*ustar)) -1, -(self.settling_velocity/(0.4*ustar)) + 1)) > 10**(-4), B*(1-B**exp1)/exp1, -B*ln(B)))
         self.coeff = Function(self.P1DG).interpolate(conditional(coefftest>0, 1/coefftest, 0))
         
         
         # erosion flux - for vanrijn
-        s0 = Function(self.P1DG).interpolate((conditional(1000*0.5*self.qfc*self.unorm*mu > 0, 1000*0.5*self.qfc*self.unorm*mu, 0) - self.taucr)/self.taucr)
+        s0 = Function(self.P1DG).interpolate((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
         self.ceq = Function(self.P1DG).interpolate(0.015*(self.average_size/a) * ((conditional(s0 < 0, 0, s0))**(1.5))/(self.dstar**0.3))
         
         self.testtracer = Function(self.P1DG).project(self.tracer_init_value)
