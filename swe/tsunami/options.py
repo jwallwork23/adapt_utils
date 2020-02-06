@@ -27,8 +27,10 @@ class TsunamiOptions(ShallowWaterOptions):
     """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
-    def __init__(self, utm=True, n=30, **kwargs):
+    def __init__(self, mesh=None, utm=True, n=30, **kwargs):
         self.utm = utm
+        if mesh is not None:
+            self.default_mesh = mesh
         super(TsunamiOptions, self).__init__(**kwargs)
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False

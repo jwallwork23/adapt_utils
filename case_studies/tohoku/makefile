@@ -24,3 +24,11 @@ fixed_mesh:
 	@echo "Solving Tohoku tsunami problem on a fixed mesh..."
 	@python3 run_fixed_mesh.py
 	@echo "Done!"
+
+clean:
+	@echo "Cleaning directory..."
+	@rm -rf outputs/*.pvd
+	@rm -rf outputs/*.vtu
+	@rm -rf outputs/fixed_mesh/*.pvd
+	@rm -rf outputs/fixed_mesh/*.vtu
+	@echo "Done!"

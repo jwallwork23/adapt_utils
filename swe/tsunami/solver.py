@@ -11,6 +11,10 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
     """
     For general tsunami propagation problems.
     """
+    def __init__(self, *args, **kwargs)
+        self.ext = kwargs.pop('ext')
+        super(TsunamiProblem, self).__init__(*args, **kwargs)
+
     def set_fields(self, adapted=False):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
@@ -33,7 +37,10 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         self.callbacks = {}
         locs = [op.gauges[g]["coords"] for g in op.gauges]
         names = list(op.gauges.keys())
-        fname = "gauges_{:d}".format(self.num_cells[-1])
+        fname = "gauges"
+        if self.extension is not None:
+            fname = '_'.join([fname, ext])
+        fname = '_'.join([fname, str(self.num_cells[-1])])
         for g in op.gauges:
             self.callbacks[g] = callback.DetectorsCallback(self.solver_obj, locs, ['elev_2d'],
                                                            fname, names)
