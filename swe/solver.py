@@ -457,7 +457,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
         self.op.set_boundary_surface()
-        self.fields['source'] = self.source#op.set_source_tracer(self.P1DG, self.solver_obj)
+        self.fields['source'] = self.op.source#op.set_source_tracer(self.P1DG, self.solver_obj)
 
 
     def set_stabilisation(self):

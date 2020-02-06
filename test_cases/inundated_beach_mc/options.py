@@ -182,25 +182,25 @@ class BalzanoOptions(TsunamiOptions):
         return self.initial_value#, self.tracer_init_value
 
     def get_update_forcings(self, solver_obj):
-        eta = solver_obj.fields.elev_2d
-        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
 
         def update_forcings(t):
-            """
-            self.old_bathymetry_2d = project(solver_obj.fields.bathymetry_2d, solver_obj.fields.bathymetry_2d.function_space())
-
-            self.bathymetry.project(self.old_bathymetry_2d+(solver_obj.fields.tracer_2d))       """     
+            uv1, eta = solver_obj.fields.solution_2d.spit()
+            uv_cg.project(uv1)
+            elev_cg.project(eta)
+            bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
             
-            self.update_forcings()
-            
-            #self.source.project(self.source*self.test_mc)
+            # Update depth
+            if self.wetting_and_drying:
+                self.depth.project(eta + bathymetry_displacement(eta) + self.bathymetry)
+            else:
+                self.depth.project(eta + self.bathymetry)
+                
             self.update_boundary_conditions(t=t)
-
-            # Update bathymetry and friction
-            if self.friction == 'nikuradse':
-                if self.wetting_and_drying:
-                    self.depth.project(eta + bathymetry_displacement(eta) + self.bathymetry)
-                self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
+            self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
+            
+            # calculate skin friction coefficient
+            hclip.interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
+            cfactor.interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*hclip/self.ksp))**(-2)), Constant(0.0)))
 
         return update_forcings
 
@@ -360,8 +360,8 @@ class BalzanoOptions(TsunamiOptions):
         self.source = self.set_source_tracer(self.P1DG, solver_obj = None, init = True)   
         qbsourcedepth = Function(self.V).project(self.source * self.depth)
         
-    #def update_suspended(self):
-        
+    def update_suspended(self):
+
 
 def heaviside_approx(H, alpha):
     return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5
