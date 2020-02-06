@@ -52,7 +52,7 @@ class BalzanoOptions(TsunamiOptions):
         self.average_size = 200e-6  # Average sediment size
         self.friction_coeff = 0.025
 
-        tmp = self.set_initial_conditions()
+        tmp = self.set_initial_condition(self.P1DG)
         self.set_up_suspended()
 
         # Stabilisation
