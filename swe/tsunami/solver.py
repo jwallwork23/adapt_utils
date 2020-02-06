@@ -19,7 +19,7 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
-        self.fields['source'] = self.op.set_source_tracer(self.P1DG)
+        self.fields['source'] = self.op.set_source_tracer(self.P1DG, self.solver_obj)
         
         # self.op.set_boundary_surface()
 
