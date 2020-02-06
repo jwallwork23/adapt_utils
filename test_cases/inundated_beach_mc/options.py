@@ -100,8 +100,14 @@ class BalzanoOptions(TsunamiOptions):
             self.quadratic_drag_coefficient = interpolate(self.get_cfactor(), fs)
         return self.quadratic_drag_coefficient
 
-    def set_source_tracer(self, fs):
-        self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.testtracer/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+    def set_source_tracer(self, fs, init = False):
+        self.coeff = Function(self.depth.function_space()).project(self.coeff)
+        self.ceq = Function(self.depth.function_space()).project(self.ceq)
+        if init:
+            self.testtracer = Function(self.depth.function_space()).project(self.testtracer)
+            self.source = Function(self.depth.function_space()).project(-(self.settling_velocity*self.coeff*self.testtracer/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+        else:
+            self.source = Function(self.depth.function_space()).project(-(self.settling_velocity*self.coeff*self.solver_obj.fields.tracer_2d/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
         return self.source
 
     def get_cfactor(self):
@@ -351,10 +357,10 @@ class BalzanoOptions(TsunamiOptions):
         self.ceq = Function(self.P1DG).interpolate(0.015*(self.average_size/a) * ((conditional(s0 < 0, 0, s0))**(1.5))/(self.dstar**0.3))
         
         self.testtracer = Function(self.P1DG).project(self.tracer_init_value)
-        self.source = self.set_source_tracer(self.P1DG)   
+        self.source = self.set_source_tracer(self.P1DG, init = True)   
         qbsourcedepth = Function(self.V).project(self.source * self.depth)
         
-    def update_suspended(self):
+    #def update_suspended(self):
         
 
 def heaviside_approx(H, alpha):
