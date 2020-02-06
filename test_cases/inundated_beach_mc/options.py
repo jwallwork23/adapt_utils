@@ -58,6 +58,8 @@ class BalzanoOptions(TsunamiOptions):
         self.uv_init = as_vector([1.0e-7, 0.0])
         self.eta_init = Constant(0.0)
 
+        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
+        
         self.set_up_suspended()
         
         # Stabilisation
@@ -83,8 +85,6 @@ class BalzanoOptions(TsunamiOptions):
         # Goal-Oriented
         self.qoi_mode = 'inundation_volume'
 
-
-        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)
 
         # Timeseries
         self.wd_obs = []
