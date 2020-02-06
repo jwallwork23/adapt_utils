@@ -93,7 +93,7 @@ class TsunamiOptions(ShallowWaterOptions):
             self.default_mesh = fs.mesh()
         P1 = FunctionSpace(self.default_mesh, "CG", 1)
         self.bathymetry = Function(P1, name="Bathymetry")
-        if adapted:
+        if adapted or not hasattr(self, 'lonlat_mesh'):
             self.get_lonlat_mesh()
 
         # Interpolate bathymetry data *in lonlat space*
@@ -207,7 +207,11 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Loop over all available mesh resolutions
         for res in resolutions:
-            f = h5py.File(os.path.join(self.di, 'diagnostic_gauges_{:d}.hdf5'.format(res)), 'r')
+            fname = os.path.join(self.di, 'diagnostic_gauges')
+            if extension is not None:
+                fname = '_'.join([fname, extension])
+            fname = '_'.join(['{:d}.hdf5'.format(res))])
+            f = h5py.File(fname, 'r')
             y = f[gauge][()]
             y = y.reshape(len(y),)[:cutoff+1]
             y -= y[0]

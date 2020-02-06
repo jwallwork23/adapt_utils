@@ -735,6 +735,7 @@ class SteadyProblem():
             else:
                 raise ValueError
             self.monitor_function = monitor
+            self.op.num_adapt = 1
         elif approach == 'isotropic':
             if self.op.adapt_field in self.fields:
                 f = self.fields[self.op.adapt_field]
