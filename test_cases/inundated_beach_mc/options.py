@@ -180,10 +180,12 @@ class BalzanoOptions(TsunamiOptions):
         bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
 
         def update_forcings(t):
-            
+            """
             self.old_bathymetry_2d = project(solver_obj.fields.bathymetry_2d, solver_obj.fields.bathymetry_2d.function_space())
 
-            self.bathymetry.project(self.old_bathymetry_2d+(solver_obj.fields.tracer_2d))            
+            self.bathymetry.project(self.old_bathymetry_2d+(solver_obj.fields.tracer_2d))       """     
+            
+            self.update_forcings()
             
             #self.source.project(self.source*self.test_mc)
             self.update_boundary_conditions(t=t)
@@ -351,6 +353,9 @@ class BalzanoOptions(TsunamiOptions):
         self.testtracer = Function(self.P1DG).project(self.tracer_init_value)
         self.source = self.set_source_tracer(self.P1DG)   
         qbsourcedepth = Function(self.V).project(self.source * self.depth)
+        
+    def update_suspended(self):
+        
 
 def heaviside_approx(H, alpha):
     return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5
