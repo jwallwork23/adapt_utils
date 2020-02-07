@@ -32,6 +32,7 @@ class TsunamiOptions(ShallowWaterOptions):
         if mesh is not None:
             self.default_mesh = mesh
         super(TsunamiOptions, self).__init__(**kwargs)
+        
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False
 
@@ -161,7 +162,9 @@ class TsunamiOptions(ShallowWaterOptions):
         
     def get_initial_depth(self, fs):
         """Compute the initial total water depth, using the bathymetry and initial elevation."""
-        if not hasattr(self, 'bathymetry'):
+        print("check")
+        import ipdb; ipdb.set_trace()
+        if self.bathymetry is None:
             self.set_bathymetry(fs.sub(1))
         if not hasattr(self, 'initial_value'):
             self.set_initial_condition(fs)
@@ -171,12 +174,12 @@ class TsunamiOptions(ShallowWaterOptions):
             self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta, eta.function_space())
         else:
             self.depth = interpolate(self.bathymetry + eta, eta.function_space())
-        return self.depth        
+        return self.depth
 
     def wd_dispacement_mc(self, eta):
         H = self.bathymetry + eta
-        return 0.5 * (sqrt(H ** 2 + self.wetting_and_drying_alpha ** 2) - H)        
-    
+        return 0.5 * (sqrt(H ** 2 + self.wetting_and_drying_alpha ** 2) - H)
+
     def get_export_func(self, solver_obj):
         def export_func():
             self.get_eta_tilde(solver_obj)

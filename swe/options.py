@@ -14,7 +14,7 @@ class ShallowWaterOptions(Options):
     solve_tracer = Bool(False).tag(config=True)
 
     # Physical
-    bathymetry = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
+    bathymetry = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)#FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
     base_viscosity = NonNegativeFloat(0.0).tag(config=True)
     base_diffusivity = NonNegativeFloat(0.0).tag(config=True)
     viscosity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
@@ -79,7 +79,7 @@ class ShallowWaterOptions(Options):
 
     def get_initial_depth(self, fs):
         """Compute the initial total water depth, using the bathymetry and initial elevation."""
-        if not hasattr(self, 'bathymetry'):
+        if self.bathymetry is None:
             self.set_bathymetry(fs.sub(1))
         if not hasattr(self, 'initial_value'):
             self.set_initial_condition(fs)

@@ -15,6 +15,7 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         self.extension = extension
         super(TsunamiProblem, self).__init__(*args, **kwargs)
 
+
     def set_fields(self, adapted=False):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)

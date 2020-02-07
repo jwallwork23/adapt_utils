@@ -75,7 +75,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
-        # options.timestepper_options.implicitness_theta = 1.0
+        if op.timestepper == 'CrankNicolson':
+            options.timestepper_options.implicitness_theta = op.implicitness_theta
 
         # Outputs
         options.output_directory = self.di
@@ -497,7 +498,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
-        # options.timestepper_options.implicitness_theta = 1.0
+        if op.timestepper == 'CrankNicolson':
+            options.timestepper_options.implicitness_theta = op.implicitness_theta
 
         # Outputs
         options.output_directory = self.di
@@ -527,7 +529,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.solve_tracer:
             #options.tracer_advective_velocity = op.conv_vel
             options.tracer_source_2d = self.fields['source']
-        
+
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
         if op.solve_tracer:
