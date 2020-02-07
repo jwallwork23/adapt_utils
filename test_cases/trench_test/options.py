@@ -124,8 +124,8 @@ class TrenchOptions(TrenchHydroOptions):
         """
         self.initial_value = Function(fs, name="Initial condition")
         u, eta = self.initial_value.split()
-        u.interpolate(self.uv_init)
-        eta.assign(self.eta_init)
+        u.project(self.uv_init)
+        eta.project(self.eta_init)
         self.tracer_init = Function(eta.function_space(), name="Tracer Initial condition").project(self.tracer_init_value)
         
         return self.initial_value#, self.tracer_init_value
