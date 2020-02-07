@@ -210,7 +210,7 @@ class TsunamiOptions(ShallowWaterOptions):
             fname = os.path.join(self.di, 'diagnostic_gauges')
             if extension is not None:
                 fname = '_'.join([fname, extension])
-            fname = '_'.join(['{:d}.hdf5'.format(res))])
+            fname = '_'.join(['{:d}.hdf5'.format(res)])
             f = h5py.File(fname, 'r')
             y = f[gauge][()]
             y = y.reshape(len(y),)[:cutoff+1]

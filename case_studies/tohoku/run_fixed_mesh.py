@@ -5,39 +5,42 @@ from adapt_utils.swe.tsunami.solver import TsunamiProblem
 
 import argparse
 
-parser = argparse.ArgumentParser()
-parser.add_argument("-num_initial_adapt")
-parser.add_argument("-n")
-parser.add_argument("-end_time")
-parser.add_argument("-adapt_field")
-parser.add_argument("-approach")
-parser.add_argument("-target")
-parser.add_argument("-alpha")
-parser.add_argument("-beta")
-parser.add_argument("-debug")
+parser = argparse.ArgumentParser(prog="run_fixed_mesh")
+parser.add_argument("-num_initial_adapt", type=int, help="Number of initial adaptation steps")
+parser.add_argument("-n", type=int, help="Initial uniform mesh resolution")
+parser.add_argument("-end_time", help="End time of simulation")
+parser.add_argument("-adapt_field", help="Field to adapt w.r.t. Choose multiple seperated by '__'")
+parser.add_argument("-approach", help="Mesh adaptation approach. Choose multiple seperated by '__'")
+parser.add_argument("-target", help="Target mesh complexity/error for metric based methods")
+parser.add_argument("-alpha", type=float,
+                    help="Tuning parameter for monitor functions related to magnitude")
+parser.add_argument("-beta", type=float,
+                    help="Tuning parameter for monitor functions related to scale")
+parser.add_argument("-debug", help="Print all debugging statements")
 args = parser.parse_args()
 
-n = int(args.n or 40)
-num_adapt = int(args.num_initial_adapt or 0)
+# Read parameters
+n = args.n or 40
+num_adapt = args.num_initial_adapt or 0
 offset = 0  # TODO: Use offset
-alpha = float(args.alpha or 0.001)
-beta = float(args.beta or 0.005)
-
+alpha = args.alpha or 0.001
+beta = args.beta or 0.005
+adapt_fields = (args.adapt_field or 'bathymetry').split('__')
+approaches = (args.approach or 'fixed_mesh').split('__')
+if len(adapt_fields) < len(approaches):
+    adapt_fields = [adapt_fields[0] for approach in approaches]
+elif len(adapt_fields) > len(approaches):
+    approaches = [approach[0] for field in adapt_fields]
 
 # Adapt mesh in lonlat space
 ext = None
-adapt_field = args.adapt_field or 'bathymetry'
-adapt_fields = adapt_field.split('__')
-approach = args.approach or 'fixed_mesh'
-approaches = approach.split('__')
-R = zip(approaches, [adapt_fields[0] for f in approaches]) if len(adapt_fields) < len(approaches) else zip(approaches, adapt_fields)
 if num_adapt > 0:
-    ext = "{:s}_{:d}".format(adapt_field, num_adapt)  # FIXME
+    ext = "{:s}_{:d}".format('_'.join(adapt_fields), num_adapt)  # FIXME
     op_init = TohokuOptions(utm=False, n=n, offset=offset, nonlinear_method='quasi_newton',
                             h_max=1.0e+10, target=float(args.target or 1.0e+4),
                             debug=bool(args.debug or False), r_adapt_rtol=1.0e-2)
-    for approach, field in R:
-        op_init.adapt_field=field
+    for approach, adapt_field in zip(approaches, adapt_fields):
+        op_init.adapt_field = adapt_field
         if not hasattr(op_init, 'lonlat_mesh'):
             op_init.get_lonlat_mesh()
         swp_init = TsunamiProblem(op_init, levels=0)
