@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.test_cases.trench_teest.hydro_options import TrenchHydroOptions
+from adapt_utils.test_cases.trench_test.hydro_options import TrenchHydroOptions
 
 import numpy as np
 import matplotlib.pyplot as plt

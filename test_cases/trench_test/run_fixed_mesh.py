@@ -11,8 +11,6 @@ op = TrenchHydroOptions(debug=False,
 tp = TsunamiProblem(op, levels=0)
 tp.solve(uses_adjoint=False)
 
-import ipdb; ipdb.set_trace()
-
 uv, elev = tp.solution.split()
 
 export_final_state("hydrodynamics_trench", uv, elev)
