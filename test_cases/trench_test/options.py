@@ -162,18 +162,20 @@ class TrenchOptions(TrenchHydroOptions):
         """
         Initialise simulation with results from a previous simulation
         """
+        DG_2d = FunctionSpace(self.default_mesh, 'DG', 1)
+        V = VectorFunctionSpace(self.default_mesh, 'DG', 1)        
 
         # elevation
         with timed_stage('initialising elevation'):
             chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(self.P1DG, name="elevation")
+            elev_init = Function(DG_2d, name="elevation")
             chk.load(elev_init)
             File(outputdir + "/elevation_imported.pvd").write(elev_init)
             chk.close()
         # velocity
         with timed_stage('initialising velocity'):
             chk = DumbCheckpoint(inputdir + "/velocity" , mode=FILE_READ)
-            uv_init = Function(self.vector_dg, name="velocity")
+            uv_init = Function(V, name="velocity")
             chk.load(uv_init)
             File(outputdir + "/velocity_imported.pvd").write(uv_init)
             chk.close()
