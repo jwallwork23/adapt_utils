@@ -164,6 +164,7 @@ class BalzanoOptions(TracerOptions):
         top_wall_tag = 4
         boundary_conditions = {}
         boundary_conditions[inflow_tag] = {'value': self.tracer_init_value}
+        print(self.tracer_init_value.dat.data[:])
         return boundary_conditions
 
     def update_boundary_conditions(self, t=0.0):

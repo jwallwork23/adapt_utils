@@ -39,3 +39,5 @@ def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this pro
 
 tp.monitor_function = wet_dry_interface_monitor
 tp.solve(uses_adjoint=False)
+
+import ipdb; ipdb.set_trace()
