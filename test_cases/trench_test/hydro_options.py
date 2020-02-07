@@ -74,9 +74,9 @@ class TrenchHydroOptions(TracerOptions):
 
         # Timeseries
         self.wd_obs = []
-        self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
-        tol = 1e-8  # FIXME: Point evaluation hack
-        self.xrange = np.linspace(tol, 16-tol, 20)
+        #self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
+        #tol = 1e-8  # FIXME: Point evaluation hack
+        #self.xrange = np.linspace(tol, 16-tol, 20)
         self.qois = []    
 
     def set_quadratic_drag_coefficient(self, fs):
@@ -91,9 +91,9 @@ class TrenchHydroOptions(TracerOptions):
             raise ValueError("Depth is undefined.")
         
         self.ksp = Constant(3*self.average_size)
-        hclip = Function(self.P1DG).interpolate(conditional(ksp > self.depth, ksp, depth))
+        hclip = Function(self.P1DG).interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
         aux = 11.036*hclip/self.ksp
-        return conditional(depth>ksp, 2*(0.4**2)/(ln(aux)**2), 0.0)
+        return conditional(self.depth>self.ksp, 2*(0.4**2)/(ln(aux)**2), 0.0)
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
@@ -168,9 +168,10 @@ class TrenchHydroOptions(TracerOptions):
         return None
 
     def set_qoi_kernel(self, solver_obj):
-        J = self.evaluate_qoi_form(solver_obj)
-        eta = solver_obj.fields.solution_2d.split()[1]
-        dJdeta = derivative(J, eta, TestFunction(eta.function_space()))  # TODO: test
+        #J = self.evaluate_qoi_form(solver_obj)
+        #eta = solver_obj.fields.solution_2d.split()[1]
+        #dJdeta = derivative(J, eta, TestFunction(eta.function_space()))  # TODO: test
+        return None
 
     def evaluate_qoi_form(self, solver_obj):
         try:

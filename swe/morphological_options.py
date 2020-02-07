@@ -11,7 +11,6 @@ class TracerOptions(TsunamiOptions):
     """
     
     def __init__(self, **kwargs):
-        import ipdb; ipdb.set_trace()
         super(TracerOptions, self).__init__(**kwargs)    
     
     def set_up_suspended(self):
