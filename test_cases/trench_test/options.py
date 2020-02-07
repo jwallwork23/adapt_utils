@@ -30,11 +30,11 @@ class TrenchOptions(TrenchHydroOptions):
         self.di = "morph_output"
                 
         self.num_hours = 5
-        import ipdb; ipdb.set_trace()
+
         # Physical
         self.base_diffusivity = 0.15
-        
-        
+
+
         self.porosity = Constant(0.4)
         self.ks = 0.025
 
@@ -44,13 +44,13 @@ class TrenchOptions(TrenchHydroOptions):
             assert friction in ('nikuradse', 'manning')
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
-                
+        self.friction = friction 
         self.morfac = 100
 
 
         # Initial
         input_dir = 'hydrodynamics_trench'
-        self.eta_init, self.uv_init = initialise_fields(self.default_mesh, input_dir, self.di)        
+        self.eta_init, self.uv_init = self.initialise_fields(input_dir, self.di)        
 
         self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
         
@@ -158,23 +158,22 @@ class TrenchOptions(TrenchHydroOptions):
 
         return update_forcings
 
-    def initialise_fields(mesh2d, inputdir, outputdir,):
+    def initialise_fields(self, inputdir, outputdir):
         """
         Initialise simulation with results from a previous simulation
         """
-        DG_2d = FunctionSpace(mesh2d, 'DG', 1)
+
         # elevation
         with timed_stage('initialising elevation'):
             chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(DG_2d, name="elevation")
+            elev_init = Function(self.P1DG, name="elevation")
             chk.load(elev_init)
             File(outputdir + "/elevation_imported.pvd").write(elev_init)
             chk.close()
         # velocity
         with timed_stage('initialising velocity'):
             chk = DumbCheckpoint(inputdir + "/velocity" , mode=FILE_READ)
-            V = VectorFunctionSpace(mesh2d, 'DG', 1)
-            uv_init = Function(V, name="velocity")
+            uv_init = Function(self.vector_dg, name="velocity")
             chk.load(uv_init)
             File(outputdir + "/velocity_imported.pvd").write(uv_init)
             chk.close()

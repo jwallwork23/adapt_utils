@@ -48,7 +48,7 @@ class TracerOptions(TsunamiOptions):
         self.unorm = Function(self.P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
 
         self.hc = Function(self.P1DG).project(conditional(self.depth > 0.001, self.depth, 0.001))
-        self.aux = Function(self.P1DG).project(conditional(11.036*hc/self.ks > 1.001, 11.036*hc/self.ks, 1.001))
+        self.aux = Function(self.P1DG).project(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
         self.qfc = Function(self.P1DG).project(2/(ln(self.aux)/0.4)**2)
         
         self.TOB = Function(self.V).project(1000*0.5*self.qfc*self.unorm)

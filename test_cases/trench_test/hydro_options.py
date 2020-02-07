@@ -30,6 +30,7 @@ class TrenchHydroOptions(TracerOptions):
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
         self.V = FunctionSpace(self.default_mesh, "CG", 1)
         self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
+        self.vector_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
         
         super(TrenchHydroOptions, self).__init__(**kwargs)
         self.plot_pvd = True  
