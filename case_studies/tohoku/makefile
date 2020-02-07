@@ -31,4 +31,8 @@ clean:
 	@rm -rf outputs/*.vtu
 	@rm -rf outputs/fixed_mesh/*.pvd
 	@rm -rf outputs/fixed_mesh/*.vtu
+	@rm -rf outputs/fixed_mesh/Elevation2d/*.pvd
+	@rm -rf outputs/fixed_mesh/Elevation2d/*.vtu
+	@rm -rf outputs/fixed_mesh/Velocity2d/*.pvd
+	@rm -rf outputs/fixed_mesh/Velocity2d/*.vtu
 	@echo "Done!"
