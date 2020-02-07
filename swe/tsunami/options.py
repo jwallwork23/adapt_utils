@@ -162,8 +162,7 @@ class TsunamiOptions(ShallowWaterOptions):
         
     def get_initial_depth(self, fs):
         """Compute the initial total water depth, using the bathymetry and initial elevation."""
-        print("check")
-        import ipdb; ipdb.set_trace()
+
         if self.bathymetry is None:
             self.set_bathymetry(fs.sub(1))
         if not hasattr(self, 'initial_value'):
