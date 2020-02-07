@@ -30,7 +30,7 @@ class TrenchOptions(TrenchHydroOptions):
         self.di = "morph_output"
                 
         self.num_hours = 5
-
+        import ipdb; ipdb.set_trace()
         # Physical
         self.base_diffusivity = 0.15
         self.tracer_init_value = Constant(1e-5)
@@ -65,7 +65,7 @@ class TrenchOptions(TrenchHydroOptions):
         #self.dt_per_export = self.end_time/100
         #self.dt_per_remesh = self.end_time/100
         self.timestepper = 'CrankNicolson'
-        #self.implicitness_theta = 1.0
+        self.implicitness_theta = 1.0
 
         # Adaptivity
         self.h_min = 1e-8
@@ -126,6 +126,7 @@ class TrenchOptions(TrenchHydroOptions):
         u, eta = self.initial_value.split()
         u.interpolate(self.uv_init)
         eta.assign(self.eta_init)
+        import ipdb; ipdb.set_trace()
         self.tracer_init = Function(eta.function_space(), name="Tracer Initial condition").project(self.tracer_init_value)
         
         return self.initial_value#, self.tracer_init_value
