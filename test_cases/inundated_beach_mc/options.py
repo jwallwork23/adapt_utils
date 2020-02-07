@@ -384,7 +384,7 @@ class BalzanoOptions(TsunamiOptions):
         self.s0.assign((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
         self.ceq.assign(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         
-        self.source.project(set_source_tracer(self.eta.function_space()))
+        self.source.project(self.set_source_tracer(self.eta.function_space()))
         
 
 def heaviside_approx(H, alpha):
