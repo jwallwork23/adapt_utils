@@ -32,7 +32,8 @@ class TrenchHydroOptions(TracerOptions):
         self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
         
         super(TrenchHydroOptions, self).__init__(**kwargs)
-        self.plot_pvd = True        
+        self.plot_pvd = True  
+        self.di = "hydro_output"
 
         # Physical
         self.base_viscosity = 1e-6

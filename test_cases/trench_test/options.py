@@ -26,7 +26,8 @@ class TrenchOptions(TrenchHydroOptions):
         
         
         super(TrenchOptions, self).__init__(**kwargs)
-        self.plot_pvd = True        
+        self.plot_pvd = True
+        self.di = "morph_output"
                 
         self.num_hours = 5
 
@@ -48,8 +49,8 @@ class TrenchOptions(TrenchHydroOptions):
 
 
         # Initial
-        self.uv_init = as_vector([0.51, 0.0])
-        self.eta_init = Constant(0.4)
+        input_dir = 'hydrodynamics_trench'
+        self.eta_init, self.uv_init = initialise_fields(self.default_mesh, input_dir, self.di)        
 
         self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
         
@@ -157,5 +158,24 @@ class TrenchOptions(TrenchHydroOptions):
 
         return update_forcings
 
-                
-
+    def initialise_fields(mesh2d, inputdir, outputdir,):
+        """
+        Initialise simulation with results from a previous simulation
+        """
+        DG_2d = FunctionSpace(mesh2d, 'DG', 1)
+        # elevation
+        with timed_stage('initialising elevation'):
+            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
+            elev_init = Function(DG_2d, name="elevation")
+            chk.load(elev_init)
+            File(outputdir + "/elevation_imported.pvd").write(elev_init)
+            chk.close()
+        # velocity
+        with timed_stage('initialising velocity'):
+            chk = DumbCheckpoint(inputdir + "/velocity" , mode=FILE_READ)
+            V = VectorFunctionSpace(mesh2d, 'DG', 1)
+            uv_init = Function(V, name="velocity")
+            chk.load(uv_init)
+            File(outputdir + "/velocity_imported.pvd").write(uv_init)
+            chk.close()
+        return  elev_init, uv_init,
