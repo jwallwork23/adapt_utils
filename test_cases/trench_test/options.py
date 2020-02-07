@@ -145,7 +145,7 @@ class TrenchOptions(TrenchHydroOptions):
                 self.depth.project(self.eta + self.bathymetry)
             
             self.hc.interpolate(conditional(self.depth > 0.001, self.depth, 0.001))
-            self.aux.interpolate(conditional(11.036*hc/self.ks > 1.001, 11.036*hc/self.ks, 1.001))
+            self.aux.interpolate(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
             self.qfc.interpolate(2/(ln(self.aux)/0.4)**2)
     
             # calculate skin friction coefficient
