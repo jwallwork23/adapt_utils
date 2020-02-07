@@ -3,11 +3,14 @@ from thetis.configuration import *
 
 from adapt_utils.swe.tsunami.options import TsunamiOptions, heaviside_approx
 
+import os
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib import rc
 
-rc('text', usetex=True)
+
+matplotlib.rc('text', usetex=True)
+matplotlib.rc('font', family='serif')
 
 
 __all__ = ["BalzanoOptions"]
@@ -21,7 +24,7 @@ class BalzanoOptions(TsunamiOptions):
         shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
     """
 
-    def __init__(self, friction='manning', plot_timeseries=False, n=1, **kwargs):
+    def __init__(self, friction='manning', plot_timeseries=False, n=1, bathymetry_type=1, **kwargs):
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
 
@@ -30,6 +33,14 @@ class BalzanoOptions(TsunamiOptions):
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True
         self.num_hours = 24
+
+        # Three possible bathymetries
+        try:
+            assert bathymetry_type in (1, 2, 3)
+        except AssertionError:
+            raise ValueError("`bathymetry_type` should be chosen from (1, 2, 3).")
+        self.bathymetry_type = bathymetry_type
+        self.di = os.path.join(self.di, 'bathymetry{:d}'.format(self.bathymetry_type))
 
         # Physical
         self.base_viscosity = 1e-6
@@ -76,6 +87,9 @@ class BalzanoOptions(TsunamiOptions):
         tol = 1e-8  # FIXME: Point evaluation hack
         self.xrange = np.linspace(tol, 1.5*self.basin_x-tol, 20)
 
+        # Outputs  (NOTE: self.di has changed)
+        self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
+
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
             self.quadratic_drag_coefficient = interpolate(self.get_cfactor(), fs)
@@ -100,7 +114,25 @@ class BalzanoOptions(TsunamiOptions):
         max_depth = 5.0
         x, y = SpatialCoordinate(fs.mesh())
         self.bathymetry = Function(fs, name="Bathymetry")
-        self.bathymetry.interpolate((1.0 - x/self.basin_x)*max_depth)
+        L = self.basin_x
+        ξ = lambda X: L - X  # Coordinate transformation
+        b1 = ξ(x)/L*max_depth
+        if self.bathymetry_type == 1:
+            self.bathymetry.interpolate(b1)
+        elif self.bathymetry_type == 2:
+            self.bathymetry.interpolate(
+                conditional(le(abs(ξ(x) - 4000.0), 1000.0),
+                            conditional(ge(ξ(x), 4000.0),
+                                        (3000.0 + 2*(ξ(x) - 4000.0))/L*max_depth,
+                                        3000.0/L*max_depth),
+                            b1))
+        else:
+            self.bathymetry.interpolate(
+                conditional(le(abs(ξ(x) - 4000.0), 1000.0),
+                            conditional(ge(ξ(x), 4000.0),
+                                        (2000.0 + 3*(ξ(x) - 4000.0))/L*max_depth,
+                                        (3000.0 - (ξ(x) - 3000.0))/L*max_depth),
+                            b1))
         return self.bathymetry
 
     def set_viscosity(self, fs):

@@ -94,7 +94,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
-        options.use_automatic_sipg_parameter = True
+        options.use_automatic_sipg_parameter = op.sipg_parameter is None
         options.use_wetting_and_drying = op.wetting_and_drying
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
         options.solve_tracer = op.solve_tracer
@@ -520,7 +520,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
-        options.use_automatic_sipg_parameter = True
+        options.use_automatic_sipg_parameter = op.sipg_parameter is None
         options.use_wetting_and_drying = op.wetting_and_drying
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
         options.solve_tracer = op.solve_tracer

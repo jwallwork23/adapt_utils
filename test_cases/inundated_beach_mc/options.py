@@ -185,16 +185,16 @@ class BalzanoOptions(TsunamiOptions):
     def get_update_forcings(self, solver_obj):
 
         def update_forcings(t):
-            uv1, eta = solver_obj.fields.solution_2d.split()
-            self.u_cg.project(uv1)
-            self.elev_cg.project(eta)
+            self.uv1, self.eta = solver_obj.fields.solution_2d.split()
+            self.u_cg.project(self.uv1)
+            self.elev_cg.project(self.eta)
             bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
             
             # Update depth
             if self.wetting_and_drying:
-                self.depth.project(eta + bathymetry_displacement(eta) + self.bathymetry)
+                self.depth.project(self.eta + bathymetry_displacement(self.eta) + self.bathymetry)
             else:
-                self.depth.project(eta + self.bathymetry)
+                self.depth.project(self.eta + self.bathymetry)
                 
             self.update_boundary_conditions(t=t)
             self.qfc.interpolate(self.get_cfactor())
@@ -203,7 +203,7 @@ class BalzanoOptions(TsunamiOptions):
             self.hclip.interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
             self.cfactor.interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*self.hclip/self.ksp))**(-2)), Constant(0.0)))
             
-            self.update_suspended()
+            self.update_suspended(solver_obj)
                         
 
         return update_forcings
@@ -366,7 +366,7 @@ class BalzanoOptions(TsunamiOptions):
         self.source = self.set_source_tracer(self.P1DG, solver_obj = None, init = True)   
         qbsourcedepth = Function(self.V).project(self.source * self.depth)
         
-    def update_suspended(self):
+    def update_suspended(self, solver_obj):
         # mu - ratio between skin friction and normal friction
         self.mu.assign(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
             
@@ -384,7 +384,7 @@ class BalzanoOptions(TsunamiOptions):
         self.s0.assign((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
         self.ceq.assign(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         
-        self.source.project(set_source_tracer(self.eta.function_space()))
+        self.source.project(self.set_source_tracer(self.eta.function_space(), solver_obj))
         
 
 def heaviside_approx(H, alpha):
