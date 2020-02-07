@@ -1,98 +1,87 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.tsunami.options import TsunamiOptions, heaviside_approx
+from adapt_utils.swe.morphological_options import TracerOptions
 
-import os
 import numpy as np
-import matplotlib
 import matplotlib.pyplot as plt
+from matplotlib import rc
+
+rc('text', usetex=True)
 
 
-matplotlib.rc('text', usetex=True)
-matplotlib.rc('font', family='serif')
+__all__ = ["TrenchHydroOptions"]
 
 
-__all__ = ["BalzanoOptions"]
-
-
-class BalzanoOptions(TsunamiOptions):
+class TrenchHydroOptions(TracerOptions):
     """
     Parameters for test case described in [1].
 
-    [1] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in
-        shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
+    [1] Clare, Mariana, et al. “Hydro-morphodynamics 2D Modelling Using a Discontinuous Galerkin Discretisation.” 
+    EarthArXiv, 9 Jan. 2020. Web.
     """
 
-    def __init__(self, friction='manning', plot_timeseries=False, n=1, bathymetry_type=1, **kwargs):
+    def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
         self.plot_timeseries = plot_timeseries
-        self.basin_x = 13800.0  # Length of wet region
+        
 
-        #self.default_mesh = RectangleMesh(17, 10, 1.5*self.basin_x, 1200.0)
-        self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
-        super(BalzanoOptions, self).__init__(**kwargs)
-        self.plot_pvd = True
-        self.num_hours = 24
-
-        # Three possible bathymetries
-        try:
-            assert bathymetry_type in (1, 2, 3)
-        except AssertionError:
-            raise ValueError("`bathymetry_type` should be chosen from (1, 2, 3).")
-        self.bathymetry_type = bathymetry_type
-        self.di = os.path.join(self.di, 'bathymetry{:d}'.format(self.bathymetry_type))
+        self.default_mesh = RectangleMesh(16*5*nx, 5*ny, 16, 1.1)
+        self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
+        self.V = FunctionSpace(self.default_mesh, "CG", 1)
+        self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
+        
+        super(TrenchHydroOptions, self).__init__(**kwargs)
+        self.plot_pvd = True        
 
         # Physical
         self.base_viscosity = 1e-6
-        self.base_diffusivity = 0.15
-        self.wetting_and_drying = True
-        self.wetting_and_drying_alpha = Constant(0.43)
+                
+        self.gravity = Constant(9.81)
+        
+        self.solve_tracer = False
+        self.wetting_and_drying = False
+        #self.wetting_and_drying_alpha = Constant(0.43)
         try:
             assert friction in ('nikuradse', 'manning')
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
-        self.average_size = 200e-6  # Average sediment size
-        self.friction_coeff = 0.025
+        self.average_size = 160e-6  # Average sediment size
+        
 
+        # Initial
+        self.uv_init = as_vector([0.51, 0.0])
+        self.eta_init = Constant(0.4)
+
+        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
+                
         # Stabilisation
-        self.stabilisation = 'no'
+        # self.stabilisation = 'no'
+        self.grad_depth_viscosity = True
 
-        # Boundary conditions
-        h_amp = 0.5  # Ocean boundary forcing amplitude
-        h_T = self.num_hours/2*3600  # Ocean boundary forcing period
-        self.elev_func = lambda t: h_amp*(-cos(2*pi*(t-(6*3600))/h_T)+1)
 
         # Time integration
-        self.dt = 600.0
-        self.end_time = self.num_hours*3600.0
-        self.dt_per_export = 6
-        self.dt_per_remesh = 6
+        self.dt = 0.25
+        self.end_time = 500
+        #self.dt_per_export = self.end_time/(40*self.dt)
+        #self.dt_per_remesh = self.end_time/(40*self.dt)
         self.timestepper = 'CrankNicolson'
-        # self.implicitness_theta = 0.5  # TODO
-
-        # Adaptivity
-        self.h_min = 1e-8
-        self.h_max = 10.
+        self.implicitness_theta = 1.0
 
         # Goal-Oriented
         self.qoi_mode = 'inundation_volume'
 
-        P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
-        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*P1DG)  # FIXME
 
         # Timeseries
         self.wd_obs = []
         self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
         tol = 1e-8  # FIXME: Point evaluation hack
-        self.xrange = np.linspace(tol, 1.5*self.basin_x-tol, 20)
-
-        # Outputs  (NOTE: self.di has changed)
-        self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
+        self.xrange = np.linspace(tol, 16-tol, 20)
+        self.qois = []    
 
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
-            self.quadratic_drag_coefficient = interpolate(self.get_cfactor(), fs)
+            self.quadratic_drag_coefficient = project(self.get_cfactor(), self.depth.function_space())
         return self.quadratic_drag_coefficient
 
     def get_cfactor(self):
@@ -100,10 +89,11 @@ class BalzanoOptions(TsunamiOptions):
             assert hasattr(self, 'depth')
         except AssertionError:
             raise ValueError("Depth is undefined.")
-        ksp = Constant(3*self.average_size)
-        hc = conditional(self.depth > 0.001, self.depth, 0.001)
-        aux = max_value(11.036*hc/ksp, 1.001)
-        return 2*(0.4**2)/(ln(aux)**2)
+        
+        self.ksp = Constant(3*self.average_size)
+        hclip = Function(self.P1DG).interpolate(conditional(ksp > self.depth, ksp, depth))
+        aux = 11.036*hclip/self.ksp
+        return conditional(depth>ksp, 2*(0.4**2)/(ln(aux)**2), 0.0)
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
@@ -111,28 +101,15 @@ class BalzanoOptions(TsunamiOptions):
         return self.manning_drag_coefficient
 
     def set_bathymetry(self, fs, **kwargs):
-        max_depth = 5.0
+        initial_depth = Constant(0.397)
+        depth_riv = Constant(initial_depth - 0.397)
+        depth_trench = Constant(depth_riv - 0.15)
+        depth_diff = depth_trench - depth_riv
         x, y = SpatialCoordinate(fs.mesh())
+        trench = conditional(le(x, 5), depth_riv, conditional(le(x,6.5), (1/1.5)*depth_diff*(x-6.5) + depth_trench,\
+                conditional(le(x, 9.5), depth_trench, conditional(le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
         self.bathymetry = Function(fs, name="Bathymetry")
-        L = self.basin_x
-        ξ = lambda X: L - X  # Coordinate transformation
-        b1 = ξ(x)/L*max_depth
-        if self.bathymetry_type == 1:
-            self.bathymetry.interpolate(b1)
-        elif self.bathymetry_type == 2:
-            self.bathymetry.interpolate(
-                conditional(le(abs(ξ(x) - 4000.0), 1000.0),
-                            conditional(ge(ξ(x), 4000.0),
-                                        (3000.0 + 2*(ξ(x) - 4000.0))/L*max_depth,
-                                        3000.0/L*max_depth),
-                            b1))
-        else:
-            self.bathymetry.interpolate(
-                conditional(le(abs(ξ(x) - 4000.0), 1000.0),
-                            conditional(ge(ξ(x), 4000.0),
-                                        (2000.0 + 3*(ξ(x) - 4000.0))/L*max_depth,
-                                        (3000.0 - (ξ(x) - 3000.0))/L*max_depth),
-                            b1))
+        self.bathymetry.interpolate(-trench)
         return self.bathymetry
 
     def set_viscosity(self, fs):
@@ -144,60 +121,51 @@ class BalzanoOptions(TsunamiOptions):
         return
 
     def set_boundary_conditions(self, fs):
-        if not hasattr(self, 'elev_in'):
-            self.set_boundary_surface()
-        self.elev_in.assign(self.elev_func(0.0))
         inflow_tag = 1
         outflow_tag = 2
         bottom_wall_tag = 3
         top_wall_tag = 4
         boundary_conditions = {}
-        boundary_conditions[inflow_tag] = {'elev': self.elev_in}
-        boundary_conditions[outflow_tag] = {'un': Constant(0.0)}
-        boundary_conditions[bottom_wall_tag] = {'un': Constant(0.0)}
-        boundary_conditions[top_wall_tag] = {'un': Constant(0.0)}
+        boundary_conditions[inflow_tag] = {'flux': Constant(-0.22)}
+        boundary_conditions[outflow_tag] = {'elev': Constant(0.397)}
         return boundary_conditions
 
     def update_boundary_conditions(self, t=0.0):
-        self.elev_in.assign(self.elev_func(t) if 6*3600 <= t <= 18*3600 else 0.0)
+        return None
 
     def set_initial_condition(self, fs):
+        """
+        Set initial elevation and velocity using asymptotic solution.
+
+        :arg fs: `FunctionSpace` in which the initial condition should live.
+        """
         self.initial_value = Function(fs, name="Initial condition")
         u, eta = self.initial_value.split()
-        u.interpolate(as_vector([1.0e-7, 0.0]))
-        eta.assign(0.0)
+        u.interpolate(self.uv_init)
+        eta.assign(self.eta_init)
+        
         return self.initial_value
 
     def get_update_forcings(self, solver_obj):
-        eta = solver_obj.fields.elev_2d
-        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
 
         def update_forcings(t):
-            self.update_boundary_conditions(t=t)
-
-            # Update bathymetry and friction
-            if self.friction == 'nikuradse':
-                if self.wetting_and_drying:
-                    self.depth.project(eta + bathymetry_displacement(eta) + self.bathymetry)
-                self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
+            self.uv1, self.eta = solver_obj.fields.solution_2d.split()
+            
+            # Update depth
+            if self.wetting_and_drying:
+                bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+                self.depth.project(self.eta + bathymetry_displacement(self.eta) + self.bathymetry)
+            else:
+                self.depth.project(self.eta + self.bathymetry)
+                
+            self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
+            
+                        
 
         return update_forcings
 
     def get_export_func(self, solver_obj):
-        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-        eta = solver_obj.fields.elev_2d
-        b = solver_obj.fields.bathymetry_2d
-        def export_func():
-            self.eta_tilde.project(eta + bathymetry_displacement(eta))
-            self.eta_tilde_file.write(self.eta_tilde)
-
-            if self.plot_timeseries:
-
-                # Store modified bathymetry timeseries
-                P1DG = solver_obj.function_spaces.P1DG_2d
-                wd = project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
-                self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
-        return export_func
+        return None
 
     def set_qoi_kernel(self, solver_obj):
         J = self.evaluate_qoi_form(solver_obj)
@@ -275,6 +243,3 @@ class BalzanoOptions(TsunamiOptions):
         plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
         plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
-
-def heaviside_approx(H, alpha):
-    return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5

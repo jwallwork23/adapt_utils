@@ -106,7 +106,7 @@ class AdaptiveMesh():
 
         if ax is None:
             fig = plt.figure()
-            ax = plt.gca()
+            ax = fig.add_subplot(111)
         cax = plot(self.scaled_jacobian, vmin=-0.5, vmax=1, cmap=newcmap, axes=ax)
         ax.set_title("Scaled Jacobian")
         plot(self.mesh, axes=ax)

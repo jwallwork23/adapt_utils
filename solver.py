@@ -719,10 +719,9 @@ class SteadyProblem():
         :kwarg num_adapt: number of mesh adaptation steps.
         :kwargs alpha, beta: tuning parameters for Monge-Ampere monitor function.
         """
-        field = self.op.adapt_field
-        self.op.adapt_field = adapt_field or 'bathymetry'
+        self.op.adapt_field = adapt_field or self.op.adapt_field
         num_adapt = num_adapt or self.op.num_adapt
-        if approach == 'monge_ampere':
+        if approach == 'monge_ampere':  # FIXME: Need adjust scaling (h_max) for realistic problems
             if self.op.adapt_field in self.fields:
                 def monitor(mesh):
                     P1 = FunctionSpace(mesh, "CG", 1)
@@ -740,6 +739,7 @@ class SteadyProblem():
             else:
                 raise ValueError
             self.monitor_function = monitor
+            self.op.num_adapt = 1
         elif approach == 'isotropic':
             if self.op.adapt_field in self.fields:
                 f = self.fields[self.op.adapt_field]
@@ -752,7 +752,7 @@ class SteadyProblem():
             if approach != 'isotropic':
                 self.indicate_error(approach=approach)
             self.adapt_mesh(approach=approach)
-        self.op.adapt_field = field
+        File(os.path.join(self.di, 'mesh_debug.pvd')).write(self.mesh.coordinates)  # TODO: temp
 
     def adaptation_loop(self, outer_iteration=None):
         """

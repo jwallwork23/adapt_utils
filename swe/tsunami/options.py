@@ -27,9 +27,12 @@ class TsunamiOptions(ShallowWaterOptions):
     """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
-    def __init__(self, utm=True, n=30, **kwargs):
+    def __init__(self, mesh=None, utm=True, n=30, **kwargs):
         self.utm = utm
+        if mesh is not None:
+            self.default_mesh = mesh
         super(TsunamiOptions, self).__init__(**kwargs)
+        
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False
 
@@ -56,8 +59,7 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Wetting and drying
         self.wetting_and_drying = True
-        # self.wetting_and_drying_alpha = Constant(0.43)
-        self.wetting_and_drying_alpha = Constant(1.5)
+        self.wetting_and_drying_alpha = Constant(0.43)
 
         # Timestepping
         self.timestepper = 'CrankNicolson'
@@ -92,7 +94,7 @@ class TsunamiOptions(ShallowWaterOptions):
             self.default_mesh = fs.mesh()
         P1 = FunctionSpace(self.default_mesh, "CG", 1)
         self.bathymetry = Function(P1, name="Bathymetry")
-        if adapted:
+        if adapted or not hasattr(self, 'lonlat_mesh'):
             self.get_lonlat_mesh()
 
         # Interpolate bathymetry data *in lonlat space*
@@ -160,7 +162,9 @@ class TsunamiOptions(ShallowWaterOptions):
         
     def get_initial_depth(self, fs):
         """Compute the initial total water depth, using the bathymetry and initial elevation."""
-        if not hasattr(self, 'bathymetry'):
+        print("check")
+        import ipdb; ipdb.set_trace()
+        if self.bathymetry is None:
             self.set_bathymetry(fs.sub(1))
         if not hasattr(self, 'initial_value'):
             self.set_initial_condition(fs)
@@ -170,12 +174,12 @@ class TsunamiOptions(ShallowWaterOptions):
             self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta, eta.function_space())
         else:
             self.depth = interpolate(self.bathymetry + eta, eta.function_space())
-        return self.depth        
+        return self.depth
 
     def wd_dispacement_mc(self, eta):
         H = self.bathymetry + eta
-        return 0.5 * (sqrt(H ** 2 + self.wetting_and_drying_alpha ** 2) - H)        
-    
+        return 0.5 * (sqrt(H ** 2 + self.wetting_and_drying_alpha ** 2) - H)
+
     def get_export_func(self, solver_obj):
         def export_func():
             self.get_eta_tilde(solver_obj)
@@ -183,7 +187,7 @@ class TsunamiOptions(ShallowWaterOptions):
         return export_func
 
     # TODO: Plot multiple mesh approaches
-    def plot_timeseries(self, gauge, extension=None, plot_lp=False):
+    def plot_timeseries(self, gauge, extension=None, plot_lp=False, cutoff=25):
         """
         Plot timeseries for `gauge` under all stored mesh resolutions.
         """
@@ -192,24 +196,29 @@ class TsunamiOptions(ShallowWaterOptions):
         except AssertionError:
             raise ValueError("Gauge '{:s}' is not valid. Choose from {:}.".format(gauge, self.gauges.keys()))
 
-        fig = plt.figure()
-        ax = plt.gca()
+        fig = plt.figure(figsize=[6.4, 4.8])
+        ax = fig.add_subplot(111)
 
+        # Plot measurements
         print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
-        y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
         N = int(self.end_time/self.dt/self.dt_per_export)
-        t = np.linspace(0, self.end_time/60.0, N+1)  # TODO: Read from 'time' in HDF5 file
+        if 'data' in self.gauges[gauge]:
+            y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
+        else:
+            y_data = np.array([])
+        t = np.linspace(0, float(len(y_data)-1), len(y_data))  # TODO: Read from 'time' in HDF5 file
         ax.plot(t, y_data, label='Data', linestyle='solid')
 
         # Dictionary for norms and errors of timeseries
-        errors = {'tv': {'data': total_variation(y_data), 'name': 'total variation'}}
-        if plot_lp:
-            for p in ('l1', 'l2', 'linf'):
-                errors[p] = {'data': lp_norm(y_data, p=p),
-                             'name': '$\ell_\infty$' if p == 'linf' else '$\el{:s}$'.format(p)}
-        for key in errors:
-            errors[key]['abs'] = []
-            errors[key]['rel'] = []
+        if 'data' in self.gauges[gauge]:
+            errors = {'tv': {'data': total_variation(y_data), 'name': 'total variation'}}
+            if plot_lp:
+                errors['l1'] = {'data': lp_norm(y_data, p=1), 'name': '$\ell_1$ error'}
+                errors['l2'] = {'data': lp_norm(y_data, p=2), 'name': '$\ell_2$ error'}
+                errors['linf'] = {'data': lp_norm(y_data, p='inf'), 'name': '$\ell_\infty$ error'}
+            for key in errors:
+                errors[key]['abs'] = []
+                errors[key]['rel'] = []
 
         # Find all relevant HDF5 files and sort by ascending mesh resolution
         approach = 'uniform' if self.approach == 'fixed_mesh' else self.approach
@@ -219,10 +228,17 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Loop over all available mesh resolutions
         for res in resolutions:
-            f = h5py.File(os.path.join(self.di, 'diagnostic_gauges_{:d}.hdf5'.format(res)), 'r')
-            y = f[gauge][()].reshape(N+1,)
+            fname = os.path.join(self.di, 'diagnostic_gauges')
+            if extension is not None:
+                fname = '_'.join([fname, extension])
+            fname = '_'.join(['{:d}.hdf5'.format(res)])
+            f = h5py.File(fname, 'r')
+            y = f[gauge][()]
+            y = y.reshape(len(y),)[:cutoff+1]
             y -= y[0]
-            y = np.round(y, 2)  # Ensure consistent precision
+            y = np.round(y, 2)  # Ensure consistent precision  # TODO: Update according to above
+            t = f["time"][()]
+            t = t.reshape(len(t),)[:cutoff+1]/60.0
 
             # Plot timeseries for current mesh resolution
             label = ' '.join([approach.replace('_', ' '), "({:d} cells)".format(res)]).title()
@@ -230,17 +246,21 @@ class TsunamiOptions(ShallowWaterOptions):
             f.close()
 
             # Compute absolute and relative errors
-            error = np.array(y) - np.array(y_data)
-            if plot_lp:
-                for p in ('l1', 'l2', 'linf'):
-                    errors[p]['abs'].append(lp_norm(error, p=p))
-            errors['tv']['abs'].append(total_variation(error))
-            for key in errors:
-                errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
+            if 'data' in self.gauges[gauge]:
+                y_cutoff = np.array(y[:len(y_data)])
+                error = y_cutoff - np.array(y_data)
+                if plot_lp:
+                    for p in ('l1', 'l2', 'linf'):
+                        errors[p]['abs'].append(lp_norm(error, p=p))
+                errors['tv']['abs'].append(total_variation(error))
+                for key in errors:
+                    errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
         plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.ylabel("Free surface displacement $[\mathrm m]$")
+        plt.xlim([0, cutoff])
         plt.ylim([-2, 5])
-        plt.legend()
+        plt.grid(True)
+        ax.legend()
         fname = "gauge_timeseries_{:s}".format(gauge)
         if extension is not None:
             fname = '_'.join([fname, str(extension)])
@@ -248,12 +268,15 @@ class TsunamiOptions(ShallowWaterOptions):
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
         # Plot relative errors
+        if not 'data' in self.gauges[gauge]:
+            return
         for key in errors:
-            fig = plt.figure()
-            ax = plt.gca()
+            fig = plt.figure(figsize=[3.2, 4.8])
+            ax = fig.add_subplot(111)
             ax.semilogx(resolutions, 100.0*np.array(errors[key]['rel']), marker='o')
             plt.xlabel("Number of elements")
-            plt.ylabel(r"Relative {:s} error (\%)".format(errors[key]['name']))
+            plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
+            plt.grid(True)
             fname = "gauge_{:s}_error_{:s}".format(key, gauge)
             if extension is not None:
                 fname = '_'.join([fname, str(extension)])

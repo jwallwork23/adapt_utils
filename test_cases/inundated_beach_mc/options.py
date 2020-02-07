@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.tsunami.options import TsunamiOptions, heaviside_approx
+from adapt_utils.swe.morphological_options import TracerOptions
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,7 +13,7 @@ rc('text', usetex=True)
 __all__ = ["BalzanoOptions"]
 
 
-class BalzanoOptions(TsunamiOptions):
+class BalzanoOptions(TracerOptions):
     """
     Parameters for test case described in [1].
 
@@ -53,6 +53,7 @@ class BalzanoOptions(TsunamiOptions):
         self.friction = friction
         self.average_size = 200e-6  # Average sediment size
         self.friction_coeff = 0.025
+        self.morfac = 1
 
 
         # Initial
@@ -185,16 +186,16 @@ class BalzanoOptions(TsunamiOptions):
     def get_update_forcings(self, solver_obj):
 
         def update_forcings(t):
-            uv1, eta = solver_obj.fields.solution_2d.split()
-            self.u_cg.project(uv1)
-            self.elev_cg.project(eta)
+            self.uv1, self.eta = solver_obj.fields.solution_2d.split()
+            self.u_cg.project(self.uv1)
+            self.elev_cg.project(self.eta)
             bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
             
             # Update depth
             if self.wetting_and_drying:
-                self.depth.project(eta + bathymetry_displacement(eta) + self.bathymetry)
+                self.depth.project(self.eta + bathymetry_displacement(self.eta) + self.bathymetry)
             else:
-                self.depth.project(eta + self.bathymetry)
+                self.depth.project(self.eta + self.bathymetry)
                 
             self.update_boundary_conditions(t=t)
             self.qfc.interpolate(self.get_cfactor())
@@ -203,7 +204,7 @@ class BalzanoOptions(TsunamiOptions):
             self.hclip.interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
             self.cfactor.interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*self.hclip/self.ksp))**(-2)), Constant(0.0)))
             
-            self.update_suspended()
+            self.update_suspended(solver_obj)
                         
 
         return update_forcings
@@ -304,88 +305,7 @@ class BalzanoOptions(TsunamiOptions):
         plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
         plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
-        
-    def set_up_suspended(self):
-        
-        R = Constant(2650/1000 - 1)
-        self.dstar = Constant(self.average_size*((self.g*R)/(self.base_viscosity**2))**(1/3))
-        if max(self.dstar.dat.data[:] < 1):
-            print('ERROR: dstar value less than 1')
-        elif max(self.dstar.dat.data[:] < 4):
-            self.thetacr = Constant(0.24*(self.dstar**(-1)))
-        elif max(self.dstar.dat.data[:] < 10):
-            self.thetacr = Constant(0.14*(self.dstar**(-0.64)))
-        elif max(self.dstar.dat.data[:] < 20):
-            self.thetacr = Constant(0.04*(self.dstar**(-0.1)))
-        elif max(self.dstar.dat.data[:] < 150):
-            self.thetacr = Constant(0.013*(self.dstar**(0.29)))        
-        else:
-            self.thetacr = Constant(0.055)
-            
-        self.taucr = Constant((2650-1000)*self.gravity*self.average_size*self.thetacr)
-        
-        if self.average_size <= 100*(10**(-6)):
-            self.settling_velocity = Constant(9.81*(self.average_size**2)*((2650/1000)-1)/(18*self.base_viscosity))
-        elif self.average_size <= 1000*(10**(-6)):
-            self.settling_velocity = Constant((10*self.base_viscosity/self.average_size)*(sqrt(1 + 0.01*((((2650/1000) - 1)*9.81*(self.average_size**3))/(self.base_viscosity**2)))-1))
-        else:
-            self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
 
-        self.u_cg = Function(self.vector_cg).project(self.uv_init)
-        self.horizontal_velocity = Function(self.V).project(self.u_cg[0])
-        self.vertical_velocity = Function(self.V).project(self.u_cg[1])
-        self.elev_cg = Function(self.V).project(self.eta_init)
-
-    
-        self.unorm = Function(self.P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
-
-        self.qfc = Function(self.P1DG).project(self.get_cfactor())
-        self.TOB = Function(self.V).project(1000*0.5*self.qfc*self.unorm)
-        
-        
-        # skin friction coefficient
-        self.hclip = Function(self.P1DG).interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
-        self.cfactor = Function(self.P1DG).interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*self.hclip/self.ksp))**(-2)), Constant(0.0)))
-        # mu - ratio between skin friction and normal friction
-        self.mu = Function(self.P1DG).interpolate(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
-        
-        
-        self.a = (self.ks)/2
-        self.B = Function(self.P1DG).interpolate(conditional(self.a > self.depth, 1, self.a/self.depth))
-        self.ustar = Function(self.P1DG).interpolate(sqrt(0.5*self.qfc*self.unorm))
-        self.exp1 = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
-        self.coefftest = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), self.B*(1-self.B**self.exp1)/self.exp1, -self.B*ln(self.B)))
-        self.coeff = Function(self.P1DG).interpolate(conditional(self.coefftest>0, 1/self.coefftest, 0))
-        
-        
-        # erosion flux - for vanrijn
-        self.s0 = Function(self.P1DG).interpolate((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
-        self.ceq = Function(self.P1DG).interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
-        
-        self.testtracer = Function(self.P1DG).project(self.tracer_init_value)
-        self.source = self.set_source_tracer(self.P1DG, solver_obj = None, init = True)   
-        qbsourcedepth = Function(self.V).project(self.source * self.depth)
-        
-    def update_suspended(self):
-        # mu - ratio between skin friction and normal friction
-        self.mu.assign(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
-            
-        # bed shear stress
-        self.unorm.interpolate((self.horizontal_velocity**2) + (self.vertical_velocity**2))
-        self.TOB.interpolate(1000*0.5*self.qfc*self.unorm)
-        
-        self.B.interpolate(conditional(self.a > self.depth, 1, self.a/self.depth))
-        self.ustar.interpolate(sqrt(0.5*self.qfc*self.unorm))
-        self.exp1.assign(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
-        self.coefftest.assign(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), self.B*(1-self.B**self.exp1)/self.exp1, -self.B*ln(self.B)))
-        self.coeff.assign(conditional(self.coefftest>0, 1/self.coefftest, 0))
-        
-        # erosion flux - van rijn
-        self.s0.assign((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
-        self.ceq.assign(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
-        
-        self.source.project(self.set_source_tracer(self.eta.function_space()))
-        
 
 def heaviside_approx(H, alpha):
     return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5
