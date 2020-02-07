@@ -16,6 +16,7 @@ parser.add_argument("-alpha", type=float,
                     help="Tuning parameter for monitor functions related to magnitude")
 parser.add_argument("-beta", type=float,
                     help="Tuning parameter for monitor functions related to scale")
+parser.add_argument("-r_adapt_rtol", type=float, help="Relative tolerance for r-adaptation.")
 parser.add_argument("-debug", help="Print all debugging statements")
 args = parser.parse_args()
 
@@ -38,7 +39,7 @@ if num_adapt > 0:
     ext = "{:s}_{:d}".format('_'.join(adapt_fields), num_adapt)  # FIXME
     op_init = TohokuOptions(utm=False, n=n, offset=offset, nonlinear_method='quasi_newton',
                             h_max=1.0e+10, target=float(args.target or 1.0e+4),
-                            debug=bool(args.debug or False), r_adapt_rtol=1.0e-2)
+                            debug=bool(args.debug or False), r_adapt_rtol=args.r_adapt_rtol or 0.01)
     for approach, adapt_field in zip(approaches, adapt_fields):
         op_init.adapt_field = adapt_field
         if not hasattr(op_init, 'lonlat_mesh'):
