@@ -73,7 +73,7 @@ class TracerOptions(TsunamiOptions):
         self.s0 = Function(self.P1DG).interpolate((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
         self.ceq = Function(self.P1DG).interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         
-        self.testtracer = Function(self.P1DG).project(self.tracer_init_value)
+        self.testtracer = Function(self.P1DG).project(self.ceq/self.coeff)
         self.source = self.set_source_tracer(self.P1DG, solver_obj = None, init = True)   
         self.qbsourcedepth = Function(self.V).project(self.source * self.depth)
         
