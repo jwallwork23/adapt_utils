@@ -24,7 +24,7 @@ class TrenchOptions(TrenchHydroOptions):
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
         self.plot_timeseries = plot_timeseries
         
-        self.tracer_init_value = Constant(1e-5)
+        
         super(TrenchOptions, self).__init__(**kwargs)
         self.plot_pvd = True
         self.di = "morph_output"
@@ -55,6 +55,9 @@ class TrenchOptions(TrenchHydroOptions):
         self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
         
         self.set_up_suspended()
+        
+        self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
+        self.tracer_init = Function(eta.function_space(), name="Tracer Initial condition").project(self.tracer_init_value)        
         
         # Stabilisation
         self.stabilisation = 'no'
@@ -126,9 +129,8 @@ class TrenchOptions(TrenchHydroOptions):
         u, eta = self.initial_value.split()
         u.project(self.uv_init)
         eta.project(self.eta_init)
-        self.tracer_init = Function(eta.function_space(), name="Tracer Initial condition").project(self.tracer_init_value)
         
-        return self.initial_value#, self.tracer_init_value
+        return self.initial_value
 
     def get_update_forcings(self, solver_obj):
 
