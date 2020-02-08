@@ -104,7 +104,7 @@ class TracerOptions(TsunamiOptions):
         # erosion flux - van rijn
         self.s0.assign((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
         self.ceq.assign(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
-        
+        self.tracer_init_value.assign(self.ceq.at([0,0])/self.coeff.at([0,0]))
         self.source.project(self.set_source_tracer(self.eta.function_space(), solver_obj))
         
         f = (((1-self.porosity)*(self.z_n1 - self.z_n)/(self.dt*self.morfac))*self.v)*dx

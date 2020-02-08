@@ -20,7 +20,7 @@ tp = TsunamiProblem(op, levels=0)
 tp.setup_solver()
 
 
-def gradient_interface_monitor(mesh, alpha=10.0):  # FIXME: all this projection is expensive!
+def gradient_interface_monitor(mesh, alpha=1.0):
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 

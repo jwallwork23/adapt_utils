@@ -57,7 +57,7 @@ class TrenchOptions(TrenchHydroOptions):
         self.set_up_suspended()
         
         self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
-        self.tracer_init = Function(eta.function_space(), name="Tracer Initial condition").project(self.tracer_init_value)        
+        self.tracer_init = Function(self.P1DG, name="Tracer Initial condition").project(self.tracer_init_value)        
         
         # Stabilisation
         self.stabilisation = 'no'
