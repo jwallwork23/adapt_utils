@@ -143,7 +143,7 @@ class SteadyProblem():
                 self.fields[i] = None
             else:
                 raise ValueError
-        self.op.bathymetry = self.fields['bathymetry']  # TODO: needed?
+        self.op.bathymetry = self.fields['bathymetry']
         self.op.set_boundary_surface()
 
     def set_stabilisation(self):
@@ -317,6 +317,7 @@ class SteadyProblem():
         Project forward or adjoint solution, as specified by the boolean kwarg
         `adjoint`.
         """
+        import ipdb; ipdb.set_trace()
         self.project(val, out=self.get_solution(adjoint=adjoint))
 
     def get_qoi_kernel(self):
@@ -663,7 +664,6 @@ class SteadyProblem():
 
             x.dat.data[:] = mesh_mover.x.dat.data  # TODO: PyOP2
             tmp.mesh.coordinates.assign(x)  # TODO: May need to modify coords of hierarchy, too
-
             # Project fields and solutions onto temporary Problem
             tmp.project_fields(self)
             tmp.project_solution(self.solution)
@@ -934,11 +934,10 @@ class UnsteadyProblem(SteadyProblem):
             if self.approach == 'fixed_mesh':
                 self.solve_step(adjoint=adjoint)
                 break
-
+            
             # Adaptive mesh case
             for i in range(self.op.num_adapt):
                 self.adapt_mesh()
-
                 # Interpolate value from previous step onto new mesh
                 if self.remesh_step == 0:
                     self.set_start_condition(adjoint)

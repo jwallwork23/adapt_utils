@@ -1,7 +1,8 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.test_cases.trench_test.hydro_options import TrenchHydroOptions
+#from adapt_utils.test_cases.trench_test.hydro_options import TrenchHydroOptions
+from adapt_utils.swe.morphological_options import TracerOptions
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -13,7 +14,7 @@ rc('text', usetex=True)
 __all__ = ["TrenchOptions"]
 
 
-class TrenchOptions(TrenchHydroOptions):
+class TrenchOptions(TracerOptions):
     """
     Parameters for test case described in [1].
 
@@ -24,10 +25,41 @@ class TrenchOptions(TrenchHydroOptions):
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
         self.plot_timeseries = plot_timeseries
         
+        self.default_mesh = RectangleMesh(16*5*nx, 5*ny, 16, 1.1)
+        self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
+        self.V = FunctionSpace(self.default_mesh, "CG", 1)
+        self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
+        self.vector_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
         
         super(TrenchOptions, self).__init__(**kwargs)
-        self.plot_pvd = True
+        self.plot_pvd = True  
         self.di = "morph_output"
+
+        # Physical
+        self.base_viscosity = 1e-6
+                
+        self.gravity = Constant(9.81)
+        
+        self.solve_tracer = False
+        self.wetting_and_drying = False
+        #self.wetting_and_drying_alpha = Constant(0.43)
+        try:
+            assert friction in ('nikuradse', 'manning')
+        except AssertionError:
+            raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
+        self.friction = friction
+        self.average_size = 160e-6  # Average sediment size
+        
+
+        # Initial
+        self.uv_init = as_vector([0.51, 0.0])
+        self.eta_init = Constant(0.4)
+
+        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
+                
+
+        self.grad_depth_viscosity = True        
+
         
         self.bathymetry_file = File(self.di + "/bathy.pvd")
                 
@@ -52,7 +84,12 @@ class TrenchOptions(TrenchHydroOptions):
 
         # Initial
         input_dir = 'hydrodynamics_trench'
-        self.eta_init, self.uv_init = self.initialise_fields(input_dir, self.di)        
+
+        # Initial
+        self.uv_init = as_vector([0.51, 0.0])
+        self.eta_init = Constant(0.4)
+
+        #self.eta_init, self.uv_init = self.initialise_fields(input_dir, self.di)        
 
         self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
         
@@ -66,9 +103,9 @@ class TrenchOptions(TrenchHydroOptions):
 
         # Time integration
         self.dt = 0.3
-        self.end_time = self.num_hours*3600.0
-        #self.dt_per_export = self.end_time/100
-        #self.dt_per_remesh = self.end_time/100
+        self.end_time = self.num_hours*3600.0/self.morfac
+        self.dt_per_export = 40
+        self.dt_per_remesh = 100
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
@@ -99,6 +136,40 @@ class TrenchOptions(TrenchHydroOptions):
                         
         return self.source
 
+    
+    def set_quadratic_drag_coefficient(self, fs):
+        if self.friction == 'nikuradse':
+            self.quadratic_drag_coefficient = project(self.get_cfactor(), self.depth.function_space())
+        return self.quadratic_drag_coefficient
+
+    def get_cfactor(self):
+        try:
+            assert hasattr(self, 'depth')
+        except AssertionError:
+            raise ValueError("Depth is undefined.")
+        
+        self.ksp = Constant(3*self.average_size)
+        hclip = Function(self.P1DG).interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
+        aux = 11.036*hclip/self.ksp
+        return conditional(self.depth>self.ksp, 2*(0.4**2)/(ln(aux)**2), 0.0)
+
+    def set_manning_drag_coefficient(self, fs):
+        if self.friction == 'manning':
+            self.manning_drag_coefficient = Constant(self.friction_coeff or 0.02)
+        return self.manning_drag_coefficient
+
+    def set_bathymetry(self, fs, **kwargs):
+        import ipdb; ipdb.set_trace()
+        initial_depth = Constant(0.397)
+        depth_riv = Constant(initial_depth - 0.397)
+        depth_trench = Constant(depth_riv - 0.15)
+        depth_diff = depth_trench - depth_riv
+        x, y = SpatialCoordinate(fs.mesh())
+        trench = conditional(le(x, 5), depth_riv, conditional(le(x,6.5), (1/1.5)*depth_diff*(x-6.5) + depth_trench,\
+                conditional(le(x, 9.5), depth_trench, conditional(le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
+        self.bathymetry = Function(fs, name="Bathymetry")
+        self.bathymetry.interpolate(-trench)
+        return self.bathymetry
 
     def set_viscosity(self, fs):
         self.viscosity = Function(fs)
@@ -107,6 +178,16 @@ class TrenchOptions(TrenchHydroOptions):
 
     def set_coriolis(self, fs):
         return
+
+    def set_boundary_conditions(self, fs):
+        inflow_tag = 1
+        outflow_tag = 2
+        bottom_wall_tag = 3
+        top_wall_tag = 4
+        boundary_conditions = {}
+        boundary_conditions[inflow_tag] = {'flux': Constant(-0.22)}
+        boundary_conditions[outflow_tag] = {'elev': Constant(0.397)}
+        return boundary_conditions
 
 
     def set_boundary_conditions_tracer(self, fs):

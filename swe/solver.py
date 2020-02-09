@@ -452,7 +452,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)
-        self.fields['bathymetry'] = self.op.set_bathymetry(self.P1DG)
+        self.fields['bathymetry'] = self.op.set_bathymetry(self.P1)
         self.fields['inflow'] = self.op.set_inflow(self.P1_vec)
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
