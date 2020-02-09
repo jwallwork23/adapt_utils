@@ -28,6 +28,8 @@ class TrenchOptions(TrenchHydroOptions):
         super(TrenchOptions, self).__init__(**kwargs)
         self.plot_pvd = True
         self.di = "morph_output"
+        
+        self.bathymetry_file = File(self.di + "/bathy.pvd")
                 
         self.num_hours = 5
 
@@ -156,6 +158,8 @@ class TrenchOptions(TrenchHydroOptions):
             self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
             
             self.update_suspended(solver_obj)
+            
+            self.bathymetry_file.write(self.bathymetry)
                         
 
         return update_forcings
