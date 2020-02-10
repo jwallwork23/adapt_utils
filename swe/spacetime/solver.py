@@ -81,20 +81,20 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         tf_tag = self.op.t_final_tag
 
         # Momentum equation
-        self.lhs = inner(ddt(u), v)*dx                  # Time derivative
-        self.lhs += inner(g*grad_x(η), v)*dx            # Pressure gradient term
-        self.lhs += inner(f*perp(u), v)*dx              # Coriolis term
-        self.lhs += nu*inner(grad_x(u), grad_x(v))*dx   # Viscosity term
+        self.lhs = inner(v, ddt(u))*dx                  # Time derivative
+        self.lhs += inner(v, g*grad_x(η))*dx            # Pressure gradient term
+        self.lhs += inner(v, f*perp(u))*dx              # Coriolis term
+        self.lhs += nu*inner(grad_x(v), grad_x(u))*dx   # Viscosity term
 
         # Integration by parts for viscosity
         for i in self.mesh.exterior_facets.unique_markers:
             if not i in (t0_tag, tf_tag):
-                self.lhs += -nu*inner(dot(grad_x(u), n), v)*ds(i)
+                self.lhs += -nu*inner(v, dot(grad_x(u), n))*ds(i)
 
         # Continuity equation
-        self.lhs += inner(ddt(η), θ)*dx                 # Time derivative
-        self.lhs += -inner(b*u, grad_x(θ))*dx           # Continuity term
-        self.rhs = inner(b*Constant(as_vector([0.0, 0.0])), grad_x(θ))*dx
+        self.lhs += inner(θ, ddt(η))*dx                 # Time derivative
+        self.lhs += -inner(grad_x(θ), b*u)*dx           # Continuity term
+        self.rhs = inner(grad_x(θ), b*Constant(as_vector([0.0, 0.0])))*dx
 
         # TODO: Enable different BCs
 
@@ -103,7 +103,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         self.dbcs = [DirichletBC(self.V.sub(0), u0, t0_tag),
                      DirichletBC(self.V.sub(1), eta0, t0_tag)]
 
-    def plot_solution(self, adjoint=False):
+    def plot_solution(self, adjoint=False):  # FIXME: Can't seem to plot vector fields
         if adjoint:
             z, zeta = self.adjoint_solution.split()
             zeta.rename("Adjoint elevation")
