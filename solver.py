@@ -27,7 +27,7 @@ class SteadyProblem():
         * adapt mesh based on some error estimator of choice.
     """
     def __init__(self, op, mesh, finite_element, discrete_adjoint=False, prev_solution=None, levels=1):
-        print_output(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
+        op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
         self.op = op
@@ -39,17 +39,17 @@ class SteadyProblem():
         self.levels = levels
 
         # Setup problem
-        print_output(op.indent+"Building mesh...")
+        op.print_debug(op.indent+"Building mesh...")
         self.set_mesh(mesh)
         self.am_init = self.am.copy()
-        print_output(op.indent+"Building function spaces...")
+        op.print_debug(op.indent+"Building function spaces...")
         self.create_function_spaces()
-        print_output(op.indent+"Building solutions...")
+        op.print_debug(op.indent+"Building solutions...")
         self.create_solutions()
-        print_output(op.indent+"Building fields...")
+        op.print_debug(op.indent+"Building fields...")
         self.set_fields()
         self.set_stabilisation()
-        print_output(op.indent+"Setting boundary conditions...")
+        op.print_debug(op.indent+"Setting boundary conditions...")
         self.boundary_conditions = op.set_boundary_conditions(self.V)
 
         # Outputs
@@ -71,7 +71,7 @@ class SteadyProblem():
         self.outer_num_cells = []
         self.outer_num_vertices = []
         self.outer_qois = []
-        print_output(op.indent + "{:s} initialisation complete!\n".format(self.__class__.__name__))
+        op.print_debug(op.indent + "{:s} initialisation complete!\n".format(self.__class__.__name__))
 
     def set_mesh(self, mesh):
         """

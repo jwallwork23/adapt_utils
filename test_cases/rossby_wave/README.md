@@ -33,6 +33,7 @@
   through a delicate balance between nonlinearity and dispersion."
 * Illustrates a situation where adjoint based error estimators are not useful.
 * Flow is constrained to a band... suitable candidate for mesh optimisation?
+* Good candidate for r-adaptation.
 
 ### References
 
