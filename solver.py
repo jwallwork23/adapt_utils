@@ -12,7 +12,9 @@ from adapt_utils.adapt.p0_metric import *
 from adapt_utils.adapt.r import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
 from adapt_utils.misc import *
+
 from adapt_utils.norms import *
+
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem"]
@@ -317,7 +319,6 @@ class SteadyProblem():
         Project forward or adjoint solution, as specified by the boolean kwarg
         `adjoint`.
         """
-        import ipdb; ipdb.set_trace()
         self.project(val, out=self.get_solution(adjoint=adjoint))
 
     def get_qoi_kernel(self):
@@ -670,9 +671,9 @@ class SteadyProblem():
             tmp.project_solution(self.adjoint_solution, adjoint=True)
 
             # Update self.mesh and function spaces, etc.
-            # self.mesh.coordinates.assign(x)
-            #print(self.bathymetry.function_space())
-            self.mesh.coordinates.dat.data[:] = x.dat.data
+
+            self.mesh.coordinates.dat.data[:] = x.dat.data  # FIXME: Not parallel
+
 
             self.create_function_spaces()
             self.create_solutions()
@@ -685,16 +686,23 @@ class SteadyProblem():
             m = interpolate(self.monitor_function(self.mesh), self.P1)
             m.rename("Monitor function")
             self.monitor_file.write(m)
+
         else:
             try:
                 assert hasattr(self, 'M')
             except AssertionError:
                 raise ValueError("Please supply a metric.")
+
             self.am.pragmatic_adapt(self.M)
             self.set_mesh(self.am.mesh)
 
-        if approach != 'monge_ampere':
+        if self.approach != 'monge_ampere':
             print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
+
+            self.am.adapt(self.M)
+            self.set_mesh(self.am.mesh)
+
+
             self.num_cells.append(self.mesh.num_cells())
             self.num_vertices.append(self.mesh.num_vertices())
             self.plot()

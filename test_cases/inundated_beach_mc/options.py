@@ -1,6 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
+
 from adapt_utils.swe.morphological_options import TracerOptions
 
 import numpy as np
@@ -13,7 +14,9 @@ rc('text', usetex=True)
 __all__ = ["BalzanoOptions"]
 
 
+
 class BalzanoOptions(TracerOptions):
+
     """
     Parameters for test case described in [1].
 
@@ -38,11 +41,12 @@ class BalzanoOptions(TracerOptions):
         # Physical
         self.base_viscosity = 1e-6
         self.base_diffusivity = 0.15
+
         self.tracer_init_value = Constant(1e-5)
         self.gravity = Constant(9.81)
         self.porosity = Constant(0.4)
         self.ks = 0.025
-
+        
         self.solve_tracer = True
         self.wetting_and_drying = True
         self.wetting_and_drying_alpha = Constant(0.43)
@@ -53,6 +57,7 @@ class BalzanoOptions(TracerOptions):
         self.friction = friction
         self.average_size = 200e-6  # Average sediment size
         self.friction_coeff = 0.025
+
         self.morfac = 1
 
 
@@ -64,6 +69,7 @@ class BalzanoOptions(TracerOptions):
         
         self.set_up_suspended()
         
+
         # Stabilisation
         self.stabilisation = 'no'
 
@@ -101,6 +107,7 @@ class BalzanoOptions(TracerOptions):
             self.quadratic_drag_coefficient = interpolate(self.get_cfactor(), fs)
         return self.quadratic_drag_coefficient
 
+
     def set_source_tracer(self, fs, solver_obj, init = False):
         self.coeff = Function(self.depth.function_space()).project(self.coeff)
         self.ceq = Function(self.depth.function_space()).project(self.ceq)
@@ -117,6 +124,7 @@ class BalzanoOptions(TracerOptions):
             assert hasattr(self, 'depth')
         except AssertionError:
             raise ValueError("Depth is undefined.")
+
         self.ksp = Constant(3*self.average_size)
         hc = conditional(self.depth > 0.001, self.depth, 0.001)
         aux = max_value(11.036*hc/self.ksp, 1.001)
@@ -138,6 +146,7 @@ class BalzanoOptions(TracerOptions):
         self.viscosity = Function(fs)
         self.viscosity.assign(self.base_viscosity)
         return self.viscosity
+
 
     def set_coriolis(self, fs):
         return
@@ -165,6 +174,7 @@ class BalzanoOptions(TracerOptions):
         boundary_conditions = {}
         boundary_conditions[inflow_tag] = {'value': self.tracer_init_value}
         print(self.tracer_init_value.dat.data[:])
+
         return boundary_conditions
 
     def update_boundary_conditions(self, t=0.0):
@@ -178,13 +188,16 @@ class BalzanoOptions(TracerOptions):
         """
         self.initial_value = Function(fs, name="Initial condition")
         u, eta = self.initial_value.split()
+
         u.interpolate(self.uv_init)
         eta.assign(self.eta_init)
         self.tracer_init = Function(eta.function_space(), name="Tracer Initial condition").project(self.tracer_init_value)
+
         
         return self.initial_value#, self.tracer_init_value
 
     def get_update_forcings(self, solver_obj):
+
 
         def update_forcings(t):
             self.uv1, self.eta = solver_obj.fields.solution_2d.split()
@@ -206,7 +219,7 @@ class BalzanoOptions(TracerOptions):
             self.cfactor.interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*self.hclip/self.ksp))**(-2)), Constant(0.0)))
             
             self.update_suspended(solver_obj)
-                        
+
 
         return update_forcings
 
@@ -306,7 +319,6 @@ class BalzanoOptions(TracerOptions):
         plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
         plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
-
 
 def heaviside_approx(H, alpha):
     return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5

@@ -75,6 +75,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
+
         if op.timestepper == 'CrankNicolson':
             options.timestepper_options.implicitness_theta = op.implicitness_theta
 
@@ -459,8 +460,39 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
         self.op.set_boundary_surface()
         self.fields['source'] = self.op.source#op.set_source_tracer(self.P1DG, self.solver_obj)
+        
 
 
+    def project_fields(self, prob):  # TODO: dict storage => more general loop
+        self.viscosity = self.project(prob.viscosity, Function(self.P1))
+        self.diffusivity = self.project(prob.diffusivity, Function(self.P1))
+        self.bathymetry = self.project(prob.bathymetry, Function(self.P1DG))
+        self.op.bathymetry = self.bathymetry
+        self.inflow = self.project(prob.inflow, Function(self.P1_vec))
+        self.coriolis = self.project(prob.coriolis, Function(self.P1))
+        self.quadratic_drag_coefficient = self.project(prob.quadratic_drag_coefficient, Function(self.P1))
+        self.manning_drag_coefficient = self.project(prob.manning_drag_coefficient, Function(self.P1))
+        self.op.depth = project(self.op.depth, self.P1)
+        #self.conv_vel =project(prob.conv, self.P1_vec)
+        
+        if prob.source is not None:
+            self.source = self.project(prob.source, Function(self.P1DG))
+        else:
+            self.source = None
+
+    def project_fields(self, prob):  # TODO: dict storage => more general loop
+        self.viscosity = self.project(prob.viscosity, Function(self.P1))
+        self.diffusivity = self.project(prob.diffusivity, Function(self.P1))
+        self.bathymetry = self.project(prob.bathymetry, Function(self.P1DG))
+        self.op.bathymetry = self.bathymetry
+        self.inflow = self.project(prob.inflow, Function(self.P1_vec))
+        self.coriolis = self.project(prob.coriolis, Function(self.P1))
+        self.quadratic_drag_coefficient = self.project(prob.quadratic_drag_coefficient, Function(self.P1))
+        self.manning_drag_coefficient = self.project(prob.manning_drag_coefficient, Function(self.P1))
+        self.op.depth = project(self.op.depth, self.P1)
+
+
+>>>>>>> b26e769b2e3327c0b67d27d7faba8bd7a3eb0035
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
         if self.stabilisation in ('no', 'lax_friedrichs'):
@@ -498,6 +530,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
+
         if op.timestepper == 'CrankNicolson':
             options.timestepper_options.implicitness_theta = op.implicitness_theta
 
@@ -529,7 +562,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.solve_tracer:
             #options.tracer_advective_velocity = op.conv_vel
             options.tracer_source_2d = self.fields['source']
-
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
         if op.solve_tracer:

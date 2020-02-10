@@ -1,0 +1,37 @@
+dt = 0.3
+Coupled time integrator: CoupledCrankNicolson2D
+  Shallow Water time integrator: CrankNicolson
+  Tracer time integrator: CrankNicolson
+Using time integrator: CoupledCrankNicolson2D
+    0     0 T=      0.00 eta norm:     1.6781 u norm:     2.1396  0.00
+volume2d rel. error  0.0000e+00
+    1    20 T=      6.00 eta norm:     1.6485 u norm:     1.9478 23.67
+volume2d rel. error -1.6019e-02
+    2    40 T=     12.00 eta norm:     1.6691 u norm:     1.8971 15.11
+volume2d rel. error -4.8699e-03
+    3    60 T=     18.00 eta norm:     1.6869 u norm:     1.8590 12.74
+volume2d rel. error  4.7019e-03
+    4    80 T=     24.00 eta norm:     1.6958 u norm:     1.9591 11.89
+volume2d rel. error  9.4943e-03
+    5   100 T=     30.00 eta norm:     1.6832 u norm:     1.9845 13.25
+volume2d rel. error  2.7001e-03
+    6   120 T=     36.00 eta norm:     1.6753 u norm:     1.9794 14.31
+volume2d rel. error -1.5046e-03
+    7   140 T=     42.00 eta norm:     1.6741 u norm:     1.9384 18.16
+volume2d rel. error -2.1524e-03
+    8   160 T=     48.00 eta norm:     1.6801 u norm:     1.9268 19.50
+volume2d rel. error  1.0718e-03
+    9   180 T=     54.00 eta norm:     1.6836 u norm:     1.9374 18.03
+volume2d rel. error  2.9294e-03
+   10   200 T=     60.00 eta norm:     1.6829 u norm:     1.9539 17.88
+volume2d rel. error  2.5431e-03
+   11   220 T=     66.00 eta norm:     1.6801 u norm:     1.9575 17.79
+volume2d rel. error  1.0442e-03
+   12   240 T=     72.00 eta norm:     1.6788 u norm:     1.9500 18.12
+volume2d rel. error  3.4611e-04
+   13   260 T=     78.00 eta norm:     1.6796 u norm:     1.9434 17.27
+volume2d rel. error  7.7485e-04
+   14   280 T=     84.00 eta norm:     1.6808 u norm:     1.9430 12.34
+volume2d rel. error  1.4556e-03
+   15   300 T=     90.00 eta norm:     1.6812 u norm:     1.9471 12.98
+volume2d rel. error  1.6634e-03

@@ -74,7 +74,7 @@ class TracerOptions(TsunamiOptions):
         self.ceq = Function(self.P1DG).interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         
         self.testtracer = Function(self.P1DG).project(self.ceq/self.coeff)
-        self.source = self.set_source_tracer(self.P1DG, solver_obj = None, init = True)   
+        self.source = Function(self.P1DG).project(self.set_source_tracer(self.P1DG, solver_obj = None, init = True)) 
         self.qbsourcedepth = Function(self.V).project(self.source * self.depth)
         
         self.z_n = Function(self.V)
@@ -84,9 +84,9 @@ class TracerOptions(TsunamiOptions):
         
     def update_suspended(self, solver_obj):
         
-        self.old_bathymetry_2d.assign(solver_obj.fields.bathymetry_2d)
+        self.old_bathymetry_2d.project(solver_obj.fields.bathymetry_2d)
         
-        self.z_n.assign(self.old_bathymetry_2d)
+        self.z_n.interpolate(self.old_bathymetry_2d)
         
         # mu - ratio between skin friction and normal friction
         self.mu.assign(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
@@ -99,13 +99,14 @@ class TracerOptions(TsunamiOptions):
         self.ustar.interpolate(sqrt(0.5*self.qfc*self.unorm))
         self.exp1.assign(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
         self.coefftest.assign(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), self.B*(1-self.B**self.exp1)/self.exp1, -self.B*ln(self.B)))
-        self.coeff.assign(conditional(self.coefftest>0, 1/self.coefftest, 0))
+        self.coeff.interpolate(conditional(self.coefftest>0, 1/self.coefftest, 0))
         
         # erosion flux - van rijn
         self.s0.assign((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
-        self.ceq.assign(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
+        self.ceq.interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         self.tracer_init_value.assign(self.ceq.at([0,0])/self.coeff.at([0,0]))
         self.source.project(self.set_source_tracer(self.eta.function_space(), solver_obj))
+        
         
         f = (((1-self.porosity)*(self.z_n1 - self.z_n)/(self.dt*self.morfac))*self.v)*dx
         
@@ -115,4 +116,4 @@ class TracerOptions(TsunamiOptions):
         
         solve(f==0, self.z_n1)
         
-        solver_obj.fields.bathymetry_2d.assign(self.z_n1)
+        #solver_obj.fields.bathymetry_2d.assign(self.z_n1)

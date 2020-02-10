@@ -51,6 +51,7 @@ class ShallowWaterOptions(Options):
         self.viscosity = Constant(self.base_viscosity)
         return self.viscosity
     
+
     def set_source_tracer(self, fs, solver_obj):
         """Should be implemented in derived class."""
         return self.source

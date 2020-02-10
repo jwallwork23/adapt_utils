@@ -21,7 +21,8 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)
         # TODO: Should interpolate bathy from fresh
-        self.fields['bathymetry'] = self.op.set_bathymetry(self.P1, adapted=adapted)
+        import ipdb; ipdb.set_trace()
+        self.fields['bathymetry'] = self.op.bathymetry#set_bathymetry(self.P1, adapted=adapted)
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)

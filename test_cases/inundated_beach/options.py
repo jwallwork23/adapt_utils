@@ -1,6 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
+
 from adapt_utils.swe.tsunami.options import TsunamiOptions, heaviside_approx
 
 import os
@@ -30,8 +31,11 @@ class BalzanoOptions(TsunamiOptions):
 
         #self.default_mesh = RectangleMesh(17, 10, 1.5*self.basin_x, 1200.0)
         self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
+
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True
+
+
         self.num_hours = 24
 
         # Three possible bathymetries

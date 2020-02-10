@@ -14,8 +14,11 @@ op = BalzanoOptions(approach='monge_ampere',
                     n=2,
                     r_adapt_rtol=1.0e-3)
 
+
 tp = TsunamiProblem(op, levels=0)
 tp.setup_solver()
+
+
 
 
 def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this projection is expensive!

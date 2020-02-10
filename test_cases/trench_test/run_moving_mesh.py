@@ -20,7 +20,7 @@ tp = TsunamiProblem(op, levels=0)
 tp.setup_solver()
 
 
-def gradient_interface_monitor(mesh, alpha=200):
+def gradient_interface_monitor(mesh, alpha=1):
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 

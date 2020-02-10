@@ -24,6 +24,7 @@ def find(pattern, path):
                 result.append(os.path.join(root, name))
     return result
 
+
 def check_spd(matrix):
     """
     Verify that a tensor field `matrix` is symmetric positive-definite (SPD) and hence a Riemannian

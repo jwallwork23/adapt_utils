@@ -25,7 +25,7 @@ class TrenchOptions(TracerOptions):
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
         self.plot_timeseries = plot_timeseries
         
-        self.default_mesh = RectangleMesh(16*5*nx, 5*ny, 16, 1.1)
+        self.default_mesh = RectangleMesh(10*5*nx, 5*ny, 16, 1.1)
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
         self.V = FunctionSpace(self.default_mesh, "CG", 1)
         self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
@@ -53,10 +53,7 @@ class TrenchOptions(TracerOptions):
 
         # Initial
         self.uv_init = as_vector([0.51, 0.0])
-        self.eta_init = Constant(0.4)
-
-        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
-                
+        self.eta_init = Constant(0.4)    
 
         self.grad_depth_viscosity = True        
 
@@ -85,23 +82,23 @@ class TrenchOptions(TracerOptions):
         # Initial
         input_dir = 'hydrodynamics_trench'
 
-        # Initial
-        self.uv_init = as_vector([0.51, 0.0])
-        self.eta_init = Constant(0.4)
 
         #self.eta_init, self.uv_init = self.initialise_fields(input_dir, self.di)        
 
-        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
+        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "DG", 1)*self.V)   
+        
+        
         
         self.set_up_suspended()
         
         self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
-        self.tracer_init = Function(self.P1DG, name="Tracer Initial condition").project(self.tracer_init_value)        
+        self.tracer_init = Function(self.P1DG, name="Tracer Initial condition").project(self.testtracer)        
         
         # Stabilisation
         self.stabilisation = 'no'
 
         # Time integration
+        self.t_old = Constant(0.0)
         self.dt = 0.3
         self.end_time = self.num_hours*3600.0/self.morfac
         self.dt_per_export = 40
@@ -132,7 +129,7 @@ class TrenchOptions(TracerOptions):
             self.testtracer = Function(self.depth.function_space()).project(self.testtracer)
             self.source = Function(self.depth.function_space()).project(-(self.settling_velocity*self.coeff*self.testtracer/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
         else:
-            self.source = Function(self.depth.function_space()).project(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+            self.source.project(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
                         
         return self.source
 
@@ -151,7 +148,7 @@ class TrenchOptions(TracerOptions):
         self.ksp = Constant(3*self.average_size)
         hclip = Function(self.P1DG).interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
         aux = 11.036*hclip/self.ksp
-        return conditional(self.depth>self.ksp, 2*(0.4**2)/(ln(aux)**2), 0.0)
+        return conditional(self.depth>self.ksp, 2*(0.4**2)/(ln(aux)**2), Constant(0.0))
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
@@ -218,6 +215,7 @@ class TrenchOptions(TracerOptions):
     def get_update_forcings(self, solver_obj):
 
         def update_forcings(t):
+            
             self.uv1, self.eta = solver_obj.fields.solution_2d.split()
             self.u_cg.project(self.uv1)
             self.elev_cg.project(self.eta)
@@ -237,12 +235,14 @@ class TrenchOptions(TracerOptions):
             self.cfactor.interpolate(self.get_cfactor())
 
             self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
-            
-            self.update_suspended(solver_obj)
-            
-            self.bathymetry_file.write(self.bathymetry)
-                        
 
+            #if self.t_old.dat.data[:] == t:
+            #    print(t)
+            #    self.update_suspended(solver_obj)
+            
+            #    self.bathymetry_file.write(self.bathymetry)
+            self.t_old.assign(t)        
+            
         return update_forcings
 
     def initialise_fields(self, inputdir, outputdir):

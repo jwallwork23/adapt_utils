@@ -180,8 +180,9 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     t_list = []    
     
     def update_forcings_tracer(t_new):
-        import ipdb; ipdb.set_trace()
         # update bathymetry
+        
+        
         old_bathymetry_2d.assign(bathymetry_2d)
         
         # extract new elevation and velocity and project onto CG space
@@ -211,7 +212,6 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
         hclip.interpolate(th.conditional(ksp > depth, ksp, depth))
         cfactor.interpolate(th.conditional(depth > ksp, 2*((2.5*th.ln(11.036*hclip/ksp))**(-2)), th.Constant(0.0)))
         
-
         if morfac_transport == True:
 
             # if include sediment then update_forcings is run twice but only want to update bathymetry once
@@ -433,7 +433,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                 fire.solve(f == 0, z_n1)
                 
                 # update bed
-                bathymetry_2d.assign(z_n1)
+                #bathymetry_2d.assign(z_n1)
 
                 if round(t_new, 2)%t_export == 0:
                     # calculate difference between original bathymetry and new bathymetry
@@ -458,7 +458,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     #    t_export = np.round(t_end/100, 0)
     #else:
     #    t_export = 1
-    t_export = 6
+    t_export = 12
     
     th.print_output('Exporting to '+outputdir)
     
@@ -619,6 +619,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
         sediment_rate = th.Constant(ceq.at([0,0])/coeff.at([0,0]))
         testtracer = th.Function(P1_2d).interpolate(ceq/coeff)
+        import ipdb; ipdb.set_trace()
         # calculate depth-averaged source term for sediment concentration equation
         source = th.Function(P1_2d).interpolate(-(settling_velocity*coeff*sediment_rate/depth)+ (settling_velocity*ceq/depth))
     
