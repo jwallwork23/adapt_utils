@@ -202,9 +202,13 @@ class TsunamiOptions(ShallowWaterOptions):
         # Find all relevant HDF5 files and sort by ascending mesh resolution
         approach = 'uniform' if self.approach == 'fixed_mesh' else self.approach
         fnames = find('diagnostic_gauges_*.hdf5', self.di)
-        resolutions = [int(fname.split('_')[-1][:-5]) for fname in fnames]
+        resolutions = []
+        for fname in fnames:
+            s = fname.split('_')
+            res = int(s[-1][:-5])
+            if len(s) == 4:  # TODO: Temporary: only plot fixed_mesh
+                resolutions.append(res)
         resolutions.sort()
-        resolutions_to_plot = []
 
         # Loop over all available mesh resolutions
         for res in resolutions:
@@ -212,9 +216,7 @@ class TsunamiOptions(ShallowWaterOptions):
             if extension is not None:
                 fname = '_'.join([fname, extension])
             fname = '_'.join([fname, '{:d}.hdf5'.format(res)])
-            if not os.path.exists(fname):
-                continue
-            resolutions_to_plot.append(res)
+            assert os.path.exists(fname)
             f = h5py.File(fname, 'r')
             y = f[gauge][()]
             y = y.reshape(len(y),)[:cutoff+1]
@@ -256,7 +258,7 @@ class TsunamiOptions(ShallowWaterOptions):
         for key in errors:
             fig = plt.figure(figsize=[3.2, 4.8])
             ax = fig.add_subplot(111)
-            ax.semilogx(resolutions_to_plot, 100.0*np.array(errors[key]['rel']), marker='o')
+            ax.semilogx(resolutions, 100.0*np.array(errors[key]['rel']), marker='o')
             plt.xlabel("Number of elements")
             plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
             plt.grid(True)
