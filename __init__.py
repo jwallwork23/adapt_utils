@@ -1,3 +1,5 @@
+from __future__ import absolute_import
+
 # Base classes
 from adapt_utils.options import *
 from adapt_utils.solver import *
@@ -8,14 +10,4 @@ from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.p0_metric import *
 from adapt_utils.adapt.recovery import *
 
-from thetis import print_output
-
-
-__all__ = ["doc"]
-
-
-def doc(anything):
-    """
-    Print the docstring of any class or function.
-    """
-    print_output(anything.__doc__)
+from thetis import *

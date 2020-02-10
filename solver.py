@@ -1,5 +1,4 @@
-from firedrake import *
-from thetis import create_directory, print_output
+from thetis import *
 
 import os
 import numpy as np
