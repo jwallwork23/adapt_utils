@@ -112,7 +112,9 @@ class SteadyProblem():
         self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
         self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
         self.test = TestFunction(self.V)
+        self.tests = TestFunctions(self.V)
         self.trial = TrialFunction(self.V)
+        self.trials = TrialFunctions(self.V)
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
 
