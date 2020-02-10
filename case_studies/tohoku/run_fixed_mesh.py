@@ -35,6 +35,7 @@ elif len(adapt_fields) > len(approaches):
 
 # Adapt mesh in lonlat space
 ext = None
+mesh = None
 if num_adapt > 0:
     ext = "{:s}_{:d}".format('_'.join(adapt_fields), num_adapt)  # FIXME
     op_init = TohokuOptions(utm=False, n=n, offset=offset, nonlinear_method='quasi_newton',
@@ -47,11 +48,12 @@ if num_adapt > 0:
         swp_init = TsunamiProblem(op_init, levels=0)
         swp_init.initialise_mesh(approach=approach or 'hessian', alpha=alpha, beta=beta, num_adapt=num_adapt)
         op_init.default_mesh = swp_init.mesh
-op_init.latlon_mesh = swp_init.mesh
-op_init.get_utm_mesh()
+    op_init.latlon_mesh = swp_init.mesh
+    op_init.get_utm_mesh()
+    mesh = op_init.default_mesh
 
 # Set parameters for fixed mesh run
-op = TohokuOptions(mesh=op_init.default_mesh, utm=True, plot_pvd=True, offset=offset)
+op = TohokuOptions(mesh=mesh, utm=True, plot_pvd=True, offset=offset)
 op.end_time = float(args.end_time or op.end_time)
 op.get_lonlat_mesh()
 op.set_bathymetry()

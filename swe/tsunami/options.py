@@ -204,13 +204,17 @@ class TsunamiOptions(ShallowWaterOptions):
         fnames = find('diagnostic_gauges_*.hdf5', self.di)
         resolutions = [int(fname.split('_')[-1][:-5]) for fname in fnames]
         resolutions.sort()
+        resolutions_to_plot = []
 
         # Loop over all available mesh resolutions
         for res in resolutions:
             fname = os.path.join(self.di, 'diagnostic_gauges')
             if extension is not None:
                 fname = '_'.join([fname, extension])
-            fname = '_'.join(['{:d}.hdf5'.format(res)])
+            fname = '_'.join([fname, '{:d}.hdf5'.format(res)])
+            if not os.path.exists(fname):
+                continue
+            resolutions_to_plot.append(res)
             f = h5py.File(fname, 'r')
             y = f[gauge][()]
             y = y.reshape(len(y),)[:cutoff+1]
@@ -252,7 +256,7 @@ class TsunamiOptions(ShallowWaterOptions):
         for key in errors:
             fig = plt.figure(figsize=[3.2, 4.8])
             ax = fig.add_subplot(111)
-            ax.semilogx(resolutions, 100.0*np.array(errors[key]['rel']), marker='o')
+            ax.semilogx(resolutions_to_plot, 100.0*np.array(errors[key]['rel']), marker='o')
             plt.xlabel("Number of elements")
             plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
             plt.grid(True)
