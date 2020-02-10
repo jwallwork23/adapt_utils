@@ -1,8 +1,5 @@
 from firedrake import *
 
-import os
-import numpy as np
-
 from adapt_utils.solver import SteadyProblem
 
 
@@ -49,7 +46,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
     def set_fields(self):
         self.fields = {}
-        # self.fields['viscosity'] = self.op.set_viscosity(self.P1)
+        self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['bathymetry'] = self.op.set_bathymetry(self.P1)
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
 
@@ -71,10 +68,12 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         g = self.op.g
         f = self.fields['coriolis']
         b = self.fields['bathymetry']
+        nu = self.fields['viscosity']
 
         # Operators
         grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])
         perp = lambda F: as_vector([-F[1], F[0]])
+        ddt = lambda F: F.dx(2)
         n = as_vector([self.n[0], self.n[1]])
 
         # Initial and final time tags
@@ -82,12 +81,18 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         tf_tag = self.op.t_final_tag
 
         # Momentum equation
-        self.lhs = inner(u.dx(2), v)*dx                 # Time derivative
+        self.lhs = inner(ddt(u), v)*dx                  # Time derivative
         self.lhs += inner(g*grad_x(η), v)*dx            # Pressure gradient term
         self.lhs += inner(f*perp(u), v)*dx              # Coriolis term
+        self.lhs += nu*inner(grad_x(u), grad_x(v))*dx   # Viscosity term
+
+        # Integration by parts for viscosity
+        for i in self.mesh.exterior_facets.unique_markers:
+            if not i in (t0_tag, tf_tag):
+                self.lhs += -nu*inner(dot(grad_x(u), n), v)*ds(i)
 
         # Continuity equation
-        self.lhs += inner(η.dx(2), θ)*dx                # Time derivative
+        self.lhs += inner(ddt(η), θ)*dx                 # Time derivative
         self.lhs += -inner(b*u, grad_x(θ))*dx           # Continuity term
         self.rhs = inner(b*Constant(as_vector([0.0, 0.0])), grad_x(θ))*dx
 

@@ -67,6 +67,10 @@ class RippleOptions(ShallowWaterOptions):
         self.coriolis = Constant(0.0)
         return self.coriolis
 
+    def set_viscosity(self, fs):
+        self.viscosity = Constant(0.0)
+        return self.viscosity
+
     def set_boundary_conditions(self, fs):
         if not hasattr(self, 'initial_value'):
             self.set_initial_condition(fs)
