@@ -87,8 +87,11 @@ solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file = morph.morpholo
                  beta_fn = 1.3, surbeta2_fn = 1/1.5, alpha_secc_fn = 0.75, angle_fn = 35, mesh_step_size = 0.2)
 
 
+def update_mc(t_new):
+    print(min(solver_obj.fields.tracer_2d.dat.data[:]))
+
 # run model
-solver_obj.iterate(update_forcings = update_forcings_tracer)
+solver_obj.iterate(update_forcings = update_mc)#forcings_tracer)
 
 # bathymetry
 

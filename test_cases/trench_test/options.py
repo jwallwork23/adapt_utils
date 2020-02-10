@@ -156,7 +156,7 @@ class TrenchOptions(TracerOptions):
         return self.manning_drag_coefficient
 
     def set_bathymetry(self, fs, **kwargs):
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         initial_depth = Constant(0.397)
         depth_riv = Constant(initial_depth - 0.397)
         depth_trench = Constant(depth_riv - 0.15)
@@ -215,7 +215,8 @@ class TrenchOptions(TracerOptions):
     def get_update_forcings(self, solver_obj):
 
         def update_forcings(t):
-            
+            print(min(solver_obj.fields.tracer_2d.dat.data[:]))
+            """
             self.uv1, self.eta = solver_obj.fields.solution_2d.split()
             self.u_cg.project(self.uv1)
             self.elev_cg.project(self.eta)
@@ -242,7 +243,7 @@ class TrenchOptions(TracerOptions):
             
             #    self.bathymetry_file.write(self.bathymetry)
             self.t_old.assign(t)        
-            
+            """
         return update_forcings
 
     def initialise_fields(self, inputdir, outputdir):

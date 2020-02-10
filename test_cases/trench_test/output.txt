@@ -1,0 +1,37 @@
+/data2/firedrake/lib/python3.5/site-packages/pyproj/crs.py:77: FutureWarning: '+init=<authority>:<code>' syntax is deprecated. '<authority>:<code>' is the preferred initialization method.
+  return _prepare_from_string(" ".join(pjargs))
+TsunamiProblem initialisation begin
+Building mesh...
+Building function spaces...
+Building solutions...
+Building fields...
+Setting boundary conditions...
+TsunamiProblem initialisation complete!
+
+Minimum angle in mesh: 34.51 degrees
+SIPG parameter:        14.55
+Tracer SIPG parameter: 14.55
+dt = 0.3
+Coupled time integrator: CoupledCrankNicolson2D
+  Shallow Water time integrator: CrankNicolson
+  Tracer time integrator: CrankNicolson
+Using time integrator: CoupledCrankNicolson2D
+r-adaptation converged in 6 iterations.
+TsunamiProblem initialisation begin
+Building mesh...
+Building function spaces...
+Building solutions...
+Building fields...
+Setting boundary conditions...
+TsunamiProblem initialisation complete!
+
+Traceback (most recent call last):
+  File "run_moving_mesh.py", line 47, in <module>
+    tp.solve(uses_adjoint=False)
+  File "/home/mc4117/Documents/MResCode/code/adapt_utils/solver.py", line 948, in solve
+    self.adapt_mesh()
+  File "/home/mc4117/Documents/MResCode/code/adapt_utils/solver.py", line 669, in adapt_mesh
+    tmp.project_fields(self)
+  File "/home/mc4117/Documents/MResCode/code/adapt_utils/swe/solver.py", line 484, in project_fields
+    self.viscosity = self.project(prob.viscosity, Function(self.P1))
+AttributeError: 'TsunamiProblem' object has no attribute 'viscosity'
