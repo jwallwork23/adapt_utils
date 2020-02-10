@@ -35,7 +35,8 @@ class AdaptiveMesh():
         if self.dim == 2:
             self.tangent = as_vector([-self.n[1], self.n[0]])  # Tangent vector
         elif self.dim == 3:
-            raise NotImplementedError  # TODO: Get a tangent vector in 3D
+            warnings.warn("#### TODO: 3D mesh tangent vector not implemented")
+            # raise NotImplementedError  # TODO: Get a tangent vector in 3D
         else:
             raise NotImplementedError
         self.facet_area = FacetArea(self.mesh)

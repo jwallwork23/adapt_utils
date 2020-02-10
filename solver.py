@@ -181,6 +181,7 @@ class SteadyProblem():
         self.setup_solver_forward()
         if self.nonlinear:
             self.rhs = 0
+        self.op.print_debug("Solver parameters for forward: {:}".format(self.op.params))
         solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
         self.plot_solution(adjoint=False)
 
