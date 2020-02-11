@@ -209,7 +209,12 @@ class SteadyProblem():
             assert hasattr(self, 'lhs')
         except AssertionError:
             raise ValueError("Cannot compute discrete adjoint since LHS unknown.")
-        F = self.lhs if self.nonlinear else action(self.lhs, self.solution) - self.rhs
+        if self.nonlinear
+            F = self.lhs
+        else:  # FIXME: Doesn't seem to work in tsunami1d space-time case
+            tmp_u = Function(self.V)
+            F = action(self.lhs, tmp_u) - self.rhs
+            F = replace(F, {tmp_u: self.solution})
         dFdu = derivative(F, self.solution, TrialFunction(self.V))
         dFdu_form = adjoint(dFdu)
         dJdu = derivative(self.quantity_of_interest_form(), self.solution, TestFunction(self.V))
