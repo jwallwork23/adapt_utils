@@ -107,11 +107,18 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         self.dbcs = [DirichletBC(self.V.sub(0), u0, t0_tag),
                      DirichletBC(self.V.sub(1), eta0, t0_tag)]
 
+        # Final time conditions
+        if not hasattr(self, 'kernel'):
+            self.get_qoi_kernel()
+        k_u, k_eta = self.kernel.copy(deepcopy=True).split()
+        self.dbcs_adjoint = [DirichletBC(self.V.sub(0), k_u, tf_tag),
+                             DirichletBC(self.V.sub(1), k_eta, tf_tag)]
+
     def plot_solution(self, adjoint=False):  # FIXME: Can't seem to plot vector fields
         if adjoint:
             z, zeta = self.adjoint_solution.split()
             zeta.rename("Adjoint elevation")
-            spd = interpolate(sqrt(dot(u, u)), self.P1)
+            spd = interpolate(sqrt(dot(z, z)), self.P1)
             spd.rename("Adjoint fluid speed")
             self.adjoint_solution_file.write(spd, zeta)
         else:
@@ -120,6 +127,20 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
             spd = interpolate(sqrt(dot(u, u)), self.P1)
             spd.rename("Fluid speed")
             self.solution_file.write(spd, eta)
+
+    def get_qoi_kernel(self):
+        self.kernel = self.op.set_qoi_kernel(self.V)
+
+    def quantity_of_interest(self):
+        if not hasattr(self, 'kernel'):
+            self.get_qoi_kernel()
+        self.qoi = assemble(inner(self.kernel, self.solution)*dx)
+        return self.qoi
+
+    def quantity_of_interest_form(self):
+        if not hasattr(self, 'kernel'):
+            self.get_qoi_kernel()
+        return inner(self.kernel, self.solution)*dx
 
 
 class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):

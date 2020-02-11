@@ -209,10 +209,11 @@ class SteadyProblem():
             assert hasattr(self, 'lhs')
         except AssertionError:
             raise ValueError("Cannot compute discrete adjoint since LHS unknown.")
-        dFdu = derivative(self.lhs, self.solution, TrialFunction(self.V))
+        F = self.lhs if self.nonlinear else action(self.lhs, self.solution) - self.rhs
+        dFdu = derivative(F, self.solution, TrialFunction(self.V))
         dFdu_form = adjoint(dFdu)
         dJdu = derivative(self.quantity_of_interest_form(), self.solution, TestFunction(self.V))
-        solve(dFdu_form == dJdu, self.adjoint_solution, solver_parameters=self.op.adjoint_params)
+        solve(dFdu_form == dJdu, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
 
     def solve_high_order(self, adjoint=True, solve_forward=False):
         """

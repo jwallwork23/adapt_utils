@@ -45,6 +45,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
             'pc_factor_mat_solver_type': 'mumps',
             'ksp_monitor': None,
         }
+        self.adjoint_params = self.params
 
     def set_bathymetry(self, fs):
         x, t = SpatialCoordinate(fs.mesh())
@@ -86,6 +87,8 @@ class Tsunami1dOptions(ShallowWaterOptions):
         ku.assign(0.0)
         x0, t0, r = self.region_of_interest[0]
         tol = 1.0e-8
-        ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol, 1.0, 0.0)), 0.0))
-        # ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol, 0.4, 0.0)), 0.0))
+        h = 0.4
+        # h = 1.0
+        # ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), h, 0.0), 0.0))
+        ke.interpolate(conditional(le(abs(x-x0), r), h, 0.0))
         return self.kernel
