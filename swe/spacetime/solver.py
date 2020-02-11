@@ -43,7 +43,6 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
 
-
     def set_fields(self):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
@@ -85,7 +84,6 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         self.lhs += inner(v, g*grad_x(η))*dx            # Pressure gradient term
         self.lhs += inner(v, f*perp(u))*dx              # Coriolis term
         self.lhs += nu*inner(grad_x(v), grad_x(u))*dx   # Viscosity term
-
 
         # Integration by parts for viscosity
         for i in self.mesh.exterior_facets.unique_markers:
@@ -135,6 +133,12 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):
     """
     Class for solving dispersive shallow water problems discretised using space-time FEM.
+
+    NOTES:
+      * Unlike with other shallow water problems, we solve for b*u instead of u in the momentum eqn.
+      * Due to the presence of the third mixed derivative, we solve the system as 2+1+1 mixed system,
+        where the final scalar equation solves for the divergence of b*u.
+      * We use Taylor-Hood for the momentum-continuity pair and P0 space for the auxiliary equation.
     """
     def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=0):
         # TODO: FunctionSpace is currently hard-coded
@@ -168,7 +172,6 @@ class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):
         self.trials = TrialFunctions(self.V)
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
-
 
     def set_fields(self):
         self.fields = {}
@@ -222,6 +225,7 @@ class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):
 
         # Auxiliary equation, λ = div(u)
         self.lhs += inner(μ, λ)*dx + inner(grad_x(μ), u)*dx
+        # self.lhs += -jump(μ*u, n)*dS
 
         # TODO: Enable different BCs
 
@@ -235,14 +239,14 @@ class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):
         if adjoint:
             z, zeta, zdiv = self.adjoint_solution.split()
             spd = interpolate(sqrt(dot(u, u)), self.P1)
-            spd.rename("Adjoint fluid speed")
+            spd.rename("Adjoint of fluid speed scaled by bathymetry")
             zeta.rename("Adjoint elevation")
-            zdiv.rename("Divergence of adjoint fluid velocity")
+            zdiv.rename("Divergence")
             self.adjoint_solution_file.write(spd, zeta, zdiv)
         else:
             u, eta, udiv = self.solution.split()
             spd = interpolate(sqrt(dot(u, u)), self.P1)
-            spd.rename("Fluid speed")
+            spd.rename("Fluid speed scaled by bathymetry")
             eta.rename("Elevation")
-            udiv.rename("Divergence of fluid velocity")
+            udiv.rename("Divergence")
             self.solution_file.write(spd, eta, udiv)
