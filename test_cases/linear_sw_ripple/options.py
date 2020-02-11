@@ -54,9 +54,12 @@ class RippleOptions(ShallowWaterOptions):
 
     def set_initial_condition(self, fs):
         self.initial_value = Function(fs)
-        u, eta = self.initial_value.split()
-        u.interpolate(as_vector([0.0, 0.0]))
-        # eta.interpolate(self.gaussian(fs.sub(1), source=True, spacetime=True))
+        if fs.ufl_element().num_sub_elements() == 2:
+            u, eta = self.initial_value.split()
+        else:
+            u, eta, udiv = self.initial_value.split()
+            udiv.assign(0.0)
+        u.assign(0.0)
         x, y, z = SpatialCoordinate(fs.mesh())
         x0 = 2.0
         y0 = 2.0
@@ -74,7 +77,10 @@ class RippleOptions(ShallowWaterOptions):
     def set_boundary_conditions(self, fs):
         if not hasattr(self, 'initial_value'):
             self.set_initial_condition(fs)
-        u, eta = self.initial_value.split()
-        self.boundary_conditions = {1: {'un': Constant(0.0)}, 2: {'un': Constant(0.0)},
-                                    3: {'un': Constant(0.0)}, 4: {'un': Constant(0.0)},
-                                    5: {'uv': u, 'elev': eta}, 6: {}}
+        if fs.ufl_element().num_sub_elements() == 2:
+            u, eta = self.initial_value.split()
+        else:
+            u, eta, udiv = self.initial_value.split()
+        self.boundary_conditions = {5: {'uv': u, 'elev': eta}, 6: {}}
+        for i in range(1, 5):
+            self.boundary_conditions[i] = {'un': Constant(0.0)}
