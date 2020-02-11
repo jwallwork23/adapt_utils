@@ -107,19 +107,6 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         self.dbcs = [DirichletBC(self.V.sub(0), u0, t0_tag),
                      DirichletBC(self.V.sub(1), eta0, t0_tag)]
 
-    def solve_forward(self):
-        self.setup_solver_forward()
-        if self.nonlinear:
-            self.rhs = 0
-        sol = Function(self.V*self.P1)
-        self.op.print_debug("Solver parameters for forward: {:}".format(self.op.params))
-        solve(self.lhs == self.rhs, sol, bcs=self.dbcs, solver_parameters=self.op.params)
-        u_sol, eta_sol, lam_sol = sol.split()
-        u, eta = self.solution.split()
-        u.assign(u_sol)
-        eta.assign(eta_sol)
-        self.plot_solution(adjoint=False)
-
     def plot_solution(self, adjoint=False):  # FIXME: Can't seem to plot vector fields
         if adjoint:
             z, zeta = self.adjoint_solution.split()

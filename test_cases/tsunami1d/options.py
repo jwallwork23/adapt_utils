@@ -9,7 +9,7 @@ __all__ = ["Tsunami1dOptions"]
 
 
 class Tsunami1dOptions(ShallowWaterOptions):
-    def __init__(self, nx=200, dt=10.0, **kwargs):
+    def __init__(self, nx=2000, dt=1.0, **kwargs):
         super(Tsunami1dOptions, self).__init__(**kwargs)
         self.dt = dt
         self.end_time = 4200.0
@@ -58,7 +58,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
         x, t = SpatialCoordinate(fs.mesh())
         x0, t0, r = self.source_loc[0]
         tol = 1.0e-8
-        bump = 0.4*sin(pi*(x-x0+r)/50.0e+3)
+        bump = 0.4*sin(pi*(x-x0+r)/(2*r))
         # eta.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), bump, 0.0), 0.0))
         eta.interpolate(conditional(le(abs(x-x0), r), bump, 0.0))
         return self.initial_value
