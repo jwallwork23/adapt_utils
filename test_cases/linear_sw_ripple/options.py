@@ -81,5 +81,6 @@ class RippleOptions(ShallowWaterOptions):
         else:
             u, eta, udiv = self.initial_value.split()
         self.boundary_conditions = {5: {'uv': u, 'elev': eta}, 6: {}}
+        freeslip = {'un': Constant(0.0)}
         for i in range(1, 5):
-            self.boundary_conditions[i] = {'un': Constant(0.0)}
+            self.boundary_conditions[i] = freeslip

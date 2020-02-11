@@ -68,9 +68,9 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: F.dx(0)
+            grad_x = lambda F: as_vector([F.dx(0),])
             ddt = lambda F: F.dx(1)
-            n = self.n[0]
+            n = as_vector([self.n[0],])
         elif self.dim == 3:
             grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])
             perp = lambda F: as_vector([-F[1], F[0]])

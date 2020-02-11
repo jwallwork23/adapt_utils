@@ -9,7 +9,7 @@ __all__ = ["Tsunami1dOptions"]
 
 
 class Tsunami1dOptions(ShallowWaterOptions):
-    def __init__(self, nx=400, dt=1.0, **kwargs):
+    def __init__(self, nx=200, dt=10.0, **kwargs):
         super(Tsunami1dOptions, self).__init__(**kwargs)
         self.dt = dt
         self.end_time = 4200.0
@@ -57,7 +57,10 @@ class Tsunami1dOptions(ShallowWaterOptions):
         u.assign(0.0)
         x, t = SpatialCoordinate(fs.mesh())
         x0, t0, r = self.source_loc[0]
-        eta.interpolate(conditional(And(ge(x, x0-r), le(x, x0+r)), 0.4*sin(pi*(x-x0+r)/50.0e+3), 0.0))
+        tol = 1.0e-8
+        bump = 0.4*sin(pi*(x-x0+r)/50.0e+3)
+        # eta.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), bump, 0.0), 0.0))
+        eta.interpolate(conditional(le(abs(x-x0), r), bump, 0.0))
         return self.initial_value
 
     def set_coriolis(self, fs):
@@ -73,5 +76,16 @@ class Tsunami1dOptions(ShallowWaterOptions):
             self.set_initial_condition(fs)
         u, eta = self.initial_value.split()
         freeslip = {'un': Constant(0.0)}
-        self.boundary_conditions = {{1: freeslip}, {2: freeslip}, {3: {'uv': u, 'elev': eta}}, 4: {}}
+        self.boundary_conditions = {1: freeslip, 2: freeslip, 3: {'uv': u, 'elev': eta}, 4: {}}
         return self.boundary_conditions
+
+    def set_qoi_kernel(self, fs):
+        x, t = SpatialCoordinate(fs)
+        self.kernel = Function(fs)
+        ku, ke = self.kernel.split()
+        ku.assign(0.0)
+        x0, t0, r = self.region_of_interest[0]
+        tol = 1.0e-8
+        ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol, 1.0, 0.0)), 0.0))
+        # ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol, 0.4, 0.0)), 0.0))
+        return self.kernel
