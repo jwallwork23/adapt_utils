@@ -85,13 +85,13 @@ class TrenchOptions(TracerOptions):
 
         #self.eta_init, self.uv_init = self.initialise_fields(input_dir, self.di)        
 
-        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "DG", 1)*self.V)   
+        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "DG", 1)*self.P1DG)   
         
         
         
         self.set_up_suspended()
         
-        self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
+        
         self.tracer_init = Function(self.P1DG, name="Tracer Initial condition").project(self.testtracer)        
         
         # Stabilisation
@@ -122,14 +122,14 @@ class TrenchOptions(TracerOptions):
         self.qois = []
         
 
-    def set_source_tracer(self, fs, solver_obj, init = False):
-        self.coeff = Function(self.depth.function_space()).project(self.coeff)
-        self.ceq = Function(self.depth.function_space()).project(self.ceq)
+    def set_source_tracer(self, fs, solver_obj = None, init = False):
+        P1DG = FunctionSpace(self.depth.function_space().mesh(), 'DG', 1)
+        self.coeff = Function(P1DG).project(self.coeff)
+        self.ceq = Function(P1DG).project(self.ceq)
         if init:
-            self.testtracer = Function(self.depth.function_space()).project(self.testtracer)
-            self.source = Function(self.depth.function_space()).project(-(self.settling_velocity*self.coeff*self.testtracer/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+            self.source = Function(P1DG).project(-(self.settling_velocity*self.coeff*self.tracer_init_value/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
         else:
-            self.source.project(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+            self.source.interpolate(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
                         
         return self.source
 
@@ -215,18 +215,21 @@ class TrenchOptions(TracerOptions):
     def get_update_forcings(self, solver_obj):
 
         def update_forcings(t):
-            print(min(solver_obj.fields.tracer_2d.dat.data[:]))
-            """
+            print(min(self.source.dat.data[:]))
+
             self.uv1, self.eta = solver_obj.fields.solution_2d.split()
-            self.u_cg.project(self.uv1)
-            self.elev_cg.project(self.eta)
+            self.u_cg.interpolate(self.uv1)
+            self.elev_cg.interpolate(self.eta)
+            
+            self.horizontal_velocity.interpolate(self.u_cg[0])
+            self.vertical_velocity.interpolate(self.u_cg[1])
             
             # Update depth
             if self.wetting_and_drying:
                 bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-                self.depth.project(self.eta + bathymetry_displacement(self.eta) + self.bathymetry)
+                self.depth.interpolate(self.eta + bathymetry_displacement(self.eta) + self.bathymetry)
             else:
-                self.depth.project(self.eta + self.bathymetry)
+                self.depth.interpolate(self.eta + self.bathymetry)
             
             self.hc.interpolate(conditional(self.depth > 0.001, self.depth, 0.001))
             self.aux.interpolate(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
@@ -237,13 +240,13 @@ class TrenchOptions(TracerOptions):
 
             self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
 
-            #if self.t_old.dat.data[:] == t:
-            #    print(t)
-            #    self.update_suspended(solver_obj)
+            if self.t_old.dat.data[:] == t:
+                print(t)
+                self.update_suspended(solver_obj)
             
             #    self.bathymetry_file.write(self.bathymetry)
             self.t_old.assign(t)        
-            """
+            
         return update_forcings
 
     def initialise_fields(self, inputdir, outputdir):

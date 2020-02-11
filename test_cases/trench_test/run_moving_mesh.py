@@ -1,5 +1,7 @@
 from thetis import *
 
+import pylab as plt
+
 from adapt_utils.test_cases.trench_test.options import TrenchOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
 

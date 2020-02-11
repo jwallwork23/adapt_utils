@@ -178,10 +178,19 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     diff_bathy_file - bedlevel evolution file
     """    
     t_list = []    
+
+    def update_forcings_mc(t_new):
+        print(min(ceq.dat.data[:]))
+        print(min(source.dat.data[:]))
     
     def update_forcings_tracer(t_new):
         # update bathymetry
+        #import ipdb; ipdb.set_trace()
+        print(t_new)
+        print(min(source.dat.data[:]))
         
+        if round(t_new)%t_export == 0:
+            import ipdb; ipdb.set_trace()
         
         old_bathymetry_2d.assign(bathymetry_2d)
         
@@ -458,7 +467,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     #    t_export = np.round(t_end/100, 0)
     #else:
     #    t_export = 1
-    t_export = 12
+    t_export = 6
     
     th.print_output('Exporting to '+outputdir)
     
@@ -619,7 +628,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
         sediment_rate = th.Constant(ceq.at([0,0])/coeff.at([0,0]))
         testtracer = th.Function(P1_2d).interpolate(ceq/coeff)
-        import ipdb; ipdb.set_trace()
+        #import ipdb; ipdb.set_trace()
         # calculate depth-averaged source term for sediment concentration equation
         source = th.Function(P1_2d).interpolate(-(settling_velocity*coeff*sediment_rate/depth)+ (settling_velocity*ceq/depth))
     

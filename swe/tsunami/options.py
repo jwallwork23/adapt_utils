@@ -162,17 +162,17 @@ class TsunamiOptions(ShallowWaterOptions):
         
     def get_initial_depth(self, fs):
         """Compute the initial total water depth, using the bathymetry and initial elevation."""
-
-        if self.bathymetry is None:
-            self.set_bathymetry(fs.sub(1))
         if not hasattr(self, 'initial_value'):
             self.set_initial_condition(fs)
         eta = self.initial_value.split()[1]
+        V = FunctionSpace(eta.function_space().mesh(), 'CG', 1)
+        if self.bathymetry is None:
+            self.set_bathymetry(V)       
         if self.wetting_and_drying:
             bathymetry_displacement = self.wd_dispacement_mc(eta)
-            self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta, eta.function_space())
+            self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta, V)
         else:
-            self.depth = interpolate(self.bathymetry + eta, eta.function_space())
+            self.depth = interpolate(self.bathymetry + eta, V)
         return self.depth
 
     def wd_dispacement_mc(self, eta):

@@ -39,24 +39,24 @@ class TracerOptions(TsunamiOptions):
         else:
             self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
 
-        self.u_cg = Function(self.vector_cg).project(self.uv_init)
-        self.horizontal_velocity = Function(self.V).project(self.u_cg[0])
-        self.vertical_velocity = Function(self.V).project(self.u_cg[1])
-        self.elev_cg = Function(self.V).project(self.eta_init)
+        self.u_cg = Function(self.vector_cg).interpolate(self.uv_init)
+        self.horizontal_velocity = Function(self.V).interpolate(self.u_cg[0])
+        self.vertical_velocity = Function(self.V).interpolate(self.u_cg[1])
+        self.elev_cg = Function(self.V).interpolate(self.eta_init)
 
     
-        self.unorm = Function(self.P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
+        self.unorm = Function(self.P1DG).interpolate((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
 
-        self.hc = Function(self.P1DG).project(conditional(self.depth > 0.001, self.depth, 0.001))
-        self.aux = Function(self.P1DG).project(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
-        self.qfc = Function(self.P1DG).project(2/(ln(self.aux)/0.4)**2)
+        self.hc = Function(self.P1DG).interpolate(conditional(self.depth > 0.001, self.depth, 0.001))
+        self.aux = Function(self.P1DG).interpolate(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
+        self.qfc = Function(self.P1DG).interpolate(2/(ln(self.aux)/0.4)**2)
         
-        self.TOB = Function(self.V).project(1000*0.5*self.qfc*self.unorm)
+        self.TOB = Function(self.V).interpolate(1000*0.5*self.qfc*self.unorm)
         
         
         # skin friction coefficient
         
-        self.cfactor = Function(self.P1DG).project(self.get_cfactor())
+        self.cfactor = Function(self.P1DG).interpolate(self.get_cfactor())
         # mu - ratio between skin friction and normal friction
         self.mu = Function(self.P1DG).interpolate(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
         
@@ -73,9 +73,10 @@ class TracerOptions(TsunamiOptions):
         self.s0 = Function(self.P1DG).interpolate((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
         self.ceq = Function(self.P1DG).interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         
-        self.testtracer = Function(self.P1DG).project(self.ceq/self.coeff)
-        self.source = Function(self.P1DG).project(self.set_source_tracer(self.P1DG, solver_obj = None, init = True)) 
-        self.qbsourcedepth = Function(self.V).project(self.source * self.depth)
+        self.testtracer = Function(self.P1DG).interpolate(self.ceq/self.coeff)
+        self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
+        self.source = Function(self.P1DG).interpolate(self.set_source_tracer(self.P1DG, solver_obj = None, init = True)) 
+        self.qbsourcedepth = Function(self.V).interpolate(self.source * self.depth)
         
         self.z_n = Function(self.V)
         self.z_n1 = Function(self.V)
@@ -84,7 +85,7 @@ class TracerOptions(TsunamiOptions):
         
     def update_suspended(self, solver_obj):
         
-        self.old_bathymetry_2d.project(solver_obj.fields.bathymetry_2d)
+        self.old_bathymetry_2d.assign(solver_obj.fields.bathymetry_2d)
         
         self.z_n.interpolate(self.old_bathymetry_2d)
         
@@ -105,7 +106,7 @@ class TracerOptions(TsunamiOptions):
         self.s0.assign((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
         self.ceq.interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         self.tracer_init_value.assign(self.ceq.at([0,0])/self.coeff.at([0,0]))
-        self.source.project(self.set_source_tracer(self.eta.function_space(), solver_obj))
+        self.source.interpolate(self.set_source_tracer(self.P1DG, solver_obj))
         
         
         f = (((1-self.porosity)*(self.z_n1 - self.z_n)/(self.dt*self.morfac))*self.v)*dx
