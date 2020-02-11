@@ -107,6 +107,11 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         self.dbcs = [DirichletBC(self.V.sub(0), u0, t0_tag),
                      DirichletBC(self.V.sub(1), eta0, t0_tag)]
 
+    def setup_solver_adjoint(self):
+        tf_tag = self.op.t_final_tag
+
+        # TODO: Continuous adjoint
+
         # Final time conditions
         if not hasattr(self, 'kernel'):
             self.get_qoi_kernel()
