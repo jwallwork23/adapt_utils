@@ -14,7 +14,7 @@ class RippleOptions(ShallowWaterOptions):
         self.dt = 0.05
         self.end_time = nt*self.dt
 
-        # Mesh: 3d approach
+        # Mesh: 3d space-time approach
         self.default_mesh = BoxMesh(nx, nx, nt, lx, lx, self.end_time)
         self.t_init_tag = 5
         self.t_final_tag = 6
@@ -46,7 +46,7 @@ class RippleOptions(ShallowWaterOptions):
 
     def set_bathymetry(self, fs):
         if self.shelf:
-            x, y, z = SpatialCoordinate(fs.mesh())
+            x, y, t = SpatialCoordinate(fs.mesh())
             self.bathymetry = interpolate(conditional(le(x, 0.5), self.depth/10, self.depth), fs)
         else:
             self.bathymetry = Constant(self.depth)
@@ -60,9 +60,8 @@ class RippleOptions(ShallowWaterOptions):
             u, eta, udiv = self.initial_value.split()
             udiv.assign(0.0)
         u.assign(0.0)
-        x, y, z = SpatialCoordinate(fs.mesh())
-        x0 = 2.0
-        y0 = 2.0
+        x, y, t = SpatialCoordinate(fs.mesh())
+        x0, y0, t0, r = self.source_loc[0]  # TODO: we haven't used r
         eta.interpolate(0.001*exp(-((x-x0)*(x-x0) + (y-y0)*(y-y0))/0.04))
         return self.initial_value
 
