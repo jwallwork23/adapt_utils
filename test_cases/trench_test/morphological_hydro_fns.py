@@ -178,14 +178,13 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     diff_bathy_file - bedlevel evolution file
     """    
     t_list = []    
+    tracer_list = []
 
 
     def update_forcings_tracer(t_new):
 
+        tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
-        print(t_new)
-        print(min(solver_obj.fields.tracer_2d.dat.data[:]))
-        #import ipdb; ipdb.set_trace()
         # update bathymetry      
         old_bathymetry_2d.assign(bathymetry_2d)
         
@@ -306,7 +305,6 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
                  
                     # calculate depth-averaged source term for sediment concentration equation
-                    #source.interpolate((settling_velocity*ceq/depth))
                     source.interpolate(-(settling_velocity*coeff*solver_obj.fields.tracer_2d/depth)+ (settling_velocity*ceq/depth))
                     # update sediment rate to ensure equilibrium at inflow
                     sediment_rate.assign(ceq.at([0,0])/coeff.at([0,0]))
@@ -462,7 +460,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     #    t_export = np.round(t_end/100, 0)
     #else:
     #    t_export = 1
-    t_export = 6
+    t_export = 18
     
     th.print_output('Exporting to '+outputdir)
     
@@ -623,7 +621,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
         sediment_rate = th.Constant(ceq.at([0,0])/coeff.at([0,0]))
         testtracer = th.Function(P1_2d).interpolate(ceq/coeff)
-        #import ipdb; ipdb.set_trace()
+
         # calculate depth-averaged source term for sediment concentration equation
         source = th.Function(P1_2d).interpolate(-(settling_velocity*coeff*sediment_rate/depth)+ (settling_velocity*ceq/depth))
     
@@ -789,6 +787,10 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     else:
         # set initial conditions
         solver_obj.assign_initial_conditions(uv=uv_init, elev= elev_init)
+
+    solver_obj.iterate(update_forcings = update_forcings_tracer)
+    
+    import ipdb; ipdb.set_trace()
 
     return solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file
 

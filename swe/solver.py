@@ -485,7 +485,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             self.remesh_step = 0
         op = self.op
         self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.fields['bathymetry'])
-        import ipdb; ipdb.set_trace()
+
         self.solver_obj.export_initial_state = self.remesh_step == 0
             
         

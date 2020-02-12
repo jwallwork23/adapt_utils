@@ -27,9 +27,9 @@ class TrenchOptions(TracerOptions):
 
         self.default_mesh = RectangleMesh(8*5*nx, 5*ny, 16, 1.1)
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
-        self.V = FunctionSpace(self.default_mesh, "CG", 1)
-        self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
-        self.vector_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
+        self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
+        self.P1_vec = VectorFunctionSpace(self.default_mesh, "CG", 1)
+        self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
         
         super(TrenchOptions, self).__init__(**kwargs)
         self.plot_pvd = True  
@@ -57,6 +57,7 @@ class TrenchOptions(TracerOptions):
 
         self.grad_depth_viscosity = True        
 
+        self.tracer_list = []
         
         self.bathymetry_file = File(self.di + "/bathy.pvd")
                 
@@ -89,7 +90,7 @@ class TrenchOptions(TracerOptions):
         
       
         
-        self.uv_d = Function(self.vector_dg).project(self.uv_init)
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
         self.eta_d = Function(self.P1DG).project(self.eta_init)
         
         self.set_up_suspended(self.default_mesh)
@@ -126,11 +127,11 @@ class TrenchOptions(TracerOptions):
         
 
     def set_source_tracer(self, fs, solver_obj = None, init = False):
-        P1DG = FunctionSpace(self.depth.function_space().mesh(), 'DG', 1)
-        self.coeff = Function(P1DG).project(self.coeff)
-        self.ceq = Function(P1DG).project(self.ceq)
+        #P1DG = FunctionSpace(self.depth.function_space().mesh(), 'DG', 1)
+        #self.coeff = Function(P1DG).project(self.coeff)
+        #self.ceq = Function(P1DG).project(self.ceq)
         if init:
-            self.source = Function(P1DG).project(-(self.settling_velocity*self.coeff*self.tracer_init_value/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+            self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.tracer_init_value/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
         else:
             self.source.interpolate(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+(self.settling_velocity*self.ceq/self.depth))
         return self.source
@@ -156,7 +157,7 @@ class TrenchOptions(TracerOptions):
         return self.manning_drag_coefficient
 
     def set_bathymetry(self, fs, **kwargs):
-        #import ipdb; ipdb.set_trace()
+
         initial_depth = Constant(0.397)
         depth_riv = Constant(initial_depth - 0.397)
         depth_trench = Constant(depth_riv - 0.15)
@@ -213,11 +214,11 @@ class TrenchOptions(TracerOptions):
         return self.initial_value
 
     def get_update_forcings(self, solver_obj):
-
+        
         def update_forcings(t):
-            print(t)
-            print(min(solver_obj.fields.tracer_2d.dat.data[:]))
-            #import ipdb; ipdb.set_trace()
+
+            self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
+
             self.uv1, self.eta = solver_obj.fields.solution_2d.split()
             self.u_cg.interpolate(self.uv1)
             self.elev_cg.interpolate(self.eta)
@@ -265,7 +266,7 @@ class TrenchOptions(TracerOptions):
         # velocity
         with timed_stage('initialising velocity'):
             chk = DumbCheckpoint(inputdir + "/velocity" , mode=FILE_READ)
-            uv_init = Function(self.vector_dg, name="velocity")
+            uv_init = Function(self.P1_vec_dg, name="velocity")
             chk.load(uv_init)
             File(outputdir + "/velocity_imported.pvd").write(uv_init)
             chk.close()

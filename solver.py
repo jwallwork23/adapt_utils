@@ -113,6 +113,7 @@ class SteadyProblem():
         self.P2 = FunctionSpace(self.mesh, "CG", 2)
         self.P1DG = FunctionSpace(self.mesh, "DG", 1)
         self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
+        self.P1_vec_dg = VectorFunctionSpace(self.mesh, "DG", 1)
         self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
         self.test = TestFunction(self.V)
         self.trial = TrialFunction(self.V)
@@ -136,6 +137,7 @@ class SteadyProblem():
         """
         Project all fields from Problem `prob` onto the corresponding function spaces in `self`.
         """
+
         for i in self.fields:
             if isinstance(prob.fields[i], Function):
                 self.fields[i] = self.project(prob.fields[i], Function(self.fields[i].function_space()))
@@ -673,7 +675,6 @@ class SteadyProblem():
             # Update self.mesh and function spaces, etc.
 
             self.mesh.coordinates.dat.data[:] = x.dat.data  # FIXME: Not parallel
-
 
             self.create_function_spaces()
             self.create_solutions()
