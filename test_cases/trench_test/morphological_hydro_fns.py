@@ -179,19 +179,14 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     """    
     t_list = []    
 
-    def update_forcings_mc(t_new):
-        print(min(ceq.dat.data[:]))
-        print(min(source.dat.data[:]))
-    
+
     def update_forcings_tracer(t_new):
-        # update bathymetry
-        #import ipdb; ipdb.set_trace()
+
+
         print(t_new)
-        print(min(source.dat.data[:]))
-        
-        if round(t_new)%t_export == 0:
-            import ipdb; ipdb.set_trace()
-        
+        print(min(solver_obj.fields.tracer_2d.dat.data[:]))
+        #import ipdb; ipdb.set_trace()
+        # update bathymetry      
         old_bathymetry_2d.assign(bathymetry_2d)
         
         # extract new elevation and velocity and project onto CG space
@@ -311,7 +306,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
                  
                     # calculate depth-averaged source term for sediment concentration equation
-  
+                    #source.interpolate((settling_velocity*ceq/depth))
                     source.interpolate(-(settling_velocity*coeff*solver_obj.fields.tracer_2d/depth)+ (settling_velocity*ceq/depth))
                     # update sediment rate to ensure equilibrium at inflow
                     sediment_rate.assign(ceq.at([0,0])/coeff.at([0,0]))
@@ -734,7 +729,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
         # switch on tracer calculation if using sediment transport component
         options.solve_tracer = True
         options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d', 'bathymetry_2d']
-        options.tracer_advective_velocity = corrective_velocity
+        #options.tracer_advective_velocity = corrective_velocity
         options.tracer_source_2d = source
     else:
         options.solve_tracer = False
@@ -783,8 +778,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
         str2 = str2[0:len(str2)-1] + "}"
         exec('swe_bnd[right_bnd_id] = ' + str2)
          
-    solver_obj.bnd_functions['shallow_water'] = swe_bnd
-    
+    solver_obj.bnd_functions['shallow_water'] = swe_bnd   
     
     if suspendedload == True:
         solver_obj.bnd_functions['tracer'] = {1: {'value': sediment_rate}}

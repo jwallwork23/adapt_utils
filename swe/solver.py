@@ -108,8 +108,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         # Initial conditions  # TODO: will this work over mesh iterations?
         if self.prev_solution is not None:
-            interp = self.interpolated_solution
-            u_interp, eta_interp = self.interpolated_solution.split()
+            interp = self.interpolate_solution
+            u_interp, eta_interp = self.interpolate_solution.split()
         else:
             interp = Function(self.V)
             u_interp, eta_interp = interp.split()
@@ -478,13 +478,21 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solver_obj.iterate(update_forcings=self.op.get_update_forcings(self.solver_obj),
                                 export_func=self.op.get_export_func(self.solver_obj))
         self.solution = self.solver_obj.fields.solution_2d
+        self.solution_tracer = self.solver_obj.fields.tracer_2d
 
     def setup_solver(self):
         if not hasattr(self, 'remesh_step'):
             self.remesh_step = 0
         op = self.op
         self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.fields['bathymetry'])
+        import ipdb; ipdb.set_trace()
         self.solver_obj.export_initial_state = self.remesh_step == 0
+            
+        
+        if op.solve_tracer:
+            self.uv_d, self.eta_d = self.solution.split()
+            op.set_up_suspended(self.mesh)
+        
         options = self.solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
@@ -530,7 +538,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.solve_tracer = op.solve_tracer
         if op.solve_tracer:
             #options.tracer_advective_velocity = op.conv_vel
-            options.tracer_source_2d = self.fields['source']
+            options.tracer_source_2d = self.op.source
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
         if op.solve_tracer:
@@ -542,17 +550,22 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
             raise NotImplementedError  # TODO: Adaptive case. Will need to save mesh.
         elif self.prev_solution is not None:
-            u_interp, eta_interp = self.interpolated_solution.split()
+            u_interp, eta_interp = self.interpolate_solution.split()
+            
         else:
             u_interp, eta_interp = self.solution.split()
+            if hasattr(self, 'solution_tracer'):
+                tracer_interp = self.solution_tracer
+            else:
+                tracer_interp = self.op.tracer_init
             
         if op.solve_tracer:
             
             if self.op.tracer_init is not None:
-                self.solver_obj.assign_initial_conditions(uv = u_interp, elev = eta_interp, tracer = self.op.tracer_init)
+                self.solver_obj.assign_initial_conditions(uv = u_interp, elev = eta_interp, tracer = tracer_interp)
         else:
             self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
-        
+
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()

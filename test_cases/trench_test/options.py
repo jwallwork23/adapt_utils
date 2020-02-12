@@ -24,8 +24,8 @@ class TrenchOptions(TracerOptions):
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
         self.plot_timeseries = plot_timeseries
-        
-        self.default_mesh = RectangleMesh(10*5*nx, 5*ny, 16, 1.1)
+
+        self.default_mesh = RectangleMesh(8*5*nx, 5*ny, 16, 1.1)
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
         self.V = FunctionSpace(self.default_mesh, "CG", 1)
         self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
@@ -87,22 +87,25 @@ class TrenchOptions(TracerOptions):
 
         self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "DG", 1)*self.P1DG)   
         
+      
         
+        self.uv_d = Function(self.vector_dg).project(self.uv_init)
+        self.eta_d = Function(self.P1DG).project(self.eta_init)
         
-        self.set_up_suspended()
+        self.set_up_suspended(self.default_mesh)
         
         
         self.tracer_init = Function(self.P1DG, name="Tracer Initial condition").project(self.testtracer)        
         
         # Stabilisation
-        self.stabilisation = 'no'
+        self.stabilisation = 'lax_friedrichs'
 
         # Time integration
         self.t_old = Constant(0.0)
         self.dt = 0.3
         self.end_time = self.num_hours*3600.0/self.morfac
-        self.dt_per_export = 40
-        self.dt_per_remesh = 100
+        self.dt_per_export = 60
+        self.dt_per_remesh = 60
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
@@ -129,14 +132,13 @@ class TrenchOptions(TracerOptions):
         if init:
             self.source = Function(P1DG).project(-(self.settling_velocity*self.coeff*self.tracer_init_value/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
         else:
-            self.source.interpolate(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
-                        
+            self.source.interpolate(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+(self.settling_velocity*self.ceq/self.depth))
         return self.source
 
     
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
-            self.quadratic_drag_coefficient = project(self.get_cfactor(), self.depth.function_space())
+            self.quadratic_drag_coefficient = project(self.get_cfactor(), fs)
         return self.quadratic_drag_coefficient
 
     def get_cfactor(self):
@@ -144,11 +146,9 @@ class TrenchOptions(TracerOptions):
             assert hasattr(self, 'depth')
         except AssertionError:
             raise ValueError("Depth is undefined.")
-        
         self.ksp = Constant(3*self.average_size)
         hclip = Function(self.P1DG).interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
-        aux = 11.036*hclip/self.ksp
-        return conditional(self.depth>self.ksp, 2*(0.4**2)/(ln(aux)**2), Constant(0.0))
+        return Function(self.P1DG).interpolate(conditional(self.depth>self.ksp, 2*((2.5*ln(11.036*hclip/self.ksp))**(-2)), Constant(0.0)))
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
@@ -184,6 +184,8 @@ class TrenchOptions(TracerOptions):
         boundary_conditions = {}
         boundary_conditions[inflow_tag] = {'flux': Constant(-0.22)}
         boundary_conditions[outflow_tag] = {'elev': Constant(0.397)}
+        #boundary_conditions[bottom_wall_tag] = {'un': Constant(0.0)}
+        #boundary_conditions[top_wall_tag] = {'un': Constant(0.0)}        
         return boundary_conditions
 
 
@@ -196,8 +198,6 @@ class TrenchOptions(TracerOptions):
         boundary_conditions[inflow_tag] = {'value': self.tracer_init_value}
         return boundary_conditions
 
-    def update_boundary_conditions(self, t=0.0):
-        return None
 
     def set_initial_condition(self, fs):
         """
@@ -215,38 +215,39 @@ class TrenchOptions(TracerOptions):
     def get_update_forcings(self, solver_obj):
 
         def update_forcings(t):
-            print(min(self.source.dat.data[:]))
-
+            print(t)
+            print(min(solver_obj.fields.tracer_2d.dat.data[:]))
+            #import ipdb; ipdb.set_trace()
             self.uv1, self.eta = solver_obj.fields.solution_2d.split()
             self.u_cg.interpolate(self.uv1)
             self.elev_cg.interpolate(self.eta)
-            
+
+
             self.horizontal_velocity.interpolate(self.u_cg[0])
             self.vertical_velocity.interpolate(self.u_cg[1])
             
             # Update depth
             if self.wetting_and_drying:
                 bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-                self.depth.interpolate(self.eta + bathymetry_displacement(self.eta) + self.bathymetry)
+                self.depth.interpolate(self.elev_cg + bathymetry_displacement(self.eta) + self.bathymetry)
             else:
-                self.depth.interpolate(self.eta + self.bathymetry)
+                self.depth.interpolate(self.elev_cg + self.bathymetry)
+
             
             self.hc.interpolate(conditional(self.depth > 0.001, self.depth, 0.001))
             self.aux.interpolate(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
             self.qfc.interpolate(2/(ln(self.aux)/0.4)**2)
-    
             # calculate skin friction coefficient
             self.cfactor.interpolate(self.get_cfactor())
 
-            self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
+            self.quadratic_drag_coefficient.project(self.get_cfactor())
 
             if self.t_old.dat.data[:] == t:
-                print(t)
                 self.update_suspended(solver_obj)
             
             #    self.bathymetry_file.write(self.bathymetry)
             self.t_old.assign(t)        
-            
+
         return update_forcings
 
     def initialise_fields(self, inputdir, outputdir):

@@ -13,7 +13,11 @@ class TracerOptions(TsunamiOptions):
     def __init__(self, **kwargs):
         super(TracerOptions, self).__init__(**kwargs)    
     
-    def set_up_suspended(self):
+    def set_up_suspended(self, mesh):
+        P1DG = FunctionSpace(mesh, "DG", 1)
+        V = FunctionSpace(mesh, "CG", 1)
+        vector_cg = VectorFunctionSpace(mesh, "CG", 1)
+        vector_dg = VectorFunctionSpace(mesh, "DG", 1)            
         
         R = Constant(2650/1000 - 1)
         self.dstar = Constant(self.average_size*((self.g*R)/(self.base_viscosity**2))**(1/3))
@@ -39,49 +43,51 @@ class TracerOptions(TsunamiOptions):
         else:
             self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
 
-        self.u_cg = Function(self.vector_cg).interpolate(self.uv_init)
-        self.horizontal_velocity = Function(self.V).interpolate(self.u_cg[0])
-        self.vertical_velocity = Function(self.V).interpolate(self.u_cg[1])
-        self.elev_cg = Function(self.V).interpolate(self.eta_init)
+        self.u_cg = Function(vector_cg).project(self.uv_d)
+        self.horizontal_velocity = Function(V).project(self.u_cg[0])
+        self.vertical_velocity = Function(V).project(self.u_cg[1])
+        self.elev_cg = Function(V).project(self.eta_d)
 
+        self.depth = Function(V).project(self.elev_cg + self.bathymetry)
     
-        self.unorm = Function(self.P1DG).interpolate((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
+        self.unorm = Function(P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
 
-        self.hc = Function(self.P1DG).interpolate(conditional(self.depth > 0.001, self.depth, 0.001))
-        self.aux = Function(self.P1DG).interpolate(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
-        self.qfc = Function(self.P1DG).interpolate(2/(ln(self.aux)/0.4)**2)
+        self.hc = Function(P1DG).project(conditional(self.depth > 0.001, self.depth, 0.001))
+        self.aux = Function(P1DG).project(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
+        self.qfc = Function(P1DG).project(2/(ln(self.aux)/0.4)**2)
         
-        self.TOB = Function(self.V).interpolate(1000*0.5*self.qfc*self.unorm)
+        self.TOB = Function(V).project(1000*0.5*self.qfc*self.unorm)
         
         
         # skin friction coefficient
         
-        self.cfactor = Function(self.P1DG).interpolate(self.get_cfactor())
+        self.cfactor = Function(P1DG).project(self.get_cfactor())
         # mu - ratio between skin friction and normal friction
-        self.mu = Function(self.P1DG).interpolate(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
+        self.mu = Function(P1DG).project(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
         
         
         self.a = (self.ks)/2
-        self.B = Function(self.P1DG).interpolate(conditional(self.a > self.depth, 1, self.a/self.depth))
-        self.ustar = Function(self.P1DG).interpolate(sqrt(0.5*self.qfc*self.unorm))
-        self.exp1 = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
-        self.coefftest = Function(self.P1DG).interpolate(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), self.B*(1-self.B**self.exp1)/self.exp1, -self.B*ln(self.B)))
-        self.coeff = Function(self.P1DG).interpolate(conditional(self.coefftest>0, 1/self.coefftest, 0))
+        self.B = Function(P1DG).project(conditional(self.a > self.depth, 1, self.a/self.depth))
+        self.ustar = Function(P1DG).project(sqrt(0.5*self.qfc*self.unorm))
+        self.exp1 = Function(P1DG).project(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
+        self.coefftest = Function(P1DG).project(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), self.B*(1-self.B**self.exp1)/self.exp1, -self.B*ln(self.B)))
+        self.coeff = Function(P1DG).project(conditional(self.coefftest>0, 1/self.coefftest, 0))
         
         
         # erosion flux - for vanrijn
-        self.s0 = Function(self.P1DG).interpolate((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
-        self.ceq = Function(self.P1DG).interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
+        self.s0 = Function(P1DG).project((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
+        self.ceq = Function(P1DG).project(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         
-        self.testtracer = Function(self.P1DG).interpolate(self.ceq/self.coeff)
+        self.testtracer = Function(P1DG).project(self.ceq/self.coeff)
         self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
-        self.source = Function(self.P1DG).interpolate(self.set_source_tracer(self.P1DG, solver_obj = None, init = True)) 
-        self.qbsourcedepth = Function(self.V).interpolate(self.source * self.depth)
+        self.source = Function(P1DG).project(self.set_source_tracer(P1DG, solver_obj = None, init = True)) 
+        self.qbsourcedepth = Function(V).project(self.source * self.depth)
         
-        self.z_n = Function(self.V)
-        self.z_n1 = Function(self.V)
-        self.v = TestFunction(self.V)
-        self.old_bathymetry_2d = Function(self.V)
+        self.z_n = Function(V)
+        self.z_n1 = Function(V)
+        self.v = TestFunction(V)
+        self.old_bathymetry_2d = Function(V)
+        import ipdb; ipdb.set_trace()
         
     def update_suspended(self, solver_obj):
         
@@ -107,7 +113,6 @@ class TracerOptions(TsunamiOptions):
         self.ceq.interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         self.tracer_init_value.assign(self.ceq.at([0,0])/self.coeff.at([0,0]))
         self.source.interpolate(self.set_source_tracer(self.P1DG, solver_obj))
-        
         
         f = (((1-self.porosity)*(self.z_n1 - self.z_n)/(self.dt*self.morfac))*self.v)*dx
         
