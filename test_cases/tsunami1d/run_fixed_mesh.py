@@ -15,6 +15,8 @@ matplotlib.rc('text', usetex=True)
 # Parameters
 debug = True
 plot_pdf = False
+plot_pvd = True
+save_hdf5 = True
 forward = False
 adjoint = True
 
@@ -27,9 +29,10 @@ dx = 1/n
 celerity = 20.0*np.sqrt(9.81)
 # dt = 2000.0*dx/celerity
 dt = 2.0
+# dt = 1.0  # (Value used in original paper)
 
 # NOTE: Forward and adjoint relatively stable with n = 500 and dt = 2
-op = Tsunami1dOptions(debug=debug, nx=n, dt=dt)
+op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, save_hdf5=save_hdf5, plot_pvd=plot_pvd)
 swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False)
 
 if forward:

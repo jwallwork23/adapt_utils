@@ -163,6 +163,8 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
                              DirichletBC(self.V.sub(1), k_eta, tf_tag)]
 
     def plot_solution(self, adjoint=False):  # FIXME: Can't seem to plot vector fields
+        if not self.op.plot_pvd:
+            return
         if adjoint:
             z, zeta = self.adjoint_solution.split()
             zeta.rename("Adjoint elevation")
@@ -175,6 +177,11 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
             spd = interpolate(sqrt(dot(u, u)), self.P1)
             spd.rename("Fluid speed")
             self.solution_file.write(spd, eta)
+
+    def checkpoint_solution(self, adjoint=False):
+        if not self.op.save_hdf5:
+            return
+        raise NotImplementedError  # TODO
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.V)

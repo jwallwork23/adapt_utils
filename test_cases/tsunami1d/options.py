@@ -60,10 +60,10 @@ class Tsunami1dOptions(ShallowWaterOptions):
             'fieldsplit_1_ksp_type': 'preonly',
             'fieldsplit_1_pc_type': 'ilu',
         }
-        params = direct_params
-        params['ksp_monitor'] = None
-        params['ksp_converged_reason'] = None
-        params['ksp_monitor_true_residual'] = None
+        self.params = mres_params
+        self.params['ksp_monitor'] = None
+        self.params['ksp_converged_reason'] = None
+        self.params['ksp_monitor_true_residual'] = None
         self.adjoint_params = self.params
 
     def set_bathymetry(self, fs):
