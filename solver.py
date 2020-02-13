@@ -495,6 +495,8 @@ class SteadyProblem():
         File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
         for key in self.indicators:
             File(os.path.join(self.di, key + '.pvd')).write(self.indicators[key])
+        if hasattr(self, 'indicator'):
+            self.indicator_file.write(self.indicator)
 
     def plot_solution(self, adjoint=False):
         """
