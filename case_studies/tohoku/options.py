@@ -108,7 +108,7 @@ class TohokuOptions(TsunamiOptions):
 
 
     def read_bathymetry_file(self, km=False):
-        nc = netCDF4.Dataset('resources/tohoku.nc', 'r')
+        nc = netCDF4.Dataset('resources/bathymetry.nc', 'r')
         o = self.offset
         lon = nc.variables['lon'][o:]
         lat = nc.variables['lat'][:]
