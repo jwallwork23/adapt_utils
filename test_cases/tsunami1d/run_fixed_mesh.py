@@ -14,7 +14,7 @@ matplotlib.rc('text', usetex=True)
 # Parameters
 debug = True
 plot_pdf = False
-n = 50
+n = 100
 # n = 500
 # n = 2000  # (Value used in original paper)
 dt = 2000/n

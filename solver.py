@@ -200,8 +200,10 @@ class SteadyProblem():
 
     def solve_continuous_adjoint(self):
         self.setup_solver_adjoint()
-        if self.nonlinear:
-            self.rhs_adjoint = 0
+        try:
+            assert hasattr(self, 'lhs_adjoint') and hasattr(self, 'rhs_adjoint')
+        except AssertionError:
+            raise ValueError("Cannot solve continuous adjoint since LHS and/or RHS unknown.")
         solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
 
     def solve_discrete_adjoint(self):
@@ -209,7 +211,7 @@ class SteadyProblem():
             assert hasattr(self, 'lhs')
         except AssertionError:
             raise ValueError("Cannot compute discrete adjoint since LHS unknown.")
-        if self.nonlinear
+        if self.nonlinear:
             F = self.lhs
         else:  # FIXME: Doesn't seem to work in tsunami1d space-time case
             tmp_u = Function(self.V)

@@ -60,8 +60,8 @@ class Tsunami1dOptions(ShallowWaterOptions):
         x0, t0, r = self.source_loc[0]
         tol = self.dt/2
         bump = 0.4*sin(pi*(x-x0+r)/(2*r))
-        eta.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), bump, 0.0), 0.0))
-        # eta.interpolate(conditional(le(abs(x-x0), r), bump, 0.0))
+        # eta.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), bump, 0.0), 0.0))
+        eta.interpolate(conditional(le(abs(x-x0), r), bump, 0.0))
         return self.initial_value
 
     def set_coriolis(self, fs):
@@ -89,6 +89,6 @@ class Tsunami1dOptions(ShallowWaterOptions):
         tol = self.dt/2
         h = 0.4
         # h = 1.0
-        ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), h, 0.0), 0.0))
-        # ke.interpolate(conditional(le(abs(x-x0), r), h, 0.0))
+        # ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), h, 0.0), 0.0))
+        ke.interpolate(conditional(le(abs(x-x0), r), h, 0.0))
         return self.kernel

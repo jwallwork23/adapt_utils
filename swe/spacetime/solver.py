@@ -1,5 +1,7 @@
 from firedrake import *
 
+import warnings
+
 from adapt_utils.solver import SteadyProblem
 
 
@@ -42,7 +44,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
     def set_fields(self):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
-        self.fields['bathymetry'] = self.op.set_bathymetry(self.P1)
+        self.fields['bathymetry'] = self.op.set_bathymetry(self.P0)
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
 
     def set_stabilisation(self):
@@ -98,7 +100,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         # Continuity equation
         self.lhs += inner(θ, ddt(η))*dx                 # Time derivative
         self.lhs += -inner(grad_x(θ), b*u)*dx           # Continuity term
-        self.rhs = inner(θ, b*Constant(0.0))*dx
+        self.rhs = inner(θ, b*Constant(0.0))*ds
 
         # TODO: Enable different BCs
 
@@ -108,14 +110,55 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
                      DirichletBC(self.V.sub(1), eta0, t0_tag)]
 
     def setup_solver_adjoint(self):
+        z, ζ = self.trials
+        v, θ = self.tests
+
+        # Parameters
+        g = self.op.g
+        if self.dim == 3:
+            f = self.fields['coriolis']
+        b = self.fields['bathymetry']
+        warnings.warn("#### TODO: Viscosity ignored")
+        # nu = self.fields['viscosity']
+
+        # Operators
+        if self.dim == 2:
+            grad_x = lambda F: as_vector([F.dx(0),])
+            ddt = lambda F: F.dx(1)
+            n = as_vector([self.n[0],])
+        elif self.dim == 3:
+            grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])
+            perp = lambda F: as_vector([-F[1], F[0]])
+            ddt = lambda F: F.dx(2)
+            n = as_vector([self.n[0], self.n[1]])
+        else:
+            raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
+
+        # Initial and final time tags
+        t0_tag = self.op.t_init_tag
         tf_tag = self.op.t_final_tag
 
-        # TODO: Continuous adjoint
+        # Momentum equation
+        self.lhs_adjoint = -inner(v, ddt(z))*dx
+        # self.lhs_adjoint += -b*inner(v, grad_x(ζ))*dx
+        self.lhs_adjoint += -inner(v, grad_x(b*ζ))*dx
+        if self.dim == 3:
+            self.lhs_adjoint += inner(v, f*perp(z))*dx
+        # TODO: Viscosity term
 
-        # Final time conditions
+        # Continuity equation
+        self.lhs_adjoint += -inner(θ, ddt(ζ))*dx
+        self.lhs_adjoint += g*inner(grad_x(θ), z)*dx
+
+        # RHS
         if not hasattr(self, 'kernel'):
             self.get_qoi_kernel()
         k_u, k_eta = self.kernel.copy(deepcopy=True).split()
+        self.rhs_adjoint = Constant(0.0)*(inner(v, k_u) + inner(θ, k_eta))*dx
+
+        # TODO: Enable different BCs
+
+        # Final time conditions
         self.dbcs_adjoint = [DirichletBC(self.V.sub(0), k_u, tf_tag),
                              DirichletBC(self.V.sub(1), k_eta, tf_tag)]
 
