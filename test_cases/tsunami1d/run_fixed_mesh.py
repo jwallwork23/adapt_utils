@@ -17,7 +17,7 @@ debug = True
 plot_pdf = False
 plot_pvd = True
 save_hdf5 = True
-forward = False
+forward = True
 adjoint = True
 
 # Spatial discretisation
@@ -28,12 +28,14 @@ dx = 1/n
 # Time discretisation
 celerity = 20.0*np.sqrt(9.81)
 # dt = 2000.0*dx/celerity
-dt = 2.0
+dt = 1.5
 # dt = 1.0  # (Value used in original paper)
 
-# NOTE: Forward and adjoint relatively stable with n = 500 and dt = 2
+# NOTE: Forward and adjoint relatively stable with n = 500 and dt = 1.5
 op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, save_hdf5=save_hdf5, plot_pvd=plot_pvd)
 swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False)
+
+v = 0.05
 
 if forward:
     # Solve forward problem
@@ -44,7 +46,7 @@ if forward:
     # Plot forward
     fig = plt.figure(figsize=(3.2, 4.8))
     ax = fig.add_subplot(111)
-    firedrake.plot(firedrake.interpolate(abs(eta), eta.function_space()), axes=ax, vmin=0.1, vmax=0.1001, cmap=matplotlib.cm.Reds)
+    firedrake.plot(firedrake.interpolate(abs(eta), eta.function_space()), axes=ax, vmin=v, vmax=v+0.0001, cmap=matplotlib.cm.Reds)
     ax.invert_xaxis()
     ymin = 0.0
     ymax = op.end_time
@@ -70,7 +72,7 @@ if adjoint:
     # Plot adjoint
     fig = plt.figure(figsize=(3.2, 4.8))
     ax = fig.add_subplot(111)
-    firedrake.plot(firedrake.interpolate(abs(zeta), zeta.function_space()), axes=ax, vmin=0.1, vmax=0.1001, cmap=matplotlib.cm.Blues)
+    firedrake.plot(firedrake.interpolate(abs(zeta), zeta.function_space()), axes=ax, vmin=v, vmax=v+0.0001, cmap=matplotlib.cm.Blues)
     ax.invert_xaxis()
     ymin = 0.0
     ymax = op.end_time
@@ -90,12 +92,13 @@ if adjoint:
 if forward and adjoint:
     # Take inner product of forward and adjoint solutions
     swp.dwp_indication()
+    swp.plot()
     dwp = swp.indicator
 
     # Plot inner product
     fig = plt.figure(figsize=(3.2, 4.8))
     ax = fig.add_subplot(111)
-    firedrake.plot(firedrake.interpolate(abs(dwp), dwp.function_space()), axes=ax, vmin=0.1, vmax=0.1001, cmap=matplotlib.cm.Greens)
+    firedrake.plot(firedrake.interpolate(abs(dwp), dwp.function_space()), axes=ax, vmin=v, vmax=v+0.0001, cmap=matplotlib.cm.Greens)
     ax.invert_xaxis()
     ymin = 0.0
     ymax = op.end_time

@@ -40,7 +40,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
             'pc_type': 'lu',
             'pc_factor_mat_solver_type': 'mumps',
         }
-        mres_params = {  # Whack it with an assembled LU preconditioner
+        mres_params = {  # Whack it with an assembled LU preconditioner  NOTE: Doesn't work in serial
             'mat_type': 'matfree',
             'snes_type': 'ksponly',
             'ksp_type': 'gmres',
@@ -60,7 +60,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
             'fieldsplit_1_ksp_type': 'preonly',
             'fieldsplit_1_pc_type': 'ilu',
         }
-        self.params = mres_params
+        self.params = direct_params
         self.params['ksp_monitor'] = None
         self.params['ksp_converged_reason'] = None
         self.params['ksp_monitor_true_residual'] = None
@@ -109,5 +109,6 @@ class Tsunami1dOptions(ShallowWaterOptions):
         # h = 0.4
         h = 1.0
         # ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), h, 0.0), 0.0))
-        ke.interpolate(conditional(le(abs(x-x0), r), h, 0.0))
+        # ke.interpolate(conditional(le(abs(x-x0), r), h, 0.0))
+        ke.interpolate(conditional(lt(abs(x-x0), r), h*exp(1 - 1/(1 - ((x-x0)/r)**2)), 0.0))
         return self.kernel
