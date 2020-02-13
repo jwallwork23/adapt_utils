@@ -34,17 +34,36 @@ class Tsunami1dOptions(ShallowWaterOptions):
         self.depth = 4000.0
 
         # Solver parameters
-        self.params = {
-            # 'mat_type': 'matfree',
+        direct_params = {  # Just whack it with a full LU preconditioner
             'mat_type': 'aij',
             'ksp_type': 'preonly',
-            # 'pc_type': 'python',
-            # 'pc_python_type': 'firedrake.AssembledPC',
-            # 'assembled_pc_type': 'lu'
             'pc_type': 'lu',
             'pc_factor_mat_solver_type': 'mumps',
-            'ksp_monitor': None,
         }
+        mres_params = {  # Whack it with an assembled LU preconditioner
+            'mat_type': 'matfree',
+            'snes_type': 'ksponly',
+            'ksp_type': 'gmres',
+            'pc_type': 'python',
+            'pc_python_type': 'firedrake.AssembledPC',
+            'assembled_pc_type': 'lu',
+            'snes_lag_preconditioner': -1,
+            'snes_lag_preconditioner_persists': None,
+        }
+        firedrake_fluids_params = {  # Use a "physics-based" method
+            'ksp_type': 'gmres',
+            'pc_type': 'fieldsplit',
+            'pc_fieldsplit_type': 'schur',
+            'pc_fieldsplit_fact_type': 'FULL',
+            'fieldsplit_0_ksp_type': 'preonly',
+            'fieldsplit_0_pc_type': 'ilu',
+            'fieldsplit_1_ksp_type': 'preonly',
+            'fieldsplit_1_pc_type': 'ilu',
+        }
+        params = direct_params
+        params['ksp_monitor'] = None
+        params['ksp_converged_reason'] = None
+        params['ksp_monitor_true_residual'] = None
         self.adjoint_params = self.params
 
     def set_bathymetry(self, fs):
@@ -87,8 +106,8 @@ class Tsunami1dOptions(ShallowWaterOptions):
         ku.assign(0.0)
         x0, t0, r = self.region_of_interest[0]
         tol = self.dt/2
-        h = 0.4
-        # h = 1.0
+        # h = 0.4
+        h = 1.0
         # ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), h, 0.0), 0.0))
         ke.interpolate(conditional(le(abs(x-x0), r), h, 0.0))
         return self.kernel
