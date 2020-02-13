@@ -31,4 +31,4 @@ Integral of tracer concentration over region of interest, given by a sphere of r
 software release 7.0 user manual." Paris:  R&D, Electricite de France, p. 134 (2014).
 
 [Wallwork et al.] J.G. Wallwork, N. Barral, D.A. Ham, M.D. Piggott, "Anisotropic goal-oriented mesh
-adaptation in Firedrake". In: 28th Intl Meshing Roundtable (2019). (to appear)
+adaptation in Firedrake". In: 28th Intl Meshing Roundtable, pp.83--100 (2020).

@@ -193,10 +193,10 @@ class SteadyProblem():
         Solve adjoint problem using method specified by `discrete_adjoint` boolean kwarg.
         """
         if self.discrete_adjoint:
-            print_output("Solving discrete adjoint problem on mesh with {:d} elements".format(self.mesh.num_cells()))
+            print_output("Solving discrete adjoint problem on mesh with {:d} local elements".format(self.mesh.num_cells()))
             self.solve_discrete_adjoint()
         else:
-            print_output("Solving continuous adjoint problem on mesh with {:d} elements".format(self.mesh.num_cells()))
+            print_output("Solving continuous adjoint problem on mesh with {:d} local elements".format(self.mesh.num_cells()))
             self.solve_continuous_adjoint()
         self.plot_solution(adjoint=True)
 
