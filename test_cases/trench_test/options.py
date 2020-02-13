@@ -25,7 +25,7 @@ class TrenchOptions(TracerOptions):
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
         self.plot_timeseries = plot_timeseries
 
-        self.default_mesh = RectangleMesh(8*5*nx, 5*ny, 16, 1.1)
+        self.default_mesh = RectangleMesh(16*5*nx, 5*ny, 16, 1.1)
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
         self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
         self.P1_vec = VectorFunctionSpace(self.default_mesh, "CG", 1)
@@ -86,17 +86,11 @@ class TrenchOptions(TracerOptions):
 
         #self.eta_init, self.uv_init = self.initialise_fields(input_dir, self.di)        
 
-        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "DG", 1)*self.P1DG)   
-        
-      
-        
-        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
-        self.eta_d = Function(self.P1DG).project(self.eta_init)
         
         self.set_up_suspended(self.default_mesh)
         
         
-        self.tracer_init = Function(self.P1DG, name="Tracer Initial condition").project(self.testtracer)        
+        #self.tracer_init = Function(self.P1DG, name="Tracer Initial condition").project(self.testtracer)        
         
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
@@ -216,6 +210,7 @@ class TrenchOptions(TracerOptions):
     def get_update_forcings(self, solver_obj):
         
         def update_forcings(t):
+            
 
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
@@ -228,11 +223,11 @@ class TrenchOptions(TracerOptions):
             self.vertical_velocity.interpolate(self.u_cg[1])
             
             # Update depth
-            if self.wetting_and_drying:
-                bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-                self.depth.interpolate(self.elev_cg + bathymetry_displacement(self.eta) + self.bathymetry)
-            else:
-                self.depth.interpolate(self.elev_cg + self.bathymetry)
+            #if self.wetting_and_drying:
+            #    bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+            #    self.depth.interpolate(self.elev_cg + bathymetry_displacement(self.eta) + self.bathymetry)
+            #else:
+            self.depth.project(self.elev_cg + self.bathymetry)
 
             
             self.hc.interpolate(conditional(self.depth > 0.001, self.depth, 0.001))

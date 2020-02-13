@@ -170,6 +170,7 @@ class TsunamiOptions(ShallowWaterOptions):
         eta_cg = Function(V).project(eta)
         if self.bathymetry is None:
             self.set_bathymetry(V)       
+            import ipdb; ipdb.set_trace()
         if self.wetting_and_drying:
             bathymetry_displacement = self.wd_dispacement_mc(eta)
             self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta_cg, V)

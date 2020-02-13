@@ -555,9 +555,9 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             u_interp, eta_interp = self.solution.split()
             if hasattr(self, 'solution_tracer'):
-                tracer_interp = self.solution_tracer
+                tracer_interp = Function(self.P1DG).project(self.solution_tracer)
             else:
-                tracer_interp = self.op.tracer_init
+                tracer_interp = Function(self.P1DG).project(self.op.tracer_init)
             
         if op.solve_tracer:
             

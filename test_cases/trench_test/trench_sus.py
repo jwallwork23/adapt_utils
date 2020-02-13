@@ -44,7 +44,7 @@ def boundary_conditions_fn_trench(bathymetry_2d, flag, morfac = 1, t_new = 0, st
 # define mesh
 lx = 16
 ly = 1.1
-nx = lx*5# this has to be at least double the lx as otherwise don't get trench with right gradient
+nx = lx*10# this has to be at least double the lx as otherwise don't get trench with right gradient
 ny = 5
 mesh2d = th.RectangleMesh(nx, ny, lx, ly)
 
@@ -83,7 +83,7 @@ morph.export_final_state("hydrodynamics_trench", uv, elev)
 
 solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file = morph.morphological(boundary_conditions_fn = boundary_conditions_fn_trench, morfac = 100, morfac_transport = True, suspendedload = True, convectivevel = False,\
                     bedload = False, angle_correction = False, slope_eff = False, seccurrent = False, sediment_slide = False, fluc_bcs = False, \
-                    mesh2d = mesh2d, bathymetry_2d = bathymetry_2d, input_dir = 'hydrodynamics_trench', viscosity_hydro = 10**(-6), ks = 0.025, average_size = 160 * (10**(-6)), dt = 0.3, final_time = 5*3600,\
+                    mesh2d = mesh2d, bathymetry_2d = bathymetry_2d, input_dir = 'hydrodynamics_trench', viscosity_hydro = 10**(-6), ks = 0.025, average_size = 160 * (10**(-6)), dt = 0.15, final_time = 5*3600,\
                  beta_fn = 1.3, surbeta2_fn = 1/1.5, alpha_secc_fn = 0.75, angle_fn = 35, mesh_step_size = 0.2)
 
 

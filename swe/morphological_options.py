@@ -13,7 +13,9 @@ class TracerOptions(TsunamiOptions):
     def __init__(self, **kwargs):
         super(TracerOptions, self).__init__(**kwargs)    
     
-    def set_up_suspended(self, mesh):        
+    def set_up_suspended(self, mesh): 
+        
+
         
         R = Constant(2650/1000 - 1)
         self.dstar = Constant(self.average_size*((self.g*R)/(self.base_viscosity**2))**(1/3))
@@ -39,10 +41,24 @@ class TracerOptions(TsunamiOptions):
         else:
             self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
 
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+        self.eta_d = Function(self.P1DG).project(self.eta_init)
+        
         self.u_cg = Function(self.P1_vec).project(self.uv_d)
         self.horizontal_velocity = Function(self.P1).project(self.u_cg[0])
         self.vertical_velocity = Function(self.P1).project(self.u_cg[1])
         self.elev_cg = Function(self.P1).project(self.eta_d)
+        
+        #if not hasattr(self, 'bathymetry'):
+        self.set_bathymetry(self.P1)
+        
+        self.bathymetry = Function(self.P1).project(self.bathymetry)
+
+        self.bathymetry_file = File(self.di + "/bathy.pvd")
+            
+        self.bathymetry_file.write(self.bathymetry)
+            
+        import ipdb; ipdb.set_trace()                
 
         self.depth = Function(self.P1).project(self.elev_cg + self.bathymetry)
     
@@ -74,7 +90,16 @@ class TracerOptions(TsunamiOptions):
         self.s0 = Function(self.P1DG).project((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
         self.ceq = Function(self.P1DG).project(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         
-        self.testtracer = Function(self.P1DG).project(self.ceq/self.coeff)
+        self.tracer_init = Function(self.P1DG).project(self.ceq/self.coeff)
+        
+        
+
+        self.tracer_file = File(self.di + "/tracery.pvd")
+            
+        self.tracer_file.write(self.tracer_init)
+            
+        import ipdb; ipdb.set_trace()                    
+        
         self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
         self.source = Function(self.P1DG).project(self.set_source_tracer(self.P1DG, solver_obj = None, init = True)) 
         self.qbsourcedepth = Function(self.P1).project(self.source * self.depth)
@@ -86,6 +111,8 @@ class TracerOptions(TsunamiOptions):
 
         
     def update_suspended(self, solver_obj):
+        
+        self.bathymetry.interpolate(self.set_bathymetry(self.P1))
         
         self.old_bathymetry_2d.assign(solver_obj.fields.bathymetry_2d)
         
