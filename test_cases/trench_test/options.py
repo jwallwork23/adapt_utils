@@ -211,6 +211,9 @@ class TrenchOptions(TracerOptions):
         
         def update_forcings(t):
             
+            if round(t, 2)%18.0 == 0:
+                print(t)
+                import ipdb; ipdb.set_trace()
 
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
@@ -239,6 +242,7 @@ class TrenchOptions(TracerOptions):
             self.quadratic_drag_coefficient.project(self.get_cfactor())
 
             if self.t_old.dat.data[:] == t:
+                print(t)
                 self.update_suspended(solver_obj)
             
             #    self.bathymetry_file.write(self.bathymetry)
