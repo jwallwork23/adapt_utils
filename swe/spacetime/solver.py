@@ -41,7 +41,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
 
-    def set_fields(self):
+    def set_fields(self, adapted=False):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['bathymetry'] = self.op.set_bathymetry(self.P0)
@@ -241,7 +241,7 @@ class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
 
-    def set_fields(self):
+    def set_fields(self, adapted=False):
         self.fields = {}
         self.fields['bathymetry'] = self.op.set_bathymetry(self.P1)
 

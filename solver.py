@@ -434,7 +434,7 @@ class SteadyProblem():
         """
         prod = inner(self.solution, self.adjoint_solution)
         self.indicators['dwp'] = assemble(self.p0test*prod*dx)
-        self.indicator = interpolate(prod, self.P1)
+        self.indicator = interpolate(abs(prod), self.P1)
         self.indicator.rename('dwp')
         self.estimate_error('dwp')
 
@@ -696,25 +696,26 @@ class SteadyProblem():
             m = interpolate(self.monitor_function(self.mesh), self.P1)
             m.rename("Monitor function")
             self.monitor_file.write(m)
-        else:
-            try:
-                assert hasattr(self, 'M')
-            except AssertionError:
-                raise ValueError("Please supply a metric.")
-            self.am.pragmatic_adapt(self.M)
-            self.set_mesh(self.am.mesh)
+            return
 
-        if approach != 'monge_ampere':
-            print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
-            self.num_cells.append(self.mesh.num_cells())
-            self.num_vertices.append(self.mesh.num_vertices())
-            self.plot()
+        # Metric based methods
+        try:
+            assert hasattr(self, 'M')
+        except AssertionError:
+            raise ValueError("Please supply a metric.")
+        self.am.pragmatic_adapt(self.M)
+        self.set_mesh(self.am.mesh)
 
-            # Re-initialise problem
-            self.create_function_spaces()
-            self.create_solutions()
-            self.set_fields(adapted=True)
-            self.boundary_conditions = self.op.set_boundary_conditions(self.V)
+        print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
+        self.num_cells.append(self.mesh.num_cells())
+        self.num_vertices.append(self.mesh.num_vertices())
+        self.plot()
+
+        # Re-initialise problem
+        self.create_function_spaces()
+        self.create_solutions()
+        self.set_fields(adapted=True)
+        self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
     def initialise_mesh(self, approach='hessian', adapt_field=None, num_adapt=None, alpha=1.0, beta=1.0):
         """
