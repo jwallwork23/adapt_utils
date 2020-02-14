@@ -35,7 +35,7 @@ dt = 1.5
 op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, save_hdf5=save_hdf5, plot_pvd=plot_pvd)
 swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False)
 
-v = 0.05
+v = 0.02
 
 if forward:
     # Solve forward problem
@@ -88,8 +88,6 @@ if adjoint:
     plt.savefig(fname + ".png")
     if plot_pdf:
         plt.savefig(fname + ".pdf")
-
-v = 0.025  # TODO: TESTME
 
 if forward and adjoint:
     # Take inner product of forward and adjoint solutions
