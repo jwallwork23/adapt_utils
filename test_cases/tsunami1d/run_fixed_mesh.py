@@ -89,6 +89,8 @@ if adjoint:
     if plot_pdf:
         plt.savefig(fname + ".pdf")
 
+v = 0.025  # TODO: TESTME
+
 if forward and adjoint:
     # Take inner product of forward and adjoint solutions
     swp.dwp_indication()

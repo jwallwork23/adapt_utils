@@ -36,7 +36,7 @@ class TohokuOptions(TsunamiOptions):
         self.end_time = 1500.0
         # self.end_time = 3600.0
 
-        # Gauge locations
+        # Gauge locations  # TODO: remove timeseries
         self.gauges["P02"] = {"lonlat": (142.5016, 38.5002),
                               "data": [0.00, 0.07, 0.12, 0.46, 0.85, 1.20, 1.55, 1.90, 2.25, 2.50,
                                        2.80, 3.10, 3.90, 4.80, 4.46, 2.25, -0.45, -0.17, -1.60,
@@ -108,7 +108,9 @@ class TohokuOptions(TsunamiOptions):
 
 
     def read_bathymetry_file(self, km=False):
-        nc = netCDF4.Dataset('resources/bathymetry.nc', 'r')
+        abspath = os.path.realpath(__file__)
+        fname = abspath.replace('options.py', 'resources/bathymetry.nc')
+        nc = netCDF4.Dataset(fname, 'r')
         o = self.offset
         lon = nc.variables['lon'][o:]
         lat = nc.variables['lat'][:]
@@ -121,7 +123,10 @@ class TohokuOptions(TsunamiOptions):
         fname = 'resources/surf'
         if zeroed:
             fname = '_'.join([fname, 'zeroed'])
-        nc = netCDF4.Dataset(fname + '.nc', 'r')
+        fname += '.nc'
+        abspath = os.path.realpath(__file__)
+        fname = abspath.replace('options.py', 'resources/bathymetry.nc')
+        nc = netCDF4.Dataset(fname, 'r')
         lon = nc.variables['lon' if zeroed else 'x'][:]
         lat = nc.variables['lat' if zeroed else 'y'][:]
         elev = nc.variables['z'][:, :]

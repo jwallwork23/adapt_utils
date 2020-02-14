@@ -27,7 +27,7 @@ class TsunamiOptions(ShallowWaterOptions):
     """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
-    def __init__(self, mesh=None, utm=True, n=30, **kwargs):
+    def __init__(self, mesh=None, utm=True, n=30, setup=True, **kwargs):
         self.utm = utm
         if mesh is not None:
             self.default_mesh = mesh
@@ -36,7 +36,7 @@ class TsunamiOptions(ShallowWaterOptions):
             self.force_zone_number = False
 
         # Setup longitude-latitude domain
-        if not hasattr(self, 'default_mesh'):
+        if not hasattr(self, 'default_mesh') and setup:
             b_lon, b_lat, b = self.read_bathymetry_file()
             lon_min = np.min(b_lon)
             lon_diff = np.max(b_lon) - lon_min
@@ -71,9 +71,10 @@ class TsunamiOptions(ShallowWaterOptions):
         self.locations_of_interest = {}
 
         # Outputs
-        P1DG = FunctionSpace(self.default_mesh, "DG", 1)
-        self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
-        self.eta_tilde = Function(P1DG, name='Modified elevation')
+        if setup:
+            P1DG = FunctionSpace(self.default_mesh, "DG", 1)
+            self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
+            self.eta_tilde = Function(P1DG, name='Modified elevation')
 
     def get_utm_mesh(self):
         zone = self.force_zone_number
