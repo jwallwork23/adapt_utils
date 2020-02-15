@@ -66,8 +66,8 @@ class TrenchHydroOptions(TracerOptions):
         # Time integration
         self.dt = 0.25
         self.end_time = 500
-        #self.dt_per_export = self.end_time/(40*self.dt)
-        #self.dt_per_remesh = self.end_time/(40*self.dt)
+        self.dt_per_export = 500
+        self.dt_per_remesh = 500
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
@@ -177,3 +177,13 @@ def export_final_state(inputdir, uv, elev,):
     chk.store(elev, name="elevation")
     File(inputdir + '/elevationout.pvd').write(elev)
     chk.close()
+    
+    from firedrake.petsc import PETSc
+    try:
+        import firedrake.cython.dmplex as dmplex
+    except:
+        import firedrake.dmplex as dmplex  # Older version
+    
+    plex = elev.function_space().mesh()._plex
+    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
+    viewer(plex)

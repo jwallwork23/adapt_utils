@@ -52,9 +52,11 @@ class TrenchOptions(TracerOptions):
         
 
         # Initial
-        self.uv_init = as_vector([0.51, 0.0])
-        self.eta_init = Constant(0.4)    
+        #self.uv_init = as_vector([0.51, 0.0])
+        #self.eta_init = Constant(0.4)    
 
+
+        
         self.grad_depth_viscosity = True        
 
         self.tracer_list = []
@@ -84,8 +86,13 @@ class TrenchOptions(TracerOptions):
         input_dir = 'hydrodynamics_trench'
 
 
-        #self.eta_init, self.uv_init = self.initialise_fields(input_dir, self.di)        
-
+        self.eta_init, self.uv_init = self.initialise_fields(input_dir, self.di)   
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+        self.eta_d = Function(self.P1DG).project(self.eta_init)        
+        
+        self.convective_vel_flag = True
+        
+        self.t_old = Constant(0.0)        
         
         self.set_up_suspended(self.default_mesh)
         
@@ -96,7 +103,7 @@ class TrenchOptions(TracerOptions):
         self.stabilisation = 'lax_friedrichs'
 
         # Time integration
-        self.t_old = Constant(0.0)
+        
         self.dt = 0.3
         self.end_time = self.num_hours*3600.0/self.morfac
         self.dt_per_export = 60
@@ -120,12 +127,15 @@ class TrenchOptions(TracerOptions):
         self.qois = []
         
 
-    def set_source_tracer(self, fs, solver_obj = None, init = False):
+    def set_source_tracer(self, fs, solver_obj = None, init = False, t_old = Constant(100)):
         #P1DG = FunctionSpace(self.depth.function_space().mesh(), 'DG', 1)
         #self.coeff = Function(P1DG).project(self.coeff)
         #self.ceq = Function(P1DG).project(self.ceq)
         if init:
-            self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.tracer_init_value/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+            if t_old.dat.data[:] == 0.0:
+                self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.tracer_init_value/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+            else:
+                self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.tracer_interp/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
         else:
             self.source.interpolate(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+(self.settling_velocity*self.ceq/self.depth))
         return self.source
@@ -211,8 +221,8 @@ class TrenchOptions(TracerOptions):
         
         def update_forcings(t):
             
+            #print(t)
             if round(t, 2)%18.0 == 0:
-                print(t)
                 import ipdb; ipdb.set_trace()
 
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
@@ -244,8 +254,8 @@ class TrenchOptions(TracerOptions):
             if self.t_old.dat.data[:] == t:
                 print(t)
                 self.update_suspended(solver_obj)
-            
-            #    self.bathymetry_file.write(self.bathymetry)
+                self.bathymetry_file = File(self.di + "/bathy.pvd")
+                self.bathymetry_file.write(solver_obj.fields.bathymetry_2d)
             self.t_old.assign(t)        
 
         return update_forcings
@@ -254,18 +264,33 @@ class TrenchOptions(TracerOptions):
         """
         Initialise simulation with results from a previous simulation
         """     
+        from firedrake.petsc import PETSc
 
+        try:
+            import firedrake.cython.dmplex as dmplex
+        except:
+            import firedrake.dmplex as dmplex  # Older version        
+
+        # mesh
+        with timed_stage('mesh'):
+            # Load
+            newplex = PETSc.DMPlex().create()
+            newplex.createFromFile(inputdir + '/myplex.h5')
+            mesh = Mesh(newplex)
+            
+        DG_2d = FunctionSpace(mesh, 'DG', 1)  
+        vector_dg = VectorFunctionSpace(mesh, 'DG', 1)          
         # elevation
         with timed_stage('initialising elevation'):
             chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(self.P1DG, name="elevation")
+            elev_init = Function(DG_2d, name="elevation")
             chk.load(elev_init)
             File(outputdir + "/elevation_imported.pvd").write(elev_init)
             chk.close()
         # velocity
         with timed_stage('initialising velocity'):
             chk = DumbCheckpoint(inputdir + "/velocity" , mode=FILE_READ)
-            uv_init = Function(self.P1_vec_dg, name="velocity")
+            uv_init = Function(vector_dg, name="velocity")
             chk.load(uv_init)
             File(outputdir + "/velocity_imported.pvd").write(uv_init)
             chk.close()

@@ -1,6 +1,6 @@
 # Directories
 *.pdf
-*.log
+*log
 *.pyc
 *.gz
 *.pvd

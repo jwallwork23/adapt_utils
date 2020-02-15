@@ -311,7 +311,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                     # update sediment rate to ensure equilibrium at inflow
                     sediment_rate.assign(ceq.at([0,0])/coeff.at([0,0]))
                     print(t_new)
-                    print(sediment_rate.dat.data[:])
+                    print(solver_obj.bnd_functions['tracer'][1]['value'].dat.data[:])
                     print(solver_obj.fields.tracer_2d.at([0,0]))
 
                     if convectivevel == True:
@@ -440,7 +440,11 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                 fire.solve(f == 0, z_n1)
                 
                 # update bed
-                #bathymetry_2d.assign(z_n1)
+                bathymetry_2d.assign(z_n1)
+                print(max(bathymetry_2d.dat.data[:]))
+                
+                bathymetry_file = th.File(outputdir + "/bathy.pvd")
+                bathymetry_file.write(bathymetry_2d)                
 
                 if round(t_new, 2)%t_export == 0:
                     # calculate difference between original bathymetry and new bathymetry
@@ -546,9 +550,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
             settling_velocity = th.Constant(1.1*th.sqrt(9.81*average_size*((2650/1000) - 1)))        
     
     # initialise velocity, elevation and depth
-    #elev_init, uv_init = initialise_fields(mesh2d, input_dir, outputdir)
-    uv_init = th.as_vector((0.51, 0.0))
-    elev_init = th.Constant(0.4)
+    elev_init, uv_init = initialise_fields(mesh2d, input_dir, outputdir)
 
     uv_cg = th.Function(vector_cg).interpolate(uv_init)
 
@@ -732,7 +734,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
         # switch on tracer calculation if using sediment transport component
         options.solve_tracer = True
         options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d', 'bathymetry_2d']
-        #options.tracer_advective_velocity = corrective_velocity
+        options.tracer_advective_velocity = corrective_velocity
         options.tracer_source_2d = source
     else:
         options.solve_tracer = False
@@ -795,7 +797,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
     solver_obj.iterate(update_forcings = update_forcings_tracer)
     
-    import ipdb; ipdb.set_trace()
+    #import ipdb; ipdb.set_trace()
 
     return solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file
 

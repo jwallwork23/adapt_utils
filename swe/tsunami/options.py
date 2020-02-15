@@ -38,6 +38,7 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Setup longitude-latitude domain
         if not hasattr(self, 'default_mesh'):
+            print('went here')
             b_lon, b_lat, b = self.read_bathymetry_file()
             lon_min = np.min(b_lon)
             lon_diff = np.max(b_lon) - lon_min

@@ -41,22 +41,25 @@ class TracerOptions(TsunamiOptions):
         else:
             self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
 
-        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
-        self.eta_d = Function(self.P1DG).project(self.eta_init)
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_d)
+        self.eta_d = Function(self.P1DG).project(self.eta_d)
         
         self.u_cg = Function(self.P1_vec).project(self.uv_d)
         self.horizontal_velocity = Function(self.P1).project(self.u_cg[0])
         self.vertical_velocity = Function(self.P1).project(self.u_cg[1])
         self.elev_cg = Function(self.P1).project(self.eta_d)
         
-        #if not hasattr(self, 'bathymetry'):
-        self.set_bathymetry(self.P1)
         
-        self.bathymetry = Function(self.P1).project(self.bathymetry)
+        if self.t_old.dat.data[:] == 0.0:
+            self.set_bathymetry(self.P1)
+        else:
+            self.bathymetry = Function(self.P1).project(self.bathymetry)
 
         self.bathymetry_file = File(self.di + "/bathy.pvd")
             
         self.bathymetry_file.write(self.bathymetry)
+        
+        #import ipdb; ipdb.set_trace()
                      
 
         self.depth = Function(self.P1).project(self.elev_cg + self.bathymetry)
@@ -99,8 +102,33 @@ class TracerOptions(TsunamiOptions):
         
         
         self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
-        self.source = Function(self.P1DG).project(self.set_source_tracer(self.P1DG, solver_obj = None, init = True)) 
+        self.source = Function(self.P1DG).project(self.set_source_tracer(self.P1DG, solver_obj = None, init = True, t_old = self.t_old)) 
         self.qbsourcedepth = Function(self.P1).project(self.source * self.depth)
+        
+        if self.convective_vel_flag:
+            # correction factor to advection velocity in sediment concentration equation
+
+            self.Bconv = Function(self.P1DG).interpolate(conditional(self.depth > 1.1*self.ksp, self.ksp/self.depth, self.ksp/(1.1*self.ksp)))
+            self.Aconv = Function(self.P1DG).interpolate(conditional(self.depth > 1.1* self.a, self.a/self.depth, self.a/(1.1*self.a)))
+                    
+            # take max of value calculated either by ksp or depth
+            self.Amax = Function(self.P1DG).interpolate(conditional(self.Aconv > self.Bconv, self.Aconv, self.Bconv))
+
+            self.r1conv = Function(self.P1DG).interpolate(1 - (1/0.4)*conditional(self.settling_velocity/self.ustar < 1, self.settling_velocity/self.ustar, 1))
+
+            self.Ione = Function(self.P1DG).interpolate(conditional(self.r1conv > 10**(-8), (1 - self.Amax**self.r1conv)/self.r1conv, conditional(self.r1conv < - 10**(-8), (1 - self.Amax**self.r1conv)/self.r1conv, ln(self.Amax))))
+
+            self.Itwo = Function(self.P1DG).interpolate(conditional(self.r1conv > 10**(-8), -(self.Ione + (ln(self.Amax)*(self.Amax**self.r1conv)))/self.r1conv, conditional(self.r1conv < - 10**(-8), -(self.Ione + (ln(self.Amax)*(self.Amax**self.r1conv)))/self.r1conv, -0.5*ln(self.Amax)**2)))
+
+            self.alpha = Function(self.P1DG).interpolate(-(self.Itwo - (ln(self.Amax) - ln(30))*self.Ione)/(self.Ione * ((ln(self.Amax) - ln(30)) + 1)))
+
+            # final correction factor
+            self.alphatest2 = Function(self.P1DG).interpolate(conditional(conditional(self.alpha > 1, 1, self.alpha) < 0, 0, conditional(self.alpha > 1, 1, self.alpha)))
+                    
+            # multiply correction factor by velocity and insert back into sediment concentration equation
+            self.corrective_velocity = Function(self.P1_vec).interpolate(self.alphatest2 * self.uv_d)
+        else:
+            self.corrective_velocity = Function(self.P1_vec).interpolate(self.uv_d)
         
         self.z_n = Function(self.P1)
         self.z_n1 = Function(self.P1)
@@ -110,9 +138,9 @@ class TracerOptions(TsunamiOptions):
         
     def update_suspended(self, solver_obj):
         
-        self.bathymetry.interpolate(self.set_bathymetry(self.P1))
+        #self.bathymetry.interpolate(self.set_bathymetry(self.P1))
         
-        self.old_bathymetry_2d.assign(solver_obj.fields.bathymetry_2d)
+        self.old_bathymetry_2d.assign(self.bathymetry)
         
         self.z_n.interpolate(self.old_bathymetry_2d)
         
@@ -134,7 +162,6 @@ class TracerOptions(TsunamiOptions):
         self.ceq.interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         self.tracer_init_value.assign(self.ceq.at([0,0])/self.coeff.at([0,0]))
         print('tracer')
-        print(self.tracer_init_value.dat.data[:])
         print(solver_obj.bnd_functions['tracer'][1]['value'].dat.data[:])
         print(solver_obj.fields.tracer_2d.at([0,0]))
         self.source.interpolate(self.set_source_tracer(self.P1DG, solver_obj))
@@ -143,8 +170,36 @@ class TracerOptions(TsunamiOptions):
         
         self.qbsourcedepth.interpolate(self.source*self.depth)
         
+        if self.convective_vel_flag:
+            
+            # correction factor to advection velocity in sediment concentration equation
+            self.Bconv.interpolate(conditional(self.depth > 1.1*self.ksp, self.ksp/self.depth, self.ksp/(1.1*self.ksp)))
+            self.Aconv.interpolate(conditional(self.depth > 1.1* self.a, self.a/self.depth, self.a/(1.1*self.a)))
+                    
+            # take max of value calculated either by ksp or depth
+            self.Amax.assign(conditional(self.Aconv > self.Bconv, self.Aconv, self.Bconv))
+
+            self.r1conv.assign(1 - (1/0.4)*conditional(self.settling_velocity/self.ustar < 1, self.settling_velocity/self.ustar, 1))
+
+            self.Ione.assign(conditional(self.r1conv > 10**(-8), (1 - self.Amax**self.r1conv)/self.r1conv, conditional(self.r1conv < - 10**(-8), (1 - self.Amax**self.r1conv)/self.r1conv, ln(self.Amax))))
+
+            self.Itwo.assign(conditional(self.r1conv > 10**(-8), -(self.Ione + (ln(self.Amax)*(self.Amax**self.r1conv)))/self.r1conv, conditional(self.r1conv < - 10**(-8), -(self.Ione + (ln(self.Amax)*(self.Amax**self.r1conv)))/self.r1conv, -0.5*ln(self.Amax)**2)))
+
+            self.alpha.assign(-(self.Itwo - (ln(self.Amax) - ln(30))*self.Ione)/(self.Ione * ((ln(self.Amax) - ln(30)) + 1)))
+
+            # final correction factor
+            self.alphatest2.assign(conditional(conditional(self.alpha > 1, 1, self.alpha) < 0, 0, conditional(self.alpha > 1, 1, self.alpha)))
+                    
+            # multiply correction factor by velocity and insert back into sediment concentration equation
+            self.corrective_velocity.interpolate(self.alphatest2 * self.uv1)            
+
+        else:
+            self.corrective_velocity.interpolate(self.uv1)
+        
         f += - (self.qbsourcedepth * self.v)*dx
         
         solve(f==0, self.z_n1)
         
-        #solver_obj.fields.bathymetry_2d.assign(self.z_n1)
+        self.bathymetry.assign(self.z_n1)
+        solver_obj.fields.bathymetry_2d.assign(self.z_n1)
+        print(max(self.bathymetry.dat.data[:]))
