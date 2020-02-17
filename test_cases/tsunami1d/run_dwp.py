@@ -1,4 +1,5 @@
 import firedrake
+from thetis import print_output
 
 import os
 import numpy as np
@@ -21,14 +22,14 @@ forward = True
 adjoint = True
 
 # Spatial discretisation
-n = 100
+n = 500
 # n = 2000  # (Value used in original paper)
 dx = 1/n
 
 # Time discretisation
 celerity = 20.0*np.sqrt(9.81)
-# dt = 2000.0*dx/celerity
-dt = 5.0
+# dt = 40.0e+3*dx/celerity
+dt = 1.5
 # dt = 1.0  # (Value used in original paper)
 
 # NOTE: Forward and adjoint relatively stable with n = 500 and dt = 1.5
@@ -42,9 +43,10 @@ op.num_adapt = 1
 # op.norm_order = 1
 # op.normalisation = 'error'
 
-swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False)
+swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False, levels=0)
 swp.setup_solver_forward()
 swp.solve_forward()
+print_output("QoI before adaptation: {:.4e}".format(op.evaluate_qoi(swp.solution)))
 swp.setup_solver_adjoint()
 swp.solve_adjoint()
 swp.dwp_indication()
@@ -62,6 +64,7 @@ if forward:
     # Solve forward problem
     swp.setup_solver_forward()
     swp.solve_forward()
+    print_output("QoI after adaptation: {:.4e}".format(op.evaluate_qoi(swp.solution)))
     eta = swp.solution.split()[1]
 
     # Plot forward

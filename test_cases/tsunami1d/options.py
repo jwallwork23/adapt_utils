@@ -113,7 +113,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
         return self.boundary_conditions
 
     def set_qoi_kernel(self, fs):
-        x, t = SpatialCoordinate(fs)
+        x, t = SpatialCoordinate(fs.mesh())
         self.kernel = Function(fs)
         ku, ke = self.kernel.split()
         ku.assign(0.0)
@@ -126,3 +126,13 @@ class Tsunami1dOptions(ShallowWaterOptions):
         # ke.interpolate(conditional(le(abs(x-x0), r), amplitude, 0.0))
         ke.interpolate(conditional(lt(abs(x-x0), r), bump, 0.0))
         return self.kernel
+
+    def evaluate_qoi(self, sol):
+        eta = sol.split()[1]
+        x, t = SpatialCoordinate(sol.function_space().mesh())
+        x0, t0, r = self.region_of_interest[0]
+        # amplitude = 0.4
+        amplitude = 1.0
+        bump = amplitude*exp(1 - 1/(1 - ((x-x0)/r)**2))
+        kernel = conditional(lt(abs(x-x0), r), bump, 0.0)
+        return assemble(kernel*eta*ds(self.t_final_tag, degree=12))

@@ -1,4 +1,5 @@
 import firedrake
+from thetis import print_output
 
 import os
 import numpy as np
@@ -17,6 +18,7 @@ debug = True
 plot_pdf = False
 plot_pvd = True
 save_hdf5 = True
+approach = 'dwr'
 
 # Spatial discretisation
 n = 250
@@ -25,12 +27,12 @@ dx = 1/n
 
 # Time discretisation
 celerity = 20.0*np.sqrt(9.81)
-# dt = 2000.0*dx/celerity
+# dt = 40.0e+3*dx/celerity
 dt = 3.0
 # dt = 1.0  # (Value used in original paper)
 
 # NOTE: Forward and adjoint relatively stable with n = 500 and dt = 1.5
-op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, approach='dwr_both',
+op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, approach=approach,
                       save_hdf5=save_hdf5, plot_pvd=plot_pvd,
                       horizontal_length_scale=1000.0, time_scale=10.0)
 op.h_min = 100.0/op.L
@@ -43,6 +45,7 @@ op.num_adapt = 1
 swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False, levels=1)
 swp.setup_solver_forward()
 swp.solve_forward()
+print_output("QoI before adaptation: {:.4e}".format(op.evaluate_qoi(swp.solution)))
 swp.setup_solver_adjoint()
 swp.solve_adjoint()
 adjoint = 'adjoint' in op.approach
@@ -67,8 +70,8 @@ T = op.T  # Time scale
 # Plot error estimator
 fig = plt.figure(figsize=(3.2, 4.8))
 ax = fig.add_subplot(111)
-# firedrake.plot(swp.indicator, axes=ax, vmin=v, vmax=1.001*v, cmap=matplotlib.cm.Greens)
-firedrake.plot(swp.indicator, axes=ax, cmap=matplotlib.cm.Greens)
+firedrake.plot(swp.indicator, axes=ax, vmin=v, vmax=1.001*v, cmap=matplotlib.cm.Greens)
+# firedrake.plot(swp.indicator, axes=ax, cmap=matplotlib.cm.Greens)
 ax.invert_xaxis()
 ymin = op.start_time
 ymax = op.end_time

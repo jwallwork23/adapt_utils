@@ -1,4 +1,5 @@
 import firedrake
+from thetis import print_output
 
 import os
 import numpy as np
@@ -22,14 +23,14 @@ adjoint = True
 quads = False
 
 # Spatial discretisation
-n = 500
+n = 1000
 # n = 2000  # (Value used in original paper)
 dx = 1/n
 
 # Time discretisation
 celerity = 20.0*np.sqrt(9.81)
-# dt = 2000.0*dx/celerity
-dt = 1.5
+# dt = 40.0e+3*dx/celerity
+dt = 3.0
 # dt = 1.0  # (Value used in original paper)
 
 # NOTE: Forward and adjoint relatively stable with n = 500, dt = 1.5 and quads = False
@@ -45,6 +46,7 @@ if forward:
     # Solve forward problem
     swp.setup_solver_forward()
     swp.solve_forward()
+    print_output("QoI: {:.4e}".format(op.evaluate_qoi(swp.solution)))
     eta = swp.solution.split()[1]
 
     # Plot forward
