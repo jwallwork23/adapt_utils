@@ -247,6 +247,9 @@ class SteadyProblem():
         Retrieve forward or adjoint solution, as specified by boolean kwarg `adjoint`.
         """
         return self.adjoint_solution if adjoint else self.solution
+    
+    def get_tracer(self):
+        return self.solver_obj.fields.tracer_2d
 
     def get_error(self, adjoint=False):
         """
@@ -322,6 +325,9 @@ class SteadyProblem():
         `adjoint`.
         """
         self.project(val, out=self.get_solution(adjoint=adjoint))
+        
+    def project_tracer(self, val, adjoint = False):
+        self.project(val, out = self.get_tracer())
 
     def get_qoi_kernel(self):
         """
@@ -654,13 +660,14 @@ class SteadyProblem():
                 assert hasattr(self, 'monitor_function')
             except AssertionError:
                 raise ValueError("Please supply a monitor function.")
-
+            import ipdb; ipdb.set_trace()
             # Create MeshMover object and establish coordinate transformation
             mesh_mover = MeshMover(self.am_init.mesh, self.monitor_function, op=self.op)
             mesh_mover.adapt()
 
             # Create a temporary Problem based on the new mesh
             am_copy = self.am.copy()
+            
             tmp = type(self)(self.op, mesh=am_copy.mesh, discrete_adjoint=self.discrete_adjoint,
                              prev_solution=self.prev_solution, levels=self.levels)
             x = Function(tmp.mesh.coordinates)
@@ -670,6 +677,13 @@ class SteadyProblem():
             # Project fields and solutions onto temporary Problem
             tmp.project_fields(self)
             tmp.project_solution(self.solution)
+            """
+            if hasattr(self, 'solution_tracer'):
+                tmp.solution_tracer = Function(tmp.solution.split()[1].function_space()).project(self.solution_tracer)
+                print('tracer')
+            else:
+                tmp.project_tracer(self.op.tracer_init)
+            """
             tmp.project_solution(self.adjoint_solution, adjoint=True)
 
             # Update self.mesh and function spaces, etc.
@@ -687,6 +701,9 @@ class SteadyProblem():
             m = interpolate(self.monitor_function(self.mesh), self.P1)
             m.rename("Monitor function")
             self.monitor_file.write(m)
+            import ipdb; ipdb.set_trace()
+            self.op.old_mesh = am_copy.mesh
+            
 
         else:
             try:
@@ -948,13 +965,14 @@ class UnsteadyProblem(SteadyProblem):
             for i in range(self.op.num_adapt):
                 self.adapt_mesh()
                 # Interpolate value from previous step onto new mesh
+                import ipdb; ipdb.set_trace()
                 if self.remesh_step == 0:
                     self.set_start_condition(adjoint)
                 elif i == 0:
                     self.project_solution(solution, adjoint=adjoint)
                 else:
                     self.project_solution(solution_old, adjoint=adjoint)
-
+                    
                 # Solve PDE on new mesh
                 self.op.plot_pvd = i == 0
                 # time = None if i == 0 else self.step_end - self.op.dt
@@ -965,6 +983,8 @@ class UnsteadyProblem(SteadyProblem):
                 if i == 0:
                     solution = Function(self.solution)
                     solution_old = Function(self.solution_old)
+                    solution_tracer = Function(self.solution_tracer)
+                    solution_tracer_old = Function(self.solution_tracer)
                     if self.step_end + self.op.dt*self.op.dt_per_remesh > self.op.end_time:
                         break  # No need to do adapt for final timestep
             # self.plot()  # TODO: Temporary. It is called at end of adapt_mesh

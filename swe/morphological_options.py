@@ -93,13 +93,6 @@ class TracerOptions(TsunamiOptions):
         self.tracer_init = Function(self.P1DG).project(self.ceq/self.coeff)
         
         
-
-        self.tracer_file = File(self.di + "/tracery.pvd")
-            
-        self.tracer_file.write(self.tracer_init)
-            
-        import ipdb; ipdb.set_trace()                    
-        
         self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
         self.source = Function(self.P1DG).project(self.set_source_tracer(self.P1DG, solver_obj = None, init = True, t_old = self.t_old)) 
         self.qbsourcedepth = Function(self.P1).project(self.source * self.depth)

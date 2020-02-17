@@ -22,7 +22,7 @@ tp = TsunamiProblem(op, levels=0)
 tp.setup_solver()
 
 
-def gradient_interface_monitor(mesh, alpha=1000000.0):
+def gradient_interface_monitor(mesh, alpha=10**9):
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 
@@ -41,7 +41,8 @@ def gradient_interface_monitor(mesh, alpha=1000000.0):
     bath_dy = interpolate(b.dx(1), P1_current)
     norm = interpolate(pow(bath_dx, 2) + pow(bath_dy, 2), P1_current)
     norm_proj = project(norm, P1)
-
+    #import ipdb; ipdb.set_trace()
+    
 
     return sqrt(1.0 + alpha*norm_proj)
 

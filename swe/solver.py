@@ -479,12 +479,13 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
                                 export_func=self.op.get_export_func(self.solver_obj))
         self.solution = self.solver_obj.fields.solution_2d
         if self.op.solve_tracer:
-            self.solution_tracer = self.solver_obj.fields.tracer_2d
-            import ipdb; ipdb.set_trace()
-            self.solution_bathymetry = Function(self.P1).project(self.solver_obj.fields.bathymetry_2d)
+            self.solution_tracer = self.solver_obj.fields.tracer_2d.copy(deepcopy = True)#Function(P1_DG).project(self.solver_obj.fields.tracer_2d)
+            self.solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy = True)
             tracer_file = File(self.op.di + "/tracer_init.pvd")
             
             tracer_file.write(self.solution_tracer) 
+            
+            import ipdb; ipdb.set_trace()
 
     def setup_solver(self):
         if not hasattr(self, 'remesh_step'):
@@ -516,9 +517,20 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             u_interp, eta_interp = self.solution.split()
             if op.solve_tracer:
                 if hasattr(self, 'solution_tracer'):
-                    self.op.tracer_interp = Function(self.P1DG).project(self.solution_tracer)
+                    P1DG = FunctionSpace(self.am_init.mesh, "DG", 1)
+                    solution_tracer_new = Function(P1DG).project(self.solution_tracer)
+                    self.op.tracer_interp = Function(self.P1DG).project(solution_tracer_new)
+                    import ipdb; ipdb.set_trace()
+                    tracer_file = File(self.op.di + "/tracer_init_2.pvd")
+                    tracer_file.write(self.solution_tracer)            
+            
                 else:
                     self.op.tracer_interp = Function(self.P1DG).project(self.op.tracer_init)
+                    #self.solution_tracer = Function(self.P1DG).project(self.op.tracer_init)
+
+            tracer_file = File(self.op.di + "/tracer_solver.pvd")                    
+            tracer_file.write(self.op.tracer_interp) 
+            import ipdb; ipdb.set_trace()
         
         if op.solve_tracer:
             self.uv_d, self.eta_d = self.solution.split()
@@ -585,9 +597,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)        
 
-        tracer_file = File(self.op.di + "/tracer_solver.pvd")
-            
-        tracer_file.write(self.op.tracer_interp)                
+   
 
 
         if hasattr(self, 'extra_setup'):
