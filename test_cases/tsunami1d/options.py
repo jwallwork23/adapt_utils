@@ -9,14 +9,18 @@ __all__ = ["Tsunami1dOptions"]
 
 
 class Tsunami1dOptions(ShallowWaterOptions):
-    def __init__(self, nx=2000, dt=1.0, **kwargs):
+    def __init__(self, nx=2000, dt=1.0, horizontal_length_scale=1000.0, time_scale=10.0, **kwargs):
         super(Tsunami1dOptions, self).__init__(**kwargs)
-        self.dt = dt
-        self.end_time = 4200.0
+        self.L = horizontal_length_scale
+        self.T = time_scale
+        self.dt = dt/self.T
+        self.start_time = 0.0/self.T
+        self.end_time = 4200.0/self.T
         nt = int(np.round(self.end_time/self.dt))
 
         # Mesh: 2d space-time approach
-        self.default_mesh = RectangleMesh(nx, nt, 400.0e+3, self.end_time)
+        lx = 400.0e+3/self.L
+        self.default_mesh = RectangleMesh(nx, nt, lx, self.end_time)
         self.t_init_tag = 3
         self.t_final_tag = 4
 
@@ -26,12 +30,13 @@ class Tsunami1dOptions(ShallowWaterOptions):
         # self.family = 'taylor-hood'
 
         # Initial/final condition
-        self.source_loc = [(125.0e+3, 0.0, 25.0e+3)]
-        self.region_of_interest = [(17.5e+3, self.end_time, 7.5e+3)]
+        self.source_loc = [(125.0e+3/self.L, self.start_time, 25.0e+3/self.L)]
+        self.region_of_interest = [(17.5e+3/self.L, self.end_time, 7.5e+3/self.L)]
 
         # Physical parameters
         self.g.assign(9.81)
         self.depth = 4000.0
+        self.shelf_break_loc = 50.0e+3/self.L
 
         # Solver parameters
         direct_params = {  # Just whack it with a full LU preconditioner
@@ -68,7 +73,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
 
     def set_bathymetry(self, fs):
         x, t = SpatialCoordinate(fs.mesh())
-        self.bathymetry = interpolate(conditional(le(x, 50.0e+3), self.depth/20, self.depth), fs)
+        self.bathymetry = interpolate(conditional(le(x, self.shelf_break_loc), self.depth/20, self.depth), fs)
         return self.bathymetry
 
     def set_initial_condition(self, fs):
@@ -78,7 +83,8 @@ class Tsunami1dOptions(ShallowWaterOptions):
         x, t = SpatialCoordinate(fs.mesh())
         x0, t0, r = self.source_loc[0]
         tol = self.dt/2
-        bump = 0.4*sin(pi*(x-x0+r)/(2*r))
+        amplitude = 0.4
+        bump = amplitude*sin(pi*(x-x0+r)/(2*r))
         # eta.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), bump, 0.0), 0.0))
         eta.interpolate(conditional(le(abs(x-x0), r), bump, 0.0))
         return self.initial_value
@@ -106,9 +112,10 @@ class Tsunami1dOptions(ShallowWaterOptions):
         ku.assign(0.0)
         x0, t0, r = self.region_of_interest[0]
         tol = self.dt/2
-        # h = 0.4
-        h = 1.0
-        # ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), h, 0.0), 0.0))
-        # ke.interpolate(conditional(le(abs(x-x0), r), h, 0.0))
-        ke.interpolate(conditional(lt(abs(x-x0), r), h*exp(1 - 1/(1 - ((x-x0)/r)**2)), 0.0))
+        # amplitude = 0.4
+        amplitude = 1.0
+        bump = amplitude*exp(1 - 1/(1 - ((x-x0)/r)**2))
+        # ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), amplitude, 0.0), 0.0))
+        # ke.interpolate(conditional(le(abs(x-x0), r), amplitude, 0.0))
+        ke.interpolate(conditional(lt(abs(x-x0), r), bump, 0.0))
         return self.kernel

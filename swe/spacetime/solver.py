@@ -61,6 +61,10 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         u, η = self.trials
         v, θ = self.tests
 
+        # Adjust for length and time scales
+        T = Constant(1.0 if not hasattr(self.op, 'T') else self.op.T)
+        L = Constant(1.0 if not hasattr(self.op, 'L') else self.op.L)
+
         # Parameters
         g = self.op.g
         if self.dim == 3:
@@ -70,13 +74,13 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0),])
-            ddt = lambda F: F.dx(1)
+            grad_x = lambda F: as_vector([F.dx(0),])/L
+            ddt = lambda F: F.dx(1)/T
             n = as_vector([self.n[0],])
         elif self.dim == 3:
-            grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])
+            grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
             perp = lambda F: as_vector([-F[1], F[0]])
-            ddt = lambda F: F.dx(2)
+            ddt = lambda F: F.dx(2)/T
             n = as_vector([self.n[0], self.n[1]])
         else:
             raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
@@ -113,6 +117,10 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         z, ζ = self.trials
         v, θ = self.tests
 
+        # Adjust for length and time scales
+        T = Constant(1.0 if not hasattr(self.op, 'T') else self.op.T)
+        L = Constant(1.0 if not hasattr(self.op, 'L') else self.op.L)
+
         # Parameters
         g = self.op.g
         if self.dim == 3:
@@ -123,13 +131,13 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0),])
-            ddt = lambda F: F.dx(1)
+            grad_x = lambda F: as_vector([F.dx(0),])/L
+            ddt = lambda F: F.dx(1)/T
             n = as_vector([self.n[0],])
         elif self.dim == 3:
-            grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])
+            grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
             perp = lambda F: as_vector([-F[1], F[0]])
-            ddt = lambda F: F.dx(2)
+            ddt = lambda F: F.dx(2)/T
             n = as_vector([self.n[0], self.n[1]])
         else:
             raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
