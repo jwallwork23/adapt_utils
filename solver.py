@@ -148,7 +148,7 @@ class SteadyProblem():
             else:
                 raise ValueError
         self.op.bathymetry = self.fields['bathymetry']
-        self.op.set_boundary_surface()
+        #self.op.set_boundary_surface()
 
     def set_stabilisation(self):
         """

@@ -458,7 +458,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
-        self.op.set_boundary_surface()
+        #self.op.set_boundary_surface()
         self.fields['source'] = self.op.source#op.set_source_tracer(self.P1DG, self.solver_obj)
 
 
@@ -482,27 +482,24 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             self.solution_tracer = self.solver_obj.fields.tracer_2d
             import ipdb; ipdb.set_trace()
             self.solution_bathymetry = Function(self.P1).project(self.solver_obj.fields.bathymetry_2d)
-            bathymetry_file = File(self.op.di + "/bathy_init.pvd")
+            tracer_file = File(self.op.di + "/tracer_init.pvd")
             
-            bathymetry_file.write(self.solution_bathymetry) 
+            tracer_file.write(self.solution_tracer) 
 
     def setup_solver(self):
         if not hasattr(self, 'remesh_step'):
             self.remesh_step = 0
         op = self.op
         
-        if hasattr(self, "solution_bathymetry"):
-            bathymetry = Function(self.solution_bathymetry.function_space()).project(self.solution_bathymetry)
-        else:
-            bathymetry = self.op.set_bathymetry(self.P1)
+        P1 = FunctionSpace(self.mesh, 'CG', 1)
+
+        #if hasattr(self, "old_bathymetry_2d"):
+        #    self.op.bathymetry = Function(P1).project(self.old_bathymetry)
+        #else:
+        self.op.bathymetry = self.op.set_bathymetry(self.P1)
     
-        bathymetry_file = File(self.op.di + "/bathy_solver.pvd")
-            
-        bathymetry_file.write(bathymetry)        
         
-        import ipdb; ipdb.set_trace()
-        
-        self.solver_obj = solver2d.FlowSolver2d(self.mesh, bathymetry)
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.op.bathymetry)
 
         self.solver_obj.export_initial_state = self.remesh_step == 0
             
@@ -588,7 +585,9 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)        
 
-        
+        tracer_file = File(self.op.di + "/tracer_solver.pvd")
+            
+        tracer_file.write(self.op.tracer_interp)                
 
 
         if hasattr(self, 'extra_setup'):

@@ -200,6 +200,6 @@ class TracerOptions(TsunamiOptions):
         
         solve(f==0, self.z_n1)
         
-        self.bathymetry.assign(self.z_n1)
+        #self.bathymetry.assign(self.z_n1)
         solver_obj.fields.bathymetry_2d.assign(self.z_n1)
         print(max(self.bathymetry.dat.data[:]))
