@@ -106,8 +106,8 @@ class TrenchOptions(TracerOptions):
         
         self.dt = 0.3
         self.end_time = self.num_hours*3600.0/self.morfac
-        self.dt_per_export = 10
-        self.dt_per_remesh = 10
+        self.dt_per_export = 60
+        self.dt_per_remesh = 60
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 

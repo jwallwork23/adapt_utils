@@ -661,6 +661,19 @@ class SteadyProblem():
             except AssertionError:
                 raise ValueError("Please supply a monitor function.")
             import ipdb; ipdb.set_trace()
+            
+
+            
+            if hasattr(self, "solution_tracer"):
+                #test = self.solution_tracer.copy(deepcopy = True)
+                self.op.old_mesh = Mesh(Function(self.mesh.coordinates))                
+                #self.op.old_mesh = test.function_space().mesh()
+                P1DG = FunctionSpace(self.op.old_mesh, "DG", 1)
+                self.op.solution_old_tracer = Function(P1DG).project(self.solution_tracer)
+                tracer_file = File(self.op.di + "/tracer_init_mc.pvd")
+            
+                tracer_file.write(self.op.solution_old_tracer) 
+                
             # Create MeshMover object and establish coordinate transformation
             mesh_mover = MeshMover(self.am_init.mesh, self.monitor_function, op=self.op)
             mesh_mover.adapt()
@@ -677,13 +690,7 @@ class SteadyProblem():
             # Project fields and solutions onto temporary Problem
             tmp.project_fields(self)
             tmp.project_solution(self.solution)
-            """
-            if hasattr(self, 'solution_tracer'):
-                tmp.solution_tracer = Function(tmp.solution.split()[1].function_space()).project(self.solution_tracer)
-                print('tracer')
-            else:
-                tmp.project_tracer(self.op.tracer_init)
-            """
+
             tmp.project_solution(self.adjoint_solution, adjoint=True)
 
             # Update self.mesh and function spaces, etc.
@@ -702,8 +709,7 @@ class SteadyProblem():
             m.rename("Monitor function")
             self.monitor_file.write(m)
             import ipdb; ipdb.set_trace()
-            self.op.old_mesh = am_copy.mesh
-            
+       
 
         else:
             try:
@@ -983,8 +989,6 @@ class UnsteadyProblem(SteadyProblem):
                 if i == 0:
                     solution = Function(self.solution)
                     solution_old = Function(self.solution_old)
-                    solution_tracer = Function(self.solution_tracer)
-                    solution_tracer_old = Function(self.solution_tracer)
                     if self.step_end + self.op.dt*self.op.dt_per_remesh > self.op.end_time:
                         break  # No need to do adapt for final timestep
             # self.plot()  # TODO: Temporary. It is called at end of adapt_mesh
