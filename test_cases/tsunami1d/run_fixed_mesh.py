@@ -19,6 +19,7 @@ plot_pvd = True
 save_hdf5 = True
 forward = True
 adjoint = True
+quads = False
 
 # Spatial discretisation
 n = 500
@@ -31,9 +32,9 @@ celerity = 20.0*np.sqrt(9.81)
 dt = 1.5
 # dt = 1.0  # (Value used in original paper)
 
-# NOTE: Forward and adjoint relatively stable with n = 500 and dt = 1.5
+# NOTE: Forward and adjoint relatively stable with n = 500, dt = 1.5 and quads = False
 op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, save_hdf5=save_hdf5, plot_pvd=plot_pvd,
-                      horizontal_length_scale=1000.0, time_scale=10.0)
+                      horizontal_length_scale=1000.0, time_scale=10.0, quads=quads)
 swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False)
 
 v = 0.02

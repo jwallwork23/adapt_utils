@@ -1,6 +1,7 @@
 from firedrake import *
 
 import numpy as np
+import warnings
 
 from adapt_utils.swe.options import ShallowWaterOptions
 
@@ -9,7 +10,7 @@ __all__ = ["Tsunami1dOptions"]
 
 
 class Tsunami1dOptions(ShallowWaterOptions):
-    def __init__(self, nx=2000, dt=1.0, horizontal_length_scale=1000.0, time_scale=10.0, **kwargs):
+    def __init__(self, nx=2000, dt=1.0, horizontal_length_scale=1000.0, time_scale=10.0, quads=False, **kwargs):
         super(Tsunami1dOptions, self).__init__(**kwargs)
         self.L = horizontal_length_scale
         self.T = time_scale
@@ -20,7 +21,13 @@ class Tsunami1dOptions(ShallowWaterOptions):
 
         # Mesh: 2d space-time approach
         lx = 400.0e+3/self.L
-        self.default_mesh = RectangleMesh(nx, nt, lx, self.end_time)
+        if quads:
+            try:
+                assert self.approach in ('fixed_mesh', 'uniform')
+            except AssertionError:
+                warnings.warn("Quadrilaterals not allowed for adaptation with pragmatic. Reverting to triangles.")
+                quads = False
+        self.default_mesh = RectangleMesh(nx, nt, lx, self.end_time, quadrilateral=quads)
         self.t_init_tag = 3
         self.t_final_tag = 4
 

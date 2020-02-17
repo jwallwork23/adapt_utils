@@ -41,6 +41,7 @@ op.target = 10000.0
 op.num_adapt = 1
 # op.norm_order = 1
 # op.normalisation = 'error'
+
 swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False)
 swp.setup_solver_forward()
 swp.solve_forward()

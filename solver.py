@@ -492,7 +492,11 @@ class SteadyProblem():
         """
         Plot current mesh and indicator fields, if available.
         """
-        File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
+        meshfile = File(os.path.join(self.di, 'mesh.pvd'))
+        try:
+            meshfile.write(self.mesh)  # This is allowed in modern firedrake
+        except ValueError:
+            meshfile.write(self.mesh.coordinates)
         for key in self.indicators:
             File(os.path.join(self.di, key + '.pvd')).write(self.indicators[key])
         if hasattr(self, 'indicator'):
