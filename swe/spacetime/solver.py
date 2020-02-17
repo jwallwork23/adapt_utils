@@ -3,6 +3,7 @@ from firedrake import *
 import warnings
 
 from adapt_utils.solver import SteadyProblem
+from adapt_utils.adapt.metric import isotropic_metric, steady_metric
 
 
 __all__ = ["SpaceTimeShallowWaterProblem", "SpaceTimeDispersiveShallowWaterProblem"]
@@ -159,8 +160,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         self.lhs_adjoint += g*inner(grad_x(θ), z)*dx
 
         # RHS
-        if not hasattr(self, 'kernel'):
-            self.get_qoi_kernel()
+        self.get_qoi_kernel()
         k_u, k_eta = self.kernel.copy(deepcopy=True).split()
         self.rhs_adjoint = Constant(0.0)*(inner(v, k_u) + inner(θ, k_eta))*dx
 
@@ -169,6 +169,19 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         # Final time conditions
         self.dbcs_adjoint = [DirichletBC(self.V.sub(0), k_u, tf_tag),
                              DirichletBC(self.V.sub(1), k_eta, tf_tag)]
+
+    def get_isotropic_metric(self):
+        """Accounts for length and time scales."""  # FIXME: Is this the right thing to do?
+        el = self.indicator.ufl_element()
+        name = self.indicator.dat.name
+        if (el.family(), el.degree()) != ('Lagrange', 1):
+            self.indicator = project(self.indicator, self.P1)
+            self.indicator.rename(name)
+        self.M = isotropic_metric(self.indicator, noscale=True, op=self.op)
+        if hasattr(self.op, 'L') and hasattr(self.op, 'T'):
+            L, T = self.op.L, self.op.T
+            self.M.interpolate(as_matrix([[self.M[0, 0]/L, 0.0], [0.0, self.M[1, 1]/T]]))
+        self.M = steady_metric(H=self.M, op=self.op)
 
     def plot_solution(self, adjoint=False):  # FIXME: Can't seem to plot vector fields
         if not self.op.plot_pvd:
