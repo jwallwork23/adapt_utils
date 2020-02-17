@@ -87,7 +87,7 @@ class SteadyProblem():
         self.n = FacetNormal(self.mesh)  # TODO: use version in AdaptiveMesh
         self.h = CellSize(self.mesh)     # TODO: use version in AdaptiveMesh
         self.dim = self.mesh.topological_dimension()
-        self.op.print_debug("Number of mesh elements: {:d}".format(mesh.num_cells()))
+        self.op.print_debug(self.op.indent+"Number of mesh elements: {:d}".format(mesh.num_cells()))
 
     def create_enriched_problem(self):
         """
@@ -557,7 +557,7 @@ class SteadyProblem():
                 if not approach in self.estimators:
                     self.estimators[approach] = []
                 self.get_isotropic_metric()
-                if approach in ('dwr_both', 'dwr_averaged'):
+                if approach == 'dwr_both':
                     self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
                     self.get_isotropic_metric()
                 else:

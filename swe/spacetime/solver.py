@@ -170,6 +170,143 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         self.dbcs_adjoint = [DirichletBC(self.V.sub(0), k_u, tf_tag),
                              DirichletBC(self.V.sub(1), k_eta, tf_tag)]
 
+    def get_dwr_residual_forward(self):
+        tpe = self.tp_enriched
+        tpe.project_solution(self.solution)  # FIXME: prolong
+        u, eta = tpe.solution.split()
+        z, zeta = self.adjoint_error.split()
+
+        # Adjust for length and time scales
+        T = Constant(1.0 if not hasattr(self.op, 'T') else self.op.T)
+        L = Constant(1.0 if not hasattr(self.op, 'L') else self.op.L)
+
+        # Physical parameters
+        g = self.op.g
+        b = tpe.fields['bathymetry']
+        warnings.warn("#### TODO: Viscosity ignored")
+        warnings.warn("#### TODO: Coriolis ignored")
+
+        # Operators
+        if self.dim == 2:
+            grad_x = lambda F: as_vector([F.dx(0),])/L
+            ddt = lambda F: F.dx(1)/T
+            n = as_vector([tpe.n[0],])
+            div_x = lambda F: F[0].dx(0)
+        elif self.dim == 3:
+            grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
+            perp = lambda F: as_vector([-F[1], F[0]])
+            ddt = lambda F: F.dx(2)/T
+            n = as_vector([tpe.n[0], tpe.n[1]])
+            div_x = lambda F: F[0].dx(0) + F[1].dx(1)  # TODO: test
+        else:
+            raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
+
+        dwr = -inner(self.adjoint_error, ddt(tpe.solution))
+        dwr += -inner(z, g*grad_x(eta))
+        dwr += -inner(zeta, div_x(b*u))
+
+        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
+        self.estimate_error('dwr_cell')
+
+    def get_dwr_flux_forward(self):
+        tpe = self.tp_enriched
+        i = tpe.p0test
+        tpe.project_solution(self.solution)  # FIXME: prolong
+        u, eta = tpe.solution.split()
+        z, zeta = self.adjoint_error.split()
+
+        # Physical parameters
+        b = tpe.fields['bathymetry']
+        warnings.warn("#### TODO: Viscosity ignored")
+
+        # Normal vector
+        if self.dim == 2:
+            n = as_vector([tpe.n[0],])
+        elif self.dim == 3:
+            n = as_vector([tpe.n[0], tpe.n[1]])
+        else:
+            raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
+
+        # Flux term resulting from integration by parts
+        loc = i*inner(zeta, dot(b*u, n))
+        flux_terms = (loc('+') + loc('-'))*dS + loc*ds
+
+        # Solve auxiliary finite element problem to get traces on particular element
+        mass_term = i*tpe.p0trial*dx
+        res = Function(tpe.P0)
+        solve(mass_term == flux_terms, res)
+        self.indicators['dwr_flux'] = project(assemble(i*res*dx), self.P0)
+        self.estimate_error('dwr_flux')
+
+    def get_dwr_residual_adjoint(self):
+        tpe = self.tp_enriched
+        tpe.project_solution(self.solution, adjoint=True)  # FIXME: prolong
+        u, eta = self.error.split()
+        z, zeta = tpe.adjoint_solution.split()
+
+        # Adjust for length and time scales
+        T = Constant(1.0 if not hasattr(self.op, 'T') else self.op.T)
+        L = Constant(1.0 if not hasattr(self.op, 'L') else self.op.L)
+
+        # Physical parameters
+        g = self.op.g
+        b = tpe.fields['bathymetry']
+        warnings.warn("#### TODO: Viscosity ignored")
+        warnings.warn("#### TODO: Coriolis ignored")
+
+        # Operators
+        if self.dim == 2:
+            grad_x = lambda F: as_vector([F.dx(0),])/L
+            ddt = lambda F: F.dx(1)/T
+            n = as_vector([tpe.n[0],])
+            div_x = lambda F: F[0].dx(0)
+        elif self.dim == 3:
+            grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
+            perp = lambda F: as_vector([-F[1], F[0]])
+            ddt = lambda F: F.dx(2)/T
+            n = as_vector([tpe.n[0], tpe.n[1]])
+            div_x = lambda F: F[0].dx(0) + F[1].dx(1)  # TODO: test
+        else:
+            raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
+
+        dwr = inner(self.error, ddt(tpe.adjoint_solution))
+        dwr += inner(u, grad_x(b*zeta))
+        dwr += inner(eta, g*div_x(z))
+        # NOTE: Kernel is DirichletBC so ignored here
+
+        self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
+        self.estimate_error('dwr_cell_adjoint')
+
+    def get_dwr_flux_adjoint(self):
+        tpe = self.tp_enriched
+        i = tpe.p0test
+        tpe.project_solution(self.solution, adjoint=True)  # FIXME: prolong
+        u, eta = self.error.split()
+        z, zeta = tpe.adjoint_solution.split()
+
+        # Physical parameters
+        g = self.op.g
+        warnings.warn("#### TODO: Viscosity ignored")
+
+        # Normal vector
+        if self.dim == 2:
+            n = as_vector([tpe.n[0],])
+        elif self.dim == 3:
+            n = as_vector([tpe.n[0], tpe.n[1]])
+        else:
+            raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
+
+        # Flux term resulting from integration by parts
+        loc = -i*inner(eta, g*dot(z, n))
+        flux_terms = (loc('+') + loc('-'))*dS + loc*ds
+
+        # Solve auxiliary finite element problem to get traces on particular element
+        mass_term = i*tpe.p0trial*dx
+        res = Function(tpe.P0)
+        solve(mass_term == flux_terms, res)
+        self.indicators['dwr_flux_adjoint'] = project(assemble(i*res*dx), self.P0)
+        self.estimate_error('dwr_flux_adjoint')
+
     def get_isotropic_metric(self):
         """Accounts for length and time scales."""  # FIXME: Is this the right thing to do?
         el = self.indicator.ufl_element()
@@ -202,7 +339,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
     def checkpoint_solution(self, adjoint=False):
         if not self.op.save_hdf5:
             return
-        raise NotImplementedError  # TODO
+        raise NotImplementedError  # TODO: Save fields to HDF5 and plot later
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.V)
