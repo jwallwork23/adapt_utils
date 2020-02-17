@@ -32,7 +32,7 @@ dt = 15.0
 # dt = 1.0  # (Value used in original paper)
 
 # NOTE: Forward and adjoint relatively stable with n = 500 and dt = 1.5
-op = Tsunami1dOptions(debug=debug, approach='dwr_adjoint', nx=n, dt=dt,
+op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, approach='dwr_both',
                       save_hdf5=save_hdf5, plot_pvd=plot_pvd,
                       horizontal_length_scale=1000.0, time_scale=10.0)
 swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False, levels=1)
@@ -45,8 +45,10 @@ adjoint = 'adjoint' in op.approach
 swp.dwr_indication(adjoint=adjoint)
 if 'both' in op.approach:
     swp.dwr_indication(adjoint=not adjoint)
-    swp.indicators['dwr_cell_both'] = swp.indicators['dwr_cell'] + swp.indicators['dwr_cell_adjoint']
-    swp.indicators['dwr_flux_both'] = swp.indicators['dwr_flux'] + swp.indicators['dwr_flux_adjoint']
+    swp.indicators['dwr_cell_both'] = swp.indicators['dwr_cell'].copy(deepcopy=True)
+    swp.indicators['dwr_cell_both'] += swp.indicators['dwr_cell_adjoint']
+    swp.indicators['dwr_flux_both'] = swp.indicators['dwr_flux'].copy(deepcopy=True)
+    swp.indicators['dwr_flux_both'] += swp.indicators['dwr_flux_adjoint']
 swp.plot()
 
 exit(0)
