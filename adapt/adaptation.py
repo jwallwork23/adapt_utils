@@ -23,12 +23,14 @@ class AdaptiveMesh():
         """
         self.levels = levels
         self.op = op
-        self.hierarchy = MeshHierarchy(mesh, levels)
-        self.mesh = self.hierarchy[0]
+        use_hierarchy = levels > 0
+        if use_hierarchy:
+            self.hierarchy = MeshHierarchy(mesh, levels)
+            self.mesh = self.hierarchy[0]
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
         assert self.dim in (2, 3)
-        if levels > 0:
+        if use_hierarchy:
             self.refined_mesh = self.hierarchy[1]
 
         self.n = FacetNormal(self.mesh)
