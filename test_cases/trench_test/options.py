@@ -252,7 +252,6 @@ class TrenchOptions(TracerOptions):
             self.quadratic_drag_coefficient.project(self.get_cfactor())
 
             if self.t_old.dat.data[:] == t:
-                print(t)
                 self.update_suspended(solver_obj)
                 self.bathymetry_file = File(self.di + "/bathy.pvd")
                 self.bathymetry_file.write(solver_obj.fields.bathymetry_2d)

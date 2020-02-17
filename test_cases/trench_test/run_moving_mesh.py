@@ -34,7 +34,7 @@ def gradient_interface_monitor(mesh, alpha=100.0):
     
     eta = tp.solution.split()[1]
     
-    b = tp.fields['bathymetry']
+    b = tp.solver_obj.fields.tracer_2d#fields['bathymetry']
     current_mesh = eta.function_space().mesh()
     P1_current = FunctionSpace(current_mesh, "CG", 1)
     bath_dx = interpolate(b.dx(0), P1_current)

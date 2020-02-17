@@ -183,8 +183,6 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
     def update_forcings_tracer(t_new):
 
-        if round(t_new, 2)%t_export == 0:
-            import ipdb; ipdb.set_trace()
         tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
         # update bathymetry      
@@ -310,9 +308,12 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                     source.interpolate(-(settling_velocity*coeff*solver_obj.fields.tracer_2d/depth)+ (settling_velocity*ceq/depth))
                     # update sediment rate to ensure equilibrium at inflow
                     sediment_rate.assign(ceq.at([0,0])/coeff.at([0,0]))
+<<<<<<< HEAD
                     print(t_new)
                     print(solver_obj.bnd_functions['tracer'][1]['value'].dat.data[:])
                     print(solver_obj.fields.tracer_2d.at([0,0]))
+=======
+>>>>>>> parent of 265ab5b... fixing tracer
 
                     if convectivevel == True:
                         # correction factor to advection velocity in sediment concentration equation
