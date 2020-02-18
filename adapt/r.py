@@ -31,7 +31,7 @@ class MeshMover():
         plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
         A1121-A1148.
     """
-    def __init__(self, mesh, monitor_function, method='monge_ampere', bc=None, op=Options()):
+    def __init__(self, mesh, monitor_function, method='monge_ampere', bc=None, bbc=None, op=Options()):
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
         try:
@@ -47,6 +47,7 @@ class MeshMover():
         self.method = method
         assert op.nonlinear_method in ('quasi_newton', 'relaxation')
         self.bc = bc
+        self.bbc = bbc
         self.op = op
         self.ξ = Function(self.mesh.coordinates)  # Computational coordinates
         self.x = Function(self.mesh.coordinates)  # Physical coordinates
@@ -301,7 +302,6 @@ class MeshMover():
               deformation may occur if this is not the case.
         """
         u_cts, v_cts = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
-        bcs = []
 
         # FEM problem for L2 projection
         a = dot(v_cts, u_cts)*dx
@@ -311,19 +311,23 @@ class MeshMover():
         n = FacetNormal(self.mesh)
         a_bc = dot(u_cts, n)*dot(v_cts, n)*ds
         L_bc = Constant(0.0)*dot(v_cts, n)*ds
-        bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary'))
+        bc = self.bc
+        if bc is None:
+            bc = [EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary')]
 
         # Allow tangential movement, but only up until the end of boundary segments
         s = as_vector([n[1], -n[0]])
         a_bc = dot(u_cts, s)*dot(v_cts, s)*ds
         L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
-        edges = set(self.mesh.exterior_facets.unique_markers)
-        corners = [(i, j) for i in edges for j in edges.difference([i])]
-        bbc = DirichletBC(self.P1_vec, 0, corners)
+        bbc = self.bbc
+        if bbc is None:
+            edges = set(self.mesh.exterior_facets.unique_markers)
+            corners = [(i, j) for i in edges for j in edges.difference([i])]
+            bbc = DirichletBC(self.P1_vec, 0, corners)
         bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=bbc))
 
         # Create solver
-        prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bcs)
+        prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bc)
         self.l2_projector = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
 
     def adapt(self):
