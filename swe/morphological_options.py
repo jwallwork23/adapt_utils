@@ -126,9 +126,74 @@ class TracerOptions(TsunamiOptions):
         self.z_n1 = Function(self.P1)
         self.v = TestFunction(self.P1)
         self.old_bathymetry_2d = Function(self.P1)
-
         
-    def update_suspended(self, solver_obj):
+    def set_up_bedload(self, mesh):   
+
+        #calculate angle of flow
+        self.calfa = Function(self.P1).interpolate(self.horizontal_velocity/sqrt(self.unorm))
+        self.salfa = Function(self.P1).interpolate(self.vertical_velocity/sqrt(self.unorm))
+        self.div_function = Function(self.P1_vec).interpolate(as_vector((self.calfa, self.salfa)))
+
+        if self.slope_eff:    
+            # slope effect magnitude correction due to gravity where beta is a parameter normally set to 1.3
+            self.slopecoef = Function(self.P1).interpolate(1 + self.beta*(self.dzdx*self.calfa + self.dzdy*self.salfa))
+        else:
+            self.slopecoef = Function(self.P1).interpolate(Constant(1.0))
+
+        # implement meyer-peter-muller bedload transport formula
+        self.thetaprime = Function(self.P1).interpolate(self.mu*(1000*0.5*self.qfc*self.unorm)/((2650-1000)*9.81*self.average_size))
+
+        # if velocity above a certain critical value then transport occurs
+        self.phi = Function(self.P1).interpolate(conditional(self.thetaprime < self.thetacr, 0, 8*(self.thetaprime-self.thetacr)**1.5))
+        
+        self.z_n = Function(self.P1)
+        self.z_n1 = Function(self.P1)
+        self.v = TestFunction(self.P1)
+        self.n = FacetNormal(self.P1.mesh())
+        self.old_bathymetry_2d = Function(self.P1)        
+        
+
+    def update_key_hydro(self, solver_obj):
+        
+        self.old_bathymetry_2d.assign(solver_obj.fields.bathymetry_2d)
+        
+        self.z_n.interpolate(self.old_bathymetry_2d) 
+        
+        self.uv1, self.eta = solver_obj.fields.solution_2d.split()
+        self.u_cg.interpolate(self.uv1)
+        self.elev_cg.interpolate(self.eta)
+
+
+        self.horizontal_velocity.interpolate(self.u_cg[0])
+        self.vertical_velocity.interpolate(self.u_cg[1])
+            
+        # Update depth
+        if self.wetting_and_drying:
+            bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+            self.depth.interpolate(self.elev_cg + bathymetry_displacement(self.eta) + self.bathymetry)
+        else:
+            self.depth.interpolate(self.elev_cg + self.bathymetry)
+
+            
+        self.hc.interpolate(conditional(self.depth > 0.001, self.depth, 0.001))
+        self.aux.interpolate(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
+        self.qfc.interpolate(2/(ln(self.aux)/0.4)**2)
+        
+        # calculate skin friction coefficient
+        self.cfactor.interpolate(self.get_cfactor())
+
+        self.quadratic_drag_coefficient.project(self.get_cfactor())        
+        
+        # mu - ratio between skin friction and normal friction
+        self.mu.assign(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
+            
+        # bed shear stress
+        self.unorm.interpolate((self.horizontal_velocity**2) + (self.vertical_velocity**2))
+        self.TOB.interpolate(1000*0.5*self.qfc*self.unorm)       
+        
+        self.f = (((1-self.porosity)*(self.z_n1 - self.z_n)/(self.dt*self.morfac))*self.v)*dx
+        
+    def update_suspended(self, solver_obj):   
         
         
         self.old_bathymetry_2d.assign(self.bathymetry)
@@ -156,7 +221,6 @@ class TracerOptions(TsunamiOptions):
 
         self.source.interpolate(self.set_source_tracer(self.P1DG, solver_obj))
         
-        f = (((1-self.porosity)*(self.z_n1 - self.z_n)/(self.dt*self.morfac))*self.v)*dx
         
         self.qbsourcedepth.interpolate(self.source*self.depth)
         
@@ -186,10 +250,5 @@ class TracerOptions(TsunamiOptions):
         else:
             self.corrective_velocity.interpolate(self.uv1)
         
-        f += - (self.qbsourcedepth * self.v)*dx
+        self.f += - (self.qbsourcedepth * self.v)*dx
         
-        solve(f==0, self.z_n1)
-        
-        self.bathymetry.assign(self.z_n1)
-        solver_obj.fields.bathymetry_2d.assign(self.z_n1)
-        print(max(self.bathymetry.dat.data[:]))

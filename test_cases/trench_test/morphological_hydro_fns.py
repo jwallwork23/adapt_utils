@@ -441,6 +441,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                                
 
                 if round(t_new, 2)%t_export == 0:
+                    import ipdb; ipdb.set_trace()
                     # calculate difference between original bathymetry and new bathymetry
                     bathymetry_file = th.File(outputdir + "/bathy.pvd")
                     bathymetry_file.write(bathymetry_2d) 
