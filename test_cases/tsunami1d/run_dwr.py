@@ -17,26 +17,21 @@ matplotlib.rc('text', usetex=True)
 debug = True
 plot_pdf = False
 plot_pvd = True
-save_hdf5 = True
 approach = 'dwr'
+L = 1000.0  # Horizontal length scale
+T = 10.0    # Time scale
+v = 0.02
 
-# Spatial discretisation
 n = 250
 # n = 2000  # (Value used in original paper)
-dx = 1/n
-
-# Time discretisation
-celerity = 20.0*np.sqrt(9.81)
-# dt = 40.0e+3*dx/celerity
 dt = 3.0
 # dt = 1.0  # (Value used in original paper)
 
 # NOTE: Forward and adjoint relatively stable with n = 500 and dt = 1.5
-op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, approach=approach,
-                      save_hdf5=save_hdf5, plot_pvd=plot_pvd,
-                      horizontal_length_scale=1000.0, time_scale=10.0)
-op.h_min = 100.0/op.L
-op.h_max = 100.0e+3/op.L
+op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, approach=approach, plot_pvd=plot_pvd,
+                      horizontal_length_scale=L, time_scale=T)
+op.h_min = 100.0/L
+op.h_max = 100.0e+3/L
 op.target = 10000.0
 op.num_adapt = 1
 # op.norm_order = 1
@@ -62,10 +57,6 @@ if 'both' in op.approach:
     swp.indicator += swp.indicators['dwr_flux_both']
 swp.indicator = firedrake.interpolate(abs(swp.indicator), swp.P0)
 swp.plot()
-
-v = 0.02
-L = op.L  # Horizontal length scale
-T = op.T  # Time scale
 
 # Plot error estimator
 fig = plt.figure(figsize=(3.2, 4.8))

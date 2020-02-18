@@ -10,17 +10,51 @@ __all__ = ["Tsunami1dOptions"]
 
 
 class Tsunami1dOptions(ShallowWaterOptions):
+    """
+    Parameter class for the one dimensional idealised tsunami described in [1], solved using
+    space-time FEM.
+
+    :param nx: (Initial) number of points in the spatial dimension.
+    :param dt: (Initial) timestep, relating to the distance between points in the temporal dimension.
+               If set to `None` then a value is specified automatically so as to satisfy the CFL
+               condition.
+
+    [1] B. Davis & R. LeVeque, "Adjoint methods for guiding adaptive mesh refinement in tsunami
+        modelling", Pure and Applied Geophysics, 173(12):4055–4074, 2016.
+    """
     def __init__(self, nx=2000, dt=1.0, horizontal_length_scale=1000.0, time_scale=10.0, quads=False, **kwargs):
         super(Tsunami1dOptions, self).__init__(**kwargs)
-        self.L = horizontal_length_scale
-        self.T = time_scale
-        self.dt = dt/self.T
-        self.start_time = 0.0/self.T
-        self.end_time = 4200.0/self.T
+
+        # Spatial discretisation
+        lx = 400.0e+3
+        dx = lx/nx
+        celerity = 20.0*np.sqrt(9.81)
+
+        # Temporal discretisation
+        self.start_time = 0.0
+        self.end_time = 4200.0
+        if dt is None:
+            dt = 0.85*dx/celerity
+        self.dt = dt
         nt = int(np.round(self.end_time/self.dt))
 
-        # Mesh: 2d space-time approach
+        # Check CFL condition
+        cfl = self.dt*celerity/dx
+        try:
+            assert cfl < 1
+        except AssertionError:
+            raise ValueError("CFL condition not met, with value {:.4e}.".format(cfl))
+        self.print_debug("dx {:.1f}  dt {:.1f}  CFL {:.4f}".format(dx, dt, cfl))
+
+        # Adjust time scale and length scale
+        self.L = horizontal_length_scale
+        self.T = time_scale
+        self.dt /= self.T
+        self.start_time /= self.T
+        self.end_time /= self.T
         lx = 400.0e+3/self.L
+
+        # Mesh: 2d space-time approach
         if quads:
             try:
                 assert self.approach in ('fixed_mesh', 'uniform')

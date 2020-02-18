@@ -17,27 +17,22 @@ matplotlib.rc('text', usetex=True)
 debug = True
 plot_pdf = False
 plot_pvd = True
-save_hdf5 = True
 forward = True
 adjoint = True
+L = 1000.0
+T = 10.0
+v = 0.02
 
-# Spatial discretisation
 n = 500
 # n = 2000  # (Value used in original paper)
-dx = 1/n
-
-# Time discretisation
-celerity = 20.0*np.sqrt(9.81)
-# dt = 40.0e+3*dx/celerity
 dt = 1.5
 # dt = 1.0  # (Value used in original paper)
 
 # NOTE: Forward and adjoint relatively stable with n = 500 and dt = 1.5
-op = Tsunami1dOptions(debug=debug, approach='dwp', nx=n, dt=dt,
-                      save_hdf5=save_hdf5, plot_pvd=plot_pvd,
-                      horizontal_length_scale=1000.0, time_scale=10.0)
-op.h_min = 100.0/op.L
-op.h_max = 100.0e+3/op.L
+op = Tsunami1dOptions(debug=debug, approach='dwp', nx=n, dt=dt, plot_pvd=plot_pvd,
+                      horizontal_length_scale=L, time_scale=T)
+op.h_min = 100.0/L
+op.h_max = 100.0e+3/L
 op.target = 10000.0
 op.num_adapt = 1
 # op.norm_order = 1
@@ -53,10 +48,6 @@ swp.dwp_indication()
 swp.indicator.interpolate(abs(swp.indicator))
 swp.get_isotropic_metric()
 swp.adapt_mesh()
-
-v = 0.02
-L = op.L  # Horizontal length scale
-T = op.T  # Time scale
 
 # FIXME: Solution of equations on new mesh
 
