@@ -154,9 +154,6 @@ class TracerOptions(TsunamiOptions):
         self.ceq.interpolate(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
         self.tracer_init_value.assign(self.ceq.at([0,0])/self.coeff.at([0,0]))
 
-        print('tracer')
-        print(solver_obj.bnd_functions['tracer'][1]['value'].dat.data[:])
-        print(solver_obj.fields.tracer_2d.at([0,0]))
 
         self.source.interpolate(self.set_source_tracer(self.P1DG, solver_obj))
         
@@ -194,6 +191,6 @@ class TracerOptions(TsunamiOptions):
         
         solve(f==0, self.z_n1)
         
-        #self.bathymetry.assign(self.z_n1)
+        self.bathymetry.assign(self.z_n1)
         solver_obj.fields.bathymetry_2d.assign(self.z_n1)
         print(max(self.bathymetry.dat.data[:]))

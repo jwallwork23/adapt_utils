@@ -147,7 +147,6 @@ class SteadyProblem():
                 self.fields[i] = None
             else:
                 raise ValueError
-        self.op.bathymetry = self.fields['bathymetry']
         #self.op.set_boundary_surface()
 
     def set_stabilisation(self):
@@ -660,19 +659,7 @@ class SteadyProblem():
                 assert hasattr(self, 'monitor_function')
             except AssertionError:
                 raise ValueError("Please supply a monitor function.")
-            import ipdb; ipdb.set_trace()
-            
 
-            
-            if hasattr(self, "solution_tracer"):
-                #test = self.solution_tracer.copy(deepcopy = True)
-                self.op.old_mesh = Mesh(Function(self.mesh.coordinates))                
-                #self.op.old_mesh = test.function_space().mesh()
-                P1DG = FunctionSpace(self.op.old_mesh, "DG", 1)
-                self.op.solution_old_tracer = Function(P1DG).project(self.solution_tracer)
-                tracer_file = File(self.op.di + "/tracer_init_mc.pvd")
-            
-                tracer_file.write(self.op.solution_old_tracer) 
                 
             # Create MeshMover object and establish coordinate transformation
             mesh_mover = MeshMover(self.am_init.mesh, self.monitor_function, op=self.op)
@@ -708,8 +695,6 @@ class SteadyProblem():
             m = interpolate(self.monitor_function(self.mesh), self.P1)
             m.rename("Monitor function")
             self.monitor_file.write(m)
-            import ipdb; ipdb.set_trace()
-       
 
         else:
             try:
@@ -971,7 +956,7 @@ class UnsteadyProblem(SteadyProblem):
             for i in range(self.op.num_adapt):
                 self.adapt_mesh()
                 # Interpolate value from previous step onto new mesh
-                import ipdb; ipdb.set_trace()
+
                 if self.remesh_step == 0:
                     self.set_start_condition(adjoint)
                 elif i == 0:

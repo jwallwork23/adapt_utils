@@ -22,7 +22,7 @@ tp = TsunamiProblem(op, levels=0)
 tp.setup_solver()
 
 
-def gradient_interface_monitor(mesh, alpha=10**9):
+def gradient_interface_monitor(mesh, alpha=100):
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 
@@ -34,7 +34,7 @@ def gradient_interface_monitor(mesh, alpha=10**9):
     
     eta = tp.solution.split()[1]
     
-    b = tp.solver_obj.fields.tracer_2d#fields['bathymetry']
+    b = tp.solver_obj.fields.bathymetry_2d
     current_mesh = eta.function_space().mesh()
     P1_current = FunctionSpace(current_mesh, "CG", 1)
     bath_dx = interpolate(b.dx(0), P1_current)

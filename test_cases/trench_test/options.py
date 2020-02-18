@@ -49,12 +49,6 @@ class TrenchOptions(TracerOptions):
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
         self.average_size = 160e-6  # Average sediment size
-        
-
-        # Initial
-        #self.uv_init = as_vector([0.51, 0.0])
-        #self.eta_init = Constant(0.4)    
-
 
         
         self.grad_depth_viscosity = True        
@@ -128,9 +122,6 @@ class TrenchOptions(TracerOptions):
         
 
     def set_source_tracer(self, fs, solver_obj = None, init = False, t_old = Constant(100)):
-        #P1DG = FunctionSpace(self.depth.function_space().mesh(), 'DG', 1)
-        #self.coeff = Function(P1DG).project(self.coeff)
-        #self.ceq = Function(P1DG).project(self.ceq)
         if init:
             if t_old.dat.data[:] == 0.0:
                 self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.tracer_init_value/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
@@ -221,9 +212,12 @@ class TrenchOptions(TracerOptions):
         
         def update_forcings(t):
             
-            #print(t)
             if round(t, 2)%18.0 == 0:
-                import ipdb; ipdb.set_trace()
+                if self.t_old.dat.data[:] == t:
+                    bath_file = File(self.di + '/bath_init_op.pvd')
+                    bath_file.write(self.op.bathymetry)  
+                    bath_file = File(self.di + '/bath_init_solver.pvd')
+                    bath_file.write(solver_obj.fields.bathymetry_2d)  
 
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
@@ -246,6 +240,7 @@ class TrenchOptions(TracerOptions):
             self.hc.interpolate(conditional(self.depth > 0.001, self.depth, 0.001))
             self.aux.interpolate(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
             self.qfc.interpolate(2/(ln(self.aux)/0.4)**2)
+            
             # calculate skin friction coefficient
             self.cfactor.interpolate(self.get_cfactor())
 
@@ -253,8 +248,7 @@ class TrenchOptions(TracerOptions):
 
             if self.t_old.dat.data[:] == t:
                 self.update_suspended(solver_obj)
-                self.bathymetry_file = File(self.di + "/bathy.pvd")
-                self.bathymetry_file.write(solver_obj.fields.bathymetry_2d)
+            
             self.t_old.assign(t)        
 
         return update_forcings
