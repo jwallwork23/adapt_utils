@@ -130,7 +130,6 @@ class TracerOptions(TsunamiOptions):
         
     def update_suspended(self, solver_obj):
         
-        #self.bathymetry.interpolate(self.set_bathymetry(self.P1))
         
         self.old_bathymetry_2d.assign(self.bathymetry)
         

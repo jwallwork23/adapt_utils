@@ -308,12 +308,6 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                     source.interpolate(-(settling_velocity*coeff*solver_obj.fields.tracer_2d/depth)+ (settling_velocity*ceq/depth))
                     # update sediment rate to ensure equilibrium at inflow
                     sediment_rate.assign(ceq.at([0,0])/coeff.at([0,0]))
-<<<<<<< HEAD
-                    print(t_new)
-                    print(solver_obj.bnd_functions['tracer'][1]['value'].dat.data[:])
-                    print(solver_obj.fields.tracer_2d.at([0,0]))
-=======
->>>>>>> parent of 265ab5b... fixing tracer
 
                     if convectivevel == True:
                         # correction factor to advection velocity in sediment concentration equation
@@ -442,13 +436,14 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                 
                 # update bed
                 bathymetry_2d.assign(z_n1)
+                print(t_new)
                 print(max(bathymetry_2d.dat.data[:]))
-                
-                bathymetry_file = th.File(outputdir + "/bathy.pvd")
-                bathymetry_file.write(bathymetry_2d)                
+                               
 
                 if round(t_new, 2)%t_export == 0:
                     # calculate difference between original bathymetry and new bathymetry
+                    bathymetry_file = th.File(outputdir + "/bathy.pvd")
+                    bathymetry_file.write(bathymetry_2d) 
                     diff_bathy.interpolate(-bathymetry_2d + orig_bathymetry)
                     diff_bathy_file.write(diff_bathy)
 

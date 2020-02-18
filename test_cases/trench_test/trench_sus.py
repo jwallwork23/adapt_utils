@@ -66,7 +66,7 @@ trench = th.conditional(th.le(x, 5), depth_riv, th.conditional(th.le(x,6.5), (1/
                                                                th.conditional(th.le(x, 9.5), depth_trench, th.conditional(th.le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv,\
                                                                                                                           depth_riv))))
 bathymetry_2d.interpolate(-trench)
-
+"""
 # define initial elevation
 elev_init = th.Function(P1_2d).interpolate(th.Constant(0.4))
 uv_init = th.as_vector((0.51, 0.0))
@@ -79,15 +79,11 @@ solver_obj.iterate(update_forcings = update_forcings_hydrodynamics)
 
 uv, elev = solver_obj.fields.solution_2d.split()
 morph.export_final_state("hydrodynamics_trench_fine", uv, elev)
-
+"""
 
 solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file = morph.morphological(boundary_conditions_fn = boundary_conditions_fn_trench, morfac = 100, morfac_transport = True, suspendedload = True, convectivevel = True,\
                     bedload = False, angle_correction = False, slope_eff = False, seccurrent = False, sediment_slide = False, fluc_bcs = False, \
-<<<<<<< HEAD
-                    mesh2d = mesh2d, bathymetry_2d = bathymetry_2d, input_dir = 'hydrodynamics_trench', viscosity_hydro = 10**(-6), ks = 0.025, average_size = 160 * (10**(-6)), dt = 0.1, final_time = 5*3600,\
-=======
-                    mesh2d = mesh2d, bathymetry_2d = bathymetry_2d, input_dir = 'hydrodynamics_trench', viscosity_hydro = 10**(-6), ks = 0.025, average_size = 160 * (10**(-6)), dt = 0.15, final_time = 5*3600,\
->>>>>>> parent of 265ab5b... fixing tracer
+                    mesh2d = mesh2d, bathymetry_2d = bathymetry_2d, input_dir = 'hydrodynamics_trench_fine', viscosity_hydro = 10**(-6), ks = 0.025, average_size = 160 * (10**(-6)), dt = 0.1, final_time = 5*3600,\
                  beta_fn = 1.3, surbeta2_fn = 1/1.5, alpha_secc_fn = 0.75, angle_fn = 35, mesh_step_size = 0.2)
 
 
@@ -103,7 +99,7 @@ bathymetrythetis1 = []
 
 for i in np.linspace(0,15.8, 80):
     xaxisthetis1.append(i)
-    bathymetrythetis1.append(-self.solver_obj.fields.bathymetry_2d.at([i, 0.55]))
+    bathymetrythetis1.append(-solver_obj.fields.bathymetry_2d.at([i, 0.55]))
 
 df = pd.concat([pd.DataFrame(xaxisthetis1), pd.DataFrame(bathymetrythetis1)], axis = 1)
 

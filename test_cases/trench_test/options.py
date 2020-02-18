@@ -90,9 +90,6 @@ class TrenchOptions(TracerOptions):
         
         self.set_up_suspended(self.default_mesh)
         
-        
-        #self.tracer_init = Function(self.P1DG, name="Tracer Initial condition").project(self.testtracer)        
-        
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
 
@@ -214,10 +211,9 @@ class TrenchOptions(TracerOptions):
             
             if round(t, 2)%18.0 == 0:
                 if self.t_old.dat.data[:] == t:
-                    bath_file = File(self.di + '/bath_init_op.pvd')
-                    bath_file.write(self.op.bathymetry)  
-                    bath_file = File(self.di + '/bath_init_solver.pvd')
+                    bath_file = File(self.di + '/bath_timestep.pvd')
                     bath_file.write(solver_obj.fields.bathymetry_2d)  
+                    import ipdb; ipdb.set_trace()
 
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
@@ -247,6 +243,7 @@ class TrenchOptions(TracerOptions):
             self.quadratic_drag_coefficient.project(self.get_cfactor())
 
             if self.t_old.dat.data[:] == t:
+                print(t)
                 self.update_suspended(solver_obj)
             
             self.t_old.assign(t)        

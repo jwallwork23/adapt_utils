@@ -479,9 +479,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if self.op.solve_tracer:
             solution_tracer = self.solver_obj.fields.tracer_2d.copy(deepcopy = True)
             solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy = True)
-
-            bath_file = File(self.di + '/bath_init_one.pvd')
-            bath_file.write(self.solver_obj.fields.bathymetry_2d)
             
             old_mesh = Mesh(Function(self.mesh.coordinates))                
             P1DG = FunctionSpace(old_mesh, "DG", 1)
@@ -489,10 +486,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             
             self.op.solution_old_tracer = Function(P1DG).project(solution_tracer)
             self.op.solution_old_bathymetry = Function(P1).project(solution_bathymetry)
-            bath_file = File(self.di + '/bath_init_two.pvd')
-            bath_file.write(self.op.solution_old_bathymetry)
-            
-            import ipdb; ipdb.set_trace()
             
     def setup_solver(self):
         if not hasattr(self, 'remesh_step'):
@@ -503,11 +496,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             self.op.bathymetry = Function(self.P1).project(self.op.solution_old_bathymetry)
         else:
             self.op.bathymetry = self.op.set_bathymetry(self.P1)
-
-        bath_file = File(self.di + '/bath_init_three.pvd')
-        bath_file.write(self.op.bathymetry)    
-        
-        import ipdb; ipdb.set_trace()
         
         self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.op.bathymetry)
 
@@ -593,7 +581,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)        
 
-        import ipdb; ipdb.set_trace()
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
