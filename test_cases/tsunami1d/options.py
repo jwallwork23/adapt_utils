@@ -22,7 +22,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
     [1] B. Davis & R. LeVeque, "Adjoint methods for guiding adaptive mesh refinement in tsunami
         modelling", Pure and Applied Geophysics, 173(12):4055–4074, 2016.
     """
-    def __init__(self, nx=2000, dt=1.0, horizontal_length_scale=1000.0, time_scale=10.0, quads=False, **kwargs):
+    def __init__(self, nx=2000, dt=1.0, end_time=4200.0, horizontal_length_scale=1000.0, time_scale=10.0, quads=False, **kwargs):
         super(Tsunami1dOptions, self).__init__(**kwargs)
 
         # Spatial discretisation
@@ -32,7 +32,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
 
         # Temporal discretisation
         self.start_time = 0.0
-        self.end_time = 4200.0
+        self.end_time = end_time
         if dt is None:
             dt = 0.85*dx/celerity
         self.dt = dt

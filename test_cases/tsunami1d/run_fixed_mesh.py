@@ -15,6 +15,7 @@ from adapt_utils.test_cases.tsunami1d.options import Tsunami1dOptions
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", help="Number of points in spatial dimension")
 parser.add_argument("-dt", help="Timestep")
+parser.add_argument("-end_time", help="End time of simulation")
 parser.add_argument("-plot_png")
 parser.add_argument("-plot_pdf")
 parser.add_argument("-forward", help="Solve forward problem")
@@ -25,6 +26,7 @@ args = parser.parse_args()
 debug = True
 n = int(args.n or 2000)     # (Value used in original paper)
 dt = float(args.dt or 1.0)  # (Value used in original paper)
+end_time = float(args.end_time or 4200.0)
 plot_png = bool(args.plot_png)
 plot_pdf = bool(args.plot_pdf)
 forward = bool(args.forward)
@@ -42,7 +44,7 @@ if plot_png or plot_pdf:
 # NOTE: Forward and adjoint relatively stable with:
 #   * n = 500, dt = 1.5 and quads = False
 #   * n = 1000, dt = 3.0 and quads = False
-op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, plot_pvd=True,
+op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, end_time=end_time, plot_pvd=True,
                       horizontal_length_scale=L, time_scale=T, quads=quads)
 swp = SpaceTimeShallowWaterProblem(op, discrete_adjoint=False)
 
