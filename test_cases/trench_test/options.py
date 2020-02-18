@@ -88,7 +88,9 @@ class TrenchOptions(TracerOptions):
         
         self.t_old = Constant(0.0)        
         
+        self.slope_eff = False
         self.set_up_suspended(self.default_mesh)
+        self.set_up_bedload(self.default_mesh)
         
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
@@ -217,34 +219,17 @@ class TrenchOptions(TracerOptions):
 
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
-            self.uv1, self.eta = solver_obj.fields.solution_2d.split()
-            self.u_cg.interpolate(self.uv1)
-            self.elev_cg.interpolate(self.eta)
-
-
-            self.horizontal_velocity.interpolate(self.u_cg[0])
-            self.vertical_velocity.interpolate(self.u_cg[1])
-            
-            # Update depth
-            #if self.wetting_and_drying:
-            #    bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-            #    self.depth.interpolate(self.elev_cg + bathymetry_displacement(self.eta) + self.bathymetry)
-            #else:
-            self.depth.project(self.elev_cg + self.bathymetry)
-
-            
-            self.hc.interpolate(conditional(self.depth > 0.001, self.depth, 0.001))
-            self.aux.interpolate(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
-            self.qfc.interpolate(2/(ln(self.aux)/0.4)**2)
-            
-            # calculate skin friction coefficient
-            self.cfactor.interpolate(self.get_cfactor())
-
-            self.quadratic_drag_coefficient.project(self.get_cfactor())
+            self.update_key_hydro(solver_obj)
 
             if self.t_old.dat.data[:] == t:
                 print(t)
                 self.update_suspended(solver_obj)
+                #self.update_bedload(solver_obj)
+                solve(self.f==0, self.z_n1)
+        
+                self.bathymetry.assign(self.z_n1)
+                solver_obj.fields.bathymetry_2d.assign(self.z_n1)
+                print(max(self.bathymetry.dat.data[:]))                
             
             self.t_old.assign(t)        
 
