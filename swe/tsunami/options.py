@@ -27,7 +27,7 @@ class TsunamiOptions(ShallowWaterOptions):
     """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
-    def __init__(self, mesh=None, utm=True, n=30, **kwargs):
+    def __init__(self, mesh=None, utm=True, n=30, setup=True, **kwargs):
         self.utm = utm
         if mesh is not None:
             self.default_mesh = mesh
@@ -37,8 +37,7 @@ class TsunamiOptions(ShallowWaterOptions):
             self.force_zone_number = False
 
         # Setup longitude-latitude domain
-        if not hasattr(self, 'default_mesh'):
-            print('went here')
+        if not hasattr(self, 'default_mesh') and setup:
             b_lon, b_lat, b = self.read_bathymetry_file()
             lon_min = np.min(b_lon)
             lon_diff = np.max(b_lon) - lon_min
@@ -73,9 +72,10 @@ class TsunamiOptions(ShallowWaterOptions):
         self.locations_of_interest = {}
 
         # Outputs
-        P1DG = FunctionSpace(self.default_mesh, "DG", 1)
-        self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
-        self.eta_tilde = Function(P1DG, name='Modified elevation')
+        if setup:
+            P1DG = FunctionSpace(self.default_mesh, "DG", 1)
+            self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
+            self.eta_tilde = Function(P1DG, name='Modified elevation')
 
     def get_utm_mesh(self):
         zone = self.force_zone_number
@@ -227,7 +227,12 @@ class TsunamiOptions(ShallowWaterOptions):
         # Find all relevant HDF5 files and sort by ascending mesh resolution
         approach = 'uniform' if self.approach == 'fixed_mesh' else self.approach
         fnames = find('diagnostic_gauges_*.hdf5', self.di)
-        resolutions = [int(fname.split('_')[-1][:-5]) for fname in fnames]
+        resolutions = []
+        for fname in fnames:
+            s = fname.split('_')
+            res = int(s[-1][:-5])
+            if len(s) == 4:  # TODO: Temporary: only plot fixed_mesh
+                resolutions.append(res)
         resolutions.sort()
 
         # Loop over all available mesh resolutions
@@ -235,7 +240,8 @@ class TsunamiOptions(ShallowWaterOptions):
             fname = os.path.join(self.di, 'diagnostic_gauges')
             if extension is not None:
                 fname = '_'.join([fname, extension])
-            fname = '_'.join(['{:d}.hdf5'.format(res)])
+            fname = '_'.join([fname, '{:d}.hdf5'.format(res)])
+            assert os.path.exists(fname)
             f = h5py.File(fname, 'r')
             y = f[gauge][()]
             y = y.reshape(len(y),)[:cutoff+1]

@@ -1,5 +1,4 @@
-from firedrake import *
-from thetis import create_directory, print_output
+from thetis import *
 
 import os
 import numpy as np
@@ -30,7 +29,7 @@ class SteadyProblem():
         * adapt mesh based on some error estimator of choice.
     """
     def __init__(self, op, mesh, finite_element, discrete_adjoint=False, prev_solution=None, levels=1):
-        print_output(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
+        op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
         self.op = op
@@ -42,23 +41,25 @@ class SteadyProblem():
         self.levels = levels
 
         # Setup problem
-        print_output(op.indent+"Building mesh...")
+        op.print_debug(op.indent+"Building mesh...")
         self.set_mesh(mesh)
         self.am_init = self.am.copy()
-        print_output(op.indent+"Building function spaces...")
+        op.print_debug(op.indent+"Building function spaces...")
         self.create_function_spaces()
-        print_output(op.indent+"Building solutions...")
+        op.print_debug(op.indent+"Building solutions...")
         self.create_solutions()
-        print_output(op.indent+"Building fields...")
+        op.print_debug(op.indent+"Building fields...")
         self.set_fields()
         self.set_stabilisation()
-        print_output(op.indent+"Setting boundary conditions...")
+        op.print_debug(op.indent+"Setting boundary conditions...")
         self.boundary_conditions = op.set_boundary_conditions(self.V)
 
         # Outputs
         self.di = create_directory(self.op.di)
         self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
+        self.solution_fpath_hdf5 = os.path.join(self.di, 'solution.hdf5')
         self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
+        self.adjoint_solution_fpath_hdf5 = os.path.join(self.di, 'adjoint_solution.hdf5')
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         self.monitor_file = File(os.path.join(self.di, 'monitor.pvd'))
 
@@ -74,7 +75,7 @@ class SteadyProblem():
         self.outer_num_cells = []
         self.outer_num_vertices = []
         self.outer_qois = []
-        print_output(op.indent + "{:s} initialisation complete!\n".format(self.__class__.__name__))
+        op.print_debug(op.indent + "{:s} initialisation complete!\n".format(self.__class__.__name__))
 
     def set_mesh(self, mesh):
         """
@@ -87,7 +88,8 @@ class SteadyProblem():
             self.create_enriched_problem()
         self.n = FacetNormal(self.mesh)  # TODO: use version in AdaptiveMesh
         self.h = CellSize(self.mesh)     # TODO: use version in AdaptiveMesh
-        self.op.print_debug("Number of mesh elements: {:d}".format(mesh.num_cells()))
+        self.dim = self.mesh.topological_dimension()
+        self.op.print_debug(self.op.indent+"Number of mesh elements: {:d}".format(mesh.num_cells()))
 
     def create_enriched_problem(self):
         """
@@ -116,7 +118,9 @@ class SteadyProblem():
         self.P1_vec_dg = VectorFunctionSpace(self.mesh, "DG", 1)
         self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
         self.test = TestFunction(self.V)
+        self.tests = TestFunctions(self.V)
         self.trial = TrialFunction(self.V)
+        self.trials = TrialFunctions(self.V)
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
 
@@ -183,6 +187,7 @@ class SteadyProblem():
         self.setup_solver_forward()
         if self.nonlinear:
             self.rhs = 0
+        self.op.print_debug("Solver parameters for forward: {:}".format(self.op.params))
         solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
         self.plot_solution(adjoint=False)
 
@@ -191,17 +196,19 @@ class SteadyProblem():
         Solve adjoint problem using method specified by `discrete_adjoint` boolean kwarg.
         """
         if self.discrete_adjoint:
-            print_output("Solving discrete adjoint problem on mesh with {:d} elements".format(self.mesh.num_cells()))
+            print_output("Solving discrete adjoint problem on mesh with {:d} local elements".format(self.mesh.num_cells()))
             self.solve_discrete_adjoint()
         else:
-            print_output("Solving continuous adjoint problem on mesh with {:d} elements".format(self.mesh.num_cells()))
+            print_output("Solving continuous adjoint problem on mesh with {:d} local elements".format(self.mesh.num_cells()))
             self.solve_continuous_adjoint()
         self.plot_solution(adjoint=True)
 
     def solve_continuous_adjoint(self):
         self.setup_solver_adjoint()
-        if self.nonlinear:
-            self.rhs_adjoint = 0
+        try:
+            assert hasattr(self, 'lhs_adjoint') and hasattr(self, 'rhs_adjoint')
+        except AssertionError:
+            raise ValueError("Cannot solve continuous adjoint since LHS and/or RHS unknown.")
         solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
 
     def solve_discrete_adjoint(self):
@@ -209,10 +216,16 @@ class SteadyProblem():
             assert hasattr(self, 'lhs')
         except AssertionError:
             raise ValueError("Cannot compute discrete adjoint since LHS unknown.")
-        dFdu = derivative(self.lhs, self.solution, TrialFunction(self.V))
+        if self.nonlinear:
+            F = self.lhs
+        else:  # FIXME: Doesn't seem to work in tsunami1d space-time case
+            tmp_u = Function(self.V)
+            F = action(self.lhs, tmp_u) - self.rhs
+            F = replace(F, {tmp_u: self.solution})
+        dFdu = derivative(F, self.solution, TrialFunction(self.V))
         dFdu_form = adjoint(dFdu)
         dJdu = derivative(self.quantity_of_interest_form(), self.solution, TestFunction(self.V))
-        solve(dFdu_form == dJdu, self.adjoint_solution, solver_parameters=self.op.adjoint_params)
+        solve(dFdu_form == dJdu, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
 
     def solve_high_order(self, adjoint=True, solve_forward=False):
         """
@@ -430,7 +443,7 @@ class SteadyProblem():
         """
         prod = inner(self.solution, self.adjoint_solution)
         self.indicators['dwp'] = assemble(self.p0test*prod*dx)
-        self.indicator = interpolate(prod, self.P1)
+        self.indicator = interpolate(abs(prod), self.P1)
         self.indicator.rename('dwp')
         self.estimate_error('dwp')
 
@@ -488,9 +501,15 @@ class SteadyProblem():
         """
         Plot current mesh and indicator fields, if available.
         """
-        File(os.path.join(self.di, 'mesh.pvd')).write(self.mesh.coordinates)
+        meshfile = File(os.path.join(self.di, 'mesh.pvd'))
+        try:
+            meshfile.write(self.mesh)  # This is allowed in modern firedrake
+        except ValueError:
+            meshfile.write(self.mesh.coordinates)
         for key in self.indicators:
             File(os.path.join(self.di, key + '.pvd')).write(self.indicators[key])
+        if hasattr(self, 'indicator'):
+            self.indicator_file.write(self.indicator)
 
     def plot_solution(self, adjoint=False):
         """
@@ -551,7 +570,7 @@ class SteadyProblem():
                 if not approach in self.estimators:
                     self.estimators[approach] = []
                 self.get_isotropic_metric()
-                if approach in ('dwr_both', 'dwr_averaged'):
+                if approach == 'dwr_both':
                     self.indicator.interpolate(Constant(0.5)*(i+self.indicator))
                     self.get_isotropic_metric()
                 else:
@@ -695,32 +714,26 @@ class SteadyProblem():
             m = interpolate(self.monitor_function(self.mesh), self.P1)
             m.rename("Monitor function")
             self.monitor_file.write(m)
+            return
 
-        else:
-            try:
-                assert hasattr(self, 'M')
-            except AssertionError:
-                raise ValueError("Please supply a metric.")
+        # Metric based methods
+        try:
+            assert hasattr(self, 'M')
+        except AssertionError:
+            raise ValueError("Please supply a metric.")
+        self.am.pragmatic_adapt(self.M)
+        self.set_mesh(self.am.mesh)
 
-            self.am.pragmatic_adapt(self.M)
-            self.set_mesh(self.am.mesh)
+        print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
+        self.num_cells.append(self.mesh.num_cells())
+        self.num_vertices.append(self.mesh.num_vertices())
+        self.plot()
 
-        if self.approach != 'monge_ampere':
-            print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
-
-            self.am.adapt(self.M)
-            self.set_mesh(self.am.mesh)
-
-
-            self.num_cells.append(self.mesh.num_cells())
-            self.num_vertices.append(self.mesh.num_vertices())
-            self.plot()
-
-            # Re-initialise problem
-            self.create_function_spaces()
-            self.create_solutions()
-            self.set_fields(adapted=True)
-            self.boundary_conditions = self.op.set_boundary_conditions(self.V)
+        # Re-initialise problem
+        self.create_function_spaces()
+        self.create_solutions()
+        self.set_fields(adapted=True)
+        self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
     def initialise_mesh(self, approach='hessian', adapt_field=None, num_adapt=None, alpha=1.0, beta=1.0):
         """

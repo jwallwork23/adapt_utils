@@ -34,4 +34,5 @@ adjoint.py
 *.msh
 *.pvd
 *.vtu
+*.txt
 *.ipynb_checkpoints

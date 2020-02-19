@@ -23,19 +23,22 @@ class AdaptiveMesh():
         """
         self.levels = levels
         self.op = op
-        # self.hierarchy = MeshHierarchy(mesh, levels)  # FIXME
-        # self.mesh = self.hierarchy[0]
+        use_hierarchy = levels > 0
+        if use_hierarchy:
+            self.hierarchy = MeshHierarchy(mesh, levels)
+            self.mesh = self.hierarchy[0]
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
         assert self.dim in (2, 3)
-        # if levels > 0:
-        #     self.refined_mesh = self.hierarchy[1]
+        if use_hierarchy:
+            self.refined_mesh = self.hierarchy[1]
 
         self.n = FacetNormal(self.mesh)
         if self.dim == 2:
             self.tangent = as_vector([-self.n[1], self.n[0]])  # Tangent vector
         elif self.dim == 3:
-            raise NotImplementedError  # TODO: Get a tangent vector in 3D
+            warnings.warn("#### TODO: 3D mesh tangent vector not implemented")
+            # raise NotImplementedError  # TODO: Get a tangent vector in 3D
         else:
             raise NotImplementedError
         self.facet_area = FacetArea(self.mesh)

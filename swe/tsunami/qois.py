@@ -14,7 +14,7 @@ class InundationCallback(callback.AccumulatorCallback):
         eta = solver_obj.fields.elev_2d
         b = solver_obj.fields.bathymetry_2d
         dry = conditional(le(b, 0), 1, 0)
-        f_init = assemble(dry*heaviside_approx(eta + b, alpha)*dx(degree=12))
+        f_init = assemble(dry*(eta + heaviside_approx(eta + b, alpha))*dx(degree=12))
         def qoi():
             return assemble(dry*(eta + heaviside_approx(eta + b, alpha))*dx(degree=12)) - f_init
         super(InundationCallback, self).__init__(qoi, solver_obj, **kwargs)

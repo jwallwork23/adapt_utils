@@ -11,9 +11,15 @@ import scipy.sparse.linalg as sla
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["find", "check_spd", "get_boundary_nodes", "index_string",
+__all__ = ["doc", "find", "check_spd", "get_boundary_nodes", "index_string",
            "UnnestedConditionCheck", "NestedConditionCheck"]
 
+
+def doc(anything):
+    """
+    Print the docstring of any class or function.
+    """
+    print_output(anything.__doc__)
 
 def find(pattern, path):
     """Find all files with a specified pattern."""

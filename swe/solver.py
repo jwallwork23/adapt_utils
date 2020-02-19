@@ -27,7 +27,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if prev_solution is not None:
             self.interpolate_solution(prev_solution)
 
-        # Physical fields
+        # Physical parameters
         physical_constants['g_grav'].assign(op.g)
 
         # Parameters for adjoint computation
