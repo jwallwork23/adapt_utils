@@ -1,10 +1,5 @@
 # Directories
-*log
-*.gz
-*.pvd
-*.vtu
-*.hdf5
-
+__pycache__/
 
 # Specific files
 FIXME
