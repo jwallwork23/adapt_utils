@@ -8,7 +8,6 @@
 *.hdf5
 *.pyc
 __pycache__/*
-case_studies/*
 desalination/*
 tracer/*
 tsunami/*
