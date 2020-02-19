@@ -99,8 +99,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_wetting_and_drying = op.wetting_and_drying
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
         options.solve_tracer = op.solve_tracer
-        #if op.solve_tracer:
-            #raise NotImplementedError  # TODO
+        if op.solve_tracer:
+            raise NotImplementedError  # TODO
 
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
@@ -476,16 +476,18 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solver_obj.iterate(update_forcings=self.op.get_update_forcings(self.solver_obj),
                                 export_func=self.op.get_export_func(self.solver_obj))
         self.solution = self.solver_obj.fields.solution_2d
+        
+        old_mesh = Mesh(Function(self.mesh.coordinates))                
+        P1DG = FunctionSpace(old_mesh, "DG", 1)
+        P1 = FunctionSpace(old_mesh, "CG", 1)    
+        
+        solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy = True)
+        self.op.solution_old_bathymetry = Function(P1).project(solution_bathymetry)
+        
         if self.op.solve_tracer:
             solution_tracer = self.solver_obj.fields.tracer_2d.copy(deepcopy = True)
-            solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy = True)
-            
-            old_mesh = Mesh(Function(self.mesh.coordinates))                
-            P1DG = FunctionSpace(old_mesh, "DG", 1)
-            P1 = FunctionSpace(old_mesh, "CG", 1)
-            
             self.op.solution_old_tracer = Function(P1DG).project(solution_tracer)
-            self.op.solution_old_bathymetry = Function(P1).project(solution_bathymetry)
+            
             
     def setup_solver(self):
         if not hasattr(self, 'remesh_step'):
