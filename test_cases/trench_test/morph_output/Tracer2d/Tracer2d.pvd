@@ -1,7 +1,5 @@
 <?xml version="1.0" ?>
 <VTKFile type="Collection" version="0.1" byte_order="LittleEndian">
 <Collection>
-<DataSet timestep="0" file="Tracer2d_0.vtu" />
-<DataSet timestep="1" file="Tracer2d_1.vtu" />
 </Collection>
 </VTKFile>

@@ -3,5 +3,22 @@
 <Collection>
 <DataSet timestep="0" file="bath_export_0.vtu" />
 <DataSet timestep="1" file="bath_export_1.vtu" />
+<DataSet timestep="2" file="bath_export_2.vtu" />
+<DataSet timestep="3" file="bath_export_3.vtu" />
+<DataSet timestep="4" file="bath_export_4.vtu" />
+<DataSet timestep="5" file="bath_export_5.vtu" />
+<DataSet timestep="6" file="bath_export_6.vtu" />
+<DataSet timestep="7" file="bath_export_7.vtu" />
+<DataSet timestep="8" file="bath_export_8.vtu" />
+<DataSet timestep="9" file="bath_export_9.vtu" />
+<DataSet timestep="10" file="bath_export_10.vtu" />
+<DataSet timestep="11" file="bath_export_11.vtu" />
+<DataSet timestep="12" file="bath_export_12.vtu" />
+<DataSet timestep="13" file="bath_export_13.vtu" />
+<DataSet timestep="14" file="bath_export_14.vtu" />
+<DataSet timestep="15" file="bath_export_15.vtu" />
+<DataSet timestep="16" file="bath_export_16.vtu" />
+<DataSet timestep="17" file="bath_export_17.vtu" />
+<DataSet timestep="18" file="bath_export_18.vtu" />
 </Collection>
 </VTKFile>

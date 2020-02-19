@@ -214,13 +214,6 @@ class TrenchOptions(TracerOptions):
     def get_update_forcings(self, solver_obj):
         
         def update_forcings(t):
-            """
-            if round(t, 2)%18.0 == 0:
-                if self.t_old.dat.data[:] == t:
-                    bath_file = File(self.di + '/bath_timestep.pvd')
-                    bath_file.write(solver_obj.fields.bathymetry_2d)  
-                    #import ipdb; ipdb.set_trace()
-            """
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
             self.update_key_hydro(solver_obj)
