@@ -464,7 +464,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     #    t_export = np.round(t_end/100, 0)
     #else:
     #    t_export = 1
-    t_export = 1
+    t_export = 18
     
     th.print_output('Exporting to '+outputdir)
     
