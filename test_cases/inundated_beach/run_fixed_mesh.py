@@ -1,20 +1,10 @@
-from thetis import print_output
+from thetis import *
 
 from adapt_utils.test_cases.inundated_beach.options import BalzanoOptions
-from adapt_utils.swe.tsunami.solver import TsunamiProblem
+from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 
-import matplotlib.pyplot as plt
-import argparse
-
-parser = argparse.ArgumentParser()
-parser.add_argument("-bathymetry_type")
-args = parser.parse_args()
-
-bathy_type = int(args.bathymetry_type or 1)
-
-op = BalzanoOptions(plot_timeseries=True, bathymetry_type=bathy_type)
+op = BalzanoOptions(plot_timeseries=True)
 op.qoi_mode = 'inundation_volume'
-tp = TsunamiProblem(op, levels=0)
-tp.solve()
-print_output("QoI: {:.1f} km^3 h".format(tp.callbacks["qoi"].get_val()/1.0e+9))
+swp = UnsteadyShallowWaterProblem(op, levels=0)
+swp.solve()
 op.plot()
