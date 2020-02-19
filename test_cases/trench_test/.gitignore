@@ -1,3 +1,5 @@
 outputs/*
 ./txt
 outputs*/
+morph_output/*
+hydro_output/*
