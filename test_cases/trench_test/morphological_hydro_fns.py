@@ -435,10 +435,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                 fire.solve(f == 0, z_n1)
                 
                 # update bed
-                bathymetry_2d.assign(z_n1)
-                print(t_new)
-                print(max(bathymetry_2d.dat.data[:]))
-                               
+                bathymetry_2d.assign(z_n1)                              
 
                 if round(t_new, 2)%t_export == 0:
                     # calculate difference between original bathymetry and new bathymetry

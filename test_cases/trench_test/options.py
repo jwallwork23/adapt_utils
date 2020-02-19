@@ -226,15 +226,13 @@ class TrenchOptions(TracerOptions):
             self.update_key_hydro(solver_obj)
 
             if self.t_old.dat.data[:] == t:
-                print(t)
                 self.update_suspended(solver_obj)
                 self.update_bedload(solver_obj)
                 
                 solve(self.f==0, self.z_n1)
         
                 self.bathymetry.assign(self.z_n1)
-                solver_obj.fields.bathymetry_2d.assign(self.z_n1)
-                print(max(self.bathymetry.dat.data[:]))                
+                solver_obj.fields.bathymetry_2d.assign(self.z_n1)              
             
             self.t_old.assign(t)        
 
