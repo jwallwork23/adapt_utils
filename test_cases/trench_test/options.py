@@ -4,6 +4,7 @@ from thetis.configuration import *
 #from adapt_utils.test_cases.trench_test.hydro_options import TrenchHydroOptions
 from adapt_utils.swe.morphological_options import TracerOptions
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
@@ -120,6 +121,9 @@ class TrenchOptions(TracerOptions):
         self.xrange = np.linspace(tol, 16-tol, 20)
         self.qois = []
         
+        # Outputs  (NOTE: self.di has changed)
+        self.bath_file = File(os.path.join(self.di, 'bath_export.pvd'))        
+        
 
     def set_source_tracer(self, fs, solver_obj = None, init = False, t_old = Constant(100)):
         if init:
@@ -180,8 +184,7 @@ class TrenchOptions(TracerOptions):
         boundary_conditions = {}
         boundary_conditions[inflow_tag] = {'flux': Constant(-0.22)}
         boundary_conditions[outflow_tag] = {'elev': Constant(0.397)}
-        #boundary_conditions[bottom_wall_tag] = {'un': Constant(0.0)}
-        #boundary_conditions[top_wall_tag] = {'un': Constant(0.0)}        
+     
         return boundary_conditions
 
 
@@ -211,13 +214,13 @@ class TrenchOptions(TracerOptions):
     def get_update_forcings(self, solver_obj):
         
         def update_forcings(t):
-            
+            """
             if round(t, 2)%18.0 == 0:
                 if self.t_old.dat.data[:] == t:
                     bath_file = File(self.di + '/bath_timestep.pvd')
                     bath_file.write(solver_obj.fields.bathymetry_2d)  
                     #import ipdb; ipdb.set_trace()
-
+            """
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
             self.update_key_hydro(solver_obj)
@@ -272,3 +275,9 @@ class TrenchOptions(TracerOptions):
             File(outputdir + "/velocity_imported.pvd").write(uv_init)
             chk.close()
         return  elev_init, uv_init,
+
+    def get_export_func(self, solver_obj):
+        self.bath_export = solver_obj.fields.bathymetry_2d
+        def export_func():
+            self.bath_file.write(self.bath_export)
+        return export_func

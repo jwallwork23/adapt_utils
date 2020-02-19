@@ -2,6 +2,7 @@ from thetis import *
 
 import pylab as plt
 import pandas as pd
+import numpy as np
 
 from adapt_utils.test_cases.trench_test.options import TrenchOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
@@ -61,8 +62,8 @@ df = pd.concat([pd.DataFrame(xaxisthetis1), pd.DataFrame(bathymetrythetis1)], ax
 
 df.to_csv('bed_trench_adap.csv')
 
-adapted_mesh = pd.read_csv('bed_trench_adap.csv')
-plt.plot(adapted_mesh['0'], adapted_mesh['0.1'], label = 'adapted_mesh')
+not_adapted_mesh = pd.read_csv('bed_trench_output.csv')
+plt.plot(not_adapted_mesh['0'], not_adapted_mesh['0.1'], label = 'not adapted mesh')
 
 data = pd.read_excel('../../../Trench/recreatepaperrun1.xlsx', sheet_name = 'recreatepaperrun', header = None)
 diff_15 = pd.read_excel('../../../Trench/extra_diffusion.xlsx')
@@ -73,6 +74,6 @@ thetisdf = pd.read_csv('../../../Trench/Sensitivity Analysis/linux_morfacfactor_
 plt.plot(thetisdf['0'], thetisdf['0.1'], label = 'Thetis')
 
 plt.plot(diff_15['x'][diff_15['y'] == 0.55], -diff_15['diff 0.15 diff factors'][diff_15['y'] == 0.55], label = 'Sisyphe')
-plt.plot(xaxisthetis1, bathymetrythetis1, '.', linewidth = 2, label = 'new')
+plt.plot(xaxisthetis1, bathymetrythetis1, '.', linewidth = 2, label = 'adapted mesh')
 plt.legend()
 plt.show()

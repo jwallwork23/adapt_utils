@@ -441,10 +441,9 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                                
 
                 if round(t_new, 2)%t_export == 0:
-                    #import ipdb; ipdb.set_trace()
                     # calculate difference between original bathymetry and new bathymetry
-                    bathymetry_file = th.File(outputdir + "/bathy.pvd")
                     bathymetry_file.write(bathymetry_2d) 
+                    import ipdb; ipdb.set_trace()
                     diff_bathy.interpolate(-bathymetry_2d + orig_bathymetry)
                     diff_bathy_file.write(diff_bathy)
 
@@ -493,6 +492,8 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
 
     # define output file for bed evolution
+    bathymetry_file = th.File(outputdir + "/bathy.pvd")
+    bathymetry_file.write(bathymetry_2d)
     diff_bathy_file = th.File(outputdir + "/diff_bathy.pvd")
     diff_bathy_file.write(diff_bathy)
 

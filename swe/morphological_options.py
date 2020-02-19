@@ -55,11 +55,6 @@ class TracerOptions(TsunamiOptions):
         else:
             self.bathymetry = Function(self.P1).project(self.bathymetry)
 
-        self.bathymetry_file = File(self.di + "/bathy.pvd")
-            
-        self.bathymetry_file.write(self.bathymetry)
-
-
         self.depth = Function(self.P1).project(self.elev_cg + self.bathymetry)
     
         self.unorm = Function(self.P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
