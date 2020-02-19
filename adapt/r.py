@@ -324,7 +324,7 @@ class MeshMover():
             edges = set(self.mesh.exterior_facets.unique_markers)
             corners = [(i, j) for i in edges for j in edges.difference([i])]
             bbc = DirichletBC(self.P1_vec, 0, corners)
-        bcs.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=bbc))
+        bc.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=bbc))
 
         # Create solver
         prob = LinearVariationalProblem(a, L, self.grad_φ_cts, bcs=bc)
