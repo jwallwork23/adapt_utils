@@ -443,7 +443,6 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                 if round(t_new, 2)%t_export == 0:
                     # calculate difference between original bathymetry and new bathymetry
                     bathymetry_file.write(bathymetry_2d) 
-                    import ipdb; ipdb.set_trace()
                     diff_bathy.interpolate(-bathymetry_2d + orig_bathymetry)
                     diff_bathy_file.write(diff_bathy)
 
@@ -465,7 +464,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     #    t_export = np.round(t_end/100, 0)
     #else:
     #    t_export = 1
-    t_export = 18
+    t_export = 1
     
     th.print_output('Exporting to '+outputdir)
     
@@ -492,8 +491,6 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
 
     # define output file for bed evolution
-    bathymetry_file = th.File(outputdir + "/bathy.pvd")
-    bathymetry_file.write(bathymetry_2d)
     diff_bathy_file = th.File(outputdir + "/diff_bathy.pvd")
     diff_bathy_file.write(diff_bathy)
 
@@ -753,6 +750,9 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     # crank-nicholson used to integrate in time system of ODEs resulting from application of galerkin FEM
     options.timestepper_type = 'CrankNicolson'
     options.timestepper_options.implicitness_theta = 1.0
+    
+    bathymetry_file = th.File(outputdir + "/bathy.pvd")
+    bathymetry_file.write(solver_obj.fields.bathymetry_2d)        
 
     if not hasattr(options.timestepper_options, 'use_automatic_timestep'):
         options.timestep = dt
@@ -794,8 +794,6 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
         solver_obj.assign_initial_conditions(uv=uv_init, elev= elev_init)
 
     solver_obj.iterate(update_forcings = update_forcings_tracer)
-    
-    #import ipdb; ipdb.set_trace()
 
     return solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file
 
