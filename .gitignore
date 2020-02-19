@@ -1,5 +1,4 @@
 # Directories
-*.pdf
 *log
 *.gz
 *.pvd
