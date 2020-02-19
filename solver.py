@@ -75,7 +75,7 @@ class SteadyProblem():
         self.outer_qois = []
         op.print_debug(op.indent + "{:s} initialisation complete!\n".format(self.__class__.__name__))
 
-    def set_mesh(self, mesh):
+    def set_mesh(self, mesh):  # TODO: Should just create one MeshHierarchy instead of nested ones
         """
         Build `AdaptiveMesh` object.
         """
@@ -96,7 +96,7 @@ class SteadyProblem():
         self.op_enriched = self.op.copy()
         self.op_enriched.degree += self.op.degree_increase
         self.op_enriched.indent += '  '
-        print_output("\nCreating enriched finite element space of degree {:d}...".format(self.op_enriched.degree))
+        self.op.print_debug("\nCreating enriched finite element space of degree {:d}...".format(self.op_enriched.degree))
         self.tp_enriched = type(self)(self.op_enriched, mesh=self.am.refined_mesh,
                                       discrete_adjoint=self.discrete_adjoint,
                                       prev_solution=self.prev_solution, levels=self.levels-1)

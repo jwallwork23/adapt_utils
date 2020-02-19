@@ -10,7 +10,7 @@ __all__ = ["SteadyTurbineOptions", "UnsteadyTurbineOptions"]
 
 
 # Default: Newton with line search; solve linear system exactly with LU factorisation
-default_params = {
+lu_params = {
     'mat_type': 'aij',
     'snes_type': 'newtonls',
     'snes_rtol': 1e-3,
@@ -22,6 +22,8 @@ default_params = {
     'pc_type': 'lu',
     'pc_factor_mat_solver_type': 'mumps',
 }
+# TODO: 'Physics based' fieldsplit approach
+default_params = lu_params
 keys = {key for key in default_params if not 'snes' in key}
 default_adjoint_params = {}
 for key in keys:
@@ -37,8 +39,9 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     turbine_diameter = PositiveFloat(18.).tag(config=True)
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
 
-    def __init__(self, num_iterations=1, **kwargs):
-        self.bathymetry = Constant(40.0)  # TODO: Set bathymetry
+    def __init__(self, num_iterations=1, bathymetry_space=None, **kwargs):
+        self.base_bathymetry = 40.0
+        self.set_bathymetry(bathymetry_space)
         super(SteadyTurbineOptions, self).__init__(**kwargs)
         self.timestepper = 'SteadyState'
         self.dt = 20.
@@ -57,20 +60,23 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         return self.viscosity
 
     def set_inflow(self, fs):
-        self.inflow = interpolate(as_vector([3., 0.]), fs)
-        return self.inflow
+        """Should be implemented in derived class."""
+        pass
 
     def get_max_depth(self):
-        assert hasattr(self, 'bathymetry')
-        if isinstance(self.bathymetry, Constant):
-            self.max_depth = self.bathymetry.values()[0]
-        elif isinstance(self.bathymetry, Function):
-            self.max_depth = self.bathymetry.vector().gather().max()
+        if hasattr(self, 'bathymetry'):
+            if isinstance(self.bathymetry, Constant):
+                self.max_depth = self.bathymetry.values()[0]
+            elif isinstance(self.bathymetry, Function):
+                self.max_depth = self.bathymetry.vector().gather().max()
+            else:
+                raise ValueError("Bathymetry format cannot be understood.")
         else:
-            raise ValueError("Bathymetry format cannot be understood.")
+            assert hasattr(self, 'base_bathymetry')
+            self.max_depth = self.base_bathymetry
 
     def set_bathymetry(self, fs):
-        self.bathymetry = Constant(40.0)
+        self.bathymetry = Constant(self.base_bathymetry)
         return self.bathymetry
 
     def set_quadratic_drag_coefficient(self, fs):

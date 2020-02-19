@@ -41,10 +41,14 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.bathymetry = Constant(40.0)
         return self.bathymetry
 
+    def set_inflow(self, fs):
+        self.inflow = Constant(as_vector([3., 0.]))
+        return self.inflow
+
     def set_viscosity(self, fs):
         sponge = False
-        self.viscosity = Function(fs)
         if sponge:
+            self.viscosity = Function(fs)
             x, y = SpatialCoordinate(fs.mesh())
             xmin = 0.0
             xmax = 1000.0
@@ -52,7 +56,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
             eps = 20.0
             self.viscosity.interpolate(self.base_viscosity + exp(ramp*(x-xmax+eps)))
         else:
-            self.viscosity.assign(self.base_viscosity)
+            self.viscosity = Constant(self.base_viscosity)
         return self.viscosity
 
     def set_boundary_conditions(self, fs):
