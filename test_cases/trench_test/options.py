@@ -57,7 +57,7 @@ class TrenchOptions(TracerOptions):
         
         self.bathymetry_file = File(self.di + "/bathy.pvd")
                 
-        self.num_hours = 5
+        self.num_hours = 15
 
         # Physical
         self.base_diffusivity = 0.15
@@ -88,7 +88,8 @@ class TrenchOptions(TracerOptions):
         
         self.t_old = Constant(0.0)        
         
-        self.slope_eff = False
+        self.slope_eff = True
+        self.angle_correction = True
         self.set_up_suspended(self.default_mesh)
         self.set_up_bedload(self.default_mesh)
         
@@ -215,7 +216,7 @@ class TrenchOptions(TracerOptions):
                 if self.t_old.dat.data[:] == t:
                     bath_file = File(self.di + '/bath_timestep.pvd')
                     bath_file.write(solver_obj.fields.bathymetry_2d)  
-                    import ipdb; ipdb.set_trace()
+                    #import ipdb; ipdb.set_trace()
 
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
@@ -224,7 +225,8 @@ class TrenchOptions(TracerOptions):
             if self.t_old.dat.data[:] == t:
                 print(t)
                 self.update_suspended(solver_obj)
-                #self.update_bedload(solver_obj)
+                self.update_bedload(solver_obj)
+                
                 solve(self.f==0, self.z_n1)
         
                 self.bathymetry.assign(self.z_n1)

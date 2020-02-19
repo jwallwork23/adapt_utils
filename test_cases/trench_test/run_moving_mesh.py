@@ -1,6 +1,7 @@
 from thetis import *
 
 import pylab as plt
+import pandas as pd
 
 from adapt_utils.test_cases.trench_test.options import TrenchOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
@@ -48,3 +49,30 @@ def gradient_interface_monitor(mesh, alpha=100):
 
 tp.monitor_function = gradient_interface_monitor
 tp.solve(uses_adjoint=False)
+
+xaxisthetis1 = []
+bathymetrythetis1 = []
+
+for i in np.linspace(0,15.8, 80):
+    xaxisthetis1.append(i)
+    bathymetrythetis1.append(-tp.solver_obj.fields.bathymetry_2d.at([i, 0.55]))
+
+df = pd.concat([pd.DataFrame(xaxisthetis1), pd.DataFrame(bathymetrythetis1)], axis = 1)
+
+df.to_csv('bed_trench_adap.csv')
+
+adapted_mesh = pd.read_csv('bed_trench_adap.csv')
+plt.plot(adapted_mesh['0'], adapted_mesh['0.1'], label = 'adapted_mesh')
+
+data = pd.read_excel('../../../Trench/recreatepaperrun1.xlsx', sheet_name = 'recreatepaperrun', header = None)
+diff_15 = pd.read_excel('../../../Trench/extra_diffusion.xlsx')
+
+plt.scatter(data[0], data[1], label = 'Experimental Data')
+
+thetisdf = pd.read_csv('../../../Trench/Sensitivity Analysis/linux_morfacfactor_ten_bed_new_one_diff15.csv')
+plt.plot(thetisdf['0'], thetisdf['0.1'], label = 'Thetis')
+
+plt.plot(diff_15['x'][diff_15['y'] == 0.55], -diff_15['diff 0.15 diff factors'][diff_15['y'] == 0.55], label = 'Sisyphe')
+plt.plot(xaxisthetis1, bathymetrythetis1, '.', linewidth = 2, label = 'new')
+plt.legend()
+plt.show()

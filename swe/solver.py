@@ -543,8 +543,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.output_directory = self.di
         
         if op.solve_tracer:
-            options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d', 'bathymetry_2d'] if op.plot_pvd else []
-            options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d', 'tracer_2d', 'bathymetry_2d'] if op.save_hdf5 else []
+            options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d'] if op.plot_pvd else []
+            options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d', 'tracer_2d'] if op.save_hdf5 else []
         else:
             options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
             options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []

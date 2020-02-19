@@ -125,7 +125,11 @@ class TracerOptions(TsunamiOptions):
         self.z_n = Function(self.P1)
         self.z_n1 = Function(self.P1)
         self.v = TestFunction(self.P1)
-        self.old_bathymetry_2d = Function(self.P1)
+        self.old_bathymetry_2d = Function(self.P1).interpolate(self.bathymetry)
+        
+        # define bed gradient
+        self.dzdx = Function(self.P1).interpolate(self.old_bathymetry_2d.dx(0))
+        self.dzdy = Function(self.P1).interpolate(self.old_bathymetry_2d.dx(1))
         
     def set_up_bedload(self, mesh):   
 
@@ -133,12 +137,27 @@ class TracerOptions(TsunamiOptions):
         self.calfa = Function(self.P1).interpolate(self.horizontal_velocity/sqrt(self.unorm))
         self.salfa = Function(self.P1).interpolate(self.vertical_velocity/sqrt(self.unorm))
         self.div_function = Function(self.P1_vec).interpolate(as_vector((self.calfa, self.salfa)))
-
+        
+        self.beta = 1.3
+        
+        self.surbeta2 = Constant(1/1.5)
+        self.cparam = Constant((2650-1000)*9.81*self.average_size*(self.surbeta2**2))
+        
         if self.slope_eff:    
             # slope effect magnitude correction due to gravity where beta is a parameter normally set to 1.3
             self.slopecoef = Function(self.P1).interpolate(1 + self.beta*(self.dzdx*self.calfa + self.dzdy*self.salfa))
         else:
             self.slopecoef = Function(self.P1).interpolate(Constant(1.0))
+            
+        if self.angle_correction == True:
+            # slope effect angle correction due to gravity
+            self.tt1 = Function(self.P1).interpolate(conditional(1000*0.5*self.qfc*self.unorm > 10**(-10), sqrt(self.cparam/(1000*0.5*self.qfc*self.unorm)), sqrt(self.cparam/(10**(-10)))))
+            # add on a factor of the bed gradient to the normal
+            self.aa = Function(self.P1).interpolate(self.salfa + self.tt1*self.dzdy)
+            self.bb = Function(self.P1).interpolate(self.calfa + self.tt1*self.dzdx)
+            self.norm = Function(self.P1).interpolate(conditional(sqrt(self.aa**2 + self.bb**2) > 10**(-10), sqrt(self.aa**2 + self.bb**2),10**(-10)))
+            self.calfamod = Function(self.P1).interpolate(self.bb/self.norm)
+            self.salfamod = Function(self.P1).interpolate(self.aa/self.norm)            
 
         # implement meyer-peter-muller bedload transport formula
         self.thetaprime = Function(self.P1).interpolate(self.mu*(1000*0.5*self.qfc*self.unorm)/((2650-1000)*9.81*self.average_size))
@@ -157,12 +176,17 @@ class TracerOptions(TsunamiOptions):
         
         self.old_bathymetry_2d.assign(solver_obj.fields.bathymetry_2d)
         
+        
+        
         self.z_n.interpolate(self.old_bathymetry_2d) 
         
         self.uv1, self.eta = solver_obj.fields.solution_2d.split()
         self.u_cg.interpolate(self.uv1)
         self.elev_cg.interpolate(self.eta)
 
+        # calculate gradient of bed (noting bathymetry is -bed)
+        self.dzdx.interpolate(self.old_bathymetry_2d.dx(0))
+        self.dzdy.interpolate(self.old_bathymetry_2d.dx(1))
 
         self.horizontal_velocity.interpolate(self.u_cg[0])
         self.vertical_velocity.interpolate(self.u_cg[1])
@@ -194,19 +218,7 @@ class TracerOptions(TsunamiOptions):
         self.f = (((1-self.porosity)*(self.z_n1 - self.z_n)/(self.dt*self.morfac))*self.v)*dx
         
     def update_suspended(self, solver_obj):   
-        
-        
-        self.old_bathymetry_2d.assign(self.bathymetry)
-        
-        self.z_n.interpolate(self.old_bathymetry_2d)
-        
-        # mu - ratio between skin friction and normal friction
-        self.mu.assign(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
-            
-        # bed shear stress
-        self.unorm.interpolate((self.horizontal_velocity**2) + (self.vertical_velocity**2))
-        self.TOB.interpolate(1000*0.5*self.qfc*self.unorm)
-        
+
         self.B.interpolate(conditional(self.a > self.depth, 1, self.a/self.depth))
         self.ustar.interpolate(sqrt(0.5*self.qfc*self.unorm))
         self.exp1.assign(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
@@ -252,3 +264,47 @@ class TracerOptions(TsunamiOptions):
         
         self.f += - (self.qbsourcedepth * self.v)*dx
         
+    def update_bedload(self, solver_obj):
+
+        # calculate angle of flow
+        self.calfa.interpolate(self.horizontal_velocity/sqrt(self.unorm))
+        self.salfa.interpolate(self.vertical_velocity/sqrt(self.unorm))
+        self.div_function.interpolate(as_vector((self.calfa, self.salfa)))
+        
+        if self.slope_eff:    
+            # slope effect magnitude correction due to gravity where beta is a parameter normally set to 1.3
+            # we use z_n1 and equals so that we can use an implicit method in Exner
+            self.slopecoef = (1 + self.beta*(self.z_n1.dx(0)*self.calfa + self.z_n1.dx(1)*self.salfa))
+        else:
+            self.slopecoef = Constant(1.0)  
+            
+        if self.angle_correction == True:
+            # slope effect angle correction due to gravity
+            self.tt1.interpolate(conditional(1000*0.5*self.qfc*self.unorm > 10**(-10), sqrt(self.cparam/(1000*0.5*self.qfc*self.unorm)), sqrt(self.cparam/(10**(-10)))))
+            # add on a factor of the bed gradient to the normal
+            self.aa.assign(self.salfa + self.tt1*self.dzdy)
+            self.bb.assign(self.calfa + self.tt1*self.dzdx)
+            self.norm.assign(conditional(sqrt(self.aa**2 + self.bb**2) > 10**(-10), sqrt(self.aa**2 + self.bb**2),10**(-10)))
+            # we use z_n1 and equals so that we can use an implicit method in Exner
+            self.calfamod = (self.calfa + (self.tt1*self.z_n1.dx(0)))/self.norm
+            self.salfamod = (self.salfa + (self.tt1*self.z_n1.dx(1)))/self.norm              
+            
+        # implement meyer-peter-muller bedload transport formula
+        self.thetaprime.interpolate(self.mu*(1000*0.5*self.qfc*self.unorm)/((2650-1000)*9.81*self.average_size))
+
+        # if velocity above a certain critical value then transport occurs
+        self.phi.assign(conditional(self.thetaprime < self.thetacr, 0, 8*(self.thetaprime-self.thetacr)**1.5))
+                        
+        # bedload transport flux with magnitude correction
+        self.qb_total = self.slopecoef*self.phi*sqrt(self.g*(2650/1000 - 1)*self.average_size**3)            
+        
+        # formulate bedload transport flux with correct angle depending on corrections implemented
+        if self.angle_correction == True:
+            self.qbx = self.qb_total*self.calfamod
+            self.qby = self.qb_total*self.salfamod                     
+        else:
+            self.qbx = self.qb_total*self.calfa
+            self.qby = self.qb_total*self.salfa                            
+                    
+        # add bedload transport to exner equation
+        self.f += -(self.v*((self.qbx*self.n[0]) + (self.qby*self.n[1])))*ds(1) -(self.v*((self.qbx*self.n[0]) + (self.qby*self.n[1])))*ds(2) + (self.qbx*(self.v.dx(0)) + self.qby*(self.v.dx(1)))*dx                

@@ -82,8 +82,8 @@ morph.export_final_state("hydrodynamics_trench_fine", uv, elev)
 """
 
 solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file = morph.morphological(boundary_conditions_fn = boundary_conditions_fn_trench, morfac = 100, morfac_transport = True, suspendedload = True, convectivevel = True,\
-                    bedload = False, angle_correction = False, slope_eff = False, seccurrent = False, sediment_slide = False, fluc_bcs = False, \
-                    mesh2d = mesh2d, bathymetry_2d = bathymetry_2d, input_dir = 'hydrodynamics_trench_fine', viscosity_hydro = 10**(-6), ks = 0.025, average_size = 160 * (10**(-6)), dt = 0.1, final_time = 5*3600,\
+                    bedload = True, angle_correction = True, slope_eff = True, seccurrent = False, sediment_slide = False, fluc_bcs = False, \
+                    mesh2d = mesh2d, bathymetry_2d = bathymetry_2d, input_dir = 'hydrodynamics_trench_fine', viscosity_hydro = 10**(-6), ks = 0.025, average_size = 160 * (10**(-6)), dt = 0.1, final_time = 15*3600,\
                  beta_fn = 1.3, surbeta2_fn = 1/1.5, alpha_secc_fn = 0.75, angle_fn = 35, mesh_step_size = 0.2)
 
 
