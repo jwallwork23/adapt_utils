@@ -2,6 +2,8 @@ all: dir clean geo_xcoarse mesh_xcoarse
 
 allmesh: dir clean geo mesh_aligned mesh_offset
 
+results: all uniform adapt plot
+
 dir:
 	@echo "Making directories..."
 	@mkdir -p outputs/fixed_mesh/hdf5
@@ -45,7 +47,18 @@ mesh_xcoarse:
 
 uniform:
 	@echo "Running uniform convergence test..."
-	@echo mpiexec -n 8 python3 run_uniform_convergence.py
+	@mpiexec -n 8 python3 run_uniform_convergence.py
+	@echo "Done!"
+
+adapt:
+	@echo "Running adaptive convergence test..."
+	@python3 run_adaptive_convergence.py -approach carpio_isotropic
+	@python3 run_adaptive_convergence.py -approach carpio
+	@echo "Done!"
+
+plot:
+	@echo "Plotting convergence curves..."
+	@python3 plot_convergence.py
 	@echo "Done!"
 
 clean:

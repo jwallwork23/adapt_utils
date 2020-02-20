@@ -5,6 +5,7 @@ steady_turbine/stephan.py
 steady_turbine/stephan-noid.py
 steady_turbine/run.py
 steady_turbine/*.geo
+steady_turbine/admos_paper_plots.ipynb
 unsteady_turbine/output/
 unsteady_turbine/outputs/
 unsteady_turbine/screenshots/

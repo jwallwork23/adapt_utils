@@ -12,7 +12,7 @@ args = parser.parse_args()
 # Parameters
 kwargs = {
     'approach': args.approach or 'carpio',
-    'target': 100.0,
+    'target': 400.0,
     'debug': True,
     'adapt_field': 'all_int',
     'normalisation': 'complexity',
@@ -21,10 +21,12 @@ kwargs = {
     'h_max': 500.0,
     'num_adapt': 35,  # Maximum iterations
     'element_rtol': 0.002,
-    'outer_iterations': 3,
+    'outer_iterations': 4,
+    'target_base': 4,
 }
 
-for offset in (0, 1)
+outstrs = {0: [], 1: []}
+for offset in (0, 1):
 
     # Run adaptation loop
     op = Steady2TurbineOptions(offset=offset, **kwargs)
@@ -38,11 +40,11 @@ for offset in (0, 1)
     outfile.create_dataset('qoi', data=tp.outer_qois)
     outfile.close()
 
+    for i in range(op.outer_iterations):
+        outstrs[offset].append("{:5d}  {:8d}  {:7d}  {:6.4f}kW".format(i+1, tp.outer_num_cells[i], tp.outer_dofs[i], tp.outer_qois[i]/1000.0))
+
 # Print results to screen
 for offset in (0, 1):
     print_output("="*80 + "\nLevel  Elements     DOFs        J{:d}".format(offset))
     for i in range(op.outer_iterations):
-        print_output("{:5d}  {:8d}  {:7d}  {:6.4f}kW".format(i+1, tp.outer_num_cells[i], tp.outer_dofs[i], tp.outer_qois[i]))
-
-# TODO: Format output as table
-# TODO: Plot QoI convergence with nice formatting. (Replacing jupyter notebook.)
+        print_output(outstrs[offset][i])
