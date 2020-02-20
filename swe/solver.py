@@ -525,7 +525,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         
         if op.solve_tracer:
             self.uv_d, self.eta_d = self.solution.split()
-            op.set_up_suspended(self.mesh)
+            op.set_up_suspended(self.mesh, tracer = self.tracer_interp)
                
         options = self.solver_obj.options
         

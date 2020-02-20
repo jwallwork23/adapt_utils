@@ -125,13 +125,14 @@ class TrenchOptions(MorphOptions):
         self.bath_file = File(os.path.join(self.di, 'bath_export.pvd'))        
         
 
-    def set_source_tracer(self, fs, solver_obj = None, init = False, t_old = Constant(100)):
+    def set_source_tracer(self, fs, solver_obj = None, init = False, t_old = Constant(100), tracer = None):
         if init:
             if t_old.dat.data[:] == 0.0:
                 self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.tracer_init_value/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
             else:
-                self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.tracer_interp/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+                self.source = Function(fs).project(-(self.settling_velocity*self.coeff*tracer/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
         else:
+
             self.source.interpolate(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+(self.settling_velocity*self.ceq/self.depth))
         return self.source
 
