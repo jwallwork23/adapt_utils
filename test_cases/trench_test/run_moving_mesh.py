@@ -58,11 +58,11 @@ tp.solve(uses_adjoint=False)
 xaxisthetis1 = []
 bathymetrythetis1 = []
 
-for i in np.linspace(0,15.8, 80):
+for i in np.linspace(0,15.8, 40):
     xaxisthetis1.append(i)
     bathymetrythetis1.append(-tp.solver_obj.fields.bathymetry_2d.at([i, 0.55]))
 
-df = pd.concat([pd.DataFrame(xaxisthetis1), pd.DataFrame(bathymetrythetis1)], axis = 1)
+df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(bathymetrythetis1, columns = ['bath'])], axis = 1)
 
 df.to_csv('bed_trench_adap.csv')
 
@@ -81,3 +81,20 @@ plt.plot(diff_15['x'][diff_15['y'] == 0.55], -diff_15['diff 0.15 diff factors'][
 plt.plot(xaxisthetis1, bathymetrythetis1, '.', linewidth = 2, label = 'adapted mesh')
 plt.legend()
 plt.show()
+
+datathetis = []
+bathymetrythetis1 = []
+diff_thetis = []
+for i in range(len(data[0].dropna()[0:3])):
+    print(i)
+    datathetis.append(data[0].dropna()[i])
+    bathymetrythetis1.append(-tp.solver_obj.fields.bathymetry_2d.at([np.round(data[0].dropna()[i],3), 0.55]))
+    diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
+for i in range(4, len(data[0].dropna())):
+    print(i)
+    datathetis.append(data[0].dropna()[i])
+    bathymetrythetis1.append(-tp.solver_obj.fields.bathymetry_2d.at([np.round(data[0].dropna()[i],3), 0.55]))
+    diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
+    
+print("L2 norm: ")
+print(np.sqrt(sum(diff_thetis)))    
