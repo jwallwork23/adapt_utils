@@ -4,7 +4,7 @@ from adapt_utils.swe.turbine.solver import SteadyTurbineProblem
 
 import argparse
 
-parser = argparse.ArgumentParser()  # TODO: Remove argparse
+parser = argparse.ArgumentParser()  # TODO: Run all using outer adaptation loop; remove argparse
 parser.add_argument('-approach', help="Mesh adaptation strategy")
 parser.add_argument('-target', help="Scaling parameter for metric")
 parser.add_argument('-offset', help="Toggle offset or aligned turbine configurations")
@@ -35,6 +35,5 @@ op.set_all_rtols(0.002)
 tp = SteadyTurbineProblem(op, discrete_adjoint=True, prev_solution=sol, levels=1)
 tp.adaptation_loop()
 
-# TODO: Outer adaptation loop
 # TODO: Format output as table
 # TODO: Plot QoI convergence with nice formatting. (Replaces jupyter notebook.)

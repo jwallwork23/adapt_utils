@@ -2,14 +2,14 @@ from thetis import *
 from adapt_utils.test_cases.steady_turbine.options import *
 from adapt_utils.swe.turbine.solver import *
 
-num_levels = 3  # TODO: Put back to 5
+num_levels = 5
 
 kwargs = {'plot_pvd': True, 'debug': True}
 
 data = {}
 for offset in (False, True):
     op = Steady2TurbineOffsetOptions(**kwargs) if offset else Steady2TurbineOptions(**kwargs)
-    tp = SteadyTurbineProblem(op, levels=num_levels-1)  # FIXME: Parallel not working if num_levels > 1
+    tp = SteadyTurbineProblem(op, levels=num_levels-1)
     data[offset] = {'qois': [], 'num_cells': [], 'dofs': []}
     for level in range(num_levels):
         tp.solve()
