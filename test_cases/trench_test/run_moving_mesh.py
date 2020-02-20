@@ -24,7 +24,7 @@ tp = TsunamiProblem(op, levels=0)
 tp.setup_solver()
 
 
-def gradient_interface_monitor(mesh, alpha = 2000.0):
+def gradient_interface_monitor(mesh, alpha = 2000.0, beta = 10.0):
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 
@@ -43,12 +43,14 @@ def gradient_interface_monitor(mesh, alpha = 2000.0):
     bath_dx_dx_sq = interpolate(pow(bath_dx_sq.dx(0), 2), P1_current)
     bath_dy_dy_sq = interpolate(pow(bath_dy_sq.dx(1), 2), P1_current)
     #norm = interpolate(conditional(bath_dx_dx_sq + bath_dy_dy_sq > 10**(-7), bath_dx_dx_sq + bath_dy_dy_sq, Constant(10**(-7))), P1_current)
-    norm = interpolate(bath_dx_dx_sq + bath_dy_dy_sq, P1_current)
-    norm_tmp = interpolate(bath_dx_sq/norm, P1_current)
-    norm_proj = project(norm, P1)
+    norm_two = interpolate(bath_dx_dx_sq + bath_dy_dy_sq, P1_current)
+    norm_one = interpolate(bath_dx_sq + bath_dy_sq, P1_current)
+    #norm_tmp = interpolate(bath_dx_sq/norm, P1_current)
+    norm_one_proj = project(norm_one, P1)
+    norm_two_proj = project(norm_two, P1)
 
 
-    return sqrt(1.0 + (alpha*norm_proj))
+    return sqrt(1.0 + (alpha*norm_two_proj) + (beta*norm_one_proj))
 
 tp.monitor_function = gradient_interface_monitor
 tp.solve(uses_adjoint=False)

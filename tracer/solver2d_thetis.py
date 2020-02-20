@@ -9,6 +9,7 @@ from adapt_utils.misc import index_string
 __all__ = ["SteadyTracerProblem2d_Thetis", "UnsteadyTracerProblem2d_Thetis"]
 
 
+# TODO: Revise this
 class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
     r"""
     General discontinuous Galerkin solver object for stationary tracer advection problems of the form
@@ -19,12 +20,12 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
     for (prescribed) velocity :math:`\textbf{u}`, diffusivity :math:`\nu \geq 0`, source :math:`f`
     and (prognostic) concentration :math:`\phi`.
     """
-    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=1):
+    def __init__(self, op, mesh=None, 
         try:
             assert op.family in ("Discontinuous Lagrange", "DG", "dg")
         except AssertionError:
             raise ValueError("Finite element '{:s}' not supported in Thetis tracer model.".format(op.family))
-        super(SteadyTracerProblem2d_Thetis, self).__init__(mesh, op, discrete_adjoint, fe, prev_solution, levels)
+        super(SteadyTracerProblem2d_Thetis, self).__init__(op, mesh, **kwargs)
 
     def solve(self):
         solver_obj = solver2d.FlowSolver2d(self.mesh, Constant(1.))
@@ -144,14 +145,10 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         self.indicators['dwr_flux'] = res
 
 
+# TODO: revise this
 class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
-    def __init__(self,
-                 op,
-                 mesh=None,
-                 discrete_adjoint=False,
-                 finite_element=FiniteElement("Discontinuous Lagrange", triangle, 1)):
-        super(UnsteadyTracerProblem2d_Thetis, self).__init__(mesh, op, finite_element, discrete_adjoint, 1)
-        assert(finite_element.family() == "Discontinuous Lagrange")
+    def __init__(self, op, mesh=None, **kwargs):
+        super(UnsteadyTracerProblem2d_Thetis, self).__init__(op, mesh, **kwargs)
 
         self.set_fields()
 

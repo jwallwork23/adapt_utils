@@ -15,7 +15,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
     """
     General solver object for stationary shallow water problems.
     """
-    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=1):
+    def __init__(self, op, mesh=None, **kwargs):
         p = op.degree
         if op.family == 'dg-dg' and p >= 0:
             fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p)
@@ -23,7 +23,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
             fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1)
         else:
             raise NotImplementedError
-        super(SteadyShallowWaterProblem, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
+        super(SteadyShallowWaterProblem, self).__init__(op, mesh, fe, **kwargs)
+        prev_solution = kwargs.get('prev_solution')
         if prev_solution is not None:
             self.interpolate_solution(prev_solution)
 
@@ -106,6 +107,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
 
+        # NOTE: Extra setup must be done *before* setting initial condition
+        if hasattr(self, 'extra_setup'):
+            self.extra_setup()
+
         # Initial conditions  # TODO: will this work over mesh iterations?
         if self.prev_solution is not None:
             u_interp, eta_interp = self.solution.split()
@@ -115,9 +120,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
             u_interp.interpolate(self.fields['inflow'])
             eta_interp.assign(0.0)
         self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
-
-        if hasattr(self, 'extra_setup'):
-            self.extra_setup()
 
         self.lhs = self.solver_obj.timestepper.F
         self.solution = self.solver_obj.fields.solution_2d
@@ -424,7 +426,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
     """
     General solver object for time-dependent shallow water problems.
     """
-    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=1, load_index=0):
+    def __init__(self, op, mesh=None, **kwargs):
         p = op.degree
         if op.family == 'dg-dg' and p >= 0:
             fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p)
@@ -432,8 +434,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1)
         else:
             raise NotImplementedError
-        self.load_index = load_index
-        super(UnsteadyShallowWaterProblem, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
+        super(UnsteadyShallowWaterProblem, self).__init__(op, mesh, fe, **kwargs)
+        prev_solution = kwargs.get('prev_solution')
         if prev_solution is not None:
             self.interpolate_solution(prev_solution)
 
@@ -513,15 +515,13 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if self.load_index > 0:
             self.solver_obj.load_state(self.load_index)
             raise NotImplementedError
-        elif self.prev_solution is not None:
-            u_interp, eta_interp = self.interpolate_solution.split()
         else:
             u_interp, eta_interp = self.solution.split()
-            if op.solve_tracer:
-                if hasattr(self, 'solution_old_tracer'):
-                    self.tracer_interp = Function(self.P1DG).project(self.solution_old_tracer)         
-                else:
-                    self.tracer_interp = Function(self.P1DG).project(self.op.tracer_init)
+        if op.solve_tracer:
+            if hasattr(self, 'solution_old_tracer'):
+                self.tracer_interp = Function(self.P1DG).project(self.solution_old_tracer)         
+            else:
+                self.tracer_interp = Function(self.P1DG).project(self.op.tracer_init)
         
         if op.solve_tracer:
             self.uv_d, self.eta_d = self.solution.split()
@@ -579,7 +579,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.solve_tracer:
             self.solver_obj.bnd_functions['tracer'] = op.set_boundary_conditions_tracer(self.V)
 
-
             
         if op.solve_tracer:
             
@@ -587,7 +586,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
                 self.solver_obj.assign_initial_conditions(uv = u_interp, elev = eta_interp, tracer = self.tracer_interp)
         else:
             self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)        
-
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()

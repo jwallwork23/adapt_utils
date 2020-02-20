@@ -13,9 +13,9 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
     """
     Class for solving shallow water problems discretised using space-time FEM.
     """
-    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=0):
+    def __init__(self, op, mesh=None, **kwargs):
         # TODO: FunctionSpace is currently hard-coded
-        super(SpaceTimeShallowWaterProblem, self).__init__(op, mesh, None, discrete_adjoint, prev_solution, levels)
+        super(SpaceTimeShallowWaterProblem, self).__init__(op, mesh, None, **kwargs)
 
         # Apply initial condition
         self.set_start_condition(adjoint=False)
@@ -366,9 +366,9 @@ class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):
         where the final scalar equation solves for the divergence of b*u.
       * We use Taylor-Hood for the momentum-continuity pair and P0 space for the auxiliary equation.
     """
-    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=0):
+    def __init__(self, op, mesh=None, **kwargs):
         # TODO: FunctionSpace is currently hard-coded
-        super(SpaceTimeDispersiveShallowWaterProblem, self).__init__(op, mesh, None, discrete_adjoint, prev_solution, levels)
+        super(SpaceTimeDispersiveShallowWaterProblem, self).__init__(op, mesh, None, **kwargs)
         try:
             assert self.mesh.topological_dimension() == 3
         except AssertionError:

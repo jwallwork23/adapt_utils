@@ -28,7 +28,7 @@ class SteadyProblem():
         * solve adjoint PDE;
         * adapt mesh based on some error estimator of choice.
     """
-    def __init__(self, op, mesh, finite_element, discrete_adjoint=False, prev_solution=None, levels=1):
+    def __init__(self, op, mesh, finite_element, discrete_adjoint=False, prev_solution=None, levels=0, hierarchy=None):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -42,8 +42,9 @@ class SteadyProblem():
 
         # Setup problem
         op.print_debug(op.indent+"Building mesh...")
-        self.set_mesh(mesh)
-        self.am_init = self.am.copy()
+        self.set_mesh(mesh, hierarchy=hierarchy)
+        if op.approach == 'monge_ampere':
+            self.am_init = self.am.copy()  # FIXME: Less hacky
         op.print_debug(op.indent+"Building function spaces...")
         self.create_function_spaces()
         op.print_debug(op.indent+"Building solutions...")
@@ -77,19 +78,19 @@ class SteadyProblem():
         self.outer_qois = []
         op.print_debug(op.indent + "{:s} initialisation complete!\n".format(self.__class__.__name__))
 
-    def set_mesh(self, mesh):
+    def set_mesh(self, mesh, hierarchy):
         """
-        Build `AdaptiveMesh` object.
+        Build `AdaptiveMesh` object, passing the hierarchy instead of creating a new one.
         """
         mesh = mesh or self.op.default_mesh
-        self.am = AdaptiveMesh(mesh, levels=self.levels)
+        self.am = AdaptiveMesh(hierarchy or mesh, levels=self.levels)
         self.mesh = self.am.mesh
         if self.levels > 0:
             self.create_enriched_problem()
-        self.n = FacetNormal(self.mesh)  # TODO: use version in AdaptiveMesh
-        self.h = CellSize(self.mesh)     # TODO: use version in AdaptiveMesh
+        self.n = self.am.n
+        self.h = self.am.h
         self.dim = self.mesh.topological_dimension()
-        self.op.print_debug(self.op.indent+"Number of mesh elements: {:d}".format(mesh.num_cells()))
+        self.op.print_debug(self.op.indent+"Number of mesh elements: {:d}".format(self.mesh.num_cells()))
 
     def create_enriched_problem(self):
         """
@@ -98,10 +99,13 @@ class SteadyProblem():
         self.op_enriched = self.op.copy()
         self.op_enriched.degree += self.op.degree_increase
         self.op_enriched.indent += '  '
-        print_output("\nCreating enriched finite element space of degree {:d}...".format(self.op_enriched.degree))
-        self.tp_enriched = type(self)(self.op_enriched, mesh=self.am.refined_mesh,
+        self.op.print_debug(self.op.indent+"\nCreating enriched finite element space of degree {:d}...".format(self.op_enriched.degree))
+        self.tp_enriched = type(self)(self.op_enriched,
+                                      mesh=self.am.mesh,
                                       discrete_adjoint=self.discrete_adjoint,
-                                      prev_solution=self.prev_solution, levels=self.levels-1)
+                                      prev_solution=self.prev_solution,
+                                      levels=self.levels-1,
+                                      hierarchy=self.am.hierarchy)
 
     def create_function_spaces(self):
         """
@@ -914,8 +918,8 @@ class UnsteadyProblem(SteadyProblem):
         * solve adjoint PDE;
         * adapt mesh based on some error estimator of choice.
     """
-    def __init__(self, op, mesh, finite_element, discrete_adjoint=False, prev_solution=None, levels=1):
-        super(UnsteadyProblem, self).__init__(op, mesh, finite_element, discrete_adjoint, prev_solution, levels)
+    def __init__(self, op, mesh, finite_element, **kwargs):
+        super(UnsteadyProblem, self).__init__(op, mesh, finite_element, **kwargs)
         self.set_start_condition()
         self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
         self.estimators = {}
