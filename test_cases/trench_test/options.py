@@ -2,7 +2,7 @@ from thetis import *
 from thetis.configuration import *
 
 #from adapt_utils.test_cases.trench_test.hydro_options import TrenchHydroOptions
-from adapt_utils.swe.morphological_options import TracerOptions
+from adapt_utils.swe.morphological_options import MorphOptions
 
 import os
 import numpy as np
@@ -15,7 +15,7 @@ rc('text', usetex=True)
 __all__ = ["TrenchOptions"]
 
 
-class TrenchOptions(TracerOptions):
+class TrenchOptions(MorphOptions):
     """
     Parameters for test case described in [1].
 

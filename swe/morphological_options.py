@@ -3,15 +3,15 @@ from thetis.configuration import *
 
 from adapt_utils.swe.tsunami.options import TsunamiOptions
 
-__all__ = ["TracerOptions"]
+__all__ = ["MorphOptions"]
 
-class TracerOptions(TsunamiOptions):
+class MorphOptions(TsunamiOptions):
     """
     Parameter class for general morphological problems.
     """
     
     def __init__(self, **kwargs):
-        super(TracerOptions, self).__init__(**kwargs)    
+        super(MorphOptions, self).__init__(**kwargs)    
     
     def set_up_suspended(self, mesh): 
         

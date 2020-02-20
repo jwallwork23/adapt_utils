@@ -481,11 +481,11 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         P1 = FunctionSpace(old_mesh, "CG", 1)    
         
         solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy = True)
-        self.op.solution_old_bathymetry = Function(P1).project(solution_bathymetry)
+        self.solution_old_bathymetry = Function(P1).project(solution_bathymetry)
         
         if self.op.solve_tracer:
             solution_tracer = self.solver_obj.fields.tracer_2d.copy(deepcopy = True)
-            self.op.solution_old_tracer = Function(P1DG).project(solution_tracer)
+            self.solution_old_tracer = Function(P1DG).project(solution_tracer)
             
             
     def setup_solver(self):
@@ -494,11 +494,11 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         op = self.op
         
         if hasattr(self, "solution_old_bathymetry"):
-            self.op.bathymetry = Function(self.P1).project(self.solution_old_bathymetry)
+            op.bathymetry = Function(self.P1).project(self.solution_old_bathymetry)
         else:
-            self.op.bathymetry = self.set_bathymetry(self.P1)
+            op.bathymetry = self.set_bathymetry(self.P1)
         
-        self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.op.bathymetry)
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
 
         self.solver_obj.export_initial_state = self.remesh_step == 0
             

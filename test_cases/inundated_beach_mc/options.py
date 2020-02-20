@@ -2,7 +2,7 @@ from thetis import *
 from thetis.configuration import *
 
 
-from adapt_utils.swe.morphological_options import TracerOptions
+from adapt_utils.swe.morphological_options import MorphOptions
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -15,7 +15,7 @@ __all__ = ["BalzanoOptions"]
 
 
 
-class BalzanoOptions(TracerOptions):
+class BalzanoOptions(MorphOptions):
 
     """
     Parameters for test case described in [1].
