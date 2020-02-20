@@ -15,7 +15,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
     """
     General solver object for stationary shallow water problems.
     """
-    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=1):
+    def __init__(self, op, mesh=None, **kwargs):
         p = op.degree
         if op.family == 'dg-dg' and p >= 0:
             fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p)
@@ -23,7 +23,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
             fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1)
         else:
             raise NotImplementedError
-        super(SteadyShallowWaterProblem, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
+        super(SteadyShallowWaterProblem, self).__init__(op, mesh, fe, **kwargs)
+        prev_solution = kwargs.get('prev_solution')
         if prev_solution is not None:
             self.interpolate_solution(prev_solution)
 
@@ -424,7 +425,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
     """
     General solver object for time-dependent shallow water problems.
     """
-    def __init__(self, op, mesh=None, discrete_adjoint=True, prev_solution=None, levels=1, load_index=0):
+    def __init__(self, op, mesh=None, **kwargs):
         p = op.degree
         if op.family == 'dg-dg' and p >= 0:
             fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p)
@@ -432,8 +433,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1)
         else:
             raise NotImplementedError
-        self.load_index = load_index
-        super(UnsteadyShallowWaterProblem, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
+        super(UnsteadyShallowWaterProblem, self).__init__(op, mesh, fe, **kwargs)
+        prev_solution = kwargs.get('prev_solution')
         if prev_solution is not None:
             self.interpolate_solution(prev_solution)
 
@@ -525,14 +526,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
 
         # Initial conditions
-        if self.load_index > 0:
-            self.solver_obj.load_state(self.load_index)
-
-            raise NotImplementedError  # TODO: Adaptive case. Will need to save mesh.
-        elif self.prev_solution is not None:
-            u_interp, eta_interp = self.interpolated_solution.split()
-        else:
-            u_interp, eta_interp = self.solution.split()
+        u_interp, eta_interp = self.solution.split()
         self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
 
         if hasattr(self, 'extra_setup'):

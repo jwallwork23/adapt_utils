@@ -2,7 +2,7 @@ from thetis import *
 from adapt_utils.test_cases.steady_turbine.options import *
 from adapt_utils.swe.turbine.solver import *
 
-num_levels = 1  # TODO: Put back to 5
+num_levels = 3  # TODO: Put back to 5
 
 kwargs = {'plot_pvd': True, 'debug': True}
 

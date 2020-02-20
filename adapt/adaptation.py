@@ -19,19 +19,22 @@ class AdaptiveMesh():
     """
     def __init__(self, mesh, levels=0, op=Options()):
         """
-        `AdaptMesh` object is initialised as the basis of a `MeshHierarchy`.
+        `AdaptiveMesh` object is initialised as the basis of a `MeshHierarchy`.
         """
         self.levels = levels
         self.op = op
-        use_hierarchy = levels > 0
-        if use_hierarchy:
-            self.hierarchy = MeshHierarchy(mesh, levels)
-            self.mesh = self.hierarchy[0]
         self.mesh = mesh
+        if mesh.__class__.__name__ == 'HierarchyBase':
+            self.hierarchy = mesh
+        elif levels > 0:
+            self.hierarchy = MeshHierarchy(mesh, levels)
+        if hasattr(self, 'hierarchy'):
+            n = len(self.hierarchy)
+            self.mesh = self.hierarchy[n-levels-1]
+            if levels > 0:
+                self.refined_mesh = self.hierarchy[n-levels]
         self.dim = self.mesh.topological_dimension()
         assert self.dim in (2, 3)
-        if use_hierarchy:
-            self.refined_mesh = self.hierarchy[1]
 
         self.n = FacetNormal(self.mesh)
         if self.dim == 2:
@@ -46,9 +49,9 @@ class AdaptiveMesh():
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.P0_vec = VectorFunctionSpace(self.mesh, "DG", 0)
         self.P0_ten = TensorFunctionSpace(self.mesh, "DG", 0)
-        self.jacobian_sign = interpolate(sign(JacobianDeterminant(mesh)), self.P0)
+        self.jacobian_sign = interpolate(sign(JacobianDeterminant(self.mesh)), self.P0)
 
-    def copy(self):
+    def copy(self):  # FIXME: Doesn't preserve hierarchy
         return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
 
     def get_quality(self):

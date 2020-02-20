@@ -8,7 +8,7 @@ from adapt_utils.adapt.recovery import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
 
-__all__ = ["SteadyTracerProblem2d", "UnsteadyTracerProblem2d"]
+__all__ = ["SteadyTracerProblem2d"]
 
 
 class SteadyTracerProblem2d(SteadyProblem):
@@ -28,14 +28,14 @@ class SteadyTracerProblem2d(SteadyProblem):
         * Dirichlet;
         * outflow.
     """
-    def __init__(self, op, mesh=None, discrete_adjoint=False, prev_solution=None, levels=1):
+    def __init__(self, op, mesh=None, **kwargs):
         if op.family in ("Lagrange", "CG", "cg"):
             fe = FiniteElement("Lagrange", triangle, op.degree)
         elif op.family in ("Discontinuous Lagrange", "DG", "dg"):
             fe = FiniteElement("Discontinuous Lagrange", triangle, op.degree)
         else:
             raise NotImplementedError
-        super(SteadyTracerProblem2d, self).__init__(op, mesh, fe, discrete_adjoint, prev_solution, levels)
+        super(SteadyTracerProblem2d, self).__init__(op, mesh, fe, **kwargs)
         self.nonlinear = False
 
     def set_fields(self, adapted=False):
@@ -320,32 +320,3 @@ class SteadyTracerProblem2d(SteadyProblem):
         # n = self.n
         # Fhat = i*dot(phi, n)
         # bdy_contributions -= Fhat*ds(2) + Fhat*ds(3) + Fhat*ds(4)
-
-
-class UnsteadyTracerProblem2d(UnsteadyProblem):
-    def __init__(self, op, mesh=None, discrete_adjoint=False, prev_solution=None, levels=0):
-        raise NotImplementedError
-        # TODO: Copy over most of the above
-        # TODO: Make sure export_func and update_forcings get added in Thetis version
-
-    def set_fields(self):
-        op = self.op
-        self.nu = op.set_diffusivity(self.P1)
-        self.u = op.set_velocity(self.P1_vec)
-        self.divergence_free = np.allclose(norm(div(self.u)), 0.0)
-        self.source = op.set_source(self.P1)
-        self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
-
-        # Stabilisation
-        self.stabilisation = self.stabilisation or 'SUPG'
-        if self.stabilisation in ('SU', 'SUPG'):
-            self.supg_coefficient(mode='diameter')
-            # self.supg_coefficient(mode='nguyen')
-        elif self.stabilisation == 'lax_friedrichs':
-            self.stabilisation_parameter = op.stabilisaton_parameter
-        elif self.stabilisation != 'no':
-            raise ValueError("Stabilisation method {:s} not recognised".format(self.stabilisation))
-
-        # Rename solution fields
-        self.solution.rename('Tracer concentration')
-        self.adjoint_solution.rename('Adjoint tracer concentration')
