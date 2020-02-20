@@ -1,19 +1,21 @@
 from thetis import *
 from thetis.configuration import *
+
 import os
 
 from adapt_utils.swe.turbine.options import SteadyTurbineOptions
 
 
-__all__ = ["Steady2TurbineOptions", "Steady2TurbineOffsetOptions"]
+__all__ = ["Steady2TurbineOptions"]
 
 
 class Steady2TurbineOptions(SteadyTurbineOptions):
     """Parameters for the steady 2 turbine problem"""
 
-    mesh_path = Unicode('xcoarse.msh').tag(config=True)
-
-    def __init__(self, **kwargs):
+    def __init__(self, offset=0, **kwargs):
+        self.offset = offset
+        self.mesh_path = 'xcoarse_offset.msh' if offset else 'xcoarse.msh'
+        self.inflow_velocity = [3.0, 0.0]
         super(Steady2TurbineOptions, self).__init__(**kwargs)
 
         # Domain
@@ -21,7 +23,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.domain_width = 300.0
         abspath = os.path.realpath(__file__)
         self.mesh_path = abspath.replace('options.py', self.mesh_path)
-        self.default_mesh = Mesh(self.mesh_path)
+        self.set_default_mesh()
 
         # Physical
         # self.base_viscosity = 1.3e-3
@@ -34,15 +36,21 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         D = self.turbine_diameter
         L = self.domain_length
         W = self.domain_width
-        self.region_of_interest = [(L/2-8*D, W/2, D/2), (L/2+8*D, W/2, D/2)]
-        self.thrust_coefficient_correction()
+        yloc = [W/2, W/2]
+        yloc[0] -= self.offset*D
+        yloc[1] += self.offset*D
+        self.region_of_interest = [(L/2-8*D, yloc[0], D/2), (L/2+8*D, yloc[1], D/2)]
+        self.thrust_coefficient_correction()  # TODO: Don't do this in __init__
+
+    def set_default_mesh(self):
+        self.default_mesh = Mesh(self.mesh_path)
 
     def set_bathymetry(self, fs):
         self.bathymetry = Constant(40.0)
         return self.bathymetry
 
     def set_inflow(self, fs):
-        self.inflow = Constant(as_vector([3., 0.]))
+        self.inflow = Constant(as_vector(self.inflow_velocity))
         return self.inflow
 
     def set_viscosity(self, fs):
@@ -70,16 +78,3 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         boundary_conditions[right_tag] = {'elev': Constant(0.)}
         boundary_conditions[wall_tag] = {'un': Constant(0.)}
         return boundary_conditions
-
-
-class Steady2TurbineOffsetOptions(Steady2TurbineOptions):
-    def __init__(self, spacing=1.0, **kwargs):
-        """
-        :kwarg spacing: number of turbine widths to offset in each direction.
-        """
-        self.mesh_path = 'xcoarse_offset.msh'
-        super(Steady2TurbineOffsetOptions, self).__init__(**kwargs)
-        D = self.turbine_diameter
-        L = self.domain_length
-        W = self.domain_width
-        self.region_of_interest = [(L/2-8*D, W/2-spacing*D, D/2), (L/2+8*D, W/2+spacing*D, D/2)]

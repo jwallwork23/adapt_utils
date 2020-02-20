@@ -51,6 +51,8 @@ class SteadyProblem():
         self.set_fields()
         self.set_stabilisation()
         op.print_debug(op.indent+"Setting boundary conditions...")
+        self.dbcs = []  # TODO: Populate from op
+        self.dbcs_adjoint = []  # TODO: Populate from op
         self.boundary_conditions = op.set_boundary_conditions(self.V)
 
         # Outputs
@@ -72,6 +74,7 @@ class SteadyProblem():
         # Storage during outer mesh adaptation loop
         self.outer_estimators = []
         self.outer_num_cells = []
+        self.outer_dofs = []
         self.outer_num_vertices = []
         self.outer_qois = []
         op.print_debug(op.indent + "{:s} initialisation complete!\n".format(self.__class__.__name__))
@@ -712,7 +715,7 @@ class SteadyProblem():
         except AssertionError:
             raise ValueError("Please supply a metric.")
         self.am.pragmatic_adapt(self.M)
-        self.set_mesh(self.am.mesh)
+        self.set_mesh(self.am.mesh, hierarchy=None)  # Hiearchy is reconstructed from scratch
 
         print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.num_cells.append(self.mesh.num_cells())
@@ -834,6 +837,7 @@ class SteadyProblem():
             print_output('\n' + 80*'#')
         self.outer_estimators.append(self.estimators[self.approach][-1])
         self.outer_num_cells.append(self.num_cells[-1])
+        self.outer_dofs.append(dofs)
         self.outer_num_vertices.append(self.num_vertices[-1])
         self.outer_qois.append(self.qois[-1])
 
@@ -844,10 +848,12 @@ class SteadyProblem():
         """
         op = self.op
         initial_target = op.target
+        # initial_mesh = copy_mesh(self.mesh)
         for i in range(op.outer_iterations):
             op.target = initial_target*op.target_base**i
-            op.set_default_mesh()  # TODO: Temporary
-            self.set_mesh(op.default_mesh)
+            op.set_default_mesh()
+            self.set_mesh(op.default_mesh, hierarchy=None)  # TODO: Temporary
+            # self.set_mesh(copy_mesh(initial_mesh), hierarchy=None)  # Hiearchy is reconstructed from scratch
             self.create_function_spaces()
             self.create_solutions()
             self.set_fields()

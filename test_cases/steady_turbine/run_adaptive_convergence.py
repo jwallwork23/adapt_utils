@@ -3,37 +3,46 @@ from adapt_utils.test_cases.steady_turbine.options import *
 from adapt_utils.swe.turbine.solver import SteadyTurbineProblem
 
 import argparse
+import h5py
 
-parser = argparse.ArgumentParser()  # TODO: Run all using outer adaptation loop; remove argparse
+parser = argparse.ArgumentParser()
 parser.add_argument('-approach', help="Mesh adaptation strategy")
-parser.add_argument('-target', help="Scaling parameter for metric")
-parser.add_argument('-offset', help="Toggle offset or aligned turbine configurations")
 args = parser.parse_args()
 
-op2.init(log_level=INFO)
+# Parameters
+kwargs = {
+    'approach': args.approach or 'carpio',
+    'target': 100.0,
+    'debug': True,
+    'adapt_field': 'all_int',
+    'normalisation': 'complexity',
+    'convergence_rate': 1,
+    'norm_order': None,
+    'h_max': 500.0,
+    'num_adapt': 35,  # Maximum iterations
+    'element_rtol': 0.002,
+    'outer_iterations': 3,
+}
 
-# Problem setup
-offset = bool(args.offset or False)
-label = 'xcoarse_offset' if offset else 'xcoarse'
-sol = None
+for offset in (0, 1)
 
-# Adaptation parameters
-approach = args.approach or 'carpio'
-op = Steady2TurbineOffsetOptions(approach) if offset else Steady2TurbineOptions(approach)
-op.target = float(args.target or 1000)
-op.adapt_field = 'all_int'
-op.normalisation = 'complexity'
-op.convergence_rate = 1
-op.norm_order = None
-op.h_max = 500.0
+    # Run adaptation loop
+    op = Steady2TurbineOptions(offset=offset, **kwargs)
+    tp = SteadyTurbineProblem(op, discrete_adjoint=True, levels=1)
+    tp.outer_adaptation_loop()
 
-# Termination criteria
-op.num_adapt = 35  # Maximum iterations
-op.set_all_rtols(0.002)
+    # Store element count and QoI to HDF5
+    outfile = h5py.File('outputs/{:s}/hdf5/qoi_offset_{:d}.h5'.format(op.approach, op.offset), 'w')
+    outfile.create_dataset('elements', data=tp.outer_num_cells)
+    outfile.create_dataset('dofs', data=tp.outer_dofs)
+    outfile.create_dataset('qoi', data=tp.outer_qois)
+    outfile.close()
 
-# Set initial mesh hierarchy
-tp = SteadyTurbineProblem(op, discrete_adjoint=True, prev_solution=sol, levels=1)
-tp.adaptation_loop()
+# Print results to screen
+for offset in (0, 1):
+    print_output("="*80 + "\nLevel  Elements     DOFs        J{:d}".format(offset))
+    for i in range(op.outer_iterations):
+        print_output("{:5d}  {:8d}  {:7d}  {:6.4f}kW".format(i+1, tp.outer_num_cells[i], tp.outer_dofs[i], tp.outer_qois[i]))
 
 # TODO: Format output as table
-# TODO: Plot QoI convergence with nice formatting. (Replaces jupyter notebook.)
+# TODO: Plot QoI convergence with nice formatting. (Replacing jupyter notebook.)

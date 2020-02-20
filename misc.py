@@ -11,14 +11,14 @@ import scipy.sparse.linalg as sla
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["doc", "find", "check_spd", "get_boundary_nodes", "index_string",
+__all__ = ["copy_mesh", "doc", "find", "check_spd", "get_boundary_nodes", "index_string",
            "UnnestedConditionCheck", "NestedConditionCheck"]
 
+def copy_mesh(mesh):
+    return Mesh(Function(mesh.coordinates))
 
 def doc(anything):
-    """
-    Print the docstring of any class or function.
-    """
+    """Print the docstring of any class or function."""
     print_output(anything.__doc__)
 
 def find(pattern, path):

@@ -1,6 +1,13 @@
-all: clean geo_xcoarse mesh_xcoarse
+all: dir clean geo_xcoarse mesh_xcoarse
 
-allmesh: clean geo mesh_aligned mesh_offset
+allmesh: dir clean geo mesh_aligned mesh_offset
+
+dir:
+	@echo "Making directories..."
+	@mkdir -p outputs/fixed_mesh/hdf5
+	@mkdir -p outputs/carpio_isotropic/hdf5
+	@mkdir -p outputs/carpio/hdf5
+	@echo "Done!"
 
 geo:
 	@echo "Generating geometry files..."
