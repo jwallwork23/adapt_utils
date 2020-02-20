@@ -279,3 +279,7 @@ class TrenchOptions(MorphOptions):
         def export_func():
             self.bath_file.write(self.bath_export)
         return export_func
+    
+    def set_boundary_surface(self):
+        """Set the initial displacement of the boundary elevation."""
+        pass

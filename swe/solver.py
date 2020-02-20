@@ -42,6 +42,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)
+        self.fields['bathymetry'] = self.op.set_bathymetry(self.P1DG)
         self.fields['inflow'] = self.op.set_inflow(self.P1_vec)
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
@@ -451,12 +452,15 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)
+        if self.op.solve_tracer == False:
+            self.fields['bathmetry'] = self.op.set_bathymetry(self.P1DG)
         self.fields['inflow'] = self.op.set_inflow(self.P1_vec)
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
-        #self.op.set_boundary_surface()
         self.fields['source'] = self.op.source
+        
+        self.op.set_boundary_surface()
 
 
     def set_stabilisation(self):
@@ -496,12 +500,14 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if hasattr(self, "solution_old_bathymetry"):
             op.bathymetry = Function(self.P1).project(self.solution_old_bathymetry)
         else:
-            op.bathymetry = self.set_bathymetry(self.P1)
+            op.bathymetry = self.op.set_bathymetry(self.P1)
         
-        self.solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
-
+        if self.op.solve_tracer:
+            self.solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
+        else:
+            self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.fields['bathymetry'])
+        
         self.solver_obj.export_initial_state = self.remesh_step == 0
-            
 
         # Initial conditions
         if self.load_index > 0:

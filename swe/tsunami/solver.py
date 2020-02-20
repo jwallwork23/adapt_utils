@@ -20,12 +20,15 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)
+        # TODO: Should interpolate bathy from fresh
+        if self.op.solve_tracer == False:
+            self.fields['bathymetry'] = self.op.set_bathymetry(self.P1, adapted=adapted)        
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1DG)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
         self.fields['source'] = self.op.source
         
-        # self.op.set_boundary_surface()
+        #self.op.set_boundary_surface()
 
     def extra_setup(self):  # TODO: Plot eta_tilde, too
         op = self.op

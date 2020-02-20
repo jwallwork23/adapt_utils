@@ -151,7 +151,7 @@ class SteadyProblem():
                 self.fields[i] = None
             else:
                 raise ValueError
-        #self.op.set_boundary_surface()
+        self.op.set_boundary_surface()
 
     def set_stabilisation(self):
         """
