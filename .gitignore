@@ -12,3 +12,4 @@ adjoint.py
 *.vtu
 *.txt
 *.ipynb_checkpoints
+*.hdf5

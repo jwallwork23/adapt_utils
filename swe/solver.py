@@ -107,8 +107,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         # Initial conditions  # TODO: will this work over mesh iterations?
         if self.prev_solution is not None:
-            interp = self.interpolate_solution
-            u_interp, eta_interp = self.interpolate_solution.split()
+            u_interp, eta_interp = self.solution.split()
         else:
             interp = Function(self.V)
             u_interp, eta_interp = interp.split()
@@ -494,10 +493,10 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             self.remesh_step = 0
         op = self.op
         
-        if hasattr(self.op, "solution_old_bathymetry"):
-            self.op.bathymetry = Function(self.P1).project(self.op.solution_old_bathymetry)
+        if hasattr(self, "solution_old_bathymetry"):
+            self.op.bathymetry = Function(self.P1).project(self.solution_old_bathymetry)
         else:
-            self.op.bathymetry = self.op.set_bathymetry(self.P1)
+            self.op.bathymetry = self.set_bathymetry(self.P1)
         
         self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.op.bathymetry)
 
@@ -513,10 +512,10 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             u_interp, eta_interp = self.solution.split()
             if op.solve_tracer:
-                if hasattr(self.op, 'solution_old_tracer'):
-                    self.op.tracer_interp = Function(self.P1DG).project(self.op.solution_old_tracer)         
+                if hasattr(self, 'solution_old_tracer'):
+                    self.tracer_interp = Function(self.P1DG).project(self.solution_old_tracer)         
                 else:
-                    self.op.tracer_interp = Function(self.P1DG).project(self.op.tracer_init)
+                    self.tracer_interp = Function(self.P1DG).project(self.op.tracer_init)
         
         if op.solve_tracer:
             self.uv_d, self.eta_d = self.solution.split()
@@ -579,7 +578,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.solve_tracer:
             
             if self.op.tracer_init is not None:
-                self.solver_obj.assign_initial_conditions(uv = u_interp, elev = eta_interp, tracer = self.op.tracer_interp)
+                self.solver_obj.assign_initial_conditions(uv = u_interp, elev = eta_interp, tracer = self.tracer_interp)
         else:
             self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)        
 

@@ -16,7 +16,7 @@ op = TrenchOptions(approach='monge_ampere',
                     num_adapt=1,
                     qoi_mode='inundation_volume',
                     friction = 'nikuradse',
-                    nx=1,
+                    nx=0.75,
                     ny = 1,
                     r_adapt_rtol=1.0e-3)
 
@@ -24,7 +24,7 @@ tp = TsunamiProblem(op, levels=0)
 tp.setup_solver()
 
 
-def gradient_interface_monitor(mesh, alpha=100):
+def gradient_interface_monitor(mesh, alpha = 2000.0):
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 
@@ -33,20 +33,22 @@ def gradient_interface_monitor(mesh, alpha=100):
     :kwarg alpha: controls the size of the dense region surrounding the coast.
     """
     P1 = FunctionSpace(mesh, "CG", 1)
-    
+
     eta = tp.solution.split()[1]
-    
     b = tp.solver_obj.fields.bathymetry_2d
     current_mesh = eta.function_space().mesh()
     P1_current = FunctionSpace(current_mesh, "CG", 1)
-    bath_dx = interpolate(b.dx(0), P1_current)
-    bath_dy = interpolate(b.dx(1), P1_current)
-    norm = interpolate(pow(bath_dx, 2) + pow(bath_dy, 2), P1_current)
+    bath_dx_sq = interpolate(pow(b.dx(0), 2), P1_current)
+    bath_dy_sq = interpolate(pow(b.dx(1), 2), P1_current)
+    bath_dx_dx_sq = interpolate(pow(bath_dx_sq.dx(0), 2), P1_current)
+    bath_dy_dy_sq = interpolate(pow(bath_dy_sq.dx(1), 2), P1_current)
+    #norm = interpolate(conditional(bath_dx_dx_sq + bath_dy_dy_sq > 10**(-7), bath_dx_dx_sq + bath_dy_dy_sq, Constant(10**(-7))), P1_current)
+    norm = interpolate(bath_dx_dx_sq + bath_dy_dy_sq, P1_current)
+    norm_tmp = interpolate(bath_dx_sq/norm, P1_current)
     norm_proj = project(norm, P1)
-    #import ipdb; ipdb.set_trace()
-    
 
-    return sqrt(1.0 + alpha*norm_proj)
+
+    return sqrt(1.0 + (alpha*norm_proj))
 
 tp.monitor_function = gradient_interface_monitor
 tp.solve(uses_adjoint=False)
