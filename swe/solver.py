@@ -512,11 +512,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solver_obj.export_initial_state = self.remesh_step == 0
 
         # Initial conditions
-        if self.load_index > 0:
-            self.solver_obj.load_state(self.load_index)
-            raise NotImplementedError
-        else:
-            u_interp, eta_interp = self.solution.split()
+        u_interp, eta_interp = self.solution.split()
         if op.solve_tracer:
             if hasattr(self, 'solution_old_tracer'):
                 self.tracer_interp = Function(self.P1DG).project(self.solution_old_tracer)         
