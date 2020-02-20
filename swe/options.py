@@ -14,7 +14,7 @@ class ShallowWaterOptions(Options):
     solve_tracer = Bool(False).tag(config=True)
 
     # Physical
-    bathymetry = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
+    bathymetry = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)#FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
     base_viscosity = NonNegativeFloat(0.0).tag(config=True)
     base_diffusivity = NonNegativeFloat(0.0).tag(config=True)
     viscosity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
@@ -24,6 +24,7 @@ class ShallowWaterOptions(Options):
     inflow = FiredrakeVectorExpression(None, allow_none=True).tag(config=True)
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
     coriolis = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    source = FiredrakeScalarExpression(None, allow_none=True, help="Scalar source term for tracer problem.").tag(config=True)
 
     # Model
     grad_div_viscosity = Bool(False).tag(config=True)
@@ -49,11 +50,17 @@ class ShallowWaterOptions(Options):
         """Should be implemented in derived class."""
         self.viscosity = Constant(self.base_viscosity)
         return self.viscosity
+    
+
+    def set_source_tracer(self, fs, solver_obj):
+        """Should be implemented in derived class."""
+        return self.source
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
         self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity
+    
 
     def set_inflow(self, fs):
         """Should be implemented in derived class."""
@@ -73,7 +80,7 @@ class ShallowWaterOptions(Options):
 
     def get_initial_depth(self, fs):
         """Compute the initial total water depth, using the bathymetry and initial elevation."""
-        if not hasattr(self, 'bathymetry'):
+        if self.bathymetry is None:
             self.set_bathymetry(fs.sub(1))
         if not hasattr(self, 'initial_value'):
             self.set_initial_condition(fs)

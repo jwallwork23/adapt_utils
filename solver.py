@@ -11,7 +11,9 @@ from adapt_utils.adapt.p0_metric import *
 from adapt_utils.adapt.r import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
 from adapt_utils.misc import *
+
 from adapt_utils.norms import *
+
 
 
 __all__ = ["SteadyProblem", "UnsteadyProblem"]
@@ -120,6 +122,7 @@ class SteadyProblem():
         self.P2 = FunctionSpace(self.mesh, "CG", 2)
         self.P1DG = FunctionSpace(self.mesh, "DG", 1)
         self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
+        self.P1_vec_dg = VectorFunctionSpace(self.mesh, "DG", 1)
         self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
         self.test = TestFunction(self.V)
         self.tests = TestFunctions(self.V)
@@ -145,6 +148,7 @@ class SteadyProblem():
         """
         Project all fields from Problem `prob` onto the corresponding function spaces in `self`.
         """
+
         for i in self.fields:
             if isinstance(prob.fields[i], Function):
                 self.fields[i] = self.project(prob.fields[i], Function(self.fields[i].function_space()))
@@ -154,7 +158,6 @@ class SteadyProblem():
                 self.fields[i] = None
             else:
                 raise ValueError
-        self.op.bathymetry = self.fields['bathymetry']  # TODO: needed?
         self.op.set_boundary_surface()
 
     def set_stabilisation(self):
@@ -263,6 +266,9 @@ class SteadyProblem():
         Retrieve forward or adjoint solution, as specified by boolean kwarg `adjoint`.
         """
         return self.adjoint_solution if adjoint else self.solution
+    
+    def get_tracer(self):
+        return self.solver_obj.fields.tracer_2d
 
     def get_error(self, adjoint=False):
         """
@@ -338,6 +344,9 @@ class SteadyProblem():
         `adjoint`.
         """
         self.project(val, out=self.get_solution(adjoint=adjoint))
+        
+    def project_tracer(self, val, adjoint = False):
+        self.project(val, out = self.get_tracer())
 
     def get_qoi_kernel(self):
         """
@@ -677,25 +686,30 @@ class SteadyProblem():
             except AssertionError:
                 raise ValueError("Please supply a monitor function.")
 
+                
             # Create MeshMover object and establish coordinate transformation
             mesh_mover = MeshMover(self.am_init.mesh, self.monitor_function, op=self.op)
             mesh_mover.adapt()
 
             # Create a temporary Problem based on the new mesh
             am_copy = self.am.copy()
+            
             tmp = type(self)(self.op, mesh=am_copy.mesh, discrete_adjoint=self.discrete_adjoint,
                              prev_solution=self.prev_solution, levels=self.levels)
             x = Function(tmp.mesh.coordinates)
-            x.dat.data[:] = mesh_mover.x.dat.data  # FIXME: Not parallel
-            tmp.mesh.coordinates.assign(x)  # TODO: Need to modify coords of hierarchy, too
 
+            x.dat.data[:] = mesh_mover.x.dat.data  # TODO: PyOP2
+            tmp.mesh.coordinates.assign(x)  # TODO: May need to modify coords of hierarchy, too
             # Project fields and solutions onto temporary Problem
             tmp.project_fields(self)
             tmp.project_solution(self.solution)
+
             tmp.project_solution(self.adjoint_solution, adjoint=True)
 
             # Update self.mesh and function spaces, etc.
+
             self.mesh.coordinates.dat.data[:] = x.dat.data  # FIXME: Not parallel
+
             self.create_function_spaces()
             self.create_solutions()
             self.boundary_conditions = self.op.set_boundary_conditions(self.V)
@@ -960,19 +974,19 @@ class UnsteadyProblem(SteadyProblem):
             if self.approach == 'fixed_mesh':
                 self.solve_step(adjoint=adjoint)
                 break
-
+            
             # Adaptive mesh case
             for i in range(self.op.num_adapt):
                 self.adapt_mesh()
-
                 # Interpolate value from previous step onto new mesh
+
                 if self.remesh_step == 0:
                     self.set_start_condition(adjoint)
                 elif i == 0:
                     self.project_solution(solution, adjoint=adjoint)
                 else:
                     self.project_solution(solution_old, adjoint=adjoint)
-
+                    
                 # Solve PDE on new mesh
                 self.op.plot_pvd = i == 0
                 # time = None if i == 0 else self.step_end - self.op.dt

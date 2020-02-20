@@ -76,7 +76,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
-        # options.timestepper_options.implicitness_theta = 1.0
+
+        if op.timestepper == 'CrankNicolson':
+            options.timestepper_options.implicitness_theta = op.implicitness_theta
 
         # Outputs
         options.output_directory = self.di
@@ -111,8 +113,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         # Initial conditions  # TODO: will this work over mesh iterations?
         if self.prev_solution is not None:
-            interp = self.interpolated_solution
-            u_interp, eta_interp = self.interpolated_solution.split()
+            u_interp, eta_interp = self.solution.split()
         else:
             interp = Function(self.V)
             u_interp, eta_interp = interp.split()
@@ -453,12 +454,16 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)
-        self.fields['bathymetry'] = self.op.set_bathymetry(self.P1DG)
+        if self.op.solve_tracer == False:
+            self.fields['bathmetry'] = self.op.set_bathymetry(self.P1DG)
         self.fields['inflow'] = self.op.set_inflow(self.P1_vec)
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
+        self.fields['source'] = self.op.source
+        
         self.op.set_boundary_surface()
+
 
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
@@ -476,14 +481,50 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solver_obj.iterate(update_forcings=self.op.get_update_forcings(self.solver_obj),
                                 export_func=self.op.get_export_func(self.solver_obj))
         self.solution = self.solver_obj.fields.solution_2d
-
+        
+        old_mesh = Mesh(Function(self.mesh.coordinates))                
+        P1DG = FunctionSpace(old_mesh, "DG", 1)
+        P1 = FunctionSpace(old_mesh, "CG", 1)    
+        
+        solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy = True)
+        self.solution_old_bathymetry = Function(P1).project(solution_bathymetry)
+        
+        if self.op.solve_tracer:
+            solution_tracer = self.solver_obj.fields.tracer_2d.copy(deepcopy = True)
+            self.solution_old_tracer = Function(P1DG).project(solution_tracer)
+            
+            
     def setup_solver(self):
         if not hasattr(self, 'remesh_step'):
             self.remesh_step = 0
         op = self.op
-        self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.fields['bathymetry'])
+        
+        if hasattr(self, "solution_old_bathymetry"):
+            op.bathymetry = Function(self.P1).project(self.solution_old_bathymetry)
+        else:
+            op.bathymetry = self.op.set_bathymetry(self.P1)
+        
+        if self.op.solve_tracer:
+            self.solver_obj = solver2d.FlowSolver2d(self.mesh, op.bathymetry)
+        else:
+            self.solver_obj = solver2d.FlowSolver2d(self.mesh, self.fields['bathymetry'])
+        
         self.solver_obj.export_initial_state = self.remesh_step == 0
+
+        # Initial conditions
+        u_interp, eta_interp = self.solution.split()
+        if op.solve_tracer:
+            if hasattr(self, 'solution_old_tracer'):
+                self.tracer_interp = Function(self.P1DG).project(self.solution_old_tracer)         
+            else:
+                self.tracer_interp = Function(self.P1DG).project(self.op.tracer_init)
+        
+        if op.solve_tracer:
+            self.uv_d, self.eta_d = self.solution.split()
+            op.set_up_suspended(self.mesh, tracer = self.tracer_interp)
+               
         options = self.solver_obj.options
+        
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
 
@@ -497,12 +538,19 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
-        # options.timestepper_options.implicitness_theta = 1.0
+
+        if op.timestepper == 'CrankNicolson':
+            options.timestepper_options.implicitness_theta = op.implicitness_theta
 
         # Outputs
         options.output_directory = self.di
-        options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
-        options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []
+        
+        if op.solve_tracer:
+            options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d'] if op.plot_pvd else []
+            options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d', 'tracer_2d'] if op.save_hdf5 else []
+        else:
+            options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
+            options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []
 
         # Parameters
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
@@ -520,14 +568,20 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
         options.solve_tracer = op.solve_tracer
         if op.solve_tracer:
-            raise NotImplementedError  # TODO
-
+            options.tracer_advective_velocity = self.op.corrective_velocity
+            options.tracer_source_2d = self.op.source
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
+        if op.solve_tracer:
+            self.solver_obj.bnd_functions['tracer'] = op.set_boundary_conditions_tracer(self.V)
 
-        # Initial conditions
-        u_interp, eta_interp = self.solution.split()
-        self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+            
+        if op.solve_tracer:
+            
+            if self.op.tracer_init is not None:
+                self.solver_obj.assign_initial_conditions(uv = u_interp, elev = eta_interp, tracer = self.tracer_interp)
+        else:
+            self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)        
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
