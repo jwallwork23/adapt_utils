@@ -102,7 +102,7 @@ class SteadyProblem():
         self.op_enriched = self.op.copy()
         self.op_enriched.degree += self.op.degree_increase
         self.op_enriched.indent += '  '
-        self.op.print_debug(self.op.indent+"\nCreating enriched finite element space of degree {:d}...".format(self.op_enriched.degree))
+        self.op.print_debug("\n{:s}Creating enriched finite element space of degree {:d}...".format(self.op.indent, self.op_enriched.degree))
         self.tp_enriched = type(self)(self.op_enriched,
                                       mesh=self.am.mesh,
                                       discrete_adjoint=self.discrete_adjoint,

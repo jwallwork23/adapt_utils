@@ -26,7 +26,7 @@ kwargs = {
     'debug': True,
 
     # Adaptation parameters
-    'target': float(args.target or 400.0),
+    'target': float(args.target or 3200.0),
     'adapt_field': 'all_int',
     'normalisation': 'complexity',
     'convergence_rate': 1,
@@ -49,6 +49,17 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach
         tp = tp.tp_enriched
     tp.solve()
     tp.op.print_debug("QoI: {:.4e}kW".format(tp.quantity_of_interest()/1000))
+
+    # Plot fluid speed
+    u = tp.solution.split()[0]
+    spd = firedrake.interpolate(firedrake.sqrt(firedrake.dot(u, u)), tp.P1)
+    fig = plt.figure(figsize=(12, 5))
+    ax = fig.add_subplot(111)
+    firedrake.plot(spd, axes=ax, colorbar=True, vmin=3.5, vmax=5.2, edgecolor='none', edgewidth=0, antialiased=False)
+    ax.set_xlim([0.0, op.domain_length])
+    ax.set_ylim([0.0, op.domain_width])
+    plt.savefig('screenshots/fluid_speed_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()))
+    # FIXME: Do not show mesh edges
 else:
     tp.adaptation_loop()
 

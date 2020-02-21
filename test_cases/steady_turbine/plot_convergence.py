@@ -46,7 +46,7 @@ for offset in (0, 1):
             ax.semilogx(dofs, qois, linestyle='-', **kwargs)
     plt.grid(True)
     xlim = ax.get_xlim()
-    plt.hlines([exact, 1.006*exact], xlim[0], xlim[1], linestyles='dashed', label=r'0.6\% relative error')
+    plt.hlines([exact, 1.01*exact], xlim[0], xlim[1], linestyles='dashed', label=r'1\% relative error')
     plt.xlim(xlim)
 
     yticks = ["{:.2f}".format(1e-3*i) for i in ax.get_yticks().tolist()]

@@ -1,9 +1,8 @@
-from thetis import *
-from adapt_utils.test_cases.steady_turbine.options import *
-from adapt_utils.swe.turbine.solver import SteadyTurbineProblem
-
 import argparse
 import h5py
+
+from adapt_utils.test_cases.steady_turbine.options import *
+from adapt_utils.swe.turbine.solver import SteadyTurbineProblem
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-approach', help="Mesh adaptation strategy")
@@ -25,7 +24,7 @@ kwargs = {
 
     # Optimisation parameters
     'num_adapt': 35,  # Maximum iterations
-    'element_rtol': 0.002,
+    'element_rtol': 0.002,  # TODO: try 0.001
     'outer_iterations': 4,
     'target_base': 4,
 }
@@ -50,6 +49,6 @@ for offset in (0, 1):
 
 # Print results to screen
 for offset in (0, 1):
-    print_output("="*80 + "\nLevel  Elements     DOFs        J{:d}".format(offset))
+    op.print_debug("="*80 + "\nLevel  Elements     DOFs        J{:d}".format(offset))
     for i in range(op.outer_iterations):
-        print_output(outstrs[offset][i])
+        op.print_debug(outstrs[offset][i])

@@ -64,9 +64,24 @@ anisotropic:
 	@python3 run_adaptive_convergence.py -approach carpio
 	@echo "Done!"
 
-screenshot:
-	@echo "Individual runs for figure plots..."
-	##### TODO!
+screenshot: screenshot_uniform screenshot_isotropic screenshot_anisotropic
+
+screenshot_uniform:
+	@echo "Individual run for uniform refinement screenshots..."
+	@python3 run.py -approach fixed_mesh -offset 0 -level 3
+	@python3 run.py -approach fixed_mesh -offset 1 -level 3
+	@echo "Done!"
+
+screenshot_isotropic:
+	@echo "Individual run for isotropic adaptation screenshots..."
+	@python3 run.py -approach carpio_isotropic -offset 0
+	@python3 run.py -approach carpio_isotropic -offset 1
+	@echo "Done!"
+
+screenshot_anisotropic:
+	@echo "Individual run for anisotropic adaptation screenshots..."
+	@python3 run.py -approach carpio -offset 0
+	@python3 run.py -approach carpio -offset 1
 	@echo "Done!"
 
 plot:

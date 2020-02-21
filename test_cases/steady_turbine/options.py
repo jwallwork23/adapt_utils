@@ -21,6 +21,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         # self.base_viscosity = 1.3e-3
         self.base_viscosity = 0.5  # NOTE: previously 1.0
         self.inflow_velocity = [5.0, 0.0] # NOTE: previously [3.0, 0.0]
+        # NOTE: 5 ms^{-1} is a typical fast flow in Pentland Firth
 
         super(Steady2TurbineOptions, self).__init__(**kwargs)
 
