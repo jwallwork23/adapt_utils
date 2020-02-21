@@ -4,19 +4,18 @@ import os
 __all__ = ["generate_geo_file"]
 
 
-def generate_geo_file(op, level='coarse', tag=None, filepath='.'):
+def generate_geo_file(op, level='coarse', filepath='.'):
     """
     Generate domain geometry file using the specifications in `op`.
 
     :arg op: Parameter class.
     :kwarg level: Desired level of mesh resolution.
-    :kwarg tag: Additional label to use in naming.
     :kwarg filepath: Where to save .geo file.
     """
     locs = op.region_of_interest
     n = len(locs)
     assert n > 0
-    label = '_'.join([level, tag]) if tag is not None else level
+    label = '_'.join([level, str(op.offset)])
     d = locs[0][2]
     for i in range(1, n):
         assert locs[i][2] == d

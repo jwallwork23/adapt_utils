@@ -18,7 +18,9 @@ lu_params = {
     'snes_max_it': 100,
     'snes_linesearch_type': 'bt',
     'snes_monitor': None,
+    'snes_converged_reason': None,
     'ksp_type': 'preonly',
+    'ksp_converged_reason': None,
     'pc_type': 'lu',
     'pc_factor_mat_solver_type': 'mumps',
 }

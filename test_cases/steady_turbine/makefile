@@ -1,6 +1,6 @@
 all: dir clean geo_xcoarse mesh_xcoarse
 
-allmesh: dir clean geo mesh_aligned mesh_offset
+allmesh: dir clean geo mesh
 
 results: all uniform adapt plot
 
@@ -16,22 +16,23 @@ geo:
 	@python3 generate_geo.py
 	@echo "Done!"
 
-mesh_aligned:
-	@echo "Generating aligned meshes..."
-	@gmsh -2 xcoarse.geo
-	@gmsh -2 coarse.geo
-	@gmsh -2 medium.geo
-	@gmsh -2 fine.geo
-	@gmsh -2 xfine.geo
-	@echo "Done!"
-
-mesh_offset:
-	@echo "Generating aligned meshes..."
-	@gmsh -2 xcoarse_offset.geo
-	@gmsh -2 coarse_offset.geo
-	@gmsh -2 medium_offset.geo
-	@gmsh -2 fine_offset.geo
-	@gmsh -2 xfine_offset.geo
+mesh:
+	@echo "Generating all meshes..."
+	@gmsh -2 xcoarse_0.geo
+	@gmsh -2 coarse_0.geo
+	@gmsh -2 medium_0.geo
+	@gmsh -2 fine_0.geo
+	@gmsh -2 xfine_0.geo
+	@gmsh -2 xcoarse_1.geo
+	@gmsh -2 coarse_1.geo
+	@gmsh -2 medium_1.geo
+	@gmsh -2 fine_1.geo
+	@gmsh -2 xfine_1.geo
+	@gmsh -2 xcoarse_2.geo
+	@gmsh -2 coarse_2.geo
+	@gmsh -2 medium_2.geo
+	@gmsh -2 fine_2.geo
+	@gmsh -2 xfine_2.geo
 	@echo "Done!"
 
 geo_xcoarse:
@@ -41,8 +42,9 @@ geo_xcoarse:
 
 mesh_xcoarse:
 	@echo "Generating xcoarse meshes..."
-	@gmsh -2 xcoarse.geo
-	@gmsh -2 xcoarse_offset.geo
+	@gmsh -2 xcoarse_0.geo
+	@gmsh -2 xcoarse_1.geo
+	@gmsh -2 xcoarse_2.geo
 	@echo "Done!"
 
 uniform:

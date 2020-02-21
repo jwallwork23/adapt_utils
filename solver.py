@@ -806,30 +806,29 @@ class SteadyProblem():
         qoi_old = np.finfo(float).min
         num_cells_old = np.iinfo(int).min
         estimator_old = np.finfo(float).min
-        print_output("Number of mesh elements: %d" % self.mesh.num_cells())
         for i in range(op.num_adapt):
             if outer_iteration is None:
-                print_output("\n  Adaptation loop, iteration %d." % (i+1))
+                print_output("\n  '{:s}' adaptation loop, iteration {:d}.".format(self.approach, i+1))
             else:
-                print_output("\n  Adaptation loop %d, iteration %d." % (outer_iteration, i+1))
+                print_output("\n  '{:s}' adaptation loop {:d}, iteration {:d}.".format(self.approach, outer_iteration, i+1))
             print_output("====================================\n")
             self.solve_forward()
             qoi = self.quantity_of_interest()
             self.qois.append(qoi)
-            print_output("Quantity of interest: %.4e" % qoi)
+            print_output("Quantity of interest: {:.4e}".format(qoi))
             if i > 0 and np.abs(qoi - qoi_old) < op.qoi_rtol*qoi_old:
                 print_output("Converged quantity of interest!")
                 break
             self.solve_adjoint()
             self.indicate_error()
             estimator = self.estimators[self.approach][-1]
-            print_output("Error estimator '%s': %.4e" % (self.approach, estimator))
+            print_output("Error estimator '{:s}': {:.4e}".format(self.approach, estimator))
             if i > 0 and np.abs(estimator - estimator_old) < op.estimator_rtol*estimator_old:
                 print_output("Converged error estimator!")
                 break
             self.adapt_mesh()
             num_cells = self.mesh.num_cells()
-            print_output("Number of mesh elements: %d" % num_cells)
+            print_output("Number of mesh elements: {:d}".format(num_cells))
             if i > 0 and np.abs(num_cells - num_cells_old) < op.element_rtol*num_cells_old:
                 print_output("Converged number of mesh elements!")
                 break

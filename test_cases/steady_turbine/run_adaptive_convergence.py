@@ -8,17 +8,22 @@ import h5py
 parser = argparse.ArgumentParser()
 parser.add_argument('-approach', help="Mesh adaptation strategy")
 args = parser.parse_args()
+approach = args.approach or 'carpio'
 
 # Parameters
 kwargs = {
-    'approach': args.approach or 'carpio',
-    'target': 400.0,
+    'approach': approach,
     'debug': True,
+
+    # Adaptation parameters
+    'target': 400.0,
     'adapt_field': 'all_int',
     'normalisation': 'complexity',
     'convergence_rate': 1,
     'norm_order': None,
     'h_max': 500.0,
+
+    # Optimisation parameters
     'num_adapt': 35,  # Maximum iterations
     'element_rtol': 0.002,
     'outer_iterations': 4,

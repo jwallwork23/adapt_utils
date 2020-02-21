@@ -14,8 +14,13 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
 
     def __init__(self, offset=0, **kwargs):
         self.offset = offset
-        self.mesh_path = 'xcoarse_offset.msh' if offset else 'xcoarse.msh'
+        self.mesh_path = 'xcoarse_{:d}.msh'.format(offset)
+
+        # Physical
+        # self.base_viscosity = 1.3e-3
+        self.base_viscosity = 1.0
         self.inflow_velocity = [3.0, 0.0]
+
         super(Steady2TurbineOptions, self).__init__(**kwargs)
 
         # Domain
@@ -23,11 +28,8 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.domain_width = 300.0
         abspath = os.path.realpath(__file__)
         self.mesh_path = abspath.replace('options.py', self.mesh_path)
-        self.set_default_mesh()
-
-        # Physical
-        # self.base_viscosity = 1.3e-3
-        self.base_viscosity = 1.0
+        if os.path.exists(self.mesh_path):
+            self.set_default_mesh()
 
         # Model
         self.family = 'dg-cg'
