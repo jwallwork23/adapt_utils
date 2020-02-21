@@ -27,8 +27,12 @@ for offset in (0, 1):
     fig = plt.figure()
     ax = fig.add_subplot(111)
 
-    exact = 5.0719e3 if offset else 4.6170e3  # TODO: get from results
+    # Read converged QoI value from file
+    f = h5py.File('outputs/fixed_mesh/hdf5/qoi_offset_{:d}.h5'.format(offset), 'r')
+    exact = np.array(f['qoi'])[-1]
+    f.close()
 
+    # Plot convergence curves
     for approach in ('fixed_mesh', 'carpio_isotropic', 'carpio'):
         f = h5py.File('outputs/{:s}/hdf5/qoi_offset_{:d}.h5'.format(approach, offset), 'r')
         dofs, qois = np.array(f['dofs']), np.array(f['qoi'])
