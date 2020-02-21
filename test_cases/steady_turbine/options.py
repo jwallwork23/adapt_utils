@@ -12,20 +12,21 @@ __all__ = ["Steady2TurbineOptions"]
 class Steady2TurbineOptions(SteadyTurbineOptions):
     """Parameters for the steady 2 turbine problem"""
 
-    def __init__(self, offset=0, **kwargs):
+    def __init__(self, offset=0, separation=8, **kwargs):
         self.offset = offset
-        self.mesh_path = 'xcoarse_{:d}.msh'.format(offset)
+        self.separation = separation
+        self.mesh_path = 'xcoarse_{:d}.msh'.format(self.offset)
 
         # Physical
         # self.base_viscosity = 1.3e-3
-        self.base_viscosity = 1.0
-        self.inflow_velocity = [3.0, 0.0]
+        self.base_viscosity = 0.5  # NOTE: previously 1.0
+        self.inflow_velocity = [5.0, 0.0] # NOTE: previously [3.0, 0.0]
 
         super(Steady2TurbineOptions, self).__init__(**kwargs)
 
         # Domain
-        self.domain_length = 1000.0
-        self.domain_width = 300.0
+        self.domain_length = 1200.0  # NOTE: previously 1000.0
+        self.domain_width = 500.0  # NOTE: previously 300
         abspath = os.path.realpath(__file__)
         self.mesh_path = abspath.replace('options.py', self.mesh_path)
         if os.path.exists(self.mesh_path):
@@ -38,10 +39,11 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         D = self.turbine_diameter
         L = self.domain_length
         W = self.domain_width
+        S = self.separation
         yloc = [W/2, W/2]
         yloc[0] -= self.offset*D
         yloc[1] += self.offset*D
-        self.region_of_interest = [(L/2-8*D, yloc[0], D/2), (L/2+8*D, yloc[1], D/2)]
+        self.region_of_interest = [(L/2-S*D, yloc[0], D/2), (L/2+S*D, yloc[1], D/2)]
         self.thrust_coefficient_correction()  # TODO: Don't do this in __init__
 
     def set_default_mesh(self):

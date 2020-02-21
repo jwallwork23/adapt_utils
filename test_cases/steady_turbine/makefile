@@ -49,7 +49,7 @@ mesh_xcoarse:
 
 uniform:
 	@echo "Running uniform convergence test..."
-	@mpiexec -n 8 python3 run_uniform_convergence.py
+	@python3 run_uniform_convergence.py
 	@echo "Done!"
 
 adapt:
