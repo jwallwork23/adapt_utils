@@ -6,7 +6,11 @@ from adapt_utils.test_cases.steady_turbine.options import *
 from adapt_utils.swe.turbine.solver import *
 
 
-kwargs = {'plot_pvd': False, 'debug': True, 'outer_iterations': 5}
+kwargs = {
+    'plot_pvd': False,
+    'debug': True,
+    'outer_iterations': 4,  # TODO: 5
+}
 
 data = {}
 for offset in (0, 1):

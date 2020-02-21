@@ -1,8 +1,14 @@
 import argparse
+import firedrake
+import matplotlib
+import matplotlib.pyplot as plt
 
 from adapt_utils.test_cases.steady_turbine.options import *
 from adapt_utils.swe.turbine.solver import *
 
+
+plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+plt.rc('text', usetex=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-approach', help="Mesh adaptation approach.")
@@ -19,10 +25,6 @@ kwargs = {
     'plot_pvd': True,
     'debug': True,
 
-    # Problem parameters
-    'inflow_velocity': [6.0, 0.0],
-    'base_viscosity': 0.5,
-
     # Adaptation parameters
     'target': float(args.target or 400.0),
     'adapt_field': 'all_int',
@@ -31,11 +33,17 @@ kwargs = {
     'norm_order': None,
     'h_max': 500.0,
 
+    # Optimisation parameters
+    'element_rtol': 0.002,
+    'num_adapt': 35,
+
 }
 level = int(args.level or 4)
-if kwargs['approach'] != 'fixed_mesh':
+op = Steady2TurbineOptions(**kwargs)
+op.set_all_rtols(op.element_rtol)
+if op.approach != 'fixed_mesh':
     level = 1
-tp = SteadyTurbineProblem(Steady2TurbineOptions(**kwargs), discrete_adjoint=True, levels=level)
+tp = SteadyTurbineProblem(op, discrete_adjoint=True, levels=level)
 if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach
     for i in range(level):
         tp = tp.tp_enriched
@@ -43,3 +51,22 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach
     tp.op.print_debug("QoI: {:.4e}kW".format(tp.quantity_of_interest()/1000))
 else:
     tp.adaptation_loop()
+
+    # Plot mesh
+    fig = plt.figure(figsize=(12, 5))
+    ax = fig.add_subplot(111)
+    firedrake.plot(firedrake.Function(tp.P1), axes=ax, colorbar=False, cmap=matplotlib.cm.binary, edgecolors='dimgray')
+    ax.set_xlim([0.0, op.domain_length])
+    ax.set_ylim([0.0, op.domain_width])
+
+    # Annotate with turbine footprint
+    loc = op.region_of_interest
+    D = op.turbine_diameter
+    patch_kwargs = {'facecolor': 'none', 'edgecolor': 'b', 'linewidth': 1}
+    ax.add_patch(matplotlib.patches.Rectangle((loc[0][0]-D/2, loc[0][1]-D/2), D, D, **patch_kwargs))
+    ax.add_patch(matplotlib.patches.Rectangle((loc[1][0]-D/2, loc[1][1]-D/2), D, D, **patch_kwargs))
+    fname = '{:s}_offset{:d}_target{:d}_elem{:d}'.format(op.approach, op.offset, int(op.target), tp.num_cells[-1])
+    plt.savefig('screenshots/{:s}.pdf'.format(fname))
+
+    # TODO: use zoom effect to get better idea of mesh in turbine region
+    # (https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html)
