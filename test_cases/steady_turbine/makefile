@@ -1,8 +1,10 @@
-all: dir clean geo_xcoarse mesh_xcoarse
+all: xcoarse uniform adapt plot screenshot
+
+xcoarse: dir clean geo_xcoarse mesh_xcoarse
 
 allmesh: dir clean geo mesh
 
-results: all uniform adapt plot
+adapt: isotropic anisotropic
 
 dir:
 	@echo "Making directories..."
@@ -52,10 +54,19 @@ uniform:
 	@python3 run_uniform_convergence.py
 	@echo "Done!"
 
-adapt:
-	@echo "Running adaptive convergence test..."
+isotropic:
+	@echo "Running isotropic adaptive convergence test..."
 	@python3 run_adaptive_convergence.py -approach carpio_isotropic
+	@echo "Done!"
+
+anisotropic:
+	@echo "Running anisotropic adaptive convergence test..."
 	@python3 run_adaptive_convergence.py -approach carpio
+	@echo "Done!"
+
+screenshot:
+	@echo "Individual runs for figure plots..."
+	##### TODO!
 	@echo "Done!"
 
 plot:
