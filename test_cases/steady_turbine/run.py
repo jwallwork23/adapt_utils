@@ -71,13 +71,9 @@ else:
     centre_t2 = (loc[1][0]-D/2, loc[1][1]-D/2)
 
     # Setup figures
-    fig = plt.figure(figsize=(12, 10))
-    ax_main = fig.add_subplot(212)
-    ax_zoom = fig.add_subplot(211)
-    ax_main.set_xlim([0.0, op.domain_length])
-    ax_main.set_ylim([0.0, op.domain_width])
-    ax_zoom.set_xlim(centre_t1[0] - 2*D, centre_t2[0] + 2*D)
-    ax_zoom.set_ylim(op.domain_width/2 - 3*D, op.domain_width/2 + 3*D)
+    fig = plt.figure(figsize=(24, 5))
+    ax_main = fig.add_subplot(121)
+    ax_zoom = fig.add_subplot(122)
 
     # Plot mesh and annotate with turbine footprint
     patch_kwargs = {'facecolor': 'none', 'edgecolor': 'b', 'linewidth': 1}
@@ -87,7 +83,11 @@ else:
         ax.add_patch(ptch.Rectangle(centre_t2, D, D, **patch_kwargs))
 
     # Magnify turbine region
-    zoom_effect02(ax, ax_zoom)
+    ax_main.set_xlim([0.0, op.domain_length])
+    ax_main.set_ylim([0.0, op.domain_width])
+    ax_zoom.set_xlim(centre_t1[0] - 2*D, centre_t2[0] + 2*D)
+    ax_zoom.set_ylim(op.domain_width/2 - 3*D, op.domain_width/2 + 3*D)
+    zoom_effect02(ax_zoom, ax, color='lightgrey')
 
     # Save to file
     fname = '{:s}_offset{:d}_target{:d}_elem{:d}'.format(op.approach, op.offset, int(op.target), tp.num_cells[-1])
