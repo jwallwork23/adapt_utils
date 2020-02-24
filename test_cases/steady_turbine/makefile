@@ -10,6 +10,8 @@ screenshot: screenshot_uniform screenshot_adapt
 
 screenshot_adapt: screenshot_isotropic screenshot_anisotropic
 
+plot: semilog loglog
+
 dir:
 	@echo "Making directories..."
 	@mkdir -p outputs/fixed_mesh/hdf5
@@ -87,9 +89,14 @@ screenshot_anisotropic:
 	@python3 run.py -approach carpio -offset 1
 	@echo "Done!"
 
-plot:
+semilog:
 	@echo "Plotting convergence curves..."
 	@python3 plot_convergence.py
+	@echo "Done!"
+
+loglog:
+	@echo "Plotting convergence curves..."
+	@python3 plot_convergence.py -loglog 1
 	@echo "Done!"
 
 clean:

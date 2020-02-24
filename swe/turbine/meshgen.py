@@ -24,7 +24,7 @@ def generate_geo_file(op, level='coarse', filepath='.'):
     if n < 3:
         f.write('W={:.1f};     // width of channel\n'.format(op.domain_width))
         f.write('L={:.1f};      // length of channel\n'.format(op.domain_length))
-        if level == 'xcoarse':  # TODO: Consider coarsening
+        if level == 'xcoarse':
             dx1 = 40.
             dx2 = 8.
         elif level == 'coarse':

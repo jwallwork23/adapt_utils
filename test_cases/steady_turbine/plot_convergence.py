@@ -2,6 +2,11 @@ import os
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
+import argparse
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-loglog")
+args = parser.parse_args()
 
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
@@ -13,7 +18,7 @@ def power2error(x):
 def error2power(x):
     return x * exact/100 + exact
 
-loglog = False
+loglog = bool(args.loglog)
 xlabel = "Degrees of freedom (DOFs)"
 ylabel = r"Power output $(\mathrm{kW})$"
 ylabel2 = r"Relative error in power output (\%)"
@@ -52,19 +57,20 @@ for offset in (0, 1):
             else:
                 ax.semilogx(dofs, qois, **kwargs)
     plt.grid(True)
-    xlim = ax.get_xlim()
-    plt.hlines([exact, (1.0 + errorline/100)*exact], xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
+    xlim = [2e+3, 1e+6] if loglog else [4e+3, 4e+6]
     plt.xlim(xlim)
+    if not loglog:
+        plt.hlines([exact, (1.0 + errorline/100)*exact], xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
 
     ytick = "{:.2f}\%" if loglog else "{:.2f}"
     scale = 1.0 if loglog else 1e-3
     if loglog:
-        ax.set_ylim([0.1, 10.0])
+        ax.set_ylim([0.01, 6.0])
     yticks = [ytick.format(scale*i) for i in ax.get_yticks().tolist()]
     ax.set_yticklabels(yticks)
     plt.xlabel(xlabel, fontsize=fontsize)
     plt.ylabel(ylabel, fontsize=fontsize)
-    plt.legend(fontsize=fontsize)
+    plt.legend(fontsize=16)
 
     if not loglog:
         secax = ax.secondary_yaxis('right', functions=(power2error, error2power))
@@ -72,6 +78,9 @@ for offset in (0, 1):
         yticks = ["{:.2f}\%".format(i) for i in secax.get_yticks().tolist()]
         secax.set_yticklabels(yticks)
 
-    plt.savefig('outputs/convergence_{:d}.png'.format(offset), bbox_inches='tight')
+    fname = 'outputs/convergence_{:d}'.format(offset)
+    if loglog:
+        fname = '_'.join([fname, 'loglog'])
+    plt.savefig(fname + '.png', bbox_inches='tight')
 
 plt.show()
