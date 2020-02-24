@@ -35,7 +35,7 @@ kwargs = {
     'h_max': 500.0,
 
     # Optimisation parameters
-    'element_rtol': 0.002,
+    'element_rtol': 0.001,
     'num_adapt': 35,
 
 }
@@ -45,7 +45,27 @@ op.set_all_rtols(op.element_rtol)
 if op.approach != 'fixed_mesh':
     level = 1
 tp = SteadyTurbineProblem(op, discrete_adjoint=True, levels=level)
-if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach
+
+# Farm geometry
+loc = op.region_of_interest
+D = op.turbine_diameter
+centre_t1 = (loc[0][0]-D/2, loc[0][1]-D/2)
+centre_t2 = (loc[1][0]-D/2, loc[1][1]-D/2)
+patch_kwargs = {'facecolor': 'none', 'edgecolor': 'b', 'linewidth': 1}
+
+if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
+
+    # Plot initial mesh
+    fig = plt.figure(figsize=(12, 5))
+    ax = fig.add_subplot(111)
+    meshplot(tp.mesh, axes=ax)
+    ax.set_xlim([0.0, op.domain_length])
+    ax.set_ylim([0.0, op.domain_width])
+    ax.add_patch(ptch.Rectangle(centre_t1, D, D, **patch_kwargs))
+    ax.add_patch(ptch.Rectangle(centre_t2, D, D, **patch_kwargs))
+    plt.savefig('screenshots/inital_mesh_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()))
+
+    # Solve problem in enriched space
     for i in range(level):
         tp = tp.tp_enriched
     tp.solve()
@@ -64,21 +84,14 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach
 else:
     tp.adaptation_loop()
 
-    # Farm geometry
-    loc = op.region_of_interest
-    D = op.turbine_diameter
-    centre_t1 = (loc[0][0]-D/2, loc[0][1]-D/2)
-    centre_t2 = (loc[1][0]-D/2, loc[1][1]-D/2)
-
     # Setup figures
     fig = plt.figure(figsize=(24, 5))
     ax_main = fig.add_subplot(121)
     ax_zoom = fig.add_subplot(122)
 
     # Plot mesh and annotate with turbine footprint
-    patch_kwargs = {'facecolor': 'none', 'edgecolor': 'b', 'linewidth': 1}
     for ax in (ax_main, ax_zoom):
-        meshplot(tp.mesh, axes=ax, colorbar=False)
+        meshplot(tp.mesh, axes=ax)
         ax.add_patch(ptch.Rectangle(centre_t1, D, D, **patch_kwargs))
         ax.add_patch(ptch.Rectangle(centre_t2, D, D, **patch_kwargs))
 
@@ -86,8 +99,8 @@ else:
     ax_main.set_xlim([0.0, op.domain_length])
     ax_main.set_ylim([0.0, op.domain_width])
     ax_zoom.set_xlim(centre_t1[0] - 2*D, centre_t2[0] + 2*D)
-    ax_zoom.set_ylim(op.domain_width/2 - 3*D, op.domain_width/2 + 3*D)
-    zoom_effect02(ax_zoom, ax, color='lightgrey')
+    ax_zoom.set_ylim(op.domain_width/2 - 3.5*D, op.domain_width/2 + 3.5*D)
+    zoom_effect02(ax_zoom, ax, color='w')
 
     # Save to file
     fname = '{:s}_offset{:d}_target{:d}_elem{:d}'.format(op.approach, op.offset, int(op.target), tp.num_cells[-1])
