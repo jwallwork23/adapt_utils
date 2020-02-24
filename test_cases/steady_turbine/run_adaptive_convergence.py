@@ -16,7 +16,7 @@ kwargs = {
 
     # Adaptation parameters
     # 'target': 500.0,
-    'target': 1000.0 if 'isotropic' in approach else 300.0,
+    'target': 800.0 if 'isotropic' in approach else 200.0,
     'adapt_field': 'all_int',
     'normalisation': 'complexity',
     'convergence_rate': 1,
@@ -25,8 +25,8 @@ kwargs = {
 
     # Optimisation parameters
     'num_adapt': 35,  # Maximum iterations
-    'element_rtol': 0.002,  # Try 0.001
-    'outer_iterations': 6 if 'isotropic' in approach else 7,  # NOTE: previously 4
+    'element_rtol': 0.002,  # TODO: use 0.001?
+    'outer_iterations': 7 if 'isotropic' in approach else 8,  # NOTE: previously 4
     'target_base': 2,  # NOTE: previously 4
 }
 

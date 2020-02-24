@@ -16,6 +16,7 @@ xlabel = "Degrees of freedom (DOFs)"
 ylabel = r"Power output $(\mathrm{kW})$"
 ylabel2 = r"Relative error in power output (\%)"
 loglog = False
+errorline = 0.5
 
 characteristics = {
     'fixed_mesh': {'label': 'Uniform refinement', 'marker': 'o', 'color': 'cornflowerblue'},
@@ -46,7 +47,7 @@ for offset in (0, 1):
             ax.semilogx(dofs, qois, linestyle='-', **kwargs)
     plt.grid(True)
     xlim = ax.get_xlim()
-    plt.hlines([exact, 1.01*exact], xlim[0], xlim[1], linestyles='dashed', label=r'1\% relative error')
+    plt.hlines([exact, (1.0 + errorline/100)*exact], xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
     plt.xlim(xlim)
 
     yticks = ["{:.2f}".format(1e-3*i) for i in ax.get_yticks().tolist()]
@@ -60,6 +61,6 @@ for offset in (0, 1):
     yticks = ["{:.2f}\%".format(i) for i in secax.get_yticks().tolist()]
     secax.set_yticklabels(yticks)
 
-    plt.savefig('outputs/convergence_{:d}.png'.format(offset))
+    plt.savefig('outputs/convergence_{:d}.png'.format(offset), bbox_inches='tight')
 
 plt.show()

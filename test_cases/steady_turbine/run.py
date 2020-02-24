@@ -35,7 +35,7 @@ kwargs = {
     'h_max': 500.0,
 
     # Optimisation parameters
-    'element_rtol': 0.001,
+    'element_rtol': 0.002,  # TODO: use 0.001?
     'num_adapt': 35,
 
 }
@@ -63,7 +63,7 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
     ax.set_ylim([0.0, op.domain_width])
     ax.add_patch(ptch.Rectangle(centre_t1, D, D, **patch_kwargs))
     ax.add_patch(ptch.Rectangle(centre_t2, D, D, **patch_kwargs))
-    plt.savefig('screenshots/inital_mesh_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()))
+    plt.savefig('screenshots/inital_mesh_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()), bbox_inches='tight')
 
     # Solve problem in enriched space
     for i in range(level):
@@ -76,11 +76,10 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
     spd = firedrake.interpolate(firedrake.sqrt(firedrake.dot(u, u)), tp.P1)
     fig = plt.figure(figsize=(12, 5))
     ax = fig.add_subplot(111)
-    firedrake.plot(spd, axes=ax, colorbar=True, vmin=3.5, vmax=5.2, edgecolor='none', edgewidth=0, antialiased=False)
+    firedrake.plot(spd, axes=ax, colorbar={'orientation': 'horizontal'}, vmin=3.5, vmax=5.2, shading='gouraud')
     ax.set_xlim([0.0, op.domain_length])
     ax.set_ylim([0.0, op.domain_width])
-    plt.savefig('screenshots/fluid_speed_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()))
-    # FIXME: Do not show mesh edges
+    plt.savefig('screenshots/fluid_speed_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()), bbox_inches='tight')
 else:
     tp.adaptation_loop()
 
@@ -104,4 +103,4 @@ else:
 
     # Save to file
     fname = '{:s}_offset{:d}_target{:d}_elem{:d}'.format(op.approach, op.offset, int(op.target), tp.num_cells[-1])
-    plt.savefig('screenshots/{:s}.pdf'.format(fname))
+    plt.savefig('screenshots/{:s}.pdf'.format(fname), bbox_inches='tight')
