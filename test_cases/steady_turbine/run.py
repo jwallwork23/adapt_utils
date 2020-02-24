@@ -1,10 +1,11 @@
 import argparse
 import firedrake
-import matplotlib
 import matplotlib.pyplot as plt
+import matplotlib.patches as ptch
 
 from adapt_utils.test_cases.steady_turbine.options import *
 from adapt_utils.swe.turbine.solver import *
+from adapt_utils.plotting import *
 
 
 plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
@@ -63,21 +64,31 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach
 else:
     tp.adaptation_loop()
 
-    # Plot mesh
-    fig = plt.figure(figsize=(12, 5))
-    ax = fig.add_subplot(111)
-    firedrake.plot(firedrake.Function(tp.P1), axes=ax, colorbar=False, cmap=matplotlib.cm.binary, edgecolors='dimgray')
-    ax.set_xlim([0.0, op.domain_length])
-    ax.set_ylim([0.0, op.domain_width])
-
-    # Annotate with turbine footprint
+    # Farm geometry
     loc = op.region_of_interest
     D = op.turbine_diameter
+    centre_t1 = (loc[0][0]-D/2, loc[0][1]-D/2)
+    centre_t2 = (loc[1][0]-D/2, loc[1][1]-D/2)
+
+    # Setup figures
+    fig = plt.figure(figsize=(12, 10))
+    ax_main = fig.add_subplot(212)
+    ax_zoom = fig.add_subplot(211)
+    ax_main.set_xlim([0.0, op.domain_length])
+    ax_main.set_ylim([0.0, op.domain_width])
+    ax_zoom.set_xlim(centre_t1[0] - 2*D, centre_t2[0] + 2*D)
+    ax_zoom.set_ylim(op.domain_width/2 - 3*D, op.domain_width/2 + 3*D)
+
+    # Plot mesh and annotate with turbine footprint
     patch_kwargs = {'facecolor': 'none', 'edgecolor': 'b', 'linewidth': 1}
-    ax.add_patch(matplotlib.patches.Rectangle((loc[0][0]-D/2, loc[0][1]-D/2), D, D, **patch_kwargs))
-    ax.add_patch(matplotlib.patches.Rectangle((loc[1][0]-D/2, loc[1][1]-D/2), D, D, **patch_kwargs))
+    for ax in (ax_main, ax_zoom):
+        meshplot(tp.mesh, axes=ax, colorbar=False)
+        ax.add_patch(ptch.Rectangle(centre_t1, D, D, **patch_kwargs))
+        ax.add_patch(ptch.Rectangle(centre_t2, D, D, **patch_kwargs))
+
+    # Magnify turbine region
+    zoom_effect02(ax, ax_zoom)
+
+    # Save to file
     fname = '{:s}_offset{:d}_target{:d}_elem{:d}'.format(op.approach, op.offset, int(op.target), tp.num_cells[-1])
     plt.savefig('screenshots/{:s}.pdf'.format(fname))
-
-    # TODO: use zoom effect to get better idea of mesh in turbine region
-    # (https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html)
