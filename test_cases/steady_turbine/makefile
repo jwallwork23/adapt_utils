@@ -6,11 +6,16 @@ allmesh: dir clean geo mesh
 
 adapt: isotropic anisotropic
 
+screenshot: screenshot_uniform screenshot_adapt
+
+screenshot_adapt: screenshot_isotropic screenshot_anisotropic
+
 dir:
 	@echo "Making directories..."
 	@mkdir -p outputs/fixed_mesh/hdf5
 	@mkdir -p outputs/carpio_isotropic/hdf5
 	@mkdir -p outputs/carpio/hdf5
+	@mkdir data
 	@echo "Done!"
 
 geo:
@@ -63,8 +68,6 @@ anisotropic:
 	@echo "Running anisotropic adaptive convergence test..."
 	@python3 run_adaptive_convergence.py -approach carpio
 	@echo "Done!"
-
-screenshot: screenshot_uniform screenshot_isotropic screenshot_anisotropic
 
 screenshot_uniform:
 	@echo "Individual run for uniform refinement screenshots..."

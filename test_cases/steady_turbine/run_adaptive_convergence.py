@@ -15,7 +15,8 @@ kwargs = {
     'debug': True,
 
     # Adaptation parameters
-    'target': 400.0,
+    # 'target': 500.0,
+    'target': 1000.0 if 'isotropic' in approach else 300.0,
     'adapt_field': 'all_int',
     'normalisation': 'complexity',
     'convergence_rate': 1,
@@ -24,9 +25,9 @@ kwargs = {
 
     # Optimisation parameters
     'num_adapt': 35,  # Maximum iterations
-    'element_rtol': 0.002,  # TODO: try 0.001
-    'outer_iterations': 4,
-    'target_base': 4,
+    'element_rtol': 0.002,  # Try 0.001
+    'outer_iterations': 6 if 'isotropic' in approach else 7,  # NOTE: previously 4
+    'target_base': 2,  # NOTE: previously 4
 }
 
 outstrs = {0: [], 1: []}
@@ -34,6 +35,7 @@ for offset in (0, 1):
 
     # Run adaptation loop
     op = Steady2TurbineOptions(offset=offset, **kwargs)
+    op.set_all_rtols(op.element_rtol)
     tp = SteadyTurbineProblem(op, discrete_adjoint=True, levels=1)
     tp.outer_adaptation_loop()
 

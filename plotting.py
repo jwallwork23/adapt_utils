@@ -9,7 +9,8 @@ __all__ = ["meshplot", "zoom_effect01", "zoom_effect02"]
 
 def meshplot(mesh, **kwargs):
     P1 = firedrake.FunctionSpace(mesh, "CG", 1)
-    firedrake.plot(firedrake.Function(P1), cmap=matplotlib.cm.binary, edgecolors='dimgray', **kwargs)
+    cmap = matplotlib.cm.binary
+    firedrake.plot(firedrake.Function(P1), colorbar=False, cmap=cmap, edgecolors='dimgray', **kwargs)
 
 
 # NOTE: All functions below copied from https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html
