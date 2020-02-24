@@ -1,3 +1,4 @@
+import os
 import h5py
 import numpy as np
 import matplotlib.pyplot as plt
@@ -12,10 +13,12 @@ def power2error(x):
 def error2power(x):
     return x * exact/100 + exact
 
+loglog = False
 xlabel = "Degrees of freedom (DOFs)"
 ylabel = r"Power output $(\mathrm{kW})$"
 ylabel2 = r"Relative error in power output (\%)"
-loglog = False
+if loglog:
+    ylabel = ylabel2
 errorline = 0.5
 
 characteristics = {
@@ -35,31 +38,39 @@ for offset in (0, 1):
 
     # Plot convergence curves
     for approach in ('fixed_mesh', 'carpio_isotropic', 'carpio'):
-        f = h5py.File('outputs/{:s}/hdf5/qoi_offset_{:d}.h5'.format(approach, offset), 'r')
-        dofs, qois = np.array(f['dofs']), np.array(f['qoi'])
-        if loglog and approach == 'fixed_mesh':
-            dofs, qois = np.array(dofs[:-1]), np.array(qois[:-1])
-        f.close()
-        kwargs = characteristics[approach]
-        if loglog:
-            ax.loglog(dofs, qois, linestyle='-', **kwargs)
-        else:
-            ax.semilogx(dofs, qois, linestyle='-', **kwargs)
+        fname = 'outputs/{:s}/hdf5/qoi_offset_{:d}.h5'.format(approach, offset)
+        if os.path.exists(fname):
+            f = h5py.File(fname, 'r')
+            dofs, qois = np.array(f['dofs']), np.array(f['qoi'])
+            if loglog and approach == 'fixed_mesh':
+                dofs, qois = np.array(dofs[:-1]), np.array(qois[:-1])
+            f.close()
+            kwargs = characteristics[approach]
+            kwargs.update({'linestyle': '-'})
+            if loglog:
+                ax.loglog(dofs, power2error(qois), **kwargs)
+            else:
+                ax.semilogx(dofs, qois, **kwargs)
     plt.grid(True)
     xlim = ax.get_xlim()
     plt.hlines([exact, (1.0 + errorline/100)*exact], xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
     plt.xlim(xlim)
 
-    yticks = ["{:.2f}".format(1e-3*i) for i in ax.get_yticks().tolist()]
+    ytick = "{:.2f}\%" if loglog else "{:.2f}"
+    scale = 1.0 if loglog else 1e-3
+    if loglog:
+        ax.set_ylim([0.1, 10.0])
+    yticks = [ytick.format(scale*i) for i in ax.get_yticks().tolist()]
     ax.set_yticklabels(yticks)
     plt.xlabel(xlabel, fontsize=fontsize)
     plt.ylabel(ylabel, fontsize=fontsize)
     plt.legend(fontsize=fontsize)
 
-    secax = ax.secondary_yaxis('right', functions=(power2error, error2power))
-    secax.set_ylabel(ylabel2, fontsize=fontsize)
-    yticks = ["{:.2f}\%".format(i) for i in secax.get_yticks().tolist()]
-    secax.set_yticklabels(yticks)
+    if not loglog:
+        secax = ax.secondary_yaxis('right', functions=(power2error, error2power))
+        secax.set_ylabel(ylabel2, fontsize=fontsize)
+        yticks = ["{:.2f}\%".format(i) for i in secax.get_yticks().tolist()]
+        secax.set_yticklabels(yticks)
 
     plt.savefig('outputs/convergence_{:d}.png'.format(offset), bbox_inches='tight')
 
