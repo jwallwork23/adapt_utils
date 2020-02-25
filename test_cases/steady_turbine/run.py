@@ -51,7 +51,7 @@ loc = op.region_of_interest
 D = op.turbine_diameter
 centre_t1 = (loc[0][0]-D/2, loc[0][1]-D/2)
 centre_t2 = (loc[1][0]-D/2, loc[1][1]-D/2)
-patch_kwargs = {'facecolor': 'none', 'edgecolor': 'b', 'linewidth': 1}
+patch_kwargs = {'facecolor': 'none', 'edgecolor': 'b', 'linewidth': 2}
 
 if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
 
@@ -59,10 +59,15 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
     fig = plt.figure(figsize=(12, 5))
     ax = fig.add_subplot(111)
     meshplot(tp.mesh, axes=ax)
+    # firedrake.plot(tp.mesh, axes=ax)
     ax.set_xlim([0.0, op.domain_length])
     ax.set_ylim([0.0, op.domain_width])
     ax.add_patch(ptch.Rectangle(centre_t1, D, D, **patch_kwargs))
     ax.add_patch(ptch.Rectangle(centre_t2, D, D, **patch_kwargs))
+    for tick in ax.xaxis.get_major_ticks():
+        tick.label.set_fontsize(24)
+    for tick in ax.yaxis.get_major_ticks():
+        tick.label.set_fontsize(24)
     plt.savefig('screenshots/inital_mesh_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()), bbox_inches='tight')
 
     # Solve problem in enriched space

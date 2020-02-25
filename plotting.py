@@ -10,7 +10,8 @@ __all__ = ["meshplot", "zoom_effect01", "zoom_effect02"]
 def meshplot(mesh, **kwargs):
     P1 = firedrake.FunctionSpace(mesh, "CG", 1)
     cmap = matplotlib.cm.binary
-    firedrake.plot(firedrake.Function(P1), colorbar=False, cmap=cmap, edgecolors='dimgray', **kwargs)
+    kwargs.update({'linewidth': 0.001, 'edgecolors': 'dimgray', 'cmap': cmap})
+    firedrake.plot(firedrake.Function(P1), colorbar=False, **kwargs)
 
 
 # NOTE: All functions below copied from https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html
@@ -86,7 +87,7 @@ def zoom_effect01(ax1, ax2, xmin, xmax, **kwargs):
 def zoom_effect02(ax1, ax2, **kwargs):
     """
     ax1 : the main axes
-    ax1 : the zoomed axes
+    ax2 : the zoomed axes
 
     Similar to zoom_effect01.  The xmin & xmax will be taken from the
     ax1.viewLim.
