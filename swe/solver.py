@@ -72,12 +72,14 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.simulation_end_time = op.end_time
         options.timestepper_type = op.timestepper
         if op.params != {}:
-            options.timestepper_options.solver_parameters = op.params
+            if op.timestepper == 'PressureProjectionPicard':
+                options.timestepper_options.solver_parameters_momentum = op.params  # LU by default
+            else:
+                options.timestepper_options.solver_parameters = op.params
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
-
-        if op.timestepper == 'CrankNicolson':
+        if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta
 
         # Outputs
@@ -538,8 +540,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.debug:
             options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
-
-        if op.timestepper == 'CrankNicolson':
+        if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta
 
         # Outputs

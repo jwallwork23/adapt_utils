@@ -25,6 +25,7 @@ class ShallowWaterOptions(Options):
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
     coriolis = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     source = FiredrakeScalarExpression(None, allow_none=True, help="Scalar source term for tracer problem.").tag(config=True)
+    implicitness_theta = NonNegativeFloat(0.5).tag(config=True)
 
     # Model
     grad_div_viscosity = Bool(False).tag(config=True)

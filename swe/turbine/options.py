@@ -13,8 +13,9 @@ __all__ = ["SteadyTurbineOptions", "UnsteadyTurbineOptions"]
 lu_params = {
     'mat_type': 'aij',
     'snes_type': 'newtonls',
-    'snes_rtol': 1e-3,
-    'snes_atol': 1e-16,
+    # 'snes_rtol': 1e-3,
+    'snes_rtol': 1e-8,
+    # 'snes_atol': 1e-16,
     'snes_max_it': 100,
     'snes_linesearch_type': 'bt',
     'snes_monitor': None,
@@ -41,12 +42,12 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     turbine_diameter = PositiveFloat(18.).tag(config=True)
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
 
-    def __init__(self, num_iterations=1, bathymetry_space=None, **kwargs):
+    def __init__(self, num_iterations=1, bathymetry_space=None, timestepper='SteadyState', **kwargs):
         self.base_bathymetry = 40.0
         self.set_bathymetry(bathymetry_space)
         super(SteadyTurbineOptions, self).__init__(**kwargs)
-        self.timestepper = 'SteadyState'
-        self.dt = 20.
+        self.timestepper = timestepper
+        self.dt = 20.0
         self.end_time = num_iterations*self.dt - 0.2
 
         # Solver parameters

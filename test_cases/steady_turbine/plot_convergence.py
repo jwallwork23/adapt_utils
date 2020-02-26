@@ -57,15 +57,15 @@ for offset in (0, 1):
             else:
                 ax.semilogx(dofs, qois, **kwargs)
     plt.grid(True)
-    xlim = [2e+3, 1e+6] if loglog else [4e+3, 4e+6]
-    plt.xlim(xlim)
+    # xlim = [2e+3, 1e+6] if loglog else [4e+3, 4e+6]
+    # plt.xlim(xlim)
     if not loglog:
         plt.hlines([exact, (1.0 + errorline/100)*exact], xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
 
     ytick = "{:.2f}\%" if loglog else "{:.2f}"
     scale = 1.0 if loglog else 1e-3
-    if loglog:
-        ax.set_ylim([0.01, 6.0])
+    # if loglog:
+    #     ax.set_ylim([0.01, 6.0])
     yticks = [ytick.format(scale*i) for i in ax.get_yticks().tolist()]
     ax.set_yticklabels(yticks)
     plt.xlabel(xlabel, fontsize=fontsize)
