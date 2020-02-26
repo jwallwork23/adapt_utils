@@ -16,7 +16,7 @@ kwargs = {
 
     # Adaptation parameters
     # 'target': 500.0,
-    'target': 800.0 if 'isotropic' in approach else 200.0,
+    'target': 400.0 if 'isotropic' in approach else 200.0,
     'adapt_field': 'all_int',
     'normalisation': 'complexity',
     'convergence_rate': 1,

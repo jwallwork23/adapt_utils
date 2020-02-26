@@ -223,8 +223,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
         flux_terms += jump(u[1], n[1])*dot(u_up[1], loc('+') + loc('-'))*dS
         if self.op.stabilisation == 'lax_friedrichs':
             gamma = 0.5*abs(dot(u_up, n('-')))*self.op.stabilisation_parameter
-            loc = -i*z
-            flux_terms += gamma*dot(loc('+') + loc('-'), jump(u))*dS
+            loc = -z
+            flux_terms += gamma*dot(i('+')*loc('+') - i('-')*loc('-'), jump(u))*dS  # "Local jump"
 
         # NOTE: The following is an influential term for steady turbine...
         # loc = i*inner(outer(u, z), outer(u, n))

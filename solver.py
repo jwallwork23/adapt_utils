@@ -813,6 +813,10 @@ class SteadyProblem():
                 print_output("\n  '{:s}' adaptation loop {:d}, iteration {:d}.".format(self.approach, outer_iteration, i+1))
             print_output("====================================\n")
             self.solve_forward()
+            # try:
+            #     self.solve_forward()
+            # except ConvergenceError:
+            #     break
             qoi = self.quantity_of_interest()
             self.qois.append(qoi)
             print_output("Quantity of interest: {:.4e}".format(qoi))
@@ -820,6 +824,10 @@ class SteadyProblem():
                 print_output("Converged quantity of interest!")
                 break
             self.solve_adjoint()
+            # try:
+            #     self.solve_adjoint()
+            # except ConvergenceError:
+            #     break
             self.indicate_error()
             estimator = self.estimators[self.approach][-1]
             print_output("Error estimator '{:s}': {:.4e}".format(self.approach, estimator))
