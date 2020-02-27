@@ -38,7 +38,7 @@ for offset in (0, 1):
 
     # Read converged QoI value from file
     f = h5py.File('outputs/fixed_mesh/hdf5/qoi_offset_{:d}.h5'.format(offset), 'r')
-    exact = np.array(f['qoi'])[-1]
+    exact = np.around(np.array(f['qoi'])[-1], decimals=-2)  # NOTE!
     f.close()
 
     # Plot convergence curves

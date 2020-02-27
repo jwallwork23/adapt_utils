@@ -31,8 +31,8 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.domain_length = 1200.0
         # self.domain_width = 300.0
         self.domain_width = 500.0
-        outer_res = 30.0
-        inner_res = 6.0
+        outer_res = 40.0
+        inner_res = 8.0
         self.resolution = {'xcoarse': {'outer': outer_res, 'inner': inner_res}}
         for level in ('coarse', 'medium', 'fine', 'xfine'):
             self.resolution[level] = {'outer': outer_res, 'inner': inner_res}
