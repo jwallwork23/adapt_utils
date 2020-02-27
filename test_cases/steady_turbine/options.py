@@ -28,8 +28,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         # Domain
         self.domain_length = 1200.0  # NOTE: previously 1000.0
         self.domain_width = 500.0  # NOTE: previously 300
-        abspath = os.path.realpath(__file__)
-        self.mesh_path = abspath.replace('options.py', self.mesh_path)
+        self.mesh_path = os.path.join(os.path.dirname(__file__), self.mesh_path)
         if os.path.exists(self.mesh_path):
             self.set_default_mesh()
 

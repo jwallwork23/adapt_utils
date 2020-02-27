@@ -20,7 +20,7 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
     array_length = PositiveInteger(5).tag(config=True)
     array_width = PositiveInteger(3).tag(config=True)
     thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
-    meshfile = os.path.realpath(__file__).replace('options.py', 'channel.msh')
+    meshfile = os.path.join(os.path.dirname(__file__), 'channel.msh')
     params = PETScSolverParameters({}).tag(config=True)  # TODO
 
     def __init__(self, **kwargs):

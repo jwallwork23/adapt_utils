@@ -108,8 +108,7 @@ class TohokuOptions(TsunamiOptions):
 
 
     def read_bathymetry_file(self, km=False):
-        abspath = os.path.realpath(__file__)
-        fname = abspath.replace('options.py', 'resources/bathymetry.nc')
+        fname = os.path.join(os.path.dirname(__file__), 'resources/bathymetry.nc')
         nc = netCDF4.Dataset(fname, 'r')
         o = self.offset
         lon = nc.variables['lon'][o:]
@@ -124,8 +123,7 @@ class TohokuOptions(TsunamiOptions):
         if zeroed:
             fname = '_'.join([fname, 'zeroed'])
         fname += '.nc'
-        abspath = os.path.realpath(__file__)
-        fname = abspath.replace('options.py', 'resources/bathymetry.nc')
+        fname = os.path.join(os.path.dirname(__file__), fname)
         nc = netCDF4.Dataset(fname, 'r')
         lon = nc.variables['lon' if zeroed else 'x'][:]
         lat = nc.variables['lat' if zeroed else 'y'][:]
