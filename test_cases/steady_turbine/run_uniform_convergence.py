@@ -7,7 +7,8 @@ from adapt_utils.swe.turbine.solver import *
 kwargs = {
     'plot_pvd': False,
     'debug': True,
-    'outer_iterations': 4,  # TODO: 5
+    # 'outer_iterations': 4,
+    'outer_iterations': 5,
 }
 
 data = {}

@@ -17,7 +17,7 @@ dir:
 	@mkdir -p outputs/fixed_mesh/hdf5
 	@mkdir -p outputs/carpio_isotropic/hdf5
 	@mkdir -p outputs/carpio/hdf5
-	@mkdir data
+	@mkdir -p data
 	@echo "Done!"
 
 geo:
