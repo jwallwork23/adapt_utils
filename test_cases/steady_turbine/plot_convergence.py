@@ -6,6 +6,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-loglog")
+parser.add_argument("-round")
 args = parser.parse_args()
 
 plt.rc('text', usetex=True)
@@ -24,7 +25,7 @@ ylabel = r"Power output $(\mathrm{kW})$"
 ylabel2 = r"Relative error in power output (\%)"
 if loglog:
     ylabel = ylabel2
-errorline = 0.5
+errorline = 1.0
 
 characteristics = {
     'fixed_mesh': {'label': 'Uniform refinement', 'marker': 'o', 'color': 'cornflowerblue'},
@@ -38,8 +39,9 @@ for offset in (0, 1):
 
     # Read converged QoI value from file
     f = h5py.File('outputs/fixed_mesh/hdf5/qoi_offset_{:d}.h5'.format(offset), 'r')
-    # exact = np.around(np.array(f['qoi'])[-1], decimals=-2)  # NOTE!
     exact = np.array(f['qoi'])[-1]
+    if bool(args.round or False):
+        exact = np.around(exact, decimals=-2)
     f.close()
 
     # Plot convergence curves
@@ -58,16 +60,12 @@ for offset in (0, 1):
             else:
                 ax.semilogx(dofs, qois, **kwargs)
     plt.grid(True)
-    # xlim = [2e+3, 1e+6] if loglog else [4e+3, 4e+6]
-    # plt.xlim(xlim)
     xlim = ax.get_xlim()
     if not loglog:
         plt.hlines([exact, (1.0 + errorline/100)*exact], xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
-
+    ax.set_xlim(xlim)
     ytick = "{:.2f}\%" if loglog else "{:.2f}"
     scale = 1.0 if loglog else 1e-3
-    # if loglog:
-    #     ax.set_ylim([0.01, 6.0])
     yticks = [ytick.format(scale*i) for i in ax.get_yticks().tolist()]
     ax.set_yticklabels(yticks)
     plt.xlabel(xlabel, fontsize=fontsize)

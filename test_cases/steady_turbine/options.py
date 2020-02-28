@@ -18,19 +18,19 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.mesh_path = 'xcoarse_{:d}.msh'.format(self.offset)
 
         # Physical
-        self.base_viscosity = 1.0
-        # self.base_viscosity = 0.5
-        self.inflow_velocity = [3.0, 0.0]
-        # self.inflow_velocity = [5.0, 0.0]
+        # self.base_viscosity = 1.0
+        self.base_viscosity = 0.5
+        # self.inflow_velocity = [3.0, 0.0]
+        self.inflow_velocity = [5.0, 0.0]
         # NOTE: 5 ms^{-1} is a typical fast flow in Pentland Firth
 
         super(Steady2TurbineOptions, self).__init__(**kwargs)
 
         # Domain
-        self.domain_length = 1000.0
-        # self.domain_length = 1200.0
-        self.domain_width = 300.0
-        # self.domain_width = 500.0
+        # self.domain_length = 1000.0
+        self.domain_length = 1200.0
+        # self.domain_width = 300.0
+        self.domain_width = 500.0
         outer_res = 40.0
         inner_res = 8.0
         self.resolution = {'xcoarse': {'outer': outer_res, 'inner': inner_res}}

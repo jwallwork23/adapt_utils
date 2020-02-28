@@ -12,8 +12,8 @@ args = parser.parse_args()
 kwargs = {
     'plot_pvd': False,
     'debug': True,
-    # 'outer_iterations': 4,
-    'outer_iterations': 5,
+    'outer_iterations': 4,
+    # 'outer_iterations': 5,
     'offset' : int(args.offset or 0),
 }
 
