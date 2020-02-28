@@ -854,7 +854,7 @@ class SteadyProblem():
             print_output("Target:               {:.2e}".format(op.target))
             print_output("Number of elements:   {:d}".format(num_cells))
             print_output("DOF count:            {:d}".format(dofs))
-            print_output("Quantity of interest: {:.4e}".format(qoi))
+            print_output("Quantity of interest: {:.5e}".format(qoi))
             print_output('\n' + 80*'#')
         self.outer_estimators.append(self.estimators[self.approach][-1])
         self.outer_num_cells.append(self.num_cells[-1])

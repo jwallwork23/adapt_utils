@@ -7,6 +7,7 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("-loglog")
 parser.add_argument("-round")
+parser.add_argument("-errorline")
 args = parser.parse_args()
 
 plt.rc('text', usetex=True)
@@ -25,7 +26,7 @@ ylabel = r"Power output $(\mathrm{kW})$"
 ylabel2 = r"Relative error in power output (\%)"
 if loglog:
     ylabel = ylabel2
-errorline = 1.0
+errorline = float(args.errorline or 0.0)
 
 characteristics = {
     'fixed_mesh': {'label': 'Uniform refinement', 'marker': 'o', 'color': 'cornflowerblue'},
@@ -61,8 +62,11 @@ for offset in (0, 1):
                 ax.semilogx(dofs, qois, **kwargs)
     plt.grid(True)
     xlim = ax.get_xlim()
+    hlines = [exact,]
     if not loglog:
-        plt.hlines([exact, (1.0 + errorline/100)*exact], xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
+        if errorline > 1e-3:
+            hlines.append((1.0 + errorline/100)*exact)
+        plt.hlines(hlines, xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
     ax.set_xlim(xlim)
     ytick = "{:.2f}\%" if loglog else "{:.2f}"
     scale = 1.0 if loglog else 1e-3
