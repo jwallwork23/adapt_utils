@@ -1,4 +1,4 @@
-all: xcoarse uniform adapt plot screenshot
+all: xcoarse uniform table adapt plot screenshot
 
 xcoarse: dir clean geo_xcoarse mesh_xcoarse
 
@@ -58,7 +58,8 @@ mesh_xcoarse:
 
 uniform:
 	@echo "Running uniform convergence test..."
-	@python3 run_uniform_convergence.py
+	@python3 run_uniform_convergence.py -offset 0
+	@python3 run_uniform_convergence.py -offset 1
 	@echo "Done!"
 
 isotropic:
@@ -97,6 +98,11 @@ semilog:
 loglog:
 	@echo "Plotting convergence curves..."
 	@python3 plot_convergence.py -loglog 1
+	@echo "Done!"
+
+table:
+	@echo "Writing to LaTeX formatted table..."
+	@python3 write_table.py
 	@echo "Done!"
 
 clean:
