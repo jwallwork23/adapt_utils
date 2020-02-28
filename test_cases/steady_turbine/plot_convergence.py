@@ -38,7 +38,8 @@ for offset in (0, 1):
 
     # Read converged QoI value from file
     f = h5py.File('outputs/fixed_mesh/hdf5/qoi_offset_{:d}.h5'.format(offset), 'r')
-    exact = np.around(np.array(f['qoi'])[-1], decimals=-2)  # NOTE!
+    # exact = np.around(np.array(f['qoi'])[-1], decimals=-2)  # NOTE!
+    exact = np.array(f['qoi'])[-1]
     f.close()
 
     # Plot convergence curves
@@ -59,6 +60,7 @@ for offset in (0, 1):
     plt.grid(True)
     # xlim = [2e+3, 1e+6] if loglog else [4e+3, 4e+6]
     # plt.xlim(xlim)
+    xlim = ax.get_xlim()
     if not loglog:
         plt.hlines([exact, (1.0 + errorline/100)*exact], xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
 
