@@ -8,7 +8,7 @@ from adapt_utils.adapt.recovery import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
 
-__all__ = ["SteadyTracerProblem2d"]
+__all__ = ["SteadyTracerProblem2d", "UnsteadyTracerProblem2d"]
 
 
 class SteadyTracerProblem2d(SteadyProblem):
@@ -38,6 +38,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         super(SteadyTracerProblem2d, self).__init__(op, mesh, fe, **kwargs)
         self.nonlinear = False
 
+    # TODO: update
     def set_fields(self, adapted=False):
         op = self.op
         self.nu = op.set_diffusivity(self.P1)
@@ -320,3 +321,136 @@ class SteadyTracerProblem2d(SteadyProblem):
         # n = self.n
         # Fhat = i*dot(phi, n)
         # bdy_contributions -= Fhat*ds(2) + Fhat*ds(3) + Fhat*ds(4)
+
+
+# TODO!
+class UnsteadyTracerProblem2d(UnsteadyProblem):
+    r"""
+    General solver object for 2D tracer advection problems of the form
+
+..  math::
+    \frac{\partial\phi}{\partial t} + \textbf{u} \cdot \nabla(\phi) - \nabla \cdot (\nu \cdot \nabla(\phi)) = f,
+
+    for (prescribed) velocity :math:`\textbf{u}`, diffusivity :math:`\nu \geq 0`, source :math:`f`
+    and (prognostic) concentration :math:`\phi`.
+
+    Defaults to P1 continuous Galerkin with SUPG stabilisation.
+
+    Implemented boundary condition types:
+        * Neumann;
+        * Dirichlet;
+        * outflow.
+    """
+    def __init__(self, op, mesh=None, **kwargs):
+        if op.family in ("Lagrange", "CG", "cg"):
+            fe = FiniteElement("Lagrange", triangle, op.degree)
+        elif op.family in ("Discontinuous Lagrange", "DG", "dg"):
+            fe = FiniteElement("Discontinuous Lagrange", triangle, op.degree)
+        else:
+            raise NotImplementedError
+        super(UnsteadyTracerProblem2d, self).__init__(op, mesh, fe, **kwargs)
+        self.nonlinear = False
+
+    def set_fields(self, adapted=False):
+        op = self.op
+        self.fields = {}
+        self.fields['diffusivity'] = op.set_diffusivity(self.P1)
+        self.fields['velocity'] = op.set_velocity(self.P1_vec)
+        # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
+        self.fields['source'] = op.set_source(self.P1)
+
+        # Rename solution fields
+        self.solution.rename('Tracer concentration')
+        self.adjoint_solution.rename('Adjoint tracer concentration')
+
+    def set_stabilisation(self):
+        self.stabilisation = self.stabilisation or 'SUPG'
+        if self.stabilisation in ('SU', 'SUPG'):
+            self.supg_coefficient(mode='diameter')
+            # self.supg_coefficient(mode='nguyen')
+        elif self.stabilisation == 'lax_friedrichs':
+            self.stabilisation_parameter = op.stabilisation_parameter
+        elif self.stabilisation != 'no':
+            raise ValueError("Stabilisation method {:s} not recognised".format(self.stabilisation))
+
+    def supg_coefficient(self, mode='nguyen'):
+        r"""
+        Compute SUPG stabilisation coefficent for the advection diffusion problem. There are three
+        modes in which this can be calculated, as determined by the kwarg `mode`:
+
+        In 'diameter' mode, we use the cell diameter as our measure of element size.
+
+        In 'nguyen' mode, we follow [Nguyen et al., 2009] in projecting the edge of maximal length
+        into a vector space spanning the velocity field `u` and taking the length of this projected
+        edge as the measure of element size.
+
+        In 'cell_metric' mode, we use the cell metric :math:`M` to give the measure
+    ..  math::
+            h = u^T M u
+
+        In each case, we compute the stabilisation coefficent as
+
+    ..  math::
+            \tau = \frac h{2\|\textbf{u}\|}
+        """
+        u = self.fields['velocity']
+        nu = self.fields['diffusivity']
+        self.am.get_cell_size(u, mode=mode)
+        unorm = sqrt(inner(u, u))
+        Pe = 0.5*unorm*self.am.cell_size/nu
+        tau = 0.5*self.am.cell_size/unorm
+        self.stabilisation_parameter = tau*min_value(1, Pe/3)
+
+    def setup_solver_forward(self):
+        phi, psi = self.trial, self.test
+        phi_old = self.solution_old
+
+        u = self.fields['velocity']
+        nu = self.fields['diffusivity']
+        source = self.fields['source']
+
+        try:
+            assert self.op.timestepper == 'CrankNicolson'
+        except AssertionError:
+            raise NotImplementedError
+        dtc = Constant(self.op.dt)
+
+        # Stabilisation
+        if self.stabilisation in ('SU', 'SUPG'):
+            coeff = self.stabilisation_parameter*dot(u, grad(psi))
+            if self.stabilisation == 'SUPG':
+                psi = psi + coeff
+        elif self.stabilisation != 'no':
+            raise ValueError("Unrecognised stabilisation method.")
+
+        # Finite element problem
+        self.lhs = psi*phi*dx
+        self.rhs = psi*phi_old*dx
+        self.lhs += dtc*psi*dot(u, grad(0.5*phi))*dx
+        self.lhs += dtc*inner(nu*grad(psi), grad(0.5*phi))*dx
+        self.rhs -= dtc*psi*dot(u, grad(0.5*phi_old))*dx
+        self.rhs -= dtc*inner(nu*grad(psi), grad(0.5*phi_old))*dx
+        self.rhs += dtc*psi*source*dx
+
+        # Account for mesh movement
+        if self.op.approach == 'ale':
+            Xdot = self.op.get_mesh_velocity()
+            self.lhs -= dtc*psi*dot(grad(0.5*phi), Xdot(self.mesh))*dx
+            self.rhs += dtc*psi*dot(grad(0.5*phi_old), Xdot(self.mesh))*dx
+
+        # SU stabilisation
+        if self.stabilisation == 'SU':
+            self.lhs += dtc*coeff*dot(u, grad(0.5*phi))*dx
+            self.rhs -= dtc*coeff*dot(u, grad(0.5*phi_old))*dx
+
+        # Boundary conditions
+        bcs = self.boundary_conditions
+        self.dbcs = []
+        for i in bcs.keys():
+            if bcs[i] == {}:
+                self.lhs += -nu*psi*dot(self.n, nabla_grad(0.5*phi))*ds(i)
+                self.rhs -= -nu*psi*dot(self.n, nabla_grad(0.5*phi_old))*ds(i)
+            if 'diff_flux' in bcs[i]:
+                self.rhs += psi*bcs[i]['diff_flux']*ds(i)
+            if 'value' in bcs[i]:
+                self.dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))

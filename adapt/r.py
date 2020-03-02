@@ -62,6 +62,8 @@ class MeshMover():
             self.setup_equidistribution()
             self.setup_l2_projector()
             self.initialise_sigma()
+        elif self.mesh_velocity_function is None:
+            self.mesh_velocity_function = self.op.get_mesh_velocity()
         if self.op.nonlinear_method != 'quasi_newton':
             self.setup_pseudotimestepper()
 
