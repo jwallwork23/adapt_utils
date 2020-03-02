@@ -31,7 +31,7 @@ class MeshMover():
         plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
         A1121-A1148.
     """
-    def __init__(self, mesh, monitor_function, method='monge_ampere', bc=None, bbc=None, op=Options()):
+    def __init__(self, mesh, monitor_function, mesh_velocity=None, method='monge_ampere', bc=None, bbc=None, op=Options()):
         self.mesh = mesh
         self.dim = self.mesh.topological_dimension()
         try:
@@ -43,7 +43,8 @@ class MeshMover():
         except AssertionError:
             raise ValueError
         self.monitor_function = monitor_function
-        assert method in ('monge_ampere', 'laplacian_smoothing')
+        self.mesh_velocity_function = mesh_velocity
+        assert method in ('monge_ampere', 'laplacian_smoothing', 'ale')
         self.method = method
         assert op.nonlinear_method in ('quasi_newton', 'relaxation')
         self.bc = bc
@@ -57,9 +58,12 @@ class MeshMover():
         # Create functions and solvers
         self.create_function_spaces()
         self.create_functions()
-        self.setup_equidistribution()
-        self.setup_l2_projector()
-        self.initialise_sigma()
+        if self.method != 'ale':
+            self.setup_equidistribution()
+            self.setup_l2_projector()
+            self.initialise_sigma()
+        if self.op.nonlinear_method != 'quasi_newton':
+            self.setup_pseudotimestepper()
 
         # Outputs
         if self.op.debug:
@@ -76,11 +80,16 @@ class MeshMover():
         self.W = self.V*self.V_ten
         self.P1 = FunctionSpace(self.mesh, "CG", 1)
         self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
+        self.P1DG_vec = VectorFunctionSpace(self.mesh, "DG", 1)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.p0test = TestFunction(self.P0)
 
     def create_functions(self):
-        if self.op.nonlinear_method == 'relaxation':
+        if self.method == 'ale':
+            self.x_old = Function(self.P1DG_vec)
+            self.x_new = Function(self.P1DG_vec)
+            self.x_old.assign(self.mesh.coordinates)
+        elif self.op.nonlinear_method == 'relaxation':
             self.φ_old = Function(self.V)
             self.φ_new = Function(self.V)
             self.σ_old = Function(self.V_ten)
@@ -92,7 +101,8 @@ class MeshMover():
             self.φ_old, self.σ_old = split(self.φσ_temp)
         self.θ = Constant(0.0)  # Normalisation parameter
         self.monitor = Function(self.P1, name="Monitor function")
-        self.update_monitor()
+        self.mesh_velocity = Function(self.P1_vec, name="Mesh velocity")
+        self.update()
         self.volume = Function(self.P0, name="Mesh volume").assign(assemble(self.p0test*dx))
         self.original_volume = assemble(self.p0test*dx)
         self.total_volume = assemble(Constant(1.0)*dx(domain=self.mesh))
@@ -108,20 +118,33 @@ class MeshMover():
         L = inner(v_test, Constant(as_vector([0.0, 0.0])))*dx
         solve(a == L, self.grad_φ_cts, bcs=self.bc)
 
-    def update_monitor(self):
-        self.monitor.interpolate(self.monitor_function(self.mesh))
+    def update(self):
+        if self.monitor_function is not None:
+            self.monitor.interpolate(self.monitor_function(self.mesh))
+        elif self.mesh_velocity_function is not None:
+            self.mesh_velocity.interpolate(self.mesh_velocity_function(self.mesh))
 
     def setup_pseudotimestepper(self):
-        assert self.op.nonlinear_method == 'relaxation'
-        φ, ψ = TrialFunction(self.V), TestFunction(self.V)
-        a = dot(grad(ψ), grad(φ))*dx
-        L = dot(grad(ψ), grad(self.φ_old))*dx
-        L += self.dt*ψ*(self.monitor*det(self.I + self.σ_old) - self.θ)*dx
-        prob = LinearVariationalProblem(a, L, self.φ_new)
+        if self.method == 'ale':
+            x, xi = TrialFunction(self.P1DG_vec), TestFunction(self.P1DG_vec)
+            a = dot(xi, x)*dx
+            L = dot(xi, self.x_old)*dx
+            L += self.dt*dot(self.mesh_velocity, xi)*dx
+            prob = LinearVariationalProblem(a, L, self.x_new)
+            params = {'ksp_type': 'cg', 'pc_type': 'jacobi'}
+            self.V_nullspace = None
+        elif self.op.nonlinear_method == 'relaxation':
+            φ, ψ = TrialFunction(self.V), TestFunction(self.V)
+            a = dot(grad(ψ), grad(φ))*dx
+            L = dot(grad(ψ), grad(self.φ_old))*dx
+            L += self.dt*ψ*(self.monitor*det(self.I + self.σ_old) - self.θ)*dx
+            prob = LinearVariationalProblem(a, L, self.φ_new)
+            params = {'ksp_type': 'cg', 'pc_type': 'gamg'}
+        else:
+            raise NotImplementedError
         self.pseudotimestepper = LinearVariationalSolver(prob, nullspace=self.V_nullspace,
                                                          transpose_nullspace=self.V_nullspace,
-                                                         solver_parameters={'ksp_type': 'cg',
-                                                                            'pc_type': 'gamg'})
+                                                         solver_parameters=params)
 
     def setup_residuals(self):
         ψ = TestFunction(self.V)
@@ -174,7 +197,6 @@ class MeshMover():
         """
         n = FacetNormal(self.mesh)
         if self.op.nonlinear_method == 'relaxation':
-            self.setup_pseudotimestepper()
             σ, τ = TrialFunction(self.V_ten), TestFunction(self.V_ten)
             a = inner(τ, σ)*dx
             L = -dot(div(τ), grad(self.φ_new))*dx
@@ -199,7 +221,7 @@ class MeshMover():
                 self.apply_map()
 
                 self.mesh.coordinates.assign(self.x)
-                self.update_monitor()
+                self.update()
                 self.mesh.coordinates.assign(self.ξ)
 
                 # Evaluate normalisation coefficient
@@ -339,6 +361,14 @@ class MeshMover():
         else:
             raise NotImplementedError  # TODO
 
+    def adapt_ale(self):
+        assert self.method == 'ale'
+        self.mesh.coordinates.assign(self.x)
+        self.update()
+        self.mesh.coordinates.assign(self.ξ)
+        self.pseudotimestepper.solve()
+        self.x_old.assign(self.x_new)
+
     def adapt_monge_ampere(self):
         if self.op.nonlinear_method == 'quasi_newton':
             self.equidistribution.snes.setMonitor(self.fakemonitor)
@@ -355,7 +385,7 @@ class MeshMover():
 
             # Update monitor function
             self.mesh.coordinates.assign(self.x)
-            self.update_monitor()
+            self.update()
             assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
             self.volume /= self.original_volume
             if i % 10 == 0 and self.op.debug:

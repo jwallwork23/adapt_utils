@@ -3,7 +3,7 @@ from thetis.configuration import *
 # from scipy.special import kn
 
 from adapt_utils.options import Options
-from adapt_utils.misc.misc import *
+from adapt_utils.misc import *
 
 
 __all__ = ["TracerOptions", "bessk0"]
