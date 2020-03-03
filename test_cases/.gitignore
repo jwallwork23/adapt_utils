@@ -36,3 +36,6 @@ slotted_cylinder/screenshots/
 slotted_cylinder/__pycache__/
 tsunami1d/outputs/
 tsunami1d/__pycache__/
+ale_advection/outputs/
+ale_advection/screenshots/
+ale_advection/__pycache__/
