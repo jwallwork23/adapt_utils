@@ -1023,13 +1023,13 @@ class UnsteadyProblem(SteadyProblem):
             self.project_solution(solution)
         self.get_qoi_kernel()
 
-    def quantity_of_interest(self):
-        """
-        Functional of interest which takes the PDE solution as input.
-        """
-        if not hasattr(self, 'kernel'):
-            self.get_qoi_kernel()
-        raise NotImplementedError  # TODO: account for time integral forms
+    # def quantity_of_interest(self):
+    #     """
+    #     Functional of interest which takes the PDE solution as input.
+    #     """
+    #     if not hasattr(self, 'kernel'):
+    #         self.get_qoi_kernel()
+    #     raise NotImplementedError  # TODO: account for time integral forms
 
     def get_adjoint_state(self, variable='Tracer2d'):
         """

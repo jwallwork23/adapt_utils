@@ -468,9 +468,13 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
             self.solution = val
         self.get_solution(adjoint).rename(name)
 
-    def solve_step(self):
-        solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
-        self.solution_old.assign(self.solution)
+    def solve_step(self, adjoint=False):
+        if adjoint:
+            solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
+            self.adjoint_solution_old.assign(self.adjoint_solution)
+        else:
+            solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
+            self.solution_old.assign(self.solution)
 
     def solve_ale(self):
         op = self.op
@@ -484,3 +488,7 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
             self.mesh.coordinates.assign(self.mm.x_new)  # Update mesh
             self.plot_solution()
             t += op.dt
+
+    def get_qoi_kernel(self):
+        self.kernel = self.op.set_qoi_kernel(self.P0)
+        return self.kernel

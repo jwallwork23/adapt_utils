@@ -7,8 +7,7 @@ __all__ = ["ALEAdvectionOptions"]
 
 
 class ALEAdvectionOptions(TracerOptions):
-    def __init__(self, n=40, prescribed_velocity='fluid', approach='ale', *args, **kwargs):
-        self.prescribed_velocity = prescribed_velocity
+    def __init__(self, n=40, approach='ale', *args, **kwargs):
         super(ALEAdvectionOptions, self).__init__(*args, approach=approach, **kwargs)
         self.family = 'CG'
         self.stabilisation = 'SUPG'
@@ -29,8 +28,8 @@ class ALEAdvectionOptions(TracerOptions):
         }
 
     def set_velocity(self, fs):
-        self.velocity = Constant(as_vector(self.base_velocity))
-        return self.velocity
+        self.fluid_velocity = Constant(as_vector(self.base_velocity))
+        return self.fluid_velocity
 
     def set_diffusivity(self, fs):
         self.diffusivity = Constant(self.base_diffusivity)
@@ -50,12 +49,3 @@ class ALEAdvectionOptions(TracerOptions):
         x0, y0 = 5.0, 5.0
         self.initial_value.interpolate(exp(-((x-x0)**2 + (y-y0)**2)))
         return self.initial_value
-
-    def get_mesh_velocity(self):
-        if self.prescribed_velocity == "constant":
-            self.mesh_velocity = lambda mesh: Constant(as_vector([0.0, 0.0]))  # Fixed mesh
-        elif self.prescribed_velocity == "fluid":
-            self.mesh_velocity = lambda mesh: self.velocity  # Prescribed velocity: that of the fluid
-        else:
-            raise NotImplementedError
-        return self.mesh_velocity

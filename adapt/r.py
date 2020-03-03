@@ -90,7 +90,8 @@ class MeshMover():
         if self.method == 'ale':
             self.x_old = Function(self.mesh.coordinates)
             self.x_new = Function(self.mesh.coordinates)
-            # self.x_old.assign(self.mesh.coordinates)
+            # self.x_old = interpolate(self.mesh.coordinates, self.P1DG_vec)
+            # self.x_new = interpolate(self.mesh.coordinates, self.P1DG_vec)
         elif self.op.nonlinear_method == 'relaxation':
             self.φ_old = Function(self.V)
             self.φ_new = Function(self.V)
@@ -128,7 +129,9 @@ class MeshMover():
 
     def setup_pseudotimestepper(self):
         if self.method == 'ale':
+            # FIXME: seems to depend on mesh periodicity
             x, xi = TrialFunction(self.P1DG_vec), TestFunction(self.P1DG_vec)
+            # x, xi = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
             a = dot(xi, x)*dx
             L = dot(xi, self.x_old)*dx
             L += self.dt*dot(self.mesh_velocity, xi)*dx

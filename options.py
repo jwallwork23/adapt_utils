@@ -52,7 +52,7 @@ class Options(FrozenConfigurable):
     r_adapt_maxit = PositiveInteger(1000, help="Maximum number of iterations in r-adaptation loop.").tag(config=True)
     r_adapt_rtol = PositiveFloat(1.0e-8, help="Relative tolerance for residual in r-adaptation loop.").tag(config=True)
     nonlinear_method = Unicode('quasi_newton', help="Method for solving nonlinear system under r-adaptation.").tag(config=True)
-    prescribed_velocity = Unicode(None, allow_none=True, help="Prescribed velocity to use in ALE adaptation, if any.").tag(config=True)
+    prescribed_velocity = Unicode('fluid', allow_none=True, help="Prescribed velocity to use in ALE adaptation, if any.").tag(config=True)
 
     # Metric
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
@@ -284,3 +284,20 @@ class Options(FrozenConfigurable):
     def print_debug(self, msg):
         if self.debug:
             print_output(msg)
+
+    def get_mesh_velocity(self):
+        """
+        Prescribed a mesh velocity.
+        """
+        if self.prescribed_velocity == "constant":  # Fixed mesh
+            self.mesh_velocity = lambda mesh: Constant(as_vector([0.0, 0.0]))
+        elif self.prescribed_velocity == "fluid":  # Move mesh with fluid
+            def mesh_velocity(mesh):
+                P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+                self.set_velocity(P1_vec)
+                # self.fluid_velocity /= norm(self.fluid_velocity)
+                return self.fluid_velocity
+            self.mesh_velocity = mesh_velocity
+        else:
+            raise NotImplementedError
+        return self.mesh_velocity

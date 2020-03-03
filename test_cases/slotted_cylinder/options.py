@@ -48,6 +48,13 @@ class LeVequeOptions(TracerOptions):
         self.dt_per_export = 10
         self.dt_per_remesh = 10
 
+        self.params = {
+            "ksp_type": "gmres",
+            "pc_type": "sor",
+            # "ksp_monitor": None,
+            # "ksp_converged_reason": None,
+        }
+
     def set_boundary_conditions(self, fs):
         # zero = Constant(1.0, domain=fs.mesh())
         zero = Constant(0.0, domain=fs.mesh())
@@ -62,8 +69,7 @@ class LeVequeOptions(TracerOptions):
 
     def set_velocity(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
-        self.fluid_velocity = Function(fs)
-        self.fluid_velocity.interpolate(as_vector((0.5 - y, x - 0.5)))
+        self.fluid_velocity = interpolate(as_vector((0.5 - y, x - 0.5)), fs)
         return self.fluid_velocity
 
     def set_source(self, fs):
