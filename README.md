@@ -12,7 +12,8 @@ solutions for more general problems. This is research of the Applied Modelling a
 
 * `v1.0`: 'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3358565.svg)](https://doi.org/10.5281/zenodo.3358565)
 
-* `v1.1`: 'Goal-Oriented Error Estimation and Mesh Adaptation for Shallow Water Modelling': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3571867.svg)](https://doi.org/10.5281/zenodo.3571867)
+* `v1.1`: 'Goal-Oriented Error Estimation and Mesh Adaptation for Shallow Water Modelling': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3695801.svg)](https://doi.org/10.5281/zenodo.3695801)
+
 
 ### User instructions
 
