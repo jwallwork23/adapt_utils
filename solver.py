@@ -514,7 +514,9 @@ class SteadyProblem():
         except ValueError:
             meshfile.write(self.mesh.coordinates)
         for key in self.indicators:
-            File(os.path.join(self.di, key + '.pvd')).write(self.indicators[key])
+            tmp = interpolate(abs(self.indicators[key]), self.P0)
+            tmp.rename(key)
+            File(os.path.join(self.di, key + '.pvd')).write(tmp)
         if hasattr(self, 'indicator'):
             self.indicator_file.write(self.indicator)
 
@@ -947,6 +949,11 @@ class UnsteadyProblem(SteadyProblem):
 
     def set_start_condition(self, adjoint=False):
         self.set_solution(self.op.set_start_condition(self.V, adjoint=adjoint), adjoint)
+        if adjoint:
+            self.adjoint_solution_old.assign(self.adjoint_solution)
+        else:
+            self.solution_old.assign(self.solution)
+        self.plot_solution()
 
     def solve_step(self, adjoint=False):
         """

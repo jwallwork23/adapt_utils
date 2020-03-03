@@ -1,10 +1,12 @@
 from firedrake import *
+from thetis import print_output
 
 import numpy as np
 
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
 from adapt_utils.adapt.recovery import *
+from adapt_utils.adapt.r import *
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 
 
@@ -454,3 +456,31 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
                 self.rhs += psi*bcs[i]['diff_flux']*ds(i)
             if 'value' in bcs[i]:
                 self.dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))
+
+    def set_solution(self, val, adjoint=False):
+        """
+        Set forward or adjoint solution, as specified by boolean kwarg `adjoint`.
+        """
+        name = self.get_solution(adjoint).dat.name
+        if adjoint:
+            self.adjoint_solution = val
+        else:
+            self.solution = val
+        self.get_solution(adjoint).rename(name)
+
+    def solve_step(self):
+        solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
+        self.solution_old.assign(self.solution)
+
+    def solve_ale(self):
+        op = self.op
+        self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
+        self.setup_solver_forward()
+        t = 0.0
+        while t < op.end_time - 0.5*op.dt:
+            print_output("t = {:.1f}s".format(t))
+            self.mm.adapt_ale()                          # Solve mesh movement
+            self.solve_step()                            # Solve PDE
+            self.mesh.coordinates.assign(self.mm.x_new)  # Update mesh
+            self.plot_solution()
+            t += op.dt

@@ -88,9 +88,9 @@ class MeshMover():
 
     def create_functions(self):
         if self.method == 'ale':
-            self.x_old = Function(self.P1DG_vec)
-            self.x_new = Function(self.P1DG_vec)
-            self.x_old.assign(self.mesh.coordinates)
+            self.x_old = Function(self.mesh.coordinates)
+            self.x_new = Function(self.mesh.coordinates)
+            # self.x_old.assign(self.mesh.coordinates)
         elif self.op.nonlinear_method == 'relaxation':
             self.φ_old = Function(self.V)
             self.φ_new = Function(self.V)

@@ -13,10 +13,10 @@ class ALEAdvectionOptions(TracerOptions):
         self.family = 'CG'
         self.stabilisation = 'SUPG'
 
-        lx, ly = 30, 10
-        self.default_mesh = PeriodicRectangleMesh(3*n, n, lx, ly, direction='x')
-        self.dt = 0.1
-        self.end_time = 5.0
+        lx, ly = 10, 10
+        self.default_mesh = PeriodicRectangleMesh(n, n, lx, ly, direction='x')
+        self.dt = 0.2
+        self.end_time = 10.0
 
         self.base_diffusivity = 1.0e-8
         self.base_velocity = [1.0, 0.0]
