@@ -14,3 +14,4 @@ adjoint.py
 *.txt
 *.ipynb_checkpoints
 *.hdf5
+*.patch

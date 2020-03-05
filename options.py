@@ -79,6 +79,9 @@ class Options(FrozenConfigurable):
     outer_iterations = PositiveInteger(1, help="Number of iterations in outer adaptation loop.").tag(config=True)
     indent = Unicode('', help="Indent used in nested print statements.").tag(config=True)
 
+    # Mesh
+    periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
+
     def __init__(self, **kwargs):
         self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)

@@ -88,10 +88,13 @@ class MeshMover():
 
     def create_functions(self):
         if self.method == 'ale':
-            self.x_old = Function(self.mesh.coordinates)
-            self.x_new = Function(self.mesh.coordinates)
-            # self.x_old = interpolate(self.mesh.coordinates, self.P1DG_vec)
-            # self.x_new = interpolate(self.mesh.coordinates, self.P1DG_vec)
+            coord_space = self.mesh.coordinates.function_space()
+            if self.op.periodic:
+                self.x_old = interpolate(self.mesh.coordinates, coord_space)
+                self.x_new = interpolate(self.mesh.coordinates, coord_space)
+            else:
+                self.x_old = Function(self.mesh.coordinates)
+                self.x_new = Function(self.mesh.coordinates)
         elif self.op.nonlinear_method == 'relaxation':
             self.φ_old = Function(self.V)
             self.φ_new = Function(self.V)
@@ -129,13 +132,13 @@ class MeshMover():
 
     def setup_pseudotimestepper(self):
         if self.method == 'ale':
-            # FIXME: seems to depend on mesh periodicity
-            x, xi = TrialFunction(self.P1DG_vec), TestFunction(self.P1DG_vec)
-            # x, xi = TrialFunction(self.P1_vec), TestFunction(self.P1_vec)
+            coord_space = self.mesh.coordinates.function_space()
+            x, xi = TrialFunction(coord_space), TestFunction(coord_space)
+            dtc = Constant(self.dt)
             a = dot(xi, x)*dx
             L = dot(xi, self.x_old)*dx
-            L += self.dt*dot(self.mesh_velocity, xi)*dx
-            prob = LinearVariationalProblem(a, L, self.x_new)
+            L += dtc*dot(xi, self.mesh_velocity)*dx
+            prob = LinearVariationalProblem(a, L, self.x_new, bcs=self.bc)
             params = {'ksp_type': 'cg', 'pc_type': 'jacobi'}
             self.V_nullspace = None
         elif self.op.nonlinear_method == 'relaxation':
@@ -368,9 +371,9 @@ class MeshMover():
 
     def adapt_ale(self):
         assert self.method == 'ale'
-        self.mesh.coordinates.assign(self.x)
+        # self.mesh.coordinates.assign(self.x)
         self.update()
-        self.mesh.coordinates.assign(self.ξ)
+        # self.mesh.coordinates.assign(self.ξ)
         self.pseudotimestepper.solve()
         self.x_old.assign(self.x_new)
 

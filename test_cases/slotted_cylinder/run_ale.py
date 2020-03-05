@@ -13,6 +13,8 @@ kwargs = {
     'stabilisation': 'SUPG',
     'num_adapt': 1,
     'nonlinear_method': 'relaxation',
+    'prescribed_velocity': 'constant',
+    # 'prescribed_velocity': 'fluid',
 }
 op = LeVequeOptions(shape=0, **kwargs)
 

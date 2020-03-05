@@ -14,7 +14,9 @@ class ALEAdvectionOptions(TracerOptions):
 
         lx, ly = 10, 10
         self.default_mesh = PeriodicRectangleMesh(n, n, lx, ly, direction='x')
+        self.periodic = True
         self.dt = 0.2
+        self.dt_per_export = 1
         self.end_time = 10.0
 
         self.base_diffusivity = 1.0e-8

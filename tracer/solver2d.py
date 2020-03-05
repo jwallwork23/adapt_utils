@@ -478,16 +478,22 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
 
     def solve_ale(self):
         op = self.op
-        self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
+        bcs = []
+        coord_space = self.mesh.coordinates.function_space()
+        for i in self.mesh.exterior_facets.unique_markers:
+            bcs.append(DirichletBC(coord_space, self.mesh.coordinates, i))
+        self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', bc=bcs, op=op)
         self.setup_solver_forward()
-        t = 0.0
+        i, t = 0, 0.0
         while t < op.end_time - 0.5*op.dt:
-            print_output("t = {:.1f}s".format(t))
             self.mm.adapt_ale()                          # Solve mesh movement
             self.solve_step()                            # Solve PDE
             self.mesh.coordinates.assign(self.mm.x_new)  # Update mesh
-            self.plot_solution()
+            if (i % op.dt_per_export) == 0:
+                print_output("t = {:.1f}s".format(t))
+                self.plot_solution()
             t += op.dt
+            i += 1
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.P0)
