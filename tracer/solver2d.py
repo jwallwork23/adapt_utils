@@ -478,11 +478,7 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
 
     def solve_ale(self):
         op = self.op
-        bcs = []
-        coord_space = self.mesh.coordinates.function_space()
-        for i in self.mesh.exterior_facets.unique_markers:
-            bcs.append(DirichletBC(coord_space, self.mesh.coordinates, i))
-        self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', bc=bcs, op=op)
+        self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
         self.setup_solver_forward()
         i, t = 0, 0.0
         while t < op.end_time - 0.5*op.dt:

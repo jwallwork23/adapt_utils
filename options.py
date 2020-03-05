@@ -295,11 +295,51 @@ class Options(FrozenConfigurable):
         if self.prescribed_velocity == "constant":  # Fixed mesh
             self.mesh_velocity = lambda mesh: Constant(as_vector([0.0, 0.0]))
         elif self.prescribed_velocity == "fluid":  # Move mesh with fluid
-            def mesh_velocity(mesh):
+
+            def mesh_velocity(mesh):  # FIXME
+
+                # Get fluid velocity
                 P1_vec = VectorFunctionSpace(mesh, "CG", 1)
                 self.set_velocity(P1_vec)
-                # self.fluid_velocity /= norm(self.fluid_velocity)
+
+                # Use fluid velocity in domain interior
+                n = FacetNormal(mesh)
+                v = Function(P1_vec, name="Mesh velocity")
+                trial, test = TrialFunction(P1_vec), TestFunction(P1_vec)
+                a = dot(test, trial)*dx
+                L = dot(test, self.fluid_velocity)*dx
+
+                # TODO: Sponge condition?
+                # x, y = SpatialCoordinate(mesh)
+                # L = dot(test, exp(-((x-0.5)**2+(y-0.5)**2))*self.fluid_velocity)*dx
+
+                # # Enforce no velocity normal to boundaries
+                # a_bc = dot(test, n)*dot(trial, n)*ds
+                # L_bc = dot(test, n)*Constant(0.0)*ds
+                # bc = [EquationBC(a == L, v, 'on_boundary')]
+
+                # # Allow tangential movement, but only up until the end of boundary segments
+                # s = as_vector([n[1], -n[0]])
+                # a_bc = dot(test, s)*dot(trial, s)*ds
+                # L_bc = dot(test, s)*dot(self.fluid_velocity, s)*ds
+                # edges = set(mesh.exterior_facets.unique_markers)
+                # corners = [(i, j) for i in edges for j in edges.difference([i])]
+                # bbc = DirichletBC(P1_vec, 0, corners)
+                # bc.append(EquationBC(a_bc == L_bc, v, 'on_boundary', bcs=bbc))
+                # # self.fluid_velocity /= norm(self.fluid_velocity)
+
+                # Zero mesh velocity on boundary
+                bc = DirichletBC(P1_vec, Constant([0.0, 0.0]), 'on_boundary')
+
+                # # No constraints on boundary
+                # bc = None
+
+                solve(a == L, v, bcs=bc)
+                self.fluid_velocity.assign(v)
+
+                File(os.path.join(self.di, 'fluid_velocity.pvd')).write(v)
                 return self.fluid_velocity
+
             self.mesh_velocity = mesh_velocity
         else:
             raise NotImplementedError
