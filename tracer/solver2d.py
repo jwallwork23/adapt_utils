@@ -476,14 +476,15 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
             solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
             self.solution_old.assign(self.solution)
 
-    def solve_ale(self):
+    def solve_ale(self, solve_pde=True):
         op = self.op
         self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
         self.setup_solver_forward()
         i, t = 0, 0.0
         while t < op.end_time - 0.5*op.dt:
             self.mm.adapt_ale()                          # Solve mesh movement
-            self.solve_step()                            # Solve PDE
+            if solve_pde:
+                self.solve_step()                        # Solve PDE
             self.mesh.coordinates.assign(self.mm.x_new)  # Update mesh
             if (i % op.dt_per_export) == 0:
                 print_output("t = {:.1f}s".format(t))

@@ -20,6 +20,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         # Physical
         # self.base_viscosity = 1.0
         self.base_viscosity = 0.5
+        # self.base_viscosity = 1.030e-3
         # self.inflow_velocity = [3.0, 0.0]
         self.inflow_velocity = [5.0, 0.0]
         # NOTE: 5 ms^{-1} is a typical fast flow in Pentland Firth

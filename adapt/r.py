@@ -54,7 +54,8 @@ class MeshMover():
         self.ξ = Function(self.mesh.coordinates)  # Computational coordinates
         self.x = Function(self.mesh.coordinates)  # Physical coordinates
         self.I = Identity(self.dim)
-        self.dt = Constant(op.pseudo_dt)
+        self.dt = Constant(op.dt)
+        self.pseudo_dt = Constant(op.pseudo_dt)
 
         # Create functions and solvers
         self.create_function_spaces()
@@ -146,6 +147,7 @@ class MeshMover():
             a = inner(xi, x)*dx
             L = inner(xi, self.x_old)*dx
             L += dtc*inner(xi, dot(nabla_grad(self.x_old), self.mesh_velocity))*dx
+            # a -= dtc*inner(xi, dot(nabla_grad(x), self.mesh_velocity))*dx
             # a -= dtc*inner(xi, dot(nabla_grad(0.5*x), self.mesh_velocity))*dx
             # L += dtc*inner(xi, dot(nabla_grad(0.5*self.x_old), self.mesh_velocity))*dx
 
@@ -175,11 +177,12 @@ class MeshMover():
             prob = LinearVariationalProblem(a, L, self.x_new, bcs=self.bc)
             kwargs = {'solver_parameters': {'ksp_type': 'cg', 'pc_type': 'jacobi'}}
             # kwargs = {'solver_parameters': {'ksp_type': 'gmres', 'pc_type': 'sor'}}
+            # kwargs = {'solver_parameters': {'mat_type': 'aij', 'ksp_type': 'gmres', 'pc_type': 'lu', 'pc_factor_mat_solver_type': 'mumps'}}
         elif self.op.nonlinear_method == 'relaxation':
             φ, ψ = TrialFunction(self.V), TestFunction(self.V)
             a = dot(grad(ψ), grad(φ))*dx
             L = dot(grad(ψ), grad(self.φ_old))*dx
-            L += self.dt*ψ*(self.monitor*det(self.I + self.σ_old) - self.θ)*dx
+            L += self.pseudo_dt*ψ*(self.monitor*det(self.I + self.σ_old) - self.θ)*dx
             prob = LinearVariationalProblem(a, L, self.φ_new)
             kwargs = {'solver_parameters': {'ksp_type': 'cg', 'pc_type': 'gamg'},
                       'nullspace': self.V_nullspace, 'transpose_nullspace': self.V_nullspace}

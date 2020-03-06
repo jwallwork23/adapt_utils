@@ -301,25 +301,28 @@ class Options(FrozenConfigurable):
             def mesh_velocity(mesh):  # FIXME
 
                 # Get fluid velocity
-                P1_vec = VectorFunctionSpace(mesh, "CG", 1)
-                self.set_velocity(P1_vec)
+                coord_space = mesh.coordinates.function_space()
+                self.set_velocity(coord_space)
 
                 # Use fluid velocity in domain interior
                 n = FacetNormal(mesh)
-                v = Function(P1_vec, name="Mesh velocity")
-                trial, test = TrialFunction(P1_vec), TestFunction(P1_vec)
+                v = Function(coord_space, name="Mesh velocity")
+                trial, test = TrialFunction(coord_space), TestFunction(coord_space)
                 a = dot(test, trial)*dx
                 L = dot(test, self.fluid_velocity)*dx
 
-                # TODO: Sponge condition?
+                # # No constraints on boundary
+                # bc = None
+
+                # Sponge condition?
                 # x, y = SpatialCoordinate(mesh)
                 # alpha = 100
                 # L = dot(test, exp(-alpha*((x-0.5)**2+(y-0.5)**2))*self.fluid_velocity)*dx
 
                 # # Enforce no velocity normal to boundaries
-                # a_bc = dot(test, n)*dot(trial, n)*ds
-                # L_bc = dot(test, n)*Constant(0.0)*ds
-                # bc = [EquationBC(a == L, v, 'on_boundary')]
+                a_bc = dot(test, n)*dot(trial, n)*ds
+                L_bc = dot(test, n)*Constant(0.0)*ds
+                bc = [EquationBC(a == L, v, 'on_boundary')]
 
                 # # Allow tangential movement, but only up until the end of boundary segments
                 # s = as_vector([n[1], -n[0]])
@@ -327,15 +330,12 @@ class Options(FrozenConfigurable):
                 # L_bc = dot(test, s)*dot(self.fluid_velocity, s)*ds
                 # edges = set(mesh.exterior_facets.unique_markers)
                 # corners = [(i, j) for i in edges for j in edges.difference([i])]
-                # bbc = DirichletBC(P1_vec, 0, corners)
+                # bbc = DirichletBC(coord_space, 0, corners)
                 # bc.append(EquationBC(a_bc == L_bc, v, 'on_boundary', bcs=bbc))
                 # # self.fluid_velocity /= norm(self.fluid_velocity)
 
                 # Zero mesh velocity on boundary
-                bc = DirichletBC(P1_vec, Constant([0.0, 0.0]), 'on_boundary')
-
-                # # No constraints on boundary
-                # bc = None
+                # bc = DirichletBC(coord_space, Constant([0.0, 0.0]), 'on_boundary')
 
                 solve(a == L, v, bcs=bc)
                 self.fluid_velocity.assign(v)

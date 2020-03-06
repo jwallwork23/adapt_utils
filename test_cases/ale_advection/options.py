@@ -30,7 +30,7 @@ class ALEAdvectionOptions(TracerOptions):
         }
 
     def set_velocity(self, fs):
-        self.fluid_velocity = Constant(as_vector(self.base_velocity))
+        self.fluid_velocity = interpolate(as_vector(self.base_velocity), fs)
         return self.fluid_velocity
 
     def set_diffusivity(self, fs):
