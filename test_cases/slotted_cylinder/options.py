@@ -1,6 +1,8 @@
 from thetis import *
 from thetis.configuration import *
+
 import math
+import os
 
 from adapt_utils.tracer.options import TracerOptions
 
@@ -28,7 +30,13 @@ class LeVequeOptions(TracerOptions):
     """
     def __init__(self, shape=0, n=0, **kwargs):
         super(LeVequeOptions, self).__init__(**kwargs)
-        self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
+        # self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
+        mesh_file = os.path.join(os.path.dirname(__file__), 'circle.msh')
+        if os.path.exists(mesh_file):
+            self.default_mesh = Mesh(mesh_file)
+        if n > 0:
+            mh = MeshHierarchy(self.default_mesh, n)
+            self.default_mesh = mh[-1]
 
         # Source / receiver
         self.source_loc = [(0.25, 0.5, 0.15), (0.5, 0.25, 0.15), (0.5, 0.75, 0.15), (0.475, 0.525, 0.85)]

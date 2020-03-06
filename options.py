@@ -296,6 +296,8 @@ class Options(FrozenConfigurable):
             self.mesh_velocity = lambda mesh: Constant(as_vector([0.0, 0.0]))
         elif self.prescribed_velocity == "fluid":  # Move mesh with fluid
 
+            velocity_file = File(os.path.join(self.di, 'fluid_velocity.pvd'))
+
             def mesh_velocity(mesh):  # FIXME
 
                 # Get fluid velocity
@@ -311,7 +313,8 @@ class Options(FrozenConfigurable):
 
                 # TODO: Sponge condition?
                 # x, y = SpatialCoordinate(mesh)
-                # L = dot(test, exp(-((x-0.5)**2+(y-0.5)**2))*self.fluid_velocity)*dx
+                # alpha = 100
+                # L = dot(test, exp(-alpha*((x-0.5)**2+(y-0.5)**2))*self.fluid_velocity)*dx
 
                 # # Enforce no velocity normal to boundaries
                 # a_bc = dot(test, n)*dot(trial, n)*ds
@@ -337,7 +340,7 @@ class Options(FrozenConfigurable):
                 solve(a == L, v, bcs=bc)
                 self.fluid_velocity.assign(v)
 
-                File(os.path.join(self.di, 'fluid_velocity.pvd')).write(v)
+                velocity_file.write(v)
                 return self.fluid_velocity
 
             self.mesh_velocity = mesh_velocity
