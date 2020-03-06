@@ -514,7 +514,7 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
             t += op.dt
             i += 1
 
-    def solve_ale(self, solve_pde=True):
+    def solve_ale(self, solve_pde=True, check_inverted=True):
         op = self.op
         self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
         self.setup_solver_forward()
@@ -524,6 +524,8 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
             if solve_pde:
                 self.solve_step()                        # Solve PDE
             self.mesh.coordinates.assign(self.mm.x_new)  # Update mesh
+            if check_inverted:
+                self.am.check_inverted()
             if (i % op.dt_per_export) == 0:
                 print_output("t = {:.2f}s".format(t))
                 self.plot_solution()

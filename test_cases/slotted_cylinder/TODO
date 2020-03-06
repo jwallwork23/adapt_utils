@@ -1,5 +1,0 @@
-* Apply ALE in a naive way, where v=u (and boundaries are fixed).
-  * This will result in mesh tangling.
-  * Plot the scaled Jacobian of the tangled mesh.
-* Fix issue by applying a untangling algorithm.
-* Fix issue by invoking Pragmatic when necessary.
