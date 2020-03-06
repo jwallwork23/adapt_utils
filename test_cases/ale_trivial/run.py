@@ -9,13 +9,14 @@ from adapt_utils.adapt.r import MeshMover
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-interpretation", help="Choose from {'eulerian', 'lagrangian'}.")
+parser.add_argument("interpretation", help="Choose from {'eulerian', 'lagrangian'}.")
+parser.add_argument("-family", help="Choose from {'cg', 'dg'}.")
 args = parser.parse_args()
 
-interpretation = args.interpretation or 'eulerian'
-approach = 'fixed_mesh' if interpretation == 'eulerian' else 'ale'
+approach = 'fixed_mesh' if args.interpretation == 'eulerian' else 'ale'
+family = args.family or 'cg'
 
-op = ALEAdvectionOptions(approach=approach, prescribed_velocity='fluid')
+op = ALEAdvectionOptions(approach=approach, prescribed_velocity='fluid', family=family)
 tp = UnsteadyTracerProblem2d(op)
 init_norm = norm(tp.solution)
 if approach == 'fixed_mesh':

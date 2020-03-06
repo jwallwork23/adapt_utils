@@ -425,14 +425,35 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         elif self.stabilisation != 'no':
             raise ValueError("Unrecognised stabilisation method.")
 
+        family = self.V.ufl_element().family()
+        dg = family == 'Discontinuous Lagrange'
+        if dg:
+            assert not self.stabilisation in ('SU', 'SUPG')
+        else:
+            assert family == 'Lagrange'
+        un = dot(u, self.n)
+        upwind = 0.5*(un + abs(un))
+
         # Finite element problem
         self.lhs = psi*phi*dx
         self.rhs = psi*phi_old*dx
-        self.lhs += dtc*psi*dot(u, grad(0.5*phi))*dx
-        self.lhs += dtc*inner(nu*grad(psi), grad(0.5*phi))*dx
-        self.rhs -= dtc*psi*dot(u, grad(0.5*phi_old))*dx
-        self.rhs -= dtc*inner(nu*grad(psi), grad(0.5*phi_old))*dx
-        self.rhs += dtc*psi*source*dx
+        if dg:
+            self.lhs -= dtc*0.5*phi*div(psi*u)*dx
+            self.rhs += dtc*0.5*phi_old*div(psi*u)*dx
+            self.lhs += dtc*0.5*((psi('+') - psi('-'))*(upwind('+')*phi('+') - upwind('-')*phi('-')))*dS
+            self.rhs -= dtc*0.5*((psi('+') - psi('-'))*(upwind('+')*phi_old('+') - upwind('-')*phi_old('-')))*dS
+
+            if nu is not None:
+                tol = 1.0e-10
+                if (isinstance(nu, Constant) and nu.values()[0] > tol) or \
+                   (isinstance(nu, Function) and norm(nu) > tol):
+                    raise NotImplementedError("Diffusion term not yet implemented.")  # TODO
+        else:
+            self.lhs += dtc*psi*dot(u, grad(0.5*phi))*dx
+            self.lhs += dtc*inner(nu*grad(psi), grad(0.5*phi))*dx
+            self.rhs -= dtc*psi*dot(u, grad(0.5*phi_old))*dx
+            self.rhs -= dtc*inner(nu*grad(psi), grad(0.5*phi_old))*dx
+            self.rhs += dtc*psi*source*dx
 
         # Account for mesh movement
         if self.op.approach == 'ale':
@@ -455,7 +476,12 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
             if 'diff_flux' in bcs[i]:
                 self.rhs += psi*bcs[i]['diff_flux']*ds(i)
             if 'value' in bcs[i]:
-                self.dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))
+                if dg:
+                    self.lhs += dtc*0.5*conditional(ge(un, 0), 1, 0)*psi*un*phi*ds(i)
+                    self.rhs -= dtc*0.5*conditional(ge(un, 0), 1, 0)*psi_old*un*phi*ds(i)
+                    self.rhs -= dtc*conditional(le(un, 0), psi*un*bcs[i]['value'], 0)*ds(i)
+                else:
+                    self.dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))
 
     def set_solution(self, val, adjoint=False):
         """

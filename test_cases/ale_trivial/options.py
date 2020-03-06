@@ -9,8 +9,12 @@ __all__ = ["ALEAdvectionOptions"]
 class ALEAdvectionOptions(TracerOptions):
     def __init__(self, n=40, approach='ale', *args, **kwargs):
         super(ALEAdvectionOptions, self).__init__(*args, approach=approach, **kwargs)
-        self.family = 'CG'
-        self.stabilisation = 'SUPG'
+        if self.family in ('CG', 'cg', 'Lagrange'):
+            self.stabilisation = 'SUPG'
+        elif self.family in ('DG', 'dg', 'Discontinuous Lagrange'):
+            self.stabilisation = 'no'
+        else:
+            raise NotImplementedError
         self.num_adapt = 1
         self.nonlinear_method = 'relaxation'
 
