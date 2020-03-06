@@ -525,7 +525,11 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
                 self.solve_step()                        # Solve PDE
             self.mesh.coordinates.assign(self.mm.x_new)  # Update mesh
             if check_inverted:
-                self.am.check_inverted()
+                try:
+                    self.am.check_inverted()
+                except ValueError:
+                    self.plot_mesh()
+                    raise ValueError("Timestepping loop terminated after {:d} iterations due to inverted element.".format(i))
             if (i % op.dt_per_export) == 0:
                 print_output("t = {:.2f}s".format(t))
                 self.plot_solution()

@@ -66,19 +66,20 @@ class AdaptiveMesh():
         """
         assert self.dim == 2
         J = interpolate(Jacobian(self.mesh), self.P0_ten)
-        unswapped = as_matrix([[J[0, 0], J[0, 1]], [J[1, 0], J[1, 1]]])
-        swapped = as_matrix([[J[1, 0], J[1, 1]], [J[0, 0], J[0, 1]]])
-        sgn = Function(self.P0)
-        sgn.dat.data[:] = self.jacobian_sign.dat.data
+        # unswapped = as_matrix([[J[0, 0], J[0, 1]], [J[1, 0], J[1, 1]]])
+        # swapped = as_matrix([[J[1, 0], J[1, 1]], [J[0, 0], J[0, 1]]])
+        # sgn = Function(self.P0)
+        # sgn.dat.data[:] = self.jacobian_sign.dat.data
         # J.interpolate(conditional(ge(self.jacobian_sign, 0), unswapped, swapped))
-        J.interpolate(conditional(ge(sgn, 0), unswapped, swapped))
-        detJ = det(J)
+        # J.interpolate(conditional(ge(sgn, 0), unswapped, swapped))
+        # detJ = det(J)
         edge1 = as_vector([J[0, 0], J[1, 0]])
         edge2 = as_vector([J[0, 1], J[1, 1]])
         norm1 = sqrt(dot(edge1, edge1))
         norm2 = sqrt(dot(edge2, edge2))
 
-        self.scaled_jacobian = interpolate(detJ/(norm1*norm2), self.P0)
+        detJ = JacobianDeterminant(self.mesh)
+        self.scaled_jacobian = interpolate(detJ/(norm1*norm2*self.jacobian_sign), self.P0)
         return self.scaled_jacobian
 
     def check_inverted(self, error=True):
