@@ -30,6 +30,13 @@ class LeVequeOptions(TracerOptions):
     """
     def __init__(self, shape=0, n=0, **kwargs):
         super(LeVequeOptions, self).__init__(**kwargs)
+        if self.family in ('CG', 'cg', 'Lagrange'):
+            self.stabilisation = 'SUPG'
+        elif self.family in ('DG', 'dg', 'Discontinuous Lagrange'):
+            self.stabilisation = 'no'
+        else:
+            raise NotImplementedError
+
         # self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
         mesh_file = os.path.join(os.path.dirname(__file__), 'circle.msh')
         if os.path.exists(mesh_file):
@@ -54,6 +61,7 @@ class LeVequeOptions(TracerOptions):
         self.dt = pi/300.0
         self.end_time = 2*pi + self.dt
         self.dt_per_export = 10
+        # self.dt_per_export = 1
         self.dt_per_remesh = 10
 
         self.params = {

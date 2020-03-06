@@ -147,11 +147,8 @@ class MeshMover():
             a = inner(xi, x)*dx
             L = inner(xi, self.x_old)*dx
             L += dtc*inner(xi, dot(nabla_grad(self.x_old), self.mesh_velocity))*dx
-            # a -= dtc*inner(xi, dot(nabla_grad(x), self.mesh_velocity))*dx
-            # a -= dtc*inner(xi, dot(nabla_grad(0.5*x), self.mesh_velocity))*dx
-            # L += dtc*inner(xi, dot(nabla_grad(0.5*self.x_old), self.mesh_velocity))*dx
 
-            # FIXME: Currently, boundary is fixed
+            # TODO: We should probably impose BCs as a postproc step, as for Monge-Ampere
             # if coord_space.ufl_element().family() in ("CG", "Lagrange"):
                 # # Enforce no mesh movement normal to boundaries
                 # n = FacetNormal(self.mesh)
@@ -159,25 +156,43 @@ class MeshMover():
                 # L_bc = inner(xi, Constant(as_vector([0.0, 0.0])))*ds
                 # a_bc = inner(xi, x)*ds
                 # L_bc = inner(xi, self.x_old)*ds
+                # a_bc = inner(dot(xi, n), dot(x, n))*ds
+                # L_bc = inner(dot(xi, n), dot(self.x_old, n))*ds
                 # if self.bc is None:
                 #     self.bc = [EquationBC(a_bc == L_bc, self.x_new, 'on_boundary')]
 
-                # # Allow tangential movement, but only up until the end of boundary segments
+                # Allow tangential movement, but only up until the end of boundary segments
                 # s = as_vector([n[1], -n[0]])
                 # a_bc = inner(xi, dot(grad(x), s))*ds
                 # L_bc = inner(xi, dot(grad(self.x_old), s))*ds
+                # a_bc = inner(dot(xi, s), dot(x, s))*ds
+                # L_bc = inner(dot(xi, s), dot(self.x_old, s))*ds
                 # if self.bbc is None:
                 #     edges = set(self.mesh.exterior_facets.unique_markers)
-                #     corners = [(i, j) for i in edges for j in edges.difference([i])]
-                #     self.bbc = DirichletBC(coord_space, 0, corners)
+                #     if len(edges) > 1:
+                #         corners = [(i, j) for i in edges for j in edges.difference([i])]
+                #         self.bbc = DirichletBC(coord_space, 0, corners)
                 # self.bc.append(EquationBC(a_bc == L_bc, self.x_new, 'on_boundary', bcs=self.bbc))
             # else:
                 # warnings.warn("#### TODO: ALE boundary condition may not be properly accounted for!")
 
             prob = LinearVariationalProblem(a, L, self.x_new, bcs=self.bc)
-            kwargs = {'solver_parameters': {'ksp_type': 'cg', 'pc_type': 'jacobi'}}
-            # kwargs = {'solver_parameters': {'ksp_type': 'gmres', 'pc_type': 'sor'}}
-            # kwargs = {'solver_parameters': {'mat_type': 'aij', 'ksp_type': 'gmres', 'pc_type': 'lu', 'pc_factor_mat_solver_type': 'mumps'}}
+            kwargs = {
+                'solver_parameters': {
+                    # 'mat_type': 'aij',
+                    # 'ksp_type': 'cg',
+                    'ksp_type': 'gmres',
+                    # 'ksp_type': 'preonly',
+                    # 'pc_type': 'sor',
+                    # 'pc_type': 'lu',
+                    # 'pc_type': 'jacobi',
+                    'pc_type': 'bjacobi',
+                    'sub_pc_type': 'ilu',
+                    # 'pc_factor_mat_solver_type': 'mumps',
+                    'ksp_monitor': None,
+                    'ksp_converged_reason': None,
+                }
+            }
         elif self.op.nonlinear_method == 'relaxation':
             φ, ψ = TrialFunction(self.V), TestFunction(self.V)
             a = dot(grad(ψ), grad(φ))*dx
@@ -386,8 +401,9 @@ class MeshMover():
         L_bc = dot(grad(self.φ_old), s)*dot(v_cts, s)*ds
         if self.bbc is None:
             edges = set(self.mesh.exterior_facets.unique_markers)
-            corners = [(i, j) for i in edges for j in edges.difference([i])]
-            self.bbc = DirichletBC(self.P1_vec, 0, corners)
+            if len(edges) > 1:
+                corners = [(i, j) for i in edges for j in edges.difference([i])]
+                self.bbc = DirichletBC(self.P1_vec, 0, corners)
         self.bc.append(EquationBC(a_bc == L_bc, self.grad_φ_cts, 'on_boundary', bcs=self.bbc))
 
         # Create solver

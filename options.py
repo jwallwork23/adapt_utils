@@ -293,7 +293,7 @@ class Options(FrozenConfigurable):
         """
         Prescribed a mesh velocity.
         """
-        if self.prescribed_velocity == "constant":
+        if self.prescribed_velocity == "zero":
 
             # Eulerian case (fixed mesh)
             self.mesh_velocity = lambda mesh: Constant(as_vector([0.0, 0.0]))

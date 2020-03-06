@@ -8,20 +8,22 @@ from adapt_utils.tracer.solver2d import UnsteadyTracerProblem2d
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-initial_resolution", help="Initial mesh resolution")
-parser.add_argument("-velocity", help="Type of prescribed velocity. Choose from {'constant', 'fluid'}")
+parser.add_argument("-velocity", help="Type of prescribed velocity. Choose from {'zero', 'fluid'}")
+parser.add_argument("-family", help="Choose from {'cg', 'dg'}.")
 args = parser.parse_args()
 
 
 # Create parameter class
 i = int(args.initial_resolution or 0)
+family = args.family or 'dg'
 kwargs = {
     'approach': 'ale',
     'n': 2**i,
-    'family': 'CG',
-    'stabilisation': 'SUPG',
+    'family': family,
+    'stabilisation': 'SUPG' if family in ('CG', 'cg', 'Lagrange') else 'no',
     'num_adapt': 1,
     'nonlinear_method': 'relaxation',
-    'prescribed_velocity': args.velocity or 'constant',
+    'prescribed_velocity': args.velocity or 'zero',
 }
 op = LeVequeOptions(shape=0, **kwargs)
 
