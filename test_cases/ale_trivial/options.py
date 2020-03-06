@@ -11,6 +11,8 @@ class ALEAdvectionOptions(TracerOptions):
         super(ALEAdvectionOptions, self).__init__(*args, approach=approach, **kwargs)
         self.family = 'CG'
         self.stabilisation = 'SUPG'
+        self.num_adapt = 1
+        self.nonlinear_method = 'relaxation'
 
         lx, ly = 10, 10
         self.default_mesh = PeriodicRectangleMesh(n, n, lx, ly, direction='x')
@@ -19,14 +21,15 @@ class ALEAdvectionOptions(TracerOptions):
         self.dt_per_export = 1
         self.end_time = 10.0
 
-        self.base_diffusivity = 1.0e-8
+        # self.base_diffusivity = 1.0e-8
+        self.base_diffusivity = 0.0
         self.base_velocity = [1.0, 0.0]
 
         self.params = {
             "ksp_type": "gmres",
             "pc_type": "sor",
-            "ksp_monitor": None,
-            "ksp_converged_reason": None,
+            # "ksp_monitor": None,
+            # "ksp_converged_reason": None,
         }
 
     def set_velocity(self, fs):
