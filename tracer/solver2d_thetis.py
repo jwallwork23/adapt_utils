@@ -20,7 +20,7 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
     for (prescribed) velocity :math:`\textbf{u}`, diffusivity :math:`\nu \geq 0`, source :math:`f`
     and (prognostic) concentration :math:`\phi`.
     """
-    def __init__(self, op, mesh=None, 
+    def __init__(self, op, mesh=None, **kwargs):
         try:
             assert op.family in ("Discontinuous Lagrange", "DG", "dg")
         except AssertionError:

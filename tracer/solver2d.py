@@ -325,7 +325,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         # bdy_contributions -= Fhat*ds(2) + Fhat*ds(3) + Fhat*ds(4)
 
 
-# TODO!
+# TODO: Extend functionality
 class UnsteadyTracerProblem2d(UnsteadyProblem):
     r"""
     General solver object for 2D tracer advection problems of the form
@@ -506,7 +506,10 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         op = self.op
         self.setup_solver_forward()
         i, t = 0, 0.0
+        update_forcings = self.op.get_update_forcings()
         while t < op.end_time - 0.5*op.dt:
+            update_forcings(t)
+            self.fields['velocity'].assign(op.fluid_velocity)  # TODO: Generalise
             self.solve_step()
             if (i % op.dt_per_export) == 0:
                 print_output("t = {:.2f}s".format(t))
