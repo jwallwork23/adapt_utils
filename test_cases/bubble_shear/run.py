@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("interpretation", help="Choose from {'eulerian', 'lagrangian'}.")
 parser.add_argument("-family", help="Choose from {'cg', 'dg'}.")
 parser.add_argument("-n", help="Resolution of initial mesh.")
+parser.add_argument("-num_adapt", help="Number of initial mesh adaptations.")
 parser.add_argument("-debug", help="Toggle debugging mode.")
 args = parser.parse_args()
 
@@ -26,12 +27,18 @@ kwargs = {
     'nonlinear_method': 'quasi_newton',
     'r_adapt_rtol': 1.0e-3,
 }
+initialisation_kwargs = {
+    'approach': 'monge_ampere',
+    'num_adapt': int(args.num_adapt or 1),
+    'adapt_field': 'solution_frobenius',
+    'alpha': 0.1,
+}
 
 op = BubbleOptions(**kwargs)
 # tp = UnsteadyTracerProblem2d_Thetis(op)
 tp = UnsteadyTracerProblem2d(op)
 if approach == 'ale':
-    tp.initialise_mesh(approach='monge_ampere', adapt_field='solution_frobenius', alpha=0.1)
+    tp.initialise_mesh(**initialisation_kwargs)
     tp.set_start_condition()
 tp.setup_solver_forward()
 init_norm = norm(tp.solution)

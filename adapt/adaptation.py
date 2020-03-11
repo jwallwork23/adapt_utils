@@ -86,7 +86,7 @@ class AdaptiveMesh():
         r = interpolate(JacobianDeterminant(self.mesh)/self.jacobian_sign, self.P0)
         if r.vector().gather().min() < 0:
             if error:
-                raise ValueError("ERROR! Mesh has inverted elements!")
+                raise ValueError("Mesh has inverted elements!")
             else:
                 warnings.warn("WARNING! Mesh has inverted elements!")
 

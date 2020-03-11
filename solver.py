@@ -744,6 +744,8 @@ class SteadyProblem():
         self.create_function_spaces()
         self.create_solutions()
         self.set_fields(adapted=True)
+        if hasattr(self, 'set_start_condition'):
+            self.set_start_condition()
         self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
     def initialise_mesh(self, approach='hessian', adapt_field=None, num_adapt=None, alpha=1.0, beta=1.0):
