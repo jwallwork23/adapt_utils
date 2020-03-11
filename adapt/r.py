@@ -189,8 +189,8 @@ class MeshMover():
                     'pc_type': 'bjacobi',
                     'sub_pc_type': 'ilu',
                     # 'pc_factor_mat_solver_type': 'mumps',
-                    'ksp_monitor': None,
-                    'ksp_converged_reason': None,
+                    # 'ksp_monitor': None,
+                    # 'ksp_converged_reason': None,
                 }
             }
         elif self.op.nonlinear_method == 'relaxation':

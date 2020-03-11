@@ -54,7 +54,7 @@ class AdaptiveMesh():
     def copy(self):  # FIXME: Doesn't preserve hierarchy
         return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
 
-    def get_quality(self):
+    def get_quality(self):  # FIXME: Why do rotations of the same element not have the same quality?
         """
         Compute the scaled Jacobian for each mesh element:
     ..  math::
@@ -66,25 +66,25 @@ class AdaptiveMesh():
         """
         assert self.dim == 2
         J = interpolate(Jacobian(self.mesh), self.P0_ten)
-        unswapped = as_matrix([[J[0, 0], J[0, 1]], [J[1, 0], J[1, 1]]])
-        swapped = as_matrix([[J[1, 0], J[1, 1]], [J[0, 0], J[0, 1]]])
-        sgn = Function(self.P0)
-        sgn.dat.data[:] = self.jacobian_sign.dat.data
+        # unswapped = as_matrix([[J[0, 0], J[0, 1]], [J[1, 0], J[1, 1]]])
+        # swapped = as_matrix([[J[1, 0], J[1, 1]], [J[0, 0], J[0, 1]]])
+        # sgn = Function(self.P0)
+        # sgn.dat.data[:] = self.jacobian_sign.dat.data
         # J.interpolate(conditional(ge(self.jacobian_sign, 0), unswapped, swapped))
-        J.interpolate(conditional(ge(sgn, 0), unswapped, swapped))
-        detJ = det(J)
+        # J.interpolate(conditional(ge(sgn, 0), unswapped, swapped))
+        # detJ = det(J)
         edge1 = as_vector([J[0, 0], J[1, 0]])
         edge2 = as_vector([J[0, 1], J[1, 1]])
         norm1 = sqrt(dot(edge1, edge1))
         norm2 = sqrt(dot(edge2, edge2))
 
-        self.scaled_jacobian = interpolate(detJ/(norm1*norm2), self.P0)
+        detJ = JacobianDeterminant(self.mesh)
+        self.scaled_jacobian = interpolate(detJ/(norm1*norm2*self.jacobian_sign), self.P0)
         return self.scaled_jacobian
 
-    def check_inverted(self, error=False):
-        if not hasattr(self, 'scaled_jacobian'):
-            self.get_quality()
-        if self.scaled_jacobian.vector().gather().min() < 0:
+    def check_inverted(self, error=True):
+        r = interpolate(JacobianDeterminant(self.mesh)/self.jacobian_sign, self.P0)
+        if r.vector().gather().min() < 0:
             if error:
                 raise ValueError("ERROR! Mesh has inverted elements!")
             else:
@@ -98,8 +98,7 @@ class AdaptiveMesh():
           * blue    : low quality elements (0 - 50%);
           * magenta : inverted elements (quality < 0).
         """
-        if not hasattr(self, 'scaled_jacobian'):
-            self.get_quality()
+        self.get_quality()
 
         # FIXME: Inverted elements do not show! Tried making transparent but it didn't do anything.
         cmap = plt.get_cmap('viridis', 30)
@@ -113,7 +112,7 @@ class AdaptiveMesh():
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        cax = plot(self.scaled_jacobian, vmin=-0.5, vmax=1, cmap=newcmap, axes=ax)
+        cax = plot(self.scaled_jacobian, colorbar=True, vmin=-0.5, vmax=1, cmap=newcmap, axes=ax)
         ax.set_title("Scaled Jacobian")
         plot(self.mesh, axes=ax)
         if savefig:

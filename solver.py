@@ -504,15 +504,18 @@ class SteadyProblem():
         op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.indicator.dat(op2.READ))
         self.M = steady_metric(self.solution if adjoint else self.adjoint_solution, H=H, op=self.op)
 
+    def plot_mesh(self):
+        meshfile = File(os.path.join(self.di, 'mesh.pvd'))
+        #try:
+        #    meshfile.write(self.mesh)  # This is allowed in modern firedrake
+        #except ValueError:
+        meshfile.write(self.mesh.coordinates)
+
     def plot(self):
         """
         Plot current mesh and indicator fields, if available.
         """
-        meshfile = File(os.path.join(self.di, 'mesh.pvd'))
-        try:
-            meshfile.write(self.mesh)  # This is allowed in modern firedrake
-        except ValueError:
-            meshfile.write(self.mesh.coordinates)
+        self.plot_mesh()
         for key in self.indicators:
             tmp = interpolate(abs(self.indicators[key]), self.P0)
             tmp.rename(key)

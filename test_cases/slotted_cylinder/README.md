@@ -20,11 +20,13 @@ A fixed mesh version of this test case was coded in Firedrake as [demo][1].
 
 ### This implementation
 
-* P1DG with upwinding (see [demo][1]).
+* Unit square domain
+* P1DG with upwinding (see [demo][1]) or P1 with SUPG stabilisation.
 
 ### Remarks
 
 * Adjoint based error esimators not particularly useful.
+* A Lagrangian mesh movement approach could work, but requires care regarding the domain boundaries.
 * Metric advection could be very useful
 
 ### References

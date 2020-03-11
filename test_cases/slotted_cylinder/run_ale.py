@@ -16,6 +16,7 @@ args = parser.parse_args()
 # Create parameter class
 i = int(args.initial_resolution or 0)
 family = args.family or 'dg'
+velocity = args.velocity or 'zero'
 kwargs = {
     'approach': 'ale',
     'n': 2**i,
@@ -23,30 +24,25 @@ kwargs = {
     'stabilisation': 'SUPG' if family in ('CG', 'cg', 'Lagrange') else 'no',
     'num_adapt': 1,
     'nonlinear_method': 'relaxation',
-    'prescribed_velocity': args.velocity or 'zero',
+    'prescribed_velocity': velocity,
 }
 op = LeVequeOptions(shape=0, **kwargs)
 
 # Run model
 tp = UnsteadyTracerProblem2d(op=op)
 tp.setup_solver_forward()
-tp.solve_ale()  # FIXME
+tp.solve_ale(check_inverted=velocity != 'zero')  # FIXME: Mesh tangling issue
 print_output("\nElement count : {:d}".format(tp.mesh.num_cells()))
 
 # QoIs
-print_output("\nGaussian\n")
-print_output("Analytic QoI  : {:.8e}".format(op.exact_qoi()))
-print_output("Quadrature QoI: {:.8e}".format(op.quadrature_qoi(tp.P0)))
-print_output("Calculated QoI: {:.8e}".format(tp.quantity_of_interest()))
-op.__init__(shape=1, **kwargs)
-tp.get_qoi_kernel()
-print_output("\nCone\n")
-print_output("Analytic QoI  : {:.8e}".format(op.exact_qoi()))
-print_output("Quadrature QoI: {:.8e}".format(op.quadrature_qoi(tp.P0)))
-print_output("Calculated QoI: {:.8e}".format(tp.quantity_of_interest()))
-op.__init__(shape=2, **kwargs)
-tp.get_qoi_kernel()
-print_output("\nSlotted Cylinder\n")
-print_output("Analytic QoI  : {:.8e}".format(op.exact_qoi()))
-print_output("Quadrature QoI: {:.8e}".format(op.quadrature_qoi(tp.P0)))
-print_output("Calculated QoI: {:.8e}".format(tp.quantity_of_interest()))
+for i, shape in zip(range(3), ('Gaussian', 'Cone', 'Slotted cylinder')):
+    print_output("\n{:s}\n".format(shape))
+    op.__init__(shape=i, **kwargs)
+    tp.get_qoi_kernel()
+    exact = op.exact_qoi()
+    quadrature = op.quadrature_qoi(tp.P0)
+    approx = tp.quantity_of_interest()
+    print_output("Analytic QoI    : {:.8e}".format(exact))
+    print_output("Calculated QoI  : {:.8e}".format(approx))
+    print_output("Relative error  : {:.4f}%".format(abs(1.0-approx/exact)))
+    print_output("(Quadrature QoI : {:.8e})".format(quadrature))
