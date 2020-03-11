@@ -51,7 +51,7 @@ class BubbleOptions(TracerOptions):
         x, y = SpatialCoordinate(fs.mesh())
         T = self.period
         if not hasattr(self, 'fluid_velocity') or self.fluid_velocity is None or \
-           isinstance(self.fluid_velocity, Constant):
+           isinstance(self.fluid_velocity, Constant) or fs != self.fluid_velocity.function_space():
             self.fluid_velocity = Function(fs)
         self.fluid_velocity.interpolate(
                 as_vector((2*sin(pi*x)*sin(pi*x)*sin(2*pi*y)*cos(2*pi*t/T),

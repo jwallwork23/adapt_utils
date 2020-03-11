@@ -43,8 +43,7 @@ class SteadyProblem():
         # Setup problem
         op.print_debug(op.indent+"Building mesh...")
         self.set_mesh(mesh, hierarchy=hierarchy)
-        if op.approach == 'monge_ampere':
-            self.am_init = self.am.copy()  # FIXME: Less hacky
+        self.init_mesh = Mesh(Function(self.mesh.coordinates))
         op.print_debug(op.indent+"Building function spaces...")
         self.create_function_spaces()
         op.print_debug(op.indent+"Building solutions...")
@@ -693,7 +692,7 @@ class SteadyProblem():
 
                 
             # Create MeshMover object and establish coordinate transformation
-            mesh_mover = MeshMover(self.am_init.mesh, self.monitor_function, op=self.op)
+            mesh_mover = MeshMover(self.init_mesh, self.monitor_function, op=self.op)
             mesh_mover.adapt()
 
             # Create a temporary Problem based on the new mesh
@@ -775,7 +774,7 @@ class SteadyProblem():
                 f = ff[0]
                 def monitor(mesh):
                     P1 = FunctionSpace(mesh, "CG", 1)
-                    b = project(self.fields[f], P1)
+                    b = project(self.solution if f == 'solution' else self.fields[f], P1)
                     H = construct_hessian(b, op=self.op)
                     return 1.0 + alpha*local_frobenius_norm(H, mesh=mesh, space=P1)
             else:
