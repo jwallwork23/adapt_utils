@@ -201,9 +201,9 @@ class SteadyTracerProblem2d(SteadyProblem):
                 flux_terms += i*(flux + bcs[j]['diff_flux'])*ds(j)
 
         # Solve auxiliary FEM problem
-        self.indicators['flux'] = Function(self.P0)
-        solve(mass_term == flux_terms, self.indicators['flux'])
-        self.estimate_error('flux')
+        self.indicators['flux_forward'] = Function(self.P0)
+        solve(mass_term == flux_terms, self.indicators['flux_forward'])
+        self.estimate_error('flux_forward')
 
     def get_flux_adjoint(self):
         i = self.p0test
@@ -224,9 +224,9 @@ class SteadyTracerProblem2d(SteadyProblem):
                 flux_terms += i*flux*ds(j)  # Robin BC in adjoint
 
         # Solve auxiliary FEM problem
-        self.indicators['dwr_flux_adjoint'] = Function(self.P0)
-        solve(mass_term == flux_terms, self.indicators['dwr_flux_adjoint'])
-        self.estimate_error('dwr_flux_adjoint')
+        self.indicators['flux_adjoint'] = Function(self.P0)
+        solve(mass_term == flux_terms, self.indicators['flux_adjoint'])
+        self.estimate_error('flux_adjoint')
 
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched

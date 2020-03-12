@@ -441,6 +441,26 @@ class SteadyProblem():
             self.estimators[label] = []
         self.estimators[label].append(self.estimators[cell_label][-1] + self.estimators[flux_label][-1])
 
+    def get_flux(self, adjoint=False):
+        if adjoint:
+            self.get_flux_adjoint()
+        else:
+            self.get_flux_forward()
+
+    def get_scaled_residual(self, adjoint=False):
+        r"""
+        Evaluate the scaled form of the residual, as used in [Becker & Rannacher, 2001].
+        i.e. the $\rho_K$ term.
+        """
+        self.get_strong_residual(adjoint=adjoint)
+        self.get_flux(adjoint=adjoint)
+        rname, fname, sname = 'cell_residual', 'flux', 'scaled_residual'
+        ext = 'adjoint' if adjoint else 'forward'
+        for name in (rname, fname, sname):
+            name = '_'.joint(name, ext)
+        rho = self.indicators[rname] + self.indicators[fname]/sqrt(self.h)
+        self.indicators[sname] = assemble(self.p0test*rho*dx)
+
     def dwp_indication(self):
         """
         Indicate significance by the product of forward and adjoint solutions. This approach was
