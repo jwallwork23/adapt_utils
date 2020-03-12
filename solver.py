@@ -447,19 +447,48 @@ class SteadyProblem():
         else:
             self.get_flux_forward()
 
-    def get_scaled_residual(self, adjoint=False):
+    def get_scaled_residual(self, adjoint=False, norm_type='L2'):
         r"""
         Evaluate the scaled form of the residual, as used in [Becker & Rannacher, 2001].
         i.e. the $\rho_K$ term.
         """
-        self.get_strong_residual(adjoint=adjoint)
-        self.get_flux(adjoint=adjoint)
+        self.get_strong_residual(adjoint=adjoint, norm_type=norm_type)
+        self.get_flux(adjoint=adjoint, norm_type=norm_type)
         rname, fname, sname = 'cell_residual', 'flux', 'scaled_residual'
         ext = 'adjoint' if adjoint else 'forward'
         for name in (rname, fname, sname):
             name = '_'.joint(name, ext)
         rho = self.indicators[rname] + self.indicators[fname]/sqrt(self.h)
         self.indicators[sname] = assemble(self.p0test*rho*dx)
+        self.estimate_error(sname)
+
+    def get_scaled_weights(self, adjoint=False, norm_type='L2'):  # TODO: Needs overriding if DG?
+        r"""
+        Evaluate the scaled form of the residual weights, as used in [Becker & Rannacher, 2001].
+        i.e. the $\omega_K$ term.
+        """
+        self.solve_high_order(adjoint=not adjoint)
+        error = self.error if adjoint else self.adjoint_error
+        sname = '_'.joint('scaled_weights', 'adjoint' if adjoint else 'forward')
+        if norm_type is None:
+            R = error
+            r = error
+        elif norm_type == 'L1':
+            R = abs(error)
+            r = abs(error)
+        elif norm_type == 'L2':
+            R = error*error
+            r = error*error
+        else:
+            raise ValueError("Norm should be chosen from {None, 'L1' or 'L2'}.")
+        i = self.p0test
+        mass_term = i*self.p0trial*dx
+        flux_term = ((i*r)('+') + (i*r)('-'))*dS + i*r*ds
+        flux = Function(self.P0)
+        solve(mass_term == flux_term, flux)
+        omega = R + flux*sqrt(self.h)
+        self.indicators[sname] = assemble(i*omega*dx)
+        self.estimate_error(sname)
 
     def dwp_indication(self):
         """

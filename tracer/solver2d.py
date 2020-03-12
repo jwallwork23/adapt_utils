@@ -154,13 +154,20 @@ class SteadyTracerProblem2d(SteadyProblem):
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.P0)
 
-    def get_strong_residual_forward(self):
+    def get_strong_residual_forward(self, norm_type=None):
         u = self.fields['velocity']
         nu = self.fields['diffusivity']
         assert self.op.residual_approach in ('classical', 'difference_quotient')
         sol = self.solution if self.op.residual_approach == 'classical' else self.adjoint_solution
         R = self.fields['source'] - dot(u, grad(sol)) + div(nu*grad(sol))
-        self.indicators['cell_residual_forward'] = assemble(self.p0test*abs(R)*dx)
+        if norm_type is None:
+            self.indicators['cell_residual_forward'] = assemble(self.p0test*R*dx)
+        elif norm_type == 'L1':
+            self.indicators['cell_residual_forward'] = assemble(self.p0test*abs(R)*dx)
+        elif norm_type == 'L2':
+            self.indicators['cell_residual_forward'] = assemble(self.p0test*R*R*dx)
+        else:
+            raise ValueError("Norm should be chosen from {None, 'L1' or 'L2'}.")
         self.indicator = interpolate(self.indicators['cell_residual_forward'], self.P1)
         # self.indicator = interpolate(R, self.P1)
         # self.indicator = interpolate(abs(self.indicator), self.P1)
