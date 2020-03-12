@@ -362,20 +362,78 @@ class SteadyProblem():
             self.get_qoi_kernel()
         return assemble(inner(self.solution, self.kernel)*dx(degree=12))
 
-    def get_strong_residual(self, adjoint=False):
+    def get_strong_residual(self, adjoint=False, **kwargs):
         """
         Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
         boolean kwarg.
         """
         if adjoint:
-            self.get_strong_residual_forward()
+            self.get_strong_residual_forward(**kwargs)
         else:
-            self.get_strong_residual_adjoint()
+            self.get_strong_residual_adjoint(**kwargs)
 
-    def get_strong_residual_forward(self):
+    def get_flux(self, adjoint=False, **kwargs):
+        """
+        Evaluate flux terms for forward or adjoint PDE, as specified by the `adjoint` boolean kwarg.
+        """
+        if adjoint:
+            self.get_flux_adjoint(**kwargs)
+        else:
+            self.get_flux_forward(**kwargs)
+
+    def get_scaled_residual(self, adjoint=False, norm_type='L2'):
+        r"""
+        Evaluate the scaled form of the residual, as used in [Becker & Rannacher, 2001].
+        i.e. the $\rho_K$ term.
+        """
+        self.get_strong_residual(adjoint=adjoint, norm_type=norm_type)
+        self.get_flux(adjoint=adjoint, norm_type=norm_type)
+        rname, fname, sname = 'cell_residual', 'flux', 'scaled_residual'
+        ext = 'adjoint' if adjoint else 'forward'
+        for name in (rname, fname, sname):
+            name = '_'.joint(name, ext)
+        rho = self.indicators[rname] + self.indicators[fname]/sqrt(self.h)
+        self.indicators[sname] = assemble(self.p0test*rho*dx)
+        self.estimate_error(sname)
+
+    def get_scaled_weights(self, adjoint=False, norm_type='L2'):  # TODO: Needs overriding if DG?
+        r"""
+        Evaluate the scaled form of the residual weights, as used in [Becker & Rannacher, 2001].
+        i.e. the $\omega_K$ term.
+        """
+        self.solve_high_order(adjoint=not adjoint)
+        error = self.error if adjoint else self.adjoint_error
+        sname = '_'.joint('scaled_weights', 'adjoint' if adjoint else 'forward')
+        if norm_type is None:
+            R = error
+            r = error
+        elif norm_type == 'L1':
+            R = abs(error)
+            r = abs(error)
+        elif norm_type == 'L2':
+            R = error*error
+            r = error*error
+        else:
+            raise ValueError("Norm should be chosen from {None, 'L1' or 'L2'}.")
+        i = self.p0test
+        mass_term = i*self.p0trial*dx
+        flux_term = ((i*r)('+') + (i*r)('-'))*dS + i*r*ds
+        flux = Function(self.P0)
+        solve(mass_term == flux_term, flux)
+        omega = R + flux*sqrt(self.h)
+        self.indicators[sname] = assemble(i*omega*dx)
+        self.estimate_error(sname)
+
+    def get_strong_residual_forward(self, norm_type=None):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def get_strong_residual_adjoint(self):
+    def get_strong_residual_adjoint(self, norm_type=None):
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def get_flux_forward(self):
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def get_flux_adjoint(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def get_dwr_residual(self, adjoint=False):
@@ -440,55 +498,6 @@ class SteadyProblem():
         if not label in self.estimators:
             self.estimators[label] = []
         self.estimators[label].append(self.estimators[cell_label][-1] + self.estimators[flux_label][-1])
-
-    def get_flux(self, adjoint=False):
-        if adjoint:
-            self.get_flux_adjoint()
-        else:
-            self.get_flux_forward()
-
-    def get_scaled_residual(self, adjoint=False, norm_type='L2'):
-        r"""
-        Evaluate the scaled form of the residual, as used in [Becker & Rannacher, 2001].
-        i.e. the $\rho_K$ term.
-        """
-        self.get_strong_residual(adjoint=adjoint, norm_type=norm_type)
-        self.get_flux(adjoint=adjoint, norm_type=norm_type)
-        rname, fname, sname = 'cell_residual', 'flux', 'scaled_residual'
-        ext = 'adjoint' if adjoint else 'forward'
-        for name in (rname, fname, sname):
-            name = '_'.joint(name, ext)
-        rho = self.indicators[rname] + self.indicators[fname]/sqrt(self.h)
-        self.indicators[sname] = assemble(self.p0test*rho*dx)
-        self.estimate_error(sname)
-
-    def get_scaled_weights(self, adjoint=False, norm_type='L2'):  # TODO: Needs overriding if DG?
-        r"""
-        Evaluate the scaled form of the residual weights, as used in [Becker & Rannacher, 2001].
-        i.e. the $\omega_K$ term.
-        """
-        self.solve_high_order(adjoint=not adjoint)
-        error = self.error if adjoint else self.adjoint_error
-        sname = '_'.joint('scaled_weights', 'adjoint' if adjoint else 'forward')
-        if norm_type is None:
-            R = error
-            r = error
-        elif norm_type == 'L1':
-            R = abs(error)
-            r = abs(error)
-        elif norm_type == 'L2':
-            R = error*error
-            r = error*error
-        else:
-            raise ValueError("Norm should be chosen from {None, 'L1' or 'L2'}.")
-        i = self.p0test
-        mass_term = i*self.p0trial*dx
-        flux_term = ((i*r)('+') + (i*r)('-'))*dS + i*r*ds
-        flux = Function(self.P0)
-        solve(mass_term == flux_term, flux)
-        omega = R + flux*sqrt(self.h)
-        self.indicators[sname] = assemble(i*omega*dx)
-        self.estimate_error(sname)
 
     def dwp_indication(self):
         """

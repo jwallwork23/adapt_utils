@@ -168,26 +168,33 @@ class SteadyTracerProblem2d(SteadyProblem):
             self.indicators['cell_residual_forward'] = assemble(self.p0test*R*R*dx)
         else:
             raise ValueError("Norm should be chosen from {None, 'L1' or 'L2'}.")
-        self.indicator = interpolate(self.indicators['cell_residual_forward'], self.P1)
+        self.indicator = interpolate(self.indicators['cell_residual_forward'], self.P1)  # NOTE
         # self.indicator = interpolate(R, self.P1)
         # self.indicator = interpolate(abs(self.indicator), self.P1)
         self.indicator.rename('forward strong residual')
         self.estimate_error('cell_residual_forward')
 
-    def get_strong_residual_adjoint(self):
+    def get_strong_residual_adjoint(self, norm_type=None):
         u = self.fields['velocity']
         nu = self.fields['diffusivity']
         assert self.op.residual_approach in ('classical', 'difference_quotient')
         sol = self.adjoint_solution if self.op.residual_approach == 'classical' else self.solution
         R = self.kernel + div(u*sol) + div(nu*grad(sol))
-        self.indicators['cell_residual_adjoint'] = assemble(self.p0test*abs(R)*dx)
-        self.indicator = interpolate(self.indicators['cell_residual_adjoint'], self.P1)
+        if norm_type is None:
+            self.indicators['cell_residual_adjoint'] = assemble(self.p0test*R*dx)
+        elif norm_type == 'L1':
+            self.indicators['cell_residual_adjoint'] = assemble(self.p0test*abs(R)*dx)
+        elif norm_type == 'L2':
+            self.indicators['cell_residual_adjoint'] = assemble(self.p0test*R*R*dx)
+        else:
+            raise ValueError("Norm should be chosen from {None, 'L1' or 'L2'}.")
+        self.indicator = interpolate(self.indicators['cell_residual_adjoint'], self.P1)  # NOTE
         # self.indicator = interpolate(R, self.P1)
         # self.indicator = interpolate(abs(self.indicator), self.P1)
         self.indicator.rename('adjoint strong residual')
         self.estimate_error('cell_residual_adjoint')
 
-    def get_flux_forward(self):
+    def get_flux_forward(self, norm_type=None):
         i = self.p0test
         nu = self.fields['diffusivity']
         assert self.op.residual_approach in ('classical', 'difference_quotient')
@@ -196,7 +203,14 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Flux terms (arising from integration by parts)
         mass_term = i*self.p0trial*dx
         flux = -nu*dot(self.n, nabla_grad(sol))
-        flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+        if norm_type is None:
+            flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+        elif norm_type == 'L1':
+            flux_terms = ((i*abs(flux))('+') + (i*abs(flux))('-'))*dS
+        elif norm_type == 'L2':
+            flux_terms = ((i*flux*flux)('+') + (i*flux*flux)('-'))*dS
+        else:
+            raise ValueError("Norm should be chosen from {None, 'L1' or 'L2'}.")
 
         # Account for boundary conditions
         # NOTES:
@@ -205,14 +219,20 @@ class SteadyTracerProblem2d(SteadyProblem):
         bcs = self.boundary_conditions
         for j in bcs:
             if 'diff_flux' in bcs[j]:
-                flux_terms += i*(flux + bcs[j]['diff_flux'])*ds(j)
+                bdy_flux = flux + bcs[j]['diff_flux']
+                if norm_type is None:
+                    flux_terms += i*bdy_flux*ds(j)
+                elif norm_type == 'L1':
+                    flux_terms += i*abs(bdy_flux)*ds(j)
+                elif norm_type == 'L2':
+                    flux_terms += i*bdy_flux*bdy_flux*ds(j)
 
         # Solve auxiliary FEM problem
         self.indicators['flux_forward'] = Function(self.P0)
         solve(mass_term == flux_terms, self.indicators['flux_forward'])
         self.estimate_error('flux_forward')
 
-    def get_flux_adjoint(self):
+    def get_flux_adjoint(self, norm_type=None):
         i = self.p0test
         u = self.fields['velocity']
         nu = self.fields['diffusivity']
@@ -222,13 +242,25 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Edge residual
         mass_term = i*self.p0trial*dx
         flux = -(sol*dot(u, self.n) + nu*dot(self.n, nabla_grad(sol)))
-        flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+        if norm_type is None:
+            flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+        elif norm_type == 'L1':
+            flux_terms = ((i*abs(flux))('+') + (i*abs(flux))('-'))*dS
+        elif norm_type == 'L2':
+            flux_terms = ((i*flux*flux)('+') + (i*flux*flux)('-'))*dS
+        else:
+            raise ValueError("Norm should be chosen from {None, 'L1' or 'L2'}.")
 
         # Account for boundary conditions
         bcs = self.boundary_conditions
         for j in bcs.keys():
-            if not 'value' in bcs[j]:
-                flux_terms += i*flux*ds(j)  # Robin BC in adjoint
+            if not 'value' in bcs[j]:  # Robin BC in adjoint
+                if norm_type is None:
+                    flux_terms += i*flux*ds(j)
+                elif norm_type == 'L1':
+                    flux_terms += i*abs(flux)*ds(j)
+                elif norm_type == 'L2':
+                    flux_terms += i*flux*flux*ds(j)
 
         # Solve auxiliary FEM problem
         self.indicators['flux_adjoint'] = Function(self.P0)
