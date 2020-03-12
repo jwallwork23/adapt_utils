@@ -391,7 +391,7 @@ class SteadyProblem():
         rname, fname, sname = 'cell_residual', 'flux', 'scaled_residual'
         ext = 'adjoint' if adjoint else 'forward'
         for name in (rname, fname, sname):
-            name = '_'.joint(name, ext)
+            name = '_'.join([name, ext])
         rho = self.indicators[rname] + self.indicators[fname]/sqrt(self.h)
         self.indicators[sname] = assemble(self.p0test*rho*dx)
         self.estimate_error(sname)
@@ -403,7 +403,7 @@ class SteadyProblem():
         """
         self.solve_high_order(adjoint=not adjoint)
         error = self.error if adjoint else self.adjoint_error
-        sname = '_'.joint('scaled_weights', 'adjoint' if adjoint else 'forward')
+        sname = '_'.join(['scaled_weights', 'adjoint' if adjoint else 'forward'])
         if norm_type is None:
             R = error
             r = error
@@ -423,6 +423,30 @@ class SteadyProblem():
         omega = R + flux*sqrt(self.h)
         self.indicators[sname] = assemble(i*omega*dx)
         self.estimate_error(sname)
+
+    def get_dwr_upper_bound(self, adjoint=False, **kwargs):
+        # TODO: doc [Becker & Rannacher, 2001]
+        self.get_scaled_residual(adjoint=adjoint, **kwargs)
+        self.get_scaled_weights(adjoint=adjoint, **kwargs)
+        rho, omega, iname = 'scaled_residual', 'scaled_weights', 'upper_bound'
+        ext = 'adjoint' if adjoint else 'forward'
+        for name in (rho, omega, iname):
+            name = '_'.join([name, ext])
+        ext = 'adjoint' if adjoint else 'forward'
+        self.indicators[iname] = assemble(self.p0test*self.indicators[rho]*self.indicators[omega]*dx)
+        self.estimate_error(iname)
+
+    def get_difference_quotient(self, adjoint=False, **kwargs):
+        # TODO: doc [Becker & Rannacher, 2001]
+        self.get_scaled_residual(adjoint=adjoint, **kwargs)
+        self.get_flux(adjoint=not adjoint, **kwargs)  # FIXME: Should be forward/adjoint residual
+        rho, omega, iname = 'scaled_residual', 'flux', 'difference_quotient'
+        ext = 'adjoint' if adjoint else 'forward'
+        for name in (rho, omega, iname):
+            name = '_'.join([name, ext])
+        ext = 'adjoint' if adjoint else 'forward'
+        self.indicators[iname] = assemble(self.p0test*self.indicators[rho]*self.indicators[omega]*dx)
+        self.estimate_error(iname)
 
     def get_strong_residual_forward(self, norm_type=None):
         raise NotImplementedError("Should be implemented in derived class.")
