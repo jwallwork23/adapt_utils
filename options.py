@@ -71,6 +71,7 @@ class Options(FrozenConfigurable):
 
     # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
+    residual_approach = Unicode('standard', help="Method for evaluating strong residual.").tag(config=True)
 
     # Adaptation loop
     element_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in mesh element count").tag(config=True)

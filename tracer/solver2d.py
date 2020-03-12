@@ -40,14 +40,13 @@ class SteadyTracerProblem2d(SteadyProblem):
         super(SteadyTracerProblem2d, self).__init__(op, mesh, fe, **kwargs)
         self.nonlinear = False
 
-    # TODO: update
     def set_fields(self, adapted=False):
         op = self.op
-        self.nu = op.set_diffusivity(self.P1)
-        self.u = op.set_velocity(self.P1_vec)
-        self.divergence_free = np.allclose(norm(div(self.u)), 0.0)
-        self.source = op.set_source(self.P1)
-        self.gradient_field = self.nu  # arbitrary field to take gradient for discrete adjoint
+        self.fields = {}
+        self.fields['diffusivity'] = op.set_diffusivity(self.P1)
+        self.fields['velocity'] = op.set_velocity(self.P1_vec)
+        # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
+        self.fields['source'] = op.set_source(self.P1)
 
         # Stabilisation
         self.stabilisation = self.stabilisation or 'SUPG'
@@ -83,27 +82,31 @@ class SteadyTracerProblem2d(SteadyProblem):
     ..  math::
             \tau = \frac h{2\|\textbf{u}\|}
         """
-        self.am.get_cell_size(self.u, mode=mode)
-        unorm = sqrt(inner(self.u, self.u))
-        Pe = 0.5*unorm*self.am.cell_size/self.nu
+        u = self.fields['velocity']
+        self.am.get_cell_size(u, mode=mode)
+        unorm = sqrt(inner(u, u))
+        Pe = 0.5*unorm*self.am.cell_size/self.fields['diffusivity']
         tau = 0.5*self.am.cell_size/unorm
         self.stabilisation_parameter = tau*min_value(1, Pe/3)
 
     def setup_solver_forward(self):
         phi = self.trial
         psi = self.test
+        nu = self.fields['diffusivity']
+        u = self.fields['velocity']
+        source = self.fields['source']
 
         # Finite element problem
-        self.lhs = psi*dot(self.u, grad(phi))*dx + self.nu*inner(grad(psi), grad(phi))*dx
-        self.rhs = psi*self.source*dx
+        self.lhs = psi*dot(u, grad(phi))*dx + nu*inner(grad(psi), grad(phi))*dx
+        self.rhs = psi*source*dx
 
         # Stabilisation
         if self.stabilisation in ('SU', 'SUPG'):
-            coeff = self.stabilisation_parameter*dot(self.u, grad(psi))
-            self.lhs += coeff*dot(self.u, grad(phi))*dx
+            coeff = self.stabilisation_parameter*dot(u, grad(psi))
+            self.lhs += coeff*dot(u, grad(phi))*dx
             if self.stabilisation == 'SUPG':
-                self.lhs += coeff*-div(self.nu*grad(phi))*dx
-                self.rhs += coeff*self.source*dx
+                self.lhs += coeff*-div(nu*grad(phi))*dx
+                self.rhs += coeff*source*dx
         elif self.stabilisation != 'no':
             raise ValueError("Unrecognised stabilisation method.")
 
@@ -112,7 +115,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.dbcs = []
         for i in bcs.keys():
             if bcs[i] == {}:
-                self.lhs += -self.nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
+                self.lhs += -nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
             if 'diff_flux' in bcs[i]:
                 self.rhs += psi*bcs[i]['diff_flux']*ds(i)
             if 'value' in bcs[i]:
@@ -121,17 +124,19 @@ class SteadyTracerProblem2d(SteadyProblem):
     def setup_solver_adjoint(self):
         lam = self.trial
         psi = self.test
+        nu = self.fields['diffusivity']
+        u = self.fields['velocity']
 
         # Adjoint finite element problem
-        self.lhs_adjoint = lam*dot(self.u, grad(psi))*dx + self.nu*inner(grad(lam), grad(psi))*dx
+        self.lhs_adjoint = lam*dot(u, grad(psi))*dx + nu*inner(grad(lam), grad(psi))*dx
         self.rhs_adjoint = self.kernel*psi*dx
 
         # Stabilisation
         if self.stabilisation in ('SU', 'SUPG'):
-            coeff = -self.stabilisation_parameter*div(self.u*psi)
-            self.lhs_adjoint += -coeff*div(self.u*lam)*dx
+            coeff = -self.stabilisation_parameter*div(u*psi)
+            self.lhs_adjoint += -coeff*div(u*lam)*dx
             if self.stabilisation == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
-                self.lhs_adjoint += coeff*-div(self.nu*grad(lam))*dx
+                self.lhs_adjoint += coeff*-div(nu*grad(lam))*dx
                 self.rhs_adjoint += coeff*self.kernel*dx
         elif self.stabilisation != 'no':
             raise ValueError("Unrecognised stabilisation method.")
@@ -143,14 +148,18 @@ class SteadyTracerProblem2d(SteadyProblem):
             if not 'diff_flux' in bcs[i]:
                 self.dbcs_adjoint.append(DirichletBC(self.V, 0, i))  # Dirichlet BC in adjoint
             if not 'value' in bcs[i]:
-                self.lhs_adjoint += -lam*psi*(dot(self.u, self.n))*ds(i)
-                self.lhs_adjoint += -self.nu*psi*dot(self.n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
+                self.lhs_adjoint += -lam*psi*(dot(u, self.n))*ds(i)
+                self.lhs_adjoint += -nu*psi*dot(self.n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.P0)
 
     def get_strong_residual_forward(self):
-        R = self.source - dot(self.u, grad(self.solution)) + div(self.nu*grad(self.solution))
+        u = self.fields['velocity']
+        nu = self.fields['diffusivity']
+        assert self.op.residual_approach in ('classical', 'difference_quotient')
+        sol = self.solution if self.op.residual_approach == 'classical' else self.adjoint_solution
+        R = self.fields['source'] - dot(u, grad(sol)) + div(nu*grad(sol))
         self.indicators['cell_residual_forward'] = assemble(self.p0test*abs(R)*dx)
         self.indicator = interpolate(self.indicators['cell_residual_forward'], self.P1)
         # self.indicator = interpolate(R, self.P1)
@@ -159,13 +168,65 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.estimate_error('cell_residual_forward')
 
     def get_strong_residual_adjoint(self):
-        R = self.kernel + div(self.u*self.adjoint_solution) + div(self.nu*grad(self.adjoint_solution))
+        u = self.fields['velocity']
+        nu = self.fields['diffusivity']
+        assert self.op.residual_approach in ('classical', 'difference_quotient')
+        sol = self.adjoint_solution if self.op.residual_approach == 'classical' else self.solution
+        R = self.kernel + div(u*sol) + div(nu*grad(sol))
         self.indicators['cell_residual_adjoint'] = assemble(self.p0test*abs(R)*dx)
         self.indicator = interpolate(self.indicators['cell_residual_adjoint'], self.P1)
         # self.indicator = interpolate(R, self.P1)
         # self.indicator = interpolate(abs(self.indicator), self.P1)
         self.indicator.rename('adjoint strong residual')
         self.estimate_error('cell_residual_adjoint')
+
+    def get_flux_forward(self):
+        i = self.p0test
+        nu = self.fields['diffusivity']
+        assert self.op.residual_approach in ('classical', 'difference_quotient')
+        sol = self.adjoint_solution if self.op.residual_approach == 'classical' else self.solution
+
+        # Flux terms (arising from integration by parts)
+        mass_term = i*self.p0trial*dx
+        flux = -nu*dot(self.n, nabla_grad(sol))
+        flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+
+        # Account for boundary conditions
+        # NOTES:
+        #   * For CG methods, Dirichlet error is zero, by construction.
+        #   * Negative sign in `flux`.
+        bcs = self.boundary_conditions
+        for j in bcs:
+            if 'diff_flux' in bcs[j]:
+                flux_terms += i*(flux + bcs[j]['diff_flux'])*ds(j)
+
+        # Solve auxiliary FEM problem
+        self.indicators['flux'] = Function(self.P0)
+        solve(mass_term == flux_terms, self.indicators['flux'])
+        self.estimate_error('flux')
+
+    def get_flux_adjoint(self):
+        i = self.p0test
+        u = self.fields['velocity']
+        nu = self.fields['diffusivity']
+        assert self.op.residual_approach in ('classical', 'difference_quotient')
+        sol = self.adjoint_solution if self.op.residual_approach == 'classical' else self.solution
+
+        # Edge residual
+        mass_term = i*self.p0trial*dx
+        flux = -(sol*dot(u, self.n) + nu*dot(self.n, nabla_grad(sol)))
+        flux_terms = ((i*flux)('+') + (i*flux)('-'))*dS
+
+        # Account for boundary conditions
+        bcs = self.boundary_conditions
+        for j in bcs.keys():
+            if not 'value' in bcs[j]:
+                flux_terms += i*flux*ds(j)  # Robin BC in adjoint
+
+        # Solve auxiliary FEM problem
+        self.indicators['dwr_flux_adjoint'] = Function(self.P0)
+        solve(mass_term == flux_terms, self.indicators['dwr_flux_adjoint'])
+        self.estimate_error('dwr_flux_adjoint')
 
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
@@ -249,20 +310,23 @@ class SteadyTracerProblem2d(SteadyProblem):
         adj = interpolate(abs(adj), self.P1)
         adj.rename("Adjoint solution in modulus")
 
+        nu = self.fields['diffusivity']
+        u = self.fields['velocity']
+
         # Get potential to take Hessian w.r.t.
         # x, y = SpatialCoordinate(self.mesh)
         if adjoint:
             source = self.kernel
-            # F1 = -sol*self.u[0] - self.nu*sol.dx(0) - source*x
-            # F2 = -sol*self.u[1] - self.nu*sol.dx(1) - source*y
-            F1 = -sol*self.u[0] - self.nu*sol.dx(0)
-            F2 = -sol*self.u[1] - self.nu*sol.dx(1)
+            # F1 = -sol*u[0] - nu*sol.dx(0) - source*x
+            # F2 = -sol*u[1] - nu*sol.dx(1) - source*y
+            F1 = -sol*u[0] - nu*sol.dx(0)
+            F2 = -sol*u[1] - nu*sol.dx(1)
         else:
-            source = self.source
-            # F1 = sol*self.u[0] - self.nu*sol.dx(0) - source*x
-            # F2 = sol*self.u[1] - self.nu*sol.dx(1) - source*y
-            F1 = sol*self.u[0] - self.nu*sol.dx(0)
-            F2 = sol*self.u[1] - self.nu*sol.dx(1)
+            source = self.fields['source']
+            # F1 = sol*u[0] - nu*sol.dx(0) - source*x
+            # F2 = sol*u[1] - nu*sol.dx(1) - source*y
+            F1 = sol*u[0] - nu*sol.dx(0)
+            F2 = sol*u[1] - nu*sol.dx(1)
 
         # NOTES:
         #  * The derivation for the second potential uses the fact that u is divergence free (in
@@ -506,7 +570,7 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         op = self.op
         self.setup_solver_forward()
         i, t = 0, 0.0
-        update_forcings = self.op.get_update_forcings()
+        update_forcings = self.op.get_update_forcings(solver_obj=None)
         while t < op.end_time - 0.5*op.dt:
             update_forcings(t)
             self.fields['velocity'].assign(op.fluid_velocity)  # TODO: Generalise
