@@ -31,11 +31,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         # Physical parameters
         physical_constants['g_grav'].assign(op.g)
 
-        # Parameters for adjoint computation
-        z, zeta = self.adjoint_solution.split()
-        z.rename("Adjoint fluid velocity")
-        zeta.rename("Adjoint elevation")
-
         # Classification
         self.nonlinear = True
 
@@ -48,6 +43,15 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
+
+    def create_solutions(self):
+        super(SteadyShallowWaterProblem, self).create_solutions()
+        z, zeta = self.adjoint_solution.split()
+        z.rename("Adjoint fluid velocity")
+        zeta.rename("Adjoint elevation")
+
+    def project_tracer(self, val, adjoint = False):
+        self.project(val, out=self.get_tracer())
 
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
@@ -444,11 +448,6 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         # Physical fields
         physical_constants['g_grav'].assign(op.g)
 
-        # Parameters for adjoint computation
-        z, zeta = self.adjoint_solution.split()
-        z.rename("Adjoint fluid velocity")
-        zeta.rename("Adjoint elevation")
-
         # Classification
         self.nonlinear = True
 
@@ -466,6 +465,14 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         
         self.op.set_boundary_surface()
 
+    def create_solutions(self):
+        super(UnsteadyShallowWaterProblem, self).create_solutions()
+        z, zeta = self.adjoint_solution.split()
+        z.rename("Adjoint fluid velocity")
+        zeta.rename("Adjoint elevation")
+
+    def project_tracer(self, val, adjoint = False):
+        self.project(val, out=self.get_tracer())
 
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
