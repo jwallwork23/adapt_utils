@@ -57,6 +57,11 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
         H = self.op.bathymetry + eta
         return -self.C_D*sqrt(dot(u, u))*inner(z, u)/H
 
+    def extra_strong_residual_terms_momentum(self):
+        u, eta = self.solution.split()
+        H = self.op.bathymetry + eta
+        return -self.C_D*sqrt(dot(u, u))*u/H
+
     def get_qoi_kernel(self):
         self.kernel = Function(self.V)
         u = self.solution.split()[0]

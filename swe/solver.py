@@ -147,6 +147,46 @@ class SteadyShallowWaterProblem(SteadyProblem):
         swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=self.op.bathymetry)
         return swt.get_bnd_functions(eta_in, u_in, bdy_id, self.boundary_conditions)
 
+    def get_strong_residual_forward(self):
+        u, eta = self.solution.split()
+
+        b = self.fields['bathymetry']
+        nu = self.fields['viscosity']
+        f = self.fields['coriolis']
+        H = b + eta
+
+        R1 = -self.op.g*grad(eta)              # ExternalPressureGradient
+        R2 = -div(H*u)                         # HUDiv
+        R1 += -dot(u, nabla_grad(u))           # HorizontalAdvection
+        if f is not None:
+            R1 += -f*as_vector((-u[1], u[0]))  # Coriolis
+
+        # QuadraticDrag
+        if self.fields['quadratic_drag_coefficient'] is not None:
+            C_D = self.fields['quadratic_drag_coefficient']
+            R1 += -C_D*sqrt(dot(u, u))*u/H
+        elif self.fields['manning_drag_coefficient'] is not None:
+            C_D = op.g*self.fields['manning_drag_coefficient']**2/pow(H, 1/3)
+            R1 += -C_D*sqrt(dot(u, u))*u/H
+
+        # HorizontalViscosity
+        stress = 2*nu*sym(grad(u)) if self.op.grad_div_viscosity else nu*grad(u)
+        dwr += inner(z, div(stress))
+        if self.op.grad_depth_viscosity:
+            R1 += dot(grad(H)/H, stress)
+
+        if hasattr(self, 'extra_strong_residual_terms_momentum'):
+            R1 += self.extra_strong_residual_terms_momentum()
+        if hasattr(self, 'extra_strong_residual_terms_continuity'):
+            R2 += self.extra_strong_residual_terms_continuity()
+
+        if norm_type == 'L2':
+            inner_product = assemble(self.p0test*(inner(R1, R1) + inner(R2, R2))*dx)
+            self.indicators['cell_residual_forward'] = project(sqrt(inner_product), self.P0)
+        else:
+            raise NotImplementedError
+        self.estimate_error('cell_residual_forward')
+
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
         tpe.project_solution(self.solution)  # FIXME: prolong
