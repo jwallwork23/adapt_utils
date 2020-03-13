@@ -174,7 +174,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if hasattr(self, 'extra_residual_terms'):
             dwr += tpe.extra_residual_terms()
 
-        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
+        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*dwr*dx), self.P0)
         self.estimate_error('dwr_cell')
 
     def get_dwr_flux_forward(self):
