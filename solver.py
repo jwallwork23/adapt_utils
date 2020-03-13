@@ -202,12 +202,19 @@ class SteadyProblem():
         Solve adjoint problem using method specified by `discrete_adjoint` boolean kwarg.
         """
         num_cells = self.mesh.num_cells()
-        family = {"Lagrange": "P{:d}", "Dicontinuous Lagrange": "P{:d}DG"}
         el = self.V.ufl_element()
-        try:
-            space = family[el.family()].format(el.degree())
-        except KeyError:
-            raise NotImplementedError("Unsupported function space {:s}.".format(el.family()))
+        deg = el.degree()
+        family = el.family()
+        if family == "Lagrange":
+            space = "P{:d}".format(deg)
+        elif family == "Discontinuous Lagrange":
+            space = "P{:d}DG".format(deg)
+        elif family == "Mixed" and self.op.family == 'dg-dg':
+            space = "P{:d}DG-P{:d}DG".format(deg, deg)
+        elif family == "Mixed" and self.op.family == 'dg-cg':
+            space = "P{:d}DG-P{:d}".format(deg-1, deg)
+        else:
+            raise NotImplementedError("Unsupported function space {:s}.".format(family))
         approach = 'discrete' if self.discrete_adjoint else 'continuous'
         print_output("Solving {:s} adjoint problem in {:s} space on a mesh with {:d} local elements".format(approach, space, num_cells))
         if self.discrete_adjoint:
