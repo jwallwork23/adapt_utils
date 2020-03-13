@@ -375,9 +375,9 @@ class SteadyProblem():
         boolean kwarg.
         """
         if adjoint:
-            self.get_strong_residual_forward(**kwargs)
-        else:
             self.get_strong_residual_adjoint(**kwargs)
+        else:
+            self.get_strong_residual_forward(**kwargs)
 
     def get_flux(self, adjoint=False, **kwargs):
         """
@@ -397,8 +397,9 @@ class SteadyProblem():
         self.get_flux(adjoint=adjoint, norm_type=norm_type)
         rname, fname, sname = 'cell_residual', 'flux', 'scaled_residual'
         ext = 'adjoint' if adjoint else 'forward'
-        for name in (rname, fname, sname):
-            name = '_'.join([name, ext])
+        rname = '_'.join([rname, ext])
+        fname = '_'.join([fname, ext])
+        sname = '_'.join([sname, ext])
         rho = self.indicators[rname] + self.indicators[fname]/sqrt(self.h)
         self.indicators[sname] = assemble(self.p0test*rho*dx)
         self.estimate_error(sname)
@@ -412,23 +413,21 @@ class SteadyProblem():
         error = self.error if adjoint else self.adjoint_error
         sname = '_'.join(['scaled_weights', 'adjoint' if adjoint else 'forward'])
         if norm_type is None:
-            R = error
-            r = error
+            e = error
         elif norm_type == 'L1':
-            R = abs(error)
-            r = abs(error)
+            e = abs(error)
         elif norm_type == 'L2':
-            R = error*error
-            r = error*error
+            e = error*error
         else:
             raise ValueError("Norm should be chosen from {None, 'L1' or 'L2'}.")
-        i = self.p0test
-        mass_term = i*self.p0trial*dx
-        flux_term = ((i*r)('+') + (i*r)('-'))*dS + i*r*ds
-        flux = Function(self.P0)
+        tpe = self.tp_enriched
+        i = tpe.p0test
+        mass_term = i*tpe.p0trial*dx
+        flux_term = ((i*e)('+') + (i*e)('-'))*dS + i*e*ds
+        flux = Function(tpe.P0)
         solve(mass_term == flux_term, flux)
-        omega = R + flux*sqrt(self.h)
-        self.indicators[sname] = assemble(i*omega*dx)
+        omega = e + flux*sqrt(tpe.h)
+        self.indicators[sname] = project(assemble(i*omega*dx), self.P0)
         self.estimate_error(sname)
 
     def get_dwr_upper_bound(self, adjoint=False, **kwargs):
@@ -439,13 +438,14 @@ class SteadyProblem():
         """
         self.get_scaled_residual(adjoint=adjoint, **kwargs)
         self.get_scaled_weights(adjoint=adjoint, **kwargs)
-        rho, omega, iname = 'scaled_residual', 'scaled_weights', 'upper_bound'
+        rho, omega, name = 'scaled_residual', 'scaled_weights', 'upper_bound'
         ext = 'adjoint' if adjoint else 'forward'
-        for name in (rho, omega, iname):
-            name = '_'.join([name, ext])
+        rho = '_'.join([rho, ext])
+        omega = '_'.join([omega, ext])
+        name = '_'.join([name, ext])
         ext = 'adjoint' if adjoint else 'forward'
-        self.indicators[iname] = assemble(self.p0test*self.indicators[rho]*self.indicators[omega]*dx)
-        self.estimate_error(iname)
+        self.indicators[name] = assemble(self.p0test*self.indicators[rho]*self.indicators[omega]*dx)
+        self.estimate_error(name)
 
     def get_difference_quotient(self, adjoint=False, **kwargs):
         """
@@ -454,13 +454,14 @@ class SteadyProblem():
         """
         self.get_scaled_residual(adjoint=adjoint, **kwargs)
         self.get_flux(adjoint=adjoint, residual_approach='difference_quotient', **kwargs)
-        rho, omega, iname = 'scaled_residual', 'flux', 'difference_quotient'
+        rho, omega, name = 'scaled_residual', 'flux', 'difference_quotient'
         ext = 'adjoint' if adjoint else 'forward'
-        for name in (rho, omega, iname):
-            name = '_'.join([name, ext])
+        rho = '_'.join([rho, ext])
+        omega = '_'.join([omega, ext])
+        name = '_'.join([name, ext])
         ext = 'adjoint' if adjoint else 'forward'
-        self.indicators[iname] = assemble(self.p0test*self.indicators[rho]*self.indicators[omega]*dx)
-        self.estimate_error(iname)
+        self.indicators[name] = assemble(self.p0test*self.indicators[rho]*self.indicators[omega]*dx)
+        self.estimate_error(name)
 
     def get_strong_residual_forward(self, norm_type=None):
         raise NotImplementedError("Should be implemented in derived class.")
@@ -612,6 +613,7 @@ class SteadyProblem():
         """
         self.plot_mesh()
         for key in self.indicators:
+            # tmp = interpolate(abs(self.indicators[key]/self.estimators[key][-1]), self.P0)
             tmp = interpolate(abs(self.indicators[key]), self.P0)
             tmp.rename(key)
             File(os.path.join(self.di, key + '.pvd')).write(tmp)
