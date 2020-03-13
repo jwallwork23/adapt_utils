@@ -40,6 +40,10 @@ class SteadyTracerProblem2d(SteadyProblem):
         super(SteadyTracerProblem2d, self).__init__(op, mesh, fe, **kwargs)
         self.nonlinear = False
 
+        # Rename solution fields
+        self.solution.rename('Tracer concentration')
+        self.adjoint_solution.rename('Adjoint tracer concentration')
+
     def set_fields(self, adapted=False):
         op = self.op
         self.fields = {}
@@ -48,7 +52,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
         self.fields['source'] = op.set_source(self.P1)
 
-        # Stabilisation
+    def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'SUPG'
         if self.stabilisation in ('SU', 'SUPG'):
             self.supg_coefficient(mode='diameter')
@@ -57,10 +61,6 @@ class SteadyTracerProblem2d(SteadyProblem):
             self.stabilisation_parameter = op.stabilisaton_parameter
         elif self.stabilisation != 'no':
             raise ValueError("Stabilisation method {:s} not recognised".format(self.stabilisation))
-
-        # Rename solution fields
-        self.solution.rename('Tracer concentration')
-        self.adjoint_solution.rename('Adjoint tracer concentration')
 
     def supg_coefficient(self, mode='nguyen'):
         r"""
@@ -96,19 +96,25 @@ class SteadyTracerProblem2d(SteadyProblem):
         u = self.fields['velocity']
         source = self.fields['source']
 
+        if self.stabilisation in ('SU', 'SUPG'):
+            coeff = self.stabilisation_parameter*dot(u, grad(psi))
+            if self.stabilisation == 'SUPG':
+                psi = psi + coeff
+
         # Finite element problem
         self.lhs = psi*dot(u, grad(phi))*dx + nu*inner(grad(psi), grad(phi))*dx
         self.rhs = psi*source*dx
 
         # Stabilisation
-        if self.stabilisation in ('SU', 'SUPG'):
-            coeff = self.stabilisation_parameter*dot(u, grad(psi))
+        # if self.stabilisation in ('SU', 'SUPG'):
+        if self.stabilisation == 'SU':
+            # coeff = self.stabilisation_parameter*dot(u, grad(psi))
             self.lhs += coeff*dot(u, grad(phi))*dx
-            if self.stabilisation == 'SUPG':
-                self.lhs += coeff*-div(nu*grad(phi))*dx
-                self.rhs += coeff*source*dx
-        elif self.stabilisation != 'no':
-            raise ValueError("Unrecognised stabilisation method.")
+            # if self.stabilisation == 'SUPG':
+                # self.lhs += coeff*-div(nu*grad(phi))*dx
+                # self.rhs += coeff*source*dx
+        # elif self.stabilisation != 'no':
+        #     raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
         bcs = self.boundary_conditions

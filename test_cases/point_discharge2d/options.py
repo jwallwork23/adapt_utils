@@ -25,9 +25,9 @@ class TelemacOptions(TracerOptions):
     :kwarg offset: Shift in x-direction for source location.
     :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
-    def __init__(self, offset=0., centred=False, **kwargs):
+    def __init__(self, n=0, offset=0., centred=False, **kwargs):
         super(TelemacOptions, self).__init__(**kwargs)
-        self.set_default_mesh()
+        self.set_default_mesh(n=n)
         self.offset = offset
         self.family = 'cg'
         self.stabilisation = 'SUPG'
@@ -50,8 +50,8 @@ class TelemacOptions(TracerOptions):
         self.normalisation = 'error'
         self.norm_order = 1
 
-    def set_default_mesh(self):  # TODO: Temporary fix
-        self.default_mesh = RectangleMesh(100, 20, 50, 10)
+    def set_default_mesh(self, n=0):
+        self.default_mesh = RectangleMesh(100*2**n, 20*2**n, 50, 10)
 
     def set_boundary_conditions(self, fs):
         zero = Constant(0.0, domain=fs.mesh())
@@ -67,8 +67,7 @@ class TelemacOptions(TracerOptions):
         return self.diffusivity
 
     def set_velocity(self, fs):
-        self.fluid_velocity = Function(fs)
-        self.fluid_velocity.interpolate(as_vector((1., 0.)))
+        self.fluid_velocity = interpolate(as_vector((1., 0.)), fs)
         return self.fluid_velocity
 
     def set_source(self, fs):
