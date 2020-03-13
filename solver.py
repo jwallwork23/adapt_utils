@@ -432,7 +432,11 @@ class SteadyProblem():
         self.estimate_error(sname)
 
     def get_dwr_upper_bound(self, adjoint=False, **kwargs):
-        # TODO: doc [Becker & Rannacher, 2001]
+        r"""
+        Evaluate an upper bound for the DWR given by the product of residual and weights,
+        as used in [Becker & Rannacher, 2001].
+        i.e. $\rho_K \omega_K$.
+        """
         self.get_scaled_residual(adjoint=adjoint, **kwargs)
         self.get_scaled_weights(adjoint=adjoint, **kwargs)
         rho, omega, iname = 'scaled_residual', 'scaled_weights', 'upper_bound'
@@ -444,9 +448,12 @@ class SteadyProblem():
         self.estimate_error(iname)
 
     def get_difference_quotient(self, adjoint=False, **kwargs):
-        # TODO: doc [Becker & Rannacher, 2001]
+        """
+        Evaluate difference quotient approximation to the DWR given by the product of residual and
+        flux term evaluated at the adjoint solution, as used in [Becker & Rannacher, 2001].
+        """
         self.get_scaled_residual(adjoint=adjoint, **kwargs)
-        self.get_flux(adjoint=not adjoint, **kwargs)  # FIXME: Should be forward/adjoint residual
+        self.get_flux(adjoint=adjoint, **kwargs)
         rho, omega, iname = 'scaled_residual', 'flux', 'difference_quotient'
         ext = 'adjoint' if adjoint else 'forward'
         for name in (rho, omega, iname):

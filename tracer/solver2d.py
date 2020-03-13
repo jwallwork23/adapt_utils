@@ -223,7 +223,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         i = self.p0test
         nu = self.fields['diffusivity']
         assert self.op.residual_approach in ('classical', 'difference_quotient')
-        sol = self.adjoint_solution if self.op.residual_approach == 'classical' else self.solution
+        sol = self.solution if self.op.residual_approach == 'classical' else self.adjoint_solution
 
         # Flux terms (arising from integration by parts)
         mass_term = i*self.p0trial*dx
