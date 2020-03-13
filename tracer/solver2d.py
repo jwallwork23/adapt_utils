@@ -45,8 +45,8 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.fields = {}
         self.fields['diffusivity'] = op.set_diffusivity(self.P1)
         self.fields['velocity'] = op.set_velocity(self.P1_vec)
-        # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
         self.fields['source'] = op.set_source(self.P1)
+        # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
 
     def create_solutions(self):
         super(SteadyTracerProblem2d, self).create_solutions()
@@ -499,8 +499,8 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         self.fields = {}
         self.fields['diffusivity'] = op.set_diffusivity(self.P1)
         self.fields['velocity'] = op.set_velocity(self.P1_vec)
-        # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
         self.fields['source'] = op.set_source(self.P1)
+        # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
 
         # Rename solution fields
         self.solution.rename('Tracer concentration')

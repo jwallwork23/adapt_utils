@@ -273,9 +273,6 @@ class SteadyProblem():
         """
         return self.adjoint_solution if adjoint else self.solution
     
-    def get_tracer(self):
-        return self.solver_obj.fields.tracer_2d
-
     def get_error(self, adjoint=False):
         """
         Retrieve forward or adjoint error, as specified by boolean kwarg `adjoint`.
