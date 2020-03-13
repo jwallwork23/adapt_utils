@@ -34,7 +34,7 @@ for level in range(op.outer_iterations):
     if level < op.outer_iterations-1:
         tp = tp.tp_enriched
 
-# Store element count and QoI to HDF5
+# Store QoI and element and DOF counts to HDF5
 outfile = h5py.File('outputs/fixed_mesh/hdf5/qoi_offset_{:d}.h5'.format(op.offset), 'w')
 outfile.create_dataset('elements', data=num_cells)
 outfile.create_dataset('dofs', data=dofs)

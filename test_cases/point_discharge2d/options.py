@@ -1,6 +1,7 @@
 from firedrake import *
 from thetis.configuration import *
 
+import os
 # from scipy.special import kn
 import numpy as np
 
@@ -25,7 +26,7 @@ class TelemacOptions(TracerOptions):
     :kwarg offset: Shift in x-direction for source location.
     :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
-    def __init__(self, n=0, offset=0., centred=False, **kwargs):
+    def __init__(self, n=0, offset=1.0, centred=False, **kwargs):
         super(TelemacOptions, self).__init__(**kwargs)
         self.set_default_mesh(n=n)
         self.offset = offset
@@ -39,10 +40,11 @@ class TelemacOptions(TracerOptions):
         #       of analytical solutions, it is not quite right. As such, we have calibrated the
         #       radius so that solving on a sequence of increasingly refined uniform meshes leads to
         #       convergence of the uniform mesh solution to the analytical solution.
+        # calibrated_r = 0.06245
         calibrated_r = 0.07980 if centred else 0.07972
         self.source_loc = [(1.+self.offset, 5., calibrated_r)]
         self.region_of_interest = [(20., 5., 0.5)] if centred else [(20., 7.5, 0.5)]
-        self.source_value = 100.
+        self.source_value = 100.0
         self.source_discharge = 0.1
         self.base_diffusivity = 0.1
 
@@ -67,7 +69,7 @@ class TelemacOptions(TracerOptions):
         return self.diffusivity
 
     def set_velocity(self, fs):
-        self.fluid_velocity = interpolate(as_vector((1., 0.)), fs)
+        self.fluid_velocity = interpolate(as_vector((1.0, 0.0)), fs)
         return self.fluid_velocity
 
     def set_source(self, fs):
@@ -75,6 +77,7 @@ class TelemacOptions(TracerOptions):
         nrm = assemble(self.ball(fs, source=True)*dx)
         scaling = pi*r0*r0/nrm if np.allclose(nrm, 0.0) else 1.0
         scaling *= 0.5*self.source_value
+        # scaling *= self.source_value
         self.source = self.ball(fs, source=True, scale=scaling)
         return self.source
 
@@ -98,7 +101,7 @@ class TelemacOptions(TracerOptions):
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
         self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
         self.solution.rename('Analytic tracer concentration')
-        outfile = File(self.di + 'analytic.pvd')
+        outfile = File(os.path.join(self.di, 'analytic.pvd'))
         outfile.write(self.solution)  # NOTE: use 40 discretisation levels in ParaView
         return self.solution
 
