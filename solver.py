@@ -453,7 +453,7 @@ class SteadyProblem():
         flux term evaluated at the adjoint solution, as used in [Becker & Rannacher, 2001].
         """
         self.get_scaled_residual(adjoint=adjoint, **kwargs)
-        self.get_flux(adjoint=adjoint, **kwargs)
+        self.get_flux(adjoint=adjoint, residual_approach='difference_quotient', **kwargs)
         rho, omega, iname = 'scaled_residual', 'flux', 'difference_quotient'
         ext = 'adjoint' if adjoint else 'forward'
         for name in (rho, omega, iname):

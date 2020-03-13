@@ -182,8 +182,7 @@ class SteadyTracerProblem2d(SteadyProblem):
     def get_strong_residual_forward(self, norm_type=None):
         u = self.fields['velocity']
         nu = self.fields['diffusivity']
-        assert self.op.residual_approach in ('classical', 'difference_quotient')
-        sol = self.solution if self.op.residual_approach == 'classical' else self.adjoint_solution
+        sol = self.solution
         R = self.fields['source'] - dot(u, grad(sol)) + div(nu*grad(sol))
         if norm_type is None:
             self.indicators['cell_residual_forward'] = assemble(self.p0test*R*dx)
@@ -202,8 +201,7 @@ class SteadyTracerProblem2d(SteadyProblem):
     def get_strong_residual_adjoint(self, norm_type=None):
         u = self.fields['velocity']
         nu = self.fields['diffusivity']
-        assert self.op.residual_approach in ('classical', 'difference_quotient')
-        sol = self.adjoint_solution if self.op.residual_approach == 'classical' else self.solution
+        sol = self.adjoint_solution
         R = self.kernel + div(u*sol) + div(nu*grad(sol))
         if norm_type is None:
             self.indicators['cell_residual_adjoint'] = assemble(self.p0test*R*dx)
@@ -219,11 +217,11 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.indicator.rename('adjoint strong residual')
         self.estimate_error('cell_residual_adjoint')
 
-    def get_flux_forward(self, norm_type=None):
+    def get_flux_forward(self, norm_type=None, residual_approach='classical'):
         i = self.p0test
         nu = self.fields['diffusivity']
-        assert self.op.residual_approach in ('classical', 'difference_quotient')
-        sol = self.solution if self.op.residual_approach == 'classical' else self.adjoint_solution
+        assert residual_approach in ('classical', 'difference_quotient')
+        sol = self.solution if residual_approach == 'classical' else self.adjoint_solution
 
         # Flux terms (arising from integration by parts)
         mass_term = i*self.p0trial*dx
@@ -257,12 +255,12 @@ class SteadyTracerProblem2d(SteadyProblem):
         solve(mass_term == flux_terms, self.indicators['flux_forward'])
         self.estimate_error('flux_forward')
 
-    def get_flux_adjoint(self, norm_type=None):
+    def get_flux_adjoint(self, norm_type=None, residual_approach='classical'):
         i = self.p0test
         u = self.fields['velocity']
         nu = self.fields['diffusivity']
-        assert self.op.residual_approach in ('classical', 'difference_quotient')
-        sol = self.adjoint_solution if self.op.residual_approach == 'classical' else self.solution
+        assert residual_approach in ('classical', 'difference_quotient')
+        sol = self.adjoint_solution if residual_approach == 'classical' else self.solution
 
         # Edge residual
         mass_term = i*self.p0trial*dx
