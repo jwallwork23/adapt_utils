@@ -1,5 +1,7 @@
+from firedrake import *
+
 import argparse
-import firedrake
+import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as ptch
 
@@ -60,7 +62,7 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
     fig = plt.figure(figsize=(12, 5))
     ax = fig.add_subplot(111)
     meshplot(tp.mesh, axes=ax)
-    # firedrake.plot(tp.mesh, axes=ax)
+    # plot(tp.mesh, axes=ax)
     ax.set_xlim([0.0, op.domain_length])
     ax.set_ylim([0.0, op.domain_width])
     ax.add_patch(ptch.Rectangle(centre_t1, D, D, **patch_kwargs))
@@ -79,10 +81,10 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
 
     # Plot fluid speed
     u = tp.solution.split()[0]
-    spd = firedrake.interpolate(firedrake.sqrt(firedrake.dot(u, u)), tp.P1)
+    spd = interpolate(sqrt(dot(u, u)), tp.P1)
     fig = plt.figure(figsize=(12, 5))
     ax = fig.add_subplot(111)
-    firedrake.plot(spd, axes=ax, colorbar={'orientation': 'horizontal'}, vmin=3.5, vmax=5.2, shading='gouraud')
+    plot(spd, axes=ax, colorbar={'orientation': 'horizontal'}, vmin=3.5, vmax=5.2, shading='gouraud')
     ax.set_xlim([0.0, op.domain_length])
     ax.set_ylim([0.0, op.domain_width])
     plt.savefig('screenshots/fluid_speed_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()), bbox_inches='tight')
@@ -110,3 +112,23 @@ else:
     # Save to file
     fname = '{:s}_offset{:d}_target{:d}_elem{:d}'.format(op.approach, op.offset, int(op.target), tp.num_cells[-1])
     plt.savefig('screenshots/{:s}.pdf'.format(fname), bbox_inches='tight')
+
+    # Plot dwr cell residual
+    residual = interpolate(abs(tp.indicators['dwr_cell']), tp.indicators['dwr_cell'].function_space())
+    fig = plt.figure(figsize=(12, 5))
+    ax = fig.add_subplot(111)
+    # plot(residual, axes=ax, colorbar={'orientation': 'horizontal'}, locator=ticker.LogLocator(), vmin=3.5, vmax=5.2, shading='gouraud')
+    plot(residual, axes=ax, colorbar={'orientation': 'horizontal', 'norm': matplotlib.colors.LogNorm()}, vmin=3.5, vmax=5.2, shading='gouraud')
+    ax.set_xlim([0.0, op.domain_length])
+    ax.set_ylim([0.0, op.domain_width])
+    plt.savefig('screenshots/cell_residual_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()), bbox_inches='tight')
+
+    # Plot dwr flux
+    flux = interpolate(abs(tp.indicators['dwr_flux']), tp.indicators['dwr_flux'].function_space())
+    fig = plt.figure(figsize=(12, 5))
+    ax = fig.add_subplot(111)
+    # plot(flux, axes=ax, colorbar={'orientation': 'horizontal'}, locator=matplotlib.ticker.LogLocator(), vmin=3.5, vmax=5.2, shading='gouraud')
+    plot(flux, axes=ax, colorbar={'orientation': 'horizontal', 'norm': matplotlib.colors.LogNorm()}, vmin=3.5, vmax=5.2, shading='gouraud')
+    ax.set_xlim([0.0, op.domain_length])
+    ax.set_ylim([0.0, op.domain_width])
+    plt.savefig('screenshots/flux_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()), bbox_inches='tight')
