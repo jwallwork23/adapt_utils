@@ -132,42 +132,14 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.sipg_parameter = options.sipg_parameter
 
     def solve_forward(self):
-        self.setup_solver()
+        self.setup_solver_forward()
         self.solver_obj.iterate()
         self.solution = self.solver_obj.fields.solution_2d
 
     def get_bdy_functions(self, eta_in, u_in, bdy_id):
         b = self.op.bathymetry
-        bdy_len = self.mesh.boundary_len[bdy_id]
-        funcs = self.boundary_conditions.get(bdy_id)
-        if 'elev' in funcs and 'uv' in funcs:
-            eta = funcs['elev']
-            u = funcs['uv']
-        elif 'elev' in funcs and 'un' in funcs:
-            eta = funcs['elev']
-            u = funcs['un']*self.n
-        elif 'elev' in funcs and 'flux' in funcs:
-            eta = funcs['elev']
-            H = eta + b
-            area = H*bdy_len
-            u = funcs['flux']/area*self.n
-        elif 'elev' in funcs:
-            eta = funcs['elev']
-            u = u_in
-        elif 'uv' in funcs:
-            eta = eta_in
-            u = funcs['uv']
-        elif 'un' in funcs:
-            eta = eta_in
-            u = funcs['un']*self.n
-        elif 'flux' in funcs:
-            eta = eta_in
-            H = eta + b
-            area = H*bdy_len
-            u = funcs['flux']/area*self.n
-        else:
-            raise Exception('Unsupported boundary type {:}'.format(funcs.keys()))
-        return eta, u
+        swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=self.op.bathymetry)
+        return swt.get_bnd_functions(eta_in, u_in, bdy_id, self.boundary_conditions)
 
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
@@ -601,6 +573,11 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
         for e in self.solver_obj.exporters.values():
             e.set_next_export_ix(self.solver_obj.i_export)
+
+    def get_bdy_functions(self, eta_in, u_in, bdy_id):
+        b = self.op.bathymetry
+        swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=self.op.bathymetry)
+        return swt.get_bnd_functions(eta_in, u_in, bdy_id, self.boundary_conditions)
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.solver_obj)
