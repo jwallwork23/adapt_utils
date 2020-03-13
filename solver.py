@@ -201,11 +201,18 @@ class SteadyProblem():
         """
         Solve adjoint problem using method specified by `discrete_adjoint` boolean kwarg.
         """
+        num_cells = self.mesh.num_cells()
+        family = {"Lagrange": "P{:d}", "Dicontinuous Lagrange": "P{:d}DG"}
+        el = self.V.ufl_element()
+        try:
+            space = family[el.family()].format(el.degree())
+        except KeyError:
+            raise NotImplementedError("Unsupported function space {:s}.".format(el.family()))
+        approach = 'discrete' if self.discrete_adjoint else 'continuous'
+        print_output("Solving {:s} adjoint problem in {:s} space on a mesh with {:d} local elements".format(approach, space, num_cells))
         if self.discrete_adjoint:
-            print_output("Solving discrete adjoint problem on mesh with {:d} local elements".format(self.mesh.num_cells()))
             self.solve_discrete_adjoint()
         else:
-            print_output("Solving continuous adjoint problem on mesh with {:d} local elements".format(self.mesh.num_cells()))
             self.solve_continuous_adjoint()
         self.plot_solution(adjoint=True)
 
@@ -344,9 +351,6 @@ class SteadyProblem():
         """
         self.project(val, out=self.get_solution(adjoint=adjoint))
         
-    def project_tracer(self, val, adjoint = False):
-        self.project(val, out = self.get_tracer())
-
     def get_qoi_kernel(self):
         """
         Derivative `g` of functional of interest `J`. i.e. For solution `u` we have
@@ -358,8 +362,7 @@ class SteadyProblem():
         """
         Functional of interest which takes the PDE solution as input.
         """
-        if not hasattr(self, 'kernel'):
-            self.get_qoi_kernel()
+        self.get_qoi_kernel()
         return assemble(inner(self.solution, self.kernel)*dx(degree=12))
 
     def get_strong_residual(self, adjoint=False, **kwargs):
@@ -747,7 +750,8 @@ class SteadyProblem():
         assert approach in self.indicators
         if not approach in self.estimators:
             self.estimators[approach] = []
-        self.estimators[approach].append(self.indicators[approach].vector().gather().sum())
+        tmp = interpolate(abs(self.indicators[approach]), self.P0)
+        self.estimators[approach].append(tmp.vector().gather().sum())
 
     def plot_error_estimate(self, approach):
         raise NotImplementedError  # TODO
@@ -828,6 +832,7 @@ class SteadyProblem():
         self.set_fields(adapted=True)
         if hasattr(self, 'set_start_condition'):
             self.set_start_condition()
+        self.set_stabilisation()
         self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
     def initialise_mesh(self, approach='hessian', adapt_field=None, num_adapt=None, alpha=1.0, beta=1.0):
@@ -935,7 +940,7 @@ class SteadyProblem():
             num_cells_old = num_cells
             estimator_old = estimator
             dofs = self.V.dof_count
-            dofs = dofs if isinstance(dofs, int) else sum(dofs)  # TODO: parallelise
+            dofs = dofs if self.V.value_size == 1 else sum(dofs)  # TODO: parallelise
         if outer_iteration is None:
             print_output('\n' + 80*'#' + '\n' + 37*' ' + 'SUMMARY\n' + 80*'#')
             print_output("Approach:             '{:s}'".format(self.approach))

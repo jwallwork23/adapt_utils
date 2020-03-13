@@ -40,10 +40,6 @@ class SteadyTracerProblem2d(SteadyProblem):
         super(SteadyTracerProblem2d, self).__init__(op, mesh, fe, **kwargs)
         self.nonlinear = False
 
-        # Rename solution fields
-        self.solution.rename('Tracer concentration')
-        self.adjoint_solution.rename('Adjoint tracer concentration')
-
     def set_fields(self, adapted=False):
         op = self.op
         self.fields = {}
@@ -51,6 +47,11 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.fields['velocity'] = op.set_velocity(self.P1_vec)
         # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
         self.fields['source'] = op.set_source(self.P1)
+
+    def create_solutions(self):
+        super(SteadyTracerProblem2d, self).create_solutions()
+        self.solution.rename('Tracer concentration')
+        self.adjoint_solution.rename('Adjoint tracer concentration')
 
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'SUPG'
@@ -100,6 +101,8 @@ class SteadyTracerProblem2d(SteadyProblem):
             coeff = self.stabilisation_parameter*dot(u, grad(psi))
             if self.stabilisation == 'SUPG':
                 psi = psi + coeff
+        elif self.stabilisation != 'no':
+            raise ValueError("Unrecognised stabilisation method.")
 
         # Finite element problem
         self.lhs = psi*dot(u, grad(phi))*dx + nu*inner(grad(psi), grad(phi))*dx
@@ -122,38 +125,54 @@ class SteadyTracerProblem2d(SteadyProblem):
         for i in bcs.keys():
             if bcs[i] == {}:
                 self.lhs += -nu*psi*dot(self.n, nabla_grad(phi))*ds(i)
-            if 'diff_flux' in bcs[i]:
-                self.rhs += psi*bcs[i]['diff_flux']*ds(i)
-            if 'value' in bcs[i]:
+            elif 'value' in bcs[i]:
                 self.dbcs.append(DirichletBC(self.V, bcs[i]['value'], i))
+            elif 'diff_flux' in bcs[i]:
+                self.rhs += psi*bcs[i]['diff_flux']*ds(i)
+            else:
+                raise ValueError("Unrecognised BC types in {:}.".format(bcs[i]))
 
     def setup_solver_adjoint(self):
         lam = self.trial
         psi = self.test
         nu = self.fields['diffusivity']
         u = self.fields['velocity']
+        self.get_qoi_kernel()
+
+        if self.stabilisation in ('SU', 'SUPG'):
+            coeff = -self.stabilisation_parameter*div(u*psi)
+            if self.stabilisation == 'SUPG':
+                psi = psi + coeff
+        elif self.stabilisation != 'no':
+            raise ValueError("Unrecognised stabilisation method.")
 
         # Adjoint finite element problem
         self.lhs_adjoint = lam*dot(u, grad(psi))*dx + nu*inner(grad(lam), grad(psi))*dx
         self.rhs_adjoint = self.kernel*psi*dx
 
         # Stabilisation
-        if self.stabilisation in ('SU', 'SUPG'):
-            coeff = -self.stabilisation_parameter*div(u*psi)
+        if self.stabilisation == 'SU':
+        # if self.stabilisation in ('SU', 'SUPG'):
+        #     coeff = -self.stabilisation_parameter*div(u*psi)
             self.lhs_adjoint += -coeff*div(u*lam)*dx
-            if self.stabilisation == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
-                self.lhs_adjoint += coeff*-div(nu*grad(lam))*dx
-                self.rhs_adjoint += coeff*self.kernel*dx
-        elif self.stabilisation != 'no':
-            raise ValueError("Unrecognised stabilisation method.")
+            # if self.stabilisation == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
+                # self.lhs_adjoint += coeff*-div(nu*grad(lam))*dx
+                # self.rhs_adjoint += coeff*self.kernel*dx
+        # elif self.stabilisation != 'no':
+            # raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
         bcs = self.boundary_conditions
         self.dbcs_adjoint = []
         for i in bcs.keys():
+            if bcs[i] != {}:
+                try:
+                    assert 'diff_flux' in bcs[i] or 'value' in bcs[i]
+                except AssertionError:
+                    raise ValueError("Unrecognised BC types in {:}.".format(bcs[i]))
             if not 'diff_flux' in bcs[i]:
                 self.dbcs_adjoint.append(DirichletBC(self.V, 0, i))  # Dirichlet BC in adjoint
-            if not 'value' in bcs[i]:
+            elif 'value' in bcs[i]:
                 self.lhs_adjoint += -lam*psi*(dot(u, self.n))*ds(i)
                 self.lhs_adjoint += -nu*psi*dot(self.n, nabla_grad(lam))*ds(i)  # Robin BC in adjoint
 
@@ -276,21 +295,26 @@ class SteadyTracerProblem2d(SteadyProblem):
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
         tpe.project_solution(self.solution)  # FIXME: prolong
-        strong_residual = tpe.source - dot(tpe.u, grad(tpe.solution)) + div(tpe.nu*grad(tpe.solution))
+        u = tpe.fields['velocity']
+        nu = tpe.fields['diffusivity']
+        source = tpe.fields['source']
+
+        strong_residual = source - dot(u, grad(tpe.solution)) + div(nu*grad(tpe.solution))
         dwr = strong_residual*self.adjoint_error
         if self.stabilisation == 'SUPG':  # Account for stabilisation error
-            dwr += strong_residual*tpe.stabilisation_parameter*dot(tpe.u, grad(self.adjoint_error))
-        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
+            dwr += strong_residual*tpe.stabilisation_parameter*dot(u, grad(self.adjoint_error))
+        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*dwr*dx), self.P0)
         self.estimate_error('dwr_cell')
 
     def get_dwr_flux_forward(self):
         tpe = self.tp_enriched
         i = tpe.p0test
         tpe.project_solution(self.solution)  # FIXME: prolong
+        nu = tpe.fields['diffusivity']
 
         # Flux terms (arising from integration by parts)
         mass_term = i*tpe.p0trial*dx
-        flux = -tpe.nu*dot(tpe.n, nabla_grad(tpe.solution))
+        flux = -nu*dot(tpe.n, nabla_grad(tpe.solution))
         dwr = flux*self.adjoint_error
         flux_terms = ((i*dwr)('+') + (i*dwr)('-'))*dS
 
@@ -306,25 +330,32 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Solve auxiliary FEM problem
         edge_res = Function(tpe.P0)
         solve(mass_term == flux_terms, edge_res)
-        self.indicators['dwr_flux'] = project(assemble(i*abs(edge_res)*dx), self.P0)
+        self.indicators['dwr_flux'] = project(edge_res, self.P0)
         self.estimate_error('dwr_flux')
 
     def get_dwr_residual_adjoint(self):
         tpe = self.tp_enriched
         tpe.project_solution(self.adjoint_solution, adjoint=True)  # FIXME: prolong
-        strong_residual = tpe.op.box(tpe.P0) + div(tpe.u*tpe.adjoint_solution) + div(tpe.nu*grad(tpe.adjoint_solution))
+        u = tpe.fields['velocity']
+        nu = tpe.fields['diffusivity']
+        kernel = tpe.kernel
+
+        strong_residual = kernel + div(u*tpe.adjoint_solution) + div(nu*grad(tpe.adjoint_solution))
         dwr = strong_residual*self.error
-        self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*abs(dwr)*dx), self.P0)
+        self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*dwr*dx), self.P0)
         self.estimate_error('dwr_cell_adjoint')
         
     def get_dwr_flux_adjoint(self):
         tpe = self.tp_enriched
         i = tpe.p0test
         tpe.project_solution(self.adjoint_solution, adjoint=True)  # FIXME: prolong
+        u = tpe.fields['velocity']
+        nu = tpe.fields['diffusivity']
+        n = tpe.n
 
         # Edge residual
         mass_term = i*tpe.p0trial*dx
-        flux = -(tpe.adjoint_solution*dot(tpe.u, tpe.n) + tpe.nu*dot(tpe.n, nabla_grad(tpe.adjoint_solution)))
+        flux = -(tpe.adjoint_solution*dot(u, n) + nu*dot(n, nabla_grad(tpe.adjoint_solution)))
         dwr = flux*self.error
         flux_terms = ((i*dwr)('+') + (i*dwr)('-'))*dS
 
@@ -337,11 +368,12 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Solve auxiliary FEM problem
         edge_res_adjoint = Function(tpe.P0)
         solve(mass_term == flux_terms, edge_res_adjoint)
-        self.indicators['dwr_flux_adjoint'] = project(assemble(i*abs(edge_res_adjoint)*dx), self.P0)
+        self.indicators['dwr_flux_adjoint'] = project(edge_res_adjoint, self.P0)
         self.estimate_error('dwr_flux_adjoint')
 
     def get_hessian_metric(self, adjoint=False, noscale=False):
-        self.M = steady_metric(self.get_solution(adjoint), mesh=self.mesh, noscale=noscale, op=self.op)
+        sol = self.get_solution(adjoint)
+        self.M = steady_metric(sol, mesh=self.mesh, noscale=noscale, op=self.op)
         
     def get_loseille_metric(self, adjoint=False, relax=True):
         adj = self.get_solution(not adjoint)
