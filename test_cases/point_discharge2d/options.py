@@ -2,7 +2,6 @@ from firedrake import *
 from thetis.configuration import *
 
 import os
-# from scipy.special import kn
 import numpy as np
 
 from adapt_utils.tracer.options import *
@@ -28,10 +27,18 @@ class TelemacOptions(TracerOptions):
     """
     def __init__(self, n=0, offset=1.0, centred=False, **kwargs):
         super(TelemacOptions, self).__init__(**kwargs)
+
+        # Domain
         self.set_default_mesh(n=n)
         self.offset = offset
+
+        # FEM
         self.family = 'cg'
         self.stabilisation = 'SUPG'
+
+        # Physics
+        self.base_velocity = [1.0, 0.0]
+        self.base_diffusivity = 0.1
 
         # Source / receiver
         # NOTE: It isn't obvious how to represent a delta function on a finite element mesh. The
@@ -46,11 +53,17 @@ class TelemacOptions(TracerOptions):
         self.region_of_interest = [(20., 5., 0.5)] if centred else [(20., 7.5, 0.5)]
         self.source_value = 100.0
         self.source_discharge = 0.1
-        self.base_diffusivity = 0.1
 
         # Metric normalisation
         self.normalisation = 'error'
         self.norm_order = 1
+
+        # Goal-oriented error estimation
+        self.degree_increase = 1
+
+        # Mesh optimisation
+        self.num_adapt = 35
+        self.element_rtol = 0.002
 
     def set_default_mesh(self, n=0):
         self.default_mesh = RectangleMesh(100*2**n, 20*2**n, 50, 10)
@@ -69,7 +82,7 @@ class TelemacOptions(TracerOptions):
         return self.diffusivity
 
     def set_velocity(self, fs):
-        self.fluid_velocity = interpolate(as_vector((1.0, 0.0)), fs)
+        self.fluid_velocity = Constant(as_vector(self.base_velocity))
         return self.fluid_velocity
 
     def set_source(self, fs):
