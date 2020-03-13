@@ -6,6 +6,8 @@ from adapt_utils.test_cases.point_discharge2d.options import *
 from adapt_utils.tracer.solver2d import *
 
 
+# FIXME: Values don't quite agree with what we had previously
+
 num_levels = 5
 
 for centred in (1, 0):
@@ -18,8 +20,6 @@ for centred in (1, 0):
         op.degree_increase = 0
         tp = SteadyTracerProblem2d(op, levels=0)
         tp.solve()
-
-        # TODO: Update
         num_cells.append(tp.num_cells[0])
         qois.append(tp.quantity_of_interest())
         op.print_debug("\nMesh {:d} in the hierarchy".format(n+1))

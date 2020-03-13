@@ -18,24 +18,25 @@ parser.add_argument('-level', help="Number of uniform refinements to apply to th
 parser.add_argument('-offset', help="""
     Number of turbine diameters by which to offset turbines in y-direction.
     'Aligned' configuration given by offset=0, 'Offset' configuration given by offset=1.""")
+parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 
 kwargs = {
     'approach': args.approach or 'fixed_mesh',
     'offset': int(args.offset or 0),
     'plot_pvd': True,
-    'debug': True,
+    'debug': bool(args.debug or 0),
 
     # Adaptation parameters
     'target': float(args.target or 3200.0),
     'adapt_field': 'all_int',
     'normalisation': 'complexity',
     'convergence_rate': 1,
-    'norm_order': None,
+    'norm_order': None,  # i.e. infinity norm
     'h_max': 500.0,
 
     # Optimisation parameters
-    'element_rtol': 0.002,  # TODO: use 0.001?
+    'element_rtol': 0.001,
     'num_adapt': 35,
 
 }
