@@ -1,15 +1,25 @@
 from thetis import *
 
+import argparse
+
 from adapt_utils.test_cases.rossby_wave.options import BoydOptions
 from adapt_utils.test_cases.rossby_wave.monitors import *
 from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 
 
-# NOTE: It seems as though [Huang et al 2008] considers n = 4, 8, 20
-n_coarse = 1
-n_fine = 30  # TODO: 50
-initial_monitor = None
-# initial_monitor = equator_monitor
+parser = argparse.ArgumentParser()
+parser.add_argument("-n_coarse", help="Resolution of coarse mesh.")
+parser.add_argument("-n_fine", help="Resolution of fine mesh.")
+parser.add_argument("-refine_equator", help="""
+Apply Monge-Ampere based r-adaptation to refine equatorial region.""")
+parser.add_argument("-calculate_metrics", help="Compute metrics using the fine mesh.")
+args = parser.parse_args()
+
+
+n_coarse = int(args.n_coarse or 1)  # NOTE: [Huang et al 2008] considers n = 4, 8, 20
+n_fine = int(args.n_fine or 50)
+refine_equator = bool(args.refine_equator or False)
+initial_monitor = equator_monitor if refine_equator else None  # TODO: Other options
 
 op = BoydOptions(n=n_coarse, order=1)
 op.debug = True
@@ -30,10 +40,11 @@ if initial_monitor is not None:
 
 swp.solve(uses_adjoint=False)
 
-print_output("\nCalculating error metrics...")
-op.get_peaks(swp.solution.split()[1], reference_mesh_resolution=n_fine)
-print_output("h+       : {:.8e}".format(op.h_upper))
-print_output("h-       : {:.8e}".format(op.h_lower))
-print_output("C+       : {:.8e}".format(op.c_upper))
-print_output("C-       : {:.8e}".format(op.c_lower))
-print_output("RMS error: {:.8e}".format(op.rms))
+if bool(args.calculate_metrics or False):
+    print_output("\nCalculating error metrics...")
+    op.get_peaks(swp.solution.split()[1], reference_mesh_resolution=n_fine)
+    print_output("h+       : {:.8e}".format(op.h_upper))
+    print_output("h-       : {:.8e}".format(op.h_lower))
+    print_output("C+       : {:.8e}".format(op.c_upper))
+    print_output("C-       : {:.8e}".format(op.c_lower))
+    print_output("RMS error: {:.8e}".format(op.rms))
