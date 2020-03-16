@@ -797,7 +797,9 @@ class SteadyProblem():
             # Create a temporary Problem based on the new mesh
             am_copy = self.am.copy()
             
-            tmp = type(self)(self.op, mesh=am_copy.mesh, discrete_adjoint=self.discrete_adjoint,
+            op_copy = type(self.op)(mesh=am_copy.mesh)
+            op_copy.update(self.op)
+            tmp = type(self)(op_copy, mesh=am_copy.mesh, discrete_adjoint=self.discrete_adjoint,
                              prev_solution=self.prev_solution, levels=self.levels)
             x = Function(tmp.mesh.coordinates)
 

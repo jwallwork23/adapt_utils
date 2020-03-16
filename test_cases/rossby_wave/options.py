@@ -29,7 +29,7 @@ class BoydOptions(ShallowWaterOptions):
         self.plot_pvd = True
 
         # Physics
-        self.g.assign(1.)
+        self.g.assign(1.0)
 
         # Initial mesh
         self.lx = 48
@@ -38,25 +38,25 @@ class BoydOptions(ShallowWaterOptions):
                 'partition': True,
                 'overlap_type': (DistributedMeshOverlapType.VERTEX, 10),
         }
-        if periodic:
-            self.default_mesh = PeriodicRectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly,
-                                                      direction='x',
-                                                      distribution_parameters=self.distribution_parameters)
-        else:
-            self.default_mesh = RectangleMesh(self.lx*n, self.ly*n, self.lx, self.ly,
-                                              distribution_parameters=self.distribution_parameters)
-        x, y = SpatialCoordinate(self.default_mesh)
-        self.default_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
-        self.x, self.y = SpatialCoordinate(self.default_mesh)
+        if mesh is None:
+            args = (self.lx*n, self.ly*n, self.lx, self.ly)
+            kwargs = {'distribution_parameters' : self.distribution_parameters}
+            if periodic:
+                kwargs['direction'] = 'x'
+            mesh_constructor = PeriodicRectangleMesh if periodic else RectangleMesh
+            self.default_mesh = mesh_constructor(*args, **kwargs)
+            x, y = SpatialCoordinate(self.default_mesh)
+            self.default_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
         # NOTE: This setup corresponds to 'Grid B' in [Huang et al 2008].
 
         # Time integration
         self.dt = 0.05
-        if compute_metrics:
-            self.end_time = 120.
-        else:
-            self.start_time = 10.
-            self.end_time = 20.
+        self.end_time = 120.
+        # if compute_metrics:
+        #     self.end_time = 120.
+        # else:
+        #     self.start_time = 10.
+        #     self.end_time = 20.
         self.dt_per_export = 10
         self.dt_per_remesh = 20
         self.timestepper = 'CrankNicolson'
@@ -136,9 +136,10 @@ class BoydOptions(ShallowWaterOptions):
         """
         Get Hermite polynomials.
         """
-        polys = [Constant(1.), 2*self.y]
+        x, y = SpatialCoordinate(self.default_mesh)
+        polys = [Constant(1.), 2*y]
         for i in range(2, 28):
-            polys.append(2*self.y*polys[i-1] - 2*(i-1)*polys[i-2])
+            polys.append(2*y*polys[i-1] - 2*(i-1)*polys[i-2])
         return polys
 
     def xi(self, t=0.):
@@ -147,10 +148,11 @@ class BoydOptions(ShallowWaterOptions):
 
         :kwarg t: current time.
         """
+        x, y = SpatialCoordinate(self.default_mesh)
         c = -1/3  # Modon propagation speed
         if self.order == 1:
             c -= 0.395*self.soliton_amplitude*self.soliton_amplitude
-        return self.x - c*t
+        return x - c*t
 
     def phi(self, t=0.):
         """
@@ -174,7 +176,8 @@ class BoydOptions(ShallowWaterOptions):
         """
         exp term.
         """
-        return exp(-0.5*self.y*self.y)
+        x, y = SpatialCoordinate(self.default_mesh)
+        return exp(-0.5*y*y)
 
     def zeroth_order_terms(self, t=0.):
         """
@@ -183,9 +186,10 @@ class BoydOptions(ShallowWaterOptions):
         :kwarg t: current time.
         """
         self.terms = {}
-        self.terms['u'] = self.phi(t)*0.25*(-9 + 6*self.y*self.y)*self.psi()
-        self.terms['v'] = 2*self.y*self.dphidx(t)*self.psi()
-        self.terms['eta'] = self.phi(t)*0.25*(3 + 6*self.y*self.y)*self.psi()
+        x, y = SpatialCoordinate(self.default_mesh)
+        self.terms['u'] = self.phi(t)*0.25*(-9 + 6*y*y)*self.psi()
+        self.terms['v'] = 2*y*self.dphidx(t)*self.psi()
+        self.terms['eta'] = self.phi(t)*0.25*(3 + 6*y*y)*self.psi()
 
     def hermite_sum(self, field):
         """
@@ -200,19 +204,20 @@ class BoydOptions(ShallowWaterOptions):
 
         :kwarg t: current time.
         """
+        x, y = SpatialCoordinate(self.default_mesh)
         C = -0.395*self.soliton_amplitude*self.soliton_amplitude
         phi = self.phi(t)
         self.zeroth_order_terms(t)
 
         # Expansion for u
-        self.terms['u'] += C*phi*0.5625*(3 + 2*self.y*self.y)*self.psi()
+        self.terms['u'] += C*phi*0.5625*(3 + 2*y*y)*self.psi()
         self.terms['u'] += phi*phi*self.hermite_sum('u')
 
         # Expansion for v
         self.terms['v'] += self.dphidx(t)*phi*self.hermite_sum('v')
 
         # Expansion for eta
-        self.terms['eta'] += C*phi*0.5625*(-5 + 2*self.y*self.y)*self.psi()
+        self.terms['eta'] += C*phi*0.5625*(-5 + 2*y*y)*self.psi()
         self.terms['eta'] += phi*phi*self.hermite_sum('eta')
 
     def set_coriolis(self, fs):
