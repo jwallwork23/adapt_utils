@@ -142,10 +142,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.solver_obj.iterate()
         self.solution = self.solver_obj.fields.solution_2d
 
-    def get_bdy_functions(self, eta_in, u_in, bdy_id):
-        b = self.op.bathymetry
-        swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=self.op.bathymetry)
-        return swt.get_bnd_functions(eta_in, u_in, bdy_id, self.boundary_conditions)
+    def get_bnd_functions(self, *args):
+        b = self.op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
+        swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=b)
+        return swt.get_bnd_functions(*args, self.boundary_conditions)
 
     def get_strong_residual_forward(self):
         u, eta = self.solution.split()
@@ -298,7 +298,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             funcs = bcs.get(j)
 
             if funcs is not None:
-                eta_ext, u_ext = tpe.get_bdy_functions(eta, u, j)
+                eta_ext, u_ext = tpe.get_bnd_functions(eta, u, j)
 
                 # ExternalPressureGradient
                 un_jump = inner(u - u_ext, n)
@@ -607,10 +607,10 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         for e in self.solver_obj.exporters.values():
             e.set_next_export_ix(self.solver_obj.i_export)
 
-    def get_bdy_functions(self, eta_in, u_in, bdy_id):
-        b = self.op.bathymetry
-        swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=self.op.bathymetry)
-        return swt.get_bnd_functions(eta_in, u_in, bdy_id, self.boundary_conditions)
+    def get_bnd_functions(self, *args):
+        b = self.op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
+        swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=b)
+        return swt.get_bnd_functions(*args, self.boundary_conditions)
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.solver_obj)
