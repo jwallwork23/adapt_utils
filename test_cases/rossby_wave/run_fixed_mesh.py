@@ -13,6 +13,7 @@ parser.add_argument("-n_fine", help="Resolution of fine mesh.")
 parser.add_argument("-refine_equator", help="""
 Apply Monge-Ampere based r-adaptation to refine equatorial region.""")
 parser.add_argument("-calculate_metrics", help="Compute metrics using the fine mesh.")
+parser.add_argument("-debug", help="Toggle debugging mode.")
 args = parser.parse_args()
 
 
@@ -21,13 +22,17 @@ n_fine = int(args.n_fine or 50)
 refine_equator = bool(args.refine_equator or False)
 initial_monitor = equator_monitor if refine_equator else None  # TODO: Other options
 
-op = BoydOptions(n=n_coarse, order=1)
-op.debug = True
-op.dt = 0.04/n_coarse
-# op.end_time = 10*op.dt
-op.plot_pvd = n_coarse < 5
-op.dt_per_export = 10*n_coarse
-op.dt_per_remesh = 10*n_coarse
+kwargs = {
+  'n': n_coarse,
+  'debug': bool(args.debug or False),
+  'dt': 0.04/n_coarse,
+  'plot_pvd': n_coarse < 5,
+  'dt_per_export': 10*n_coarse,
+  'order': 1,
+  'num_adapt': 1,
+}
+
+op = BoydOptions(**kwargs)
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 
