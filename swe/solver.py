@@ -46,7 +46,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
     def create_solutions(self):
         super(SteadyShallowWaterProblem, self).create_solutions()
-        u, eta = self.adjoint_solution.split()
+        u, eta = self.solution.split()
         u.rename("Fluid velocity")
         eta.rename("Elevation")
         z, zeta = self.adjoint_solution.split()
@@ -382,67 +382,44 @@ class SteadyShallowWaterProblem(SteadyProblem):
             eta.rename("Elevation")
             self.solution_file.write(u, eta)
 
-    def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
+    def get_hessian_metric(self, adjoint=False, **kwargs):
+        kwargs.setdefault('noscale', False)
+        kwargs.setdefault('degree', 1)
+        kwargs.setdefault('mesh', self.mesh)
+        kwargs.setdefault('op', self.op)
         field = self.op.adapt_field
-        sol = self.get_solution(adjoint)
+        sol = self.adjoint_solution if adjoint else self.solution
         u, eta = sol.split()
 
-        def elevation():
-            return steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
-
-        def velocity_x():
-            s = Function(self.P1).interpolate(u[0])
-            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
-
-        def velocity_y():
-            s = Function(self.P1).interpolate(u[1])
-            return steady_metric(s, noscale=noscale, degree=degree, op=self.op)
-
-        def speed():
-            spd = Function(self.P1).interpolate(sqrt(inner(u, u)))
-            return steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
-
-        def inflow():
-            v = Function(self.P1).interpolate(inner(u, self.op.inflow))
-            return steady_metric(v, noscale=noscale, degree=degree, op=self.op)
-
-        def bathymetry():
-            b = Function(self.P1).interpolate(self.op.bathymetry)
-            return steady_metric(b, noscale=noscale, degree=degree, op=self.op)
-
-        def viscosity():
-            nu = Function(self.P1).interpolate(self.op.viscosity)
-            return steady_metric(nu, noscale=noscale, degree=degree, op=self.op)
-
-        metrics = {'elevation': elevation, 'velocity_x': velocity_x, 'velocity_y': velocity_y,
-                   'speed': speed, 'inflow': inflow,
-                   'bathymetry': bathymetry, 'viscosity': viscosity}
+        fdict = {'elevation': eta, 'velocity_x': u[0], 'velocity_y': u[1],
+             'speed': sqrt(inner(u, u)), 'inflow': inner(u, self.fields['inflow'])}
+        fdict.update(self.fields)
 
         self.M = Function(self.P1_ten)
-        if field in metrics:
-            self.M = metrics[field]()
+        if field in fdict:
+            self.M = steady_metric(fdict[field], **kwargs)
         elif field == 'all_avg':
-            self.M += metrics['velocity_x']()
-            self.M += metrics['velocity_y']()
-            self.M += metrics['elevation']()
+            self.M += steady_metric(fdict['velocity_x'], **kwargs)
+            self.M += steady_metric(fdict['velocity_y'], **kwargs)
+            self.M += steady_metric(fdict['elevation'], **kwargs)
             self.M /= 3.0
         elif field == 'all_int':
-            self.M = metric_intersection(metrics['velocity_x'](), metrics['velocity_y']())
-            self.M = metric_intersection(self.M, metrics['elevation']())
+            self.M = metric_intersection(steady_metric(fdict['velocity_x'], **kwargs),
+                                         steady_metric(fdict['velocity_y'], **kwargs))
+            self.M = metric_intersection(self.M, steady_metric(fdict['elevation'], **kwargs))
         elif 'avg' in field and 'int' in field:
             raise NotImplementedError  # TODO
         elif 'avg' in field:
             fields = field.split('_avg_')
             num_fields = len(fields)
-            print(fields, num_fields)
             for i in range(num_fields):
-                self.M += metrics[fields[i]]()
+                self.M += steady_metric(fdict[fields[i]], **kwargs)
             self.M /= num_fields
         elif 'int' in field:
             fields = field.split('_int_')
-            self.M = metrics[fields[0]]()
+            self.M = steady_metric(fdict[fields[0]], **kwargs)
             for i in range(1, len(fields)):
-                self.M = metric_intersection(self.M, metrics[fields[i]]())
+                self.M = metric_intersection(self.M, steady_metric(fields[f[i]], **kwargs))
         else:
             raise ValueError("Adaptation field {:s} not recognised.".format(field))
 
@@ -486,7 +463,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
     def create_solutions(self):
         super(UnsteadyShallowWaterProblem, self).create_solutions()
-        u, eta = self.adjoint_solution.split()
+        u, eta = self.solution.split()
         u.rename("Fluid velocity")
         eta.rename("Elevation")
         z, zeta = self.adjoint_solution.split()
@@ -607,11 +584,12 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.solve_tracer:
             options.tracer_advective_velocity = self.op.corrective_velocity
             options.tracer_source_2d = self.op.source
+
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
         if op.solve_tracer:
             self.solver_obj.bnd_functions['tracer'] = op.set_boundary_conditions_tracer(self.V)
-            
+
         if op.solve_tracer:
             if self.op.tracer_init is not None:
                 self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp, tracer=self.tracer_interp)
@@ -649,63 +627,44 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             eta.rename("Elevation")
             self.solution_file.write(u, eta)
 
-    def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
+    def get_hessian_metric(self, adjoint=False, **kwargs):
+        kwargs.setdefault('noscale', False)
+        kwargs.setdefault('degree', 1)
+        kwargs.setdefault('mesh', self.mesh)
+        kwargs.setdefault('op', self.op)
         field = self.op.adapt_field
         sol = self.adjoint_solution if adjoint else self.solution
         u, eta = sol.split()
 
-        def elevation():
-            return steady_metric(eta, noscale=noscale, degree=degree, op=self.op)
-
-        def velocity_x():
-            return steady_metric(u[0], noscale=noscale, degree=degree, op=self.op)
-
-        def velocity_y():
-            return steady_metric(u[1], noscale=noscale, degree=degree, op=self.op)
-
-        def speed():
-            spd = interpolate(sqrt(inner(u, u)), self.P1)  # TODO: Do we need to interpolate?
-            return steady_metric(spd, noscale=noscale, degree=degree, op=self.op)
-
-        def inflow():
-            v = interpolate(inner(u, self.fields['inflow']), self.P1)  # TODO: Do we need to interpolate?
-            return steady_metric(v, noscale=noscale, degree=degree, op=self.op)
-
-        def bathymetry():
-            return steady_metric(self.fields['bathymetry'], noscale=noscale, degree=degree, op=self.op)
-
-        def viscosity():
-            return steady_metric(self.fields['viscosity'], noscale=noscale, degree=degree, op=self.op)
-
-        # TODO: This will all be simpler when fields dict is implemented
-        metrics = {'elevation': elevation, 'velocity_x': velocity_x, 'velocity_y': velocity_y,
-                   'speed': speed, 'inflow': inflow,
-                   'bathymetry': bathymetry, 'viscosity': viscosity}
+        fdict = {'elevation': eta, 'velocity_x': u[0], 'velocity_y': u[1],
+             'speed': sqrt(inner(u, u)), 'inflow': inner(u, self.fields['inflow'])}
+        fdict.update(self.fields)
 
         self.M = Function(self.P1_ten)
-        if field in metrics:
-            self.M = metrics[field]()
+        if field in fdict:
+            self.M = steady_metric(fdict[field], **kwargs)
         elif field == 'all_avg':
-            self.M += metrics['velocity_x']()
-            self.M += metrics['velocity_y']()
-            self.M += metrics['elevation']()
+            self.M += steady_metric(fdict['velocity_x'], **kwargs)
+            self.M += steady_metric(fdict['velocity_y'], **kwargs)
+            self.M += steady_metric(fdict['elevation'], **kwargs)
             self.M /= 3.0
         elif field == 'all_int':
-            self.M = metric_intersection(metrics['velocity_x'](), metrics['velocity_y']())
-            self.M = metric_intersection(self.M, metrics['elevation']())
+            self.M = metric_intersection(steady_metric(fdict['velocity_x'], **kwargs),
+                                         steady_metric(fdict['velocity_y'], **kwargs))
+            self.M = metric_intersection(self.M, steady_metric(fdict['elevation'], **kwargs))
         elif 'avg' in field and 'int' in field:
             raise NotImplementedError  # TODO
         elif 'avg' in field:
             fields = field.split('_avg_')
             num_fields = len(fields)
             for i in range(num_fields):
-                self.M += metrics[fields[i]]()
+                self.M += steady_metric(fdict[fields[i]], **kwargs)
             self.M /= num_fields
         elif 'int' in field:
             fields = field.split('_int_')
-            self.M = metrics[fields[0]]()
+            self.M = steady_metric(fdict[fields[0]], **kwargs)
             for i in range(1, len(fields)):
-                self.M = metric_intersection(self.M, metrics[fields[i]]())
+                self.M = metric_intersection(self.M, steady_metric(fields[f[i]], **kwargs))
         else:
             raise ValueError("Adaptation field {:s} not recognised.".format(field))
 
