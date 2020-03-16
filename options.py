@@ -83,7 +83,8 @@ class Options(FrozenConfigurable):
     # Mesh
     periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
 
-    def __init__(self, **kwargs):
+    def __init__(self, mesh=None, **kwargs):
+        self.default_mesh = mesh
         self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)
         self.end_time -= 0.5*self.dt
