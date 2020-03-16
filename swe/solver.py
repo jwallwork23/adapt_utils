@@ -87,7 +87,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             else:
                 options.timestepper_options.solver_parameters = op.params
         if op.debug:
-            options.timestepper_options.solver_parameters['snes_monitor'] = None
+            # options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta
@@ -551,7 +551,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.params != {}:
             options.timestepper_options.solver_parameters = op.params
         if op.debug:
-            options.timestepper_options.solver_parameters['snes_monitor'] = None
+            # options.timestepper_options.solver_parameters['snes_monitor'] = None
             print_output(options.timestepper_options.solver_parameters)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta

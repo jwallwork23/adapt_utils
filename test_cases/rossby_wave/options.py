@@ -16,7 +16,7 @@ class BoydOptions(ShallowWaterOptions):
     """
     soliton_amplitude = PositiveFloat(0.395).tag(config=True)
 
-    def __init__(self, periodic=True, n=1, order=0, compute_metrics=True, **kwargs):
+    def __init__(self, mesh=None, periodic=True, n=1, order=0, compute_metrics=True, **kwargs):
         """
         :kwarg approach: mesh adaptation approach
         :kwarg periodic: toggle periodic boundary in x-direction
@@ -57,7 +57,7 @@ class BoydOptions(ShallowWaterOptions):
         # else:
         #     self.start_time = 10.
         #     self.end_time = 20.
-        self.dt_per_export = 10
+        self.dt_per_export = 20
         self.dt_per_remesh = 20
         self.timestepper = 'CrankNicolson'
 
@@ -364,3 +364,19 @@ class BoydOptions(ShallowWaterOptions):
         sol_proj *= sol_proj
         self.rms = sqrt(np.mean(sol_proj.vector().gather()))
         self.print_debug("Done!")
+
+    def get_export_func(self, solver_obj):
+        def export_func():
+            if self.debug:
+                t = solver_obj.simulation_time
+                exact = self.get_exact_solution(solver_obj.function_spaces.V_2d, t=t)
+                approx = solver_obj.fields.solution_2d
+                error = errornorm(approx, exact)/norm(exact)
+                print_output("DEBUG: t = {:6.2f} relative error {:6.2f}%".format(t, error))
+            return
+        return export_func
+
+    # def get_update_forcings(self, solver_obj):
+    #     def update_forcings(t):
+    #         return
+    #     return update_forcings
