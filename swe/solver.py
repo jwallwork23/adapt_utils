@@ -474,8 +474,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields = {}
         self.fields['viscosity'] = self.op.set_viscosity(self.P1)
         self.fields['diffusivity'] = self.op.set_diffusivity(self.P1)
-        if self.op.solve_tracer == False:
-            self.fields['bathmetry'] = self.op.set_bathymetry(self.P1DG)
+        if not self.op.solve_tracer:
+            self.fields['bathymetry'] = self.op.set_bathymetry(self.P1DG)
         self.fields['inflow'] = self.op.set_inflow(self.P1_vec)
         self.fields['coriolis'] = self.op.set_coriolis(self.P1)
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
@@ -629,6 +629,18 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.solver_obj)
+
+    def plot_solution(self, adjoint=False):
+        if adjoint:
+            z, zeta = self.adjoint_solution.split()
+            z.rename("Adjoint fluid velocity")
+            zeta.rename("Adjoint elevation")
+            self.adjoint_solution_file.write(z, zeta)
+        else:
+            u, eta = self.solution.split()
+            u.rename("Fluid velocity")
+            eta.rename("Elevation")
+            self.solution_file.write(u, eta)
 
     def get_hessian_metric(self, noscale=False, degree=1, adjoint=False):
         field = self.op.adapt_field
