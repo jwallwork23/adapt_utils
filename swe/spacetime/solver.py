@@ -28,19 +28,12 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         Build the finite element space, `V`, for the prognostic solution, along with various other
         useful spaces and test functions and trial functions based upon them.
         """
-        self.P0 = FunctionSpace(self.mesh, "DG", 0)
-        self.P1 = FunctionSpace(self.mesh, "CG", 1)
-        self.P2 = FunctionSpace(self.mesh, "CG", 2)
-        self.P1DG = FunctionSpace(self.mesh, "DG", 1)
-        self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
-        self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
+        super(SpaceTimeShallowWaterProblem, self).create_function_spaces()
         self.V = VectorFunctionSpace(self.mesh, "CG", 2, dim=self.dim-1)*self.P1
         self.test = TestFunction(self.V)
         self.tests = TestFunctions(self.V)
         self.trial = TrialFunction(self.V)
         self.trials = TrialFunctions(self.V)
-        self.p0test = TestFunction(self.P0)
-        self.p0trial = TrialFunction(self.P0)
 
     def set_fields(self, adapted=False):
         self.fields = {}
@@ -385,19 +378,12 @@ class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):
         Build the finite element space, `V`, for the prognostic solution, along with various other
         useful spaces and test functions and trial functions based upon them.
         """
-        self.P0 = FunctionSpace(self.mesh, "DG", 0)
-        self.P1 = FunctionSpace(self.mesh, "CG", 1)
-        self.P2 = FunctionSpace(self.mesh, "CG", 2)
-        self.P1DG = FunctionSpace(self.mesh, "DG", 1)
-        self.P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
-        self.P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
+        super(SpaceTimeDispersiveShallowWaterProblem, self).create_function_spaces()
         self.V = VectorFunctionSpace(self.mesh, "CG", 2, dim=2)*self.P1*self.P1
         self.test = TestFunction(self.V)
         self.tests = TestFunctions(self.V)
         self.trial = TrialFunction(self.V)
         self.trials = TrialFunctions(self.V)
-        self.p0test = TestFunction(self.P0)
-        self.p0trial = TrialFunction(self.P0)
 
     def set_fields(self, adapted=False):
         self.fields = {}
