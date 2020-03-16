@@ -520,8 +520,12 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         P1DG_old = FunctionSpace(old_mesh, "DG", 1)
         P1_old = FunctionSpace(old_mesh, "CG", 1)  
 
-        solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy=True)
-        self.solution_old_bathymetry = project(solution_bathymetry, P1_old)
+        if isinstance(solver_obj.fields.bathymetry_2d, Constant):
+            solution_bathymetry = Constant(solver_obj.fields.bathymetry_2d)
+            self.solution_old_bathymetry = Constant(solution_bathymetry)
+        else:
+            solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy=True)
+            self.solution_old_bathymetry = project(solution_bathymetry, P1_old)
 
         if self.op.solve_tracer:
             solution_tracer = self.solver_obj.fields.tracer_2d.copy(deepcopy=True)
@@ -534,7 +538,10 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
         # Use appropriate bathymetry
         if hasattr(self, "solution_old_bathymetry"):
-            op.bathymetry = project(self.solution_old_bathymetry, self.P1)
+            if isinstance(self.solution_old_bathymetry, Constant):
+                op.bathymetry = Constant(self.solution_old_bathymetry)
+            else:
+                op.bathymetry = project(self.solution_old_bathymetry, self.P1)
         else:
             op.bathymetry = self.op.set_bathymetry(self.P1)
         b = op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
