@@ -57,7 +57,8 @@ class BoydOptions(ShallowWaterOptions):
 
         # Time integration
         self.dt = 0.05
-        self.end_time = 120.0
+        # self.end_time = 120.0
+        self.end_time = 30.0
         self.dt_per_export = 50
         self.dt_per_remesh = 50
         self.timestepper = 'CrankNicolson'
@@ -137,10 +138,7 @@ class BoydOptions(ShallowWaterOptions):
         ξ = x - c*self.t
         self.φ = 0.771*(B/cosh(B*ξ))**2
         self.dφdx = -2*B*self.φ*tanh(B*ξ)
-
-        # Account for periodicity of domain
-        self.φ +=  0.771*(B/cosh(B*(ξ - self.lx)))**2
-        self.dφdx += -2*B*self.φ*tanh(B*(ξ - self.lx))
+        # TODO: account for periodicity
 
         # Plotting
         self.relative_errors = []
@@ -173,38 +171,6 @@ class BoydOptions(ShallowWaterOptions):
             boundary_conditions[tag] = dirichlet
         return boundary_conditions
 
-    def add_zeroth_order_terms(self):
-        """
-        Zeroth order asymptotic solution.
-
-        :kwarg t: current time.
-        """
-        x, y = SpatialCoordinate(self.default_mesh)
-        self.terms['u'] += self.φ*0.25*(-9 + 6*y*y)*self.Ψ
-        self.terms['v'] += 2*y*self.dφdx*self.Ψ
-        self.terms['eta'] += self.φ*0.25*(3 + 6*y*y)*self.Ψ
-
-    def add_first_order_terms(self):
-        """
-        First order asymptotic solution.
-
-        :kwarg t: current time.
-        """
-        x, y = SpatialCoordinate(self.default_mesh)
-        B = self.soliton_amplitude
-        C = -0.395*B*B
-
-        # Expansion for u
-        self.terms['u'] += C*self.φ*0.5625*(3 + 2*y*y)*self.Ψ
-        self.terms['u'] += self.φ*self.φ*self.hermite_sum['u']
-
-        # Expansion for v
-        self.terms['v'] += self.dφdx*self.φ*self.hermite_sum['v']
-
-        # Expansion for eta
-        self.terms['eta'] += C*self.φ*0.5625*(-5 + 2*y*y)*self.Ψ
-        self.terms['eta'] += self.φ*self.φ*self.hermite_sum['eta']
-
     def set_qoi_kernel(self, fs):
         # raise NotImplementedError  # TODO: Kelvin wave?
         return
@@ -217,13 +183,27 @@ class BoydOptions(ShallowWaterOptions):
         :kwarg t: current time.
         """
         msg = "Computing order {:d} asymptotic solution at time {:.2f}s on mesh with {:d} local elements..."
-        self.print_debug(msg.format(self.order+1, t, fs.mesh().num_cells()))
+        self.print_debug(msg.format(self.order, t, fs.mesh().num_cells()))
         self.t.assign(t)
-        self.terms = {'u': 0, 'v': 0, 'eta': 0}
-        self.add_zeroth_order_terms()
+        x, y = SpatialCoordinate(self.default_mesh)
+        B = self.soliton_amplitude
+        C = -0.395*B*B
+
+        # Zero order terms
+        self.terms = {}
+        self.terms['u'] = self.φ*0.25*(-9 + 6*y*y)*self.Ψ
+        self.terms['v'] = 2*y*self.dφdx*self.Ψ
+        self.terms['eta'] = self.φ*0.25*(3 + 6*y*y)*self.Ψ
+
+        # First order terms
         if self.order > 0:
             assert self.order == 1
-            self.add_first_order_terms()
+            self.terms['u'] += C*self.φ*0.5625*(3 + 2*y*y)*self.Ψ
+            self.terms['u'] += self.φ*self.φ*self.hermite_sum['u']
+            self.terms['v'] += self.dφdx*self.φ*self.hermite_sum['v']
+            self.terms['eta'] += C*self.φ*0.5625*(-5 + 2*y*y)*self.Ψ
+            self.terms['eta'] += self.φ*self.φ*self.hermite_sum['eta']
+
         self.exact_solution = Function(fs, name="Order {:d} asymptotic solution".format(self.order))
         u, eta = self.exact_solution.split()
         u.interpolate(as_vector([self.terms['u'], self.terms['v']]))
