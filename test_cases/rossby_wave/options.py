@@ -368,7 +368,10 @@ class BoydOptions(ShallowWaterOptions):
             assert len(self.relative_errors) > 0
         except AssertionError:
             raise ValueError("Nothing to write to HDF5!")
-        fname = os.path.join(self.di, filename or 'relative_errors') + '.hdf5'
+        fname = 'relative_errors'
+        if filename is not None:
+            fname = '_'.join([fname, filename])
+        fname = os.path.join(self.di, fname) + '.hdf5'
         errorfile = h5py.File(fname, 'w')
         errorfile.create_dataset('error', data=self.relative_errors)
         errorfile.close()
@@ -395,9 +398,12 @@ class BoydOptions(ShallowWaterOptions):
             except AssertionError:
                 raise ValueError("Nothing to plot!")
             self.relative_errors = np.array(self.relative_errors)
-            label = fname.split('/')[-1]
+            label = fname.split('/')[-1][:-5]
+            words = label.split('_')
+            label = ' '.join(words[2:]).capitalize()
             plt.plot(np.linspace(0, self.end_time, n), 100.0*self.relative_errors, label=label)
         plt.xlabel(r"Time [s]")
         plt.ylabel(r"Relative error (\%)")
+        plt.legend()
         plt.savefig(os.path.join(self.di, 'relative_errors.png'))
         plt.show()
