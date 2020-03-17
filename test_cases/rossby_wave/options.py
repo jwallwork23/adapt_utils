@@ -41,8 +41,8 @@ class BoydOptions(ShallowWaterOptions):
         self.lx = 48
         self.ly = 24
         self.distribution_parameters = {
-                'partition': True,
-                'overlap_type': (DistributedMeshOverlapType.VERTEX, 10),
+            'partition': True,
+            'overlap_type': (DistributedMeshOverlapType.VERTEX, 10),
         }
         if mesh is None:
             args = (self.lx*n, self.ly*n, self.lx, self.ly)
@@ -58,7 +58,7 @@ class BoydOptions(ShallowWaterOptions):
         # Time integration
         self.dt = 0.05
         # self.end_time = 120.0
-        self.end_time = 30.0
+        self.end_time = 30.0  # TODO: Temporary until periodicity is fixed in exact solution
         self.dt_per_export = 50
         self.dt_per_remesh = 50
         self.timestepper = 'CrankNicolson'
@@ -141,7 +141,7 @@ class BoydOptions(ShallowWaterOptions):
         # TODO: account for periodicity
 
         # Plotting
-        self.relative_errors = []
+        self.relative_errors = {'l1': [], 'l2': [], 'linf': []}
         self.exact_solution_file = File(os.path.join(self.di, 'exact.pvd'))
 
     def set_bathymetry(self, fs):
@@ -226,8 +226,8 @@ class BoydOptions(ShallowWaterOptions):
         """
         Set up a non-periodic, very fine mesh on the PDE domain.
         """
-        nx = self.lx*n
-        ny = self.ly*n
+        nx = int(self.lx*n)
+        ny = int(self.ly*n)
         self.print_debug("Generating reference mesh with {:d} local elements...".format(2*nx*ny))
         reference_mesh = RectangleMesh(nx, ny, self.lx, self.ly,
                                        distribution_parameters=self.distribution_parameters)
@@ -241,7 +241,9 @@ class BoydOptions(ShallowWaterOptions):
         """
 
         # Generate an identical non-periodic mesh
-        nonperiodic_mesh = RectangleMesh(self.lx*self.n, self.ly*self.n, self.lx, self.ly,
+        nx = int(self.lx*n)
+        ny = int(self.ly*n)
+        nonperiodic_mesh = RectangleMesh(nx, ny, self.lx, self.ly,
                                          distribution_parameters=self.distribution_parameters)
         x, y = SpatialCoordinate(nonperiodic_mesh)
         nonperiodic_mesh.coordinates.interpolate(as_vector([x - self.lx/2, y - self.ly/2]))
@@ -251,9 +253,7 @@ class BoydOptions(ShallowWaterOptions):
 
         # Project into corresponding function space
         V = FunctionSpace(nonperiodic_mesh, sol.ufl_element())
-        sol_np = Function(V)
-        sol_np.project(sol)
-        return sol_np
+        return project(sol, V)
 
     def get_peaks(self, sol_periodic, reference_mesh_resolution=50):
         """
@@ -333,9 +333,15 @@ class BoydOptions(ShallowWaterOptions):
 
                 # Compute relative error
                 approx = solver_obj.fields.solution_2d
-                error = errornorm(approx, exact)/norm(exact)
-                self.relative_errors.append(error)
-                print_output("DEBUG: t = {:6.2f} relative error {:6.2f}%".format(t, 100*error))
+                u, eta = approx.split()
+                l1_error = errornorm(approx, exact, norm_type='l1')/norm(exact, norm_type='l1')
+                l2_error = errornorm(approx, exact, norm_type='l2')/norm(exact, norm_type='l2')
+                linf_error = abs(1.0 - eta.vector().gather().max()/exact_eta.vector().gather().max())
+                self.relative_errors['l1'].append(l1_error)
+                self.relative_errors['l2'].append(l2_error)
+                self.relative_errors['linf'].append(linf_error)
+                msg = "DEBUG: t = {:6.2f} l1 error {:6.2f}% l2 error {:6.2f}% linf error {:6.2f}%"
+                print_output(msg.format(t, 100*l1_error, 100*l2_error, 100*linf_error))
 
                 # TODO: Compute exact solution and error on fine reference mesh
             return
@@ -349,7 +355,7 @@ class BoydOptions(ShallowWaterOptions):
     def write_to_hdf5(self, filename=None):
         """Write relative error timeseries to HDF5."""
         try:
-            assert len(self.relative_errors) > 0
+            assert len(self.relative_errors['l2']) > 0
         except AssertionError:
             raise ValueError("Nothing to write to HDF5!")
         fname = 'relative_errors'
@@ -357,7 +363,9 @@ class BoydOptions(ShallowWaterOptions):
             fname = '_'.join([fname, filename])
         fname = os.path.join(self.di, fname) + '.hdf5'
         errorfile = h5py.File(fname, 'w')
-        errorfile.create_dataset('error', data=self.relative_errors)
+        errorfile.create_dataset('l1_error', data=self.relative_errors['l1'])
+        errorfile.create_dataset('l2_error', data=self.relative_errors['l2'])
+        errorfile.create_dataset('linf_error', data=self.relative_errors['linf'])
         errorfile.close()
 
     def read_from_hdf5(self, filename=None):
@@ -368,30 +376,43 @@ class BoydOptions(ShallowWaterOptions):
         except AssertionError:
             raise IOError("HDF file {:s} does not exist!".format(fname))
         errorfile = h5py.File(fname, 'r')
-        self.relative_errors = np.array(errorfile['error'])
+        self.relative_errors['l1'] = np.array(errorfile['l1_error'])
+        self.relative_errors['l2'] = np.array(errorfile['l2_error'])
+        self.relative_errors['linf'] = np.array(errorfile['linf_error'])
         errorfile.close()
 
     def plot_errors(self):
         """Plot relative error timeseries."""
-        fnames = [f for f in os.listdir(self.di) if f.endswith('.hdf5') and 'relative_errors' in f]
-        for fname in fnames:
-            self.read_from_hdf5(filename=fname)
-            n = len(self.relative_errors)
-            try:
-                assert n > 0
-            except AssertionError:
-                raise ValueError("Nothing to plot!")
-            self.relative_errors = np.array(self.relative_errors)
-            label = fname.split('/')[-1][:-5]
-            words = label.split('_')
-            kwargs = {
-                'label': ' '.join(words[2:]).capitalize(),
-                # 'linestyle': 'dashed',
-                # 'marker': 'x',
-            }
-            plt.plot(np.linspace(0, self.end_time, n), 100.0*self.relative_errors, **kwargs)
-        plt.xlabel(r"Time [s]")
-        plt.ylabel(r"Relative error (\%)")
-        plt.legend()
-        plt.savefig(os.path.join(self.di, 'relative_errors.png'))
+
+        for norm_type in ("l1", "l2", "linf"):
+            plt.figure()
+            fnames = [f for f in os.listdir(self.di) if f.endswith('.hdf5') and 'relative_errors' in f]
+            for fname in fnames:
+                self.read_from_hdf5(filename=fname)
+                try:
+                    n = len(self.relative_errors[norm_type])
+                except KeyError:  # TODO: temp
+                    break
+                try:
+                    assert n > 0
+                except AssertionError:
+                    raise ValueError("Nothing to plot!")
+                self.relative_errors[norm_type] = 100*np.array(self.relative_errors[norm_type])
+                label = fname.split('/')[-1][:-5]
+                words = label.split('_')
+                kwargs = {
+                    'label': ' '.join(words[2:]).capitalize(),
+                    'linestyle': 'dashed',
+                    'marker': 'x',
+                }
+                plt.plot(np.linspace(0, self.end_time, n), self.relative_errors[norm_type], **kwargs)
+            plt.xlabel(r"Time [s]")
+            if norm_type == "l1":
+                plt.ylabel(r"Relative $\mathcal L_1$ error (\%)")
+            elif norm_type == "l2":
+                plt.ylabel(r"Relative $\mathcal L_2$ error (\%)")
+            elif norm_type == "linf":
+                plt.ylabel(r"Relative $\mathcal L_\infty$ error (\%)")
+            plt.legend()
+            plt.savefig(os.path.join(self.di, 'relative_errors_{:s}.png'.format(norm_type)))
         plt.show()
