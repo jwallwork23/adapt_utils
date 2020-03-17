@@ -29,7 +29,7 @@ class BoydOptions(ShallowWaterOptions):
         :kwarg n: mesh resolution
         """
         super(BoydOptions, self).__init__(mesh=mesh, **kwargs)
-        self.periodic = periodic
+        self.periodic = periodic  # TODO: needed?
         self.n = n
         self.order = order
         self.plot_pvd = True
@@ -65,6 +65,9 @@ class BoydOptions(ShallowWaterOptions):
         # Adaptivity
         self.h_min = 1e-8
         self.h_max = 10.0
+
+        # Read in user-specified kwargs
+        self.update(kwargs)
 
         # Unnormalised Hermite series coefficients
         u = np.zeros(28)
@@ -130,7 +133,7 @@ class BoydOptions(ShallowWaterOptions):
             modon_propagation_speed -= 0.395*B*B
         c = Constant(modon_propagation_speed)
         ξ = x - c*self.t
-        self.φ =  0.771*(B/cosh(B*ξ))**2
+        self.φ = 0.771*(B/cosh(B*ξ))**2
         self.φ +=  0.771*(B/cosh(B*(ξ - 48.0)))**2
         self.dφdx = -2*B*self.φ*tanh(B*ξ)
         self.dφdx += -2*B*self.φ*tanh(B*(ξ - 48.0))
@@ -153,21 +156,17 @@ class BoydOptions(ShallowWaterOptions):
 
         :arg fs: `FunctionSpace` in which the solution should live.
         """
-        x, y = SpatialCoordinate(fs.mesh())
-        self.coriolis = interpolate(y, fs)
+        self.coriolis = interpolate(SpatialCoordinate(fs.mesh())[1], fs)
         return self.coriolis
 
     def set_boundary_conditions(self, fs):
         """
         Set no slip boundary conditions uv = 0 along North and South boundaries.
         """
-        zero = Constant(as_vector([0., 0.]), domain=fs.mesh())
+        dirichlet = {'uv': Constant(as_vector([0., 0.]), domain=fs.mesh())}
         boundary_conditions = {}
-        boundary_conditions[1] = {'uv': zero}
-        boundary_conditions[2] = {'uv': zero}
-        if not self.periodic:
-            boundary_conditions[3] = {'uv': zero}
-            boundary_conditions[4] = {'uv': zero}
+        for tag in fs.mesh().exterior_facets.unique_markers:
+            boundary_conditions[tag] = dirichlet
         return boundary_conditions
 
     def add_zeroth_order_terms(self):
@@ -353,6 +352,8 @@ class BoydOptions(ShallowWaterOptions):
                 error = errornorm(approx, exact)/norm(exact)
                 self.relative_errors.append(error)
                 print_output("DEBUG: t = {:6.2f} relative error {:6.2f}%".format(t, 100*error))
+
+                # TODO: Compute exact solution and error on fine reference mesh
             return
         return export_func
 
@@ -361,19 +362,20 @@ class BoydOptions(ShallowWaterOptions):
     #         return
     #     return update_forcings
 
-    def write_to_hdf5(self):
+    def write_to_hdf5(self, filename=None):
         """Write relative error timeseries to HDF5."""
         try:
             assert len(self.relative_errors) > 0
         except AssertionError:
             raise ValueError("Nothing to write to HDF5!")
-        errorfile = h5py.File(os.path.join(self.di, 'relative_errors.hdf5'), 'w')
+        fname = os.path.join(self.di, filename or 'relative_errors') + '.hdf5'
+        errorfile = h5py.File(fname, 'w')
         errorfile.create_dataset('error', data=self.relative_errors)
         errorfile.close()
 
-    def read_from_hdf5(self):
+    def read_from_hdf5(self, filename=None):
         """Read relative error timeseries from HDF5."""
-        fname = os.path.join(self.di, 'relative_errors.hdf5')
+        fname = os.path.join(self.di, filename or 'relative_errors') + '.hdf5'
         try:
             assert os.path.exists(fname)
         except AssertionError:

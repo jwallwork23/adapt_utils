@@ -31,7 +31,7 @@ kwargs = {
   'end_time': float(args.end_time or 120.0),
   'dt': 0.04/n_coarse,
   'plot_pvd': n_coarse < 5,
-  'dt_per_export': 10*n_coarse,
+  'dt_per_export': 50*n_coarse,
   'order': 1,
   'num_adapt': 1,
   'r_adapt_rtol': 1.0e-3,
