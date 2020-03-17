@@ -1,13 +1,19 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.options import ShallowWaterOptions
-
-import numpy as np
+import h5py
 import weakref
+import numpy as np
+import matplotlib.pyplot as plt
+
+from adapt_utils.swe.options import ShallowWaterOptions
 
 
 __all__ = ["BoydOptions"]
+
+
+plt.rc('text', usetex=True)
+plt.rc('font', family='serif')
 
 
 class BoydOptions(ShallowWaterOptions):
@@ -51,19 +57,14 @@ class BoydOptions(ShallowWaterOptions):
 
         # Time integration
         self.dt = 0.05
-        self.end_time = 120.
-        # if compute_metrics:
-        #     self.end_time = 120.
-        # else:
-        #     self.start_time = 10.
-        #     self.end_time = 20.
-        self.dt_per_export = 20
-        self.dt_per_remesh = 20
+        self.end_time = 120.0
+        self.dt_per_export = 50
+        self.dt_per_remesh = 50
         self.timestepper = 'CrankNicolson'
 
         # Adaptivity
         self.h_min = 1e-8
-        self.h_max = 10.
+        self.h_max = 10.0
 
         # Unnormalised Hermite series coefficients
         u = np.zeros(28)
@@ -109,7 +110,32 @@ class BoydOptions(ShallowWaterOptions):
         eta[22] = -0.1382304e-17
         eta[24] =  0.1066277e-19
         eta[26] = -0.1178252e-21
-        self.hermite_coeffs = {'u': u, 'v': v, 'eta': eta}
+        hermite_coeffs = {'u': u, 'v': v, 'eta': eta}
+
+        # Hermite polynomials
+        x, y = SpatialCoordinate(self.default_mesh)
+        polynomials = [Constant(1.0), 2*y]
+        for i in range(2, 28):
+            polynomials.append(2*y*polynomials[i-1] - 2*(i-1)*polynomials[i-2])
+        self.Ψ = exp(-0.5*y*y)
+        self.hermite_sum = {}
+        for f in ('u', 'v', 'eta'):
+            self.hermite_sum[f] = self.Ψ*sum(hermite_coeffs[f][i]*polynomials[i] for i in range(28))
+
+        # Variables for expansion
+        self.t = Constant(0.0)
+        modon_propagation_speed = -1/3
+        if self.order == 1:
+            modon_propagation_speed -= 0.395*self.soliton_amplitude*self.soliton_amplitude
+        c = Constant(modon_propagation_speed)
+        self.ξ = x - c*self.t + conditional(le(x - c*self.t, -24.0), 48.0, 0.0)
+        B = self.soliton_amplitude
+        self.φ =  0.771*B*B*(1/(cosh(B*self.ξ)**2))
+        self.dφdx = -2*B*self.φ*tanh(B*self.ξ)
+
+        # Plotting
+        self.relative_errors = []
+        self.exact_solution_file = File(os.path.join(self.di, 'exact.pvd'))
 
     def set_bathymetry(self, fs):
         self.bathymetry = Constant(1.0, domain=fs.mesh())
@@ -118,6 +144,16 @@ class BoydOptions(ShallowWaterOptions):
     def set_viscosity(self, fs):
         self.viscosity = Constant(0.0, domain=fs.mesh())
         return self.viscosity
+
+    def set_coriolis(self, fs):
+        """
+        Set beta plane approximation Coriolis parameter.
+
+        :arg fs: `FunctionSpace` in which the solution should live.
+        """
+        x, y = SpatialCoordinate(fs.mesh())
+        self.coriolis = interpolate(y, fs)
+        return self.coriolis
 
     def set_boundary_conditions(self, fs):
         """
@@ -132,73 +168,18 @@ class BoydOptions(ShallowWaterOptions):
             boundary_conditions[4] = {'uv': zero}
         return boundary_conditions
 
-    def polynomials(self):
-        """
-        Get Hermite polynomials.
-        """
-        x, y = SpatialCoordinate(self.default_mesh)
-        polys = [Constant(1.), 2*y]
-        for i in range(2, 28):
-            polys.append(2*y*polys[i-1] - 2*(i-1)*polys[i-2])
-        return polys
-
-    def xi(self, t=0.):
-        """
-        Get time-shifted x-coordinate.
-
-        :kwarg t: current time.
-        """
-        x, y = SpatialCoordinate(self.default_mesh)
-        c = -1/3  # Modon propagation speed
-        if self.order == 1:
-            c -= 0.395*self.soliton_amplitude*self.soliton_amplitude
-        return x - c*t
-
-    def phi(self, t=0.):
-        """
-        sech^2 term.
-
-        :kwarg t: current time.
-        """
-        B = self.soliton_amplitude
-        return 0.771*B*B*(1/(cosh(B*self.xi(t))**2))
-
-    def dphidx(self, t=0.):
-        """
-        tanh * phi term.
-
-        :kwarg t: current time. 
-        """
-        B = self.soliton_amplitude
-        return -2*B*self.phi(t)*tanh(B*self.xi(t))
-
-    def psi(self):
-        """
-        exp term.
-        """
-        x, y = SpatialCoordinate(self.default_mesh)
-        return exp(-0.5*y*y)
-
-    def zeroth_order_terms(self, t=0.):
+    def add_zeroth_order_terms(self):
         """
         Zeroth order asymptotic solution.
 
         :kwarg t: current time.
         """
-        self.terms = {}
         x, y = SpatialCoordinate(self.default_mesh)
-        self.terms['u'] = self.phi(t)*0.25*(-9 + 6*y*y)*self.psi()
-        self.terms['v'] = 2*y*self.dphidx(t)*self.psi()
-        self.terms['eta'] = self.phi(t)*0.25*(3 + 6*y*y)*self.psi()
+        self.terms['u'] += self.φ*0.25*(-9 + 6*y*y)*self.Ψ
+        self.terms['v'] += 2*y*self.dφdx*self.Ψ
+        self.terms['eta'] += self.φ*0.25*(3 + 6*y*y)*self.Ψ
 
-    def hermite_sum(self, field):
-        """
-        Sum the terms of the Hermite expansion for a given field.
-        """
-        h = sum(self.hermite_coeffs[field][i]*self.polynomials()[i] for i in range(28))
-        return self.psi()*h
-
-    def first_order_terms(self, t=0.):
+    def add_first_order_terms(self):
         """
         First order asymptotic solution.
 
@@ -206,36 +187,23 @@ class BoydOptions(ShallowWaterOptions):
         """
         x, y = SpatialCoordinate(self.default_mesh)
         C = -0.395*self.soliton_amplitude*self.soliton_amplitude
-        phi = self.phi(t)
-        self.zeroth_order_terms(t)
 
         # Expansion for u
-        self.terms['u'] += C*phi*0.5625*(3 + 2*y*y)*self.psi()
-        self.terms['u'] += phi*phi*self.hermite_sum('u')
+        self.terms['u'] += C*self.φ*0.5625*(3 + 2*y*y)*self.Ψ
+        self.terms['u'] += self.φ*self.φ*self.hermite_sum['u']
 
         # Expansion for v
-        self.terms['v'] += self.dphidx(t)*phi*self.hermite_sum('v')
+        self.terms['v'] += self.dφdx*self.φ*self.hermite_sum['v']
 
         # Expansion for eta
-        self.terms['eta'] += C*phi*0.5625*(-5 + 2*y*y)*self.psi()
-        self.terms['eta'] += phi*phi*self.hermite_sum('eta')
-
-    def set_coriolis(self, fs):
-        """
-        Set beta plane approximation Coriolis parameter.
-
-        :arg fs: `FunctionSpace` in which the solution should live.
-        """
-        x, y = SpatialCoordinate(fs.mesh())
-        self.coriolis = Function(fs)
-        self.coriolis.interpolate(y)
-        return self.coriolis
+        self.terms['eta'] += C*self.φ*0.5625*(-5 + 2*y*y)*self.Ψ
+        self.terms['eta'] += self.φ*self.φ*self.hermite_sum['eta']
 
     def set_qoi_kernel(self, fs):
         # raise NotImplementedError  # TODO: Kelvin wave?
         return
 
-    def get_exact_solution(self, fs, t=0.):
+    def get_exact_solution(self, fs, t=0.0):
         """
         Evaluate asymptotic solution of chosen order.
 
@@ -243,12 +211,15 @@ class BoydOptions(ShallowWaterOptions):
         :kwarg t: current time.
         """
         assert self.order in (0, 1)
-        self.print_debug("Computing order {:d} asymptotic solution on mesh with {:d} elements...".format(self.order+1, fs.mesh().num_cells()))
-        if self.order == 0:
-            self.zeroth_order_terms(t)
-        else:
-            self.first_order_terms(t)
-        self.exact_solution = Function(fs)
+        msg = "Computing order {:d} asymptotic solution on mesh with {:d} local elements..."
+        self.print_debug(msg.format(self.order+1, fs.mesh().num_cells()))
+        self.t.assign(t)
+        self.terms = {'u': 0, 'v': 0, 'eta': 0}
+        self.add_zeroth_order_terms()
+        if self.order > 0:
+            assert self.order == 1
+            self.add_first_order_terms()
+        self.exact_solution = Function(fs, name="Order {:d} asymptotic solution".format(self.order))
         u, eta = self.exact_solution.split()
         u.interpolate(as_vector([self.terms['u'], self.terms['v']]))
         eta.interpolate(self.terms['eta'])
@@ -262,8 +233,8 @@ class BoydOptions(ShallowWaterOptions):
 
         :arg fs: `FunctionSpace` in which the initial condition should live.
         """
-        self.get_exact_solution(fs, t=0.)
-        self.initial_value = self.exact_solution.copy()
+        self.get_exact_solution(fs, t=0.0)
+        self.initial_value = self.exact_solution.copy(deepcopy=True)
         return self.initial_value
 
     def get_reference_mesh(self, n=50):
@@ -272,7 +243,7 @@ class BoydOptions(ShallowWaterOptions):
         """
         nx = self.lx*n
         ny = self.ly*n
-        self.print_debug("Generating reference mesh with {:d} elements...".format(2*nx*ny))
+        self.print_debug("Generating reference mesh with {:d} local elements...".format(2*nx*ny))
         reference_mesh = RectangleMesh(nx, ny, self.lx, self.ly,
                                        distribution_parameters=self.distribution_parameters)
         x, y = SpatialCoordinate(reference_mesh)
@@ -365,14 +336,21 @@ class BoydOptions(ShallowWaterOptions):
         self.rms = sqrt(np.mean(sol_proj.vector().gather()))
         self.print_debug("Done!")
 
-    def get_export_func(self, solver_obj):
+    def get_export_func(self, solver_obj):  # TODO: Could just write as a callback
         def export_func():
             if self.debug:
                 t = solver_obj.simulation_time
+
+                # Get exact solution and plot
                 exact = self.get_exact_solution(solver_obj.function_spaces.V_2d, t=t)
+                exact_u, exact_eta = exact.split()
+                self.exact_solution_file.write(exact_u, exact_eta)
+
+                # Compute relative error
                 approx = solver_obj.fields.solution_2d
                 error = errornorm(approx, exact)/norm(exact)
-                print_output("DEBUG: t = {:6.2f} relative error {:6.2f}%".format(t, error))
+                self.relative_errors.append(error)
+                print_output("DEBUG: t = {:6.2f} relative error {:6.2f}%".format(t, 100*error))
             return
         return export_func
 
@@ -380,3 +358,40 @@ class BoydOptions(ShallowWaterOptions):
     #     def update_forcings(t):
     #         return
     #     return update_forcings
+
+    def write_to_hdf5(self):
+        """Write relative error timeseries to HDF5."""
+        try:
+            assert len(self.relative_errors) > 0
+        except AssertionError:
+            raise ValueError("Nothing to write to HDF5!")
+        errorfile = h5py.File(os.path.join(self.di, 'relative_errors.hdf5'), 'w')
+        errorfile.create_dataset('error', data=self.relative_errors)
+        errorfile.close()
+
+    def read_from_hdf5(self):
+        """Read relative error timeseries from HDF5."""
+        fname = os.path.join(self.di, 'relative_errors.hdf5')
+        try:
+            assert os.path.exists(fname)
+        except AssertionError:
+            raise IOError("HDF file {:s} does not exist!".format(fname))
+        errorfile = h5py.File(fname, 'w')
+        self.relative_errors = np.array(errorfile['error'])
+        errorfile.close()
+
+    def plot_errors(self, filename=None):
+        """Plot relative error timeseries."""
+        n = len(self.relative_errors)
+        try:
+            assert n > 0
+        except AssertionError:
+            raise ValueError("Nothing to plot!")
+        self.relative_errors = np.array(self.relative_errors)
+        plt.plot(np.linspace(0, self.end_time, n), 100.0*self.relative_errors)
+        plt.xlabel(r"Time [s]")
+        plt.ylabel(r"Relative error (\%)")
+        if filename is None:
+            plt.show()
+        else:
+            plt.savefig(os.path.join(self.di, filename + '.png'))

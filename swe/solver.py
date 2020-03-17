@@ -497,8 +497,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         P1DG_old = FunctionSpace(old_mesh, "DG", 1)
         P1_old = FunctionSpace(old_mesh, "CG", 1)  
 
-        if isinstance(solver_obj.fields.bathymetry_2d, Constant):
-            solution_bathymetry = Constant(solver_obj.fields.bathymetry_2d)
+        if isinstance(self.solver_obj.fields.bathymetry_2d, Constant):
+            solution_bathymetry = Constant(self.solver_obj.fields.bathymetry_2d)
             self.solution_old_bathymetry = Constant(solution_bathymetry)
         else:
             solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy=True)

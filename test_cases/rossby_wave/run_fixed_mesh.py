@@ -10,9 +10,11 @@ from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 parser = argparse.ArgumentParser()
 parser.add_argument("-n_coarse", help="Resolution of coarse mesh.")
 parser.add_argument("-n_fine", help="Resolution of fine mesh.")
+parser.add_argument("-end_time", help="Simulation end time.")
 parser.add_argument("-refine_equator", help="""
 Apply Monge-Ampere based r-adaptation to refine equatorial region.""")
 parser.add_argument("-calculate_metrics", help="Compute metrics using the fine mesh.")
+parser.add_argument("-read_only", help="Read error file instead of computing anew.")
 parser.add_argument("-debug", help="Toggle debugging mode.")
 args = parser.parse_args()
 
@@ -21,10 +23,12 @@ n_coarse = int(args.n_coarse or 1)  # NOTE: [Huang et al 2008] considers n = 4, 
 n_fine = int(args.n_fine or 50)
 refine_equator = bool(args.refine_equator or False)
 initial_monitor = equator_monitor if refine_equator else None  # TODO: Other options
+read_only = bool(args.read_only or False)
 
 kwargs = {
   'n': n_coarse,
   'debug': bool(args.debug or False),
+  'end_time': float(args.end_time or 120.0),
   'dt': 0.04/n_coarse,
   'plot_pvd': n_coarse < 5,
   'dt_per_export': 10*n_coarse,
@@ -43,7 +47,12 @@ if initial_monitor is not None:
     # op.approach = 'fixed_mesh'  # TODO: check if needed
     swp.__init__(op, mesh=swp.mesh, levels=swp.levels)
 
-swp.solve(uses_adjoint=False)
+if read_only:
+    swp.op.read_from_hdf5()
+else:
+    swp.solve(uses_adjoint=False)
+    swp.op.write_to_hdf5()
+swp.op.plot_errors("uniform" if initial_monitor is None else "refined_equator")
 
 if bool(args.calculate_metrics or False):
     print_output("\nCalculating error metrics...")
