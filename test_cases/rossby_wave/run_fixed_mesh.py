@@ -34,6 +34,7 @@ kwargs = {
   'dt_per_export': 10*n_coarse,
   'order': 1,
   'num_adapt': 1,
+  'r_adapt_rtol': 1.0e-3,
 }
 
 op = BoydOptions(**kwargs)
@@ -52,7 +53,8 @@ if read_only:
 else:
     swp.solve(uses_adjoint=False)
     swp.op.write_to_hdf5()
-swp.op.plot_errors("uniform" if initial_monitor is None else "refined_equator")
+fname = '{:s}_{:d}'.format("uniform" if initial_monitor is None else "refined_equator", n_coarse)
+swp.op.plot_errors(fname)
 
 if bool(args.calculate_metrics or False):
     print_output("\nCalculating error metrics...")

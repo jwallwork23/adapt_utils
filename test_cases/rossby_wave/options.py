@@ -28,7 +28,7 @@ class BoydOptions(ShallowWaterOptions):
         :kwarg periodic: toggle periodic boundary in x-direction
         :kwarg n: mesh resolution
         """
-        super(BoydOptions, self).__init__(**kwargs)
+        super(BoydOptions, self).__init__(mesh=mesh, **kwargs)
         self.periodic = periodic
         self.n = n
         self.order = order
@@ -213,7 +213,6 @@ class BoydOptions(ShallowWaterOptions):
         :arg fs: `FunctionSpace` in which the solution should live.
         :kwarg t: current time.
         """
-        assert self.order in (0, 1)
         msg = "Computing order {:d} asymptotic solution on mesh with {:d} local elements..."
         self.print_debug(msg.format(self.order+1, fs.mesh().num_cells()))
         self.t.assign(t)
