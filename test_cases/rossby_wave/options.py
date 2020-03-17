@@ -122,16 +122,18 @@ class BoydOptions(ShallowWaterOptions):
         for f in ('u', 'v', 'eta'):
             self.hermite_sum[f] = self.Ψ*sum(hermite_coeffs[f][i]*polynomials[i] for i in range(28))
 
-        # Variables for expansion
+        # Variables for asymptotic expansion
         self.t = Constant(0.0)
-        modon_propagation_speed = -1/3
-        if self.order == 1:
-            modon_propagation_speed -= 0.395*self.soliton_amplitude*self.soliton_amplitude
-        c = Constant(modon_propagation_speed)
-        self.ξ = x - c*self.t + conditional(le(x - c*self.t, -24.0), 48.0, 0.0)
         B = self.soliton_amplitude
-        self.φ =  0.771*B*B*(1/(cosh(B*self.ξ)**2))
-        self.dφdx = -2*B*self.φ*tanh(B*self.ξ)
+        modon_propagation_speed = -1.0/3.0
+        if self.order == 1:
+            modon_propagation_speed -= 0.395*B*B
+        c = Constant(modon_propagation_speed)
+        ξ = x - c*self.t
+        self.φ =  0.771*(B/cosh(B*ξ))**2
+        self.φ +=  0.771*(B/cosh(B*(ξ - 48.0)))**2
+        self.dφdx = -2*B*self.φ*tanh(B*ξ)
+        self.dφdx += -2*B*self.φ*tanh(B*(ξ - 48.0))
 
         # Plotting
         self.relative_errors = []
@@ -186,7 +188,8 @@ class BoydOptions(ShallowWaterOptions):
         :kwarg t: current time.
         """
         x, y = SpatialCoordinate(self.default_mesh)
-        C = -0.395*self.soliton_amplitude*self.soliton_amplitude
+        B = self.soliton_amplitude
+        C = -0.395*B*B
 
         # Expansion for u
         self.terms['u'] += C*self.φ*0.5625*(3 + 2*y*y)*self.Ψ
