@@ -375,27 +375,29 @@ class BoydOptions(ShallowWaterOptions):
 
     def read_from_hdf5(self, filename=None):
         """Read relative error timeseries from HDF5."""
-        fname = os.path.join(self.di, filename or 'relative_errors') + '.hdf5'
+        fname = os.path.join(self.di, filename or 'relative_errors.hdf5')
         try:
             assert os.path.exists(fname)
         except AssertionError:
             raise IOError("HDF file {:s} does not exist!".format(fname))
-        errorfile = h5py.File(fname, 'w')
+        errorfile = h5py.File(fname, 'r')
         self.relative_errors = np.array(errorfile['error'])
         errorfile.close()
 
-    def plot_errors(self, filename=None):
+    def plot_errors(self):
         """Plot relative error timeseries."""
-        n = len(self.relative_errors)
-        try:
-            assert n > 0
-        except AssertionError:
-            raise ValueError("Nothing to plot!")
-        self.relative_errors = np.array(self.relative_errors)
-        plt.plot(np.linspace(0, self.end_time, n), 100.0*self.relative_errors)
+        fnames = [f for f in os.listdir(self.di) if f.endswith('.hdf5') and 'relative_errors' in f]
+        for fname in fnames:
+            self.read_from_hdf5(filename=fname)
+            n = len(self.relative_errors)
+            try:
+                assert n > 0
+            except AssertionError:
+                raise ValueError("Nothing to plot!")
+            self.relative_errors = np.array(self.relative_errors)
+            label = fname.split('/')[-1]
+            plt.plot(np.linspace(0, self.end_time, n), 100.0*self.relative_errors, label=label)
         plt.xlabel(r"Time [s]")
         plt.ylabel(r"Relative error (\%)")
-        if filename is None:
-            plt.show()
-        else:
-            plt.savefig(os.path.join(self.di, filename + '.png'))
+        plt.savefig(os.path.join(self.di, 'relative_errors.png'))
+        plt.show()

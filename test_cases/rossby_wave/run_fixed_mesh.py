@@ -48,13 +48,11 @@ if initial_monitor is not None:
     # op.approach = 'fixed_mesh'  # TODO: check if needed
     swp.__init__(op, mesh=swp.mesh, levels=swp.levels)
 
-if read_only:
-    swp.op.read_from_hdf5()
-else:
-    swp.solve(uses_adjoint=False)
-    swp.op.write_to_hdf5()
 fname = '{:s}_{:d}'.format("uniform" if initial_monitor is None else "refined_equator", n_coarse)
-swp.op.plot_errors(fname)
+if not read_only:
+    swp.solve(uses_adjoint=False)
+    swp.op.write_to_hdf5(fname)
+swp.op.plot_errors()
 
 if bool(args.calculate_metrics or False):
     print_output("\nCalculating error metrics...")
