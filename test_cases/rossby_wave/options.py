@@ -61,6 +61,8 @@ class BoydOptions(ShallowWaterOptions):
         self.dt_per_export = 50
         self.dt_per_remesh = 50
         self.timestepper = 'CrankNicolson'
+        self.family = 'dg-dg'
+        # self.family = 'dg-cg'
 
         # Adaptivity
         self.h_min = 1e-8
@@ -134,9 +136,11 @@ class BoydOptions(ShallowWaterOptions):
         c = Constant(modon_propagation_speed)
         ξ = x - c*self.t
         self.φ = 0.771*(B/cosh(B*ξ))**2
-        self.φ +=  0.771*(B/cosh(B*(ξ - 48.0)))**2
         self.dφdx = -2*B*self.φ*tanh(B*ξ)
-        self.dφdx += -2*B*self.φ*tanh(B*(ξ - 48.0))
+
+        # Account for periodicity of domain
+        self.φ +=  0.771*(B/cosh(B*(ξ - self.lx)))**2
+        self.dφdx += -2*B*self.φ*tanh(B*(ξ - self.lx))
 
         # Plotting
         self.relative_errors = []
@@ -212,8 +216,8 @@ class BoydOptions(ShallowWaterOptions):
         :arg fs: `FunctionSpace` in which the solution should live.
         :kwarg t: current time.
         """
-        msg = "Computing order {:d} asymptotic solution on mesh with {:d} local elements..."
-        self.print_debug(msg.format(self.order+1, fs.mesh().num_cells()))
+        msg = "Computing order {:d} asymptotic solution at time {:.2f}s on mesh with {:d} local elements..."
+        self.print_debug(msg.format(self.order+1, t, fs.mesh().num_cells()))
         self.t.assign(t)
         self.terms = {'u': 0, 'v': 0, 'eta': 0}
         self.add_zeroth_order_terms()
@@ -400,8 +404,12 @@ class BoydOptions(ShallowWaterOptions):
             self.relative_errors = np.array(self.relative_errors)
             label = fname.split('/')[-1][:-5]
             words = label.split('_')
-            label = ' '.join(words[2:]).capitalize()
-            plt.plot(np.linspace(0, self.end_time, n), 100.0*self.relative_errors, label=label)
+            kwargs = {
+                'label': ' '.join(words[2:]).capitalize(),
+                # 'linestyle': 'dashed',
+                # 'marker': 'x',
+            }
+            plt.plot(np.linspace(0, self.end_time, n), 100.0*self.relative_errors, **kwargs)
         plt.xlabel(r"Time [s]")
         plt.ylabel(r"Relative error (\%)")
         plt.legend()
