@@ -32,8 +32,8 @@ kwargs = {
   'dt': 0.04/n_coarse,
   'plot_pvd': n_coarse < 5,
   'dt_per_export': 50*n_coarse,
-  # 'order': 1,
-  'order': 0,
+  'order': 1,
+  # 'order': 0,
   'num_adapt': 1,
   'r_adapt_rtol': 1.0e-3,
 }

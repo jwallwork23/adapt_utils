@@ -416,4 +416,3 @@ class BoydOptions(ShallowWaterOptions):
                 plt.ylabel(r"Relative $\mathcal L_\infty$ error (\%)")
             plt.legend()
             plt.savefig(os.path.join(self.di, 'relative_errors_{:s}.png'.format(norm_type)))
-        plt.show()
