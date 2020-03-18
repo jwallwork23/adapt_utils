@@ -140,7 +140,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def solve_forward(self):
         self.setup_solver_forward()
         self.solver_obj.iterate()
-        self.solution = self.solver_obj.fields.solution_2d
+        self.solution.assign(self.solver_obj.fields.solution_2d)
 
     def get_bnd_functions(self, *args):
         b = self.op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']

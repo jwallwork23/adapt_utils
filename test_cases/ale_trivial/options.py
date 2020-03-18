@@ -23,6 +23,7 @@ class ALEAdvectionOptions(TracerOptions):
         self.periodic = True
         self.dt = 0.2
         self.dt_per_export = 1
+        self.dt_per_remesh = 1
         self.end_time = 10.0
 
         # self.base_diffusivity = 1.0e-8
@@ -53,8 +54,7 @@ class ALEAdvectionOptions(TracerOptions):
         return self.boundary_conditions
 
     def set_initial_condition(self, fs):
-        self.initial_value = Function(fs)
         x, y = SpatialCoordinate(fs.mesh())
         x0, y0 = 5.0, 5.0
-        self.initial_value.interpolate(exp(-((x-x0)**2 + (y-y0)**2)))
+        self.initial_value = interpolate(exp(-((x-x0)**2 + (y-y0)**2)), fs)
         return self.initial_value

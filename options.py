@@ -244,10 +244,7 @@ class Options(FrozenConfigurable):
         return box
 
     def set_start_condition(self, fs, adjoint=False):
-        if adjoint:
-            return self.set_final_condition(fs)
-        else:
-            return self.set_initial_condition(fs)
+        return self.set_final_condition(fs) if adjoint else self.set_initial_condition(fs)
 
     def set_initial_condition(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")

@@ -9,7 +9,7 @@ from adapt_utils.misc import index_string
 __all__ = ["SteadyTracerProblem2d_Thetis", "UnsteadyTracerProblem2d_Thetis"]
 
 
-# TODO: Revise this
+# FIXME: SteadyState timestepper doesn't work for tracers
 class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
     r"""
     General discontinuous Galerkin solver object for stationary tracer advection problems of the form
@@ -25,15 +25,17 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
             assert op.family in ("Discontinuous Lagrange", "DG", "dg")
         except AssertionError:
             raise ValueError("Finite element '{:s}' not supported in Thetis tracer model.".format(op.family))
+        fe = FiniteElement("Discontinuous Lagrange", triangle, op.degree)
         super(SteadyTracerProblem2d_Thetis, self).__init__(op, mesh, **kwargs)
 
-    def solve_forward(self):
-        solver_obj = solver2d.FlowSolver2d(self.mesh, Constant(1.0))
-        options = solver_obj.options
+    def setup_solver_forward(self):
+        op = self.op
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, Constant(1.0))
+        options = self.solver_obj.options
         options.timestepper_type = 'SteadyState'
         options.timestep = 20.
         options.simulation_end_time = 0.9*options.timestep
-        if self.op.plot_pvd:
+        if op.plot_pvd:
             options.fields_to_export = ['tracer_2d']
         else:
             options.no_exports = True
@@ -42,18 +44,25 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         options.tracer_only = True
         options.horizontal_diffusivity = self.fields['diffusivity']
         options.tracer_source_2d = self.fields['source']
-        solver_obj.assign_initial_conditions(elev=Function(self.P1), uv=self.fields['velocity'])
+        self.solver_obj.assign_initial_conditions(elev=Function(self.P1), uv=self.fields['velocity'])
 
         # Set SIPG parameter
         options.use_automatic_sipg_parameter = True
-        solver_obj.create_equations()
+        self.solver_obj.create_equations()
         self.sipg_parameter = options.sipg_parameter
 
-        # Assign BCs and solve
-        solver_obj.bnd_functions['tracer'] = self.op.boundary_conditions
-        solver_obj.iterate()
-        self.solution.assign(solver_obj.fields.tracer_2d)
+        # Assign BCs
+        self.solver_obj.bnd_functions['tracer'] = op.boundary_conditions
+
+    def solve_forward(self):
+        self.setup_solver_forward()
+        self.solver_obj.iterate()
+        self.solution.assign(self.solver_obj.fields.tracer_2d)
         self.lhs = self.solver_obj.timestepper.F
+
+    def get_bnd_functions(self, *args):
+        tt = tracer_eq_2d.TracerTerm(self.V)
+        return tt.get_bnd_functions(*args, self.boundary_conditions)
 
     def solve_continuous_adjoint(self):
         raise NotImplementedError  # TODO
@@ -87,7 +96,7 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         f = self.kernel if adjoint else self.fields['source']
 
         sol = self.adjoint_solution if adjoint else self.solution
-        adj = self.solution if adjoint self.adjoint_solution
+        adj = self.solution if adjoint else self.adjoint_solution
 
         # TODO: non divergence-free u case
         F = f - dot(u, grad(sol)) + div(nu*grad(sol))
@@ -109,7 +118,7 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         family = self.finite_element.family()
 
         sol = self.adjoint_solution if adjoint else self.solution
-        adj = self.solution if adjoint self.adjoint_solution
+        adj = self.solution if adjoint else self.adjoint_solution
 
         # TODO: non divergence-free u case
 
@@ -147,7 +156,14 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
 
         # Boundary conditions
         bcs = self.op.boundary_conditions
-        raise NotImplementedError  # TODO: BCs
+        for j in bcs:
+            funcs = bcs.get(j)
+
+            if funcs is not None:
+                sol_ext, u_ext, eta_ext = tpe.get_bnd_functions(sol, u, eta)
+                # TODO
+
+            raise NotImplementedError
 
         # Solve auxiliary finite element problem to get traces on particular element
         name = 'dwr_flux'
@@ -159,24 +175,8 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         return name
 
 
-# TODO: revise this
 class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
-    def __init__(self, op, mesh=None, **kwargs):
-        super(UnsteadyTracerProblem2d_Thetis, self).__init__(op, mesh, **kwargs)
-
-        # Classification
-        self.nonlinear = False
-
-    def set_fields(self):
-        op = self.op
-        self.fields = {}
-        self.fields['diffusivity'] = op.set_diffusivity(self.P1)
-        self.fields['velocity'] = op.set_velocity(self.P1_vec)
-        self.fields['source'] = op.set_source(self.P1)
-        self.divergence_free = np.allclose(assemble(div(self.fields['velocity'])*dx), 0.0)
-
-        # Arbitrary field to take gradient for discrete adjoint
-        self.gradient_field = self.fields['diffusivity']
+    # TODO: doc
 
     def solve_step(self, adjoint=False):
         self.set_fields()
@@ -189,11 +189,13 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
                 assert self.divergence_free
             except AssertionError:
                 raise NotImplementedError  # TODO
+        if not hasattr(self, 'remesh_step'):
+            self.remesh_step = 0
         op = self.op
 
         # Create solver and pass parameters, etc.
-        solver_obj = solver2d.FlowSolver2d(self.mesh, Constant(1.0))
-        options = solver_obj.options
+        self.solver_obj = solver2d.FlowSolver2d(self.mesh, Constant(1.0))
+        options = self.solver_obj.options
         options.timestepper_type = op.timestepper
         options.timestep = op.dt
         options.simulation_export_time = op.dt*op.dt_per_export
@@ -211,105 +213,59 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
         options.tracer_only = True
         options.horizontal_diffusivity = self.fields['diffusivity']
         options.tracer_source_2d = self.fields['source']
-        velocity = -self.u if adjoint else self.u
-        init = self.adjoint_solution if adjoint else self.solution
-        solver_obj.assign_initial_conditions(elev=Function(self.V), uv=velocity, tracer=init)
+        options.use_automatic_sipg_parameter = op.sipg_parameter is None
 
-        # set up callbacks
-        # cb = callback.TracerMassConservation2DCallback('tracer_2d', solver_obj)
+        # Assign initial conditions
+        velocity = -self.fields['velocity'] if adjoint else self.fields['velocity']
+        init = self.adjoint_solution if adjoint else self.solution
+        self.solver_obj.assign_initial_conditions(uv=velocity, tracer=init)
+
+        # Set up callbacks
+        # cb = callback.TracerMassConservation2DCallback('tracer_2d', self.solver_obj)
         # if self.remesh_step == 0:
         #     self.init_norm = cb.initial_value
         # else:
         #     cb.initial_value = self.init_norm
-        # solver_obj.add_callback(cb, 'export')
+        # self.solver_obj.add_callback(cb, 'export')
 
         # Ensure correct iteration count
-        solver_obj.i_export = self.remesh_step
-        solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
-        solver_obj.iteration = self.remesh_step*op.dt_per_remesh
-        solver_obj.simulation_time = time or self.remesh_step*op.dt*op.dt_per_remesh
-        for e in solver_obj.exporters.values():
-            e.set_next_export_ix(solver_obj.i_export)
+        self.solver_obj.i_export = self.remesh_step
+        self.solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
+        self.solver_obj.iteration = self.remesh_step*op.dt_per_remesh
+        self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
+        for e in self.solver_obj.exporters.values():
+            e.set_next_export_ix(self.solver_obj.i_export)
 
-        # Set SIPG parameter
-        options.use_automatic_sipg_parameter = True
-        solver_obj.create_equations()
         self.sipg_parameter = options.sipg_parameter
 
         def store_old_value():
-            """
-            Script for storing previous iteration to HDF5, as well as current.
-            """
-            i = index_string(self.num_exports - int(solver_obj.iteration/self.op.dt_per_export))
-            print(i)
+            """Script for storing previous iteration to HDF5, as well as current."""
+            i = index_string(self.num_exports - int(self.solver_obj.iteration/op.dt_per_export))
+            print_output(i)
             filename = 'Adjoint2d_{:5s}'.format(i)
             filepath = 'outputs/adjoint/hdf5'
             with DumbCheckpoint(os.path.join(filepath, filename), mode=FILE_CREATE) as dc:
-                dc.store(solver_obj.timestepper.timesteppers.tracer.solution)
-                dc.store(solver_obj.timestepper.timesteppers.tracer.solution_old)
+                dc.store(self.solver_obj.timestepper.timesteppers.tracer.solution)
+                dc.store(self.solver_obj.timestepper.timesteppers.tracer.solution_old)
                 dc.close()
 
-        # Solve
-        solver_obj.bnd_functions['tracer'] = self.op.adjoint_boundary_conditions if adjoint else self.op.boundary_conditions
+        # Update forcings / exports
+        update_forcings = op.get_update_forcings(self.solver_obj)
+        export_func = op.get_export_func(self.solver_obj)
         if adjoint:
-            solver_obj.iterate(export_func=store_old_value)
-            self.adjoint_solution.assign(solver_obj.fields.tracer_2d)
+            def export_func_wrapper():
+                store_old_value()
+                export_func()
         else:
-            solver_obj.iterate()
-            self.solution.assign(solver_obj.fields.tracer_2d)
-            self.solution_old.assign(solver_obj.timestepper.timesteppers.tracer.solution_old)
-            self.ts = solver_obj.timestepper.timesteppers.tracer
-
-    def get_timestepper(self, adjoint=False):
-        self.set_fields()
-        op = self.op
-
-        # Create solver and pass parameters, etc.
-        solver_obj = solver2d.FlowSolver2d(self.mesh, Constant(1.))
-        options = solver_obj.options
-        options.timestepper_type = op.timestepper
-        options.timestep = op.dt
-        options.simulation_end_time = 0.9*op.dt
-        options.fields_to_export = []
-        options.solve_tracer = True
-        options.lax_friedrichs_tracer = self.stabilisation == 'lax_friedrichs'
-        options.tracer_only = True
-        options.horizontal_diffusivity = self.nu
-        if hasattr(self, 'source'):
-            options.tracer_source_2d = self.source
-        velocity = -self.u if adjoint else self.u
-        solver_obj.assign_initial_conditions(elev=Function(self.V), uv=velocity, tracer=self.solution)
-
-        # Ensure correct iteration count
-        solver_obj.i_export = self.remesh_step
-        solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
-        solver_obj.iteration = self.remesh_step*op.dt_per_remesh
-        solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
-        for e in solver_obj.exporters.values():
-            e.set_next_export_ix(solver_obj.i_export)
-
-        # Set SIPG parameter
-        options.use_automatic_sipg_parameter = True
-        solver_obj.create_equations()
-        self.sipg_parameter = options.sipg_parameter
+            export_func_wrapper = export_func
 
         # Solve
-        solver_obj.bnd_functions['tracer'] = op.boundary_conditions
-        solver_obj.create_timestepper()
-        if not adjoint:
-            self.ts = solver_obj.timestepper.timesteppers.tracer
-
-    def get_hessian(self, adjoint=False):
-        f = self.adjoint_solution if adjoint else self.solution
-        return steady_metric(f, mesh=self.mesh, noscale=True, op=self.op)
-
-    def get_hessian_metric(self, adjoint=False):
-        field_for_adapt = self.adjoint_solution if adjoint else self.solution
-        if norm(field_for_adapt) > 1e-8:
-            self.M = steady_metric(field_for_adapt, op=self.op)
+        bcs = op.adjoint_boundary_conditions if adjoint else op.boundary_conditions
+        self.solver_obj.bnd_functions['tracer'] = bcs
+        self.solver_obj.iterate(export_func=export_func_wrapper, update_forcings=update_forcings)
+        if adjoint:
+            self.adjoint_solution.assign(self.solver_obj.fields.tracer_2d)
         else:
-            self.M = None
-
-    def get_qoi_kernel(self):
-        self.kernel = self.op.set_qoi_kernel(self.P0)
-        return self.kernel
+            self.solution.assign(self.solver_obj.fields.tracer_2d)
+            self.solution_old.assign(self.solver_obj.timestepper.timesteppers.tracer.solution_old)
+            # self.lhs = self.solver_obj.timestepper.F

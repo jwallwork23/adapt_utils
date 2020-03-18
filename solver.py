@@ -360,7 +360,10 @@ class SteadyProblem():
         Derivative `g` of functional of interest `J`. i.e. For solution `u` we have
             J(u) = g . u
         """
-        raise NotImplementedError("Should be implemented in derived class.")
+        if not hasattr(self.op, 'set_qoi_kernel'):
+            raise NotImplementedError("Should be implemented in derived class.")
+        self.kernel = self.op.set_qoi_kernel(self.P0)
+        return self.kernel
 
     def quantity_of_interest(self):
         """
@@ -541,22 +544,34 @@ class SteadyProblem():
         self.estimate_error(name)
         return name
 
-    def get_hessian_metric(self, adjoint=False):
+    def get_hessian_metric(self, adjoint=False, **kwargs):
         """
         Compute an appropriate Hessian metric for the problem at hand. This is inherently
         problem-dependent, since the choice of field for adaptation is not universal.
 
         Hessian metric should be computed and stored as `self.M`.
         """
-        raise NotImplementedError("Should be implemented in derived class.")
+        try:
+            assert self.V.value_size == 1
+        except AssertionError:
+            raise NotImplementedError("Should be implemented in derived class.")
+        f = self.adjoint_solution if adjoint else self.solution
+        nrm = norm(f)
+        if nrm < 1e-10:
+            raise ValueError("Cannot compute Hessian as norm is too small: {:.4e}".format(nrm))
+        self.M = steady_metric(f, op=self.op, **kwargs)
 
     def get_hessian(self, adjoint=False):
         """
         Compute an appropriate Hessian for the problem at hand. This is inherently
         problem-dependent, since the choice of field for adaptation is not universal.
         """
-        self.get_hessian_metric(adjoint=adjoint, noscale=True)
-        return self.M
+        try:
+            assert self.V.value_size == 1
+        except AssertionError:
+            raise NotImplementedError("Should be implemented in derived class.")
+        f = self.adjoint_solution if adjoint else self.solution
+        return steady_metric(f, mesh=self.mesh, noscale=True, op=self.op)
 
     def get_isotropic_metric(self):
         """
@@ -1043,8 +1058,7 @@ class UnsteadyProblem(SteadyProblem):
         self.num_exports = int(np.floor((op.end_time - op.dt)/op.dt/op.dt_per_export))
 
     def create_solutions(self):
-        self.solution = Function(self.V, name='Solution')
-        self.adjoint_solution = Function(self.V, name='Adjoint solution')
+        super(UnsteadyProblem, self).create_solutions()
         self.solution_old = Function(self.V, name='Old solution')
         self.adjoint_solution_old = Function(self.V, name='Old adjoint solution')
 
@@ -1088,6 +1102,7 @@ class UnsteadyProblem(SteadyProblem):
             #  * Use 'fixed_mesh_plot' to call `plot` at each export.
             if self.approach == 'fixed_mesh':
                 self.solve_step(adjoint=adjoint)
+                print('!!!')
                 break
             
             # Adaptive mesh case

@@ -500,7 +500,7 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         if op.family in ("Lagrange", "CG", "cg"):
             fe = FiniteElement("Lagrange", triangle, op.degree)
         elif op.family in ("Discontinuous Lagrange", "DG", "dg"):
-            fe = FiniteElement("Discontinuous Lagrange", triangle, op.degree)
+            fe = FiniteElement("Discontinuous Lagrange", triangle, op.degree, variant='equispaced')
         else:
             raise NotImplementedError
         super(UnsteadyTracerProblem2d, self).__init__(op, mesh, fe, **kwargs)
@@ -512,9 +512,13 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         self.fields['diffusivity'] = op.set_diffusivity(self.P1)
         self.fields['velocity'] = op.set_velocity(self.P1_vec)
         self.fields['source'] = op.set_source(self.P1)
-        # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
+        self.divergence_free = np.allclose(assemble(div(self.fields['velocity'])*dx), 0.0)
 
-        # Rename solution fields
+        # Arbitrary field to take gradient for discrete adjoint
+        self.gradient_field = self.fields['diffusivity']
+
+    def create_solutions(self):
+        super(UnsteadyTracerProblem2d, self).create_solutions()
         self.solution.rename('Tracer concentration')
         self.adjoint_solution.rename('Adjoint tracer concentration')
 
@@ -648,27 +652,31 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         self.get_solution(adjoint).rename(name)
 
     def solve_step(self, adjoint=False):
-        if adjoint:
-            solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
-            self.adjoint_solution_old.assign(self.adjoint_solution)
-        else:
-            solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
-            self.solution_old.assign(self.solution)
-
-    def solve(self):
         op = self.op
-        self.setup_solver_forward()
-        i, t = 0, 0.0
+        i, t = 0, self.step_end - op.dt_per_export*op.dt
         update_forcings = self.op.get_update_forcings(solver_obj=None)
-        while t < op.end_time - 0.5*op.dt:
+        while t < self.step_end - 0.5*op.dt:
             update_forcings(t)
             self.fields['velocity'].assign(op.fluid_velocity)  # TODO: Generalise
-            self.solve_step()
+            if adjoint:
+                solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
+                self.adjoint_solution_old.assign(self.adjoint_solution)
+            else:
+                solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
+                self.solution_old.assign(self.solution)
             if (i % op.dt_per_export) == 0:
                 print_output("t = {:.2f}s".format(t))
                 self.plot_solution()
             t += op.dt
-            i += 1
+
+    def solve(self):
+        op = self.op
+        self.setup_solver_forward()
+        self.step_end, self.remesh_step = op.dt_per_export*op.dt, 0
+        while self.step_end < op.end_time - 0.5*op.dt:
+            self.solve_step()
+            self.step_end += op.dt_per_export*op.dt 
+            self.remesh_step += 1
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.P0)
