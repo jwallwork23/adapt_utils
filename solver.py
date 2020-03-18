@@ -374,19 +374,15 @@ class SteadyProblem():
         Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
         boolean kwarg.
         """
-        if adjoint:
-            self.get_strong_residual_adjoint(**kwargs)
-        else:
-            self.get_strong_residual_forward(**kwargs)
+        f = self.get_strong_residual_adjoint if adjoint else self.get_strong_residual_forward
+        return f(**kwargs)
 
     def get_flux(self, adjoint=False, **kwargs):
         """
         Evaluate flux terms for forward or adjoint PDE, as specified by the `adjoint` boolean kwarg.
         """
-        if adjoint:
-            self.get_flux_adjoint(**kwargs)
-        else:
-            self.get_flux_forward(**kwargs)
+        f = self.get_flux_adjoint if adjoint else self.get_flux_forward
+        return f(**kwargs)
 
     def get_scaled_residual(self, adjoint=False, norm_type='L2'):
         r"""
@@ -403,6 +399,7 @@ class SteadyProblem():
         rho = self.indicators[rname] + self.indicators[fname]/sqrt(self.h)
         self.indicators[sname] = assemble(self.p0test*rho*dx)
         self.estimate_error(sname)
+        return sname
 
     def get_scaled_weights(self, adjoint=False, norm_type='L2'):  # TODO: Needs overriding if DG?
         r"""
@@ -429,6 +426,7 @@ class SteadyProblem():
         omega = e + flux*sqrt(tpe.h)
         self.indicators[sname] = project(assemble(i*omega*dx), self.P0)
         self.estimate_error(sname)
+        return sname
 
     def get_dwr_upper_bound(self, adjoint=False, **kwargs):
         r"""
@@ -446,6 +444,7 @@ class SteadyProblem():
         ext = 'adjoint' if adjoint else 'forward'
         self.indicators[name] = assemble(self.p0test*self.indicators[rho]*self.indicators[omega]*dx)
         self.estimate_error(name)
+        return name
 
     def get_difference_quotient(self, adjoint=False, **kwargs):
         """
@@ -462,6 +461,7 @@ class SteadyProblem():
         ext = 'adjoint' if adjoint else 'forward'
         self.indicators[name] = assemble(self.p0test*self.indicators[rho]*self.indicators[omega]*dx)
         self.estimate_error(name)
+        return name
 
     def get_strong_residual_forward(self, norm_type=None):
         raise NotImplementedError("Should be implemented in derived class.")
@@ -480,10 +480,7 @@ class SteadyProblem():
         Evaluate the cellwise component of the forward or adjoint Dual Weighted Residual (DWR) error
         estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg `adjoint`.
         """
-        if adjoint:
-            self.get_dwr_residual_adjoint()
-        else:
-            self.get_dwr_residual_forward()
+        return self.get_dwr_residual_adjoint() if adjoint else self.get_dwr_residual_forward()
 
     def get_dwr_residual_forward(self):
         raise NotImplementedError("Should be implemented in derived class.")
@@ -496,10 +493,7 @@ class SteadyProblem():
         Evaluate the edgewise component of the forward or adjoint Dual Weighted Residual (DWR) error
         estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg `adjoint`.
         """
-        if adjoint:
-            self.get_dwr_flux_adjoint()
-        else:
-            self.get_dwr_flux_forward()
+        return self.get_dwr_flux_adjoint() if adjoint else self.get_dwr_flux_forward()
 
     def get_dwr_flux_forward(self):
         raise NotImplementedError("Should be implemented in derived class.")
@@ -514,29 +508,24 @@ class SteadyProblem():
 
         A P1 field to be used for isotropic mesh adaptation is stored as `self.indicator`.
         """
-        label = 'dwr'
-        cell_label = 'dwr_cell'
-        flux_label = 'dwr_flux'
-        if adjoint:
-            label += '_adjoint'
-            cell_label += '_adjoint'
-            flux_label += '_adjoint'
+        name = '_'.join(['dwr', 'adjoint' if adjoint else 'forward'])
 
         # Compute DWR residual and flux terms
         self.solve_high_order(adjoint=not adjoint)
-        self.get_dwr_residual(adjoint=adjoint)
-        self.get_dwr_flux(adjoint=adjoint)
+        cname = self.get_dwr_residual(adjoint=adjoint)
+        fname = self.get_dwr_flux(adjoint=adjoint)
 
         # Indicate error in P1 space
-        self.indicator = Function(self.P1, name=label)
-        self.indicator.interpolate(abs(self.indicators[cell_label] + self.indicators[flux_label]))
-        self.indicators[label] = Function(self.P0, name=label)
-        self.indicators[label].interpolate(abs(self.indicators[cell_label] + self.indicators[flux_label]))
+        self.indicator = Function(self.P1, name=name)
+        self.indicator.interpolate(abs(self.indicators[cname] + self.indicators[fname]))
+        self.indicators[name] = Function(self.P0, name=name)
+        self.indicators[name].interpolate(abs(self.indicators[cname] + self.indicators[fname]))
 
         # Estimate error
-        if not label in self.estimators:
-            self.estimators[label] = []
-        self.estimators[label].append(self.estimators[cell_label][-1] + self.estimators[flux_label][-1])
+        if not name in self.estimators:
+            self.estimators[name] = []
+        self.estimators[name].append(self.estimators[cname][-1] + self.estimators[fname][-1])
+        return name
 
     def dwp_indication(self):
         """
@@ -544,11 +533,13 @@ class SteadyProblem():
         used for mesh adaptive tsunami modelling in [Davis and LeVeque, 2016]. Here 'DWP' is used
         to stand for Dual Weighted Primal.
         """
+        name = 'dwp'
         prod = inner(self.solution, self.adjoint_solution)
-        self.indicators['dwp'] = assemble(self.p0test*prod*dx)
+        self.indicators[name] = assemble(self.p0test*prod*dx)
         self.indicator = interpolate(abs(prod), self.P1)
-        self.indicator.rename('dwp')
-        self.estimate_error('dwp')
+        self.indicator.rename(name)
+        self.estimate_error(name)
+        return name
 
     def get_hessian_metric(self, adjoint=False):
         """
@@ -698,22 +689,25 @@ class SteadyProblem():
         # Anisotropic a posteriori (see [Power et al., 2006])
         elif 'power' in approach:
             self.get_power_metric(adjoint=adjoint)
-            self.indicators[approach] = self.indicators['_'.join(['cell_residual', 'adjoint' if adjoint else 'forward'])].copy()
+            name = '_'.join(['cell_residual', 'adjoint' if adjoint else 'forward'])
+            self.indicators[approach] = self.indicators[name].copy(deepcopy=True)
             if not approach in ('power', 'power_adjoint'):
                 M = self.M.copy()
                 self.get_power_metric(adjoint=not adjoint)
-                self.indicators[approach] += self.indicators['_'.join(['cell_residual', 'adjoint' if not adjoint else 'forward'])].copy()
+                name = '_'.join(['cell_residual', 'adjoint' if not adjoint else 'forward'])
+                self.indicators[approach] += self.indicators[name].copy(deepcopy=True)
                 self.M = combine_metrics(M, self.M, average=average)
             self.estimate_error()
 
         # Isotropic a posteriori (see Carpio et al., 2013])
         elif 'carpio_isotropic' in approach:
             self.dwr_indication(adjoint=adjoint)
+            name = 'dwr_adjoint' if adjoint else 'dwr_forward'
             self.indicators[approach] = Function(self.P0)
-            self.indicators[approach] += self.indicators['dwr_adjoint' if adjoint else 'dwr']
+            self.indicators[approach] += self.indicators[name]
             if approach == 'carpio_isotropic_both':
                 self.dwr_indication(adjoint=not adjoint)
-                self.indicators[approach] += self.indicators['dwr_adjoint' if not adjoint else 'dwr']
+                self.indicators[approach] += self.indicators[name]
             amd = AnisotropicMetricDriver(self.am, indicator=self.indicators[approach], op=self.op)
             amd.get_isotropic_metric()
             self.M = amd.p1metric
@@ -735,7 +729,8 @@ class SteadyProblem():
             self.estimate_error()
         elif 'carpio' in approach:
             self.dwr_indication(adjoint=adjoint)
-            self.indicators[approach] = self.indicators['dwr_adjoint' if adjoint else 'dwr']
+            name = 'dwr_adjoint' if adjoint else 'dwr_forward'
+            self.indicators[approach] = self.indicators[name]
             self.get_hessian_metric(noscale=True, degree=1, adjoint=adjoint)
             amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicators[approach], op=self.op)
             amd.get_anisotropic_metric()
@@ -1171,3 +1166,28 @@ class UnsteadyProblem(SteadyProblem):
         The resulting P0 field should be stored as `self.indicator`.
         """
         raise NotImplementedError  # TODO: Use steady format, but need to get adjoint sol
+
+    def solve_ale(self, solve_pde=True, check_inverted=True):
+        # TODO: doc
+        op = self.op
+        self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
+        self.setup_solver_forward()
+        i, t = 0, 0.0
+        self.step_end = op.dt_per_export*op.dt
+        while t < op.end_time - 0.5*op.dt:
+            self.mm.adapt_ale()                          # Solve mesh movement
+            if solve_pde:
+                self.solve_step()                        # Solve PDE
+            self.mesh.coordinates.assign(self.mm.x_new)  # Update mesh
+            if check_inverted:
+                try:
+                    self.am.check_inverted()
+                except ValueError:
+                    self.plot_mesh()
+                    raise ValueError("Timestepping loop terminated after {:d} iterations due to inverted element.".format(i))
+            if (i % op.dt_per_export) == 0:
+                print_output("t = {:.2f}s".format(t))
+                self.plot_solution()
+            t += op.dt
+            self.step_end += op.dt_per_export*op.dt
+            i += 1

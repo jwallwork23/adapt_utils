@@ -46,7 +46,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.fields['diffusivity'] = op.set_diffusivity(self.P1)
         self.fields['velocity'] = op.set_velocity(self.P1_vec)
         self.fields['source'] = op.set_source(self.P1)
-        # self.divergence_free = np.allclose(norm(div(self.fields['velocity'])), 0.0)
+        self.divergence_free = np.allclose(assemble(div(self.fields['velocity'])*dx), 0.0)
 
     def create_solutions(self):
         super(SteadyTracerProblem2d, self).create_solutions()
@@ -251,9 +251,11 @@ class SteadyTracerProblem2d(SteadyProblem):
                     flux_terms += i*bdy_flux*bdy_flux*ds(j)
 
         # Solve auxiliary FEM problem
-        self.indicators['flux_forward'] = Function(self.P0)
-        solve(mass_term == flux_terms, self.indicators['flux_forward'])
-        self.estimate_error('flux_forward')
+        name = 'flux_forward'
+        self.indicators[name] = Function(self.P0)
+        solve(mass_term == flux_terms, self.indicators[name])
+        self.estimate_error(name)
+        return name
 
     def get_flux_adjoint(self, norm_type=None, residual_approach='classical'):
         i = self.p0test
@@ -286,9 +288,11 @@ class SteadyTracerProblem2d(SteadyProblem):
                     flux_terms += i*flux*flux*ds(j)
 
         # Solve auxiliary FEM problem
-        self.indicators['flux_adjoint'] = Function(self.P0)
-        solve(mass_term == flux_terms, self.indicators['flux_adjoint'])
-        self.estimate_error('flux_adjoint')
+        name = 'flux_adjoint'
+        self.indicators[name] = Function(self.P0)
+        solve(mass_term == flux_terms, self.indicators[name])
+        self.estimate_error(name)
+        return name
 
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
@@ -301,8 +305,11 @@ class SteadyTracerProblem2d(SteadyProblem):
         dwr = strong_residual*self.adjoint_error
         if self.stabilisation == 'SUPG':  # Account for stabilisation error
             dwr += strong_residual*tpe.stabilisation_parameter*dot(u, grad(self.adjoint_error))
-        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*dwr*dx), self.P0)
-        self.estimate_error('dwr_cell')
+
+        name = 'dwr_cell'
+        self.indicators[name] = project(assemble(tpe.p0test*dwr*dx), self.P0)
+        self.estimate_error(name)
+        return name
 
     def get_dwr_flux_forward(self):
         tpe = self.tp_enriched
@@ -326,10 +333,12 @@ class SteadyTracerProblem2d(SteadyProblem):
                 flux_terms += i*(dwr + bcs[j]['diff_flux']*self.adjoint_error)*ds(j)
 
         # Solve auxiliary FEM problem
+        name = 'dwr_flux'
         edge_res = Function(tpe.P0)
         solve(mass_term == flux_terms, edge_res)
-        self.indicators['dwr_flux'] = project(edge_res, self.P0)
-        self.estimate_error('dwr_flux')
+        self.indicators[name] = project(edge_res, self.P0)
+        self.estimate_error(name)
+        return name
 
     def get_dwr_residual_adjoint(self):
         tpe = self.tp_enriched
@@ -340,8 +349,11 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         strong_residual = kernel + div(u*tpe.adjoint_solution) + div(nu*grad(tpe.adjoint_solution))
         dwr = strong_residual*self.error
-        self.indicators['dwr_cell_adjoint'] = project(assemble(tpe.p0test*dwr*dx), self.P0)
-        self.estimate_error('dwr_cell_adjoint')
+
+        name = 'dwr_cell_adjoint'
+        self.indicators[name] = project(assemble(tpe.p0test*dwr*dx), self.P0)
+        self.estimate_error(name)
+        return name
         
     def get_dwr_flux_adjoint(self):
         tpe = self.tp_enriched
@@ -364,10 +376,12 @@ class SteadyTracerProblem2d(SteadyProblem):
                 flux_terms += i*dwr*ds(j)  # Robin BC in adjoint
 
         # Solve auxiliary FEM problem
+        name = 'dwr_flux_adjoint'
         edge_res_adjoint = Function(tpe.P0)
         solve(mass_term == flux_terms, edge_res_adjoint)
-        self.indicators['dwr_flux_adjoint'] = project(edge_res_adjoint, self.P0)
-        self.estimate_error('dwr_flux_adjoint')
+        self.indicators[name] = project(edge_res_adjoint, self.P0)
+        self.estimate_error(name)
+        return name
 
     def get_hessian_metric(self, adjoint=False, noscale=False):
         sol = self.get_solution(adjoint)
@@ -650,28 +664,6 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
             update_forcings(t)
             self.fields['velocity'].assign(op.fluid_velocity)  # TODO: Generalise
             self.solve_step()
-            if (i % op.dt_per_export) == 0:
-                print_output("t = {:.2f}s".format(t))
-                self.plot_solution()
-            t += op.dt
-            i += 1
-
-    def solve_ale(self, solve_pde=True, check_inverted=True):
-        op = self.op
-        self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
-        self.setup_solver_forward()
-        i, t = 0, 0.0
-        while t < op.end_time - 0.5*op.dt:
-            self.mm.adapt_ale()                          # Solve mesh movement
-            if solve_pde:
-                self.solve_step()                        # Solve PDE
-            self.mesh.coordinates.assign(self.mm.x_new)  # Update mesh
-            if check_inverted:
-                try:
-                    self.am.check_inverted()
-                except ValueError:
-                    self.plot_mesh()
-                    raise ValueError("Timestepping loop terminated after {:d} iterations due to inverted element.".format(i))
             if (i % op.dt_per_export) == 0:
                 print_output("t = {:.2f}s".format(t))
                 self.plot_solution()

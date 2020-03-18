@@ -180,12 +180,14 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if hasattr(self, 'extra_strong_residual_terms_continuity'):
             R2 += self.extra_strong_residual_terms_continuity()
 
+        name = 'cell_residual_forward'
         if norm_type == 'L2':
             inner_product = assemble(self.p0test*(inner(R1, R1) + inner(R2, R2))*dx)
-            self.indicators['cell_residual_forward'] = project(sqrt(inner_product), self.P0)
+            self.indicators[name] = project(sqrt(inner_product), self.P0)
         else:
             raise NotImplementedError
-        self.estimate_error('cell_residual_forward')
+        self.estimate_error(name)
+        return name
 
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
@@ -221,8 +223,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if hasattr(self, 'extra_residual_terms'):
             dwr += tpe.extra_residual_terms()
 
-        self.indicators['dwr_cell'] = project(assemble(tpe.p0test*dwr*dx), self.P0)
-        self.estimate_error('dwr_cell')
+        name = 'dwr_cell'
+        self.indicators[name] = project(assemble(tpe.p0test*dwr*dx), self.P0)
+        self.estimate_error(name)
+        return name
 
     def get_dwr_flux_forward(self):
         tpe = self.tp_enriched
@@ -358,11 +362,13 @@ class SteadyShallowWaterProblem(SteadyProblem):
             flux_terms += tpe.extra_flux_terms()
 
         # Solve auxiliary finite element problem to get traces on particular element
+        name = 'dwr_flux'
         mass_term = i*tpe.p0trial*dx
         res = Function(tpe.P0)
         solve(mass_term == flux_terms, res)
-        self.indicators['dwr_flux'] = project(assemble(i*res*dx), self.P0)
-        self.estimate_error('dwr_flux')
+        self.indicators[name] = project(assemble(i*res*dx), self.P0)
+        self.estimate_error(name)
+        return name
 
     def custom_adapt(self):
         if self.approach == 'vorticity':
@@ -542,6 +548,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
+        if hasattr(options, 'use_lagrangian_formulation'):  # TODO: Temporary
+            options.use_lagrangian_formulation = op.approach == 'ale'
 
         # Timestepping
         options.timestep = op.dt
