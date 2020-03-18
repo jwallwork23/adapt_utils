@@ -1148,9 +1148,7 @@ class UnsteadyProblem(SteadyProblem):
     #     raise NotImplementedError  # TODO: account for time integral forms
 
     def get_adjoint_state(self, variable='Tracer2d'):
-        """
-        Get adjoint solution at timestep i.
-        """
+        """Get adjoint solution at current remesh step."""
         if self.approach in ('uniform', 'hessian', 'vorticity'):
             return
         if not hasattr(self, 'V_orig'):
@@ -1183,7 +1181,13 @@ class UnsteadyProblem(SteadyProblem):
         raise NotImplementedError  # TODO: Use steady format, but need to get adjoint sol
 
     def solve_ale(self, solve_pde=True, check_inverted=True):
-        # TODO: doc
+        """
+        Solve unsteady problem using Arbitrary Lagrangian-Eulerian (ALE) mesh movement.
+
+        The mesh movement is driven by a `MeshMover` object, for which a prescribed velocity needs
+        to be chosen. Preset options are 'zero' and 'fluid', which correspond to the Eulerian and
+        Lagrangian approaches, respectively.
+        """
         op = self.op
         self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
         self.setup_solver_forward()
