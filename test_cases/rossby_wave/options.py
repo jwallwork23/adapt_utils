@@ -387,6 +387,7 @@ class BoydOptions(ShallowWaterOptions):
         for norm_type in ("l1", "l2", "linf"):
             plt.figure()
             fnames = [f for f in os.listdir(self.di) if f.endswith('.hdf5') and 'relative_errors' in f]
+            fnames.sort()
             for fname in fnames:
                 self.read_from_hdf5(filename=fname)
                 try:
@@ -402,7 +403,7 @@ class BoydOptions(ShallowWaterOptions):
                 words = label.split('_')
                 kwargs = {
                     'label': ' '.join(words[2:]).capitalize(),
-                    'linestyle': 'dashed',
+                    # 'linestyle': 'dashed',
                     'marker': 'x',
                 }
                 plt.plot(np.linspace(0, self.end_time, n), self.relative_errors[norm_type], **kwargs)
