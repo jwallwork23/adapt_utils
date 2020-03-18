@@ -214,6 +214,7 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
         options.horizontal_diffusivity = self.fields['diffusivity']
         options.tracer_source_2d = self.fields['source']
         options.use_automatic_sipg_parameter = op.sipg_parameter is None
+        options.use_lagrangian_formulation = op.approach == 'ale'
 
         # Assign initial conditions
         velocity = -self.fields['velocity'] if adjoint else self.fields['velocity']

@@ -40,3 +40,6 @@ tsunami1d/__pycache__/
 ale_advection/outputs/
 ale_advection/screenshots/
 ale_advection/__pycache__/
+ale_trivial/outputs/
+ale_trivial/screenshots/
+ale_trivial/__pycache__/

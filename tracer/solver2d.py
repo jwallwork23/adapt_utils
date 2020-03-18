@@ -34,7 +34,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         if op.family in ("Lagrange", "CG", "cg"):
             fe = FiniteElement("Lagrange", triangle, op.degree)
         elif op.family in ("Discontinuous Lagrange", "DG", "dg"):
-            fe = FiniteElement("Discontinuous Lagrange", triangle, op.degree)
+            fe = FiniteElement("Discontinuous Lagrange", triangle, op.degree, variant='equispaced')
         else:
             raise NotImplementedError
         super(SteadyTracerProblem2d, self).__init__(op, mesh, fe, **kwargs)
@@ -657,7 +657,11 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         update_forcings = self.op.get_update_forcings(solver_obj=None)
         while t < self.step_end - 0.5*op.dt:
             update_forcings(t)
-            self.fields['velocity'].assign(op.fluid_velocity)  # TODO: Generalise
+            if isinstance(op.fluid_velocity, Constant) or op.fluid_velocity is None:
+                self.fields['velocity'] = op.fluid_velocity
+            else:
+                # self.fields['velocity'].assign(op.fluid_velocity)
+                self.fields['velocity'] = op.fluid_velocity  # FIXME and generalise
             if adjoint:
                 solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
                 self.adjoint_solution_old.assign(self.adjoint_solution)
@@ -673,7 +677,7 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         op = self.op
         self.setup_solver_forward()
         self.step_end, self.remesh_step = op.dt_per_export*op.dt, 0
-        while self.step_end < op.end_time - 0.5*op.dt:
+        while self.step_end < op.end_time + 0.5*op.dt:
             self.solve_step()
             self.step_end += op.dt_per_export*op.dt 
             self.remesh_step += 1

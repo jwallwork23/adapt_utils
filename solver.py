@@ -1187,9 +1187,8 @@ class UnsteadyProblem(SteadyProblem):
         op = self.op
         self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
         self.setup_solver_forward()
-        i, t = 0, 0.0
-        self.step_end = op.dt_per_export*op.dt
-        while t < op.end_time - 0.5*op.dt:
+        self.step_end, self.remesh_step = op.dt_per_export*op.dt, 0
+        while self.step_end < op.end_time:
             self.mm.adapt_ale()                          # Solve mesh movement
             if solve_pde:
                 self.solve_step()                        # Solve PDE
@@ -1200,9 +1199,5 @@ class UnsteadyProblem(SteadyProblem):
                 except ValueError:
                     self.plot_mesh()
                     raise ValueError("Timestepping loop terminated after {:d} iterations due to inverted element.".format(i))
-            if (i % op.dt_per_export) == 0:
-                print_output("t = {:.2f}s".format(t))
-                self.plot_solution()
-            t += op.dt
             self.step_end += op.dt_per_export*op.dt
-            i += 1
+            self.remesh_step += 1
