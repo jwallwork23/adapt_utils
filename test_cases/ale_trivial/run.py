@@ -48,8 +48,6 @@ if approach == 'ale':
 try:
     assert np.allclose(init_coords, final_coords)
 except AssertionError:
-    print(init_coords)
-    print(final_coords)
     raise ValueError("Initial and final mesh coordinates do not match")
 
 # Compute relative errors
