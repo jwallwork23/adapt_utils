@@ -22,7 +22,7 @@ i = int(args.init_res or 0)
 # Create parameter class
 n = 2**i
 mesh = UnitSquareMesh(40*n, 40*n)
-op = LeVequeOptions(approach=approach, shape=0)
+op = LeVequeOptions(approach=approach, shape=0, family='dg', stabilisation='no')
 #op.dt = pi/(300*n)
 op.dt = 2*pi/(100*n)
 # TODO: adaptive TS?
@@ -71,12 +71,3 @@ print_output("\nSlotted Cylinder\n")
 print_output("Analytic QoI  : {:.8e}".format(op.exact_qoi()))
 print_output("Quadrature QoI: {:.8e}".format(op.quadrature_qoi(tp.P0)))
 print_output("Calculated QoI: {:.8e}".format(tp.quantity_of_interest()))
-
-# Relative Lp errors
-if approach != 'fixed_mesh':
-    op.set_initial_condition(tp.P1DG)
-L1_err, L2_err, L_inf_err = op.lp_errors(tp.solution)
-print_output("\nLp errors")  # FIXME: Are these computed properly? They seem quite large...
-print_output("Relative L1 error      : {:.8e}".format(L1_err))
-print_output("Relative L2 error      : {:.8e}".format(L2_err))
-print_output("Relative L_inf error   : {:.8e}".format(L_inf_err))

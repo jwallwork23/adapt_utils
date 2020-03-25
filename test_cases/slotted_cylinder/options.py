@@ -165,25 +165,3 @@ class LeVequeOptions(TracerOptions):
         #sol = 1.0 + bell + cone + slot_cyl
         self.set_qoi_kernel(fs)
         return assemble(self.kernel*sol*dx(degree=12))
-
-    def lp_errors(self, sol):
-        if not hasattr(self, 'initial_value'):
-            self.set_initial_condition(fs)
-        exact = self.initial_value.copy()
-
-        L1_err = assemble(abs(sol - exact)*dx)/assemble(abs(exact)*dx)
-        L2_err = sqrt(assemble((sol - exact)*(sol - exact)*dx))/sqrt(assemble(exact*exact*dx))
-        with exact.dat.vec_ro as v_exact:
-            L_inf_exact = v_exact.max()[1]
-        exact -= sol
-        domain = '{[i]: 0 <= i < diff.dofs}'
-        instructions = '''
-        for i
-            diff[i] = abs(diff[i])
-        end
-        '''
-        par_loop((domain, instructions), dx, {'diff': (exact, RW)}, is_loopy_kernel=True)
-        with exact.dat.vec_ro as v_diff:
-            L_inf_err = v_diff.max()[1]/L_inf_exact
-
-        return L1_err, L2_err, L_inf_err
