@@ -21,15 +21,7 @@ __all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecompo
 
 include_dir = ["%s/include/eigen3" % PETSC_ARCH]
 
-
-def eigen_kernel(kernel, *args, **kwargs):
-    """
-    Helper function to easily pass Eigen kernels to Firedrake via PyOP2.
-    """
-    return op2.Kernel(kernel(*args, **kwargs), kernel.__name__, cpp=True, include_dirs=include_dir)
-
-def get_eigendecomposition(d):
-    return """
+get_eigendecomposition_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -42,10 +34,9 @@ void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double *
   EVecs = eigensolver.eigenvectors();
   EVals = eigensolver.eigenvalues();
 }
-""" % (d*d, d, d, d, d, d, d, d, d)
+"""
 
-def get_reordered_eigendecomposition_2d():
-    return  """
+get_reordered_eigendecomposition_2d_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -58,27 +49,20 @@ void get_reordered_eigendecomposition(double EVecs_[4], double EVals_[2], const 
   Matrix<double, 2, 2, RowMajor> Q = eigensolver.eigenvectors().transpose();
   Vector2d D = eigensolver.eigenvalues();
   if (fabs(D(0)) > fabs(D(1))) {
+    EVecs = Q;
+    EVals = D;
+  } else {
     EVecs(0,0) = Q(1,0);
     EVecs(0,1) = Q(1,1);
     EVecs(1,0) = Q(0,0);
     EVecs(1,1) = Q(0,1);
-    EVals = D;
-  } else {
-    EVecs = Q;
     EVals(0) = D(1);
     EVals(1) = D(0);
   }
 }
 """
 
-def get_reordered_eigendecomposition(d):
-    if d == 2:
-        return get_reordered_eigendecomposition_2d()
-    else:
-        raise NotImplementedError  # TODO: 3d case
-
-def set_eigendecomposition(d):
-    return """
+set_eigendecomposition_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -89,10 +73,9 @@ void set_eigendecomposition(double M_[%d], const double * EVecs_, const double *
   Map<Vector%dd> EVals((double *)EVals_);
   M = EVecs.transpose() * EVals.asDiagonal() * EVecs;
 }
-""" % (d*d, d, d, d, d, d)
+"""
 
-def intersect(d):
-    return """
+intersect_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -111,12 +94,9 @@ void intersect(double M_[%d], const double * A_, const double * B_) {
   D = eigensolver2.eigenvalues().array().max(1).matrix().asDiagonal();
   M = Sq.transpose() * Q * D * Q.transpose() * Sq;
 }
-""" % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d)
+"""
 
-def anisotropic_refinement(d, direction):
-    assert d in (2, 3)
-    scale = 4 if d == 2 else 8
-    return """
+anisotropic_refinement_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -130,17 +110,9 @@ void anisotropic_refinement(double A_[%d]) {
   D_array(%d) *= %f;
   A = Q * D_array.matrix().asDiagonal() * Q.transpose();
 }
-""" % (d*d, d, d, d, d, d, d, d, d, direction, scale)
+"""
 
-def metric_from_hessian(d, noscale=False, op=Options()):
-    scale = 'false' if noscale else 'true'
-    if op.norm_order is None:
-        return linf_metric_from_hessian(d, scale)
-    else:
-        return lp_metric_from_hessian(d, scale, op.norm_order)
-
-def linf_metric_from_hessian(d, scale):
-    return """
+linf_metric_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -173,10 +145,9 @@ void metric_from_hessian(double A_[%d], double * f, const double * B_)
   }
   A += Q * D.asDiagonal() * Q.transpose();
 }
-""" % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d)
+"""
 
-def lp_metric_from_hessian(d, scale, p):
-    return """
+lp_metric_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -211,10 +182,9 @@ void metric_from_hessian(double A_[%d], double * f, const double * B_)
   }
   A += scaling * Q * D.asDiagonal() * Q.transpose();
 }
-""" % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d, p, p, p, d)
+"""
 
-def scale_metric(d, op=Options()):
-    return """
+scale_metric_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -225,16 +195,15 @@ void scale_metric(double A_[%d])
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(A);
   Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
   Vector%dd D = eigensolver.eigenvalues();
-  for (int i=0; i<%d; i++) D(i) = fmin(%f, fmax(%f, abs(D(i))));
+  for (int i=0; i<%d; i++) D(i) = fmin(pow(%f, -2), fmax(pow(%f, -2), abs(D(i))));
   double max_eig = fmax(D(0), D(1));
   if (%d == 3) max_eig = fmax(max_eig, D(2));
-  for (int i=0; i<%d; i++) D(i) = fmax(D(i), %f * max_eig);
+  for (int i=0; i<%d; i++) D(i) = fmax(D(i), pow(%f, -2) * max_eig);
   A = Q * D.asDiagonal() * Q.transpose();
 }
-""" % (d*d, d, d, d, d, d, d, d, d, pow(op.h_min, -2), pow(op.h_max, -2), d, d, pow(op.max_anisotropy, -2))
+"""
 
-def gemv(d, alpha=1.0, beta=0.0, tol=1e-8):
-    return """
+gemv_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -254,10 +223,9 @@ void gemv(double y_[%d], const double * A_, const double * x_) {
     y += alpha * A * x;
   }
 }
-""" % (d, d, d, d, d, alpha, beta, tol)
+"""
 
-def matscale(d):
-    return """
+matscale_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -267,10 +235,9 @@ void matscale(double B_[%d], const double * A_, const double * alpha_) {
   Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
   B += *alpha_ * A;
 }
-""" % (d*d, d, d, d, d)
+"""
 
-def singular_value_decomposition(d):
-    return """
+svd_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -281,11 +248,9 @@ void singular_value_decomposition(double A_[%d], const double * B_) {
   JacobiSVD<Matrix<double, %d, %d, RowMajor> > svd(B, ComputeFullV);
 
   A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
-}""" % (d*d, d, d, d, d, d, d)
+}"""
 
-def get_maximum_length_edge(d):
-    if d == 2:
-        return """
+get_max_length_edge_2d_str = """
 for (int i=0; i<max_vector.dofs; i++) {
   int max_index = 0;
   if (edges[1] > edges[max_index]) max_index = 1;
@@ -294,6 +259,76 @@ for (int i=0; i<max_vector.dofs; i++) {
   max_vector[1] = vectors[2*max_index+1];
 }
 """
+
+def eigen_kernel(kernel, *args, **kwargs):
+    """Helper function to easily pass Eigen kernels to Firedrake via PyOP2."""
+    return op2.Kernel(kernel(*args, **kwargs), kernel.__name__, cpp=True, include_dirs=include_dir)
+
+def get_eigendecomposition(d):
+    """Extract eigenvectors/eigenvalues from a metric field."""
+    return get_eigendecomposition_str % (d*d, d, d, d, d, d, d, d, d)
+
+def get_reordered_eigendecomposition(d):
+    """Extract eigenvectors/eigenvalues from a metric field, ordered by eigenvalue magnitude."""
+    if d == 2:
+        return get_reordered_eigendecomposition_2d_str
+    else:
+        raise NotImplementedError  # TODO: 3d case
+
+def set_eigendecomposition(d):
+    """Compute metric from eigenvectors/eigenvalues."""
+    return set_eigendecomposition_str % (d*d, d, d, d, d, d)
+
+def intersect(d):
+    """Intersect two metric fields."""
+    return intersect_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d)
+
+def anisotropic_refinement(d, direction):
+    """Refine a metric in a single coordinate direction."""
+    assert d in (2, 3)
+    scale = 4 if d == 2 else 8
+    return anisotropic_refinement_str  % (d*d, d, d, d, d, d, d, d, d, direction, scale)
+
+def metric_from_hessian(d, noscale=False, op=Options()):
+    """Build a metric field from a Hessian with user-specified normalisation methods."""
+    scale = 'false' if noscale else 'true'
+    if op.norm_order is None:
+        return linf_metric_from_hessian(d, scale)
+    else:
+        return lp_metric_from_hessian(d, scale, op.norm_order)
+
+def linf_metric_from_hessian(d, scale):
+    """Build a metric field from a Hessian using L-infinity normalisation."""
+    return linf_metric_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d)
+
+def lp_metric_from_hessian(d, scale, p):
+    """Build a metric field from a Hessian using L-p normalisation, for p>=1."""
+    return lp_metric_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d, p, p, p, d)
+
+def scale_metric(d, op=Options()):
+    """Scale a metric field in order to enforce maximum/minimum element sizes and anisotropy."""
+    return scale_metric_str % (d*d, d, d, d, d, d, d, d, d, op.h_min, op.h_max, d, d, op.max_anisotropy)
+
+def gemv(d, alpha=1.0, beta=0.0, tol=1e-8):
+    """
+    Generalised matrix-vector multiplication of matrix A and vector x:
+
+      y = alpha * A * x + beta * y.
+    """
+    return gemv_str % (d, d, d, d, d, alpha, beta, tol)
+
+def matscale(d):
+    """Multiply a matrix by a scalar field."""
+    return matscale_str % (d*d, d, d, d, d)
+
+def singular_value_decomposition(d):
+    """Compute the singular value decomposition of a metric."""
+    return svd_str % (d*d, d, d, d, d, d, d)
+
+def get_maximum_length_edge(d):
+    """Find the mesh edge with maximum length."""
+    if d == 2:
+        return get_max_length_edge_2d_str
     elif d == 3:
         raise NotImplementedError  # TODO
     else:
