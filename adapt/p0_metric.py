@@ -98,7 +98,7 @@ class AnisotropicMetricDriver():
 
         NOTE: Assumes eigevalues are already squared.
         """
-        kernel = eigen_kernel(set_eigendecomposition, self.dim)
+        kernel = eigen_kernel(set_eigendecomposition_transpose, self.dim)
         op2.par_loop(kernel, self.P0_ten.node_set, self.p0metric.dat(op2.RW), self.evec.dat(op2.READ), self.eval.dat(op2.READ))
 
     def project_metric(self):
