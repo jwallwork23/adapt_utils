@@ -1,11 +1,6 @@
 from firedrake import *
 
-import numpy as np
-import numpy
-from numpy import linalg as la
-from scipy import linalg as sla
-
-from adapt_utils.options import *
+from adapt_utils.options import Options
 from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hessian
 from adapt_utils.adapt.kernels import *
 

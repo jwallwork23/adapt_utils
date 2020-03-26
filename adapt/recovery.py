@@ -1,6 +1,6 @@
 from firedrake import *
 
-from adapt_utils.options import *
+from adapt_utils.options import Options
 
 
 __all__ = ["construct_gradient", "construct_hessian", "construct_boundary_hessian"]

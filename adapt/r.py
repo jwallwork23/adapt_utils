@@ -2,7 +2,6 @@ from firedrake import *
 from thetis import print_output
 
 import os
-import warnings
 
 from adapt_utils.options import Options
 
@@ -174,6 +173,7 @@ class MeshMover():
                 #         self.bbc = DirichletBC(coord_space, 0, corners)
                 # self.bc.append(EquationBC(a_bc == L_bc, self.x_new, 'on_boundary', bcs=self.bbc))
             # else:
+                # import warnings
                 # warnings.warn("#### TODO: ALE boundary condition may not be properly accounted for!")
 
             prob = LinearVariationalProblem(a, L, self.x_new, bcs=self.bc)

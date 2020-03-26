@@ -1,5 +1,4 @@
 from thetis import *
-from firedrake.petsc import PETSc
 
 import os
 import fnmatch
@@ -105,6 +104,8 @@ class BaseConditionCheck():
         if hasattr(self, 'M'):
             raise NotImplementedError  # TODO
         else:
+            from firedrake.petsc import PETSc
+
             # Solve eigenvalue problem
             n = self.wrk.getSize()[0]
             es = SLEPc.EPS().create(comm=COMM_WORLD)

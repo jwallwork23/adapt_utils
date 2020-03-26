@@ -1,6 +1,6 @@
 from firedrake import *
 
-from adapt_utils.options import *
+from adapt_utils.options import Options
 from adapt_utils.adapt.metric import isotropic_metric
 from adapt_utils.adapt.kernels import *
 

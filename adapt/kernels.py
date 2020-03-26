@@ -1,4 +1,4 @@
-from firedrake import *
+from firedrake import op2
 try:
     from firedrake.slate.slac.compiler import PETSC_ARCH
 except ImportError:
@@ -8,7 +8,7 @@ except ImportError:
     if not os.path.exists(os.path.join(PETSC_ARCH, 'include/eigen3')):
         PETSC_ARCH = '/usr/local'
 
-from adapt_utils.options import * 
+from adapt_utils.options import Options
 
 
 __all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecomposition",
