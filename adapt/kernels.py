@@ -4,9 +4,7 @@ try:
 except ImportError:
     import os
 
-    PETSC_ARCH = os.environ.get('PETSC_ARCH')
-    PETSC_DIR = os.environ.get('PETSC_DIR')
-    PETSC_ARCH = os.path.join(PETSC_DIR, PETSC_ARCH)
+    PETSC_ARCH = os.path.join(os.environ.get('PETSC_DIR'), os.environ.get('PETSC_ARCH'))
     if not os.path.exists(os.path.join(PETSC_ARCH, 'include/eigen3')):
         PETSC_ARCH = '/usr/local'
 
@@ -27,9 +25,13 @@ get_eigendecomposition_str = """
 using namespace Eigen;
 
 void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double * M_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > EVecs((double *)EVecs_);
   Map<Vector%dd> EVals((double *)EVals_);
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
+
+  // Solve eigenvalue problem
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(M);
   EVecs = eigensolver.eigenvectors();
   EVals = eigensolver.eigenvalues();
@@ -42,12 +44,18 @@ get_reordered_eigendecomp_2d_str = """
 using namespace Eigen;
 
 void get_reordered_eigendecomposition(double EVecs_[4], double EVals_[2], const double * M_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, 2, 2, RowMajor> > EVecs((double *)EVecs_);
   Map<Vector2d> EVals((double *)EVals_);
   Map<Matrix<double, 2, 2, RowMajor> > M((double *)M_);
+
+  // Solve eigenvalue problem
   SelfAdjointEigenSolver<Matrix<double, 2, 2, RowMajor>> eigensolver(M);
   Matrix<double, 2, 2, RowMajor> Q = eigensolver.eigenvectors();
   Vector2d D = eigensolver.eigenvalues();
+
+  // Reorder eigenpairs by magnitude of eigenvalue
   if (fabs(D(0)) > fabs(D(1))) {
     EVecs = Q;
     EVals = D;
@@ -66,12 +74,18 @@ get_reordered_eigendecomp_3d_str = """
 using namespace Eigen;
 
 void get_reordered_eigendecomposition(double EVecs_[9], double EVals_[3], const double * M_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, 3, 3, RowMajor> > EVecs((double *)EVecs_);
   Map<Vector2d> EVals((double *)EVals_);
   Map<Matrix<double, 3, 3, RowMajor> > M((double *)M_);
+
+  // Solve eigenvalue problem
   SelfAdjointEigenSolver<Matrix<double, 3, 3, RowMajor>> eigensolver(M);
   Matrix<double, 3, 3, RowMajor> Q = eigensolver.eigenvectors().transpose();
   Vector3d D = eigensolver.eigenvalues();
+
+  // Reorder eigenpairs by magnitude of eigenvalue
   if (fabs(D(0)) > fabs(D(1))) {
     if (fabs(D(1)) > fabs(D(2))) {
       EVecs = Q;
@@ -124,9 +138,13 @@ set_eigendecomposition_str = """
 using namespace Eigen;
 
 void set_eigendecomposition(double M_[%d], const double * EVecs_, const double * EVals_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
   Map<Matrix<double, %d, %d, RowMajor> > EVecs((double *)EVecs_);
   Map<Vector%dd> EVals((double *)EVals_);
+
+  // Compute metric from eigendecomposition
   M = EVecs.transpose() * EVals.asDiagonal() * EVecs;
 }
 """
@@ -137,9 +155,13 @@ set_eigendecomposition_transpose_str = """
 using namespace Eigen;
 
 void set_eigendecomposition_transpose(double M_[%d], const double * EVecs_, const double * EVals_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
   Map<Matrix<double, %d, %d, RowMajor> > EVecs((double *)EVecs_);
   Map<Vector%dd> EVals((double *)EVals_);
+
+  // Compute metric from transpose eigendecomposition
   M = EVecs * EVals.asDiagonal() * EVecs.transpose();
 }
 """
@@ -150,17 +172,27 @@ intersect_str = """
 using namespace Eigen;
 
 void intersect(double M_[%d], const double * A_, const double * B_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > M((double *)M_);
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
   Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+
+  // Solve eigenvalue problem of first metric, taking square root of eigenvalues
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(A);
   Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
   Matrix<double, %d, %d, RowMajor> D = eigensolver.eigenvalues().array().sqrt().matrix().asDiagonal();
+
+  // Compute square root and inverse square root metrics
   Matrix<double, %d, %d, RowMajor> Sq = Q * D * Q.transpose();
   Matrix<double, %d, %d, RowMajor> Sqi = Q * D.inverse() * Q.transpose();
+
+  // Solve eigenvalue problem for triple product of inverse square root metric and the second metric
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver2(Sqi.transpose() * B * Sqi);
   Q = eigensolver2.eigenvectors();
   D = eigensolver2.eigenvalues().array().max(1).matrix().asDiagonal();
+
+  // Compute metric intersection
   M = Sq.transpose() * Q * D * Q.transpose() * Sq;
 }
 """
@@ -171,12 +203,20 @@ anisotropic_refinement_str = """
 using namespace Eigen;
 
 void anisotropic_refinement(double A_[%d]) {
+
+  // Map input/output metric onto an Eigen object
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+
+  // Solve eigenvalue problem
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(A);
   Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
   Vector%dd D = eigensolver.eigenvalues();
+
+  // Scale eigenvalue in appropriate coordinate direction
   Array%dd D_array = D.array();
   D_array(%d) *= %f;
+
+  // Compute metric from eigendecomposition
   A = Q * D_array.matrix().asDiagonal() * Q.transpose();
 }
 """
@@ -186,11 +226,13 @@ linf_metric_str = """
 
 using namespace Eigen;
 
-void metric_from_hessian(double A_[%d], double * f, const double * B_)
-{
+void metric_from_hessian(double A_[%d], double * f, const double * B_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
   Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
 
+  // Compute mean diagonal and set values appropriately
   double mean_diag;
   int i,j;
   for (i=0; i<%d-1; i++) {
@@ -201,17 +243,20 @@ void metric_from_hessian(double A_[%d], double * f, const double * B_)
     }
   }
 
+  // Solve eigenvalue problem
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(B);
   Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
   Vector%dd D = eigensolver.eigenvalues();
 
-  /* Normalisation */
+  // Apply L-infinity normalisation
   for (i=0; i<%d; i++) D(i) = fmax(1e-10, abs(D(i)));
   if (%s) {
     double det = 1.0;
     for (i=0; i<%d; i++) det *= D(i);
     *f += sqrt(det);
   }
+
+  // Build metric from eigendecomposition
   A += Q * D.asDiagonal() * Q.transpose();
 }
 """
@@ -221,11 +266,13 @@ lp_metric_str = """
 
 using namespace Eigen;
 
-void metric_from_hessian(double A_[%d], double * f, const double * B_)
-{
+void metric_from_hessian(double A_[%d], double * f, const double * B_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
   Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
 
+  // Compute mean diagonal and set values appropriately
   double mean_diag;
   int i,j;
   for (i=0; i<%d-1; i++) {
@@ -236,11 +283,12 @@ void metric_from_hessian(double A_[%d], double * f, const double * B_)
     }
   }
 
+  // Solve eigenvalue problem
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(B);
   Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
   Vector%dd D = eigensolver.eigenvalues();
 
-  /* Normalisation */
+  // Apply Lp normalisation
   for (i=0; i<%d; i++) D(i) = fmax(1e-10, abs(D(i)));
   double scaling = 1.0;
   if (%s) {
@@ -249,6 +297,8 @@ void metric_from_hessian(double A_[%d], double * f, const double * B_)
     scaling = pow(det, -1 / (2 * %d + 2));
     *f += pow(det, %d / (2 * %d + %d));
   }
+
+  // Build metric from eigendecomposition
   A += scaling * Q * D.asDiagonal() * Q.transpose();
 }
 """
@@ -260,14 +310,25 @@ using namespace Eigen;
 
 void scale_metric(double A_[%d])
 {
+
+  // Map input/output metric onto an Eigen object
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+
+  // Solve eigenvalue problem
   SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(A);
   Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
   Vector%dd D = eigensolver.eigenvalues();
-  for (int i=0; i<%d; i++) D(i) = fmin(pow(%f, -2), fmax(pow(%f, -2), abs(D(i))));
-  double max_eig = fmax(D(0), D(1));
-  if (%d == 3) max_eig = fmax(max_eig, D(2));
-  for (int i=0; i<%d; i++) D(i) = fmax(D(i), pow(%f, -2) * max_eig);
+
+  // Scale eigenvalues appropriately
+  int i;
+  double max_eig = 0.0;
+  for (i=0; i<%d; i++) {
+    D(i) = fmin(pow(%f, -2), fmax(pow(%f, -2), abs(D(i))));
+    max_eig = fmax(max_eig, D(i));
+  }
+  for (i=0; i<%d; i++) D(i) = fmax(D(i), pow(%f, -2) * max_eig);
+
+  // Build metric from eigendecomposition
   A = Q * D.asDiagonal() * Q.transpose();
 }
 """
@@ -278,6 +339,8 @@ gemv_str = """
 using namespace Eigen;
 
 void gemv(double y_[%d], const double * A_, const double * x_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Vector%dd> y((double *)y_);
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
   Map<Vector%dd> x((double *)x_);
@@ -285,6 +348,7 @@ void gemv(double y_[%d], const double * A_, const double * x_) {
   double beta = %f;
   double tol = %f;
 
+  // Apply generalised matrix-vector multiplication
   if (fabs(beta) < tol) y *= beta;
   if (fabs(alpha-1.0) < tol) {
     y += A * x;
@@ -300,8 +364,12 @@ matscale_str = """
 using namespace Eigen;
 
 void matscale(double B_[%d], const double * A_, const double * alpha_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
   Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+
+  // Scale metric
   B += *alpha_ * A;
 }
 """
@@ -312,10 +380,15 @@ svd_str = """
 using namespace Eigen;
 
 void singular_value_decomposition(double A_[%d], const double * B_) {
+
+  // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
   Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+
+  // Compute singular value decomposition
   JacobiSVD<Matrix<double, %d, %d, RowMajor> > svd(B, ComputeFullV);
 
+  // Build metric from singular value decomposition
   A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
 }"""
 
@@ -362,14 +435,12 @@ def anisotropic_refinement(d, direction):
 
 def metric_from_hessian(d, noscale=False, op=Options()):
     """Build a metric field from a Hessian with user-specified normalisation methods."""
-    scale = 'false' if noscale else 'true'
-    if op.norm_order is None:
-        return linf_metric_from_hessian(d, scale)
-    else:
-        return lp_metric_from_hessian(d, scale, op.norm_order)
+    normalised_metric = linf_metric_from_hessian if op.norm_order is None else lp_metric_from_hessian
+    return normalised_metric(d, 'false' if noscale else 'true', op.norm_order)
 
-def linf_metric_from_hessian(d, scale):
+def linf_metric_from_hessian(d, scale, p):
     """Build a metric field from a Hessian using L-infinity normalisation."""
+    assert p is None
     return linf_metric_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d)
 
 def lp_metric_from_hessian(d, scale, p):
@@ -378,7 +449,7 @@ def lp_metric_from_hessian(d, scale, p):
 
 def scale_metric(d, op=Options()):
     """Scale a metric field in order to enforce maximum/minimum element sizes and anisotropy."""
-    return scale_metric_str % (d*d, d, d, d, d, d, d, d, d, op.h_min, op.h_max, d, d, op.max_anisotropy)
+    return scale_metric_str % (d*d, d, d, d, d, d, d, d, d, op.h_min, op.h_max, d, op.max_anisotropy)
 
 def gemv(d, alpha=1.0, beta=0.0, tol=1e-8):
     """
@@ -397,9 +468,6 @@ def singular_value_decomposition(d):
     return svd_str % (d*d, d, d, d, d, d, d)
 
 def get_maximum_length_edge(d):
-    assert d in (2, 3)
+    assert d == 2
     """Find the mesh edge with maximum length."""
-    if d == 2:
-        return get_max_length_edge_2d_str
-    else:
-        raise NotImplementedError  # TODO
+    return get_max_length_edge_2d_str
