@@ -14,19 +14,19 @@ def lp_norm(f, p=2):
     """
     if p is None or 'inf' in p:
         return f.max()
-    if 'l' in p:
+    elif p.startswith('l'):
         p = float(p[1:])
-    if p == 1 or np.allclose(p, 1.0):
-        return np.sum(np.abs(fi) for fi in f)
-    else:
-        assert p > 1
+        try:
+            assert p >= 1
+        except AssertionError:
+            raise ValueError("Norm type l{:} not recognised.".format(p))
         return pow(np.sum(pow(np.abs(fi), p) for fi in f), 1/p)
+    else:
+        raise ValueError("Norm type {:} not recognised.".format(p))
 
 def total_variation(f):
     """Calculate the total variation of a 1D array f."""
-    n = len(f)
-    tv = 0.0
-    i0 = 0
+    n, tv, i0 = len(f), 0.0, 0
     sign_ = np.sign(f[1] - f[i0])
     for i in range(2, n):
         sign = np.sign(f[i] - f[i-1])
