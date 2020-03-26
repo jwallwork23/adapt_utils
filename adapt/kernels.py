@@ -36,7 +36,7 @@ void get_eigendecomposition(double EVecs_[%d], double EVals_[%d], const double *
 }
 """
 
-get_reordered_eigendecomposition_2d_str = """
+get_reordered_eigendecomp_2d_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
@@ -52,12 +52,68 @@ void get_reordered_eigendecomposition(double EVecs_[4], double EVals_[2], const 
     EVecs = Q;
     EVals = D;
   } else {
-    EVecs(0,0) = Q(1,0);
-    EVecs(0,1) = Q(1,1);
-    EVecs(1,0) = Q(0,0);
-    EVecs(1,1) = Q(0,1);
+    EVecs(0,0) = Q(1,0);EVecs(0,1) = Q(1,1);
+    EVecs(1,0) = Q(0,0);EVecs(1,1) = Q(0,1);
     EVals(0) = D(1);
     EVals(1) = D(0);
+  }
+}
+"""
+
+get_reordered_eigendecomp_3d_str = """
+#include <Eigen/Dense>
+
+using namespace Eigen;
+
+void get_reordered_eigendecomposition(double EVecs_[9], double EVals_[3], const double * M_) {
+  Map<Matrix<double, 3, 3, RowMajor> > EVecs((double *)EVecs_);
+  Map<Vector2d> EVals((double *)EVals_);
+  Map<Matrix<double, 3, 3, RowMajor> > M((double *)M_);
+  SelfAdjointEigenSolver<Matrix<double, 3, 3, RowMajor>> eigensolver(M);
+  Matrix<double, 3, 3, RowMajor> Q = eigensolver.eigenvectors().transpose();
+  Vector3d D = eigensolver.eigenvalues();
+  if (fabs(D(0)) > fabs(D(1))) {
+    if (fabs(D(1)) > fabs(D(2))) {
+      EVecs = Q;
+      EVals = D;
+    } else if (fabs(D(0)) > fabs(D(2))) {
+      EVecs(0,0) = Q(0,0);EVecs(0,1) = Q(0,1);EVecs(0,2) = Q(0,2);
+      EVecs(1,0) = Q(2,0);EVecs(1,1) = Q(2,1);EVecs(1,2) = Q(2,2);
+      EVecs(2,0) = Q(1,0);EVecs(2,1) = Q(1,1);EVecs(2,2) = Q(1,2);
+      EVals(0) = D(0);
+      EVals(1) = D(2);
+      EVals(2) = D(1);
+    } else {
+      EVecs(0,0) = Q(2,0);EVecs(0,1) = Q(2,1);EVecs(0,2) = Q(2,2);
+      EVecs(1,0) = Q(0,0);EVecs(1,1) = Q(0,1);EVecs(1,2) = Q(0,2);
+      EVecs(2,0) = Q(1,0);EVecs(2,1) = Q(1,1);EVecs(2,2) = Q(1,2);
+      EVals(0) = D(2);
+      EVals(1) = D(0);
+      EVals(2) = D(1);
+    }
+  } else {
+    if (fabs(D(0)) > fabs(D(2))) {
+      EVecs(0,0) = Q(1,0);EVecs(0,1) = Q(1,1);EVecs(0,2) = Q(1,2);
+      EVecs(1,0) = Q(0,0);EVecs(1,1) = Q(0,1);EVecs(1,2) = Q(0,2);
+      EVecs(2,0) = Q(2,0);EVecs(2,1) = Q(2,1);EVecs(2,2) = Q(2,2);
+      EVals(0) = D(1);
+      EVals(1) = D(0);
+      EVals(2) = D(2);
+    } else if (fabs(D(1)) > fabs(D(2))) {
+      EVecs(0,0) = Q(1,0);EVecs(0,1) = Q(1,1);EVecs(0,2) = Q(1,2);
+      EVecs(1,0) = Q(2,0);EVecs(1,1) = Q(2,1);EVecs(1,2) = Q(2,2);
+      EVecs(2,0) = Q(0,0);EVecs(2,1) = Q(0,1);EVecs(2,2) = Q(0,2);
+      EVals(0) = D(1);
+      EVals(1) = D(2);
+      EVals(2) = D(0);
+    } else {
+      EVecs(0,0) = Q(2,0);EVecs(0,1) = Q(2,1);EVecs(0,2) = Q(2,2);
+      EVecs(1,0) = Q(0,0);EVecs(1,1) = Q(0,1);EVecs(1,2) = Q(0,2);
+      EVecs(2,0) = Q(1,0);EVecs(2,1) = Q(1,1);EVecs(2,2) = Q(1,2);
+      EVals(0) = D(2);
+      EVals(1) = D(0);
+      EVals(2) = D(1);
+    }
   }
 }
 """
@@ -270,10 +326,8 @@ def get_eigendecomposition(d):
 
 def get_reordered_eigendecomposition(d):
     """Extract eigenvectors/eigenvalues from a metric field, ordered by eigenvalue magnitude."""
-    if d == 2:
-        return get_reordered_eigendecomposition_2d_str
-    else:
-        raise NotImplementedError  # TODO: 3d case
+    assert d in (2, 3)
+    return get_reordered_eigendecomp_2d_str if d == 2 else get_reordered_eigendecomp_3d_str
 
 def set_eigendecomposition(d):
     """Compute metric from eigenvectors/eigenvalues."""
@@ -287,7 +341,7 @@ def anisotropic_refinement(d, direction):
     """Refine a metric in a single coordinate direction."""
     assert d in (2, 3)
     scale = 4 if d == 2 else 8
-    return anisotropic_refinement_str  % (d*d, d, d, d, d, d, d, d, d, direction, scale)
+    return anisotropic_refinement_str % (d*d, d, d, d, d, d, d, d, d, direction, scale)
 
 def metric_from_hessian(d, noscale=False, op=Options()):
     """Build a metric field from a Hessian with user-specified normalisation methods."""
@@ -326,10 +380,9 @@ def singular_value_decomposition(d):
     return svd_str % (d*d, d, d, d, d, d, d)
 
 def get_maximum_length_edge(d):
+    assert d in (2, 3)
     """Find the mesh edge with maximum length."""
     if d == 2:
         return get_max_length_edge_2d_str
-    elif d == 3:
-        raise NotImplementedError  # TODO
     else:
-        raise NotImplementedError
+        raise NotImplementedError  # TODO
