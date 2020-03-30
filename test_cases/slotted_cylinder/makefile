@@ -9,6 +9,8 @@ mesh:
 	@gmsh -2 circle.geo
 	@echo "Done!"
 
+uniform: uniform_circle uniform_square
+
 uniform_circle:
 	@echo "Solving solid body rotation problem on circular domain..."
 	@python3 run_thetis.py -approach fixed_mesh -mesh_type circle -init_res 0
@@ -36,6 +38,8 @@ print_square:
 	@cat outputs/fixed_mesh/square_2.log
 	@cat outputs/fixed_mesh/square_4.log
 	@cat outputs/fixed_mesh/square_8.log
+
+plot: plot_circle plot_square
 
 plot_circle:
 	@echo "Plotting convergence for circular domain..."

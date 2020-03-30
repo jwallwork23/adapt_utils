@@ -62,6 +62,7 @@ kwargs = {
     'target': 1.0/desired_error,
 }
 op = LeVequeOptions(**kwargs)
+print_output("Element count: {:d}".format(op.default_mesh.num_cells()))
 
 # Run model
 tp = UnsteadyTracerProblem2d_Thetis(op=op)
