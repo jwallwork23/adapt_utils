@@ -214,14 +214,15 @@ class UnsteadyTracerProblem2d_Thetis(UnsteadyTracerProblem2d):
         options.horizontal_diffusivity = self.fields['diffusivity']
         options.tracer_source_2d = self.fields['source']
         options.use_automatic_sipg_parameter = op.sipg_parameter is None
-        options.use_lagrangian_formulation = op.approach == 'ale'
+        if hasattr(options, 'use_lagrangian_formulation'):  # TODO: temporary
+            options.use_lagrangian_formulation = op.approach == 'ale'
 
         # Assign initial conditions
         velocity = -self.fields['velocity'] if adjoint else self.fields['velocity']
         init = self.adjoint_solution if adjoint else self.solution
         self.solver_obj.assign_initial_conditions(uv=velocity, tracer=init)
 
-        # Set up callbacks
+        # # Set up callbacks
         # cb = callback.TracerMassConservation2DCallback('tracer_2d', self.solver_obj)
         # if self.remesh_step == 0:
         #     self.init_norm = cb.initial_value

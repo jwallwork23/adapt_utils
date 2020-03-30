@@ -1084,6 +1084,12 @@ class UnsteadyProblem(SteadyProblem):
         uses_adjoint &= not 'fixed_mesh' in self.approach
         uses_adjoint &= self.approach != 'hessian'
 
+        # Setup solvers (if applicable)
+        if hasattr(self, 'setup_solver_forward'):
+            self.setup_solver_forward()
+        if uses_adjoint and hasattr(self, 'setup_solver_adjoint'):
+            self.setup_solver_adjoint()
+
         # Adapt w.r.t. initial conditions a few times before the solver loop
         if uses_adjoint:
             for i in range(max(self.op.num_adapt, 2)):
@@ -1101,8 +1107,8 @@ class UnsteadyProblem(SteadyProblem):
             # NOTE:
             #  * Use 'fixed_mesh_plot' to call `plot` at each export.
             if self.approach == 'fixed_mesh':
+                self.step_end = self.op.end_time
                 self.solve_step(adjoint=adjoint)
-                print('!!!')
                 break
             
             # Adaptive mesh case

@@ -50,10 +50,19 @@ class TracerOptions(Options):
         self.stabilisation = 'SUPG'
 
     def set_diffusivity(self, fs):
-        raise NotImplementedError
+        """Should be implemented in derived class."""
+        self.diffusivity = Constant(self.base_diffusivity)
+        return self.diffusivity
 
     def set_velocity(self, fs):
-        raise NotImplementedError
+        """Should be implemented in derived class."""
+        self.fluid_velocity = Constant(self.base_velocity)
+        return self.fluid_velocity
+
+    def set_source(self, fs):
+        """Should be implemented in derived class."""
+        self.source = None
+        return self.source
 
 def bessi0(x):
     """Modified Bessel function of the first kind. Code taken from 'Numerical recipes in C'."""

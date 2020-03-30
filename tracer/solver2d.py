@@ -673,14 +673,14 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
                 self.plot_solution()
             t += op.dt
 
-    def solve(self):
-        op = self.op
-        self.setup_solver_forward()
-        self.step_end, self.remesh_step = op.dt_per_export*op.dt, 0
-        while self.step_end < op.end_time + 0.5*op.dt:
-            self.solve_step()
-            self.step_end += op.dt_per_export*op.dt 
-            self.remesh_step += 1
+    # def solve(self):
+    #     op = self.op
+    #     self.setup_solver_forward()
+    #     self.step_end, self.remesh_step = op.dt_per_export*op.dt, 0
+    #     while self.step_end < op.end_time + 0.5*op.dt:
+    #         self.solve_step()
+    #         self.step_end += op.dt_per_export*op.dt
+    #         self.remesh_step += 1
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.P0)
