@@ -19,7 +19,7 @@ parser.add_argument("-solve_adjoint", help="Solve adjoint problem and save to hd
 parser.add_argument("-init_res", help="Initial mesh refinement level")
 parser.add_argument("-num_adapt", help="Number of adapt/solve iterations in adaptation loop")
 parser.add_argument("-desired_error", help="Desired error level in metric normalisation")
-parser.add_argument("-mesh_type", help="Choose from 'circle' or 'square'.")
+parser.add_argument("-mesh_type", help="Choose from 'circle' or 'square'")
 parser.add_argument("-shape", help="""
 Shape defining QoI, chosen from:
   0: Gaussian bell
