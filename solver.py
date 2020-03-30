@@ -1080,6 +1080,11 @@ class UnsteadyProblem(SteadyProblem):
         """
         Solve PDE using mesh adaptivity.
         """
+        op = self.op
+        try:
+            assert op.dt_per_remesh % op.dt_per_export == 0
+        except AssertionError:
+            raise ValueError("Timesteps per export should divide timesteps per remesh.")
         self.remesh_step = 0
         uses_adjoint &= not 'fixed_mesh' in self.approach
         uses_adjoint &= self.approach != 'hessian'
@@ -1092,7 +1097,7 @@ class UnsteadyProblem(SteadyProblem):
 
         # Adapt w.r.t. initial conditions a few times before the solver loop
         if uses_adjoint:
-            for i in range(max(self.op.num_adapt, 2)):
+            for i in range(max(op.num_adapt, 2)):
                 self.get_adjoint_state()
                 self.adapt_mesh()
                 self.set_start_condition(adjoint)
@@ -1101,18 +1106,18 @@ class UnsteadyProblem(SteadyProblem):
             self.set_start_condition(adjoint)
 
         # Solve/adapt loop
-        while self.step_end <= self.op.end_time:
+        while self.step_end <= op.end_time:
 
             # Fixed mesh case
             # NOTE:
             #  * Use 'fixed_mesh_plot' to call `plot` at each export.
             if self.approach == 'fixed_mesh':
-                self.step_end = self.op.end_time
+                self.step_end = op.end_time
                 self.solve_step(adjoint=adjoint)
                 break
             
             # Adaptive mesh case
-            for i in range(self.op.num_adapt):
+            for i in range(op.num_adapt):
                 self.adapt_mesh()
                 # Interpolate value from previous step onto new mesh
 
@@ -1124,8 +1129,8 @@ class UnsteadyProblem(SteadyProblem):
                     self.project_solution(solution_old, adjoint=adjoint)
                     
                 # Solve PDE on new mesh
-                self.op.plot_pvd = i == 0
-                # time = None if i == 0 else self.step_end - self.op.dt
+                op.plot_pvd = i == 0
+                # time = None if i == 0 else self.step_end - op.dt
                 # self.solve_step(adjoint=adjoint, time=time)
                 self.solve_step(adjoint=adjoint)
 
@@ -1133,11 +1138,10 @@ class UnsteadyProblem(SteadyProblem):
                 if i == 0:
                     solution = Function(self.solution)
                     solution_old = Function(self.solution_old)
-                    if self.step_end + self.op.dt*self.op.dt_per_remesh > self.op.end_time:
+                    if self.step_end + op.dt*op.dt_per_remesh > op.end_time:
                         break  # No need to do adapt for final timestep
-            # self.plot()  # TODO: Temporary. It is called at end of adapt_mesh
 
-            self.step_end += self.op.dt*self.op.dt_per_remesh
+            self.step_end += op.dt*op.dt_per_remesh
             self.remesh_step += 1
 
         # Evaluate QoI
