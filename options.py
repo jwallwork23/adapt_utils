@@ -131,9 +131,8 @@ class Options(FrozenConfigurable):
                 expr = lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps)
             b = expr if j == 0 else Or(b, expr)
         expr = conditional(b, scale, 0.)
-        indi = Function(fs)
-        indi.interpolate(expr)
-        return indi
+        # return interpolate(expr, fs)
+        return expr
 
     def bump(self, fs, scale=1., source=False):
         """
@@ -172,9 +171,8 @@ class Options(FrozenConfigurable):
                 expr2 *= exp(1 - 1/(1 - (z-z0)*(z-z0)/r2**2))
                 vol *= r2
             i += conditional(lt(expr1, vol), expr2, 0)
-        bump = Function(fs)
-        bump.interpolate(i)
-        return bump
+        # return interpolate(i, fs)
+        return i
 
     def gaussian(self, fs, scale=1., source=False):
         """
@@ -202,9 +200,8 @@ class Options(FrozenConfigurable):
                 z0 = locs[j][2]
                 expr += (z-z0)*(z-z0)
             i += conditional(lt(expr, r*r), scale*exp(1 - 1/(1 - expr/r**2)), 0)
-        bump = Function(fs)
-        bump.interpolate(i)
-        return bump
+        # return interpolate(i, fs)
+        return i
 
     def box(self, fs, scale=1., source=False):
         """
@@ -239,9 +236,8 @@ class Options(FrozenConfigurable):
                 expr = And(expr, And(gt(z, z0-r2), lt(z, z0+r2)))
             b = expr if j == 0 else Or(b, expr)
         expr = conditional(b, scale, 0.)
-        box = Function(fs)
-        box.interpolate(expr)
-        return box
+        # return interpolate(expr, fs)
+        return expr
 
     def set_start_condition(self, fs, adjoint=False):
         return self.set_final_condition(fs) if adjoint else self.set_initial_condition(fs)
