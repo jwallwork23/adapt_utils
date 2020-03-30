@@ -47,6 +47,8 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.fields['velocity'] = op.set_velocity(self.P1_vec)
         self.fields['source'] = op.set_source(self.P1)
         self.divergence_free = np.allclose(assemble(div(self.fields['velocity'])*dx), 0.0)
+        if self.divergence_free:
+            print_output("Specfied velocity field is divergence free.")
 
     def create_solutions(self):
         super(SteadyTracerProblem2d, self).create_solutions()

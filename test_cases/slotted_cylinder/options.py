@@ -28,7 +28,15 @@ class LeVequeOptions(TracerOptions):
     The QoI considered in this test case may be viewed as an extension of the QoI considered in the
     [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
-    def __init__(self, shape=0, mesh_type='circle', n=0, background_concentration=0.0, **kwargs):
+    def __init__(self, shape=0, mesh_type='circle', refinement_level=0, background_concentration=0.0, **kwargs):
+        n = refinement_level
+
+        # Temporal discretisation
+        self.dt = pi/300.0
+        self.end_time = 2*pi + self.dt
+        self.dt_per_export = 10
+        self.dt_per_remesh = 10
+
         super(LeVequeOptions, self).__init__(**kwargs)
         self.bg = background_concentration
 
@@ -64,19 +72,10 @@ class LeVequeOptions(TracerOptions):
         else:
             raise NotImplementedError
 
-        # Temporal discretisation
-        self.dt = pi/300.0
-        self.end_time = 2*pi + self.dt
-        self.dt_per_export = 10
-        self.dt_per_remesh = 10
-
         # Solver
-        self.params = {
-            "ksp_type": "gmres",
-            "pc_type": "sor",
-            # "ksp_monitor": None,
-            # "ksp_converged_reason": None,
-        }
+        self.params = self.iterative_params
+        # self.params["ksp_monitor"] = None
+        # self.params["ksp_converged_reason"] =  None
 
     def set_region_of_interest(self, shape=0):
         assert shape in (0, 1, 2)
