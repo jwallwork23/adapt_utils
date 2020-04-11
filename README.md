@@ -12,14 +12,14 @@ solutions for more general problems. This is research of the Applied Modelling a
 
 * `v1.0`: 'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3358565.svg)](https://doi.org/10.5281/zenodo.3358565)
 
-* `v1.1`: 'Goal-Oriented Error Estimation and Mesh Adaptation for Shallow Water Modelling': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3695801.svg)](https://doi.org/10.5281/zenodo.3695801)
+* `v1.3`: 'Goal-Oriented Error Estimation and Mesh Adaptation for Shallow Water Modelling': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3695801.svg)](https://doi.org/10.5281/zenodo.3695801)
 
 
 ### User instructions
 
 * Clone this repository and make it accessible to the `PYTHONPATH` environment variable.
 * If using `v1.0`, download Firedrake, PETSc and Pragmatic using [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3250888.svg)](https://doi.org/10.5281/zenodo.3250888).
-* If using `v1.1`:
+* If using `v1.3`:
 	* Install the same PETSc version as used in `v1.0`.
 	* Download Firedrake using [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3568997.svg)](https://doi.org/10.5281/zenodo.3568997), with the flag `--honour-petsc-dir` and the Thetis version [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3689727.svg)](https://doi.org/10.5281/zenodo.3689727).
 
