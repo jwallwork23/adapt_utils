@@ -171,7 +171,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
         # HorizontalViscosity
         stress = 2*nu*sym(grad(u)) if self.op.grad_div_viscosity else nu*grad(u)
-        dwr += inner(z, div(stress))
+        R1 += div(stress)
         if self.op.grad_depth_viscosity:
             R1 += dot(grad(H)/H, stress)
 
