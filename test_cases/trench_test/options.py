@@ -5,6 +5,8 @@ from thetis.configuration import *
 from adapt_utils.swe.morphological_options import MorphOptions
 
 import os
+import time
+import datetime
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
@@ -26,7 +28,7 @@ class TrenchOptions(MorphOptions):
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
         self.plot_timeseries = plot_timeseries
 
-        self.default_mesh = RectangleMesh(16*5*nx, 5*ny, 16, 1.1)# Mesh("trench.msh")
+        self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)# Mesh("trench.msh")
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
         self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
         self.P1_vec = VectorFunctionSpace(self.default_mesh, "CG", 1)
@@ -34,7 +36,12 @@ class TrenchOptions(MorphOptions):
         
         super(TrenchOptions, self).__init__(**kwargs)
         self.plot_pvd = True  
-        self.di = "morph_output"
+        
+        ts = time.time()
+        st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+        outputdir = 'outputs'+ st        
+        
+        self.di = outputdir#"morph_output"
 
         # Physical
         self.base_viscosity = 1e-6

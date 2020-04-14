@@ -328,11 +328,8 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
 
                         # final correction factor
                         alphatest2.assign(th.conditional(th.conditional(alpha > 1, 1, alpha) < 0, 0, th.conditional(alpha > 1, 1, alpha)))
-                    
-                        # multiply correction factor by velocity and insert back into sediment concentration equation
-                        corrective_velocity.interpolate(alphatest2 * uv1)
                     else:
-                        corrective_velocity.interpolate(uv1)
+                        alphatest2.assign(th.Constant(1.0))
 
                 if bedload == True:
                     
@@ -649,10 +646,8 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
             # final correction factor
             alphatest2 = th.Function(P1_2d).interpolate(th.conditional(th.conditional(alpha > 1, 1, alpha) < 0, 0, th.conditional(alpha > 1, 1, alpha)))
                     
-            # multiply correction factor by velocity and insert back into sediment concentration equation
-            corrective_velocity = th.Function(vectorP1_2d).interpolate(alphatest2 * uv_init)
         else:
-            corrective_velocity = th.Function(vectorP1_2d).interpolate(uv_init)
+            alphatest2 = th.Function(P1_2d).interpolate(th.Constant(1.0))
 
                     
     if bedload == True:
@@ -726,7 +721,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
         # switch on tracer calculation if using sediment transport component
         options.solve_tracer = True
         options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d', 'bathymetry_2d']
-        options.tracer_advective_velocity = corrective_velocity
+        options.tracer_advective_velocity_factor = alphatest2 
         options.tracer_source_2d = source
     else:
         options.solve_tracer = False
