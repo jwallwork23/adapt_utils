@@ -26,6 +26,7 @@ class TrenchOptions(MorphOptions):
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
+        super(TrenchOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
 
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)# Mesh("trench.msh")
@@ -34,7 +35,6 @@ class TrenchOptions(MorphOptions):
         self.P1_vec = VectorFunctionSpace(self.default_mesh, "CG", 1)
         self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
         
-        super(TrenchOptions, self).__init__(**kwargs)
         self.plot_pvd = True  
         
         ts = time.time()
