@@ -11,7 +11,7 @@ from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import *
 from adapt_utils.adapt.metric import steady_metric
 from adapt_utils.norms import total_variation, lp_norm
-from adapt_utils.misc import find
+from adapt_utils.misc import find, heaviside_approx
 
 
 __all__ = ["TsunamiOptions"]
@@ -336,6 +336,3 @@ class TsunamiOptions(ShallowWaterOptions):
         plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
         plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
-
-def heaviside_approx(H, alpha):
-    return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5

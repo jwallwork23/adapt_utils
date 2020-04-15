@@ -10,8 +10,8 @@ import scipy.sparse.linalg as sla
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["copy_mesh", "doc", "find", "check_spd", "get_boundary_nodes", "index_string",
-           "UnnestedConditionCheck", "NestedConditionCheck"]
+__all__ = ["copy_mesh", "doc", "find", "heaviside_approx", "check_spd", "get_boundary_nodes",
+           "index_string", "UnnestedConditionCheck", "NestedConditionCheck"]
 
 def copy_mesh(mesh):
     return Mesh(Function(mesh.coordinates))
@@ -28,6 +28,9 @@ def find(pattern, path):
             if fnmatch.fnmatch(name, pattern):
                 result.append(os.path.join(root, name))
     return result
+
+def heaviside_approx(H, alpha):
+    return 0.5*(H/(sqrt(H**2 + alpha**2))) + 0.5
 
 def check_spd(matrix):
     """

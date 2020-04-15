@@ -1147,7 +1147,6 @@ class UnsteadyProblem(SteadyProblem):
         # Evaluate QoI
         if uses_adjoint:
             self.project_solution(solution)
-        self.get_qoi_kernel()
 
     # def quantity_of_interest(self):
     #     """

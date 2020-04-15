@@ -1,8 +1,8 @@
 from thetis import *
 from thetis.configuration import *
 
-
 from adapt_utils.swe.morphological_options import MorphOptions
+from adapt_utils.misc import heaviside_approx
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -25,15 +25,16 @@ class BalzanoOptions(MorphOptions):
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
+        super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
 
         self.default_mesh = RectangleMesh(17*nx, ny, 1.5*self.basin_x, 1200.0)
-        self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
+        P1DG = FunctionSpace(self.default_mesh, "DG", 1)
+        self.eta_tilde = Function(P1DG, name='Modified elevation')
         self.V = FunctionSpace(self.default_mesh, "CG", 1)
         self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
         
-        super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True        
                 
         self.num_hours = 24
@@ -65,9 +66,9 @@ class BalzanoOptions(MorphOptions):
         self.uv_init = as_vector([1.0e-7, 0.0])
         self.eta_init = Constant(0.0)
 
-        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*self.P1DG)       
+        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*P1DG)       
         
-        self.set_up_suspended()
+        self.set_up_suspended(self.default_mesh)
         
 
         # Stabilisation
@@ -319,7 +320,4 @@ class BalzanoOptions(MorphOptions):
         plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
         plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
-
-def heaviside_approx(H, alpha):
-    return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5
 
