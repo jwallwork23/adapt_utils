@@ -58,7 +58,7 @@ class MorphOptions(ShallowWaterOptions):
         self.unorm = project(self.horizontal_velocity**2 + self.vertical_velocity**2, P1DG)
 
         self.hc = project(conditional(self.depth > 0.001, self.depth, 0.001), P1DG)
-        self.aux = project(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001, P1DG))
+        self.aux = project(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001), P1DG)
         self.qfc = project(2/(ln(self.aux)/0.4)**2, P1DG)
         
         self.TOB = project(1000*0.5*self.qfc*self.unorm, P1)
