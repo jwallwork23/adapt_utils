@@ -27,7 +27,7 @@ kwargs = {
     # 'element_rtol': 0.002,
     'element_rtol': 0.001,
     'outer_iterations': 7,
-    'target_base': 2,  # NOTE: previously 4
+    'target_base': 2,
 }
 
 outstrs = {0: [], 1: []}

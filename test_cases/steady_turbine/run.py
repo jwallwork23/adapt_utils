@@ -1,4 +1,9 @@
 from firedrake import *
+from firedrake.petsc import PETSc
+try:
+    import firedrake.cython.dmplex as dmplex
+except:
+    import firedrake.dmplex as dmplex
 
 import argparse
 import matplotlib
@@ -21,7 +26,9 @@ parser.add_argument('-offset', help="""
     Number of turbine diameters by which to offset turbines in y-direction.
     'Aligned' configuration given by offset=0, 'Offset' configuration given by offset=1.""")
 parser.add_argument('-debug', help="Toggle debugging mode.")
+parser.add_argument('-save_plex', help="Save DMPlex to HDF5")
 args = parser.parse_args()
+save_plex = bool(args.save_plex or False)
 
 kwargs = {
     'approach': args.approach or 'fixed_mesh',
@@ -90,6 +97,12 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
     plt.savefig('screenshots/fluid_speed_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()), bbox_inches='tight')
 else:
     tp.adaptation_loop()
+    if save_plex:
+        plex = tp.mesh._plex
+        viewer = PETSc.Viewer().createHDF5('{:s}_{:d}.h5'.format(op.approach, op.offset), 'w')
+        viewer(plex)
+
+    exit(0)
 
     # Setup figures
     fig = plt.figure(figsize=(24, 5))
