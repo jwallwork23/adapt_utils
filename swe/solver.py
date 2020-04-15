@@ -590,7 +590,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
         options.solve_tracer = op.solve_tracer
         if op.solve_tracer:
-            options.tracer_advective_velocity = self.op.corrective_velocity
+            options.tracer_advective_velocity_factor = self.op.corrective_velocity_factor
             options.tracer_source_2d = self.op.source
 
         # Boundary conditions

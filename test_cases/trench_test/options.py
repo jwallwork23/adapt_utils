@@ -160,7 +160,10 @@ class TrenchOptions(MorphOptions):
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
-            self.manning_drag_coefficient = Constant(self.friction_coeff or 0.02)
+            if hasattr(self, 'friction_coeff'):
+                self.manning_drag_coefficient = Constant(self.friction_coeff)
+            else:
+                self.manning_drag_coefficient = Constant(0.02)
         return self.manning_drag_coefficient
 
     def set_bathymetry(self, fs, **kwargs):
