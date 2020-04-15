@@ -16,5 +16,3 @@ op = BalzanoOptions(plot_timeseries=True, bathymetry_type=bathy_type)
 op.qoi_mode = 'inundation_volume'
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.solve()
-print_output("QoI: {:.1f} km^3 h".format(swp.callbacks["qoi"].get_val()/1.0e+9))
-op.plot()

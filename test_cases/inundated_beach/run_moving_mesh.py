@@ -36,4 +36,3 @@ def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this pro
 
 swp.monitor_function = wet_dry_interface_monitor
 swp.solve(uses_adjoint=False)
-# TODO: Evaluate QoI properly, accounting for mesh adaptation
