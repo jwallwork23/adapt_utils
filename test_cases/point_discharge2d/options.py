@@ -88,7 +88,7 @@ class TelemacOptions(TracerOptions):
     def set_source(self, fs):
         x0, y0, r0 = self.source_loc[0]
         nrm = assemble(self.ball(fs, source=True)*dx)
-        scaling = pi*r0*r0/nrm if np.allclose(nrm, 0.0) else 1.0
+        scaling = 1.0 if np.allclose(nrm, 0.0) else pi*r0*r0/nrm
         scaling *= 0.5*self.source_value
         # scaling *= self.source_value
         self.source = self.ball(fs, source=True, scale=scaling)
@@ -98,7 +98,7 @@ class TelemacOptions(TracerOptions):
         b = self.ball(fs, source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
-        rescaling = area_exact/area if np.allclose(area, 0.0) else 1.0
+        rescaling = 1.0 if np.allclose(area, 0.0) else area_exact/area
         self.kernel = rescaling*b
         return self.kernel
 
