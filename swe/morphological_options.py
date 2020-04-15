@@ -108,12 +108,10 @@ class MorphOptions(ShallowWaterOptions):
             self.alpha = interpolate(-(self.Itwo - (ln(self.Amax) - ln(30))*self.Ione)/(self.Ione * ((ln(self.Amax) - ln(30)) + 1)), P1DG)
 
             # final correction factor
-            self.alphatest2 = interpolate(conditional(conditional(self.alpha > 1, 1, self.alpha) < 0, 0, conditional(self.alpha > 1, 1, self.alpha)), P1DG)
+            self.corrective_velocity_factor = Function(self.P1DG).interpolate(conditional(conditional(self.alpha > 1, 1, self.alpha) < 0, 0, conditional(self.alpha > 1, 1, self.alpha)))
                     
-            # multiply correction factor by velocity and insert back into sediment concentration equation
-            self.corrective_velocity = interpolate(self.alphatest2 * self.uv_d, P1_vec)
         else:
-            self.corrective_velocity = interpolate(self.uv_d, P1_vec)
+            self.corrective_velocity_factor = Function(self.P1DG).interpolate(Constant(1.0))
         
         self.z_n = Function(P1)
         self.z_n1 = Function(P1)
@@ -249,16 +247,10 @@ class MorphOptions(ShallowWaterOptions):
             self.alpha.assign(-(self.Itwo - (ln(self.Amax) - ln(30))*self.Ione)/(self.Ione * ((ln(self.Amax) - ln(30)) + 1)))
 
             # final correction factor
-            self.alphatest2.assign(conditional(conditional(self.alpha > 1, 1, self.alpha) < 0, 0, conditional(self.alpha > 1, 1, self.alpha)))
-                    
-            # multiply correction factor by velocity and insert back into sediment concentration equation
-            self.corrective_velocity.interpolate(self.alphatest2 * self.uv1)            
+            self.corrective_velocity_factor.assign(conditional(conditional(self.alpha > 1, 1, self.alpha) < 0, 0, conditional(self.alpha > 1, 1, self.alpha)))
 
-        else:
-            self.corrective_velocity.interpolate(self.uv1)
-        
         self.f += - (self.qbsourcedepth * self.v)*dx
-        
+
     def update_bedload(self, solver_obj):
 
         # calculate angle of flow
