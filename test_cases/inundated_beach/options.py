@@ -26,10 +26,10 @@ class BalzanoOptions(ShallowWaterOptions):
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, n=1, bathymetry_type=1, **kwargs):
+        super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
         self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
-        super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True
         self.num_hours = 24
 
@@ -88,6 +88,7 @@ class BalzanoOptions(ShallowWaterOptions):
 
         # Outputs  (NOTE: self.di has changed)
         self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
+        self.eta_tilde = Function(P1DG, name='Modified elevation')
 
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
