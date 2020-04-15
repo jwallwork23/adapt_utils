@@ -1,8 +1,8 @@
 from thetis import *
 from thetis.configuration import *
 
-
 from adapt_utils.swe.morphological_options import MorphOptions
+from adapt_utils.misc import heaviside_approx
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -319,7 +319,4 @@ class BalzanoOptions(MorphOptions):
         plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
         plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))
-
-def heaviside_approx(H, alpha):
-    return 0.5*(H/(sqrt(H**2+alpha**2)))+0.5
 

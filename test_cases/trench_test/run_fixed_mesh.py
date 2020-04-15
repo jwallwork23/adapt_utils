@@ -10,6 +10,4 @@ op = TrenchHydroOptions(debug=False,
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.solve(uses_adjoint=False)
 
-uv, elev = tp.solution.split()
-
-export_final_state("hydrodynamics_trench", uv, elev)
+export_final_state("hydrodynamics_trench", *swp.solution.split())
