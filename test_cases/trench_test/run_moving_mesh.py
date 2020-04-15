@@ -6,7 +6,7 @@ import numpy as np
 import time
 
 from adapt_utils.test_cases.trench_test.options import TrenchOptions
-from adapt_utils.swe.tsunami.solver import TsunamiProblem
+from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 from adapt_utils.adapt import recovery
 from adapt_utils.norms import local_frobenius_norm
 
@@ -27,8 +27,8 @@ op = TrenchOptions(approach='monge_ampere',
                     ny = 1,
                     r_adapt_rtol=1.0e-3)
 
-tp = TsunamiProblem(op, levels=0)
-tp.setup_solver()
+swp = UnsteadyShallowWaterProblem(op, levels=0)
+swp.setup_solver()
 
 
 def gradient_interface_monitor(mesh, alpha = 400.0, gamma = 0.0):
@@ -41,8 +41,8 @@ def gradient_interface_monitor(mesh, alpha = 400.0, gamma = 0.0):
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
-    eta = tp.solution.split()[1]
-    b = tp.solver_obj.fields.bathymetry_2d
+    eta = swp.solution.split()[1]
+    b = swp.solver_obj.fields.bathymetry_2d
     bath_gradient = recovery.construct_gradient(b)
     bath_hess = recovery.construct_hessian(b)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
@@ -73,14 +73,14 @@ def gradient_interface_monitor(mesh, alpha = 400.0, gamma = 0.0):
     
     return H
 
-tp.monitor_function = gradient_interface_monitor
-tp.solve(uses_adjoint=False)
+swp.monitor_function = gradient_interface_monitor
+swp.solve(uses_adjoint=False)
 
 t2 = time.time()
 
 new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
 
-bath= Function(FunctionSpace(new_mesh, "CG", 1)).project(tp.solver_obj.fields.bathymetry_2d)
+bath= Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.solver_obj.fields.bathymetry_2d)
 
 data = pd.read_csv('experimental_data.csv', header = None)
 

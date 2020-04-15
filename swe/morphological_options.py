@@ -1,22 +1,17 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.tsunami.options import TsunamiOptions
+from adapt_utils.swe.options import ShallowWaterOptions
+
 
 __all__ = ["MorphOptions"]
 
-class MorphOptions(TsunamiOptions):
+
+class MorphOptions(ShallowWaterOptions):
     """
     Parameter class for general morphological problems.
     """
-    
-    def __init__(self, **kwargs):
-        super(MorphOptions, self).__init__(**kwargs)    
-    
     def set_up_suspended(self, mesh, tracer = None): 
-        
-
-        
         R = Constant(2650/1000 - 1)
         self.dstar = Constant(self.average_size*((self.g*R)/(self.base_viscosity**2))**(1/3))
         if max(self.dstar.dat.data[:] < 1):
