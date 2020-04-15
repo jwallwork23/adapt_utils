@@ -1,6 +1,6 @@
 from thetis import *
 
-from adapt_utils.swe.tsunami.options import heaviside_approx
+from adapt_utils.misc import heaviside_approx
 
 
 __all__ = ["InundationCallback"]

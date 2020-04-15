@@ -1,7 +1,8 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.tsunami.options import TsunamiOptions, heaviside_approx
+from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.misc import heaviside_approx
 
 import os
 import numpy as np
@@ -16,7 +17,7 @@ matplotlib.rc('font', family='serif')
 __all__ = ["BalzanoOptions"]
 
 
-class BalzanoOptions(TsunamiOptions):
+class BalzanoOptions(ShallowWaterOptions):
     """
     Parameters for test case described in [1].
 
