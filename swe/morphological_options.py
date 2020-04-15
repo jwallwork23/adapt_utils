@@ -57,9 +57,9 @@ class MorphOptions(ShallowWaterOptions):
     
         self.unorm = project(self.horizontal_velocity**2 + self.vertical_velocity**2, P1DG)
 
-        self.hc = project(conditional(self.depth > 0.001, self.depth, 0.001), P1DG)
-        self.aux = project(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001, P1DG))
-        self.qfc = project(2/(ln(self.aux)/0.4)**2, P1DG)
+        self.hc = conditional(self.depth > 0.001, self.depth, 0.001)
+        self.aux = conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001)
+        self.qfc = 2/(ln(self.aux)/0.4)**2
         
         self.TOB = project(1000*0.5*self.qfc*self.unorm, P1)
         
@@ -192,9 +192,9 @@ class MorphOptions(ShallowWaterOptions):
             self.depth.interpolate(self.elev_cg + self.bathymetry)
 
             
-        self.hc.interpolate(conditional(self.depth > 0.001, self.depth, 0.001))
-        self.aux.interpolate(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
-        self.qfc.interpolate(2/(ln(self.aux)/0.4)**2)
+        self.hc = conditional(self.depth > 0.001, self.depth, 0.001)
+        self.aux = conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001)
+        self.qfc = interpolate(2/(ln(self.aux)/0.4)**2
         
         # calculate skin friction coefficient
         self.cfactor.interpolate(self.get_cfactor())
@@ -210,7 +210,8 @@ class MorphOptions(ShallowWaterOptions):
         
         self.f = (((1-self.porosity)*(self.z_n1 - self.z_n)/(self.dt*self.morfac))*self.v)*dx
         
-    def update_suspended(self, solver_obj):   
+    def update_suspended(self, solver_obj):
+        P1DG = solver_obj.function_spaces.P1DG_2d
 
         self.B.interpolate(conditional(self.a > self.depth, 1, self.a/self.depth))
         self.ustar.interpolate(sqrt(0.5*self.qfc*self.unorm))
