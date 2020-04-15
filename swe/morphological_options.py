@@ -40,8 +40,8 @@ class MorphOptions(ShallowWaterOptions):
             self.settling_velocity = Constant((10*self.base_viscosity/self.average_size)*(sqrt(1 + 0.01*((((2650/1000) - 1)*9.81*(self.average_size**3))/(self.base_viscosity**2)))-1))
         else:
             self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
-        self.uv_d = project(self.uv_d, P1DG_vec)
-        self.eta_d = project(self.eta_d, P1DG)
+        self.uv_d = project(self.uv_d, P1DG_vec)  # FIXME: uv_d doesn't exist yet in inundated_beach
+        self.eta_d = project(self.eta_d, P1DG)    # FIXME: eta_d doesn't exist yet in inundated_beach
         
         self.u_cg = project(self.uv_d, P1_vec)
         self.horizontal_velocity = project(self.u_cg[0], P1)
