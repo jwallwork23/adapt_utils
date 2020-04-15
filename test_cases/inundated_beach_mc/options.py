@@ -25,15 +25,16 @@ class BalzanoOptions(MorphOptions):
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
+        super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
 
         self.default_mesh = RectangleMesh(17*nx, ny, 1.5*self.basin_x, 1200.0)
-        self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
+        self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)
+        self.eta_tilde = Function(P1DG, name='Modified elevation')
         self.V = FunctionSpace(self.default_mesh, "CG", 1)
         self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
         
-        super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_pvd = True        
                 
         self.num_hours = 24
