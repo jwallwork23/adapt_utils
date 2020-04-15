@@ -7,4 +7,3 @@ op = BalzanoOptions(plot_timeseries=True)
 op.qoi_mode = 'inundation_volume'
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.solve()
-op.plot()
