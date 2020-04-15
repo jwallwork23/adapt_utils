@@ -23,8 +23,8 @@ class TrenchHydroOptions(MorphOptions):
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
+        super(TrenchHydroOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
-        
 
         self.default_mesh = RectangleMesh(16*5*nx, 5*ny, 16, 1.1)
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
@@ -32,7 +32,6 @@ class TrenchHydroOptions(MorphOptions):
         self.vector_cg = VectorFunctionSpace(self.default_mesh, "CG", 1)
         self.vector_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
         
-        super(TrenchHydroOptions, self).__init__(**kwargs)
         self.plot_pvd = True  
         self.di = "hydro_output"
 
