@@ -106,7 +106,6 @@ class TohokuOptions(TsunamiOptions):
             circle = plt.Circle((x, y), 0.1, color=color)
             axes.add_patch(circle)
 
-
     def read_bathymetry_file(self, km=False):
         fname = os.path.join(os.path.dirname(__file__), 'resources/bathymetry.nc')
         nc = netCDF4.Dataset(fname, 'r')

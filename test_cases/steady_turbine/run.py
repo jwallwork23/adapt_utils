@@ -1,9 +1,5 @@
 from firedrake import *
 from firedrake.petsc import PETSc
-try:
-    import firedrake.cython.dmplex as dmplex
-except:
-    import firedrake.dmplex as dmplex
 
 import argparse
 import matplotlib
@@ -15,7 +11,7 @@ from adapt_utils.swe.turbine.solver import *
 from adapt_utils.plotting import *
 
 
-plt.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
 plt.rc('text', usetex=True)
 
 parser = argparse.ArgumentParser()
