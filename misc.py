@@ -3,7 +3,6 @@ from thetis import *
 import os
 import fnmatch
 import numpy as np
-import numpy.linalg as la
 import scipy.sparse as sp
 import scipy.sparse.linalg as sla
 
@@ -13,12 +12,15 @@ from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 __all__ = ["copy_mesh", "doc", "find", "heaviside_approx", "check_spd", "get_boundary_nodes",
            "index_string", "UnnestedConditionCheck", "NestedConditionCheck"]
 
+
 def copy_mesh(mesh):
     return Mesh(Function(mesh.coordinates))
+
 
 def doc(anything):
     """Print the docstring of any class or function."""
     print_output(anything.__doc__)
+
 
 def find(pattern, path):
     """Find all files with a specified pattern."""
@@ -29,8 +31,10 @@ def find(pattern, path):
                 result.append(os.path.join(root, name))
     return result
 
+
 def heaviside_approx(H, alpha):
     return 0.5*(H/(sqrt(H**2 + alpha**2))) + 0.5
+
 
 def check_spd(matrix):
     """
@@ -59,6 +63,7 @@ def check_spd(matrix):
         raise ValueError("Matrix is not positive definite!")
     print_output("Matrix is indeed SPD.")
 
+
 def index_string(index):
     """
     :arg index: integer form of index.
@@ -66,12 +71,14 @@ def index_string(index):
     """
     return (5 - len(str(index)))*'0' + str(index)
 
+
 def get_boundary_nodes(fs, segment='on_boundary'):
     """
     :arg fs: function space to get boundary nodes for.
     :kwarg segment: segment of boundary to get nodes of (default 'on_boundary').
     """
     return fs.boundary_nodes(segment, 'topological')
+
 
 class BaseConditionCheck():
 

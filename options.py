@@ -162,7 +162,7 @@ class Options(FrozenConfigurable):
             else:
                 r1 = r0
             expr1 = (x-x0)*(x-x0) + (y-y0)*(y-y0)
-            expr2 = scale*exp(1 -1/(1 - (x-x0)*(x-x0)/r0**2))*exp(1 - 1/(1 - (y-y0)*(y-y0)/r1**2))
+            expr2 = scale*exp(1 - 1/(1 - (x-x0)*(x-x0)/r0**2))*exp(1 - 1/(1 - (y-y0)*(y-y0)/r1**2))
             vol = r0*r1
             if dim == 3:
                 z0 = locs[j][2]
@@ -318,7 +318,7 @@ class Options(FrozenConfigurable):
                 trial, test = TrialFunction(coord_space), TestFunction(coord_space)
                 a = dot(test, trial)*dx
                 L = dot(test, self.fluid_velocity)*dx
-                    
+
                 if self.prescribed_velocity_bc == 'noslip':
 
                     # Enforce no boundary movement

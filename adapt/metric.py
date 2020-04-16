@@ -25,7 +25,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options
     """
     if f is None:
         try:
-            assert not H is None
+            assert H is not None
         except AssertionError:
             raise ValueError("Please supply either field for recovery, or Hessian thereof.")
     elif H is None:
@@ -63,6 +63,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options
 
     return M
 
+
 def isotropic_metric(f, noscale=False, degree=1, op=Options()):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
@@ -74,7 +75,7 @@ def isotropic_metric(f, noscale=False, degree=1, op=Options()):
     :return: Isotropic metric corresponding to `f`.
     """
     try:
-        assert not f is None
+        assert f is not None
         assert len(f.ufl_element().value_shape()) == 0
     except AssertionError:
         raise ValueError("Provide a scalar function to compute an isotropic metric w.r.t.")
@@ -111,6 +112,7 @@ def isotropic_metric(f, noscale=False, degree=1, op=Options()):
 
     return interpolate(M_diag*Identity(dim), V_ten)
 
+
 def metric_intersection(M1, M2, bdy=None):
     r"""
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
@@ -132,6 +134,7 @@ def metric_intersection(M1, M2, bdy=None):
     op2.par_loop(kernel, node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
     return M12
 
+
 def metric_relaxation(M1, M2, alpha=0.5):
     r"""
     As an alternative to intersection, pointwise metric information may be combined using a convex
@@ -149,11 +152,13 @@ def metric_relaxation(M1, M2, alpha=0.5):
     M += alpha*M1 + (1-alpha)*M2
     return M
 
+
 def combine_metrics(M1, M2, average=True):
     if average:
         return metric_relaxation(M1, M2)
     else:
         return metric_intersection(M1, M2)
+
 
 def metric_complexity(M):
     r"""
@@ -161,6 +166,7 @@ def metric_complexity(M):
     based thereupon.
     """
     return assemble(sqrt(det(M))*dx)
+
 
 def get_metric_coefficient(a, b, op=Options()):
     r"""
@@ -179,6 +185,7 @@ def get_metric_coefficient(a, b, op=Options()):
     sol = solve(a*pow(c, -0.6) + b*pow(c, -0.5) - op.target, c)
     assert len(sol) == 1
     return Constant(sol[0])
+
 
 # TODO: test
 def metric_with_boundary(f=None, H=None, h=None, mesh=None, degree=1, op=Options()):

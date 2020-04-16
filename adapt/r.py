@@ -10,7 +10,7 @@ __all__ = ["MeshMover"]
 
 
 class MeshMover():
-    """
+    r"""
     A class dedicated to performing mesh r-adaptation. Given a source mesh and a monitor function
     :math: `m`, the new mesh is established by relocating the vertices of the original mesh. That is,
     the topology remains unchanged.
@@ -149,32 +149,32 @@ class MeshMover():
 
             # TODO: We should probably impose BCs as a postproc step, as for Monge-Ampere
             # if coord_space.ufl_element().family() in ("CG", "Lagrange"):
-                # # Enforce no mesh movement normal to boundaries
-                # n = FacetNormal(self.mesh)
-                # a_bc = inner(xi, dot(grad(x), n))*ds
-                # L_bc = inner(xi, Constant(as_vector([0.0, 0.0])))*ds
-                # a_bc = inner(xi, x)*ds
-                # L_bc = inner(xi, self.x_old)*ds
-                # a_bc = inner(dot(xi, n), dot(x, n))*ds
-                # L_bc = inner(dot(xi, n), dot(self.x_old, n))*ds
-                # if self.bc is None:
-                #     self.bc = [EquationBC(a_bc == L_bc, self.x_new, 'on_boundary')]
+            #     # Enforce no mesh movement normal to boundaries
+            #     n = FacetNormal(self.mesh)
+            #     a_bc = inner(xi, dot(grad(x), n))*ds
+            #     L_bc = inner(xi, Constant(as_vector([0.0, 0.0])))*ds
+            #     a_bc = inner(xi, x)*ds
+            #     L_bc = inner(xi, self.x_old)*ds
+            #     a_bc = inner(dot(xi, n), dot(x, n))*ds
+            #     L_bc = inner(dot(xi, n), dot(self.x_old, n))*ds
+            #     if self.bc is None:
+            #         self.bc = [EquationBC(a_bc == L_bc, self.x_new, 'on_boundary')]
 
-                # Allow tangential movement, but only up until the end of boundary segments
-                # s = as_vector([n[1], -n[0]])
-                # a_bc = inner(xi, dot(grad(x), s))*ds
-                # L_bc = inner(xi, dot(grad(self.x_old), s))*ds
-                # a_bc = inner(dot(xi, s), dot(x, s))*ds
-                # L_bc = inner(dot(xi, s), dot(self.x_old, s))*ds
-                # if self.bbc is None:
-                #     edges = set(self.mesh.exterior_facets.unique_markers)
-                #     if len(edges) > 1:
-                #         corners = [(i, j) for i in edges for j in edges.difference([i])]
-                #         self.bbc = DirichletBC(coord_space, 0, corners)
-                # self.bc.append(EquationBC(a_bc == L_bc, self.x_new, 'on_boundary', bcs=self.bbc))
+            #     Allow tangential movement, but only up until the end of boundary segments
+            #     s = as_vector([n[1], -n[0]])
+            #     a_bc = inner(xi, dot(grad(x), s))*ds
+            #     L_bc = inner(xi, dot(grad(self.x_old), s))*ds
+            #     a_bc = inner(dot(xi, s), dot(x, s))*ds
+            #     L_bc = inner(dot(xi, s), dot(self.x_old, s))*ds
+            #     if self.bbc is None:
+            #         edges = set(self.mesh.exterior_facets.unique_markers)
+            #         if len(edges) > 1:
+            #             corners = [(i, j) for i in edges for j in edges.difference([i])]
+            #             self.bbc = DirichletBC(coord_space, 0, corners)
+            #     self.bc.append(EquationBC(a_bc == L_bc, self.x_new, 'on_boundary', bcs=self.bbc))
             # else:
-                # import warnings
-                # warnings.warn("#### TODO: ALE boundary condition may not be properly accounted for!")
+            #     import warnings
+            #     warnings.warn("#### TODO: ALE boundary condition may not be properly accounted for!")
 
             prob = LinearVariationalProblem(a, L, self.x_new, bcs=self.bc)
             kwargs = {

@@ -24,6 +24,7 @@ def lp_norm(f, p=2):
     else:
         raise ValueError("Norm type {:} not recognised.".format(p))
 
+
 def total_variation(f):
     """Calculate the total variation of a 1D array f."""
     n, tv, i0 = len(f), 0.0, 0
@@ -37,6 +38,7 @@ def total_variation(f):
             tv += np.abs(f[i] - f[i0])
         sign_ = sign
     return tv
+
 
 def local_norm(f, norm_type='L2'):
     """Calculate the `norm_type`-norm of `f` separately on each element of the mesh."""
@@ -76,6 +78,7 @@ def local_norm(f, norm_type='L2'):
             form = i*(expr**(p/2))*dx
     return assemble(form)**(1/p)
 
+
 def frobenius_norm(matrix, mesh=None):
     """Calculate the Frobenius norm of `matrix`."""
     mesh = mesh or matrix.function_space().mesh()
@@ -85,6 +88,7 @@ def frobenius_norm(matrix, mesh=None):
         for j in range(dim):
             f += matrix[i, j]*matrix[i, j]
     return sqrt(assemble(f*dx))
+
 
 def local_frobenius_norm(matrix, mesh=None, space=None):
     """Calculate the Frobenius norm of `matrix` separately on each element of the mesh."""
@@ -97,6 +101,7 @@ def local_frobenius_norm(matrix, mesh=None, space=None):
             f += matrix[i, j]*matrix[i, j]
     return sqrt(assemble(TestFunction(space)*f*dx))
 
+
 def local_edge_integral(f, mesh=None):
     """Integrate `f` over all edges elementwise, giving a P0 field."""
     mesh = mesh or f.function_space().mesh()
@@ -105,6 +110,7 @@ def local_edge_integral(f, mesh=None):
     solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS + test*f*ds, integral)
     return integral
 
+
 def local_interior_edge_integral(f, mesh=None):
     """Integrate `f` over all interior edges elementwise, giving a P0 field."""
     mesh = mesh or f.function_space().mesh()
@@ -112,6 +118,7 @@ def local_interior_edge_integral(f, mesh=None):
     test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
     solve(test*trial*dx == ((test*f)('+') + (test*f)('-'))*dS, integral)
     return integral
+
 
 def local_boundary_integral(f, mesh=None):
     """Integrate `f` over all exterior edges elementwise, giving a P0 field."""
