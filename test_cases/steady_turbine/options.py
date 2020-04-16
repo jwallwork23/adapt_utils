@@ -73,7 +73,6 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         if sponge:
             self.viscosity = Function(fs)
             x, y = SpatialCoordinate(fs.mesh())
-            xmin = 0.0
             xmax = 1000.0
             ramp = 0.5
             eps = 20.0
