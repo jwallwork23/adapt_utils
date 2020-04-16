@@ -15,12 +15,12 @@ def construct_gradient(f, mesh=None, bcs=None, op=Options()):
     is not actually a requirement.
 
     :arg f: (scalar) P1 solution field.
-    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
+    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a
                  Function, but a ufl expression.
     :kwarg bcs: boundary conditions for L2 projection.
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
-   """
+    """
     mesh = mesh or f.function_space().mesh()
     P1_vec = VectorFunctionSpace(mesh, "CG", 1)
     g = TrialFunction(P1_vec)
@@ -50,7 +50,7 @@ def construct_hessian(f, mesh=None, degree=1, op=Options()):
     to recover the Hessian of a P0 field, since no derivatives of `f` are required.
 
     :arg f: P1 solution field.
-    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
+    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a
                  Function, but a ufl expression.
     :kwarg degree: polynomial degree of Hessian.
     :param op: `Options` class object providing min/max cell size values.
@@ -100,6 +100,7 @@ def construct_hessian(f, mesh=None, degree=1, op=Options()):
 
     return H
 
+
 def construct_boundary_hessian(f, mesh=None, degree=1, op=Options()):
     """
     Recover the Hessian of `f` on the domain boundary. That is, the Hessian in the direction
@@ -108,7 +109,7 @@ def construct_boundary_hessian(f, mesh=None, degree=1, op=Options()):
     the boundary and is set arbitrarily to 1/h_max in the interior.
 
     :arg f: Scalar solution field.
-    :kwarg mesh: Mesh upon which Hessian is to be constructed. This must be applied if `f` is not a 
+    :kwarg mesh: Mesh upon which Hessian is to be constructed. This must be applied if `f` is not a
                  Function, but a ufl expression.
     :kwarg degree: Polynomial degree of Hessian.
     :param op: `Options` class object providing max cell size value.
