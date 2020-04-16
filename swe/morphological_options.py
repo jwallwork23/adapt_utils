@@ -217,15 +217,22 @@ class MorphOptions(ShallowWaterOptions):
             
         # Update depth
         if self.wetting_and_drying:
+<<<<<<< HEAD
             bathymetry_displacement =   solver_obj.depth.wd_bathymetry_displacement
+=======
+            bathymetry_displacement = solver_obj.eq_sw.depth.wd_bathymetry_displacement
+>>>>>>> c630fc6... Morph fixes
             self.depth.interpolate(self.elev_cg + bathymetry_displacement(self.eta) + self.bathymetry)
         else:
             self.depth.interpolate(self.elev_cg + self.bathymetry)
 
-            
         self.hc = conditional(self.depth > 0.001, self.depth, 0.001)
         self.aux = conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001)
+<<<<<<< HEAD
         self.qfc = 2/(ln(self.aux)/0.4)**2
+=======
+        self.qfc = interpolate(2/(ln(self.aux)/0.4)**2, P1DG)
+>>>>>>> c630fc6... Morph fixes
         
         # calculate skin friction coefficient
         self.cfactor.interpolate(self.get_cfactor())
