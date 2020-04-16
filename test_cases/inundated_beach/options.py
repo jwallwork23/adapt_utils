@@ -170,7 +170,7 @@ class BalzanoOptions(ShallowWaterOptions):
 
     def get_update_forcings(self, solver_obj):
         eta = solver_obj.fields.elev_2d
-        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+        bathymetry_displacement = solver_obj.eq_sw.depth.wd_bathymetry_displacement
 
         def update_forcings(t):
             self.update_boundary_conditions(t=t)
@@ -184,7 +184,7 @@ class BalzanoOptions(ShallowWaterOptions):
         return update_forcings
 
     def get_export_func(self, solver_obj):
-        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+        bathymetry_displacement = solver_obj.eq_sw.depth.wd_bathymetry_displacement
         eta = solver_obj.fields.elev_2d
         b = solver_obj.fields.bathymetry_2d
         def export_func():
