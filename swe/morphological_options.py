@@ -40,8 +40,8 @@ class MorphOptions(ShallowWaterOptions):
             self.settling_velocity = Constant((10*self.base_viscosity/self.average_size)*(sqrt(1 + 0.01*((((2650/1000) - 1)*9.81*(self.average_size**3))/(self.base_viscosity**2)))-1))
         else:
             self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
-        self.uv_d = project(self.uv_d, P1DG_vec)  # FIXME: uv_d doesn't exist yet in inundated_beach
-        self.eta_d = project(self.eta_d, P1DG)    # FIXME: eta_d doesn't exist yet in inundated_beach
+        self.uv_d = project(self.uv_d, P1DG_vec)
+        self.eta_d = project(self.eta_d, P1DG)
         
         self.u_cg = project(self.uv_d, P1_vec)
         self.horizontal_velocity = project(self.u_cg[0], P1)
@@ -186,15 +186,14 @@ class MorphOptions(ShallowWaterOptions):
             
         # Update depth
         if self.wetting_and_drying:
-            bathymetry_displacement =   solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+            bathymetry_displacement = solver_obj.eq_sw.depth.wd_bathymetry_displacement
             self.depth.interpolate(self.elev_cg + bathymetry_displacement(self.eta) + self.bathymetry)
         else:
             self.depth.interpolate(self.elev_cg + self.bathymetry)
 
-            
         self.hc = conditional(self.depth > 0.001, self.depth, 0.001)
         self.aux = conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001)
-        self.qfc = interpolate(2/(ln(self.aux)/0.4)**2
+        self.qfc = interpolate(2/(ln(self.aux)/0.4)**2, P1DG)
         
         # calculate skin friction coefficient
         self.cfactor.interpolate(self.get_cfactor())
