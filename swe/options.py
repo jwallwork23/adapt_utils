@@ -54,7 +54,7 @@ class ShallowWaterOptions(Options):
 
     def set_source_tracer(self, fs, solver_obj):
         """Should be implemented in derived class."""
-        return self.source
+        return self.depo, self.ero
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""

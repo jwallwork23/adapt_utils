@@ -81,9 +81,10 @@ uv, elev = solver_obj.fields.solution_2d.split()
 morph.export_final_state("hydrodynamics_trench_fine", uv, elev)
 """
 
+
 solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file = morph.morphological(boundary_conditions_fn = boundary_conditions_fn_trench, morfac = 100, morfac_transport = True, suspendedload = True, convectivevel = True,\
                     bedload = True, angle_correction = True, slope_eff = True, seccurrent = False, sediment_slide = False, fluc_bcs = False, \
-                    mesh2d = mesh2d, bathymetry_2d = bathymetry_2d, input_dir = 'hydrodynamics_trench_fine', viscosity_hydro = 10**(-6), ks = 0.025, average_size = 160 * (10**(-6)), dt = 0.1, final_time = 15*3600,\
+                    mesh2d = mesh2d, bathymetry_2d = bathymetry_2d, input_dir = 'hydrodynamics_trench_fine', viscosity_hydro = 10**(-6), ks = 0.025, average_size = 160 * (10**(-6)), dt = 0.2, final_time = 15*3600,\
                  beta_fn = 1.3, surbeta2_fn = 1/1.5, alpha_secc_fn = 0.75, angle_fn = 35, mesh_step_size = 0.2)
 
 
@@ -92,30 +93,36 @@ solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file = morph.morpholo
 # run model
 solver_obj.iterate(update_forcings = update_forcings_tracer)
 
-# bathymetry
-
-xaxisthetis1 = []
-bathymetrythetis1 = []
-
-for i in np.linspace(0,15.8, 80):
-    xaxisthetis1.append(i)
-    bathymetrythetis1.append(-solver_obj.fields.bathymetry_2d.at([i, 0.55]))
-
-df = pd.concat([pd.DataFrame(xaxisthetis1), pd.DataFrame(bathymetrythetis1)], axis = 1)
 
 
-#df.to_csv('bed_trench_output.csv')
 
-
-data = pd.read_excel('../Trench/recreatepaperrun1.xlsx', sheet_name = 'recreatepaperrun', header = None)
-diff_15 = pd.read_excel('../Trench/extra_diffusion.xlsx')
-
+#data = pd.read_excel('../../../Trench/recreatepaperrun1.xlsx', sheet_name = 'recreatepaperrun', header = None)
+#diff_15 = pd.read_excel('../../../Trench/extra_diffusion.xlsx')
+data = pd.read_csv('experimental_data.csv', header = None)
 plt.scatter(data[0], data[1], label = 'Experimental Data')
 
-thetisdf = pd.read_csv('../Trench/Sensitivity Analysis/linux_morfacfactor_ten_bed_new_one_diff15.csv')
-plt.plot(thetisdf['0'], thetisdf['0.1'], label = 'Thetis')
 
-plt.plot(diff_15['x'][diff_15['y'] == 0.55], -diff_15['diff 0.15 diff factors'][diff_15['y'] == 0.55], label = 'Sisyphe')
-plt.plot(xaxisthetis1, bathymetrythetis1, '-.', linewidth = 2, label = 'new')
+datathetis = []
+bathymetrythetis1 = []
+diff_thetis = []
+for i in range(len(data[0].dropna()[0:3])):
+    print(i)
+    datathetis.append(data[0].dropna()[i])
+    bathymetrythetis1.append(-solver_obj.fields.bathymetry_2d.at([np.round(data[0].dropna()[i],3), 0.55]))
+    diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
+for i in range(4, len(data[0].dropna())):
+    print(i)
+    datathetis.append(data[0].dropna()[i])
+    bathymetrythetis1.append(-solver_obj.fields.bathymetry_2d.at([np.round(data[0].dropna()[i],3), 0.55]))
+    diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
+    
+df = pd.concat([pd.DataFrame(datathetis, columns = ['x']), pd.DataFrame(bathymetrythetis1, columns = ['bath'])], axis = 1)
+
+df.to_csv('bed_trench_output.csv')
+
+plt.plot(datathetis, bathymetrythetis1, '.', linewidth = 2, label = 'adapted mesh')
 plt.legend()
 plt.show()
+    
+print("L2 norm: ")
+print(np.sqrt(sum(diff_thetis))) 

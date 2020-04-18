@@ -590,8 +590,14 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
         options.solve_tracer = op.solve_tracer
         if op.solve_tracer:
+            options.use_tracer_conservative_form = op.conservative
             options.tracer_advective_velocity_factor = self.op.corrective_velocity_factor
-            options.tracer_source_2d = self.op.source
+            if op.depth_integrated and op.conservative:
+                options.tracer_depth_integ_source = self.op.depth_int_source
+                options.tracer_depth_integ_sink = self.op.depth_int_sink
+            else:
+                options.tracer_source_2d = self.op.source
+                options.tracer_sink_2d = self.op.sink
 
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
