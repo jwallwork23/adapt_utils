@@ -222,7 +222,6 @@ class MorphOptions(ShallowWaterOptions):
         else:
             self.depth.interpolate(self.elev_cg + self.bathymetry)
 
-            
         self.hc = conditional(self.depth > 0.001, self.depth, 0.001)
         self.aux = conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001)
         self.qfc = 2/(ln(self.aux)/0.4)**2

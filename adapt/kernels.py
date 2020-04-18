@@ -402,30 +402,37 @@ for (int i=0; i<max_vector.dofs; i++) {
 }
 """
 
+
 def eigen_kernel(kernel, *args, **kwargs):
     """Helper function to easily pass Eigen kernels to Firedrake via PyOP2."""
     return op2.Kernel(kernel(*args, **kwargs), kernel.__name__, cpp=True, include_dirs=include_dir)
 
+
 def get_eigendecomposition(d):
     """Extract eigenvectors/eigenvalues from a metric field."""
     return get_eigendecomposition_str % (d*d, d, d, d, d, d, d, d, d)
+
 
 def get_reordered_eigendecomposition(d):
     """Extract eigenvectors/eigenvalues from a metric field, ordered by eigenvalue magnitude."""
     assert d in (2, 3)
     return get_reordered_eigendecomp_2d_str if d == 2 else get_reordered_eigendecomp_3d_str
 
+
 def set_eigendecomposition(d):
     """Compute metric from eigenvectors/eigenvalues."""
     return set_eigendecomposition_str % (d*d, d, d, d, d, d)
+
 
 def set_eigendecomposition_transpose(d):
     """Compute metric from transposed eigenvectors/eigenvalues."""
     return set_eigendecomposition_transpose_str % (d*d, d, d, d, d, d)
 
+
 def intersect(d):
     """Intersect two metric fields."""
     return intersect_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d)
+
 
 def anisotropic_refinement(d, direction):
     """Refine a metric in a single coordinate direction."""
@@ -433,23 +440,28 @@ def anisotropic_refinement(d, direction):
     scale = 4 if d == 2 else 8
     return anisotropic_refinement_str % (d*d, d, d, d, d, d, d, d, d, direction, scale)
 
+
 def metric_from_hessian(d, noscale=False, op=Options()):
     """Build a metric field from a Hessian with user-specified normalisation methods."""
     normalised_metric = linf_metric_from_hessian if op.norm_order is None else lp_metric_from_hessian
     return normalised_metric(d, 'false' if noscale else 'true', op.norm_order)
+
 
 def linf_metric_from_hessian(d, scale, p):
     """Build a metric field from a Hessian using L-infinity normalisation."""
     assert p is None
     return linf_metric_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d)
 
+
 def lp_metric_from_hessian(d, scale, p):
     """Build a metric field from a Hessian using L-p normalisation, for p>=1."""
     return lp_metric_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d, p, p, p, d)
 
+
 def scale_metric(d, op=Options()):
     """Scale a metric field in order to enforce maximum/minimum element sizes and anisotropy."""
     return scale_metric_str % (d*d, d, d, d, d, d, d, d, d, op.h_min, op.h_max, d, op.max_anisotropy)
+
 
 def gemv(d, alpha=1.0, beta=0.0, tol=1e-8):
     """
@@ -459,13 +471,16 @@ def gemv(d, alpha=1.0, beta=0.0, tol=1e-8):
     """
     return gemv_str % (d, d, d, d, d, alpha, beta, tol)
 
+
 def matscale(d):
     """Multiply a matrix by a scalar field."""
     return matscale_str % (d*d, d, d, d, d)
 
+
 def singular_value_decomposition(d):
     """Compute the singular value decomposition of a metric."""
     return svd_str % (d*d, d, d, d, d, d, d)
+
 
 def get_maximum_length_edge(d):
     assert d == 2

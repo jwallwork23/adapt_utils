@@ -10,9 +10,11 @@ args = parser.parse_args()
 
 levels = ('xcoarse', 'coarse', 'medium', 'fine', 'xfine')
 
+
 def make_geo(level, offset):
     assert level in levels
     generate_geo_file(Steady2TurbineOptions(offset=offset), level=level)
+
 
 for offset in (0, 1, 2):
     if args.level is not None:

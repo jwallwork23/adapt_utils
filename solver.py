@@ -15,7 +15,6 @@ from adapt_utils.misc import *
 from adapt_utils.norms import *
 
 
-
 __all__ = ["SteadyProblem", "UnsteadyProblem"]
 
 
@@ -279,7 +278,7 @@ class SteadyProblem():
         Retrieve forward or adjoint solution, as specified by boolean kwarg `adjoint`.
         """
         return self.adjoint_solution if adjoint else self.solution
-    
+
     def get_error(self, adjoint=False):
         """
         Retrieve forward or adjoint error, as specified by boolean kwarg `adjoint`.
@@ -354,7 +353,7 @@ class SteadyProblem():
         `adjoint`.
         """
         self.project(val, out=self.get_solution(adjoint=adjoint))
-        
+
     def get_qoi_kernel(self):
         """
         Derivative `g` of functional of interest `J`. i.e. For solution `u` we have
@@ -525,7 +524,7 @@ class SteadyProblem():
         self.indicators[name].interpolate(abs(self.indicators[cname] + self.indicators[fname]))
 
         # Estimate error
-        if not name in self.estimators:
+        if name not in self.estimators:
             self.estimators[name] = []
         self.estimators[name].append(self.estimators[cname][-1] + self.estimators[fname][-1])
         return name
@@ -608,9 +607,9 @@ class SteadyProblem():
 
     def plot_mesh(self):
         meshfile = File(os.path.join(self.di, 'mesh.pvd'))
-        #try:
-        #    meshfile.write(self.mesh)  # This is allowed in modern firedrake
-        #except ValueError:
+        # try:
+        #     meshfile.write(self.mesh)  # This is allowed in modern firedrake
+        # except ValueError:
         meshfile.write(self.mesh.coordinates)
 
     def plot(self):
@@ -678,11 +677,11 @@ class SteadyProblem():
         elif 'dwr' in approach:
             self.dwr_indication(adjoint=adjoint)
             self.get_isotropic_metric()
-            if not self.approach in ('dwr', 'dwr_adjoint'):
+            if self.approach not in ('dwr', 'dwr_adjoint'):
                 i = self.indicator.copy()
                 M = self.M.copy()
                 self.dwr_indication(adjoint=not adjoint)
-                if not approach in self.estimators:
+                if approach not in self.estimators:
                     self.estimators[approach] = []
                 self.get_isotropic_metric()
                 if approach == 'dwr_both':
@@ -696,7 +695,7 @@ class SteadyProblem():
         # Anisotropic a priori (see [Loseille et al., 2010])
         elif 'loseille' in approach:  # TODO: Special case estimator convergence
             self.get_loseille_metric(adjoint=adjoint)
-            if not approach in ('loseille', 'loseille_adjoint'):
+            if approach not in ('loseille', 'loseille_adjoint'):
                 M = self.M.copy()
                 self.get_loseille_metric(adjoint=not adjoint)
                 self.M = combine_metrics(M, self.M, average=average)
@@ -706,7 +705,7 @@ class SteadyProblem():
             self.get_power_metric(adjoint=adjoint)
             name = '_'.join(['cell_residual', 'adjoint' if adjoint else 'forward'])
             self.indicators[approach] = self.indicators[name].copy(deepcopy=True)
-            if not approach in ('power', 'power_adjoint'):
+            if approach not in ('power', 'power_adjoint'):
                 M = self.M.copy()
                 self.get_power_metric(adjoint=not adjoint)
                 name = '_'.join(['cell_residual', 'adjoint' if not adjoint else 'forward'])
@@ -771,7 +770,7 @@ class SteadyProblem():
         """
         approach = approach or self.approach
         assert approach in self.indicators
-        if not approach in self.estimators:
+        if approach not in self.estimators:
             self.estimators[approach] = []
         tmp = interpolate(abs(self.indicators[approach]), self.P0)
         self.estimators[approach].append(tmp.vector().gather().sum())
@@ -799,14 +798,13 @@ class SteadyProblem():
             except AssertionError:
                 raise ValueError("Please supply a monitor function.")
 
-                
             # Create MeshMover object and establish coordinate transformation
             mesh_mover = MeshMover(self.init_mesh, self.monitor_function, op=self.op)
             mesh_mover.adapt()
 
             # Create a temporary Problem based on the new mesh
             am_copy = self.am.copy()
-            
+
             op_copy = type(self.op)(mesh=am_copy.mesh)
             op_copy.update(self.op)
             tmp = type(self)(op_copy, mesh=am_copy.mesh, discrete_adjoint=self.discrete_adjoint,
@@ -886,11 +884,13 @@ class SteadyProblem():
                 ff = self.op.adapt_field.split('_')
                 assert len(ff) == 2
                 f = ff[0]
+
                 def monitor(mesh):
                     P1 = FunctionSpace(mesh, "CG", 1)
                     b = project(self.solution if f == 'solution' else self.fields[f], P1)
                     H = construct_hessian(b, op=self.op)
                     return 1.0 + alpha*local_frobenius_norm(H, mesh=mesh, space=P1)
+
             else:
                 raise ValueError
             self.monitor_function = monitor
@@ -1086,7 +1086,7 @@ class UnsteadyProblem(SteadyProblem):
         except AssertionError:
             raise ValueError("Timesteps per export should divide timesteps per remesh.")
         self.remesh_step = 0
-        uses_adjoint &= not 'fixed_mesh' in self.approach
+        uses_adjoint &= 'fixed_mesh' not in self.approach
         uses_adjoint &= self.approach != 'hessian'
 
         # Setup solvers (if applicable)
@@ -1115,7 +1115,7 @@ class UnsteadyProblem(SteadyProblem):
                 self.step_end = op.end_time
                 self.solve_step(adjoint=adjoint)
                 break
-            
+
             # Adaptive mesh case
             for i in range(op.num_adapt):
                 self.adapt_mesh()
@@ -1127,7 +1127,7 @@ class UnsteadyProblem(SteadyProblem):
                     self.project_solution(solution, adjoint=adjoint)
                 else:
                     self.project_solution(solution_old, adjoint=adjoint)
-                    
+
                 # Solve PDE on new mesh
                 op.plot_pvd = i == 0
                 # time = None if i == 0 else self.step_end - op.dt
@@ -1137,7 +1137,6 @@ class UnsteadyProblem(SteadyProblem):
                 # Store solutions from last two steps on first mesh in sequence
                 if i == 0:
                     solution = Function(self.solution)
-                    solution_old = Function(self.solution_old)
                     if self.step_end + op.dt*op.dt_per_remesh > op.end_time:
                         break  # No need to do adapt for final timestep
 
@@ -1162,7 +1161,6 @@ class UnsteadyProblem(SteadyProblem):
             return
         if not hasattr(self, 'V_orig'):
             self.V_orig = FunctionSpace(self.mesh, self.finite_element)
-        op = self.op
         names = {'Tracer2d': 'tracer_2d', 'Velocity2d': 'uv_2d', 'Elevation2d': 'elev_2d'}
         i = self.remesh_step*int(self.op.dt_per_export/self.op.dt_per_remesh)
 

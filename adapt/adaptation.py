@@ -3,7 +3,6 @@ from firedrake import *
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
 import warnings
 
 from adapt_utils.adapt.kernels import *
@@ -55,7 +54,7 @@ class AdaptiveMesh():
         return AdaptiveMesh(Mesh(Function(self.mesh.coordinates)), levels=self.levels)
 
     def get_quality(self):  # FIXME: Why do rotations of the same element not have the same quality?
-        """
+        r"""
         Compute the scaled Jacobian for each mesh element:
     ..  math::
             Q(K) = \frac{\det(J_K)}{\|\mathbf e_1\|\,\|\mathbf e2\|},
@@ -107,12 +106,10 @@ class AdaptiveMesh():
         newcolours[10:20] = np.array([0, 1, 1, 1])  # Cyan
         newcolours[20:25] = np.array([1, 1, 0, 1])  # Yellow
         newcolours[25:] = np.array([0, 1, 0, 1])    # Green
-        newcmap = ListedColormap(newcolours)
 
         if ax is None:
             fig = plt.figure()
             ax = fig.add_subplot(111)
-        cax = plot(self.scaled_jacobian, colorbar=True, vmin=-0.5, vmax=1, cmap=newcmap, axes=ax)
         ax.set_title("Scaled Jacobian")
         plot(self.mesh, axes=ax)
         if savefig:
@@ -175,10 +172,11 @@ class AdaptiveMesh():
         self.get_edge_lengths()
         self.get_edge_vectors()
         self.maximum_length_edge = Function(self.P0_vec, name="Maximum length edge")
-        par_loop(get_maximum_length_edge(self.dim), dx, {'edges': (self.edge_lengths, READ),
-                                                         'vectors': (self.edge_vectors, READ),
-                                                         'max_vector': (self.maximum_length_edge, RW)
-                                                        })
+        par_loop(get_maximum_length_edge(self.dim), dx, {
+            'edges': (self.edge_lengths, READ),
+            'vectors': (self.edge_vectors, READ),
+            'max_vector': (self.maximum_length_edge, RW)
+        })
 
     def get_cell_metric(self):  # FIXME: Something doesn't seem right
         """

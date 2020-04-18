@@ -4,13 +4,11 @@ from adapt_utils.test_cases.inundated_beach.options import BalzanoOptions
 from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
 
 op = BalzanoOptions(approach='monge_ampere',
-                    plot_timeseries=False,  # FIXME
                     plot_pvd=True,
                     debug=True,
                     nonlinear_method='relaxation',
                     # nonlinear_method='quasi_newton',  # FIXME
                     num_adapt=1,
-                    qoi_mode='inundation_volume',
                     n=2,
                     r_adapt_rtol=1.0e-3)
 swp = UnsteadyShallowWaterProblem(op, levels=0)

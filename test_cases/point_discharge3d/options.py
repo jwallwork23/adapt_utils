@@ -11,7 +11,7 @@ __all__ = ["Telemac3dOptions"]
 
 
 class Telemac3dOptions(TracerOptions):
-    """
+    r"""
     Parameters for a 3D extension of the 'Point source with diffusion' test case from TELEMAC-2D
     validation document version 7.0.
 
@@ -67,7 +67,7 @@ class Telemac3dOptions(TracerOptions):
     def set_source(self, fs):
         x0, y0, z0, r0 = self.source_loc[0]
         self.source = Function(fs)
-        nrm=assemble(self.ball(fs, source=True)*dx)
+        nrm = assemble(self.ball(fs, source=True)*dx)
         scaling = 1.0 if np.allclose(nrm, 0.0) else pi*r0*r0/nrm
         scaling *= 0.5*self.source_value
         self.source.interpolate(self.ball(fs, source=True, scale=scaling))
@@ -88,7 +88,7 @@ class Telemac3dOptions(TracerOptions):
         x0, y0, z0, r = self.source_loc[0]
         u = self.set_velocity(VectorFunctionSpace(fs.mesh(), fs.ufl_element()))
         nu = self.set_diffusivity(fs)
-        #q = 0.01  # sediment discharge of source (kg/s)
+        # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0)), r)  # (Bessel fn explodes at (x0, y0, z0))
         self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
@@ -103,7 +103,7 @@ class Telemac3dOptions(TracerOptions):
         x0, y0, z0, r = self.source_loc[0]
         u = self.set_velocity(VectorFunctionSpace(fs1.mesh(), fs1.ufl_element()))
         nu = self.set_diffusivity(fs1)
-        #q = 0.01  # sediment discharge of source (kg/s)
+        # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0)), r)  # (Bessel fn explodes at (x0, y0, z0))
         sol = 0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu)
