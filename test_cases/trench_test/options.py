@@ -27,8 +27,8 @@ class TrenchOptions(MorphOptions):
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny = 1, **kwargs):
         super(TrenchOptions, self).__init__(**kwargs)
-        self.plot_timeseries = plot_timeseries
 
+        self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)# Mesh("trench.msh")
         self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
         self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
@@ -48,9 +48,8 @@ class TrenchOptions(MorphOptions):
                 
         self.gravity = Constant(9.81)
         
-        self.solve_tracer = False
         self.wetting_and_drying = False
-        #self.wetting_and_drying_alpha = Constant(0.43)
+        
         try:
             assert friction in ('nikuradse', 'manning')
         except AssertionError:
@@ -93,7 +92,7 @@ class TrenchOptions(MorphOptions):
         self.eta_d = Function(self.P1DG).project(self.eta_init)        
         
         self.convective_vel_flag = True
-        
+
         self.t_old = Constant(0.0)        
         
         self.slope_eff = True
@@ -130,20 +129,16 @@ class TrenchOptions(MorphOptions):
         
         # Outputs  (NOTE: self.di has changed)
         self.bath_file = File(os.path.join(self.di, 'bath_export.pvd'))        
-        
 
-    def set_source_tracer(self, fs, solver_obj = None, init = False, t_old = Constant(100), tracer = None):
+    def set_source_tracer(self, fs, solver_obj = None, init = False):
         if init:
-            if t_old.dat.data[:] == 0.0:
-                self.source = Function(fs).project(-(self.settling_velocity*self.coeff*self.tracer_init_value/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
-            else:
-                self.source = Function(fs).project(-(self.settling_velocity*self.coeff*tracer/self.depth)+ (self.settling_velocity*self.ceq/self.depth))
+            self.depo = Function(fs).project(self.settling_velocity * self.coeff)
+            self.ero = Function(fs).project(self.settling_velocity * self.ceq)
         else:
+            self.depo.interpolate(self.settling_velocity * self.coeff)
+            self.ero.interpolate(self.settling_velocity * self.ceq)
+        return self.depo, self.ero
 
-            self.source.interpolate(-(self.settling_velocity*self.coeff*solver_obj.fields.tracer_2d/self.depth)+(self.settling_velocity*self.ceq/self.depth))
-        return self.source
-
-    
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
             self.quadratic_drag_coefficient = project(self.get_cfactor(), fs)
@@ -155,7 +150,7 @@ class TrenchOptions(MorphOptions):
         except AssertionError:
             raise ValueError("Depth is undefined.")
         self.ksp = Constant(3*self.average_size)
-        hclip = Function(self.P1DG).interpolate(conditional(self.ksp > self.depth, self.ksp, self.depth))
+        hclip = conditional(self.ksp > self.depth, self.ksp, self.depth)
         return Function(self.P1DG).interpolate(conditional(self.depth>self.ksp, 2*((2.5*ln(11.036*hclip/self.ksp))**(-2)), Constant(0.0)))
 
     def set_manning_drag_coefficient(self, fs):
