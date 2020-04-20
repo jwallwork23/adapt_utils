@@ -1,11 +1,8 @@
 from thetis import *
 from thetis.physical_constants import *
 
-from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 from adapt_utils.adapt.metric import *
-
-import os
 
 
 __all__ = ["SteadyShallowWaterProblem", "UnsteadyShallowWaterProblem"]
@@ -145,7 +142,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def get_bnd_functions(self, *args):
         b = self.op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
         swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=b)
-        return swt.get_bnd_functions(*args, self.boundary_conditions)
+        return swt.get_bnd_functions(self.boundary_conditions, *args)
 
     def get_strong_residual_forward(self):
         u, eta = self.solution.split()
@@ -357,7 +354,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
                     gamma = 0.5*abs(dot(u_old, n))*self.op.stabilisation_parameter
                     flux_terms += -i*gamma*dot(z, u - u_ext)*ds(j)
 
-
         if hasattr(self, 'extra_flux_terms'):
             flux_terms += tpe.extra_flux_terms()
 
@@ -398,7 +394,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         u, eta = sol.split()
 
         fdict = {'elevation': eta, 'velocity_x': u[0], 'velocity_y': u[1],
-             'speed': sqrt(inner(u, u)), 'inflow': inner(u, self.fields['inflow'])}
+                 'speed': sqrt(inner(u, u)), 'inflow': inner(u, self.fields['inflow'])}
         fdict.update(self.fields)
 
         self.M = Function(self.P1_ten)
@@ -464,7 +460,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         self.fields['quadratic_drag_coefficient'] = self.op.set_quadratic_drag_coefficient(self.P1)
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
         self.fields['source'] = self.op.source
-        
+
         self.op.set_boundary_surface()
 
     def create_solutions(self):
@@ -501,7 +497,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
         old_mesh = Mesh(Function(self.mesh.coordinates))
         P1DG_old = FunctionSpace(old_mesh, "DG", 1)
-        P1_old = FunctionSpace(old_mesh, "CG", 1)  
+        P1_old = FunctionSpace(old_mesh, "CG", 1)
 
         if isinstance(self.solver_obj.fields.bathymetry_2d, Constant):
             solution_bathymetry = Constant(self.solver_obj.fields.bathymetry_2d)
@@ -608,7 +604,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             if self.op.tracer_init is not None:
                 self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp, tracer=self.tracer_interp)
         else:
-            self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)        
+            self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
@@ -624,7 +620,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
     def get_bnd_functions(self, *args):
         b = self.op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
         swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=b)
-        return swt.get_bnd_functions(*args, self.boundary_conditions)
+        return swt.get_bnd_functions(self.boundary_conditions, *args)
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.solver_obj)
@@ -651,7 +647,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         u, eta = sol.split()
 
         fdict = {'elevation': eta, 'velocity_x': u[0], 'velocity_y': u[1],
-             'speed': sqrt(inner(u, u)), 'inflow': inner(u, self.fields['inflow'])}
+                 'speed': sqrt(inner(u, u)), 'inflow': inner(u, self.fields['inflow'])}
         fdict.update(self.fields)
 
         self.M = Function(self.P1_ten)
