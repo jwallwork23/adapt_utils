@@ -8,9 +8,6 @@ from adapt_utils.swe.turbine.options import UnsteadyTurbineOptions
 __all__ = ["Unsteady15TurbineOptions"]
 
 
-rootdir = os.environ.get('ADAPT_UTILS_HOME')
-
-
 class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
     """Parameters for the unsteady 15 turbine array test case"""
 
@@ -47,8 +44,6 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         D = self.turbine_length
         d = self.turbine_width
         self.turbine_diameter = max(D, d)
-        L = self.domain_length
-        W = self.domain_width
         deltax = 10.0*D
         deltay = 7.5*D
         self.region_of_interest = []
@@ -74,7 +69,6 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         self.viscosity = Function(fs)
         if sponge:
             x, y = SpatialCoordinate(fs.mesh())
-            xmin = 0.0
             xmax = 1000.0
             ramp = 0.5
             eps = 20.0
