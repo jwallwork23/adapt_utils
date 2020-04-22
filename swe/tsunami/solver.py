@@ -43,11 +43,12 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         if self.extension is not None:
             fname = '_'.join([fname, self.extension])
         fname = '_'.join([fname, str(self.num_cells[-1])])
-        # for g in op.gauges:  # FIXME
-        #     self.callbacks[g] = callback.DetectorsCallback(
-        #         self.solver_obj, locs, ['elev_2d'], fname, names)
-        #     self.solver_obj.add_callback(self.callbacks[g], 'export')
+        for g in op.gauges:
+            self.callbacks[g] = callback.DetectorsCallback(
+                self.solver_obj, locs, ['elev_2d'], fname, names)
+            self.solver_obj.add_callback(self.callbacks[g], 'export')
 
+        # TODO: QoI
         # # Set callback for QoI evaluation
         # self.callbacks["qoi"] = InundationCallback(self.solver_obj)
         # self.solver_obj.add_callback(self.callbacks["qoi"])

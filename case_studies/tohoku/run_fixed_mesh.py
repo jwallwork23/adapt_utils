@@ -7,6 +7,7 @@ import argparse
 
 parser = argparse.ArgumentParser(prog="run_fixed_mesh")
 parser.add_argument("-end_time", help="End time of simulation")
+parser.add_argument("-level", help="(Integer) mesh resolution")
 parser.add_argument("-approach", help="Mesh adaptation approach")
 parser.add_argument("-target", help="Target mesh complexity/error for metric based methods")
 parser.add_argument("-debug", help="Print all debugging statements")
@@ -15,9 +16,10 @@ args = parser.parse_args()
 # Read parameters
 approach = args.approach or 'fixed_mesh'
 debug = bool(args.debug or False)
+level = int(args.level or 0)
 
 # Set parameters for fixed mesh run
-op = TohokuOptions(approach=approach, plot_pvd=True, debug=debug)
+op = TohokuOptions(level=level, approach=approach, plot_pvd=True, debug=debug)
 op.end_time = float(args.end_time or op.end_time)
 op.sipg_parameter = Constant(10.0)
 
