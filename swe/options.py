@@ -94,14 +94,15 @@ class ShallowWaterOptions(Options):
         self.elev_out = Constant(0.0)
 
     def get_eta_tilde(self, solver_obj):
-        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+        bathymetry_displacement = solver_obj.eq_sw.depth.wd_bathymetry_displacement
         eta = solver_obj.fields.elev_2d
         self.eta_tilde.project(eta + bathymetry_displacement(eta))
 
     def get_export_func(self, solver_obj):
         def export_func():
-            self.get_eta_tilde(solver_obj)
-            self.eta_tilde_file.write(self.eta_tilde)
+            if self.wetting_and_drying:
+                self.get_eta_tilde(solver_obj)
+                self.eta_tilde_file.write(self.eta_tilde)
         return export_func
         
     def get_initial_depth(self, fs):

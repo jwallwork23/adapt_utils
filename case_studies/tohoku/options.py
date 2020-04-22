@@ -29,6 +29,7 @@ class TohokuOptions(TsunamiOptions):
     def __init__(self, level=0, **kwargs):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
+        self.base_viscosity = 0.0
 
         # Mesh
         self.print_debug("Loading mesh...")
@@ -111,6 +112,12 @@ class TohokuOptions(TsunamiOptions):
     def set_boundary_conditions(self, fs):
         self.boundary_conditions = {}
         return self.boundary_conditions
+
+    def get_update_forcings(self, solver_obj):
+        def update_forcings(t):
+            self.print_debug("#### DEBUG t: {:.2f}".format(t))
+            return
+        return update_forcings
 
     def set_qoi_kernel(self, solver_obj):
         pass
