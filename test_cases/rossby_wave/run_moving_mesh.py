@@ -25,6 +25,7 @@ op.dt_per_remesh = 10*n_coarse
 swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 
+
 # FIXME: Doesn't there need to be some interpolation?
 def elevation_norm_monitor(mesh, alpha=40.0, norm_type='H1'):
     """
@@ -43,6 +44,7 @@ def elevation_norm_monitor(mesh, alpha=40.0, norm_type='H1'):
         return 1.0 + alpha*local_frobenius_norm(H)
     else:
         return 1.0 + alpha*local_norm(eta_copy, norm_type=norm_type)
+
 
 # FIXME: Doesn't there need to be some interpolation?
 def velocity_norm_monitor(mesh, alpha=40.0, norm_type='HDiv'):
@@ -64,9 +66,10 @@ def velocity_norm_monitor(mesh, alpha=40.0, norm_type='HDiv'):
     else:
         return 1.0 + alpha*local_norm(u_copy, norm_type=norm_type)
 
+
 def mixed_monitor(mesh):
-    return 0.5*(velocity_norm_monitor(mesh, norm_type='HDiv') +
-                elevation_norm_monitor(mesh, norm_type='H1'))
+    return 0.5*(velocity_norm_monitor(mesh, norm_type='HDiv') + elevation_norm_monitor(mesh, norm_type='H1'))
+
 
 if initial_monitor is not None:
     swp.monitor_function = initial_monitor

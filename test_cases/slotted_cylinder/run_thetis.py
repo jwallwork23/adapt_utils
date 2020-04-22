@@ -12,6 +12,7 @@ def write(text, out):
     out.write(text+'\n')
     print_output(text)
 
+
 # Initialise
 parser = argparse.ArgumentParser()
 parser.add_argument("-approach", help="Choose adaptive approach")

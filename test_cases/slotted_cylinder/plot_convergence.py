@@ -1,6 +1,5 @@
 import os
 import matplotlib.pyplot as plt
-import numpy as np
 import argparse
 
 
@@ -52,7 +51,7 @@ for shape in shapes:
 ax.set_xlabel('Element Count', fontsize=fontsize)
 ax.set_ylabel('Relative Error in Solid Body Volume', fontsize=fontsize)
 ax.set_ylim([ax.get_ylim()[0], 10.0])
-format_spec = lambda l: "{:.3f}\%".format(l) if l < 1.0 else "{:.1f}\%".format(l)
+format_spec = lambda l: r"{:.3f}\%".format(l) if l < 1.0 else r"{:.1f}\%".format(l)
 ax.set_yticklabels([format_spec(l) for l in ax.get_yticks().tolist()])
 plt.legend(fontsize=legend_fontsize)
 plt.tight_layout()

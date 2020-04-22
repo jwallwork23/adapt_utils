@@ -27,18 +27,20 @@ class TracerOptions(Options):
     n = PositiveInteger(4, help="Mesh resolution in x- and y-directions.").tag(config=True)
 
     # Solver
-    params = PETScSolverParameters({'ksp_type': 'preonly',
-                                    'pc_type': 'lu',
-                                    'mat_type': 'aij' ,
-                                    'pc_factor_mat_solver_type': 'mumps',
-                                    }).tag(config=True)
+    params = PETScSolverParameters({
+        'ksp_type': 'preonly',
+        'pc_type': 'lu',
+        'mat_type': 'aij',
+        'pc_factor_mat_solver_type': 'mumps',
+    }).tag(config=True)
 
     # For problems bigger than ~1e6 dofs in 2d, we want to use a scalable iterative solver
-    iterative_params = PETScSolverParameters({'ksp_type': 'gmres',
-                                             'pc_type': 'sor',
-                                             }).tag(config=True)
+    iterative_params = PETScSolverParameters({
+        'ksp_type': 'gmres',
+        'pc_type': 'sor',
+    }).tag(config=True)
 
-    # Physical 
+    # Physical
     source_loc = List(default_value=None, allow_none=True, help="Location of source term (if any).").tag(config=True)
     source = FiredrakeScalarExpression(None, allow_none=True, help="Scalar source term for tracer problem.").tag(config=True)
     diffusivity = FiredrakeScalarExpression(Constant(1e-1), help="(Scalar) diffusivity field for tracer problem.").tag(config=True)
@@ -62,6 +64,7 @@ class TracerOptions(Options):
         self.source = None
         return self.source
 
+
 def bessi0(x):
     """Modified Bessel function of the first kind. Code taken from 'Numerical recipes in C'."""
     ax = abs(x)
@@ -71,6 +74,7 @@ def bessi0(x):
     y2 = 3.75/ax
     expr2 = (exp(ax)/sqrt(ax))*(0.39894228 + y2*(0.1328592e-1 + y2*(0.225319e-2 + y2*(-0.157565e-2 + y2*(0.916281e-2 + y2*(-0.2057706e-1 + y2*(0.2635537e-1 + y2*(-0.1647633e-1 + y2*0.392377e-2))))))))
     return conditional(le(ax, 3.75), expr1, expr2)
+
 
 def bessk0(x):
     """Modified Bessel function of the second kind. Code taken from 'Numerical recipes in C'."""

@@ -26,16 +26,16 @@ initial_monitor = equator_monitor if refine_equator else None  # TODO: Other opt
 read_only = bool(args.read_only or False)
 
 kwargs = {
-  'n': n_coarse,
-  'debug': bool(args.debug or False),
-  'end_time': float(args.end_time or 120.0),
-  'dt': 0.04/n_coarse,
-  'plot_pvd': n_coarse < 5,
-  'dt_per_export': 50*n_coarse,
-  'order': 1,
-  # 'order': 0,
-  'num_adapt': 1,
-  'r_adapt_rtol': 1.0e-3,
+    'n': n_coarse,
+    'debug': bool(args.debug or False),
+    'end_time': float(args.end_time or 120.0),
+    'dt': 0.04/n_coarse,
+    'plot_pvd': n_coarse < 5,
+    'dt_per_export': 50*n_coarse,
+    'order': 1,
+    # 'order': 0,
+    'num_adapt': 1,
+    'r_adapt_rtol': 1.0e-3,
 }
 
 op = BoydOptions(**kwargs)

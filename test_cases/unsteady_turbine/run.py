@@ -1,5 +1,3 @@
-from thetis import *
-
 from adapt_utils.swe.turbine.solver import UnsteadyTurbineProblem
 from adapt_utils.test_cases.unsteady_turbine.options import Unsteady15TurbineOptions
 

@@ -187,6 +187,7 @@ class BalzanoOptions(ShallowWaterOptions):
         bathymetry_displacement = solver_obj.eq_sw.depth.wd_bathymetry_displacement
         eta = solver_obj.fields.elev_2d
         b = solver_obj.fields.bathymetry_2d
+
         def export_func():
             self.eta_tilde.project(eta + bathymetry_displacement(eta))
             self.eta_tilde_file.write(self.eta_tilde)
@@ -197,6 +198,7 @@ class BalzanoOptions(ShallowWaterOptions):
                 P1DG = solver_obj.function_spaces.P1DG_2d
                 wd = project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
+
         return export_func
 
     def plot_heaviside(self):
@@ -209,12 +211,12 @@ class BalzanoOptions(ShallowWaterOptions):
 
         cset1 = plt.contourf(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
         plt.clim(0.0, 1.2)
-        cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
+        # cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
         plt.clim(0.0, 1.2)
-        cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels = [0.5])
+        # cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels=[0.5])
         cb = plt.colorbar(cset1, ticks=np.linspace(0, 1, 6))
-        cb.set_label("$\mathcal H(\eta-b)$")
+        cb.set_label(r"$\mathcal H(\eta-b)$")
         plt.ylim(min(X[0]), max(X[0]))
-        plt.xlabel("Time [$\mathrm h$]")
-        plt.ylabel("$x$ [$\mathrm m$]")
+        plt.xlabel(r"Time [$\mathrm h$]")
+        plt.ylabel(r"$x$ [$\mathrm m$]")
         plt.savefig(os.path.join(self.di, "heaviside_timeseries.pdf"))
