@@ -2,7 +2,6 @@ import firedrake
 from thetis import print_output
 
 import os
-import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import argparse
@@ -38,7 +37,7 @@ T = 10.0    # Time scale
 v = 0.02    # For plotting
 
 if plot_png or plot_pdf:
-    matplotlib.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+    matplotlib.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
     matplotlib.rc('text', usetex=True)
 
 # NOTE: Forward and adjoint relatively stable with:
@@ -73,7 +72,7 @@ if forward:
         plt.yticks([1800.0/T, 3600.0/T], ["0.5", "1.0"])
         fname = os.path.join(op.di, "forward_{:d}".format(n))
         if plot_png:
-           plt.savefig(fname + ".png")
+            plt.savefig(fname + ".png")
         if plot_pdf:
             plt.savefig(fname + ".pdf")
 

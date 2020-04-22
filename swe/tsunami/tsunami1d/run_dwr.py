@@ -2,7 +2,6 @@ import firedrake
 from thetis import print_output
 
 import os
-import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 
@@ -10,7 +9,7 @@ from adapt_utils.swe.spacetime.solver import SpaceTimeShallowWaterProblem
 from adapt_utils.swe.tsunami.tsunami1d.options import Tsunami1dOptions
 
 
-matplotlib.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+matplotlib.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
 matplotlib.rc('text', usetex=True)
 
 # Parameters
