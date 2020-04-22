@@ -111,13 +111,14 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.rhs = psi*source*dx
 
         # Stabilisation
-        # if self.stabilisation in ('SU', 'SUPG'):
         if self.stabilisation == 'SU':
-            # coeff = self.stabilisation_parameter*dot(u, grad(psi))
             self.lhs += coeff*dot(u, grad(phi))*dx
-            # if self.stabilisation == 'SUPG':
-                # self.lhs += coeff*-div(nu*grad(phi))*dx
-                # self.rhs += coeff*source*dx
+        # if self.stabilisation in ('SU', 'SUPG'):
+        #     coeff = self.stabilisation_parameter*dot(u, grad(psi))
+        #     self.lhs += coeff*dot(u, grad(phi))*dx
+        #     if self.stabilisation == 'SUPG':
+        #         self.lhs += coeff*-div(nu*grad(phi))*dx
+        #         self.rhs += coeff*source*dx
         # elif self.stabilisation != 'no':
         #     raise ValueError("Unrecognised stabilisation method.")
 
@@ -154,14 +155,15 @@ class SteadyTracerProblem2d(SteadyProblem):
 
         # Stabilisation
         if self.stabilisation == 'SU':
+            self.lhs_adjoint += -coeff*div(u*lam)*dx
         # if self.stabilisation in ('SU', 'SUPG'):
         #     coeff = -self.stabilisation_parameter*div(u*psi)
-            self.lhs_adjoint += -coeff*div(u*lam)*dx
-            # if self.stabilisation == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
-                # self.lhs_adjoint += coeff*-div(nu*grad(lam))*dx
-                # self.rhs_adjoint += coeff*self.kernel*dx
+        #     self.lhs_adjoint += -coeff*div(u*lam)*dx
+        #     if self.stabilisation == 'SUPG':  # NOTE: this is not equivalent to discrete adjoint
+        #         self.lhs_adjoint += coeff*-div(nu*grad(lam))*dx
+        #         self.rhs_adjoint += coeff*self.kernel*dx
         # elif self.stabilisation != 'no':
-            # raise ValueError("Unrecognised stabilisation method.")
+        #     raise ValueError("Unrecognised stabilisation method.")
 
         # Boundary conditions
         bcs = self.boundary_conditions
@@ -172,7 +174,7 @@ class SteadyTracerProblem2d(SteadyProblem):
                     assert 'diff_flux' in bcs[i] or 'value' in bcs[i]
                 except AssertionError:
                     raise ValueError("Unrecognised BC types in {:}.".format(bcs[i]))
-            if not 'diff_flux' in bcs[i]:
+            if 'diff_flux' not in bcs[i]:
                 self.dbcs_adjoint.append(DirichletBC(self.V, 0, i))  # Dirichlet BC in adjoint
             elif 'value' in bcs[i]:
                 self.lhs_adjoint += -lam*psi*(dot(u, self.n))*ds(i)
@@ -281,7 +283,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Account for boundary conditions
         bcs = self.boundary_conditions
         for j in bcs.keys():
-            if not 'value' in bcs[j]:  # Robin BC in adjoint
+            if 'value' not in bcs[j]:  # Robin BC in adjoint
                 if norm_type is None:
                     flux_terms += i*flux*ds(j)
                 elif norm_type == 'L1':
@@ -356,7 +358,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.indicators[name] = project(assemble(tpe.p0test*dwr*dx), self.P0)
         self.estimate_error(name)
         return name
-        
+
     def get_dwr_flux_adjoint(self):
         tpe = self.tp_enriched
         i = tpe.p0test
@@ -374,7 +376,7 @@ class SteadyTracerProblem2d(SteadyProblem):
         # Account for boundary conditions
         bcs = tpe.boundary_conditions
         for j in bcs.keys():
-            if not 'value' in bcs[j]:
+            if 'value' not in bcs[j]:
                 flux_terms += i*dwr*ds(j)  # Robin BC in adjoint
 
         # Solve auxiliary FEM problem
@@ -388,7 +390,7 @@ class SteadyTracerProblem2d(SteadyProblem):
     def get_hessian_metric(self, adjoint=False, noscale=False):
         sol = self.get_solution(adjoint)
         self.M = steady_metric(sol, mesh=self.mesh, noscale=noscale, op=self.op)
-        
+
     def get_loseille_metric(self, adjoint=False, relax=True):
         adj = self.get_solution(not adjoint)
         sol = self.get_solution(adjoint)
@@ -587,7 +589,7 @@ class UnsteadyTracerProblem2d(UnsteadyProblem):
         family = self.V.ufl_element().family()
         dg = family == 'Discontinuous Lagrange'
         if dg:
-            assert not self.stabilisation in ('SU', 'SUPG')
+            assert self.stabilisation not in ('SU', 'SUPG')
         else:
             assert family == 'Lagrange'
         un = dot(u, self.n)

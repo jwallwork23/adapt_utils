@@ -4,6 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import argparse
 
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-loglog")
 parser.add_argument("-round")
@@ -14,11 +15,14 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 fontsize = 18
 
+
 def power2error(x):
     return 100*(x - exact)/exact
 
+
 def error2power(x):
     return x * exact/100 + exact
+
 
 loglog = bool(args.loglog)
 xlabel = "Degrees of freedom (DOFs)"
@@ -62,13 +66,13 @@ for offset in (0, 1):
                 ax.semilogx(dofs, qois, **kwargs)
     plt.grid(True)
     xlim = ax.get_xlim()
-    hlines = [exact,]
+    hlines = [exact, ]
     if not loglog:
         if errorline > 1e-3:
             hlines.append((1.0 + errorline/100)*exact)
         plt.hlines(hlines, xlim[0], xlim[1], linestyles='dashed', label=r'{:.1f}\% relative error'.format(errorline))
     ax.set_xlim(xlim)
-    ytick = "{:.2f}\%" if loglog else "{:.2f}"
+    ytick = r"{:.2f}\%" if loglog else "{:.2f}"
     scale = 1.0 if loglog else 1e-3
     yticks = [ytick.format(scale*i) for i in ax.get_yticks().tolist()]
     ax.set_yticklabels(yticks)
@@ -79,7 +83,7 @@ for offset in (0, 1):
     if not loglog:
         secax = ax.secondary_yaxis('right', functions=(power2error, error2power))
         secax.set_ylabel(ylabel2, fontsize=fontsize)
-        yticks = ["{:.2f}\%".format(i) for i in secax.get_yticks().tolist()]
+        yticks = [r"{:.2f}\%".format(i) for i in secax.get_yticks().tolist()]
         secax.set_yticklabels(yticks)
 
     fname = 'outputs/convergence_{:d}'.format(offset)

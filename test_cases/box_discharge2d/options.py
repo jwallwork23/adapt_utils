@@ -8,7 +8,7 @@ __all__ = ["PowerOptions"]
 
 
 class PowerOptions(TracerOptions):
-    """
+    r"""
     Parameters for test case in [Power et al. 2006].
 
     We consider a quantity of interest (QoI) :math:`J` of the form
@@ -49,7 +49,7 @@ class PowerOptions(TracerOptions):
 
     def set_source(self, fs):
         self.source = Function(fs)
-        #self.source.interpolate(self.bump(fs, source=True))
+        # self.source.interpolate(self.bump(fs, source=True))
         self.source.interpolate(self.box(fs, source=True))
         area = assemble(self.source*dx)
         rescaling = 0.04/area if area != 0. else 1.
@@ -59,7 +59,7 @@ class PowerOptions(TracerOptions):
 
     def set_qoi_kernel(self, fs):  # FIXME: update
         self.kernel = Function(fs)
-        #self.kernel.interpolate(self.bump(fs))
+        # self.kernel.interpolate(self.bump(fs))
         self.kernel.interpolate(self.box(fs))
         area = assemble(self.kernel*dx)
         rescaling = 0.04/area if area != 0. else 1.

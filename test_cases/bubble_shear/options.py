@@ -54,8 +54,8 @@ class BubbleOptions(TracerOptions):
            isinstance(self.fluid_velocity, Constant) or fs != self.fluid_velocity.function_space():
             self.fluid_velocity = Function(fs)
         self.fluid_velocity.interpolate(
-                as_vector((2*sin(pi*x)*sin(pi*x)*sin(2*pi*y)*cos(2*pi*t/T),
-                           -2*sin(2*pi*x)*sin(pi*y)*sin(pi*y)*cos(2*pi*t/T))))
+            as_vector([2*sin(pi*x)*sin(pi*x)*sin(2*pi*y)*cos(2*pi*t/T),
+                       -2*sin(2*pi*x)*sin(pi*y)*sin(pi*y)*cos(2*pi*t/T)]))
         return self.fluid_velocity
 
     def set_source(self, fs):

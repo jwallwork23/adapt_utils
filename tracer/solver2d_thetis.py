@@ -25,7 +25,6 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
             assert op.family in ("Discontinuous Lagrange", "DG", "dg")
         except AssertionError:
             raise ValueError("Finite element '{:s}' not supported in Thetis tracer model.".format(op.family))
-        fe = FiniteElement("Discontinuous Lagrange", triangle, op.degree)
         super(SteadyTracerProblem2d_Thetis, self).__init__(op, mesh, **kwargs)
 
     def setup_solver_forward(self):
@@ -91,15 +90,9 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         return name
 
     def get_dwr_residual(self, adjoint=False):
-        u = self.fields['velocity']
-        nu = self.fields['diffusivity']
-        f = self.kernel if adjoint else self.fields['source']
-
-        sol = self.adjoint_solution if adjoint else self.solution
         adj = self.solution if adjoint else self.adjoint_solution
 
         # TODO: non divergence-free u case
-        F = f - dot(u, grad(sol)) + div(nu*grad(sol))
         res_name = self.get_strong_residual(adjoint=adjoint, norm_type=None)
         name = 'dwr_cell'
         name = '_'.join([name, 'adjoint' if adjoint else 'forward'])
@@ -114,8 +107,6 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         h = self.h
         u = self.fields['velocity']
         nu = self.fields['diffusivity']
-        degree = self.finite_element.degree()
-        family = self.finite_element.family()
 
         sol = self.adjoint_solution if adjoint else self.solution
         adj = self.solution if adjoint else self.adjoint_solution
@@ -131,7 +122,6 @@ class SteadyTracerProblem2d_Thetis(SteadyTracerProblem2d):
         # Term resulting from integration by parts in diffusion term
         loc = -i*dot(nu*grad(sol), n)*adj
         flux_integrand += (loc('+') + loc('-'))
-        bdy_integrand = loc
 
         u_av = avg(u)
         un_av = dot(u_av, n('-'))

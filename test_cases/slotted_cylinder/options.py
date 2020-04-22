@@ -105,9 +105,9 @@ class LeVequeOptions(TracerOptions):
 
         bell = 0.25*(1+cos(pi*min_value(sqrt(pow(x-bell_x0, 2) + pow(y-bell_y0, 2))/bell_r0, 1.0)))
         cone = 1.0 - min_value(sqrt(pow(x-cone_x0, 2) + pow(y-cone_y0, 2))/cone_r0, 1.0)
-        slot_cyl = conditional(sqrt(pow(x-cyl_x0, 2) + pow(y-cyl_y0, 2)) < cyl_r0,
-                     conditional(And(And(x > slot_left, x < slot_right), y < slot_top),
-                       0.0, 1.0), 0.0)
+        slot_cyl = conditional(
+            sqrt(pow(x-cyl_x0, 2) + pow(y-cyl_y0, 2)) < cyl_r0, conditional(
+                And(And(x > slot_left, x < slot_right), y < slot_top), 0.0, 1.0), 0.0)
 
         self.initial_value = interpolate(self.bg + bell + cone + slot_cyl, fs)
         return self.initial_value
