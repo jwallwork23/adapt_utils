@@ -1,4 +1,6 @@
 tohoku/outputs/
 tohoku/videos/
+tohoku/resources/meshes/
 tohoku/resources/tohoku_utm.nc
 tohoku/resources/surf_zeroed_utm.nc
+tohoku/resources/log
