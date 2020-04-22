@@ -1,8 +1,6 @@
 from thetis import *
 from thetis.configuration import *
 
-import numpy as np
-
 from adapt_utils.swe.options import ShallowWaterOptions
 
 
@@ -27,7 +25,7 @@ lu_params = {
 }
 # TODO: 'Physics based' fieldsplit approach
 default_params = lu_params
-keys = {key for key in default_params if not 'snes' in key}
+keys = {key for key in default_params if 'snes' not in key}
 default_adjoint_params = {}
 for key in keys:
     default_adjoint_params[key] = default_params[key]

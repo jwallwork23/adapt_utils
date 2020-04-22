@@ -68,9 +68,9 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0),])/L
+            grad_x = lambda F: as_vector([F.dx(0), ])/L
             ddt = lambda F: F.dx(1)/T
-            n = as_vector([self.n[0],])
+            n = as_vector([self.n[0], ])
         elif self.dim == 3:
             grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
             perp = lambda F: as_vector([-F[1], F[0]])
@@ -92,7 +92,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Integration by parts for viscosity
         for i in self.mesh.exterior_facets.unique_markers:
-            if not i in (t0_tag, tf_tag):
+            if i not in (t0_tag, tf_tag):
                 self.lhs += -nu*inner(v, dot(grad_x(u), n))*ds(i)
 
         # Continuity equation
@@ -125,19 +125,16 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0),])/L
+            grad_x = lambda F: as_vector([F.dx(0), ])/L
             ddt = lambda F: F.dx(1)/T
-            n = as_vector([self.n[0],])
         elif self.dim == 3:
             grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
             perp = lambda F: as_vector([-F[1], F[0]])
             ddt = lambda F: F.dx(2)/T
-            n = as_vector([self.n[0], self.n[1]])
         else:
             raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
 
         # Initial and final time tags
-        t0_tag = self.op.t_init_tag
         tf_tag = self.op.t_final_tag
 
         # Momentum equation
@@ -181,15 +178,12 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0),])/L
+            grad_x = lambda F: as_vector([F.dx(0), ])/L
             ddt = lambda F: F.dx(1)/T
-            n = as_vector([tpe.n[0],])
             div_x = lambda F: F[0].dx(0)
         elif self.dim == 3:
             grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
-            perp = lambda F: as_vector([-F[1], F[0]])
             ddt = lambda F: F.dx(2)/T
-            n = as_vector([tpe.n[0], tpe.n[1]])
             div_x = lambda F: F[0].dx(0) + F[1].dx(1)  # TODO: test
         else:
             raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
@@ -214,7 +208,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Normal vector
         if self.dim == 2:
-            n = as_vector([tpe.n[0],])
+            n = as_vector([tpe.n[0], ])
         elif self.dim == 3:
             n = as_vector([tpe.n[0], tpe.n[1]])
         else:
@@ -249,15 +243,12 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0),])/L
+            grad_x = lambda F: as_vector([F.dx(0), ])/L
             ddt = lambda F: F.dx(1)/T
-            n = as_vector([tpe.n[0],])
             div_x = lambda F: F[0].dx(0)
         elif self.dim == 3:
             grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
-            perp = lambda F: as_vector([-F[1], F[0]])
             ddt = lambda F: F.dx(2)/T
-            n = as_vector([tpe.n[0], tpe.n[1]])
             div_x = lambda F: F[0].dx(0) + F[1].dx(1)  # TODO: test
         else:
             raise ValueError("Only 1+1 and 2+1 dimensional problems allowed.")
@@ -283,7 +274,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Normal vector
         if self.dim == 2:
-            n = as_vector([tpe.n[0],])
+            n = as_vector([tpe.n[0], ])
         elif self.dim == 3:
             n = as_vector([tpe.n[0], tpe.n[1]])
         else:
@@ -410,7 +401,7 @@ class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):
         # Operators
         grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])
         div_x = lambda F: F[0].dx(0) + F[1].dx(1)
-        perp = lambda F: as_vector([-F[1], F[0]])
+        # perp = lambda F: as_vector([-F[1], F[0]])
         ddt = lambda F: F.dx(2)
         n = as_vector([self.n[0], self.n[1]])
 
@@ -434,7 +425,7 @@ class SpaceTimeDispersiveShallowWaterProblem(SteadyProblem):
         # Boundary terms resulting from integration by parts
         self.rhs = 0
         for i in self.mesh.exterior_facets.unique_markers:
-            if not i in (t0_tag, tf_tag):
+            if i not in (t0_tag, tf_tag):
                 self.lhs += -inner(dot(v, n), b*b*ddt(λ)/3)*ds(i)
                 self.rhs += -inner(θ, Constant(0.0))*ds(i)
                 self.rhs += inner(μ, Constant(0.0))*ds(i)

@@ -78,16 +78,6 @@ class ShallowWaterOptions(Options):
         """Should be implemented in derived class."""
         pass
 
-    def get_initial_depth(self, fs):
-        """Compute the initial total water depth, using the bathymetry and initial elevation."""
-        if self.bathymetry is None:
-            self.set_bathymetry(fs.sub(1))
-        if not hasattr(self, 'initial_value'):
-            self.set_initial_condition(fs)
-        eta = self.initial_value.split()[1]
-        self.depth = interpolate(self.bathymetry + eta, eta.function_space())
-        return self.depth
-
     def set_boundary_surface(self):
         """Set the initial displacement of the boundary elevation."""
         self.elev_in = Constant(0.0)
@@ -104,18 +94,16 @@ class ShallowWaterOptions(Options):
                 self.get_eta_tilde(solver_obj)
                 self.eta_tilde_file.write(self.eta_tilde)
         return export_func
-        
+
     def get_initial_depth(self, fs):
         """Compute the initial total water depth, using the bathymetry and initial elevation."""
         if not hasattr(self, 'initial_value'):
             self.set_initial_condition(fs)
-        
         eta = self.initial_value.split()[1]
         V = FunctionSpace(eta.function_space().mesh(), 'CG', 1)
         eta_cg = Function(V).project(eta)
         if self.bathymetry is None:
-            self.set_bathymetry(V)       
-            import ipdb; ipdb.set_trace()
+            self.set_bathymetry(V)
         if self.wetting_and_drying:
             bathymetry_displacement = self.wd_dispacement_mc(eta)
             self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta_cg, V)

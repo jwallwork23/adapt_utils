@@ -1,7 +1,6 @@
 from firedrake import *
 from adapt_utils import *
 import numpy as np
-import matplotlib.pyplot as plt
 
 op = Options()
 
