@@ -4,6 +4,7 @@ from thetis.configuration import *
 import scipy.interpolate as si
 import numpy as np
 import h5py
+import matplotlib.pyplot as plt
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import *
@@ -59,7 +60,7 @@ class TsunamiOptions(ShallowWaterOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating bathymetry...")
         # msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
-        depth = self.bathymetry.dat.data 
+        depth = self.bathymetry.dat.data
         for i, xy in enumerate(self.default_mesh.coordinates.dat.data):
             depth[i] -= self.initial_surface.dat.data[i]
             depth[i] -= bath_interp(xy[1], xy[0])
@@ -122,7 +123,6 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Plot measurements
         print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
-        N = int(self.end_time/self.dt/self.dt_per_export)
         if 'data' in self.gauges[gauge]:
             y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
         else:
@@ -134,9 +134,9 @@ class TsunamiOptions(ShallowWaterOptions):
         if 'data' in self.gauges[gauge]:
             errors = {'tv': {'data': total_variation(y_data), 'name': 'total variation'}}
             if plot_lp:
-                errors['l1'] = {'data': lp_norm(y_data, p=1), 'name': '$\ell_1$ error'}
-                errors['l2'] = {'data': lp_norm(y_data, p=2), 'name': '$\ell_2$ error'}
-                errors['linf'] = {'data': lp_norm(y_data, p='inf'), 'name': '$\ell_\infty$ error'}
+                errors['l1'] = {'data': lp_norm(y_data, p=1), 'name': r'$\ell_1$ error'}
+                errors['l2'] = {'data': lp_norm(y_data, p=2), 'name': r'$\ell_2$ error'}
+                errors['linf'] = {'data': lp_norm(y_data, p='inf'), 'name': r'$\ell_\infty$ error'}
             for key in errors:
                 errors[key]['abs'] = []
                 errors[key]['rel'] = []
@@ -201,8 +201,8 @@ class TsunamiOptions(ShallowWaterOptions):
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
         # Plot relative errors
-        if not 'data' in self.gauges[gauge]:
-            return
+        if 'data' not in self.gauges[gauge]:
+            raise ValueError("Data not found.")
         for key in errors:
             fig = plt.figure(figsize=[3.2, 4.8])
             ax = fig.add_subplot(111)
@@ -228,7 +228,7 @@ class TsunamiOptions(ShallowWaterOptions):
         qoi = self.evaluate_qoi()/1.0e9
         plt.plot(T, qois, linestyle='dashed', color='b', marker='x')
         plt.fill_between(T, np.zeros_like(qois), qois)
-        plt.xlabel("Time [$\mathrm h$]")
-        plt.ylabel("Instantaneous QoI [$\mathrm{km}^3$]")
-        plt.title("Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
+        plt.xlabel(r"Time [$\mathrm h$]")
+        plt.ylabel(r"Instantaneous QoI [$\mathrm{km}^3$]")
+        plt.title(r"Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
         plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))

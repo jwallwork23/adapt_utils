@@ -80,13 +80,13 @@ class Tsunami1dOptions(ShallowWaterOptions):
         self.shelf_break_loc = 50.0e+3/self.L
 
         # Solver parameters
-        direct_params = {  # Just whack it with a full LU preconditioner
+        self.direct_params = {  # Just whack it with a full LU preconditioner
             'mat_type': 'aij',
             'ksp_type': 'preonly',
             'pc_type': 'lu',
             'pc_factor_mat_solver_type': 'mumps',
         }
-        mres_params = {  # Whack it with an assembled LU preconditioner  NOTE: Doesn't work in serial
+        self.mres_params = {  # Whack it with an assembled LU preconditioner  NOTE: Doesn't work in serial
             'mat_type': 'matfree',
             'snes_type': 'ksponly',
             'ksp_type': 'gmres',
@@ -96,7 +96,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
             'snes_lag_preconditioner': -1,
             'snes_lag_preconditioner_persists': None,
         }
-        firedrake_fluids_params = {  # Use a "physics-based" method
+        self.firedrake_fluids_params = {  # Use a "physics-based" method
             'ksp_type': 'gmres',
             'pc_type': 'fieldsplit',
             'pc_fieldsplit_type': 'schur',
@@ -106,7 +106,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
             'fieldsplit_1_ksp_type': 'preonly',
             'fieldsplit_1_pc_type': 'ilu',
         }
-        self.params = direct_params
+        self.params = self.direct_params
         self.params['ksp_monitor'] = None
         self.params['ksp_converged_reason'] = None
         self.params['ksp_monitor_true_residual'] = None
@@ -123,9 +123,9 @@ class Tsunami1dOptions(ShallowWaterOptions):
         u.assign(0.0)
         x, t = SpatialCoordinate(fs.mesh())
         x0, t0, r = self.source_loc[0]
-        tol = self.dt/2
         amplitude = 0.4
         bump = amplitude*sin(pi*(x-x0+r)/(2*r))
+        # tol = self.dt/2
         # eta.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), bump, 0.0), 0.0))
         eta.interpolate(conditional(le(abs(x-x0), r), bump, 0.0))
         return self.initial_value
@@ -152,10 +152,10 @@ class Tsunami1dOptions(ShallowWaterOptions):
         ku, ke = self.kernel.split()
         ku.assign(0.0)
         x0, t0, r = self.region_of_interest[0]
-        tol = self.dt/2
         # amplitude = 0.4
         amplitude = 1.0
         bump = amplitude*exp(1 - 1/(1 - ((x-x0)/r)**2))
+        # tol = self.dt/2
         # ke.interpolate(conditional(le(abs(x-x0), r), conditional(le(abs(t-t0), tol), amplitude, 0.0), 0.0))
         # ke.interpolate(conditional(le(abs(x-x0), r), amplitude, 0.0))
         ke.interpolate(conditional(lt(abs(x-x0), r), bump, 0.0))

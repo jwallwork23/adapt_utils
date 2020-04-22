@@ -5,11 +5,13 @@ import ufl
 import numpy as np
 from math import pi, sqrt
 
+
 class OutOfRangeError(ValueError):
     pass
 
+
 __all__ = ["to_latlon", "from_latlon", "lonlat_to_utm", "utm_to_lonlat", "degrees", "radians"]
-           
+
 
 K0 = 0.9996
 
@@ -54,7 +56,7 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
     """
     Convert UTM coordinates to latitude-longitude, courtesy of Tobias Bieniek, 2012 (with some
     minor edits).
-    
+
     :arg easting: eastward-measured Cartesian geographic distance.
     :arg northing: northward-measured Cartesian geographic distance.
     :arg zone_number: UTM zone number (increasing eastward).
@@ -75,9 +77,11 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
     if isinstance(northing, ufl.indexed.Indexed):
         print("#### TODO: Check validity of coordinates")  # TODO
         from firedrake import sin, cos, sqrt
-    elif isinstance(latitude, np.ndarray):
-        print("#### TODO: Check validity of coordinates")  # TODO
+    elif isinstance(northing, np.ndarray):
         from numpy import sin, cos, sqrt
+        minval, maxval = northing.min(), northing.max()
+        if not (0 <= minval and maxval <= 10000000):
+            raise OutOfRangeError('northing out of range (must be between 0 m and 10,000,000 m)')
     else:
         from math import sin, cos, sqrt
         if not 0 <= northing <= 10000000:
@@ -129,11 +133,9 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
     d5 = d4*d
     d6 = d5*d
 
-    latitude = (p_rad - p_tan/r*(d2/2 - d4/24 * (5 + 3*p_tan2 + 10*c - 4*c2 - 9*E_P2)) +
-                d6/720 * (61 + 90*p_tan2 + 298 * c + 45*p_tan4 - 252*E_P2 - 3*c2))
+    latitude = (p_rad - p_tan/r*(d2/2 - d4/24 * (5 + 3*p_tan2 + 10*c - 4*c2 - 9*E_P2)) + d6/720 * (61 + 90*p_tan2 + 298 * c + 45*p_tan4 - 252*E_P2 - 3*c2))
 
-    longitude = (d - d3/6 * (1 + 2*p_tan2 + c) +
-                 d5/120 * (5 - 2*c + 28*p_tan2 - 3*c2 + 8*E_P2 + 24*p_tan4))/p_cos
+    longitude = (d - d3/6 * (1 + 2*p_tan2 + c) + d5/120 * (5 - 2*c + 28*p_tan2 - 3*c2 + 8*E_P2 + 24*p_tan4))/p_cos
 
     return degrees(latitude), degrees(longitude) + zone_number_to_central_longitude(zone_number)
 
@@ -141,7 +143,7 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
 def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
     """
     Convert latitude-longitude coordinates to UTM, courtesy of Tobias Bieniek, 2012.
-    
+
     :arg latitude: northward anglular position, origin at the Equator.
     :arg longitude: eastward angular position, with origin at the Greenwich Meridian.
     :param force_zone_number: force coordinates to fall within a particular UTM zone.
@@ -152,8 +154,13 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
         print("#### TODO: Check validity of coordinates")  # TODO
         from firedrake import sin, cos, sqrt
     elif isinstance(latitude, np.ndarray):
-        print("#### TODO: Check validity of coordinates")  # TODO
         from numpy import sin, cos, sqrt
+        minval, maxval = latitude.min(), latitude.max()
+        if not (-80.0 <= minval and maxval <= 84.0):
+            raise OutOfRangeError('latitude out of range (must be between 80 deg S and 84 deg N)')
+        minval, maxval = longitude.min(), longitude.max()
+        if not (-180.0 <= minval and maxval <= 180.0):
+            raise OutOfRangeError('longitude out of range (must be between 180 deg W and 180 deg E)')
     else:
         from math import sin, cos, sqrt
         if not -80.0 <= latitude <= 84.0:
@@ -189,16 +196,15 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
 
     m = R*(M1*lat_rad - M2*sin(2*lat_rad) + M3*sin(4*lat_rad) - M4*sin(6 * lat_rad))
 
-    easting = K0*n*(a + a3/6*(1 - lat_tan2 + c) +
-                        a5/120*(5 - 18*lat_tan2 + lat_tan4 + 72*c - 58*E_P2)) + 500000
+    easting = K0*n*(a + a3/6*(1 - lat_tan2 + c) + a5/120*(5 - 18*lat_tan2 + lat_tan4 + 72*c - 58*E_P2)) + 500000
 
-    northing = K0*(m + n*lat_tan*(a2/2 + a4/24*(5 - lat_tan2 + 9*c + 4*c**2) +
-                                        a6/720*(61 - 58*lat_tan2 + lat_tan4 + 600*c - 330*E_P2)))
+    northing = K0*(m + n*lat_tan*(a2/2 + a4/24*(5 - lat_tan2 + 9*c + 4*c**2) + a6/720*(61 - 58*lat_tan2 + lat_tan4 + 600*c - 330*E_P2)))
 
     if isinstance(latitude, ufl.indexed.Indexed):
         print("#### TODO: Check validity of coordinates")  # TODO
     elif isinstance(latitude, np.ndarray):
-        print("#### TODO: Check validity of coordinates")  # TODO
+        if latitude.min() < 0:
+            northing += 10000000
     else:
         if latitude < 0:
             northing += 10000000
@@ -212,7 +218,7 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
 def latitude_to_zone_letter(latitude):
     """
     Convert latitude UTM letter, courtesy of Tobias Bieniek, 2012.
-    
+
     :arg latitude: northward anglular position, origin at the Equator.
     :return: UTM zone letter (increasing alphabetically northward).
     """
@@ -222,7 +228,7 @@ def latitude_to_zone_letter(latitude):
 def latlon_to_zone_number(latitude, longitude):
     """
     Convert a latitude-longitude coordinate pair to UTM zone, courtesy of Tobias Bieniek, 2012.
-    
+
     :arg latitude: northward anglular position, origin at the Equator.
     :arg longitude: eastward angular position, with origin at the Grenwich Meridian.
     :return: UTM zone number (increasing eastward).
@@ -246,7 +252,7 @@ def latlon_to_zone_number(latitude, longitude):
 def zone_number_to_central_longitude(zone_number):
     """
     Convert a UTM zone number to the corresponding central longitude, courtesy of Tobias Bieniek, 2012.
-    
+
     :arg zone_number: UTM zone number (increasing eastward).
     :return: central eastward angular position of the UTM zone, with origin at the Grenwich Meridian.
     """
@@ -256,7 +262,7 @@ def zone_number_to_central_longitude(zone_number):
 def lonlat_to_utm(longitude, latitude, force_zone_number, **kwargs):
     """
     Transformation from longitude-latitude coordinates to UTM coordinates.
-    
+
     :arg longitude: eastward angular position, with origin at the Grenwich Meridian.
     :arg latitude: northward anglular position, origin at the Equator.
     :param force_zone_number: force coordinates to fall within a particular UTM zone.
