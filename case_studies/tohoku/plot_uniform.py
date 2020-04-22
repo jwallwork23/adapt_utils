@@ -1,97 +1,103 @@
 import firedrake
+from thetis import print_output
 
 import matplotlib
 import matplotlib.pyplot as plt
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
+from adapt_utils.swe.tsunami.conversion import lonlat_to_utm
 
 
-matplotlib.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-matplotlib.rc('text', usetex=True)
+# matplotlib.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})  # FIXME
+# matplotlib.rc('text', usetex=True)  # FIXME
 
 # Setup Tohoku domain
-op = TohokuOptions(utm=False, offset=0, n=40)
+op = TohokuOptions(level=0)
 mesh = op.default_mesh
-lon, lat, elev = op.read_bathymetry_file(km=True)
-fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True)
+lon1, lat1, elev1 = op.read_surface_file()
+lon, lat, elev = op.read_bathymetry_file()
+x, y = lonlat_to_utm(lon, lat, op.force_zone_number)
 
 # Plot raw bathymetry data
-ax1 = axes.flat[0]
-cs = ax1.contourf(lon, lat, elev, 50, vmin=-9, vmax=2, cmap=matplotlib.cm.coolwarm)
-ax1.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
-ax1.set_xlabel("Degrees longitude")
-ax1.set_ylabel("Degrees latitude")
-ax1.set_title("Original data")
-# op.annotate_plot(ax1, gauges=False)
-xlim = ax1.get_xlim()
-ylim = ax1.get_ylim()
+print_output("Plotting raw bathymetry...")
+fig = plt.figure(figsize=(5, 5))
+ax = plt.gca()
+cs = ax.contourf(lon, lat, elev, 50, cmap=matplotlib.cm.coolwarm)
+ax.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
+ax.set_xlabel("Degrees longitude")
+ax.set_ylabel("Degrees latitude")
+ax.set_title("Original data")
+op.annotate_plot(ax, gauges=False, coords="lonlat")
+cb = fig.colorbar(cs)
+cb.set_label("Bathymetry [m]")
+xlim = ax.get_xlim()
+ylim = ax.get_ylim()
+fname = 'outputs/bathymetry_data'
+plt.savefig(fname + '.png')
+# plt.savefig(fname + '.pdf')
 
 # Plot bathymetry data interpolated onto a uniform mesh
-ax2 = axes.flat[1]
+print_output("Plotting interpolated bathymetry...")
+fig = plt.figure(figsize=(5, 5))
+ax = plt.gca()
 op.bathymetry *= -1
-firedrake.plot(op.bathymetry, cmap=matplotlib.cm.coolwarm, axes=ax2)
-op.plot_coastline(ax2)
-ax2.set_xlabel("Degrees longitude")
-ax2.set_ylabel("Degrees latitude")
-ax2.set_xlim(xlim)
-ax2.set_ylim(ylim)
-# op.annotate_plot(ax2, gauges=True)
-ax2.yaxis.set_label_position("right")
-ax2.yaxis.tick_right()
-ax2.set_title("Uniform mesh interpolant")
-
-# Save raw bathymetry and uniform interpolant
-cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
-cb.set_label(r"Bathymetry $[\mathrm{km}]$")
-fname = 'outputs/uniform_bathymetry_{:d}'.format(mesh.num_cells())
+firedrake.tricontourf(op.bathymetry, 50, cmap=matplotlib.cm.coolwarm, axes=ax)
+ax.contour(x, y, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
+ax.set_xlabel("UTM x-coordinate [m]")
+ax.set_ylabel("UTM y-coordinate [m]")
+# op.annotate_plot(ax, gauges=True, coords="utm")
+ax.set_title("Interpolant")
+cb = fig.colorbar(cs)
+cb.set_label("Bathymetry [m]")
+fname = 'outputs/bathymetry_{:d}'.format(mesh.num_cells())
 plt.savefig(fname + '.png')
-plt.savefig(fname + '.pdf')
-
-# Setup Tohoku domain
-lon1, lat1, elev1 = op.read_surface_file()
-fig, axes = plt.subplots(nrows=1, ncols=2, sharex=True)
+# plt.savefig(fname + '.pdf')
 
 # Plot raw surface data
-ax1 = axes.flat[0]
-cs = ax1.contourf(lon1, lat1, elev1, 50, cmap=matplotlib.cm.coolwarm)
-ax1.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
-ax1.set_xlabel("Degrees longitude")
-ax1.set_ylabel("Degrees latitude")
-# op.annotate_plot(ax1, gauges=False)
-ax1.set_title("Original data")
+fig = plt.figure(figsize=(5, 5))
+ax = plt.gca()
+print_output("Plotting raw initial surface...")
+cs = ax.contourf(lon1, lat1, elev1, 50, cmap=matplotlib.cm.coolwarm)
+ax.contour(lon, lat, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
+ax.set_xlabel("Degrees longitude")
+ax.set_ylabel("Degrees latitude")
+ax.set_xlim(xlim)
+ax.set_ylim(ylim)
+# op.annotate_plot(ax, gauges=False)
+ax.set_title("Original data")
+cb = fig.colorbar(cs)
+cb.set_label("Initial free surface [m]")
+fname = 'outputs/ic_data'
+plt.savefig(fname + '.png')
+# plt.savefig(fname + '.pdf')
 
 # Plot surface data interpolated onto a uniform mesh
-ax2 = axes.flat[1]
-firedrake.plot(op.initial_surface, cmap=matplotlib.cm.coolwarm, axes=ax2)
-op.plot_coastline(ax2)
-ax2.set_xlabel("Degrees longitude")
-ax2.set_ylabel("Degrees latitude")
-ax2.set_xlim(xlim)
-ax2.set_ylim(ylim)
-# op.annotate_plot(ax2, gauges=True)
-ax2.yaxis.set_label_position("right")
-ax2.yaxis.tick_right()
-ax2.set_title("Uniform mesh interpolant")
-
-# Save raw surface and uniform interpolant
-cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
-cb.set_label("Initial free surface $[\mathrm m]$")
-fname = 'outputs/uniform_ic_{:d}'.format(mesh.num_cells())
+print_output("Plotting interpolated initial surface...")
+fig = plt.figure(figsize=(5, 5))
+ax = plt.gca()
+firedrake.tricontourf(op.initial_surface, 50, cmap=matplotlib.cm.coolwarm, axes=ax)
+ax.contour(x, y, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
+ax.set_xlabel("UTM x-coordinate [m]")
+ax.set_ylabel("UTM y-coordinate [m]")
+# op.annotate_plot(ax, gauges=True, coords="utm")
+ax.set_title("Interpolant")
+cb = fig.colorbar(cs)
+cb.set_label("Initial free surface [m]")
+fname = 'outputs/ic_{:d}'.format(mesh.num_cells())
 plt.savefig(fname + '.png')
-plt.savefig(fname + '.pdf')
+# plt.savefig(fname + '.pdf')
 
-fig = plt.figure()
-axes = fig.gca()
+print_output("Plotting Coriolis parameter...")
+fig = plt.figure(figsize=(5, 5))
+ax = plt.gca()
 P1 = op.bathymetry.function_space()
-axes, cb = firedrake.plot(op.set_coriolis(P1), axes=axes, cmap=matplotlib.cm.coolwarm, colorbar=True)
-op.plot_coastline(axes)
-axes.set_xlabel("Degrees longitude")
-axes.set_ylabel("Degrees latitude")
-axes.set_xlim(xlim)
-axes.set_ylim(ylim)
-cb.set_label(r"Coriolis parameter ($\times10^{-5}$)")
-cb.set_ticks([0.000075, 0.000080, 0.000085, 0.000090, 0.000095, 0.000100])
-cb.ax.set_yticklabels(['{:.1f}'.format(t*1.0e+5) for t in cb.get_ticks()])
-fname = 'outputs/uniform_coriolis_{:d}'.format(mesh.num_cells())
+firedrake.tricontourf(op.set_coriolis(P1), 50, cmap=matplotlib.cm.coolwarm, axes=ax)
+ax.contour(x, y, elev, vmin=-0.01, vmax=0.01, levels=0, colors='k')
+ax.set_xlabel("UTM x-coordinate [m]")
+ax.set_ylabel("UTM y-coordinate [m]")
+cb = fig.colorbar(cs)
+cb.set_label("Coriolis parameter")
+fname = 'outputs/coriolis_{:d}'.format(mesh.num_cells())
 plt.savefig(fname + '.png')
-plt.savefig(fname + '.pdf')
+# plt.savefig(fname + '.pdf')
+print_output("Done!")

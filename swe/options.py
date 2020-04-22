@@ -32,7 +32,7 @@ class ShallowWaterOptions(Options):
     grad_depth_viscosity = Bool(False).tag(config=True)
     family = Enum(['dg-dg', 'rt-dg', 'dg-cg', 'taylor-hood'], default_value='dg-dg').tag(config=True)
     wetting_and_drying = Bool(False).tag(config=True)
-    wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
+    wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(4.3)).tag(config=True)
 
     # Adaptation
     adapt_field = Unicode('all_avg', help="Adaptation field of interest.").tag(config=True)
@@ -41,6 +41,7 @@ class ShallowWaterOptions(Options):
     def __init__(self, **kwargs):
         super(ShallowWaterOptions, self).__init__(**kwargs)
         self.degree_increase = 0
+        self.timestepper = 'CrankNicolson'
         self.stabilisation = 'lax_friedrichs'
         self.stabilisation_parameter = Constant(1.0)
 
@@ -91,3 +92,33 @@ class ShallowWaterOptions(Options):
         """Set the initial displacement of the boundary elevation."""
         self.elev_in = Constant(0.0)
         self.elev_out = Constant(0.0)
+
+    def get_eta_tilde(self, solver_obj):
+        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
+        eta = solver_obj.fields.elev_2d
+        self.eta_tilde.project(eta + bathymetry_displacement(eta))
+
+    def get_export_func(self, solver_obj):
+        def export_func():
+            self.get_eta_tilde(solver_obj)
+            self.eta_tilde_file.write(self.eta_tilde)
+        return export_func
+        
+    def get_initial_depth(self, fs):
+        """Compute the initial total water depth, using the bathymetry and initial elevation."""
+        if not hasattr(self, 'initial_value'):
+            self.set_initial_condition(fs)
+        
+        eta = self.initial_value.split()[1]
+        V = FunctionSpace(eta.function_space().mesh(), 'CG', 1)
+        eta_cg = Function(V).project(eta)
+        if self.bathymetry is None:
+            self.set_bathymetry(V)       
+            import ipdb; ipdb.set_trace()
+        if self.wetting_and_drying:
+            bathymetry_displacement = self.wd_dispacement_mc(eta)
+            self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta_cg, V)
+        else:
+            self.depth = interpolate(self.bathymetry + eta_cg, V)
+
+        return self.depth

@@ -198,3 +198,23 @@ class BalzanoOptions(ShallowWaterOptions):
                 wd = project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
         return export_func
+
+    def plot_heaviside(self):
+        """Timeseries plot of approximate Heavyside function."""
+        scaling = 0.7
+        plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
+        plt.gcf().subplots_adjust(bottom=0.15)
+        T = [[t/3600]*20 for t in self.trange]
+        X = [self.xrange for t in T]
+
+        cset1 = plt.contourf(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
+        plt.clim(0.0, 1.2)
+        cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
+        plt.clim(0.0, 1.2)
+        cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels = [0.5])
+        cb = plt.colorbar(cset1, ticks=np.linspace(0, 1, 6))
+        cb.set_label("$\mathcal H(\eta-b)$")
+        plt.ylim(min(X[0]), max(X[0]))
+        plt.xlabel("Time [$\mathrm h$]")
+        plt.ylabel("$x$ [$\mathrm m$]")
+        plt.savefig(os.path.join(self.di, "heaviside_timeseries.pdf"))
