@@ -3,22 +3,15 @@ from thetis.configuration import *
 
 import scipy.interpolate as si
 import numpy as np
-import matplotlib
-import matplotlib.pyplot as plt
 import h5py
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import *
-from adapt_utils.adapt.metric import steady_metric
 from adapt_utils.norms import total_variation, lp_norm
-from adapt_utils.misc import find, heaviside_approx
+from adapt_utils.misc import find
 
 
 __all__ = ["TsunamiOptions"]
-
-
-# matplotlib.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})  # FIXME
-# matplotlib.rc('text', usetex=True)  # FIXME
 
 
 class TsunamiOptions(ShallowWaterOptions):
