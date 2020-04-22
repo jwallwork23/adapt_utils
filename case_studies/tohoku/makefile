@@ -1,8 +1,17 @@
-all: dir convert uniform metric_based monitor_based fixed_mesh
+all: dir mesh uniform metric_based monitor_based fixed_mesh
 
 dir:
 	@echo "Creating output directory..."
-	@mkdir outputs
+	@mkdir -p outputs/meshes
+	@echo "Done!"
+
+mesh:
+	@echo "Generating meshes..."
+	@python3 meshgen.py 0
+	@python3 meshgen.py 1
+	@python3 meshgen.py 2
+	@python3 meshgen.py 3
+	@python3 meshgen.py 4
 	@echo "Done!"
 
 uniform:

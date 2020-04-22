@@ -1,10 +1,9 @@
 """
 Top matter courtesy of Tobias Bieniek, 2012.
 """
-from firedrake import *
 import ufl
-
 import numpy as np
+from math import pi, sqrt
 
 class OutOfRangeError(ValueError):
     pass
@@ -75,7 +74,12 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
 
     if isinstance(northing, ufl.indexed.Indexed):
         print("#### TODO: Check validity of coordinates")  # TODO
+        from firedrake import sin, cos, sqrt
+    elif isinstance(latitude, np.ndarray):
+        print("#### TODO: Check validity of coordinates")  # TODO
+        from numpy import sin, cos, sqrt
     else:
+        from math import sin, cos, sqrt
         if not 0 <= northing <= 10000000:
             raise OutOfRangeError('northing out of range (must be between 0 m and 10,000,000 m)')
     if not 1 <= zone_number <= 60:
@@ -146,7 +150,12 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
     """
     if isinstance(latitude, ufl.indexed.Indexed):
         print("#### TODO: Check validity of coordinates")  # TODO
+        from firedrake import sin, cos, sqrt
+    elif isinstance(latitude, np.ndarray):
+        print("#### TODO: Check validity of coordinates")  # TODO
+        from numpy import sin, cos, sqrt
     else:
+        from math import sin, cos, sqrt
         if not -80.0 <= latitude <= 84.0:
             raise OutOfRangeError('latitude out of range (must be between 80 deg S and 84 deg N)')
         if not -180.0 <= longitude <= 180.0:
@@ -187,6 +196,8 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
                                         a6/720*(61 - 58*lat_tan2 + lat_tan4 + 600*c - 330*E_P2)))
 
     if isinstance(latitude, ufl.indexed.Indexed):
+        print("#### TODO: Check validity of coordinates")  # TODO
+    elif isinstance(latitude, np.ndarray):
         print("#### TODO: Check validity of coordinates")  # TODO
     else:
         if latitude < 0:
@@ -250,20 +261,7 @@ def lonlat_to_utm(longitude, latitude, force_zone_number, **kwargs):
     :arg latitude: northward anglular position, origin at the Equator.
     :param force_zone_number: force coordinates to fall within a particular UTM zone.
     """
-    z = force_zone_number
-    if isinstance(latitude, np.ndarray):
-        assert(isinstance(longitude, np.ndarray))
-        nlon = len(longitude)
-        nlat = len(latitude)
-        x = np.zeros((nlon*nlat))
-        y = np.zeros((nlon*nlat))
-        for i in range(nlon):
-            for j in range(nlat):
-                k = i*nlat + j
-                x[k], y[k] = from_latlon(latitude[j], longitude[i], force_zone_number=z, **kwargs)
-        return x, y
-    else:
-        return from_latlon(latitude, longitude, force_zone_number=z, **kwargs)
+    return from_latlon(latitude, longitude, force_zone_number, **kwargs)
 
 
 def utm_to_lonlat(x, y, zone_number, **kwargs):
@@ -273,17 +271,5 @@ def utm_to_lonlat(x, y, zone_number, **kwargs):
     :args x,y: UTM coordinates.
     :arg zone_number: UTM zone.
     """
-    if isinstance(x, np.ndarray):
-        assert(isinstance(y, np.ndarray))
-        nx = len(x)
-        ny = len(y)
-        lon = np.zeros((nx*ny))
-        lat = np.zeros((nx*ny))
-        for i in range(nx):
-            for j in range(ny):
-                k = i*ny + j
-                lat[k], lon[k] = to_latlon(x[i], y[j], zone_number, **kwargs)
-        return lon, lat
-    else:
-        lat, lon = to_latlon(x, y, zone_number, **kwargs)
-        return lon, lat
+    lat, lon = to_latlon(x, y, zone_number, **kwargs)
+    return lon, lat

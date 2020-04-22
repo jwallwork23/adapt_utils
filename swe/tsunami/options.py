@@ -17,8 +17,8 @@ from adapt_utils.misc import find, heaviside_approx
 __all__ = ["TsunamiOptions"]
 
 
-matplotlib.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
-matplotlib.rc('text', usetex=True)
+# matplotlib.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})  # FIXME
+# matplotlib.rc('text', usetex=True)  # FIXME
 
 
 class TsunamiOptions(ShallowWaterOptions):
@@ -27,55 +27,13 @@ class TsunamiOptions(ShallowWaterOptions):
     """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
 
-    def __init__(self, mesh=None, utm=True, n=30, setup=True, **kwargs):
-        self.utm = utm
-        if mesh is not None:
-            self.default_mesh = mesh
+    def __init__(self, **kwargs):
         super(TsunamiOptions, self).__init__(**kwargs)
-        
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False
-
-        # Setup longitude-latitude domain
-        if not hasattr(self, 'default_mesh') and setup:
-            b_lon, b_lat, b = self.read_bathymetry_file()
-            lon_min = np.min(b_lon)
-            lon_diff = np.max(b_lon) - lon_min
-            lat_min = np.min(b_lat)
-            lat_diff = np.max(b_lat) - lat_min
-            self.lonlat_mesh = RectangleMesh(n, n*int(np.round(lon_diff/lat_diff)), lon_diff, lat_diff)
-            lon, lat = SpatialCoordinate(self.lonlat_mesh)
-            self.lonlat_mesh.coordinates.interpolate(as_vector([lon + lon_min, lat + lat_min]))
-
-            # Setup problem domain
-            self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
-            if self.utm:
-                self.get_utm_mesh()
-
-            # Set fields
-            self.set_bathymetry(dat=(b_lon, b_lat, b), adapted=False)
-            self.set_initial_surface()
         self.base_viscosity = 1.0e-3
-
-        # Wetting and drying
-        self.wetting_and_drying = True
-        self.wetting_and_drying_alpha = Constant(0.43)
-
-        # Timestepping
-        self.timestepper = 'CrankNicolson'
-        self.dt = 5.0
-        self.dt_per_export = 12
-        self.dt_per_remesh = 12
-        self.end_time = 1500.0
-
         self.gauges = {}
         self.locations_of_interest = {}
-
-        # Outputs
-        if setup:
-            P1DG = FunctionSpace(self.default_mesh, "DG", 1)
-            self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
-            self.eta_tilde = Function(P1DG, name='Modified elevation')
 
     def get_utm_mesh(self):
         zone = self.force_zone_number
@@ -86,29 +44,35 @@ class TsunamiOptions(ShallowWaterOptions):
     def get_lonlat_mesh(self, northern=True):
         zone = self.force_zone_number
         self.lonlat_mesh = Mesh(Function(self.default_mesh.coordinates))
-        if self.utm:
-            x, y = SpatialCoordinate(self.lonlat_mesh)
-            self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
+        x, y = SpatialCoordinate(self.lonlat_mesh)
+        self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
 
-    def set_bathymetry(self, fs=None, dat=None, adapted=False):
-        if fs is not None:
-            self.default_mesh = fs.mesh()
+    def set_bathymetry(self, dat=None, cap=None):
+        assert hasattr(self, 'initial_surface')
+        if cap is not None:
+            assert cap > 0.0
         P1 = FunctionSpace(self.default_mesh, "CG", 1)
         self.bathymetry = Function(P1, name="Bathymetry")
-        if adapted or not hasattr(self, 'lonlat_mesh'):
-            self.get_lonlat_mesh()
 
         # Interpolate bathymetry data *in lonlat space*
         lon, lat, elev = dat or self.read_bathymetry_file()
-        bath_interp = si.RectBivariateSpline(lat, lon, elev)
+        self.print_debug("Transforming bathymetry to UTM coordinates...")
+        x, y = lonlat_to_utm(lon, lat, self.force_zone_number)
+        self.print_debug("Done!")
+        self.print_debug("Creating bathymetry interpolator...")
+        bath_interp = si.RectBivariateSpline(y, x, elev)
+        self.print_debug("Done!")
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating bathymetry...")
         msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
-        for i in range(self.lonlat_mesh.num_vertices()):
-            lonlat = self.lonlat_mesh.coordinates.dat.data[i] 
-            self.bathymetry.dat.data[i] = -bath_interp(lonlat[1], lonlat[0])
-            self.print_debug(msg.format(lonlat[0], lonlat[1], self.bathymetry.dat.data[i]/1000))
+        depth = self.bathymetry.dat.data 
+        for i, xy in enumerate(self.default_mesh.coordinates.dat.data):
+            depth[i] -= self.initial_surface.dat.data[i]
+            depth[i] -= bath_interp(xy[1], xy[0])
+            self.print_debug(msg.format(xy[0], xy[1], depth[i]/1000))
+        if cap is not None:
+            self.bathymetry.interpolate(max_value(cap, self.bathymetry))
         self.print_debug("Done!")
         return self.bathymetry
 
@@ -117,14 +81,14 @@ class TsunamiOptions(ShallowWaterOptions):
         self.initial_surface = Function(P1, name="Initial free surface")
 
         # Interpolate bathymetry data *in lonlat space*
-        x0, y0, elev = self.read_surface_file()
-        surf_interp = si.RectBivariateSpline(y0, x0, elev)
+        lon, lat, elev = self.read_surface_file()
+        x, y = lonlat_to_utm(lon, lat, self.force_zone_number)
+        surf_interp = si.RectBivariateSpline(y, x, elev)
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating initial surface...")
         msg = "Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
-        for i in range(self.lonlat_mesh.num_vertices()):
-            xy = self.lonlat_mesh.coordinates.dat.data[i] 
+        for i, xy in enumerate(self.default_mesh.coordinates.dat.data):
             self.initial_surface.dat.data[i] = surf_interp(xy[1], xy[0])
             self.print_debug(msg.format(xy[0], xy[1], self.initial_surface.dat.data[i]))
         self.print_debug("Done!")
@@ -146,49 +110,9 @@ class TsunamiOptions(ShallowWaterOptions):
     def set_coriolis(self, fs):
         self.coriolis = Function(fs)
         x, y = SpatialCoordinate(fs.mesh())
-        lat = to_latlon(x, y, self.force_zone_number, northern=True, force_longitude=True)[0] if self.utm else y
+        lat, lon = to_latlon(x, y, self.force_zone_number, northern=True, force_longitude=True)
         self.coriolis.interpolate(2*self.Omega*sin(radians(lat)))
         return self.coriolis
-
-    def plot_coastline(self, axes):
-        """
-        Plot the coastline according to `bathymetry` on `axes`.
-        """
-        plot(self.bathymetry, vmin=-0.01, vmax=0.01, levels=0, axes=axes, cmap=None, colors='k', contour=True)
-
-    def get_eta_tilde(self, solver_obj):
-        bathymetry_displacement = solver_obj.eq_sw.bathymetry_displacement_mass_term.wd_bathymetry_displacement
-        eta = solver_obj.fields.elev_2d
-        self.eta_tilde.project(eta + bathymetry_displacement(eta))
-        
-    def get_initial_depth(self, fs):
-        """Compute the initial total water depth, using the bathymetry and initial elevation."""
-        if not hasattr(self, 'initial_value'):
-            self.set_initial_condition(fs)
-        
-        eta = self.initial_value.split()[1]
-        V = FunctionSpace(eta.function_space().mesh(), 'CG', 1)
-        eta_cg = Function(V).project(eta)
-        if self.bathymetry is None:
-            self.set_bathymetry(V)       
-            import ipdb; ipdb.set_trace()
-        if self.wetting_and_drying:
-            bathymetry_displacement = self.wd_dispacement_mc(eta)
-            self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta_cg, V)
-        else:
-            self.depth = interpolate(self.bathymetry + eta_cg, V)
-
-        return self.depth
-
-    def wd_dispacement_mc(self, eta):
-        H = self.bathymetry + eta
-        return 0.5 * (sqrt(H ** 2 + self.wetting_and_drying_alpha ** 2) - H)
-
-    def get_export_func(self, solver_obj):
-        def export_func():
-            self.get_eta_tilde(solver_obj)
-            self.eta_tilde_file.write(self.eta_tilde)
-        return export_func
 
     # TODO: Plot multiple mesh approaches
     def plot_timeseries(self, gauge, extension=None, plot_lp=False, cutoff=25):
@@ -295,32 +219,6 @@ class TsunamiOptions(ShallowWaterOptions):
 
     def set_qoi_kernel(self, solver_obj):
         pass  # TODO
-
-    def plot(self):
-        self.plot_heaviside()
-        if 'volume' in self.qoi_mode:
-            self.plot_qoi()
-        # print_output("QoI '{:s}' = {:.4e}".format(self.qoi_mode, self.evaluate_qoi()))
-
-    def plot_heaviside(self):
-        """Timeseries plot of approximate Heavyside function."""
-        scaling = 0.7
-        plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
-        plt.gcf().subplots_adjust(bottom=0.15)
-        T = [[t/3600]*20 for t in self.trange]
-        X = [self.xrange for t in T]
-
-        cset1 = plt.contourf(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
-        plt.clim(0.0, 1.2)
-        cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
-        plt.clim(0.0, 1.2)
-        cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels = [0.5])
-        cb = plt.colorbar(cset1, ticks=np.linspace(0, 1, 6))
-        cb.set_label("$\mathcal H(\eta-b)$")
-        plt.ylim(min(X[0]), max(X[0]))
-        plt.xlabel("Time [$\mathrm h$]")
-        plt.ylabel("$x$ [$\mathrm m$]")
-        plt.savefig(os.path.join(self.di, "heaviside_timeseries.pdf"))
 
     def plot_qoi(self):
         """Timeseries plot of instantaneous QoI."""
