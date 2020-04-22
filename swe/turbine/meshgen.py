@@ -55,10 +55,10 @@ def generate_geo_file(op, level='xcoarse', filepath='.'):
         f.write('Point({:d}) = {{xt{:d}+D/2, yt{:d}+D/2, 0., dx2}};\n'.format(5+4*i+2, i, i))
         f.write('Point({:d}) = {{xt{:d}-D/2, yt{:d}+D/2, 0., dx2}};\n'.format(5+4*i+3, i, i))
     for j in range(1, 5):
-        f.write('Line({:d}) = {{{:d}, {:d}}};\n'.format(j, j, j%4+1))
+        f.write('Line({:d}) = {{{:d}, {:d}}};\n'.format(j, j, j % 4+1))
     for i in range(n):
         for j in range(4):
-            f.write('Line({:d}) = {{{:d}, {:d}}};\n'.format(5+4*i+j, 5+4*i+j, 5+4*i+(j+1)%4))
+            f.write('Line({:d}) = {{{:d}, {:d}}};\n'.format(5+4*i+j, 5+4*i+j, 5+4*i+(j+1) % 4))
 
     # Domain boundary tags
     f.write('Physical Line(1) = {4};   // Left boundary\n')

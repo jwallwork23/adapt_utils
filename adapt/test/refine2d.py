@@ -12,11 +12,13 @@ coords = amd.mesh.coordinates.copy()
 identity = as_matrix([[1/sqrt(2), 0], [0, 1/sqrt(2)]])
 method = 'topological'
 
+
 def fail(amd, msg):
     print(msg)
     plot(amd.mesh)
     plt.show()
     exit(0)
+
 
 # Check nothing happens when we adapt with the identity metric
 print('Testing hard-coded metric')

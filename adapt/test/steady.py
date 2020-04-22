@@ -1,10 +1,6 @@
 from firedrake import *
 from adapt_utils.adapt.metric import steady_metric
-from adapt_utils.adapt.recovery import construct_hessian
 from adapt_utils.options import *
-import numpy as np
-import os
-import matplotlib.pyplot as plt
 
 
 # Sensor tests considered in [Olivier 2011].
@@ -17,6 +13,7 @@ def sensor(i, mesh):
             conditional(ge(abs(x*y), 2*pi/50), 0.01*sin(50*x*y), sin(50*x*y)),
             0.1*sin(50*x) + atan(0.1/(sin(5*y) - 2*x)),
             atan(0.1/(sin(5*y)-2*x))+atan(0.5/(sin(3*y)-7*x))][i]
+
 
 op = Options()
 op.h_min = 1e-6

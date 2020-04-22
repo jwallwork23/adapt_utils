@@ -48,17 +48,21 @@ x, y = SpatialCoordinate(mesh)
 mesh.coordinates.interpolate(as_vector([x-1, y-1]))
 P1 = FunctionSpace(mesh, "CG", 1)
 
+
 def myplot(f):
     plot(interpolate(f(mesh), P1))
     plt.title(f.__name__)
     plt.show()
 
+
 def monitor_frobenius(mesh):
     H = construct_hessian(sensor(mesh), mesh=mesh, op=op)
     return 1.0 + local_frobenius_norm(H, space=P1)
 
+
 def monitor_sensor(mesh, alpha=5.0):
     return 1.0 + alpha*abs(sensor(mesh))
+
 
 if m == 'sensor':
     monitor = monitor_sensor

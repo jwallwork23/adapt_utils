@@ -12,7 +12,7 @@ import h5py
 import os
 
 
-rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
 rc('text', usetex=True)
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
@@ -88,9 +88,11 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
     """
     def get_update_forcings(self):
         op = self.op
+
         def update_forcings(t):
             op.elev_in.assign(op.max_amplitude*cos(op.omega*(t-op.T_ramp)))
             op.elev_out.assign(op.max_amplitude*cos(op.omega*(t-op.T_ramp)+pi))
+
         return update_forcings
 
     def extra_setup(self):
@@ -131,7 +133,7 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
         dat = h5py.File(os.path.join(self.op.di, 'diagnostic_turbine.hdf5'))
         time_period = np.array(dat['time'])
         if time_period[-1] < 60.0*5:
-            time_units = '$\mathrm s$'
+            time_units = r'$\mathrm s$'
         elif time_period[-1] < 3600.0*5:
             time_units = 'minutes'
             time_period /= 60.0
@@ -142,22 +144,22 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
         dat.close()
         max_power = power.max()
         if max_power < 5e3:
-            power_units = '$\mathrm W$'
+            power_units = r'$\mathrm W$'
         elif max_power < 5e6:
-            power_units = '$\mathrm{kW}$'
+            power_units = r'$\mathrm{kW}$'
             power /= 1e3
         else:
-            power_units = '$\mathrm{MW}$'
+            power_units = r'$\mathrm{MW}$'
             power /= 1e6
         total_power = np.sum(power, axis=0)
         num_turbines = power.shape[0]
-        fig = plt.figure(figsize=(12, 7))
+        plt.figure(figsize=(12, 7))
         ax = plt.subplot(111)
         array_width = self.op.array_width
         n = self.op.dt_per_export
         for i in range(num_turbines):
-            col = (i-i%array_width)//array_width
-            row = i%array_width
+            col = (i-i % array_width)//array_width
+            row = i % array_width
             label = 'Turbine {:d}({:s})'.format(col+1, chr(97+row))
             colour = ['tab:blue', 'tab:orange', 'tab:green', 'tab:red', 'tab:purple',
                       'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan'][col]
@@ -171,7 +173,7 @@ class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
         plt.savefig(os.path.join(self.op.di, 'power_timeseries.pdf'))
         plt.title('Power output of turbines in a {:d} turbine array'.format(num_turbines), fontsize=fontsize)
         plt.savefig(os.path.join(self.op.di, 'power_timeseries.png'))
-        fig = plt.figure()
+        plt.figure()
         ax = plt.subplot(111)
         ax.plot(time_period[::n], total_power[::n], marker='x')
         plt.xlabel(r'Time ({:s})'.format(time_units), fontsize=fontsize)
