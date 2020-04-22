@@ -47,7 +47,7 @@ class TsunamiOptions(ShallowWaterOptions):
         x, y = SpatialCoordinate(self.lonlat_mesh)
         self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
 
-    def set_bathymetry(self, dat=None, cap=None):
+    def set_bathymetry(self, dat=None, cap=30.0):
         assert hasattr(self, 'initial_surface')
         if cap is not None:
             assert cap > 0.0
@@ -65,12 +65,12 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating bathymetry...")
-        msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
+        # msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
         depth = self.bathymetry.dat.data 
         for i, xy in enumerate(self.default_mesh.coordinates.dat.data):
             depth[i] -= self.initial_surface.dat.data[i]
             depth[i] -= bath_interp(xy[1], xy[0])
-            self.print_debug(msg.format(xy[0], xy[1], depth[i]/1000))
+            # self.print_debug(msg.format(xy[0], xy[1], depth[i]/1000))
         if cap is not None:
             self.bathymetry.interpolate(max_value(cap, self.bathymetry))
         self.print_debug("Done!")
@@ -87,10 +87,10 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating initial surface...")
-        msg = "Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
+        # msg = "Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
         for i, xy in enumerate(self.default_mesh.coordinates.dat.data):
             self.initial_surface.dat.data[i] = surf_interp(xy[1], xy[0])
-            self.print_debug(msg.format(xy[0], xy[1], self.initial_surface.dat.data[i]))
+            # self.print_debug(msg.format(xy[0], xy[1], self.initial_surface.dat.data[i]))
         self.print_debug("Done!")
         return self.initial_surface
 
