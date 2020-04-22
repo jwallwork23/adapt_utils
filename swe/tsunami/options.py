@@ -124,7 +124,7 @@ class TsunamiOptions(ShallowWaterOptions):
         except AssertionError:
             raise ValueError("Gauge '{:s}' is not valid. Choose from {:}.".format(gauge, self.gauges.keys()))
 
-        fig = plt.figure(figsize=[6.4, 4.8])
+        fig = plt.figure(figsize=[10.0, 5.0])
         ax = fig.add_subplot(111)
 
         # Plot measurements
@@ -149,7 +149,6 @@ class TsunamiOptions(ShallowWaterOptions):
                 errors[key]['rel'] = []
 
         # Find all relevant HDF5 files and sort by ascending mesh resolution
-        approach = 'uniform' if self.approach == 'fixed_mesh' else self.approach
         fnames = find('diagnostic_gauges_*.hdf5', self.di)
         resolutions = []
         for fname in fnames:
@@ -175,7 +174,7 @@ class TsunamiOptions(ShallowWaterOptions):
             t = t.reshape(len(t),)[:cutoff+1]/60.0
 
             # Plot timeseries for current mesh resolution
-            label = ' '.join([approach.replace('_', ' '), "({:d} cells)".format(res)]).title()
+            label = ' '.join([self.approach.replace('_', ' '), "({:d} cells)".format(res)]).title()
             ax.plot(t, y, label=label, linestyle='dashed', marker='x')
             f.close()
 
@@ -189,12 +188,19 @@ class TsunamiOptions(ShallowWaterOptions):
                 errors['tv']['abs'].append(total_variation(error))
                 for key in errors:
                     errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
-        plt.xlabel(r"Time $[\mathrm{min}]$")
-        plt.ylabel("Free surface displacement $[\mathrm m]$")
+        # plt.xlabel(r"Time $[\mathrm{min}]$")
+        plt.xlabel("Time [min]")
+        # plt.ylabel(r"Free surface displacement $[\mathrm m]$")
+        plt.ylabel("Free surface displacement [m]")
         plt.xlim([0, cutoff])
         plt.ylim([-2, 5])
         plt.grid(True)
-        ax.legend()
+
+        # Legend to one side
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width*0.8, box.height])
+        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+
         fname = "gauge_timeseries_{:s}".format(gauge)
         if extension is not None:
             fname = '_'.join([fname, str(extension)])
@@ -220,11 +226,10 @@ class TsunamiOptions(ShallowWaterOptions):
     def set_qoi_kernel(self, solver_obj):
         pass  # TODO
 
-    def plot_qoi(self):
+    def plot_qoi(self):  # FIXME
         """Timeseries plot of instantaneous QoI."""
         print_output("#### TODO: Update plotting to use callback")
-        return  # TODO: temp
-        plt.figure(2)
+        plt.figure()
         T = self.trange/3600
         qois = [q/1.0e9 for q in self.qois]
         qoi = self.evaluate_qoi()/1.0e9

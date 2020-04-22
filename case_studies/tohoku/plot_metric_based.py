@@ -8,7 +8,7 @@ from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
 
 
-mpl.rc('font',**{'family':'sans-serif','sans-serif':['Helvetica']})
+mpl.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
 mpl.rc('text', usetex=True)
 
 parser = argparse.ArgumentParser()
@@ -59,7 +59,7 @@ ax2.set_title("Adapted mesh interpolant")
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
 xlim = plt.gca().get_xlim()
 ylim = plt.gca().get_ylim()
-cb.set_label("Bathymetry $[\mathrm k\mathrm m]$")
+cb.set_label(r"Bathymetry $[\mathrm k\mathrm m]$")
 mpl.pyplot.savefig('outputs/metric_adapt_bathymetry_{:d}.pdf'.format(tp.num_cells[-1]))
 
 # New figure for initial free surface
@@ -91,5 +91,5 @@ ax2.set_title("Adapted mesh interpolant")
 
 # Save adapted mesh and interpolant
 cb = fig.colorbar(cs, orientation='horizontal', ax=axes.ravel().tolist(), pad=0.2)
-cb.set_label("Initial free surface $[\mathrm m]$")
+cb.set_label(r"Initial free surface $[\mathrm m]$")
 mpl.pyplot.savefig('outputs/metric_adapt_ic_{:d}.pdf'.format(tp.num_cells[-1]))
