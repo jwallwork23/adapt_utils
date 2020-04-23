@@ -26,7 +26,7 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, level=0, **kwargs):
+    def __init__(self, level=0, locations=["Fukushima Daiichi", ], **kwargs):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
         self.base_viscosity = 0.0
@@ -43,10 +43,12 @@ class TohokuOptions(TsunamiOptions):
         self.set_bathymetry()
 
         # Timestepping: export once per minute for 25 minutes
-        self.timestepper = 'DIRK22'
+        self.timestepper = 'CrankNicolson'
+        # self.timestepper = 'SSPRK33'
         self.dt = 5.0
-        self.dt_per_export = 12
-        self.dt_per_remesh = 12
+        # self.dt = 0.01
+        self.dt_per_export = int(60.0/self.dt)
+        self.dt_per_remesh = int(60.0/self.dt)
         self.end_time = 1500.0
         # self.end_time = 3600.0
 
@@ -60,7 +62,7 @@ class TohokuOptions(TsunamiOptions):
             "804": {"lonlat": (142.1867, 39.6272)},
             "806": {"lonlat": (141.1856, 36.9714)},
         }
-        # TODO: remove timeseries
+        # TODO: Use converted pressure timeseries
         self.gauges["P02"]["data"] = [0.00, 0.07, 0.12, 0.46, 0.85, 1.20, 1.55, 1.90, 2.25, 2.50,
                                       2.80, 3.10, 3.90, 4.80, 4.46, 2.25, -0.45, -0.17, -1.60,
                                       -0.82, -0.44, -0.26, -0.08, 0.13, 0.42, 0.71]
@@ -68,8 +70,8 @@ class TohokuOptions(TsunamiOptions):
                                       2.90, 3.50, 4.50, 4.85, 3.90, 1.55, -0.35, -1.05, -0.65,
                                       -0.30, -0.15, 0.05, 0.18, 0.35, 0.53, 0.74]
 
-        # Coastal locations of interest, including major cities and nuclear power plants
-        self.locations_of_interest = {
+        # Possible coastal locations of interest, including major cities and nuclear power plants
+        locations_of_interest = {
             "Fukushima Daiichi": {"lonlat": (141.0281, 37.4213)},
             "Onagawa": {"lonlat": (141.5008, 38.3995)},
             "Fukushima Daini": {"lonlat": (141.0249, 37.3166)},
@@ -78,6 +80,7 @@ class TohokuOptions(TsunamiOptions):
             "Tohoku": {"lonlat": (141.3903, 41.1800)},
             "Tokyo": {"lonlat": (139.6917, 35.6895)},
         }
+        self.locations_of_interest = {loc: locations_of_interest[loc] for loc in locations}
 
         # Convert coordinates to UTM and create timeseries array
         for loc in (self.gauges, self.locations_of_interest):
@@ -87,10 +90,12 @@ class TohokuOptions(TsunamiOptions):
                 loc[l]["utm"] = from_latlon(lat, lon, force_zone_number=54)
                 loc[l]["coords"] = loc[l]["utm"]
 
-        # TODO: Automate more locations
-        tup = self.locations_of_interest["Fukushima Daiichi"]["coords"]
-        tup += (50.0e+03, )  # Radius of 50km
-        self.region_of_interest = [tup, ]
+        # Regions of interest
+        self.region_of_interest = []
+        for loc in self.locations_of_interest:
+            tup = self.locations_of_interest[loc]["coords"]
+            tup += (50.0e+03, )  # Radius of 50km
+            self.region_of_interest.append(tup)
 
     def read_bathymetry_file(self):
         self.print_debug("Reading bathymetry file...")
@@ -103,7 +108,7 @@ class TohokuOptions(TsunamiOptions):
         return lon, lat, elev
 
     def read_surface_file(self, zeroed=True):
-        self.print_debug("Reading intial surface file...")
+        self.print_debug("Reading initial surface file...")
         fname = 'surf'
         if zeroed:
             fname = '_'.join([fname, 'zeroed'])
@@ -116,7 +121,16 @@ class TohokuOptions(TsunamiOptions):
         return lon, lat, elev
 
     def set_boundary_conditions(self, fs):
-        self.boundary_conditions = {}
+        ocean_tag = 100
+        coast_tag = 200
+        self.boundary_conditions = {
+            # ocean_tag: {'elev': Constant(0.0)},
+            ocean_tag: {'un': Constant(0.0)},
+            coast_tag: {'un': Constant(0.0)},
+        }
+        # TODO: Sponge at ocean boundary?
+        #        - Could potentially do this by defining a gradation to the ocean boundary with a
+        #          different PhysID.
         return self.boundary_conditions
 
     def get_update_forcings(self, solver_obj):
