@@ -43,6 +43,7 @@ class TohokuOptions(TsunamiOptions):
         self.set_bathymetry()
 
         # Timestepping: export once per minute for 25 minutes
+        self.timestepper = 'DIRK22'
         self.dt = 5.0
         self.dt_per_export = 12
         self.dt_per_remesh = 12
@@ -86,6 +87,11 @@ class TohokuOptions(TsunamiOptions):
                 loc[l]["utm"] = from_latlon(lat, lon, force_zone_number=54)
                 loc[l]["coords"] = loc[l]["utm"]
 
+        # TODO: Automate more locations
+        tup = self.locations_of_interest["Fukushima Daiichi"]["coords"]
+        tup += (50.0e+03, )  # Radius of 50km
+        self.region_of_interest = [tup, ]
+
     def read_bathymetry_file(self):
         self.print_debug("Reading bathymetry file...")
         nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'bathymetry.nc'), 'r')
@@ -118,10 +124,6 @@ class TohokuOptions(TsunamiOptions):
             self.print_debug("#### DEBUG t: {:.2f}".format(t))
             return
         return update_forcings
-
-    def set_qoi_kernel(self, solver_obj):
-        pass
-        # raise NotImplementedError  # TODO
 
     def annotate_plot(self, axes, coords="lonlat", gauges=False):
         """

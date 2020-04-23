@@ -1,8 +1,9 @@
 from thetis import *
 from thetis.configuration import *
 
+import os
+
 from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
-# from adapt_utils.swe.tsunami.qois import InundationCallback
 
 
 __all__ = ["TsunamiProblem"]
@@ -31,27 +32,39 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         op = self.op
 
         # Don't bother plotting velocity
-        # self.solver_obj.options.fields_to_export = ['elev_2d'] if op.plot_pvd else []  # TODO
-        self.solver_obj.options.fields_to_export = ['elev_2d', 'uv_2d'] if op.plot_pvd else []
+        self.solver_obj.options.fields_to_export = ['elev_2d'] if op.plot_pvd else []
         self.solver_obj.options.fields_to_export_hdf5 = ['elev_2d'] if op.save_hdf5 else []
 
-        # Set callbacks to save gauge timeseries to HDF5
+        # --- Callbacks
         self.callbacks = {}
-        locs = [op.gauges[g]["coords"] for g in op.gauges]
-        names = list(op.gauges.keys())
+
+        # Gauge timeseries
+        names = [g for g in op.gauges]
+        locs = [op.gauges[g]["coords"] for g in names]
         fname = "gauges"
         if self.extension is not None:
             fname = '_'.join([fname, self.extension])
         fname = '_'.join([fname, str(self.num_cells[-1])])
-        for g in op.gauges:
-            self.callbacks[g] = callback.DetectorsCallback(
-                self.solver_obj, locs, ['elev_2d'], fname, names)
-            self.solver_obj.add_callback(self.callbacks[g], 'export')
+        self.callbacks['gauges'] = callback.DetectorsCallback(
+            self.solver_obj, locs, ['elev_2d'], fname, names)
+        self.solver_obj.add_callback(self.callbacks['gauges'], 'export')
+        # for g in names:
+        #     x, y = op.gauges[g]["coords"]
+        #     self.callbacks[g] = callback.TimeSeriesCallback2D(
+        #         self.solver_obj, ['elev_2d'], x, y, g, self.di)
+        #     self.solver_obj.add_callback(self.callbacks[g], 'export')
 
-        # TODO: QoI
-        # # Set callback for QoI evaluation
-        # self.callbacks["qoi"] = InundationCallback(self.solver_obj)
-        # self.solver_obj.add_callback(self.callbacks["qoi"])
+        # QoI
+        if not hasattr(self, 'kernel'):
+            self.get_qoi_kernel()
+        File(os.path.join(self.di, 'kernel.pvd')).write(self.kernel.split()[1])
+
+        def qoi(sol):
+            return assemble(inner(self.kernel, sol)*dx)
+
+        self.callbacks["qoi"] = callback.TimeIntegralCallback(
+            qoi, self.solver_obj, self.solver_obj.timestepper, append_to_log=True)
+        self.solver_obj.add_callback(self.callbacks["qoi"], 'timestep')
 
     # TODO: Reduce duplication (this was copied and modified from swe/solver)
     def setup_solver_forward(self):
@@ -68,8 +81,6 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         options = self.solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
-        if hasattr(options, 'use_lagrangian_formulation'):  # TODO: Temporary
-            options.use_lagrangian_formulation = op.approach == 'ale'
 
         # Timestepping
         options.timestep = op.dt
