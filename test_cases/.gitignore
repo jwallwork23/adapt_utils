@@ -32,6 +32,7 @@ inundated_beach/strip.geo
 rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/__pycache__/
+rossby_wave/run_ale.py
 slotted_cylinder/outputs/
 slotted_cylinder/screenshots/
 slotted_cylinder/__pycache__/

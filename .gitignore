@@ -11,7 +11,9 @@ adjoint.py
 *.msh
 *.pvd
 *.vtu
+*.h5
 *.txt
 *.ipynb_checkpoints
 *.hdf5
 *.patch
+*.png
