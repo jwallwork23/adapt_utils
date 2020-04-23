@@ -217,13 +217,21 @@ class TsunamiOptions(ShallowWaterOptions):
             fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
     def set_qoi_kernel(self, solver_obj):
-        P0 = solver_obj.function_spaces.P0_2d
-        U = solver_obj.function_spaces.U_2d  # (Arbitrary)
-        self.kernel = Function(U*P0)
+        # V = solver_obj.function_spaces.U_2d*solver_obj.function_spaces.P0_2d  # (Arbitrary)
+        V = solver_obj.function_spaces.V_2d
+        b = self.ball(V, source=False)
+
+        # TODO: Normalise by area computed on fine reference mesh
+        # area = assemble(b*dx)
+        # area_fine_mesh = ...
+        # rescaling = 1.0 if np.allclose(area, 0.0) else area_fine_mesh/area
+        rescaling = 1.0
+
+        self.kernel = Function(V, name="QoI kernel")
         kernel_u, kernel_eta = self.kernel.split()
         kernel_u.rename("QoI kernel (uv component)")
         kernel_eta.rename("QoI kernel (elev component)")
-        kernel_eta.interpolate(self.ball(P0, source=False))
+        kernel_eta.interpolate(rescaling*b)
         return self.kernel
 
     def plot_qoi(self):  # FIXME
