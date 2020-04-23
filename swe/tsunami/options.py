@@ -217,7 +217,14 @@ class TsunamiOptions(ShallowWaterOptions):
             fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
     def set_qoi_kernel(self, solver_obj):
-        pass  # TODO
+        P0 = solver_obj.function_spaces.P0_2d
+        U = solver_obj.function_spaces.U_2d  # (Arbitrary)
+        self.kernel = Function(U*P0)
+        kernel_u, kernel_eta = self.kernel.split()
+        kernel_u.rename("QoI kernel (uv component)")
+        kernel_eta.rename("QoI kernel (elev component)")
+        kernel_eta.interpolate(self.ball(P0, source=False))
+        return self.kernel
 
     def plot_qoi(self):  # FIXME
         """Timeseries plot of instantaneous QoI."""
