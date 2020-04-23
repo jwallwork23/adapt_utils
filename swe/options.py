@@ -17,8 +17,8 @@ class ShallowWaterOptions(Options):
     bathymetry = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     base_viscosity = NonNegativeFloat(0.0).tag(config=True)
     base_diffusivity = NonNegativeFloat(0.0).tag(config=True)
-    viscosity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
-    diffusivity = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
+    viscosity = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    diffusivity = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     quadratic_drag_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     manning_drag_coefficient = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     inflow = FiredrakeVectorExpression(None, allow_none=True).tag(config=True)
@@ -50,7 +50,10 @@ class ShallowWaterOptions(Options):
 
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
-        self.viscosity = Constant(self.base_viscosity)
+        if np.allclose(self.base_viscosity, 0.0):
+            self.viscosity = None
+        else:
+            self.viscosity = Constant(self.base_viscosity)
         return self.viscosity
 
     def set_source_tracer(self, fs, solver_obj):
@@ -59,7 +62,10 @@ class ShallowWaterOptions(Options):
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
-        self.diffusivity = Constant(self.base_diffusivity)
+        if np.allclose(self.base_diffusivity, 0.0):
+            self.diffusivity = None
+        else:
+            self.diffusivity = Constant(self.base_diffusivity)
         return self.diffusivity
 
     def set_inflow(self, fs):
