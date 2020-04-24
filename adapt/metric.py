@@ -8,7 +8,8 @@ from adapt_utils.adapt.kernels import *
 
 
 __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_intersection",
-           "metric_relaxation", "metric_complexity", "combine_metrics", "time_normalise"]
+           "metric_relaxation", "metric_complexity", "combine_metrics", "time_normalise",
+           "metric_average"]
 
 
 def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options()):
@@ -115,48 +116,66 @@ def isotropic_metric(f, noscale=False, degree=1, op=Options()):
     return interpolate(M_diag*Identity(dim), V_ten)
 
 
-def metric_intersection(M1, M2, bdy=None):
+def metric_intersection(*metrics, bdy=None):
     r"""
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
 
-    :arg M1: first metric to be intersected.
-    :arg M2: second metric to be intersected.
+    :arg metrics: metrics to be intersected.
     :param bdy: specify domain boundary to intersect over.
     :return: intersection of metrics M1 and M2.
     """
+    n = len(metrics)
+    assert n > 0
+    M = metrics[0]
+    for i in range(1, n):
+        M = _metric_intersection_pair(M, metrics[i], bdy=bdy)
+    return M
+
+
+def _metric_intersection_pair(M1, M2, bdy=None):
+    if bdy is not None:
+        raise NotImplementedError  # FIXME: boundary intersection below does not work
     V = M1.function_space()
-    mesh = V.mesh()
-    dim = mesh.topological_dimension()
+    node_set = V.boundary_nodes(bdy, 'topological') if bdy is not None else V.node_set
+    dim = V.mesh().topological_dimension()
     assert dim in (2, 3)
     assert V == M2.function_space()
-    M12 = M1.copy()
-    # FIXME: boundary intersection does not work
-    node_set = V.boundary_nodes(bdy, 'topological') if bdy is not None else V.node_set
+    M12 = M1.copy(deepcopy=True)
     kernel = eigen_kernel(intersect, dim)
     op2.par_loop(kernel, node_set, M12.dat(op2.RW), M1.dat(op2.READ), M2.dat(op2.READ))
     return M12
 
 
-def metric_relaxation(M1, M2, alpha=0.5):
+def metric_relaxation(*metrics, weights):
     r"""
     As an alternative to intersection, pointwise metric information may be combined using a convex
     combination. Whilst this method does not have as clear an interpretation as metric intersection,
     it has the benefit that the combination may be weighted towards one of the metrics in question.
 
-    :arg M1: first metric to be combined.
-    :arg M2: second metric to be combined.
-    :param alpha: scalar parameter in [0,1].
-    :return: convex combination of metrics M1 and M2 with parameter alpha.
+    :arg metrics: metrics to be combined
+    :kwarg weights: weights with which to average
+    :return: convex combination
     """
-    V = M1.function_space()
-    assert V == M2.function_space()
+    n = len(metrics)
+    assert n > 0
+    if weights is None:
+        weights = np.ones(n)/n
+    else:
+        assert len(weights) == n
+    V = metrics[0].function_space()
     M = Function(V)
-    M += alpha*M1 + (1-alpha)*M2
+    for i, Mi in enumerate(metrics):
+        assert Mi.function_space() == V
+        M += Mi*weights[i]
     return M
 
 
-def combine_metrics(M1, M2, average=True):
-    return metric_relaxation(M1, M2) if average else metric_intersection(M1, M2)
+def metric_average(*metrics):
+    return metric_relaxation(*metrics, None)
+
+
+def combine_metrics(*metrics, average=True):
+    return metric_average(*metrics) if average else metric_intersection(*metrics)
 
 
 def metric_complexity(M):
@@ -167,38 +186,33 @@ def metric_complexity(M):
     return assemble(sqrt(det(M))*dx)
 
 
-def time_normalise(hessians, timestep_integrals=None, op=Options()):
+def time_normalise(hessians, timesteps_per_remesh=None, op=Options()):
     r"""
     Normalise a list of Hessians in time as dictated by equation (1) in [Barral et al. 2016].
 
     :arg hessians: list of Hessians to be time-normalised.
-    :kwarg timestep_integrals: list of time integrals of 1/timestep over each remesh step.
+    :kwarg timesteps_per_remesh: list of time integrals of 1/timestep over each remesh step.
         For constant timesteps, this equates to the number of timesteps per remesh step.
     :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
     """
     target = op.target*op.end_time  # Desired space-time complexity
     p = op.norm_order
     n = len(hessians)
-    if timestep_integrals is None:
-        timestep_integrals = np.ones(n)*op.dt_per_remesh
+    if timesteps_per_remesh is None:
+        timesteps_per_remesh = np.ones(n)*op.dt_per_remesh
     else:
-        assert len(timestep_integrals) == n
+        assert len(timesteps_per_remesh) == n
         assert n > 0
     d = hessians[0].function_space().mesh().topological_dimension()
+    z = zip(hessians, timesteps_per_remesh)
 
     # Compute global normalisation coefficient
-    global_norm = 0.0
-    for i, H in enumerate(hessians):
-        Ki = assemble(pow(det(H), p/(2*p + d))*dx)
-        global_norm += Ki*pow(timestep_integrals[i], 2*p/(2*p + d))
-    global_norm = pow(global_norm, -2/d)
+    global_norm = pow(sum(assemble(pow(det(H)*tpr**2, p/(2*p + d))*dx) for H, tpr in z), -2/d)
     op.print_debug("Global normalisation factor: {:.4e}".format(global_norm))
 
     # Normalise on each window
-    local_norm = Constant(0.0)
-    for i, H in enumerate(hessians):
-        local_norm.assign(pow(target, 2/d)*global_norm*pow(timestep_integrals[i], -2/(2*p + d)))
-        H.interpolate(local_norm*pow(det(H), -1/(2*p + d))*H)
+    for H, tpr in z:
+        H.interpolate(pow(target, 2/d)*global_norm*pow(det(H)*tpr**2, -1/(2*p + d))*H)
         H.rename("Time-accurate {:s}".format(H.dat.name))
 
 

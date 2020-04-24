@@ -2,7 +2,7 @@ from thetis import *
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
-from adapt_utils.adapt.metric import steady_metric, metric_complexity, time_normalise
+from adapt_utils.adapt.metric import *
 
 import argparse
 
@@ -47,12 +47,17 @@ hessian_file = File(os.path.join(swp.di, 'hessian.pvd'))
 def hessian(sol):
 
     # TODO: Only setup L2 projection system once
+    # TODO: Re-implement version of below which currently exists in swe/solver
 
     uv, elev = sol.split()
     if op.adapt_field == 'elevation':
         return steady_metric(elev, mesh=swp.mesh, noscale=True, op=op)
     elif op.adapt_field == 'speed':
         return steady_metric(sqrt(inner(uv, uv)), mesh=swp.mesh, noscale=True, op=op)
+    elif op.adapt_field == 'elevation__int__speed':
+        M_elev = steady_metric(elev, mesh=swp.mesh, noscale=True, op=op)
+        M_spd = steady_metric(sqrt(inner(uv, uv)), mesh=swp.mesh, noscale=True, op=op)
+        return metric_intersection(M_elev, M_spd)
     else:
         raise NotImplementedError  # TODO
 
@@ -125,7 +130,7 @@ for i, M in enumerate(average_hessians):
     meshes.append(mesh)
 # mesh_file = File(os.path.join(swp.di, 'mesh.pvd'))  # FIXME
 for i, mesh in enumerate(meshes):
-    msg = "{:d}: complexity {:.1f} vertices {:d} elements {:d}"
+    msg = "{:2d}: complexity {:7.1f} vertices {:6d} elements {:6d}"
     print_output(msg.format(i, complexities[i], mesh.num_vertices(), mesh.num_cells()))
     mesh_file = File(os.path.join(swp.di, 'mesh_{:d}.pvd'.format(i)))  # FIXME
     mesh_file.write(mesh.coordinates)
