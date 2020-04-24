@@ -214,6 +214,59 @@ def time_normalise(hessians, timesteps_per_remesh=None, op=Options()):
         H.rename("Time-accurate {:s}".format(H.dat.name))
 
 
+# TODO: Test identities hold
+def get_density_and_quotients(M):
+    r"""
+    Since metric fields are symmetric, they admit an orthogonal eigendecomposition,
+
+  ..math::
+        M(x) = V(x) \Lambda(x) V(x)^T,
+
+    where :math:`V` and :math:`\Sigma` are matrices holding the eigenvectors and eigenvalues,
+    respectively. Since metric fields are positive definite, we know :math:`\Lambda` is positive.
+
+    The eigenvectors can be interpreted as defining the principal directions. The eigenvalue matrix
+    can be decomposed further to give two meaningful fields: the metric density :math:`d` and
+    anisotropic quotients, encapsulated by the diagonal matrix :math:`R`. These give rise to the
+    decomposition
+
+  ..math::
+        M(x) = d(x)^\frac23 V(x) R(x)^{-\frac23} V(x)^T
+
+    and are given by
+
+  ..math::
+        d = \sum_{i=1}^n h_i,\quad r_i = h_i^3/d,\quad \forall i=1:n,
+
+    where :math:`h_i := \frac1{\sqrt{\lambda_i}}`.
+    """
+    fs_ten = M.function_space()
+    mesh = fs_ten.mesh()
+    fs_vec = VectorFunctionSpace(mesh, fs_ten.ufl_element())
+    fs = FunctionSpace(mesh, fs_ten.ufl_element())
+    dim = mesh.topological_dimension()
+
+    # Setup fields
+    V = Function(fs_ten, name="Eigenvectors")
+    Λ = Function(fs_vec, name="Eigenvalues")
+    h = Function(fs_vec, name="Sizes")
+    density = Function(fs, name="Metric density")
+    quotients = Function(fs_vec, name="Anisotropic quotients")
+
+    # Compute eigendecomposition
+    kernel = eigen_kernel(get_eigendecomposition, dim)
+    op2.par_loop(kernel, fs_ten.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
+
+    # Extract density and quotients
+    h.interpolate(as_vector([1/sqrt(Λ[i]) for i in range(dim)]))
+    d = Constant(1.0)
+    for i in range(dim):
+        d = d/h[i]
+    density.interpolate(d)
+    quotients.interpolate(as_vector([h[i]**3/d for i in range(dim)]))
+    return density, quotients
+
+
 def get_metric_coefficient(a, b, op=Options()):
     r"""
     Solve algebraic problem to get scaling coefficient for interior/boundary metric. See
