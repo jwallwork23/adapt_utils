@@ -2,7 +2,7 @@ from thetis import *
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
-from adapt_utils.adapt.metric import steady_metric
+from adapt_utils.adapt.metric import steady_metric, metric_complexity, time_normalise
 
 import argparse
 
@@ -27,10 +27,9 @@ op = TohokuOptions(
     plot_pvd=True,
     debug=bool(args.debug or False),
     norm_order=int(args.norm_order or 1),  # TODO: L-inf normalisation
-    target=float(args.target or 1.0e+03),  # Desired average spatial complexity
+    target=float(args.target or 1.0e+03),  # Desired average instantaneous spatial complexity
 )
 op.end_time = float(args.end_time or op.end_time)
-op.target *= op.end_time  # Desired space-time complexity
 
 # Setup solver
 swp = TsunamiProblem(op, levels=0)
@@ -109,36 +108,26 @@ swp.solve()
 print_output("Quantity of interest: {:.4e}".format(swp.callbacks["qoi"].get_value()))
 
 
-# --- Global normalisation coefficient
+# --- Time normalise metrics
 
-p = op.norm_order
-d = swp.mesh.topological_dimension()
-glob_norm = 0.0
-for i, H in enumerate(average_hessians):
-    Ki = assemble(pow(det(H), p/(2*p + d))*dx)
-    glob_norm += Ki*pow(timestep_integrals[i], 2*p/(2*p + d))
-glob_norm = pow(glob_norm, -2/d)
-print_output("Global normalisation factor: {:.4e}".format(glob_norm))
-
-
-# --- Construct Hessians on each window
-
+time_normalise(average_hessians, timestep_integrals, op=op)
 metric_file = File(os.path.join(swp.di, 'metric.pvd'))
-local_norm = Constant(0.0)
+complexities = []
 for i, H in enumerate(average_hessians):
-    local_norm.assign(pow(op.target, 2/d)*glob_norm*pow(timestep_integrals[i], -2/(2*p+d)))
-    H.interpolate(local_norm*pow(det(H), -1/(2*p + d))*H)
-    H.rename("Metric")
     metric_file.write(H)
+    complexities.append(metric_complexity(H))
 
 
 # --- Adapt meshes
 meshes = []
-# mesh_file = File(os.path.join(swp.di, 'mesh.pvd'))
 for i, M in enumerate(average_hessians):
-    mesh_file = File(os.path.join(swp.di, 'mesh_{:d}.pvd'.format(i)))  # FIXME
     mesh = adapt(swp.mesh, M)
-    mesh_file.write(mesh.coordinates)
     meshes.append(mesh)
+# mesh_file = File(os.path.join(swp.di, 'mesh.pvd'))  # FIXME
+for i, mesh in enumerate(meshes):
+    msg = "{:d}: complexity {:.1f} vertices {:d} elements {:d}"
+    print_output(msg.format(i, complexities[i], mesh.num_vertices(), mesh.num_cells()))
+    mesh_file = File(os.path.join(swp.di, 'mesh_{:d}.pvd'.format(i)))  # FIXME
+    mesh_file.write(mesh.coordinates)
 
 # --- TODO: Run Hessian based
