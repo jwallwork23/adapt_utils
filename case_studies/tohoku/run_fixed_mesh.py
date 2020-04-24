@@ -1,4 +1,4 @@
-from thetis import Constant, print_output
+from thetis import print_output
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem

@@ -1,4 +1,4 @@
-from thetis import Constant, print_output
+from thetis import print_output
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
@@ -32,6 +32,9 @@ for level in range(levels):
     qois.append(qoi)
     num_cells.append(swp.mesh.num_cells())
 
-# Print results
+# Print/log results
+logfile = open(os.path.join(swp.di, 'qmesh_convergence_log'), 'r')
 for level in range(levels):
     print_output("{:2d}: elements {:6d} qoi {:.4e}".format(level+1, num_cells[level], qois[level]))
+    logfile.write("{:6d} {:.4e}".format(num_cells[level], qois[level]))
+logfile.close()

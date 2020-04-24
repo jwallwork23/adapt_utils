@@ -116,9 +116,12 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         if not hasattr(self, 'kernel'):
             self.get_qoi_kernel()
         File(os.path.join(self.di, 'kernel.pvd')).write(self.kernel.split()[1])
+        kt = Constant(0.0)  # Kernel in time
 
         def qoi(sol):
-            return assemble(inner(self.kernel, sol)*dx)
+            t = self.solver_obj.simulation_time
+            kt.assign(1.0 if t >= op.start_time else 0.0)
+            return assemble(kt*inner(self.kernel, sol)*dx)
 
         self.callbacks["qoi"] = callback.TimeIntegralCallback(
             qoi, self.solver_obj, self.solver_obj.timestepper, append_to_log=op.debug)
