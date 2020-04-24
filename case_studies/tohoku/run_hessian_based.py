@@ -27,10 +27,10 @@ op = TohokuOptions(
     plot_pvd=True,
     debug=bool(args.debug or False),
     norm_order=int(args.norm_order or 1),  # TODO: L-inf normalisation
-    target=float(args.target or 1.0e+06),
+    target=float(args.target or 1.0e+03),  # Desired average spatial complexity
 )
 op.end_time = float(args.end_time or op.end_time)
-print(op.dt)
+op.target *= op.end_time  # Desired space-time complexity
 
 # Setup solver
 swp = TsunamiProblem(op, levels=0)
@@ -46,9 +46,14 @@ hessian_file = File(os.path.join(swp.di, 'hessian.pvd'))
 
 
 def hessian(sol):
+
+    # TODO: Only setup L2 projection system once
+
     uv, elev = sol.split()
     if op.adapt_field == 'elevation':
-        return steady_metric(elev, noscale=True, op=op)
+        return steady_metric(elev, mesh=swp.mesh, noscale=True, op=op)
+    elif op.adapt_field == 'speed':
+        return steady_metric(sqrt(inner(uv, uv)), mesh=swp.mesh, noscale=True, op=op)
     else:
         raise NotImplementedError  # TODO
 
@@ -57,6 +62,8 @@ timestep = lambda sol: 1.0/op.dt
 
 
 def extra_setup():
+
+    # TODO: LaggedTimeIntegralCallback to reduce cost of Hessian computation
 
     # Number of timesteps per export (trivial for constant dt)
     swp.callbacks["timestep"] = callback.TimeIntegralCallback(
@@ -125,7 +132,13 @@ for i, H in enumerate(average_hessians):
     metric_file.write(H)
 
 
-# --- TODO: Adapt meshes
-
+# --- Adapt meshes
+meshes = []
+# mesh_file = File(os.path.join(swp.di, 'mesh.pvd'))
+for i, M in enumerate(average_hessians):
+    mesh_file = File(os.path.join(swp.di, 'mesh_{:d}.pvd'.format(i)))  # FIXME
+    mesh = adapt(swp.mesh, M)
+    mesh_file.write(mesh.coordinates)
+    meshes.append(mesh)
 
 # --- TODO: Run Hessian based
