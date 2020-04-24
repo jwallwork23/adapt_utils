@@ -1,9 +1,10 @@
 from thetis import print_output
 
+import argparse
+import os
+
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
-
-import argparse
 
 
 parser = argparse.ArgumentParser(prog="run_qmesh_convergence")
