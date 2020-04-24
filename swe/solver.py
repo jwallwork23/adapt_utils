@@ -490,7 +490,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             assert not adjoint
         except AssertionError:
             raise NotImplementedError  # TODO
-        self.setup_solver_forward()
+        if not hasattr(self, 'solver_obj'):
+            self.setup_solver_forward()
         self.solver_obj.iterate(update_forcings=self.op.get_update_forcings(self.solver_obj),
                                 export_func=self.op.get_export_func(self.solver_obj))
         self.solution = self.solver_obj.fields.solution_2d

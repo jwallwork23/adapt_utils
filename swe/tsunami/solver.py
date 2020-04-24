@@ -124,7 +124,7 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
             return assemble(kt*inner(self.kernel, sol)*dx)
 
         self.callbacks["qoi"] = callback.TimeIntegralCallback(
-            qoi, self.solver_obj, self.solver_obj.timestepper, append_to_log=op.debug)
+            qoi, self.solver_obj, self.solver_obj.timestepper, name="qoi", append_to_log=op.debug)
         self.solver_obj.add_callback(self.callbacks["qoi"], 'timestep')
 
         # Ensure correct iteration count
@@ -135,3 +135,6 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         if hasattr(self.solver_obj, 'exporters'):
             for e in self.solver_obj.exporters.values():
                 e.set_next_export_ix(self.solver_obj.i_export)
+
+        if hasattr(self, 'extra_setup'):
+            self.extra_setup()
