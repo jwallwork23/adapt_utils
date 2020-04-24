@@ -43,7 +43,6 @@ hessian_file = File(os.path.join(swp.di, 'hessian.pvd'))
 
 # --- Callbacks
 
-
 def hessian(sol):
 
     # TODO: Only setup L2 projection system once
@@ -51,15 +50,12 @@ def hessian(sol):
 
     uv, elev = sol.split()
     if op.adapt_field == 'elevation':
-        return steady_metric(elev, mesh=swp.mesh, noscale=True, op=op)
+        f = elev
     elif op.adapt_field == 'speed':
-        return steady_metric(sqrt(inner(uv, uv)), mesh=swp.mesh, noscale=True, op=op)
-    elif op.adapt_field == 'elevation__int__speed':
-        M_elev = steady_metric(elev, mesh=swp.mesh, noscale=True, op=op)
-        M_spd = steady_metric(sqrt(inner(uv, uv)), mesh=swp.mesh, noscale=True, op=op)
-        return metric_intersection(M_elev, M_spd)
+        f = interpolate(sqrt(inner(uv, uv)), swp.P1DG)
     else:
         raise NotImplementedError  # TODO
+    return steady_metric(f, mesh=swp.mesh, noscale=True, op=op)
 
 
 timestep = lambda sol: 1.0/op.dt

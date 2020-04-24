@@ -12,7 +12,7 @@ __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_
            "metric_average"]
 
 
-def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options()):
+def steady_metric(f=None, H=None, projector=None, noscale=False, op=Options()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
@@ -21,8 +21,8 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options
 
     :kwarg f: Field to compute the Hessian of.
     :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
+    :kwarg projector: :class:`DoubleL2Projector` object to compute Hessian.
     :kwarg noscale: If `noscale == True` then we simply take the Hessian with eigenvalues in modulus.
-    :kwarg degree: polynomial degree of Hessian.
     :kwarg op: `Options` class object providing min/max cell size values.
     :return: Steady metric associated with Hessian `H`.
     """
@@ -32,8 +32,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options
         except AssertionError:
             raise ValueError("Please supply either field for recovery, or Hessian thereof.")
     elif H is None:
-        mesh = mesh or f.function_space().mesh()
-        H = construct_hessian(f, mesh=mesh, op=op)
+        H = construct_hessian(f, op=op) if projector is None else projector.project(f)
     V = H.function_space()
     mesh = V.mesh()
     dim = mesh.topological_dimension()
@@ -67,13 +66,12 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options
     return M
 
 
-def isotropic_metric(f, noscale=False, degree=1, op=Options()):
+def isotropic_metric(f, noscale=False, op=Options()):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
     :arg f: Function to adapt to.
     :kwarg noscale: If `noscale == True` then we simply take the diagonal matrix with `f` in modulus.
-    :kwarg degree: polynomial degree of Hessian.
     :kwarg op: :class:`Options` object providing min/max cell size values.
     :return: Isotropic metric corresponding to `f`.
     """
@@ -257,9 +255,9 @@ def metric_with_boundary(f=None, H=None, h=None, mesh=None, degree=1, op=Options
             raise ValueError("Please supply either field for recovery, or Hessians thereof.")
     else:
         mesh = mesh or f.function_space().mesh()
-        H = H or construct_hessian(f, mesh=mesh, op=op)
+        H = H or construct_hessian(f, op=op)
         if h is None:
-            h = construct_boundary_hessian(f, mesh=mesh, op=op)
+            h = construct_boundary_hessian(f, op=op)
             h.interpolate(abs(h))
     V = h.function_space()
     V_ten = H.function_space()
