@@ -56,7 +56,7 @@ def myplot(f):
 
 
 def monitor_frobenius(mesh):
-    H = construct_hessian(sensor(mesh), mesh=mesh, op=op)
+    H = construct_hessian(sensor(mesh), op=op)
     return 1.0 + local_frobenius_norm(H, space=P1)
 
 

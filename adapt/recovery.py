@@ -9,7 +9,7 @@ __all__ = ["construct_gradient", "construct_hessian", "construct_boundary_hessia
 
 # --- Use the following drivers if only doing a single L2 projection on the current mesh
 
-def construct_gradient(*args, **kwargs):
+def construct_gradient(f, **kwargs):
     r"""
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
@@ -18,16 +18,14 @@ def construct_gradient(*args, **kwargs):
     is not actually a requirement.
 
     :arg f: (scalar) P1 solution field.
-    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a
-                 Function, but a ufl expression.
     :kwarg bcs: boundary conditions for L2 projection.
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
     """
-    return L2ProjectorGradient(*args, **kwargs).project()
+    return L2ProjectorGradient(f.function_space(), **kwargs).project(f)
 
 
-def construct_hessian(*args, **kwargs):
+def construct_hessian(f, **kwargs):
     r"""
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all
     second derivative information has been lost. As such, the Hessian of `f` cannot be directly
@@ -44,16 +42,13 @@ def construct_hessian(*args, **kwargs):
     to recover the Hessian of a P0 field, since no derivatives of `f` are required.
 
     :arg f: P1 solution field.
-    :kwarg mesh: mesh upon which Hessian is to be constructed. This must be applied if `f` is not a
-                 Function, but a ufl expression.
-    :kwarg degree: polynomial degree of Hessian.
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed Hessian associated with `f`.
     """
-    return DoubleL2ProjectorHessian(*args, boundary=False, **kwargs).project()
+    return DoubleL2ProjectorHessian(f.function_space(), boundary=False, **kwargs).project(f)
 
 
-def construct_boundary_hessian(f, mesh=None, degree=1, op=Options()):
+def construct_boundary_hessian(f, **kwargs):
     """
     Recover the Hessian of `f` on the domain boundary. That is, the Hessian in the direction
     tangential to the boundary. In two dimensions this gives a scalar field, whereas in three
@@ -61,13 +56,10 @@ def construct_boundary_hessian(f, mesh=None, degree=1, op=Options()):
     the boundary and is set arbitrarily to 1/h_max in the interior.
 
     :arg f: Scalar solution field.
-    :kwarg mesh: Mesh upon which Hessian is to be constructed. This must be applied if `f` is not a
-                 Function, but a ufl expression.
-    :kwarg degree: Polynomial degree of Hessian.
     :param op: `Options` class object providing max cell size value.
     :return: reconstructed boundary Hessian associated with `f`.
     """
-    return DoubleL2ProjectorHessian(*args, boundary=True, **kwargs).project()
+    return DoubleL2ProjectorHessian(f.function_space(), boundary=True, **kwargs).project(f)
 
 
 # --- Use the following drivers if doing multiple L2 projections on the current mesh
@@ -75,9 +67,9 @@ def construct_boundary_hessian(f, mesh=None, degree=1, op=Options()):
 
 class L2Projector():
 
-    def __init__(self, field, mesh=None, bcs=None, op=Options()):
-        self.field = field
-        self.mesh = mesh or field.function_space().mesh()
+    def __init__(self, function_space, bcs=None, op=Options()):
+        self.field = Function(function_space)
+        self.mesh = function_space.mesh()
         self.n = FacetNormal(self.mesh)
         self.bcs = bcs
         self.kwargs = {
@@ -87,7 +79,9 @@ class L2Projector():
     def setup(self):
         pass
 
-    def project(self):
+    def project(self, f):
+        assert f.function_space() == self.field.function_space()
+        self.field.assign(f)
         if not hasattr(self, 'projector'):
             self.setup()
         self.projector.solve()
@@ -101,8 +95,8 @@ class L2ProjectorGradient(L2Projector):
         g, φ = TrialFunction(P1_vec), TestFunction(P1_vec)
 
         a = inner(φ, g)*dx
-        # L = inner(φ, grad(self.f))*dx
-        L = f*dot(φ, n)*ds - div(φ)*self.f*dx  # Enables field to be P0
+        # L = inner(φ, grad(self.field))*dx
+        L = self.field*dot(φ, n)*ds - div(φ)*self.field*dx  # Enables field to be P0
         self.l2_projection = Function(P1_vec, name="Recovered gradient")
         prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)
         self.projector = LinearVariationalSolver(prob, **self.kwargs)
@@ -180,17 +174,19 @@ class DoubleL2ProjectorHessian(L2Projector):
         if self.bcs is None:
             a_bc = v*h*ds
             s = perp(self.n)  # Tangent vector
-            L_bc = -(s[0]*v.dx(0)*f.dx(0) + s[1]*v.dx(1)*f.dx(1))*ds
+            L_bc = -(s[0]*v.dx(0)*self.f.dx(0) + s[1]*v.dx(1)*self.f.dx(1))*ds
             self.bcs = EquationBC(a_bc == L_bc, self.l2_projection, 'on_boundary')
 
         prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)
         self.projector = LinearVariationalSolver(prob, **self.kwargs)
 
-    def project(self):
+    def project(self, f):
+        assert f.function_space() == self.field.function_space()
+        self.field.assign(f)
         if not self.boundary and self.hessian_recovery == 'dL2':
             return self._project_interior()
         else:
-            return super(DoubleL2ProjectorHessian, self).project()
+            return super(DoubleL2ProjectorHessian, self).project(f)
 
     def _project_interior(self):
         if not hasattr(self, 'projector'):
