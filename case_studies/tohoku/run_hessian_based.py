@@ -3,6 +3,7 @@ from thetis import *
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import TsunamiProblem
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.recovery import DoubleL2ProjectorHessian
 
 import argparse
 
@@ -41,21 +42,30 @@ timestep_integrals = []
 hessian_file = File(os.path.join(swp.di, 'hessian.pvd'))
 
 
+
 # --- Callbacks
+
+# Setup L2 projector
+if op.adapt_field == 'elevation':
+    fs = swp.solver_obj.function_spaces.H_2d
+elif op.adapt_field == 'speed':
+    fs = swp.P1DG
+else:
+    raise NotImplementedError  # TODO
+projector = DoubleL2ProjectorHessian(fs, op=op)
+
 
 def hessian(sol):
 
-    # TODO: Only setup L2 projection system once
     # TODO: Re-implement version of below which currently exists in swe/solver
 
     uv, elev = sol.split()
     if op.adapt_field == 'elevation':
         f = elev
     elif op.adapt_field == 'speed':
+        # TODO: Use a par_loop instead of interpolate
         f = interpolate(sqrt(inner(uv, uv)), swp.P1DG)
-    else:
-        raise NotImplementedError  # TODO
-    return steady_metric(f, mesh=swp.mesh, noscale=True, op=op)
+    return steady_metric(f, projector=projector, noscale=True, op=op)
 
 
 timestep = lambda sol: 1.0/op.dt
