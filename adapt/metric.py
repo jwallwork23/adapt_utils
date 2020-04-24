@@ -1,12 +1,14 @@
 from firedrake import *
 
+import numpy as np
+
 from adapt_utils.options import Options
 from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hessian
 from adapt_utils.adapt.kernels import *
 
 
 __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_intersection",
-           "metric_relaxation", "metric_complexity", "combine_metrics"]
+           "metric_relaxation", "metric_complexity", "combine_metrics", "time_normalise"]
 
 
 def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options()):
@@ -30,7 +32,7 @@ def steady_metric(f=None, H=None, mesh=None, noscale=False, degree=1, op=Options
             raise ValueError("Please supply either field for recovery, or Hessian thereof.")
     elif H is None:
         mesh = mesh or f.function_space().mesh()
-        H = construct_hessian(f, mesh=mesh, degree=degree, op=op)
+        H = construct_hessian(f, mesh=mesh, op=op)
     V = H.function_space()
     mesh = V.mesh()
     dim = mesh.topological_dimension()
@@ -71,7 +73,7 @@ def isotropic_metric(f, noscale=False, degree=1, op=Options()):
     :arg f: Function to adapt to.
     :kwarg noscale: If `noscale == True` then we simply take the diagonal matrix with `f` in modulus.
     :kwarg degree: polynomial degree of Hessian.
-    :kwarg op: `Options` class providing min/max cell size values.
+    :kwarg op: :class:`Options` object providing min/max cell size values.
     :return: Isotropic metric corresponding to `f`.
     """
     try:
@@ -154,10 +156,7 @@ def metric_relaxation(M1, M2, alpha=0.5):
 
 
 def combine_metrics(M1, M2, average=True):
-    if average:
-        return metric_relaxation(M1, M2)
-    else:
-        return metric_intersection(M1, M2)
+    return metric_relaxation(M1, M2) if average else metric_intersection(M1, M2)
 
 
 def metric_complexity(M):
@@ -166,6 +165,41 @@ def metric_complexity(M):
     based thereupon.
     """
     return assemble(sqrt(det(M))*dx)
+
+
+def time_normalise(hessians, timestep_integrals=None, op=Options()):
+    r"""
+    Normalise a list of Hessians in time as dictated by equation (1) in [Barral et al. 2016].
+
+    :arg hessians: list of Hessians to be time-normalised.
+    :kwarg timestep_integrals: list of time integrals of 1/timestep over each remesh step.
+        For constant timesteps, this equates to the number of timesteps per remesh step.
+    :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
+    """
+    target = op.target*op.end_time  # Desired space-time complexity
+    p = op.norm_order
+    n = len(hessians)
+    if timestep_integrals is None:
+        timestep_integrals = np.ones(n)*op.dt_per_remesh
+    else:
+        assert len(timestep_integrals) == n
+        assert n > 0
+    d = hessians[0].function_space().mesh().topological_dimension()
+
+    # Compute global normalisation coefficient
+    global_norm = 0.0
+    for i, H in enumerate(hessians):
+        Ki = assemble(pow(det(H), p/(2*p + d))*dx)
+        global_norm += Ki*pow(timestep_integrals[i], 2*p/(2*p + d))
+    global_norm = pow(global_norm, -2/d)
+    op.print_debug("Global normalisation factor: {:.4e}".format(global_norm))
+
+    # Normalise on each window
+    local_norm = Constant(0.0)
+    for i, H in enumerate(hessians):
+        local_norm.assign(pow(target, 2/d)*global_norm*pow(timestep_integrals[i], -2/(2*p + d)))
+        H.interpolate(local_norm*pow(det(H), -1/(2*p + d))*H)
+        H.rename("Time-accurate {:s}".format(H.dat.name))
 
 
 def get_metric_coefficient(a, b, op=Options()):
@@ -209,9 +243,9 @@ def metric_with_boundary(f=None, H=None, h=None, mesh=None, degree=1, op=Options
             raise ValueError("Please supply either field for recovery, or Hessians thereof.")
     else:
         mesh = mesh or f.function_space().mesh()
-        H = H or construct_hessian(f, mesh=mesh, degree=degree, op=op)
+        H = H or construct_hessian(f, mesh=mesh, op=op)
         if h is None:
-            h = construct_boundary_hessian(f, mesh=mesh, degree=degree, op=op)
+            h = construct_boundary_hessian(f, mesh=mesh, op=op)
             h.interpolate(abs(h))
     V = h.function_space()
     V_ten = H.function_space()
