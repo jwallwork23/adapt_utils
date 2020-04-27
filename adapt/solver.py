@@ -25,7 +25,7 @@ class AdaptiveProblem():
             raise NotImplementedError  # TODO
 
         # Setup problem
-        self.num_windows = int(np.floor(op.end_time/op.dt/op.dt_per_export))
+        self.num_meshes = op.num_meshes
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
         op.print_debug(op.indent + "SETUP: Building function spaces...")
@@ -44,12 +44,11 @@ class AdaptiveProblem():
         """
         Build an class:`AdaptiveMesh` object associated with each mesh.
         """
-        windows = range(self.num_windows)
-        self.meshes = meshes or [self.op.default_mesh for i in windows]
-        self.ams = [AdaptiveMesh(self.meshes[i], levels=self.levels) for i in windows]
+        self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
+        self.ams = [AdaptiveMesh(self.meshes[i], levels=self.levels) for i in range(self.num_meshes)]
         msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
-        for i in range(self.num_windows):
-            self.op.print_debug(msg.format(i, self.mesh.num_cells()))
+        for i in range(self.num_meshes):
+            self.op.print_debug(msg.format(i, self.meshes[i].num_cells()))
 
     def create_function_spaces(self):
         """
