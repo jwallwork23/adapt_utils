@@ -75,23 +75,26 @@ class AdaptiveShallowWaterProblem(AdaptiveProblem):
         """
         Create a Thetis FlowSolver2d object for solving the shallow water equations on mesh `i`.
         """
+        op = self.op
         if extra_setup is not None:
             self.extra_setup = extra_setup
 
         # Create solver object
-        op = self.op
         solver_obj = solver2d.FlowSolver2d(self.meshes[i], self.bathymetry[i])
+        self.fwd_solvers[i] = solver_obj
         options = solver_obj.options
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
 
         # Timestepping  # TODO: Put parameters in op.timestepping and use update
         options.timestep = op.dt
-        options.simulation_export_time = op.dt
-        options.simulation_end_time = (i+1)*op.end_time/self.num_meshes
+        options.simulation_export_time = op.dt*op.dt_per_export
+        options.simulation_end_time = (i+1)*op.end_time/self.num_meshes - 0.5*op.dt
         options.timestepper_type = op.timestepper
         if op.params != {}:
             options.timestepper_options.solver_parameters = op.params
+        if not self.nonlinear:
+            options.timestepper_options.solver_parameters['snes_type'] = 'ksponly'
         op.print_debug(options.timestepper_options.solver_parameters)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta
@@ -109,7 +112,7 @@ class AdaptiveShallowWaterProblem(AdaptiveProblem):
         options.polynomial_degree = op.degree
         options.update(self.fields[i])
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
-        options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameter
+        options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameters[i]
         options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
         options.use_automatic_sipg_parameter = op.sipg_parameter is None
         options.use_wetting_and_drying = op.wetting_and_drying
@@ -123,20 +126,31 @@ class AdaptiveShallowWaterProblem(AdaptiveProblem):
 
         # NOTE: Extra setup must be done *before* setting initial condition
         if hasattr(self, 'extra_setup'):
-            self.extra_setup(solver_obj)
+            self.extra_setup(i)
 
         # Initial conditions
         uv, elev = self.fwd_solutions[i].split()
         solver_obj.assign_initial_conditions(uv=uv, elev=elev)
 
+        # NOTE: Callbacks must be added *after* setting initial condition
+        if hasattr(self, 'add_callbacks'):
+            self.add_callbacks(i)
+
+        # Ensure time level matches solver iteration
+        solver_obj.i_export = i
+        solver_obj.next_export_t = i*op.dt*op.dt_per_remesh
+        solver_obj.iteration = i*op.dt_per_remesh
+        solver_obj.simulation_time = i*op.dt*op.dt_per_remesh
+        for e in solver_obj.exporters.values():
+            e.set_next_export_ix(solver_obj.i_export)
+
         # For later use
         self.lhs = solver_obj.timestepper.F
         # TODO: Check
         assert self.fwd_solutions[i].function_space() == solver_obj.function_spaces.V_2d
-        self.fwd_solvers[i] = solver_obj
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None):
-        update_forcings = update_forcings or self.op.get_update_forcings(self.fwd.solvers[i])
+        update_forcings = update_forcings or self.op.get_update_forcings(self.fwd_solvers[i])
         export_func = export_func or self.op.get_export_func(self.fwd_solvers[i])
         self.fwd_solvers[i].iterate(update_forcings=update_forcings, export_func=export_func)
         self.fwd_solutions[i].assign(self.fwd_solvers[i].fields.solution_2d)

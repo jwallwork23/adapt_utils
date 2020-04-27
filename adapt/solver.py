@@ -163,6 +163,12 @@ class AdaptiveProblem():
         """Solve adjoint PDE on mesh `i`."""
         raise NotImplementedError("Should be implemented in derived class.")
 
+    def solve(self, adjoint=False):
+        if adjoint:
+            self.solve_adjoint()
+        else:
+            self.solve_forward()
+
     def solve_forward(self):
         """Solve forward problem on the full sequence of meshes."""
         for i in range(self.num_meshes):
