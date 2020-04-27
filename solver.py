@@ -179,14 +179,14 @@ class SteadyProblem():
     def setup_solver_adjoint(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def solve(self, adjoint=False):
+    def solve(self, adjoint=False, **kwargs):
         """
         Solve the forward or adjoint PDE, as specified by the boolean kwarg, `adjoint`.
         """
         if adjoint:
-            self.solve_adjoint()
+            self.solve_adjoint(**kwargs)
         else:
-            self.solve_forward()
+            self.solve_forward(**kwargs)
 
     def solve_forward(self):
         self.setup_solver_forward()
