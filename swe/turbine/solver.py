@@ -1,15 +1,12 @@
 from thetis import *
 
-from adapt_utils.swe.solver import *
-from adapt_utils.swe.turbine.options import *
-from adapt_utils.adapt.recovery import *
-from adapt_utils.adapt.metric import *
-
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib import rc
 import h5py
 import os
+
+from adapt_utils.swe.solver import *
 
 
 rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
@@ -74,12 +71,6 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
 
     def quantity_of_interest_form(self):
         return self.C_D*pow(inner(split(self.solution)[0], split(self.solution)[0]), 1.5)*dx
-
-    def custom_adapt(self):
-        if self.approach == 'vorticity':
-            self.indicator = Function(self.P1, name='vorticity')
-            self.indicator.interpolate(curl(self.solution.split()[0]))
-            self.get_isotropic_metric()
 
 
 class UnsteadyTurbineProblem(UnsteadyShallowWaterProblem):
