@@ -141,8 +141,8 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
     def get_bnd_functions(self, *args):
         b = self.op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
-        swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=b)
-        return swt.get_bnd_functions(self.boundary_conditions, *args)
+        swt = shallowwater_eq.ShallowWaterTerm(self.V, b)
+        return swt.get_bnd_functions(*args, self.boundary_conditions)
 
     def get_strong_residual_forward(self):
         u, eta = self.solution.split()
@@ -283,10 +283,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         else:
             stress = nu*grad(u)
             stress_jump = avg(nu)*tensor_jump(u, n)
-        alpha = self.sipg_parameter
+        alpha = tpe.sipg_parameter
         assert alpha is not None
         loc = i*outer(z, n)
-        flux_terms += -alpha/avg(h)*inner(loc('+') + loc('-'), stress_jump)*dS
+        flux_terms += -avg(alpha/h)*inner(loc('+') + loc('-'), stress_jump)*dS
         flux_terms += inner(loc('+') + loc('-'), avg(stress))*dS
         loc = i*grad(z)
         flux_terms += 0.5*inner(loc('+') + loc('-'), stress_jump)*dS
@@ -579,8 +579,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
 
     def get_bnd_functions(self, *args):
         b = self.op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
-        swt = shallowwater_eq.ShallowWaterTerm(self.V, bathymetry=b)
-        return swt.get_bnd_functions(self.boundary_conditions, *args)
+        swt = shallowwater_eq.ShallowWaterTerm(self.V, b)
+        return swt.get_bnd_functions(*args, self.boundary_conditions)
 
     def get_qoi_kernel(self):
         self.kernel = self.op.set_qoi_kernel(self.solver_obj)
