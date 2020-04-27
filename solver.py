@@ -40,17 +40,17 @@ class SteadyProblem():
         self.levels = levels
 
         # Setup problem
-        op.print_debug(op.indent+"Building mesh...")
+        op.print_debug(op.indent + "Building mesh...")
         self.set_mesh(mesh, hierarchy=hierarchy)
         self.init_mesh = Mesh(Function(self.mesh.coordinates))
-        op.print_debug(op.indent+"Building function spaces...")
+        op.print_debug(op.indent + "Building function spaces...")
         self.create_function_spaces()
-        op.print_debug(op.indent+"Building solutions...")
+        op.print_debug(op.indent + "Building solutions...")
         self.create_solutions()
-        op.print_debug(op.indent+"Building fields...")
+        op.print_debug(op.indent + "Building fields...")
         self.set_fields()
         self.set_stabilisation()
-        op.print_debug(op.indent+"Setting boundary conditions...")
+        op.print_debug(op.indent + "Setting boundary conditions...")
         self.dbcs = []  # TODO: Populate from op
         self.dbcs_adjoint = []  # TODO: Populate from op
         self.boundary_conditions = op.set_boundary_conditions(self.V)
