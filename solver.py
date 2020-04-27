@@ -731,11 +731,11 @@ class SteadyProblem():
         elif approach == 'carpio_both':
             self.dwr_indication(adjoint=False)
             self.indicators[approach] = self.indicators['dwr'].copy()
-            self.get_hessian_metric(noscale=False, degree=1)  # NOTE: degree 0 doesn't work
+            self.get_hessian_metric(noscale=False)
             M = self.M.copy()
             self.dwr_indication(adjoint=True)
             self.indicators[approach] += self.indicators['dwr_adjoint']
-            self.get_hessian_metric(noscale=False, degree=1, adjoint=True)
+            self.get_hessian_metric(noscale=False, adjoint=True)
             self.M = metric_intersection(self.M, M)
             amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicators[approach], op=self.op)
             amd.get_anisotropic_metric()
@@ -745,7 +745,7 @@ class SteadyProblem():
             self.dwr_indication(adjoint=adjoint)
             name = 'dwr_adjoint' if adjoint else 'dwr_forward'
             self.indicators[approach] = self.indicators[name]
-            self.get_hessian_metric(noscale=True, degree=1, adjoint=adjoint)
+            self.get_hessian_metric(noscale=True, adjoint=adjoint)
             amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicators[approach], op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric

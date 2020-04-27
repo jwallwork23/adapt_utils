@@ -3,6 +3,7 @@ from thetis.physical_constants import *
 
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
 from adapt_utils.adapt.metric import *
+from adapt_utils.swe.utils import *
 
 
 __all__ = ["SteadyShallowWaterProblem", "UnsteadyShallowWaterProblem"]
@@ -73,7 +74,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
 
-        # Timestepping
+        # Timestepping  # TODO: Put parameters in op.timestepping and use update
         options.timestep = op.dt
         options.simulation_export_time = op.dt
         options.simulation_end_time = op.end_time
@@ -94,7 +95,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
         options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []
 
-        # Parameters
+        # Parameters  # TODO: Put parameters in op.shallow_water/tracer and use update
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
         options.polynomial_degree = op.degree
@@ -109,9 +110,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.use_automatic_sipg_parameter = op.sipg_parameter is None
         options.use_wetting_and_drying = op.wetting_and_drying
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
-        options.solve_tracer = op.solve_tracer
         if op.solve_tracer:
             raise NotImplementedError  # TODO
+        options.solve_tracer = op.solve_tracer
 
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions
@@ -369,7 +370,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def custom_adapt(self):
         if self.approach == 'vorticity':
             self.indicator = Function(self.P1, name='vorticity')
-            self.indicator.interpolate(curl(self.solution.split()[0]))
+            self.indicator.interpolate(vorticity(self.solution))
             self.get_isotropic_metric()
 
     def plot_solution(self, adjoint=False):
@@ -386,44 +387,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
 
     def get_hessian_metric(self, adjoint=False, **kwargs):
         kwargs.setdefault('noscale', False)
-        kwargs.setdefault('degree', 1)
-        kwargs.setdefault('mesh', self.mesh)
-        kwargs.setdefault('op', self.op)
-        field = self.op.adapt_field
+        kwargs['op'] = self.op
         sol = self.adjoint_solution if adjoint else self.solution
-        u, eta = sol.split()
-
-        fdict = {'elevation': eta, 'velocity_x': u[0], 'velocity_y': u[1],
-                 'speed': sqrt(inner(u, u)), 'inflow': inner(u, self.fields['inflow'])}
-        fdict.update(self.fields)
-
-        self.M = Function(self.P1_ten)
-        if field in fdict:
-            self.M = steady_metric(fdict[field], **kwargs)
-        elif field == 'all_avg':
-            self.M += steady_metric(fdict['velocity_x'], **kwargs)
-            self.M += steady_metric(fdict['velocity_y'], **kwargs)
-            self.M += steady_metric(fdict['elevation'], **kwargs)
-            self.M /= 3.0
-        elif field == 'all_int':
-            self.M = metric_intersection(steady_metric(fdict['velocity_x'], **kwargs),
-                                         steady_metric(fdict['velocity_y'], **kwargs))
-            self.M = metric_intersection(self.M, steady_metric(fdict['elevation'], **kwargs))
-        elif 'avg' in field and 'int' in field:
-            raise NotImplementedError  # TODO
-        elif 'avg' in field:
-            fields = field.split('_avg_')
-            num_fields = len(fields)
-            for i in range(num_fields):
-                self.M += steady_metric(fdict[fields[i]], **kwargs)
-            self.M /= num_fields
-        elif 'int' in field:
-            fields = field.split('_int_')
-            self.M = steady_metric(fdict[fields[0]], **kwargs)
-            for i in range(1, len(fields)):
-                self.M = metric_intersection(self.M, steady_metric(fields[f[i]], **kwargs))
-        else:
-            raise ValueError("Adaptation field {:s} not recognised.".format(field))
+        self.M = get_hessian_metric(sol, self.op.adapt_field, fields=self.fields, **kwargs)
 
 
 class UnsteadyShallowWaterProblem(UnsteadyProblem):
@@ -534,7 +500,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.fields_to_export = prognostic_fields if op.plot_pvd else []
         options.fields_to_export_hdf5 = prognostic_fields if op.save_hdf5 else []
 
-        # Parameters
+        # Parameters  # TODO: Put parameters in op.shallow_water/tracer and use update
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
         options.horizontal_viscosity = self.fields['viscosity']
@@ -596,52 +562,3 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             u.rename("Fluid velocity")
             eta.rename("Elevation")
             self.solution_file.write(u, eta)
-
-    # TODO: Take out of class, so it can be used during TS
-    def get_hessian_metric(self, adjoint=False, **kwargs):
-        kwargs.setdefault('noscale', False)
-        kwargs.setdefault('degree', 1)
-        kwargs.setdefault('mesh', self.mesh)
-        kwargs.setdefault('op', self.op)
-        field = self.op.adapt_field
-        sol = self.adjoint_solution if adjoint else self.solution
-        u, eta = sol.split()
-
-        fdict = {'elevation': eta, 'velocity_x': u[0], 'velocity_y': u[1],
-                 'speed': sqrt(inner(u, u)), 'inflow': inner(u, self.fields['inflow'])}
-        fdict.update(self.fields)
-
-        self.M = Function(self.P1_ten)
-        if field in fdict:
-            self.M = steady_metric(fdict[field], **kwargs)
-        elif field == 'all_avg':
-            self.M += steady_metric(fdict['velocity_x'], **kwargs)
-            self.M += steady_metric(fdict['velocity_y'], **kwargs)
-            self.M += steady_metric(fdict['elevation'], **kwargs)
-            self.M /= 3.0
-        elif field == 'all_int':
-            self.M = metric_intersection(steady_metric(fdict['velocity_x'], **kwargs),
-                                         steady_metric(fdict['velocity_y'], **kwargs))
-            self.M = metric_intersection(self.M, steady_metric(fdict['elevation'], **kwargs))
-        elif 'avg' in field and 'int' in field:
-            raise NotImplementedError  # TODO
-        elif 'avg' in field:
-            fields = field.split('_avg_')
-            num_fields = len(fields)
-            for i in range(num_fields):
-                self.M += steady_metric(fdict[fields[i]], **kwargs)
-            self.M /= num_fields
-        elif 'int' in field:
-            fields = field.split('_int_')
-            self.M = steady_metric(fdict[fields[0]], **kwargs)
-            for i in range(1, len(fields)):
-                self.M = metric_intersection(self.M, steady_metric(fields[f[i]], **kwargs))
-        else:
-            raise ValueError("Adaptation field {:s} not recognised.".format(field))
-
-    # TODO: Take out of class
-    def custom_adapt(self):
-        if self.approach == 'vorticity':
-            self.indicator = Function(self.P1, name='vorticity')
-            self.indicator.interpolate(curl(self.solution.split()[0]))
-            self.get_isotropic_metric()
