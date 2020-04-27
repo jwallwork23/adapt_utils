@@ -74,6 +74,7 @@ timestep = lambda sol: 1.0/op.dt
 def extra_setup():
 
     # TODO: LaggedTimeIntegralCallback to reduce cost of Hessian computation
+    # TODO: Option to take metric with maximum complexity, rather than time average
 
     # Number of timesteps per export (trivial for constant dt)
     swp.callbacks["timestep"] = callback.TimeIntegralCallback(
