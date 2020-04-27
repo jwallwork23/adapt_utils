@@ -2,7 +2,7 @@ from thetis import *
 from thetis.physical_constants import *
 
 from adapt_utils.solver import SteadyProblem, UnsteadyProblem
-from adapt_utils.adapt.metric import *
+# from adapt_utils.adapt.metric import *
 from adapt_utils.swe.utils import *
 
 
@@ -15,10 +15,11 @@ class SteadyShallowWaterProblem(SteadyProblem):
     """
     def __init__(self, op, mesh=None, **kwargs):
         p = op.degree
+        u_element = VectorElement("DG", triangle, p)
         if op.family == 'dg-dg' and p >= 0:
-            fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p, variant='equispaced')
+            fe = u_element*FiniteElement("DG", triangle, p, variant='equispaced')
         elif op.family == 'dg-cg' and p >= 0:
-            fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
+            fe = u_element*FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
         else:
             raise NotImplementedError
         super(SteadyShallowWaterProblem, self).__init__(op, mesh, fe, **kwargs)
