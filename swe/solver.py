@@ -16,9 +16,9 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def __init__(self, op, mesh=None, **kwargs):
         p = op.degree
         if op.family == 'dg-dg' and p >= 0:
-            fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p)
+            fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p, variant='equispaced')
         elif op.family == 'dg-cg' and p >= 0:
-            fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1)
+            fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
         else:
             raise NotImplementedError
         super(SteadyShallowWaterProblem, self).__init__(op, mesh, fe, **kwargs)
@@ -51,12 +51,6 @@ class SteadyShallowWaterProblem(SteadyProblem):
         z.rename("Adjoint fluid velocity")
         zeta.rename("Adjoint elevation")
 
-    def get_tracer(self):
-        return self.solver_obj.fields.tracer_2d
-
-    def project_tracer(self, val, adjoint=False):
-        self.project(val, out=self.get_tracer())
-
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
         if self.stabilisation in ('no', 'lax_friedrichs'):
@@ -84,9 +78,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
                 options.timestepper_options.solver_parameters_momentum = op.params  # LU by default
             else:
                 options.timestepper_options.solver_parameters = op.params
-        if op.debug:
-            # options.timestepper_options.solver_parameters['snes_monitor'] = None
-            print_output(options.timestepper_options.solver_parameters)
+        op.print_debug(options.timestepper_options.solver_parameters)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta
 
@@ -121,18 +113,16 @@ class SteadyShallowWaterProblem(SteadyProblem):
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
 
-        # Initial conditions  # TODO: will this work over mesh iterations?
-        if self.prev_solution is not None:
-            u_interp, eta_interp = self.solution.split()
-        else:
-            interp = Function(self.V)
-            u_interp, eta_interp = interp.split()
-            u_interp.interpolate(self.fields['inflow'])
-            eta_interp.assign(0.0)
-        self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+        # Initial conditions
+        init = self.solution.copy(deepcopy=True)
+        uv, elev = init.split()
+        if self.prev_solution is None:
+            uv.interpolate(self.fields['inflow'])
+            elev.assign(0.0)
+        self.solver_obj.assign_initial_conditions(uv=uv, elev=elev)
 
         self.lhs = self.solver_obj.timestepper.F
-        self.solution = self.solver_obj.fields.solution_2d
+        self.solution = self.solver_obj.fields.solution_2d  # TODO: Needed?
         self.sipg_parameter = options.sipg_parameter
 
     def solve_forward(self):
@@ -141,10 +131,10 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.solution.assign(self.solver_obj.fields.solution_2d)
 
     def get_bnd_functions(self, *args):
-        b = self.op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
-        swt = shallowwater_eq.ShallowWaterTerm(self.V, b)
+        swt = shallowwater_eq.ShallowWaterTerm(self.V, self.fields['bathymetry'])
         return swt.get_bnd_functions(*args, self.boundary_conditions)
 
+    # TODO: Compute residuals using thetis/error_estimation_2d
     def get_strong_residual_forward(self):
         u, eta = self.solution.split()
 
@@ -187,6 +177,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimate_error(name)
         return name
 
+    # TODO: Compute residuals using thetis/error_estimation_2d
     def get_dwr_residual_forward(self):
         tpe = self.tp_enriched
         tpe.project_solution(self.solution)  # FIXME: prolong
@@ -226,6 +217,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimate_error(name)
         return name
 
+    # TODO: Compute fluxes using thetis/error_estimation_2d
     def get_dwr_flux_forward(self):
         tpe = self.tp_enriched
         i = tpe.p0test
@@ -367,10 +359,11 @@ class SteadyShallowWaterProblem(SteadyProblem):
         self.estimate_error(name)
         return name
 
-    def custom_adapt(self):
+    def custom_adapt(self, adjoint=False):
         if self.approach == 'vorticity':
+            sol = self.get_solution(adjoint=adjoint)
             self.indicator = Function(self.P1, name='vorticity')
-            self.indicator.interpolate(vorticity(self.solution))
+            self.indicator.interpolate(vorticity(sol))
             self.get_isotropic_metric()
 
     def plot_solution(self, adjoint=False):
@@ -399,9 +392,9 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
     def __init__(self, op, mesh=None, **kwargs):
         p = op.degree
         if op.family == 'dg-dg' and p >= 0:
-            fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p)
+            fe = VectorElement("DG", triangle, p)*FiniteElement("DG", triangle, p, variant='equispaced')
         elif op.family == 'dg-cg' and p >= 0:
-            fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1)
+            fe = VectorElement("DG", triangle, p)*FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
         else:
             raise NotImplementedError
         super(UnsteadyShallowWaterProblem, self).__init__(op, mesh, fe, **kwargs)
@@ -451,23 +444,22 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             raise ValueError("Stabilisation method {:s} for {:s} not recognised".format(self.stabilisation, self.__class__.__name__))
 
-    def solve_forward(self, adjoint=False):
+    def solve_forward(self, update_forcings=None, export_func=None):
 
         # Create solver object
         if not hasattr(self, 'solver_obj'):
             self.setup_solver_forward()
 
         # Time integrate
-        self.solver_obj.iterate(
-            update_forcings=self.op.get_update_forcings(self.solver_obj),
-            export_func=self.op.get_export_func(self.solver_obj)
-        )
+        update_forcings = update_forcings or self.op.get_update_forcings(self.solver_obj)
+        export_func = export_func or self.op.get_export_func(self.solver_obj)
+        self.solver_obj.iterate(update_forcings=update_forcings, export_func=export_func)
 
         # Extract solutions
         self.solution = self.solver_obj.fields.solution_2d
         if self.op.solve_tracer:
             self.solution_tracer = self.solver_obj.fields.tracer_2d
-        self.solution_old_bathymetry = self.solver_obj.fields.bathymetry_2d
+        self.solution_bathymetry = self.solver_obj.fields.bathymetry_2d
 
     def setup_solver_forward(self):
         op = self.op
@@ -481,7 +473,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
 
-        # Timestepping
+        # Timestepping  # TODO: Put parameters in op.timestepping and use update
         options.timestep = op.dt
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end - 0.5*op.dt
@@ -491,6 +483,8 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         op.print_debug(options.timestepper_options.solver_parameters)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta
+        if hasattr(options.timestepper_options, 'use_automatic_timestep'):
+            options.timestepper_options.use_automatic_timestep = op.use_automatic_timestep
 
         # Outputs
         options.output_directory = self.di
