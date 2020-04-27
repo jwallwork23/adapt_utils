@@ -31,7 +31,7 @@ class AdaptiveShallowWaterProblem(AdaptiveProblem):
         physical_constants['g_grav'].assign(op.g)
 
         # Classification
-        self.nonlinear = True
+        self.shallow_water_options['use_nonlinear_equations'] = True
 
     def set_fields(self):
         self.fields = []
@@ -83,43 +83,31 @@ class AdaptiveShallowWaterProblem(AdaptiveProblem):
         solver_obj = solver2d.FlowSolver2d(self.meshes[i], self.bathymetry[i])
         self.fwd_solvers[i] = solver_obj
         options = solver_obj.options
-        options.use_nonlinear_equations = self.nonlinear
-        options.check_volume_conservation_2d = True
+        options.update(self.io_options)
 
-        # Timestepping  # TODO: Put parameters in op.timestepping and use update
-        options.timestep = op.dt
-        options.simulation_export_time = op.dt*op.dt_per_export
+        # Timestepping
         options.simulation_end_time = (i+1)*op.end_time/self.num_meshes - 0.5*op.dt
-        options.timestepper_type = op.timestepper
-        if op.params != {}:
-            options.timestepper_options.solver_parameters = op.params
-        if not self.nonlinear:
-            options.timestepper_options.solver_parameters['snes_type'] = 'ksponly'
-        op.print_debug(options.timestepper_options.solver_parameters)
+        options.update(self.timestepping_options)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta
         if hasattr(options.timestepper_options, 'use_automatic_timestep'):
             options.timestepper_options.use_automatic_timestep = op.use_automatic_timestep
 
-        # Outputs
-        options.output_directory = self.di
-        options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
-        options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []
+        # Solver parameters
+        if op.params != {}:
+            options.timestepper_options.solver_parameters = op.params
+        if not self.shallow_water_options['use_nonlinear_equations']:
+            options.timestepper_options.solver_parameters['snes_type'] = 'ksponly'
+        op.print_debug(options.timestepper_options.solver_parameters)
 
         # Parameters  # TODO: Put parameters in op.shallow_water/tracer and use update
-        options.use_grad_div_viscosity_term = op.grad_div_viscosity
-        options.element_family = op.family
-        options.polynomial_degree = op.degree
         options.update(self.fields[i])
+        options.update(self.shallow_water_options)
+        options.update(self.tracer_options)
         options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
         options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameters[i]
-        options.use_grad_depth_viscosity_term = op.grad_depth_viscosity
-        options.use_automatic_sipg_parameter = op.sipg_parameter is None
-        options.use_wetting_and_drying = op.wetting_and_drying
-        options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
         if op.solve_tracer:
             raise NotImplementedError  # TODO
-        options.solve_tracer = op.solve_tracer
 
         # Boundary conditions
         solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions[i]
