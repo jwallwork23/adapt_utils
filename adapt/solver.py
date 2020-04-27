@@ -38,6 +38,22 @@ class AdaptiveProblem():
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
         self.boundary_conditions = [op.set_boundary_conditions(V) for V in self.V]
 
+        # Outputs
+        self.di = create_directory(self.op.di)
+        self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
+        # self.solution_fpath_hdf5 = os.path.join(self.di, 'solution.hdf5')
+        self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
+        # self.adjoint_solution_fpath_hdf5 = os.path.join(self.di, 'adjoint_solution.hdf5')
+        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+
+        # Storage for diagnostics over mesh adaptation loop
+        self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
+        self.num_vertices = [[mesh.num_vertices() for mesh in self.meshes], ]
+        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]
+        self.indicators = [{} for mesh in self.meshes]
+        self.estimators = [{} for mesh in self.meshes]
+        self.qois = []
+
         raise NotImplementedError  # TODO
 
     def set_meshes(self, meshes):  # TODO: levels > 0
