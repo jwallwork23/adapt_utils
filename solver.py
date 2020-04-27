@@ -1051,6 +1051,10 @@ class UnsteadyProblem(SteadyProblem):
     """
     def __init__(self, op, mesh, finite_element, **kwargs):
         super(UnsteadyProblem, self).__init__(op, mesh, finite_element, **kwargs)
+        try:
+            assert self.approach == 'fixed_mesh'
+        except AssertionError:
+            raise ValueError("Mesh adaptation has been moved to :class:`AdaptiveUnsteadyProblem`.")
         self.set_start_condition()
         self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
         self.estimators = {}
@@ -1076,139 +1080,14 @@ class UnsteadyProblem(SteadyProblem):
         """
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def solve(self, adjoint=False, uses_adjoint=True):
+    def solve_forward(self):
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def solve_adjoint(self):
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def quantity_of_interest(self):
         """
-        Solve PDE using mesh adaptivity.
+        Functional of interest which takes the PDE solution as input.
         """
-        op = self.op
-        try:
-            assert op.dt_per_remesh % op.dt_per_export == 0
-        except AssertionError:
-            raise ValueError("Timesteps per export should divide timesteps per remesh.")
-        self.remesh_step = 0
-        uses_adjoint &= 'fixed_mesh' not in self.approach
-        uses_adjoint &= self.approach != 'hessian'
-
-        # Setup solvers (if applicable)
-        if hasattr(self, 'setup_solver_forward'):
-            self.setup_solver_forward()
-        if uses_adjoint and hasattr(self, 'setup_solver_adjoint'):
-            self.setup_solver_adjoint()
-
-        # Adapt w.r.t. initial conditions a few times before the solver loop
-        if uses_adjoint:
-            for i in range(max(op.num_adapt, 2)):
-                self.get_adjoint_state()
-                self.adapt_mesh()
-                self.set_start_condition(adjoint)
-                self.set_fields()
-        elif adjoint:
-            self.set_start_condition(adjoint)
-
-        # Solve/adapt loop
-        while self.step_end <= op.end_time:
-
-            # Fixed mesh case
-            # NOTE:
-            #  * Use 'fixed_mesh_plot' to call `plot` at each export.
-            if self.approach == 'fixed_mesh':
-                self.step_end = op.end_time
-                self.solve_step(adjoint=adjoint)
-                break
-
-            # Adaptive mesh case
-            for i in range(op.num_adapt):
-                self.adapt_mesh()
-                # Interpolate value from previous step onto new mesh
-
-                if self.remesh_step == 0:
-                    self.set_start_condition(adjoint)
-                elif i == 0:
-                    self.project_solution(solution, adjoint=adjoint)
-                else:
-                    self.project_solution(solution_old, adjoint=adjoint)
-
-                # Solve PDE on new mesh
-                op.plot_pvd = i == 0
-                # time = None if i == 0 else self.step_end - op.dt
-                # self.solve_step(adjoint=adjoint, time=time)
-                self.solve_step(adjoint=adjoint)
-
-                # Store solutions from last two steps on first mesh in sequence
-                if i == 0:
-                    solution = Function(self.solution)
-                    if self.step_end + op.dt*op.dt_per_remesh > op.end_time:
-                        break  # No need to do adapt for final timestep
-
-            self.step_end += op.dt*op.dt_per_remesh
-            self.remesh_step += 1
-
-        # Evaluate QoI
-        if uses_adjoint:
-            self.project_solution(solution)
-
-    # def quantity_of_interest(self):
-    #     """
-    #     Functional of interest which takes the PDE solution as input.
-    #     """
-    #     if not hasattr(self, 'kernel'):
-    #         self.get_qoi_kernel()
-    #     raise NotImplementedError  # TODO: account for time integral forms
-
-    def get_adjoint_state(self, variable='Tracer2d'):
-        """Get adjoint solution at current remesh step."""
-        if self.approach in ('uniform', 'hessian', 'vorticity'):
-            return
-        if not hasattr(self, 'V_orig'):
-            self.V_orig = FunctionSpace(self.mesh, self.finite_element)
-        names = {'Tracer2d': 'tracer_2d', 'Velocity2d': 'uv_2d', 'Elevation2d': 'elev_2d'}
-        i = self.remesh_step*int(self.op.dt_per_export/self.op.dt_per_remesh)
-
-        # FIXME for continuous adjoint
-        filename = 'Adjoint2d_{:5s}'.format(index_string(i))
-
-        # filename = '{:s}_{:5s}'.format(variable, index_string(i))
-        to_load = Function(self.V_orig, name=names[variable])
-        to_load_old = Function(self.V_orig, name=names[variable])
-        with DumbCheckpoint(os.path.join('outputs/adjoint/hdf5', filename), mode=FILE_READ) as la:
-            la.load(to_load)
-            la.load(to_load_old)
-            la.close()
-        self.adjoint_solution.project(to_load)
-        self.adjoint_solution_old.project(to_load_old)
-        self.adjoint_solution_file.write(self.adjoint_solution, t=self.op.dt*i)
-
-    def dwr_indication(self, adjoint=False):
-        """
-        Indicate errors in the quantity of interest by the Dual Weighted Residual method. This is
-        inherently problem-dependent.
-
-        The resulting P0 field should be stored as `self.indicator`.
-        """
-        raise NotImplementedError  # TODO: Use steady format, but need to get adjoint sol
-
-    def solve_ale(self, solve_pde=True, check_inverted=True):
-        """
-        Solve unsteady problem using Arbitrary Lagrangian-Eulerian (ALE) mesh movement.
-
-        The mesh movement is driven by a `MeshMover` object, for which a prescribed velocity needs
-        to be chosen. Preset options are 'zero' and 'fluid', which correspond to the Eulerian and
-        Lagrangian approaches, respectively.
-        """
-        op = self.op
-        self.mm = MeshMover(self.mesh, monitor_function=None, method='ale', op=op)
-        self.setup_solver_forward()
-        self.step_end, self.remesh_step = op.dt_per_export*op.dt, 0
-        while self.step_end < op.end_time:
-            self.mm.adapt_ale()                          # Solve mesh movement
-            if solve_pde:
-                self.solve_step()                        # Solve PDE
-            self.mesh.coordinates.assign(self.mm.x_new)  # Update mesh
-            if check_inverted:
-                try:
-                    self.am.check_inverted()
-                except ValueError:
-                    self.plot_mesh()
-                    raise ValueError("Timestepping loop terminated after {:d} iterations due to inverted element.".format(i))
-            self.step_end += op.dt_per_export*op.dt
-            self.remesh_step += 1
+        raise NotImplementedError("Should be implemented in derived class.")

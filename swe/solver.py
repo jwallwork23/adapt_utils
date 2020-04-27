@@ -485,68 +485,35 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             raise ValueError("Stabilisation method {:s} for {:s} not recognised".format(self.stabilisation, self.__class__.__name__))
 
-    def solve_step(self, adjoint=False):
-        try:
-            assert not adjoint
-        except AssertionError:
-            raise NotImplementedError  # TODO
+    def solve_forward(self, adjoint=False):
+
+        # Create solver object
         if not hasattr(self, 'solver_obj'):
             self.setup_solver_forward()
-        self.solver_obj.iterate(update_forcings=self.op.get_update_forcings(self.solver_obj),
-                                export_func=self.op.get_export_func(self.solver_obj))
+
+        # Time integrate
+        self.solver_obj.iterate(
+            update_forcings=self.op.get_update_forcings(self.solver_obj),
+            export_func=self.op.get_export_func(self.solver_obj)
+        )
+
+        # Extract solutions
         self.solution = self.solver_obj.fields.solution_2d
-
-        old_mesh = Mesh(Function(self.mesh.coordinates))
-        P1DG_old = FunctionSpace(old_mesh, "DG", 1)
-        P1_old = FunctionSpace(old_mesh, "CG", 1)
-
-        if isinstance(self.solver_obj.fields.bathymetry_2d, Constant):
-            solution_bathymetry = Constant(self.solver_obj.fields.bathymetry_2d)
-            self.solution_old_bathymetry = Constant(solution_bathymetry)
-        else:
-            solution_bathymetry = self.solver_obj.fields.bathymetry_2d.copy(deepcopy=True)
-            self.solution_old_bathymetry = project(solution_bathymetry, P1_old)
-
         if self.op.solve_tracer:
-            solution_tracer = self.solver_obj.fields.tracer_2d.copy(deepcopy=True)
-            self.solution_old_tracer = project(solution_tracer, P1DG_old)
+            self.solution_tracer = self.solver_obj.fields.tracer_2d
+        self.solution_old_bathymetry = self.solver_obj.fields.bathymetry_2d
 
     def setup_solver_forward(self):
-        if not hasattr(self, 'remesh_step'):
-            self.remesh_step = 0
         op = self.op
 
         # Use appropriate bathymetry
-        if hasattr(self, "solution_old_bathymetry"):
-            if isinstance(self.solution_old_bathymetry, Constant):
-                op.bathymetry = Constant(self.solution_old_bathymetry)
-            else:
-                op.bathymetry = project(self.solution_old_bathymetry, self.P1)
-        else:
-            op.bathymetry = self.op.set_bathymetry(self.P1)
-        b = op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
+        b = self.op.set_bathymetry(self.P1) if self.op.solve_tracer else self.fields['bathymetry']
+
+        # Create solver object
         self.solver_obj = solver2d.FlowSolver2d(self.mesh, b)
-
-        self.solver_obj.export_initial_state = self.remesh_step == 0
-
-        # Initial conditions
-        u_interp, eta_interp = self.solution.split()
-        if op.solve_tracer:
-            if hasattr(self, 'solution_old_tracer'):
-                self.tracer_interp = project(self.solution_old_tracer, self.P1DG)
-            else:
-                self.tracer_interp = project(self.op.tracer_init, self.P1DG)
-
-        if op.solve_tracer:
-            self.uv_d, self.eta_d = self.solution.split()
-            op.set_up_suspended(self.mesh, tracer=self.tracer_interp)
-
         options = self.solver_obj.options
-
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
-        if hasattr(options, 'use_lagrangian_formulation'):  # TODO: Temporary
-            options.use_lagrangian_formulation = op.approach == 'ale'
 
         # Timestepping
         options.timestep = op.dt
@@ -555,21 +522,17 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         options.timestepper_type = op.timestepper
         if op.params != {}:
             options.timestepper_options.solver_parameters = op.params
-        if op.debug:
-            # options.timestepper_options.solver_parameters['snes_monitor'] = None
-            print_output(options.timestepper_options.solver_parameters)
+        op.print_debug(options.timestepper_options.solver_parameters)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta
 
         # Outputs
         options.output_directory = self.di
-
+        prognostic_fields = ['uv_2d', 'elev_2d']
         if op.solve_tracer:
-            options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d'] if op.plot_pvd else []
-            options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d', 'tracer_2d'] if op.save_hdf5 else []
-        else:
-            options.fields_to_export = ['uv_2d', 'elev_2d'] if op.plot_pvd else []
-            options.fields_to_export_hdf5 = ['uv_2d', 'elev_2d'] if op.save_hdf5 else []
+            prognostic_fields.append('tracer_2d')
+        options.fields_to_export = prognostic_fields if op.plot_pvd else []
+        options.fields_to_export_hdf5 = prognostic_fields if op.save_hdf5 else []
 
         # Parameters
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
@@ -601,22 +564,18 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         if op.solve_tracer:
             self.solver_obj.bnd_functions['tracer'] = op.set_boundary_conditions_tracer(self.V)
 
+        # Initial conditions
+        uv, eta = self.solution.split()
         if op.solve_tracer:
-            if self.op.tracer_init is not None:
-                self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp, tracer=self.tracer_interp)
-        else:
-            self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+            self.uv_d, self.eta_d = self.solution.split()
+            op.set_up_suspended(self.mesh, tracer=self.op.tracer_init)
+        tracer_init = None
+        if op.solve_tracer and self.op.tracer_init is not None:
+            tracer_init = self.op.tracer_init
+        self.solver_obj.assign_initial_conditions(uv=uv, elev=eta, tracer=tracer_init)
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
-
-        # Ensure correct iteration count
-        self.solver_obj.i_export = self.remesh_step
-        self.solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
-        self.solver_obj.iteration = self.remesh_step*op.dt_per_remesh
-        self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
-        for e in self.solver_obj.exporters.values():
-            e.set_next_export_ix(self.solver_obj.i_export)
 
     def get_bnd_functions(self, *args):
         b = self.op.bathymetry if self.op.solve_tracer else self.fields['bathymetry']
@@ -638,6 +597,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
             eta.rename("Elevation")
             self.solution_file.write(u, eta)
 
+    # TODO: Take out of class, so it can be used during TS
     def get_hessian_metric(self, adjoint=False, **kwargs):
         kwargs.setdefault('noscale', False)
         kwargs.setdefault('degree', 1)
@@ -679,6 +639,7 @@ class UnsteadyShallowWaterProblem(UnsteadyProblem):
         else:
             raise ValueError("Adaptation field {:s} not recognised.".format(field))
 
+    # TODO: Take out of class
     def custom_adapt(self):
         if self.approach == 'vorticity':
             self.indicator = Function(self.P1, name='vorticity')
