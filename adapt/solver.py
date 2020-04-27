@@ -41,15 +41,18 @@ class AdaptiveProblem():
         self.num_meshes = op.num_meshes
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
-        op.print_debug(op.indent + "SETUP: Building function spaces...")
+        op.print_debug(op.indent + "SETUP: Creating function spaces...")
         self.create_function_spaces()
-        op.print_debug(op.indent + "SETUP: Building solutions...")
+        op.print_debug(op.indent + "SETUP: Creating solutions...")
         self.create_solutions()
-        op.print_debug(op.indent + "SETUP: Building fields...")
+        op.print_debug(op.indent + "SETUP: Creating fields...")
         self.set_fields()
+        op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
         self.boundary_conditions = [op.set_boundary_conditions(V) for V in self.V]
+        self.fwd_solvers = [None for mesh in self.meshes]  # To be populated
+        self.adj_solvers = [None for mesh in self.meshes]  # To be populated
 
         # Outputs
         self.di = create_directory(self.op.di)
@@ -67,7 +70,6 @@ class AdaptiveProblem():
         self.estimators = [{} for mesh in self.meshes]
         self.qois = []
 
-        raise NotImplementedError  # TODO
 
     def set_meshes(self, meshes):  # TODO: levels > 0
         """
@@ -88,11 +90,11 @@ class AdaptiveProblem():
         self.V = [FunctionSpace(mesh, fe) for mesh in self.meshes]
         self.P0 = [FunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
         self.P1 = [FunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
-        # self.P2 = [FunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
-        # self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
-        # self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        # self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
         # self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
-        self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        # self.P2 = [FunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
         # self.test = [TestFunction(V) for V in self.V]
         # self.tests = [TestFunctions(V) for V in self.V]
         # self.trial = [TrialFunction(V) for V in self.V]
@@ -107,12 +109,12 @@ class AdaptiveProblem():
         self.fwd_solutions = [Function(V, name='Forward solution') for V in self.V]
         self.adj_solutions = [Function(V, name='Adjoint solution') for V in self.V]
 
-    def set_fields(self, adapted=False):
-        """Set velocity field, viscosity, etc."""
+    def set_fields(self):
+        """Set velocity field, viscosity, etc (on each mesh)."""
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_stabilisation(self):
-        """ Set stabilisation mode and parameter."""
+        """ Set stabilisation mode and parameter (on each mesh)."""
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_initial_condition(self):
@@ -127,14 +129,13 @@ class AdaptiveProblem():
 
     def project(self, f, i, j):
         """Project field `f` from mesh `i` onto mesh `j`."""
-        if f[i] is None:
-            assert f[j] is None
+        if f[i] is None or isinstance(f[i], Constant):
             return
-        elif isinstance(f[i], Constant):
+        elif f[i].function_space() == f[j].function_space():
             f[j].assign(f[i])
-            return
-        for fik, fjk in zip(f[i].split(), f[j].split()):
-            fjk.project(fik)
+        else:
+            for fik, fjk in zip(f[i].split(), f[j].split()):
+                fjk.project(fik)
 
     def project_forward_solution(self, i, j):
         """Project forward solution from mesh `i` to mesh `j`."""
@@ -146,19 +147,19 @@ class AdaptiveProblem():
 
     # --- Solvers
 
-    def setup_solver_forward(self, i):
+    def setup_solver_forward(self, i, **kwargs):
         """Setup forward solver on mesh `i`."""
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def setup_solver_adjoint(self, i):
+    def setup_solver_adjoint(self, i, **kwargs):
         """Setup adjoint solver on mesh `i`."""
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def solve_forward_step(self, i):
+    def solve_forward_step(self, i, **kwargs):
         """Solve forward PDE on mesh `i`."""
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def solve_adjoint_step(self, i):
+    def solve_adjoint_step(self, i, **kwargs):
         """Solve adjoint PDE on mesh `i`."""
         raise NotImplementedError("Should be implemented in derived class.")
 
