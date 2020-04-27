@@ -16,8 +16,14 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
     def __init__(self, *args, extension=None, **kwargs):
         self.extension = extension
         super(AdaptiveTsunamiProblem, self).__init__(*args, **kwargs)
-        self.nonlinear = False
         self.callbacks = [{} for mesh in self.meshes]
+
+        # Use linearised equations
+        self.shallow_water_options['use_nonlinear_equations'] = False
+
+        # Don't bother plotting velocity
+        self.io_options['fields_to_export'] = ['elev_2d'] if self.op.plot_pvd else []
+        self.io_options['fields_to_export_hdf5'] = ['elev_2d'] if self.op.save_hdf5 else []
 
     def set_fields(self):
         self.fields = []
@@ -30,12 +36,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(self.P1[i]),
             })
             self.bathymetry.append(self.op.set_bathymetry())
-
-    def extra_setup(self, i):
-        # Don't bother plotting velocity
-        options = self.fwd_solvers[i].options
-        options.fields_to_export = ['elev_2d'] if op.plot_pvd else []
-        options.fields_to_export_hdf5 = ['elev_2d'] if op.save_hdf5 else []
 
     # FIXME: Continuity of callbacks across mesh steps
     def add_callbacks(self, i):

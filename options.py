@@ -21,8 +21,7 @@ class Options(FrozenConfigurable):
     start_time = NonNegativeFloat(0., help="Start of time window of interest.").tag(config=True)
     end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
     num_meshes = PositiveInteger(1, help="Number of meshes in :class:`AdaptiveProblem` solver").tag(config=True)
-    dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)  # TODO: remove
-    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation.").tag(config=True)  # TODO: remove
+    dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
     use_automatic_timestep = Bool(False).tag(config=True)
 
     # Boundary conditions
@@ -32,7 +31,7 @@ class Options(FrozenConfigurable):
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.").tag(config=True)
     stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0), help="Scalar stabilisation parameter.").tag(config=True)
-    sipg_parameter = FiredrakeScalarExpression(None, allow_none=True, help="Value for parameter used in symmetric interior penalty method. Chosen automatically if set to None.").tag(config=True)
+    use_automatic_sipg_parameter = Bool(True, help="Toggle automatic generation of symmetric interior penalty method.").tag(config=True)
 
     # Solver parameters
     params = PETScSolverParameters({}).tag(config=True)

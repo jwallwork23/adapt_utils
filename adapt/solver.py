@@ -54,6 +54,31 @@ class AdaptiveProblem():
         self.fwd_solvers = [None for mesh in self.meshes]  # To be populated
         self.adj_solvers = [None for mesh in self.meshes]  # To be populated
 
+        # Sub options
+        self.timestepping_options = {
+            'timestep': op.dt,
+            'simulation_export_time': op.dt*op.dt_per_export,
+            'timestepper_type': op.timestepper,
+        }
+        self.io_options = {
+            'output_directory': op.di,
+            'fields_to_export': ['uv_2d', 'elev_2d'] if op.plot_pvd else [],
+            'fields_to_export_hdf5': ['uv_2d', 'elev_2d'] if op.save_hdf5 else [],
+        }
+        self.shallow_water_options = {
+            'element_family': op.family,
+            'polynomial_degree': op.degree,
+            'use_grad_div_viscosity_term': op.grad_div_viscosity,
+            'use_grad_depth_viscosity_term': op.grad_depth_viscosity,
+            'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
+            'use_wetting_and_drying': op.wetting_and_drying,
+            'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
+            # 'check_volume_conservation_2d': True,
+        }
+        self.tracer_options = {  # TODO
+            'solve_tracer': op.solve_tracer,
+        }
+
         # Outputs
         self.di = create_directory(self.op.di)
         self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
