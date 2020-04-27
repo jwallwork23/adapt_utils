@@ -3,14 +3,27 @@ from thetis import *
 import numpy as np
 
 from adapt_utils.adapt.adaptation import AdaptiveMesh
-from adapt_utils.solver import UnsteadyProblem
 
 
 __all__ = ["AdaptiveProblem"]
 
 
 class AdaptiveProblem():
-    # TODO: doc
+    """
+    Solver object for adaptive mesh simulations with a number of meshes which is known a priori.
+    In the steady state case, the number of meshes is clearly known to be one. In the unsteady
+    case, it is likely that we seek to use more than one mesh.
+
+    The philosophy here is to separate the PDE solution from the mesh adaptation, in the sense that
+    the forward (and possibly adjoint) equations are solved over the whole time period before any
+    mesh adaptation is performed. This means that the solver object is based upon a sequence of
+    meshes, as opposed to a single mesh which is updated on-the-fly. Whilst this approach has
+    increased memory requirements compared with the on-the-fly strategy, it is beneficial for
+    goal-oriented mesh adaptation, where an outer loop is required.
+    """
+
+    # --- Setup
+
     def __init__(self, op, meshes, finite_element, discrete_adjoint=True, levels=0, hierarchies=None):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
@@ -66,7 +79,7 @@ class AdaptiveProblem():
         for i in range(self.num_meshes):
             self.op.print_debug(msg.format(i, self.meshes[i].num_cells()))
 
-    def create_function_spaces(self):
+    def create_function_spaces(self):  # NOTE: Keep minimal
         """
         Build the finite element space, `V`, for the prognostic solution, along with various other
         useful spaces and test functions and trial functions based upon them.
@@ -91,42 +104,91 @@ class AdaptiveProblem():
         """
         Set up `Function`s in the prognostic space to hold the forward and adjoint solutions.
         """
-        self.solutions = [Function(V, name='Solution') for V in self.V]
-        self.adjoint_solutions = [Function(V, name='Adjoint solution') for V in self.V]
+        self.fwd_solutions = [Function(V, name='Forward solution') for V in self.V]
+        self.adj_solutions = [Function(V, name='Adjoint solution') for V in self.V]
 
     def set_fields(self, adapted=False):
-        """
-        Set velocity field, viscosity, etc.
-        """
+        """Set velocity field, viscosity, etc."""
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_stabilisation(self):
-        """
-        Set stabilisation mode and parameter.
-        """
+        """ Set stabilisation mode and parameter."""
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def solve_step(self, adjoint=False):
-        """
-        Solve forward PDE on a particular mesh.
-        """
+    def set_initial_condition(self):
+        """Apply initial condition for forward solution on first mesh."""
+        self.fwd_solutions[0].assign(self.op.set_start_condition(self.V[0], adjoint=False))
+
+    def set_final_condition(self):
+        """Apply final time condition for adjoint solution on final mesh."""
+        self.adj_solutions[-1].assign(self.op.set_start_condition(self.V[-1], adjoint=True))
+
+    # --- Helper functions
+
+    def project(self, f, i, j):
+        """Project field `f` from mesh `i` onto mesh `j`."""
+        if f[i] is None:
+            assert f[j] is None
+            return
+        elif isinstance(f[i], Constant):
+            f[j].assign(f[i])
+            return
+        for fik, fjk in zip(f[i].split(), f[j].split()):
+            fjk.project(fik)
+
+    def project_forward_solution(self, i, j):
+        """Project forward solution from mesh `i` to mesh `j`."""
+        self.project(self.fwd_solutions, i, j)
+
+    def project_adjoint_solution(self, i, j):
+        """Project adjoint solution from mesh `i` to mesh `j`."""
+        self.project(self.adj_solutions, i, j)
+
+    # --- Solvers
+
+    def setup_solver_forward(self, i):
+        """Setup forward solver on mesh `i`."""
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def setup_solver_adjoint(self, i):
+        """Setup adjoint solver on mesh `i`."""
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def solve_forward_step(self, i):
+        """Solve forward PDE on mesh `i`."""
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def solve_adjoint_step(self, i):
+        """Solve adjoint PDE on mesh `i`."""
         raise NotImplementedError("Should be implemented in derived class.")
 
     def solve_forward(self):
-        raise NotImplementedError("Should be implemented in derived class.")
+        """Solve forward problem on the full sequence of meshes."""
+        for i in range(self.num_meshes):
+            if i == 0:
+                self.set_initial_condition()
+            else:
+                self.project_forward_solution(i-1, i)
+            self.setup_solver_forward(i)
+            self.solve_forward_step(i)
 
     def solve_adjoint(self):
-        raise NotImplementedError("Should be implemented in derived class.")
+        """Solve adjoint problem on the full sequence of meshes."""
+        for i in range(self.num_meshes - 1, -1):
+            if i == self.num_meshes - 1:
+                self.set_final_condition()
+            else:
+                self.project_adjoint_solution(i+1, i)
+            self.setup_solver_adjoint(i)
+            self.solve_adjoint_step(i)
 
     def dwr_indication(self, adjoint=False):
         """
         Indicate errors in the quantity of interest by the Dual Weighted Residual method. This is
         inherently problem-dependent.
         """
-        raise NotImplementedError
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def quantity_of_interest(self):
-        """
-        Functional of interest which takes the PDE solution as input.
-        """
+        """Functional of interest which takes the PDE solution as input."""
         raise NotImplementedError("Should be implemented in derived class.")
