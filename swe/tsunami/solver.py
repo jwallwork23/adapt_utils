@@ -15,8 +15,9 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
     """
     def __init__(self, *args, extension=None, **kwargs):
         self.extension = extension
-        super().__init__(*args, **kwargs)
+        super(TsunamiProblem, self).__init__(*args, **kwargs)
         self.nonlinear = False
+        self.callbacks = {}
 
     def set_fields(self):
         self.fields = {}
@@ -28,10 +29,10 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         self.fields['manning_drag_coefficient'] = self.op.set_manning_drag_coefficient(self.P1)
         self.fields['source'] = self.op.source
 
-    def setup_solver_forward(self):
-        if not hasattr(self, 'remesh_step'):
-            self.remesh_step = 0
+    def setup_solver_forward(self, extra_setup=None):
         op = self.op
+        if extra_setup is not None:
+            self.extra_setup = extra_setup
 
         # Interpolate bathymetry from data
         self.fields['bathymetry'] = self.op.set_bathymetry()
@@ -42,12 +43,7 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         options.use_nonlinear_equations = self.nonlinear
         options.check_volume_conservation_2d = True
 
-        self.solver_obj.export_initial_state = self.remesh_step == 0
-        # Don't bother plotting velocity
-        options.fields_to_export = ['elev_2d'] if op.plot_pvd else []
-        options.fields_to_export_hdf5 = ['elev_2d'] if op.save_hdf5 else []
-
-        # Timestepping
+        # Timestepping  # TODO: Put parameters in op.timestepping and use update
         options.timestep = op.dt
         options.simulation_export_time = op.dt*op.dt_per_export
         options.simulation_end_time = self.step_end - 0.5*op.dt
@@ -56,21 +52,18 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
             options.timestepper_options.solver_parameters = op.params
         if not self.nonlinear:
             options.timestepper_options.solver_parameters['snes_type'] = 'ksponly'
-        if op.debug:
-            # options.timestepper_options.solver_parameters['snes_monitor'] = None
-            # options.timestepper_options.solver_parameters['snes_converged_reason'] = None
-            # options.timestepper_options.solver_parameters['ksp_monitor'] = None
-            # options.timestepper_options.solver_parameters['ksp_converged_reason'] = None
-            print_output(options.timestepper_options.solver_parameters)
+        op.print_debug(options.timestepper_options.solver_parameters)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta
         if hasattr(options.timestepper_options, 'use_automatic_timestep'):
             options.timestepper_options.use_automatic_timestep = op.use_automatic_timestep
 
-        # Outputs
+        # Outputs (Don't bother plotting velocity)
         options.output_directory = self.di
+        options.fields_to_export = ['elev_2d'] if op.plot_pvd else []
+        options.fields_to_export_hdf5 = ['elev_2d'] if op.save_hdf5 else []
 
-        # Parameters
+        # Parameters  # TODO: Put parameters in op.shallow_water/tracer and use update
         options.use_grad_div_viscosity_term = op.grad_div_viscosity
         options.element_family = op.family
         options.horizontal_viscosity = self.fields['viscosity']
@@ -84,17 +77,17 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         options.use_automatic_sipg_parameter = op.sipg_parameter is None
         options.use_wetting_and_drying = op.wetting_and_drying
         options.wetting_and_drying_alpha = op.wetting_and_drying_alpha
-        options.solve_tracer = op.solve_tracer
+        if op.solve_tracer:
+            raise ValueError("Tracers not supported for tsunami model.")
 
         # Boundary conditions
         self.solver_obj.bnd_functions['shallow_water'] = op.set_boundary_conditions(self.V)
 
         # Initial conditions
-        u_interp, eta_interp = self.solution.split()
-        self.solver_obj.assign_initial_conditions(uv=u_interp, elev=eta_interp)
+        uv, elev = self.solution.split()
+        self.solver_obj.assign_initial_conditions(uv=uv, elev=elev)
 
         # --- Callbacks
-        self.callbacks = {}
 
         # Gauge timeseries
         names = [g for g in op.gauges]
@@ -112,7 +105,7 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         #         self.solver_obj, ['elev_2d'], x, y, g, self.di)
         #     self.solver_obj.add_callback(self.callbacks[g], 'export')
 
-        # QoI
+        # Quantity of interest
         if not hasattr(self, 'kernel'):
             self.get_qoi_kernel()
         File(os.path.join(self.di, 'kernel.pvd')).write(self.kernel.split()[1])
@@ -126,15 +119,6 @@ class TsunamiProblem(UnsteadyShallowWaterProblem):
         self.callbacks["qoi"] = callback.TimeIntegralCallback(
             qoi, self.solver_obj, self.solver_obj.timestepper, name="qoi", append_to_log=op.debug)
         self.solver_obj.add_callback(self.callbacks["qoi"], 'timestep')
-
-        # Ensure correct iteration count
-        self.solver_obj.i_export = self.remesh_step
-        self.solver_obj.next_export_t = self.remesh_step*op.dt*op.dt_per_remesh
-        self.solver_obj.iteration = self.remesh_step*op.dt_per_remesh
-        self.solver_obj.simulation_time = self.remesh_step*op.dt*op.dt_per_remesh
-        if hasattr(self.solver_obj, 'exporters'):
-            for e in self.solver_obj.exporters.values():
-                e.set_next_export_ix(self.solver_obj.i_export)
 
         if hasattr(self, 'extra_setup'):
             self.extra_setup()
