@@ -144,7 +144,7 @@ def _metric_intersection_pair(M1, M2, bdy=None):
     return M12
 
 
-def metric_relaxation(*metrics, weights):
+def metric_relaxation(*metrics, weights=None):
     r"""
     As an alternative to intersection, pointwise metric information may be combined using a convex
     combination. Whilst this method does not have as clear an interpretation as metric intersection,
@@ -169,7 +169,7 @@ def metric_relaxation(*metrics, weights):
 
 
 def metric_average(*metrics):
-    return metric_relaxation(*metrics, None)
+    return metric_relaxation(*metrics)
 
 
 def combine_metrics(*metrics, average=True):

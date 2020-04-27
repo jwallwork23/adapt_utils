@@ -18,6 +18,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-approach', help="Mesh adaptation approach.")
 parser.add_argument('-target', help="Target complexity for adaptive approaches.")
 parser.add_argument('-level', help="Number of uniform refinements to apply to the initial mesh.")
+parser.add_argument('-adapt_field', help="Field(s) for adaptation.")
 parser.add_argument('-offset', help="""
     Number of turbine diameters by which to offset turbines in y-direction.
     'Aligned' configuration given by offset=0, 'Offset' configuration given by offset=1.""")
@@ -34,7 +35,7 @@ kwargs = {
 
     # Adaptation parameters
     'target': float(args.target or 3200.0),
-    'adapt_field': 'all_int',
+    'adapt_field': args.adapt_field or 'all_int',
     'normalisation': 'complexity',
     'convergence_rate': 1,
     'norm_order': None,  # i.e. infinity norm
