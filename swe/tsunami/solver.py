@@ -1,5 +1,4 @@
 from thetis import *
-from thetis.configuration import *
 
 import os
 
