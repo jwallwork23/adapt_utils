@@ -82,7 +82,7 @@ class TsunamiOptions(ShallowWaterOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating initial surface...")
         # msg = "Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
-        for i, xy in enumerate(self.default_mesh.coordinates.dat.data):
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data):
             self.initial_surface.dat.data[i] = surf_interp(xy[1], xy[0])
             # self.print_debug(msg.format(xy[0], xy[1], self.initial_surface.dat.data[i]))
         self.print_debug("Done!")
@@ -97,8 +97,7 @@ class TsunamiOptions(ShallowWaterOptions):
         u.assign(0.0)
 
         # Interpolate free surface from inversion data
-        self.set_initial_surface(P1)
-        eta.interpolate(self.initial_surface)
+        eta.interpolate(self.set_initial_surface(P1))
 
         return self.initial_value
 

@@ -21,9 +21,9 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         # Use linearised equations
         self.shallow_water_options['use_nonlinear_equations'] = False
 
-        # Don't bother plotting velocity
-        self.io_options['fields_to_export'] = ['elev_2d'] if self.op.plot_pvd else []
-        self.io_options['fields_to_export_hdf5'] = ['elev_2d'] if self.op.save_hdf5 else []
+        # # Don't bother plotting velocity
+        # self.io_options['fields_to_export'] = ['elev_2d'] if self.op.plot_pvd else []
+        # self.io_options['fields_to_export_hdf5'] = ['elev_2d'] if self.op.save_hdf5 else []
 
     def set_fields(self):
         self.fields = []
