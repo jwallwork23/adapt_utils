@@ -4,6 +4,7 @@ Top matter courtesy of Tobias Bieniek, 2012.
 import ufl
 import numpy as np
 from math import pi, sqrt
+from thetis import print_output
 
 
 class OutOfRangeError(ValueError):
@@ -52,7 +53,7 @@ def radians(deg):
     return deg
 
 
-def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, force_longitude=False):
+def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, force_longitude=False, coords=None):
     """
     Convert UTM coordinates to latitude-longitude, courtesy of Tobias Bieniek, 2012 (with some
     minor edits).
@@ -62,6 +63,7 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
     :arg zone_number: UTM zone number (increasing eastward).
     :param zone_letter: UTM zone letter (increasing alphabetically northward).
     :param northern: specify northern or southern hemisphere.
+    :param coords: coordinate field of mesh (used to check validity of coordinates).
     :return: latitude-longitude coordinate pair.
     """
     if not zone_letter and northern is None:
@@ -74,18 +76,24 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
         if not 100000 <= easting < 1000000:
             raise OutOfRangeError('easting out of range (must be between 100,000 m and 999,999 m)')
 
+    msg = 'northing out of range (must be between 0 m and 10,000,000 m)'
     if isinstance(northing, ufl.indexed.Indexed):
-        print("#### TODO: Check validity of coordinates")  # TODO
         from firedrake import sin, cos, sqrt
+        if coords is None:
+            print_output("WARNING: Cannot check validity of coordinates.")
+        else:
+            minval, maxval = coords.dat.data[:, 1].min(), coords.dat.data[:, 1].max()
+            if not (0 <= minval and maxval <= 10000000):
+                raise OutOfRangeError(msg)
     elif isinstance(northing, np.ndarray):
         from numpy import sin, cos, sqrt
         minval, maxval = northing.min(), northing.max()
         if not (0 <= minval and maxval <= 10000000):
-            raise OutOfRangeError('northing out of range (must be between 0 m and 10,000,000 m)')
+            raise OutOfRangeError(msg)
     else:
         from math import sin, cos, sqrt
         if not 0 <= northing <= 10000000:
-            raise OutOfRangeError('northing out of range (must be between 0 m and 10,000,000 m)')
+            raise OutOfRangeError(msg)
     if not 1 <= zone_number <= 60:
         raise OutOfRangeError('zone number out of range (must be between 1 and 60)')
 
@@ -140,7 +148,7 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
     return degrees(latitude), degrees(longitude) + zone_number_to_central_longitude(zone_number)
 
 
-def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
+def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False, coords=None):
     """
     Convert latitude-longitude coordinates to UTM, courtesy of Tobias Bieniek, 2012.
 
@@ -148,25 +156,36 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
     :arg longitude: eastward angular position, with origin at the Greenwich Meridian.
     :param force_zone_number: force coordinates to fall within a particular UTM zone.
     :param zone_info: output zone letter and number.
+    :param coords: coordinate field of mesh (used to check validity of coordinates).
     :return: UTM coordinate 4-tuple.
     """
+    lat_msg = 'latitude out of range (must be between 80 deg S and 84 deg N)'
+    lon_msg = 'longitude out of range (must be between 180 deg W and 180 deg E)'
     if isinstance(latitude, ufl.indexed.Indexed):
-        print("#### TODO: Check validity of coordinates")  # TODO
         from firedrake import sin, cos, sqrt
+        if coords is None:
+            print_output("WARNING: Cannot check validity of coordinates.")
+        else:
+            minval, maxval = coords.dat.data[:, 0].min(), coords.dat.data[:, 0].max()
+            if not (-80.0 <= minval and maxval <= 84.0):
+                raise OutOfRangeError(lon_msg)
+            minval, maxval = coords.dat.data[:, 1].min(), coords.dat.data[:, 1].max()
+            if not (-180.0 <= minval and maxval <= 180.0):
+                raise OutOfRangeError(lat_msg)
     elif isinstance(latitude, np.ndarray):
         from numpy import sin, cos, sqrt
-        minval, maxval = latitude.min(), latitude.max()
-        if not (-80.0 <= minval and maxval <= 84.0):
-            raise OutOfRangeError('latitude out of range (must be between 80 deg S and 84 deg N)')
         minval, maxval = longitude.min(), longitude.max()
         if not (-180.0 <= minval and maxval <= 180.0):
-            raise OutOfRangeError('longitude out of range (must be between 180 deg W and 180 deg E)')
+            raise OutOfRangeError(lon_msg)
+        minval, maxval = latitude.min(), latitude.max()
+        if not (-80.0 <= minval and maxval <= 84.0):
+            raise OutOfRangeError(lat_msg)
     else:
         from math import sin, cos, sqrt
-        if not -80.0 <= latitude <= 84.0:
-            raise OutOfRangeError('latitude out of range (must be between 80 deg S and 84 deg N)')
         if not -180.0 <= longitude <= 180.0:
-            raise OutOfRangeError('longitude out of range (must be between 180 deg W and 180 deg E)')
+            raise OutOfRangeError(lon_msg)
+        if not -80.0 <= latitude <= 84.0:
+            raise OutOfRangeError(lat_msg)
 
     lat_rad = radians(latitude)
     lat_sin = sin(lat_rad)
@@ -201,7 +220,8 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False):
     northing = K0*(m + n*lat_tan*(a2/2 + a4/24*(5 - lat_tan2 + 9*c + 4*c**2) + a6/720*(61 - 58*lat_tan2 + lat_tan4 + 600*c - 330*E_P2)))
 
     if isinstance(latitude, ufl.indexed.Indexed):
-        print("#### TODO: Check validity of coordinates")  # TODO
+        if coords.dat.data[:, 1].min() < 0:
+            northing += 10000000
     elif isinstance(latitude, np.ndarray):
         if latitude.min() < 0:
             northing += 10000000

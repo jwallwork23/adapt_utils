@@ -104,7 +104,10 @@ class TsunamiOptions(ShallowWaterOptions):
     def set_coriolis(self, fs):
         self.coriolis = Function(fs)
         x, y = SpatialCoordinate(fs.mesh())
-        lat, lon = to_latlon(x, y, self.force_zone_number, northern=True, force_longitude=True)
+        lat, lon = to_latlon(
+            x, y, self.force_zone_number,
+            northern=True, coords=fs.mesh().coordinates, force_longitude=True
+        )
         self.coriolis.interpolate(2*self.Omega*sin(radians(lat)))
         return self.coriolis
 
