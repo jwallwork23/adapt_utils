@@ -141,46 +141,49 @@ class TsunamiOptions(ShallowWaterOptions):
                 errors[key]['abs'] = []
                 errors[key]['rel'] = []
 
-        # Find all relevant HDF5 files and sort by ascending mesh resolution
-        fnames = find('diagnostic_gauges_*.hdf5', self.di)
-        resolutions = []
-        for fname in fnames:
-            s = fname.split('_')
-            res = int(s[-1][:-5])
-            if len(s) == 4:  # TODO: Temporary: only plot fixed_mesh
-                resolutions.append(res)
-        resolutions.sort()
+        # Global time and profile arrays
+        T = np.array([])
+        Y = np.array([])
 
-        # Loop over all available mesh resolutions
-        for res in resolutions:
+        # Loop over mesh iterations
+        for i in range(self.num_meshes):
             fname = os.path.join(self.di, 'diagnostic_gauges')
             if extension is not None:
                 fname = '_'.join([fname, extension])
-            fname = '_'.join([fname, '{:d}.hdf5'.format(res)])
+            fname = '_'.join([fname, '{:d}.hdf5'.format(i)])
             assert os.path.exists(fname)
             f = h5py.File(fname, 'r')
             y = f[gauge][()]
             y = y.reshape(len(y),)[:cutoff+1]
-            y -= y[0]
+
+            if i == 0:
+                y0 = y[0]
+            y -= y0
             y = np.round(y, 2)  # Ensure consistent precision  # TODO: Update according to above
             t = f["time"][()]
             t = t.reshape(len(t),)[:cutoff+1]/60.0
 
-            # Plot timeseries for current mesh resolution
-            label = ' '.join([self.approach.replace('_', ' '), "({:d} cells)".format(res)]).title()
-            ax.plot(t, y, label=label, linestyle='dashed', marker='x')
-            f.close()
+            # Put arrays from individual meshes into global arrays
+            T = np.concatenate((T, t))
+            Y = np.concatenate((Y, y))
 
-            # Compute absolute and relative errors
-            if 'data' in self.gauges[gauge]:
-                y_cutoff = np.array(y[:len(y_data)])
-                error = y_cutoff - np.array(y_data)
-                if plot_lp:
-                    for p in ('l1', 'l2', 'linf'):
-                        errors[p]['abs'].append(lp_norm(error, p=p))
-                errors['tv']['abs'].append(total_variation(error))
-                for key in errors:
-                    errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
+        # Plot timeseries for current mesh
+        label = self.approach.replace('_', ' ').title()
+        ax.plot(T, Y, label=label, linestyle='dashed', marker='x')
+        f.close()
+
+        # TODO
+        # # Compute absolute and relative errors
+        # if 'data' in self.gauges[gauge]:
+        #     Y_cutoff = np.array(Y[:len(y_data)])
+        #     error = Y_cutoff - np.array(y_data)
+        #     if plot_lp:
+        #         for p in ('l1', 'l2', 'linf'):
+        #             errors[p]['abs'].append(lp_norm(error, p=p))
+        #     errors['tv']['abs'].append(total_variation(error))
+        #     for key in errors:
+        #         errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
+
         # plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.xlabel("Time [min]")
         # plt.ylabel(r"Free surface displacement $[\mathrm m]$")
@@ -200,21 +203,22 @@ class TsunamiOptions(ShallowWaterOptions):
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
         fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
-        # Plot relative errors
-        if 'data' not in self.gauges[gauge]:
-            raise ValueError("Data not found.")
-        for key in errors:
-            fig = plt.figure(figsize=[3.2, 4.8])
-            ax = fig.add_subplot(111)
-            ax.semilogx(resolutions, 100.0*np.array(errors[key]['rel']), marker='o')
-            plt.xlabel("Number of elements")
-            plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
-            plt.grid(True)
-            fname = "gauge_{:s}_error_{:s}".format(key, gauge)
-            if extension is not None:
-                fname = '_'.join([fname, str(extension)])
-            fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
-            fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
+        # TODO
+        # # Plot relative errors
+        # if 'data' not in self.gauges[gauge]:
+        #     raise ValueError("Data not found.")
+        # for key in errors:
+        #     fig = plt.figure(figsize=[3.2, 4.8])
+        #     ax = fig.add_subplot(111)
+        #     ax.semilogx(resolutions, 100.0*np.array(errors[key]['rel']), marker='o')
+        #     plt.xlabel("Number of elements")
+        #     plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
+        #     plt.grid(True)
+        #     fname = "gauge_{:s}_error_{:s}".format(key, gauge)
+        #     if extension is not None:
+        #         fname = '_'.join([fname, str(extension)])
+        #     fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
+        #     fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
     def set_qoi_kernel(self, solver_obj):
         # V = solver_obj.function_spaces.U_2d*solver_obj.function_spaces.P0_2d  # (Arbitrary)
