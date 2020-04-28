@@ -27,15 +27,14 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
 
     def set_fields(self):
         self.fields = []
-        self.bathymetry = []
-        for i in range(self.num_meshes):
+        for P1 in self.P1:
             self.fields.append({
-                'horizontal_viscosity': self.op.set_viscosity(self.P1[i]),
-                'coriolis_frequency': self.op.set_coriolis(self.P1[i]),
-                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(self.P1DG[i]),
-                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(self.P1[i]),
+                'horizontal_viscosity': self.op.set_viscosity(P1),
+                'coriolis_frequency': self.op.set_coriolis(P1),
+                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
+                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
             })
-            self.bathymetry.append(self.op.set_bathymetry())
+        self.bathymetry = [self.op.set_bathymetry() for mesh in self.meshes]
 
     # FIXME: Continuity of callbacks across mesh steps
     def add_callbacks(self, i):
@@ -60,8 +59,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         #     self.fwd_solvers[i].add_callback(self.callbacks[i][g], 'export')
 
         # Quantity of interest
-        if not hasattr(self, 'kernel'):
-            self.get_qoi_kernels()
+        self.get_qoi_kernels(i)
         kernel_file = File(os.path.join(self.di, 'kernel_mesh{:d}.pvd'.format(i)))
         kernel_file.write(self.kernels[i].split()[1])
         kt = Constant(0.0)  # Kernel in time

@@ -44,6 +44,16 @@ class AdaptiveProblem():
             'simulation_export_time': op.dt*op.dt_per_export,
             'timestepper_type': op.timestepper,
         }
+        self.num_timesteps = int(np.floor(op.end_time/op.dt))
+        try:
+            assert self.num_timesteps % op.num_meshes == 0
+        except AssertionError:
+            raise ValueError("Number of meshes should divide total number of timesteps.")
+        self.dt_per_mesh = self.num_timesteps//op.num_meshes
+        try:
+            assert self.dt_per_mesh % op.dt_per_export == 0
+        except AssertionError:
+            raise ValueError("Timesteps per export should divide timesteps per mesh iteration.")
         self.io_options = {
             'output_directory': op.di,
             'fields_to_export': ['uv_2d', 'elev_2d'] if op.plot_pvd else [],
@@ -80,8 +90,11 @@ class AdaptiveProblem():
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
         self.boundary_conditions = [op.set_boundary_conditions(V) for V in self.V]
-        self.fwd_solvers = [None for mesh in self.meshes]  # To be populated
-        self.adj_solvers = [None for mesh in self.meshes]  # To be populated
+
+        # Lists of objects to be populated
+        self.fwd_solvers = [None for mesh in self.meshes]
+        self.adj_solvers = [None for mesh in self.meshes]
+        self.kernels = [None for mesh in self.meshes]
 
         # Outputs
         self.di = create_directory(self.op.di)
@@ -104,10 +117,10 @@ class AdaptiveProblem():
         Build an class:`AdaptiveMesh` object associated with each mesh.
         """
         self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
-        self.ams = [AdaptiveMesh(self.meshes[i], levels=self.levels) for i in range(self.num_meshes)]
+        self.ams = [AdaptiveMesh(mesh, levels=self.levels) for mesh in self.meshes]
         msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
-        for i in range(self.num_meshes):
-            self.op.print_debug(msg.format(i, self.meshes[i].num_cells()))
+        for i, mesh in enumerate(self.meshes):
+            self.op.print_debug(msg.format(i, mesh.num_cells()))
 
     def create_function_spaces(self):  # NOTE: Keep minimal
         """
@@ -152,7 +165,7 @@ class AdaptiveProblem():
         """
         self.fwd_solutions = []
         self.adj_solutions = []
-        for i, V in enumerate(self.V):
+        for V in self.V:
             fwd = Function(V, name='Forward solution')
             u, eta = fwd.split()
             u.rename("Fluid velocity")
@@ -170,16 +183,16 @@ class AdaptiveProblem():
         self.fields = []
         self.bathymetry = []
         self.inflow = []
-        for i in range(self.num_meshes):
+        for P1 in self.P1:
             self.fields.append({
-                'horizontal_viscosity': self.op.set_viscosity(self.P1[i]),
-                'horizontal_diffusivity': self.op.set_diffusivity(self.P1[i]),
-                'coriolis_frequency': self.op.set_coriolis(self.P1[i]),
-                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(self.P1[i]),
-                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(self.P1[i]),
+                'horizontal_viscosity': self.op.set_viscosity(P1),
+                'horizontal_diffusivity': self.op.set_diffusivity(P1),
+                'coriolis_frequency': self.op.set_coriolis(P1),
+                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
+                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
             })
-            self.bathymetry.append(self.op.set_bathymetry(self.P1DG[i]))
-            self.inflow.append(self.op.set_inflow(self.P1_vec[i]))
+        self.bathymetry = [self.op.set_bathymetry(P1DG) for P1DG in self.P1DG]
+        self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
     # TODO: Allow different / mesh dependent stabilisation parameters
     # TODO: Tracer stabilisation
@@ -277,10 +290,10 @@ class AdaptiveProblem():
             self.add_callbacks(i)
 
         # Ensure time level matches solver iteration
-        solver_obj.i_export = i
-        solver_obj.next_export_t = i*op.dt*op.dt_per_remesh
-        solver_obj.iteration = i*op.dt_per_remesh
-        solver_obj.simulation_time = i*op.dt*op.dt_per_remesh
+        solver_obj.i_export = i*self.dt_per_mesh//op.dt_per_export
+        solver_obj.next_export_t = i*op.dt*self.dt_per_mesh
+        solver_obj.iteration = i*self.dt_per_mesh
+        solver_obj.simulation_time = i*op.dt*self.dt_per_mesh
         for e in solver_obj.exporters.values():
             e.set_next_export_ix(solver_obj.i_export)
 
@@ -336,15 +349,15 @@ class AdaptiveProblem():
         kwargs.setdefault('noscale', False)
         kwargs['op'] = self.op
         self.metrics = []
-        for i in range(self.num_meshes):
-            sol = self.adj_solutions[i] if adjoint else self.fwd_solutions[i]
+        solutions = self.adj_solutions if adjoint else self.fwd_solutions
+        for i, sol in enumerate(solutions):
             fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
             self.metrics.append(get_hessian_metric(sol, fields=fields, **kwargs))
 
     # --- Goal-oriented
 
-    def get_qoi_kernels(self):
-        self.kernels = [self.op.set_qoi_kernel(solver) for solver in self.fwd_solvers]
+    def get_qoi_kernels(self, i):
+        self.kernels[i] = self.op.set_qoi_kernel(self.fwd_solvers[i])
 
     def get_bnd_functions(self, i, *args):
         swt = shallowwater_eq.ShallowWaterTerm(self.V[i], self.bathymetry)
