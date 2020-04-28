@@ -48,7 +48,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         fname = "gauges"
         if self.extension is not None:
             fname = '_'.join([fname, self.extension])
-        fname = '_'.join([fname, str(self.num_cells[-1])])
+        fname = '_'.join([fname, str(i)])
         self.callbacks[i]['gauges'] = callback.DetectorsCallback(
             self.fwd_solvers[i], locs, ['elev_2d'], fname, names)
         self.fwd_solvers[i].add_callback(self.callbacks[i]['gauges'], 'export')
@@ -72,3 +72,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.callbacks[i]["qoi"] = callback.TimeIntegralCallback(
             qoi, self.fwd_solvers[i], self.fwd_solvers[i].timestepper, name="qoi", append_to_log=op.debug)
         self.fwd_solvers[i].add_callback(self.callbacks[i]["qoi"], 'timestep')
+
+    def quantity_of_interest(self):
+        self.qoi = sum(c[i]["qoi"].get_value() for c in self.callbacks)
+        return self.qoi
