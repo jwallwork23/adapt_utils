@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import *
 from adapt_utils.norms import total_variation, lp_norm
-from adapt_utils.misc import find
+# from adapt_utils.misc import find
 
 
 __all__ = ["TsunamiOptions"]
@@ -116,7 +116,8 @@ class TsunamiOptions(ShallowWaterOptions):
         try:
             assert gauge in self.gauges
         except AssertionError:
-            raise ValueError("Gauge '{:s}' is not valid. Choose from {:}.".format(gauge, self.gauges.keys()))
+            msg = "Gauge '{:s}' is not valid. Choose from {:}."
+            raise ValueError(msg.format(gauge, self.gauges.keys()))
 
         fig = plt.figure(figsize=[10.0, 5.0])
         ax = fig.add_subplot(111)
@@ -145,6 +146,7 @@ class TsunamiOptions(ShallowWaterOptions):
         T = np.array([])
         Y = np.array([])
 
+        # TODO: Plot multiple runs on single plot
         # Loop over mesh iterations
         for i in range(self.num_meshes):
             fname = os.path.join(self.di, 'diagnostic_gauges')
