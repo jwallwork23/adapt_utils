@@ -41,12 +41,12 @@ class TsunamiOptions(ShallowWaterOptions):
         x, y = SpatialCoordinate(self.lonlat_mesh)
         self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
 
-    def set_bathymetry(self, dat=None, cap=30.0):
+    def set_bathymetry(self, fs=None, dat=None, cap=30.0):
         assert hasattr(self, 'initial_surface')
         if cap is not None:
             assert cap > 0.0
-        P1 = FunctionSpace(self.default_mesh, "CG", 1)
-        self.bathymetry = Function(P1, name="Bathymetry")
+        fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
+        self.bathymetry = Function(fs, name="Bathymetry")
 
         # Interpolate bathymetry data *in lonlat space*
         lon, lat, elev = dat or self.read_bathymetry_file()
@@ -71,8 +71,8 @@ class TsunamiOptions(ShallowWaterOptions):
         return self.bathymetry
 
     def set_initial_surface(self, fs=None):
-        P1 = fs or FunctionSpace(self.default_mesh, "CG", 1)
-        self.initial_surface = Function(P1, name="Initial free surface")
+        fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
+        self.initial_surface = Function(fs, name="Initial free surface")
 
         # Interpolate bathymetry data *in lonlat space*
         lon, lat, elev = self.read_surface_file()
@@ -89,6 +89,7 @@ class TsunamiOptions(ShallowWaterOptions):
         return self.initial_surface
 
     def set_initial_condition(self, fs):
+        P1 = FunctionSpace(fs.mesh(), "CG", 1)
         self.initial_value = Function(fs)
         u, eta = self.initial_value.split()
 
@@ -96,7 +97,7 @@ class TsunamiOptions(ShallowWaterOptions):
         u.assign(0.0)
 
         # Interpolate free surface from inversion data
-        self.set_initial_surface(FunctionSpace(fs.mesh(), "CG", 1))
+        self.set_initial_surface(P1)
         eta.interpolate(self.initial_surface)
 
         return self.initial_value

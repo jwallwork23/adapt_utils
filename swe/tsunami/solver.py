@@ -34,7 +34,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
                 'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
             })
-        self.bathymetry = [self.op.set_bathymetry() for mesh in self.meshes]
+        self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
 
     def add_callbacks(self, i):
         super(AdaptiveTsunamiProblem, self).add_callbacks(i)

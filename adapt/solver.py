@@ -81,6 +81,7 @@ class AdaptiveProblem():
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
         op.print_debug(op.indent + "SETUP: Creating function spaces...")
+        self.set_finite_element()
         self.create_function_spaces()
         op.print_debug(op.indent + "SETUP: Creating solutions...")
         self.create_solutions()
@@ -122,6 +123,19 @@ class AdaptiveProblem():
         for i, mesh in enumerate(self.meshes):
             self.op.print_debug(msg.format(i, mesh.num_cells()))
 
+    def set_finite_element(self):
+        p = self.op.degree
+        assert p >= 0
+        family = self.op.family
+        u_element = VectorElement("DG", triangle, p)
+        if family == 'dg-dg':
+            eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
+        elif family == 'dg-cg':
+            eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
+        else:
+            raise NotImplementedError("Cannot build element {:s} of order {:d}".format(family, p))
+        self.finite_element = u_element*eta_element
+
     def create_function_spaces(self):  # NOTE: Keep minimal
         """
         Build the finite element space, `V`, for the prognostic solution, along with various other
@@ -136,17 +150,6 @@ class AdaptiveProblem():
         # self.P2 = [FunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
 
         # Shallow water space
-        p = self.op.degree
-        assert p >= 0
-        family = self.op.family
-        u_element = VectorElement("DG", triangle, p)
-        if family == 'dg-dg':
-            eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
-        elif family == 'dg-cg':
-            eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
-        else:
-            raise NotImplementedError("Cannot build element {:s} of order {:d}".format(family, p))
-        self.finite_element = u_element*eta_element
         self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
 
         # Tracer space
@@ -181,8 +184,6 @@ class AdaptiveProblem():
     def set_fields(self):
         """Set velocity field, viscosity, etc (on each mesh)."""
         self.fields = []
-        self.bathymetry = []
-        self.inflow = []
         for P1 in self.P1:
             self.fields.append({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
@@ -266,9 +267,8 @@ class AdaptiveProblem():
             self.extra_setup = extra_setup
 
         # Create solver object
-        solver_obj = solver2d.FlowSolver2d(self.meshes[i], self.bathymetry[i])
-        self.fwd_solvers[i] = solver_obj
-        options = solver_obj.options
+        self.fwd_solvers[i] = solver2d.FlowSolver2d(self.meshes[i], self.bathymetry[i])
+        options = self.fwd_solvers[i].options
         options.update(self.io_options)
 
         # Timestepping
@@ -296,7 +296,7 @@ class AdaptiveProblem():
             raise NotImplementedError  # TODO
 
         # Boundary conditions
-        solver_obj.bnd_functions['shallow_water'] = self.boundary_conditions[i]
+        self.fwd_solvers[i].bnd_functions['shallow_water'] = self.boundary_conditions[i]
 
         # NOTE: Extra setup must be done *before* setting initial condition
         if hasattr(self, 'extra_setup'):
@@ -304,23 +304,23 @@ class AdaptiveProblem():
 
         # Initial conditions
         uv, elev = self.fwd_solutions[i].split()
-        solver_obj.assign_initial_conditions(uv=uv, elev=elev)
+        self.fwd_solvers[i].assign_initial_conditions(uv=uv, elev=elev)
 
         # NOTE: Callbacks must be added *after* setting initial condition
         self.add_callbacks(i)
 
         # Ensure time level matches solver iteration
-        solver_obj.i_export = i*self.dt_per_mesh//op.dt_per_export
-        solver_obj.next_export_t = i*op.dt*self.dt_per_mesh
-        solver_obj.iteration = i*self.dt_per_mesh
-        solver_obj.simulation_time = i*op.dt*self.dt_per_mesh
-        for e in solver_obj.exporters.values():
-            e.set_next_export_ix(solver_obj.i_export)
+        self.fwd_solvers[i].i_export = i*self.dt_per_mesh//op.dt_per_export
+        self.fwd_solvers[i].next_export_t = i*op.dt*self.dt_per_mesh
+        self.fwd_solvers[i].iteration = i*self.dt_per_mesh
+        self.fwd_solvers[i].simulation_time = i*op.dt*self.dt_per_mesh
+        for e in self.fwd_solvers[i].exporters.values():
+            e.set_next_export_ix(self.fwd_solvers[i].i_export)
 
         # For later use
-        self.lhs = solver_obj.timestepper.F
+        self.lhs = self.fwd_solvers[i].timestepper.F
         # TODO: Check
-        assert self.fwd_solutions[i].function_space() == solver_obj.function_spaces.V_2d
+        assert self.fwd_solutions[i].function_space() == self.fwd_solvers[i].function_spaces.V_2d
 
     def add_callbacks(self, i):
         op = self.op
