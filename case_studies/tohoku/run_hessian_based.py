@@ -1,9 +1,9 @@
 from thetis import *
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
-from adapt_utils.swe.tsunami.solver import TsunamiProblem
+from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 from adapt_utils.swe.utils import ShallowWaterHessianRecoverer
-from adapt_utils.adapt.metric import metric_complexity
+from adapt_utils.adapt.metric import metric_complexity, time_normalise
 
 import argparse
 
@@ -11,6 +11,7 @@ import argparse
 parser = argparse.ArgumentParser(prog="run_hessian_based")
 parser.add_argument("-end_time", help="End time of simulation")
 parser.add_argument("-level", help="(Integer) mesh resolution")
+parser.add_argument("-num_meshes", help="Number of meshes to consider")
 parser.add_argument("-norm_order", help="p for Lp normalisaton")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t")
 parser.add_argument("-target", help="Target space-time complexity")
@@ -24,75 +25,62 @@ args = parser.parse_args()
 # Set parameters for fixed mesh run
 op = TohokuOptions(
     level=int(args.level or 0),
+    num_meshes=int(args.num_meshes or 5),
     approach='fixed_mesh',
     adapt_field=args.adapt_field or 'elevation',
     plot_pvd=True,
     debug=bool(args.debug or False),
     norm_order=int(args.norm_order or 1),  # TODO: L-inf normalisation
-    target=float(args.target or 1.0e+03),  # Desired average instantaneous spatial complexity
+    target=float(args.target or 1.0e+02),  # Desired average instantaneous spatial complexity
 )
 op.end_time = float(args.end_time or op.end_time)
 
 # Create problem object
-swp = TsunamiProblem(op)
+swp = AdaptiveTsunamiProblem(op)
 
-
-# --- Callbacks
-
-
-recoverer = ShallowWaterHessianRecoverer(swp.V, op=op)  # L2 projector will be repeatedly used
-hessian = lambda sol: recoverer.get_hessian_metric(sol, fields=swp.fields, noscale=True)
-timestep = lambda sol: 1.0/op.dt
-
-
-def extra_setup():
-
-    # TODO: LaggedTimeIntegralCallback to reduce cost of Hessian computation
-    # TODO: Option to take metric with maximum complexity, rather than time average
-
-    # Number of timesteps per export (trivial for constant dt)
-    swp.callbacks["timestep"] = callback.TimeIntegralCallback(
-        timestep, swp.solver_obj, swp.solver_obj.timestepper, name="timestep", append_to_log=False)
-    swp.solver_obj.add_callback(swp.callbacks["timestep"], 'timestep')
-
-    # Time integrated Hessian over each window
-    swp.callbacks["average_hessian"] = callback.TimeIntegralCallback(
-        hessian, swp.solver_obj, swp.solver_obj.timestepper, name="average_hessian", append_to_log=False)
-    swp.solver_obj.add_callback(swp.callbacks["average_hessian"], 'timestep')
-
-
-swp.setup_solver_forward(extra_setup=extra_setup)
-
-
-# --- Exports
-
-
-average_hessian = Function(swp.P1_ten, name="Average Hessian")
-average_hessians = []
-timestep_integrals = []
+average_hessians = [Function(P1_ten, name="Average Hessian") for P1_ten in swp.P1_ten]
+timestep_integrals = np.zeros(swp.num_meshes)
 hessian_file = File(os.path.join(swp.di, 'hessian.pvd'))
-
-
-def export_func():
-    if swp.solver_obj.iteration == 0:
-        return
-
-    # Extract time averaged Hessian and reset to zero for next window
-    average_hessian.interpolate(swp.callbacks["average_hessian"].get_value())
-    hessian_file.write(average_hessian)
-    average_hessians.append(average_hessian.copy(deepcopy=True))
-    swp.callbacks["average_hessian"].integrant = 0
-
-    # Extract timesteps per export and reset to zero for next window
-    timestep_integrals.append(swp.callbacks["timestep"].get_value())
-    swp.callbacks["timestep"].integrant = 0.0
 
 
 # --- Run fixed mesh
 
 
-swp.solve(export_func=export_func)
-print_output("Quantity of interest: {:.4e}".format(swp.callbacks["qoi"].get_value()))
+for i in range(swp.num_meshes):
+
+    # Transfer the solution from the previous mesh / apply initial condition
+    swp.transfer_forward_solution(i)
+
+    # Create double L2 projection operator which will be repeatedly used
+    recoverer = ShallowWaterHessianRecoverer(swp.V[i], op=op)
+    hessian = lambda sol: recoverer.get_hessian_metric(sol, fields=swp.fields[i], noscale=True)
+    swp.hessian_func = hessian
+
+    # Setup solver for current mesh iteration
+    swp.setup_solver_forward(i)
+
+    def export_func():
+
+        # We only care about the final export in each mesh iteration
+        if swp.fwd_solvers[i].iteration != (i+1)*swp.dt_per_mesh:
+            return
+
+        # Extract time averaged Hessian
+        average_hessians[i].interpolate(swp.callbacks[i]["average_hessian"].get_value())
+        hessian_file.write(average_hessians[i])
+        # swp.callbacks[i]["average_hessian"].integrant = 0
+
+        # Extract timesteps per mesh iteration
+        timestep_integrals[i] = swp.callbacks[i]["timestep"].get_value()
+        # swp.callbacks[i]["timestep"].integrant = 0.0
+
+    swp.solve_forward_step(i, export_func=export_func)
+
+    del recoverer
+
+qoi = swp.quantity_of_interest()
+print_output("Quantity of interest: {:.4e}".format(qoi))
+swp.qois.append(qoi)
 
 
 # --- Time normalise metrics
@@ -109,16 +97,29 @@ for i, H in enumerate(average_hessians):
 # --- Adapt meshes
 
 
-meshes = []
 for i, M in enumerate(average_hessians):
-    mesh = adapt(swp.mesh, M)
-    meshes.append(mesh)
-# mesh_file = File(os.path.join(swp.di, 'mesh.pvd'))  # FIXME
-for i, mesh in enumerate(meshes):
+    swp.meshes[i] = adapt(swp.meshes[i], M)
+swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
+swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
+
+mesh_file = File(os.path.join(swp.di, 'mesh.pvd'))  # FIXME
+for i, complexity in enumerate(complexities):
     msg = "{:2d}: complexity {:7.1f} vertices {:6d} elements {:6d}"
-    print_output(msg.format(i, complexities[i], mesh.num_vertices(), mesh.num_cells()))
-    mesh_file = File(os.path.join(swp.di, 'mesh_{:d}.pvd'.format(i)))  # FIXME
-    mesh_file.write(mesh.coordinates)
+    print_output(msg.format(i, complexity, swp.num_vertices[1][i], swp.num_cells[1][i]))
+    # mesh_file = File(os.path.join(swp.di, 'mesh_{:d}.pvd'.format(i)))  # FIXME
+    mesh_file.write(swp.meshes[i].coordinates)
+
+
+# ---  Setup for next run / logging
+
+
+# swp.set_meshes(swp.meshes)
+# swp.create_function_spaces()
+# swp.dofs.append([np.array(V.dof_count).sum() for V in swp.V])
+# swp.create_solutions()
+# swp.set_fields()
+# swp.set_stabilisation()
+# swp.set_boundary_conditions()
 
 
 # --- TODO: Run Hessian based

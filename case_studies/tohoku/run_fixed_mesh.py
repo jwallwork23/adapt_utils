@@ -3,7 +3,7 @@ from thetis import print_output
 import argparse
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
-from adapt_utils.swe.tsunami.adapt_solver import AdaptiveTsunamiProblem
+from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
 parser = argparse.ArgumentParser(prog="run_fixed_mesh")
@@ -24,7 +24,7 @@ op = TohokuOptions(
 op.end_time = float(args.end_time or op.end_time)
 
 # Solve
-swp = AdaptiveTsunamiProblem(op, levels=0)
+swp = AdaptiveTsunamiProblem(op)
 swp.solve_forward()
 print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
 op.plot_timeseries("P02")

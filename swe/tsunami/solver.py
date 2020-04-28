@@ -36,13 +36,13 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
             })
         self.bathymetry = [self.op.set_bathymetry() for mesh in self.meshes]
 
-    # FIXME: Continuity of callbacks across mesh steps
     def add_callbacks(self, i):
+        super(AdaptiveTsunamiProblem, self).add_callbacks(i)
         op = self.op
 
-        # --- Callbacks
 
-        # Gauge timeseries
+        # --- Gauge timeseries
+
         names = [g for g in op.gauges]
         locs = [op.gauges[g]["coords"] for g in names]
         fname = "gauges"
@@ -58,7 +58,9 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         #         self.fwd_solvers[i], ['elev_2d'], x, y, g, self.di)
         #     self.fwd_solvers[i].add_callback(self.callbacks[i][g], 'export')
 
-        # Quantity of interest
+
+        # --- Quantity of interest
+
         self.get_qoi_kernels(i)
         kernel_file = File(os.path.join(self.di, 'kernel_mesh{:d}.pvd'.format(i)))
         kernel_file.write(self.kernels[i].split()[1])
@@ -70,7 +72,9 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
             return assemble(kt*inner(self.kernels[i], sol)*dx)
 
         self.callbacks[i]["qoi"] = callback.TimeIntegralCallback(
-            qoi, self.fwd_solvers[i], self.fwd_solvers[i].timestepper, name="qoi", append_to_log=op.debug)
+            qoi, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
+            name="qoi", append_to_log=op.debug
+        )
         self.fwd_solvers[i].add_callback(self.callbacks[i]["qoi"], 'timestep')
 
     def quantity_of_interest(self):
