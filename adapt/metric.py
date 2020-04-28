@@ -12,7 +12,7 @@ __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_
            "metric_average"]
 
 
-def steady_metric(f=None, H=None, projector=None, noscale=False, normalise=True, op=Options()):
+def steady_metric(f=None, H=None, projector=None, normalise=True, op=Options()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
@@ -22,7 +22,6 @@ def steady_metric(f=None, H=None, projector=None, noscale=False, normalise=True,
     :kwarg f: Field to compute the Hessian of.
     :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
     :kwarg projector: :class:`DoubleL2Projector` object to compute Hessian.
-    :kwarg noscale: Toggle scaling by `target` complexity.
     :kwarg normalise: If `False` then we simply take the diagonal matrix with `f` in modulus.
     :kwarg op: `Options` class object providing min/max cell size values.
     :return: Steady metric associated with Hessian `H`.
@@ -39,37 +38,61 @@ def steady_metric(f=None, H=None, projector=None, noscale=False, normalise=True,
     dim = mesh.topological_dimension()
     assert dim in (2, 3)  # TODO: test 3d case works
     assert op.normalisation in ('complexity', 'error')
-    rescale = 1.0 if noscale else op.target
 
     # Functions to hold metric and its determinant
     M = Function(V).assign(0.0)
-    detH = Function(FunctionSpace(mesh, "CG", 1)).assign(0.0)
 
     # Turn Hessian into a metric
     op.print_debug("METRIC: Constructing metric from Hessian...")
-    kernel = eigen_kernel(metric_from_hessian, dim, normalise=normalise, op=op)
-    op2.par_loop(kernel, V.node_set, M.dat(op2.RW), detH.dat(op2.RW), H.dat(op2.READ))
+    kernel = eigen_kernel(metric_from_hessian, dim)
+    op2.par_loop(kernel, V.node_set, M.dat(op2.RW), H.dat(op2.READ))
     op.print_debug("METRIC: Done!")
 
     if not normalise:
         return M
 
-    # Scale by target complexity / desired error  # FIXME!
-    op.print_debug("METRIC: Normalising metric...")
-    det = assemble(detH*dx)
-    if op.normalisation == 'complexity':
-        assert det > 1e-8
-        M *= pow(rescale/det, 2/dim)
-    else:
-        M *= dim*rescale  # NOTE in the 'error' case this is the inverse thereof
-        if op.norm_order is not None:
-            assert det > 1e-8
-            M *= pow(det, 1/op.norm_order)
-    kernel = eigen_kernel(scale_metric, dim, op=op)
+    # Apply Lp normalisation
+    op.print_debug("METRIC: Normalising metric in space...")
+    space_normalise(M, op=op)
+    op.print_debug("METRIC: Done!")
+
+    # Enforce maximum/minimum element sizes and anisotropy
+    kernel = eigen_kernel(postproc_metric, dim, op=op)
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW))
     op.print_debug("METRIC: Done!")
 
     return M
+
+
+def space_normalise(M, op=Options()):
+    """
+    Normalise steady metric `M`.
+
+    NOTE: In the case of 'error' normalisation, 'target' is the inverse of error.
+    """
+    mesh = M.function_space().mesh()
+    d = mesh.topological_dimension()
+    p = op.norm_order
+
+    # Infinite p
+    if p is None:
+        if op.normalisation == 'complexity':
+            integral = assemble(sqrt(det(M))*dx)
+            M *= pow(op.target/integral, 2/d)
+        else:
+            M *= d*op.target
+        return
+
+    # Finite p
+    integral = assemble(pow(det(M), p/(2*p + d))*dx)
+    assert integral > 1.0e-08
+    if op.normalisation == 'complexity':
+        integral = pow(op.target/integral, 2/d)
+    else:
+        integral = d*op.target*pow(integral, 1/p)
+    P1 = FunctionSpace(mesh, "CG", 1)
+    M.interpolate(integral*pow(det(M), -1/(2*p + d))*M)
+    return
 
 
 def isotropic_metric(f, noscale=False, normalise=True, op=Options()):
@@ -209,7 +232,7 @@ def time_normalise(hessians, timesteps_per_remesh=None, op=Options()):
     :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
     """
     target = op.target*op.end_time/op.dt  # Desired space-time complexity
-    p = op.norm_order_time
+    p = op.norm_order
     n = len(hessians)
     if timesteps_per_remesh is None:
         timesteps_per_remesh = np.ones(n)*op.dt_per_remesh  # TODO: update

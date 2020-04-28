@@ -13,7 +13,7 @@ from adapt_utils.options import Options
 
 __all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecomposition",
            "set_eigendecomposition", "set_eigendecomposition_transpose", "intersect",
-           "anisotropic_refinement", "metric_from_hessian", "scale_metric", "include_dir",
+           "anisotropic_refinement", "metric_from_hessian", "postproc_metric", "include_dir",
            "gemv", "matscale", "singular_value_decomposition", "get_maximum_length_edge"]
 
 
@@ -221,12 +221,12 @@ void anisotropic_refinement(double A_[%d]) {
 }
 """
 
-linf_metric_str = """
+metric_from_hessian_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
-void metric_from_hessian(double A_[%d], double * f, const double * B_) {
+void metric_from_hessian(double A_[%d], const double * B_) {
 
   // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
@@ -248,67 +248,20 @@ void metric_from_hessian(double A_[%d], double * f, const double * B_) {
   Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
   Vector%dd D = eigensolver.eigenvalues();
 
-  // Apply L-infinity normalisation
+  // Take modulus of eigenvalues
   for (i=0; i<%d; i++) D(i) = fmax(1e-10, abs(D(i)));
-  if (%s) {
-    double det = 1.0;
-    for (i=0; i<%d; i++) det *= D(i);
-    *f += sqrt(det);
-  }
 
   // Build metric from eigendecomposition
   A += Q * D.asDiagonal() * Q.transpose();
 }
 """
 
-lp_metric_str = """
+postproc_metric_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
-void metric_from_hessian(double A_[%d], double * f, const double * B_) {
-
-  // Map inputs and outputs onto Eigen objects
-  Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
-  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
-
-  // Compute mean diagonal and set values appropriately
-  double mean_diag;
-  int i,j;
-  for (i=0; i<%d-1; i++) {
-    for (j=i+1; i<%d; i++) {
-      mean_diag = 0.5*(B(i,j) + B(j,i));
-      B(i,j) = mean_diag;
-      B(j,i) = mean_diag;
-    }
-  }
-
-  // Solve eigenvalue problem
-  SelfAdjointEigenSolver<Matrix<double, %d, %d, RowMajor>> eigensolver(B);
-  Matrix<double, %d, %d, RowMajor> Q = eigensolver.eigenvectors();
-  Vector%dd D = eigensolver.eigenvalues();
-
-  // Apply Lp normalisation
-  for (i=0; i<%d; i++) D(i) = fmax(1e-10, abs(D(i)));
-  double scaling = 1.0;
-  if (%s) {
-    double det = 1.0;
-    for (i=0; i<%d; i++) det *= D(i);
-    scaling = pow(det, -1 / (2 * %d + 2));
-    *f += pow(det, %d / (2 * %d + %d));
-  }
-
-  // Build metric from eigendecomposition
-  A += scaling * Q * D.asDiagonal() * Q.transpose();
-}
-"""
-
-scale_metric_str = """
-#include <Eigen/Dense>
-
-using namespace Eigen;
-
-void scale_metric(double A_[%d])
+void postproc_metric(double A_[%d])
 {
 
   // Map input/output metric onto an Eigen object
@@ -441,26 +394,14 @@ def anisotropic_refinement(d, direction):
     return anisotropic_refinement_str % (d*d, d, d, d, d, d, d, d, d, direction, scale)
 
 
-def metric_from_hessian(d, normalise=True, op=Options()):
-    """Build a metric field from a Hessian with user-specified normalisation methods."""
-    normalised_metric = linf_metric_from_hessian if op.norm_order is None else lp_metric_from_hessian
-    return normalised_metric(d, str(normalise).lower(), op.norm_order)
+def metric_from_hessian(d):
+    """Build a metric field from a Hessian"""
+    return metric_from_hessian_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d)
 
 
-def linf_metric_from_hessian(d, scale, p):
-    """Build a metric field from a Hessian using L-infinity normalisation."""
-    assert p is None
-    return linf_metric_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d)
-
-
-def lp_metric_from_hessian(d, scale, p):
-    """Build a metric field from a Hessian using L-p normalisation, for p>=1."""
-    return lp_metric_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, scale, d, p, p, p, d)
-
-
-def scale_metric(d, op=Options()):
-    """Scale a metric field in order to enforce maximum/minimum element sizes and anisotropy."""
-    return scale_metric_str % (d*d, d, d, d, d, d, d, d, d, op.h_min, op.h_max, d, op.max_anisotropy)
+def postproc_metric(d, op=Options()):
+    """Post-process a metric field in order to enforce max/min element sizes and anisotropy."""
+    return postproc_metric_str % (d*d, d, d, d, d, d, d, d, d, op.h_min, op.h_max, d, op.max_anisotropy)
 
 
 def gemv(d, alpha=1.0, beta=0.0, tol=1e-8):

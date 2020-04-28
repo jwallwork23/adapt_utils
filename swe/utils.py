@@ -61,7 +61,7 @@ class ShallowWaterHessianRecoverer():
 
         NOTE: `sol` could be a forward or adjoint solution tuple.
         """
-        kwargs.setdefault('noscale', False)
+        kwargs.setdefault('normalise', True)
         op = self.op
         kwargs['op'] = op
         adapt_field = adapt_field or op.adapt_field
