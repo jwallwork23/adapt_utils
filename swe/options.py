@@ -12,6 +12,7 @@ class ShallowWaterOptions(Options):
     Parameters for shallow water solver.
     """
     solve_tracer = Bool(False).tag(config=True)
+    solve_swe = Bool(True).tag(config=True)
 
     # Physical
     bathymetry = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
