@@ -214,11 +214,11 @@ class AdaptiveProblem():
 
     def set_initial_condition(self):
         """Apply initial condition for forward solution on first mesh."""
-        self.fwd_solutions[0].assign(self.op.set_start_condition(self.V[0], adjoint=False))
+        self.fwd_solutions[0].assign(self.op.set_initial_condition(self.V[0]))
 
     def set_final_condition(self):
         """Apply final time condition for adjoint solution on final mesh."""
-        self.adj_solutions[-1].assign(self.op.set_start_condition(self.V[-1], adjoint=True))
+        self.adj_solutions[-1].assign(self.op.set_final_condition(self.V[-1]))
 
     # --- Helper functions
 

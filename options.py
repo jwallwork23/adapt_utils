@@ -60,7 +60,8 @@ class Options(FrozenConfigurable):
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
     normalisation = Unicode('complexity', help="Metric normalisation approach, from {'complexity', 'error'}.").tag(config=True)
     target = PositiveFloat(1.0e+2, help="Target complexity / inverse desired error for normalisation, as appropriate.").tag(config=True)
-    norm_order = NonNegativeInteger(None, allow_none=True, help="Degree p of Lp norm used in 'error' normalisation approach. Use 'None' to specify infinity norm.").tag(config=True)
+    norm_order = NonNegativeInteger(None, allow_none=True, help="Degree p of Lp norm used in spatial normalisation. Use 'None' to specify infinity norm.").tag(config=True)
+    norm_order_time = NonNegativeInteger(1, help="Degree p of Lp norm used in time normalisation.").tag(config=True)
     intersect_boundary = Bool(False, help="Intersect with initial boundary metric.").tag(config=True)
 
     # Hessian

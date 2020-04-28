@@ -441,10 +441,10 @@ def anisotropic_refinement(d, direction):
     return anisotropic_refinement_str % (d*d, d, d, d, d, d, d, d, d, direction, scale)
 
 
-def metric_from_hessian(d, noscale=False, op=Options()):
+def metric_from_hessian(d, normalise=True, op=Options()):
     """Build a metric field from a Hessian with user-specified normalisation methods."""
     normalised_metric = linf_metric_from_hessian if op.norm_order is None else lp_metric_from_hessian
-    return normalised_metric(d, 'false' if noscale else 'true', op.norm_order)
+    return normalised_metric(d, str(normalise).lower(), op.norm_order)
 
 
 def linf_metric_from_hessian(d, scale, p):
