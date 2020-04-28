@@ -48,7 +48,6 @@ class TohokuOptions(TsunamiOptions):
         self.dt = 5.0
         # self.dt = 0.01
         self.dt_per_export = int(60.0/self.dt)
-        self.dt_per_remesh = int(60.0/self.dt)
         self.start_time = 15*60.0
         self.end_time = 25*60.0
         # self.end_time = 60*60.0
