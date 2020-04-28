@@ -45,6 +45,7 @@ class AdaptiveProblem():
             'timestepper_type': op.timestepper,
         }
         self.num_timesteps = int(np.floor(op.end_time/op.dt))
+        self.num_meshes = op.num_meshes
         try:
             assert self.num_timesteps % op.num_meshes == 0
         except AssertionError:
@@ -77,7 +78,6 @@ class AdaptiveProblem():
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
-        self.num_meshes = op.num_meshes
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
         op.print_debug(op.indent + "SETUP: Creating function spaces...")
@@ -89,7 +89,7 @@ class AdaptiveProblem():
         op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
-        self.boundary_conditions = [op.set_boundary_conditions(V) for V in self.V]
+        self.set_boundary_conditions()
 
         # Lists of objects to be populated
         self.fwd_solvers = [None for mesh in self.meshes]
@@ -130,7 +130,7 @@ class AdaptiveProblem():
         self.P0 = [FunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
         self.P1 = [FunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
         self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
-        # self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
         self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
         # self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
         # self.P2 = [FunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
@@ -208,6 +208,9 @@ class AdaptiveProblem():
         for i in range(self.num_meshes):
             self.stabilisation_parameters.append(self.op.stabilisation_parameter)
 
+    def set_boundary_conditions(self):
+        self.boundary_conditions = [self.op.set_boundary_conditions(V) for V in self.V]
+
     def set_initial_condition(self):
         """Apply initial condition for forward solution on first mesh."""
         self.fwd_solutions[0].assign(self.op.set_start_condition(self.V[0], adjoint=False))
@@ -235,6 +238,24 @@ class AdaptiveProblem():
     def project_adjoint_solution(self, i, j):
         """Project adjoint solution from mesh `i` to mesh `j`."""
         self.project(self.adj_solutions, i, j)
+
+    def transfer_solution(self, i, adjoint=False):
+        if adjoint:
+            self.transfer_adjoint_solution()
+        else:
+            self.transfer_forward_solution()
+
+    def transfer_forward_solution(self, i):
+        if i == 0:
+            self.set_initial_condition()
+        else:
+            self.project_forward_solution(i-1, i)
+
+    def transfer_adjoint_solution(self, i):
+        if i == self.num_meshes - 1:
+            self.set_final_condition()
+        else:
+            self.project_adjoint_solution(i+1, i)
 
     # --- Solvers
 
@@ -286,8 +307,7 @@ class AdaptiveProblem():
         solver_obj.assign_initial_conditions(uv=uv, elev=elev)
 
         # NOTE: Callbacks must be added *after* setting initial condition
-        if hasattr(self, 'add_callbacks'):
-            self.add_callbacks(i)
+        self.add_callbacks(i)
 
         # Ensure time level matches solver iteration
         solver_obj.i_export = i*self.dt_per_mesh//op.dt_per_export
@@ -301,6 +321,34 @@ class AdaptiveProblem():
         self.lhs = solver_obj.timestepper.F
         # TODO: Check
         assert self.fwd_solutions[i].function_space() == solver_obj.function_spaces.V_2d
+
+    def add_callbacks(self, i):
+        op = self.op
+
+        if not hasattr(self, 'hessian_func'):
+            return
+
+        # TODO: LaggedTimeIntegralCallback to reduce cost of Hessian computation
+        # TODO: Option to take metric with maximum complexity, rather than time average
+
+
+        # --- Number of timesteps per mesh iteration
+
+        timestep = lambda sol: 1.0/op.dt
+        self.callbacks[i]["timestep"] = callback.TimeIntegralCallback(
+            timestep, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
+            name="timestep", append_to_log=False
+        )
+        self.fwd_solvers[i].add_callback(self.callbacks[i]["timestep"], 'timestep')
+
+
+        # --- Time integrated Hessian over each window
+
+        self.callbacks[i]["average_hessian"] = callback.TimeIntegralCallback(
+            self.hessian_func, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
+            name="average_hessian", append_to_log=False
+        )
+        self.fwd_solvers[i].add_callback(self.callbacks[i]["average_hessian"], 'timestep')
 
     def setup_solver_adjoint(self, i, **kwargs):
         """Setup adjoint solver on mesh `i`."""
@@ -326,20 +374,14 @@ class AdaptiveProblem():
     def solve_forward(self):
         """Solve forward problem on the full sequence of meshes."""
         for i in range(self.num_meshes):
-            if i == 0:
-                self.set_initial_condition()
-            else:
-                self.project_forward_solution(i-1, i)
+            self.transfer_forward_solution(i)
             self.setup_solver_forward(i)
             self.solve_forward_step(i)
 
     def solve_adjoint(self):
         """Solve adjoint problem on the full sequence of meshes."""
         for i in range(self.num_meshes - 1, -1):
-            if i == self.num_meshes - 1:
-                self.set_final_condition()
-            else:
-                self.project_adjoint_solution(i+1, i)
+            self.transfer_adjoint_solution(i)
             self.setup_solver_adjoint(i)
             self.solve_adjoint_step(i)
 

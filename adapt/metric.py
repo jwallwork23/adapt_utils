@@ -193,7 +193,7 @@ def time_normalise(hessians, timesteps_per_remesh=None, op=Options()):
         For constant timesteps, this equates to the number of timesteps per remesh step.
     :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
     """
-    target = op.target*op.end_time  # Desired space-time complexity
+    target = op.target*op.end_time/op.dt/op.num_meshes  # Desired space-time complexity
     p = op.norm_order
     n = len(hessians)
     if timesteps_per_remesh is None:
