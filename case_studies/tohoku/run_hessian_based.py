@@ -23,15 +23,22 @@ args = parser.parse_args()
 # --- Setup
 
 
-# Set parameters for fixed mesh run
+# Order for spatial Lp normalisation
+p = None
+if args.norm_order is not None:  # FIXME
+    p = float(args.norm_order)
+    assert p >= 1.0
+
+# Parameter class
 op = TohokuOptions(
     level=int(args.level or 0),
     num_meshes=int(args.num_meshes or 5),
-    approach='fixed_mesh',
+    approach='hessian',
     adapt_field=args.adapt_field or 'elevation',
     plot_pvd=True,
     debug=bool(args.debug or False),
-    norm_order=int(args.norm_order or 1),  # TODO: L-inf normalisation
+    norm_order=p,
+    norm_order_time=1,
     target=float(args.target or 1.0e-01),  # FIXME: Desired average instantaneous spatial complexity
     num_adapt=int(args.num_adapt or 1),
 )
@@ -62,8 +69,9 @@ for n in range(op.num_adapt):
 
             # Create double L2 projection operator which will be repeatedly used
             recoverer = ShallowWaterHessianRecoverer(swp.V[i], op=op)
-            # hessian = lambda sol: recoverer.get_hessian_metric(sol, fields=swp.fields[i])  # FIXME
-            hessian = lambda sol: recoverer.get_hessian_metric(sol, fields=swp.fields[i], noscale=True)
+            hessian = lambda sol: recoverer.get_hessian_metric(sol, fields=swp.fields[i],
+                                                               noscale=True, normalise=False)
+                                                               # noscale=True, normalise=True)
             swp.hessian_func = hessian
 
             def export_func():

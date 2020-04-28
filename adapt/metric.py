@@ -12,7 +12,7 @@ __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_
            "metric_average"]
 
 
-def steady_metric(f=None, H=None, projector=None, noscale=False, op=Options()):
+def steady_metric(f=None, H=None, projector=None, noscale=False, normalise=True, op=Options()):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
@@ -22,7 +22,8 @@ def steady_metric(f=None, H=None, projector=None, noscale=False, op=Options()):
     :kwarg f: Field to compute the Hessian of.
     :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
     :kwarg projector: :class:`DoubleL2Projector` object to compute Hessian.
-    :kwarg noscale: If `noscale == True` then we simply take the Hessian with eigenvalues in modulus.
+    :kwarg noscale: Toggle scaling by `target` complexity.
+    :kwarg normalise: If `False` then we simply take the diagonal matrix with `f` in modulus.
     :kwarg op: `Options` class object providing min/max cell size values.
     :return: Steady metric associated with Hessian `H`.
     """
@@ -38,40 +39,46 @@ def steady_metric(f=None, H=None, projector=None, noscale=False, op=Options()):
     dim = mesh.topological_dimension()
     assert dim in (2, 3)  # TODO: test 3d case works
     assert op.normalisation in ('complexity', 'error')
+    rescale = 1.0 if noscale else op.target
 
     # Functions to hold metric and its determinant
     M = Function(V).assign(0.0)
     detH = Function(FunctionSpace(mesh, "CG", 1)).assign(0.0)
 
     # Turn Hessian into a metric
-    kernel = eigen_kernel(metric_from_hessian, dim, noscale=noscale, op=op)
+    op.print_debug("METRIC: Constructing metric from Hessian...")
+    kernel = eigen_kernel(metric_from_hessian, dim, normalise=normalise, op=op)
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW), detH.dat(op2.RW), H.dat(op2.READ))
+    op.print_debug("METRIC: Done!")
 
-    if noscale:
+    if not normalise:
         return M
 
-    # Scale by target complexity / desired error
+    # Scale by target complexity / desired error  # FIXME!
+    op.print_debug("METRIC: Normalising metric...")
     det = assemble(detH*dx)
     if op.normalisation == 'complexity':
         assert det > 1e-8
-        M *= pow(op.target/det, 2/dim)
+        M *= pow(rescale/det, 2/dim)
     else:
-        M *= dim*op.target  # NOTE in the 'error' case this is the inverse thereof
+        M *= dim*rescale  # NOTE in the 'error' case this is the inverse thereof
         if op.norm_order is not None:
             assert det > 1e-8
             M *= pow(det, 1/op.norm_order)
     kernel = eigen_kernel(scale_metric, dim, op=op)
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW))
+    op.print_debug("METRIC: Done!")
 
     return M
 
 
-def isotropic_metric(f, noscale=False, op=Options()):
+def isotropic_metric(f, noscale=False, normalise=True, op=Options()):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
     :arg f: Function to adapt to.
-    :kwarg noscale: If `noscale == True` then we simply take the diagonal matrix with `f` in modulus.
+    :kwarg noscale: Toggle scaling by `target` complexity.
+    :kwarg normalise: If `False` then we simply take the diagonal matrix with `f` in modulus.
     :kwarg op: :class:`Options` object providing min/max cell size values.
     :return: Isotropic metric corresponding to `f`.
     """
@@ -91,26 +98,30 @@ def isotropic_metric(f, noscale=False, op=Options()):
     rescale = 1 if noscale else op.target
 
     # Project into P1 space
+    op.print_debug("METRIC: Constructing isotropic metric...")
     M_diag = project(max_value(abs(rescale*f), 1e-10), V)
     M_diag.interpolate(abs(M_diag))  # Ensure positivity
+    op.print_debug("METRIC: Done!")
+    if not normalise:
+        return interpolate(M_diag*Identity(dim), V_ten)
 
     # Normalise
-    if not noscale:
-        p = op.norm_order
-        detM = Function(V).assign(M_diag)
+    op.print_debug("METRIC: Normalising metric...")
+    p = op.norm_order
+    detM = Function(V).assign(M_diag)
+    if p is not None:
+        assert p >= 1
+        detM *= M_diag
+        M_diag *= pow(detM, -1/(2*p + dim))
+        detM.interpolate(pow(detM, p/(2*p + dim)))
+    if op.normalisation == 'complexity':
+        M_diag *= pow(rescale/assemble(detM*ds), 2/dim)
+    else:
         if p is not None:
-            assert p >= 1
-            detM *= M_diag
-            M_diag *= pow(detM, -1/(2*p + dim))
-            detM.interpolate(pow(detM, p/(2*p + dim)))
-        if op.normalisation == 'complexity':
-            M_diag *= pow(op.target/assemble(detM*ds), 2/dim)
-        else:
-            if p is not None:
-                M_diag *= pow(assemble(detM*ds), 1/p)
-        M_diag = max_value(1/pow(op.h_max, 2), min_value(M_diag, 1/pow(op.h_min, 2)))
-        M_diag = max_value(M_diag, M_diag/pow(op.max_anisotropy, 2))
-
+            M_diag *= pow(assemble(detM*ds), 1/p)
+    M_diag = max_value(1/pow(op.h_max, 2), min_value(M_diag, 1/pow(op.h_min, 2)))
+    M_diag = max_value(M_diag, M_diag/pow(op.max_anisotropy, 2))
+    op.print_debug("METRIC: Done!")
     return interpolate(M_diag*Identity(dim), V_ten)
 
 
@@ -122,11 +133,13 @@ def metric_intersection(*metrics, bdy=None):
     :param bdy: specify domain boundary to intersect over.
     :return: intersection of metrics M1 and M2.
     """
+    op.print_debug("METRIC: Intersecting metrics...")
     n = len(metrics)
     assert n > 0
     M = metrics[0]
     for i in range(1, n):
         M = _metric_intersection_pair(M, metrics[i], bdy=bdy)
+    op.print_debug("METRIC: Done!")
     return M
 
 
@@ -154,6 +167,7 @@ def metric_relaxation(*metrics, weights=None):
     :kwarg weights: weights with which to average
     :return: convex combination
     """
+    op.print_debug("METRIC: Computing metric relaxation...")
     n = len(metrics)
     assert n > 0
     if weights is None:
@@ -165,6 +179,7 @@ def metric_relaxation(*metrics, weights=None):
     for i, Mi in enumerate(metrics):
         assert Mi.function_space() == V
         M += Mi*weights[i]
+    op.print_debug("METRIC: Done!")
     return M
 
 
@@ -193,11 +208,11 @@ def time_normalise(hessians, timesteps_per_remesh=None, op=Options()):
         For constant timesteps, this equates to the number of timesteps per remesh step.
     :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
     """
-    target = op.target*op.end_time/op.dt/op.num_meshes  # Desired space-time complexity
-    p = op.norm_order
+    target = op.target*op.end_time/op.dt  # Desired space-time complexity
+    p = op.norm_order_time
     n = len(hessians)
     if timesteps_per_remesh is None:
-        timesteps_per_remesh = np.ones(n)*op.dt_per_remesh
+        timesteps_per_remesh = np.ones(n)*op.dt_per_remesh  # TODO: update
     else:
         assert len(timesteps_per_remesh) == n
         assert n > 0
@@ -205,13 +220,17 @@ def time_normalise(hessians, timesteps_per_remesh=None, op=Options()):
     z = zip(hessians, timesteps_per_remesh)
 
     # Compute global normalisation coefficient
+    op.print_debug("METRIC: Computing global metric time normalisation factor...")
     global_norm = pow(sum(assemble(pow(det(H)*tpr**2, p/(2*p + d))*dx) for H, tpr in z), -2/d)
-    op.print_debug("Global normalisation factor: {:.4e}".format(global_norm))
+    op.print_debug("METRIC: Done!")
+    op.print_debug("METRIC: Global normalisation factor: {:.4e}".format(global_norm))
 
+    op.print_debug("METRIC: Normalising metric in time...")
     # Normalise on each window
     for H, tpr in z:
         H.interpolate(pow(target, 2/d)*global_norm*pow(det(H)*tpr**2, -1/(2*p + d))*H)
         H.rename("Time-accurate {:s}".format(H.dat.name))
+    op.print_debug("METRIC: Done!")
 
 
 # TODO: Test identities hold
@@ -327,7 +346,7 @@ def metric_with_boundary(f=None, H=None, h=None, mesh=None, degree=1, op=Options
     detM_bdy = Function(V).assign(h)
 
     # Turn interior Hessian into a metric
-    kernel = eigen_kernel(metric_from_hessian, dim, noscale=False, op=op)
+    kernel = eigen_kernel(metric_from_hessian, dim, normalise=True, op=op)
     op2.par_loop(kernel, V_ten.node_set, M_int.dat(op2.RW), detM_int.dat(op2.RW), H.dat(op2.READ))
 
     # Normalise
