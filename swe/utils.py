@@ -75,32 +75,12 @@ class ShallowWaterHessianRecoverer():
         if 'inflow' in fields:
             uv_space_fields['inflow'] = inner(u, fields.get('inflow'))
 
-        # --- Recover Hessian
+        # --- Recover Hessian and construct metric(s)
 
         # Combine the two velocity components with elevation
         if adapt_field in ('all_avg', 'all_int'):
             c = adapt_field[-3:]
             adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
-
-        # Elevation already lives in the correct space
-        if adapt_field == 'elevation':
-            return steady_metric(eta, projector=self.elev_projector, **kwargs)
-
-        # Velocity components can be extracted directly
-        for i, field in enumerate(('velocity_x', 'velocity_y')):
-            if adapt_field == field:
-                f = get_component(u, i, component_space=self.speed_space)
-                return steady_metric(f, projector=self.speed_projector, **kwargs)
-
-        # Fields which need projecting into speed space
-        if adapt_field in uv_space_fields:
-            f = project(uv_space_fields[adapt_field], self.speed_space)
-            return steady_metric(f, projector=self.speed_projector, **kwargs)
-
-        # Fields which need projecting into elevation space
-        if adapt_field == 'bathymetry':
-            f = project(fields.get('bathymetry'), self.elev_space)
-            return steady_metric(f, projector=self.elev_projector, **kwargs)
 
         # The list of fields are averaged/intersected, as appropriate
         # If both are specified, the list of fields are first intersected and then averaged
@@ -110,7 +90,32 @@ class ShallowWaterHessianRecoverer():
                 metrics = [self.get_hessian_metric(sol, f, fields=fields) for f in adapt_fields]
                 return combine_metrics(*metrics, average=c == 'avg')
 
-        raise ValueError("Adaptation field {:s} not recognised.".format(adapt_field))
+        # Elevation already lives in the correct space
+        if adapt_field == 'elevation':
+            f = eta
+            proj = self.elev_projector
+
+        # Velocity components can be extracted directly
+        elif adapt_field == 'velocity_x':
+            f = get_component(u, 0, component_space=self.speed_space)
+            proj = self.speed_projector
+        elif adapt_field == 'velocity_y':
+            f = get_component(u, 1, component_space=self.speed_space)
+            proj = self.speed_projector
+
+        # Fields which need projecting into speed space
+        elif adapt_field in uv_space_fields:
+            f = project(uv_space_fields[adapt_field], self.speed_space)
+            proj = self.speed_projector
+            return steady_metric(f, projector=self.speed_projector, **kwargs)
+
+        # Fields which need projecting into elevation space
+        elif adapt_field == 'bathymetry':
+            f = project(fields.get('bathymetry'), self.elev_space)
+            proj = self.elev_projector
+        else:
+            raise ValueError("Adaptation field {:s} not recognised.".format(adapt_field))
+        return steady_metric(f, projector=proj, **kwargs)
 
 
 def vorticity(sol):
@@ -124,6 +129,7 @@ def speed(sol):
     """Fluid velocity magnitude, i.e. fluid speed."""
     uv, elev = sol.split()
     return sqrt(inner(uv, uv))
+
 
 def heaviside_approx(H, alpha):
     """C0 continuous approximation to Heaviside function."""
