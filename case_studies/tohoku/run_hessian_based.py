@@ -101,7 +101,9 @@ for n in range(op.num_adapt):
 
             # Create double L2 projection operator which will be repeatedly used
             recoverer = ShallowWaterHessianRecoverer(swp.V[i], op=op)
-            hessian = lambda sol: recoverer.get_hessian_metric(sol, fields=swp.fields[i], normalise=False)
+            fields = {'bathymetry': swp.bathymetry[i]}
+            fields.update(swp.fields[i])
+            hessian = lambda sol: recoverer.get_hessian_metric(sol, fields=fields, normalise=False)
             swp.hessian_func = hessian
 
             def export_func():
