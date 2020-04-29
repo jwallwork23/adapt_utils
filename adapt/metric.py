@@ -227,45 +227,48 @@ def metric_complexity(M):
     return assemble(sqrt(det(M))*dx)
 
 
-def time_normalise(hessians, timesteps_per_remesh=None, enforce_constraints=True, op=Options()):
+def time_normalise(hessians, timestep_integrals=None, enforce_constraints=True, op=Options()):
     r"""
     Normalise a list of Hessians in time as dictated by equation (1) in [Barral et al. 2016].
 
     :arg hessians: list of Hessians to be time-normalised.
-    :kwarg timesteps_per_remesh: list of time integrals of 1/timestep over each remesh step.
+    :kwarg timestep_integrals: list of time integrals of 1/timestep over each remesh step.
         For constant timesteps, this equates to the number of timesteps per remesh step.
     :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
     """
     p = op.norm_order
     n = len(hessians)
-    if timesteps_per_remesh is None:
-        timesteps_per_remesh = np.ones(n)*np.floor(op.end_time/op.dt)/op.num_meshes
-    else:
-        assert len(timesteps_per_remesh) == n
-        assert n > 0
+    timestep_integrals = timestep_integrals or np.ones(n)*np.floor(op.end_time/op.dt)/op.num_meshes
+    assert len(timestep_integrals) == n
     d = hessians[0].function_space().mesh().topological_dimension()
-    z = zip(hessians, timesteps_per_remesh)
 
     if op.normalisation == 'error':
         raise NotImplementedError  # TODO
+
+    # Target space-time complexity
+    N_st = op.target*sum(timestep_integrals)  # Multiply instantaneous target by number of timesteps
 
     # Compute global normalisation coefficient
     op.print_debug("METRIC: Computing global metric time normalisation factor...")
     integral = 0.0
     for i, H in enumerate(hessians):
-        integral += assemble(pow(det(H)*timesteps_per_remesh[i]**2, p/(2*p + d))*dx)
-    glob_norm = pow(op.target/integral, 2/d)
+        integral += assemble(pow(det(H)*timestep_integrals[i]**2, p/(2*p + d))*dx)
+    glob_norm = pow(N_st/integral, 2/d)
     op.print_debug("METRIC: Done!")
-    op.print_debug("METRIC: Target complexity = {:.4e}".format(op.target))
+    op.print_debug("METRIC: Target space-time complexity = {:.4e}".format(N_st))
     op.print_debug("METRIC: Global normalisation factor = {:.4e}".format(glob_norm))
 
     # Normalise on each window
     op.print_debug("METRIC: Normalising metric in time...")
     for i, H in enumerate(hessians):
-        H.interpolate(glob_norm*pow(det(H)*timesteps_per_remesh[i]**2, -1/(2*p + d))*H)
+        H.interpolate(glob_norm*pow(det(H)*timestep_integrals[i]**2, -1/(2*p + d))*H)
         H.rename("Time-accurate {:s}".format(H.dat.name))
-        if enforce_constraints:  # Enforce max/min element sizes and anisotropy
+
+        # Enforce max/min element sizes and anisotropy
+        if enforce_constraints:
+            op.print_debug("METRIC: Enforcing size and ansisotropy constraints...")
             enforce_element_constraints(H, op=op)
+            op.print_debug("METRIC: Done!")
     op.print_debug("METRIC: Done!")
 
 
