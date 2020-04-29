@@ -18,14 +18,18 @@ parser.add_argument("-end_time", help="End time of simulation (default 25 minute
 # Initial mesh
 parser.add_argument("-level", help="(Integer) mesh resolution (default 0)")
 
-# Adaptation
+# Mesh adaptation
 parser.add_argument("-num_meshes", help="Number of meshes to consider (default 5)")
-parser.add_argument("-num_adapt", help="Number of iterations in adaptation loop (default 2)")
 parser.add_argument("-norm_order", help="p for Lp normalisaton (default 1)")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t")
 parser.add_argument("-target", help="Target space-time complexity (default 1.0e+03)")
 parser.add_argument("-h_min", help="Minimum tolerated element size (default 100m)")
 parser.add_argument("-h_max", help="Maximum tolerated element size (default 1000km)")
+
+# Outer loop
+parser.add_argument("-num_adapt", help="Maximum number of adaptation loop iterations (default 35)")
+parser.add_argument("-element_rtol", help="Relative tolerance for element count (default 0.005)")
+parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
 
 # Misc
 parser.add_argument("-debug", help="Print all debugging statements")
@@ -49,9 +53,8 @@ kwargs = {
     # Initial mesh
     'level': int(args.level or 0),
 
-    # Adaptation
+    # Mesh adaptation
     'num_meshes': int(args.num_meshes or 5),
-    'num_adapt': int(args.num_adapt or 1),
     'adapt_field': args.adapt_field or 'elevation',
     'normalisation': 'complexity',
     'norm_order': p,
@@ -60,13 +63,18 @@ kwargs = {
     'h_max': float(args.h_max or 1.0e+06),
     'plot_pvd': True,
 
+    # Outer loop
+    'element_rtol': float(args.element_rtol or 0.005),
+    'qoi_rtol': float(args.qoi_rtol or 0.005),
+    'num_adapt': int(args.num_adapt or 35),
+
     # Misc
     'debug': bool(args.debug or False),
 }
-logstr = 50*'*' + '\n' + 19*' ' + 'PARAMETERS\n' + 50*'*' + '\n'
+logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
 for key in kwargs:
     logstr += "    {:20s}: {:}\n".format(key, kwargs[key])
-logstr += 50*'*' + '\n'
+logstr += 80*'*' + '\n'
 print_output(logstr)
 
 # Create parameter class and problem object
@@ -76,6 +84,7 @@ swp = AdaptiveTsunamiProblem(op)
 
 # --- Mesh adaptation loop
 
+st_complexities = [np.nan]
 for n in range(op.num_adapt):
     average_hessians = [Function(P1_ten, name="Average Hessian") for P1_ten in swp.P1_ten]
     # timestep_integrals = np.zeros(swp.num_meshes)
@@ -88,7 +97,7 @@ for n in range(op.num_adapt):
         # Transfer the solution from the previous mesh / apply initial condition
         swp.transfer_forward_solution(i)
 
-        if n < op.num_adapt - 1:
+        if n < op.num_adapt-1:
 
             # Create double L2 projection operator which will be repeatedly used
             recoverer = ShallowWaterHessianRecoverer(swp.V[i], op=op)
@@ -113,9 +122,19 @@ for n in range(op.num_adapt):
 
         # TODO: Delete objects to free memory
 
+    # --- Convergence criteria
+
+    # Check QoI convergence
     qoi = swp.quantity_of_interest()
     print_output("Quantity of interest: {:.4e}".format(qoi))
+    qoi_old = swp.qois[-1]
     swp.qois.append(qoi)
+    if len(swp.qois) > 1:
+        if np.abs(qoi - qoi_old) < op.qoi_rtol*qoi_old:
+            print_output("Converged quantity of interest!")
+            break
+
+    # Check maximum number of iterations
     if n == op.num_adapt - 1:
         break
 
@@ -128,6 +147,7 @@ for n in range(op.num_adapt):
     for i, H in enumerate(average_hessians):
         metric_file.write(H)
         complexities.append(metric_complexity(H))
+    st_complexities.append(sum(complexities))
 
     # --- Adapt meshes
 
@@ -135,6 +155,8 @@ for n in range(op.num_adapt):
     for i, M in enumerate(average_hessians):
         print_output("Adaptation step {:d}/{:d}".format(i+1, swp.num_meshes))
         swp.meshes[i] = pragmatic_adapt(swp.meshes[i], M, op=op)
+    swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
+    swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
 
     # ---  Setup for next run / logging
 
@@ -148,19 +170,28 @@ for n in range(op.num_adapt):
     swp.callbacks = [{} for mesh in swp.meshes]
 
     print_output("\nResulting meshes")
-    swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
-    swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
     for i, complexity in enumerate(complexities):
         msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
         print_output(msg.format(i, complexity, swp.num_vertices[n+1][i], swp.num_cells[n+1][i]))
     print_output("")
 
+    # Check convergence of *all* element counts
+    converged = True
+    for i, num_cells in enumerate(swp.num_cells[n]):
+        if np.abs(num_cells - swp.num_cells[n-1][i]) > op.element_rtol*swp.num_cells[n-1][i]:
+            converged = False
+    if converged:
+        print_output("Converged number of mesh elements!")
+        break
+
 # --- Print summary / logging
 
-logstr += 20*' ' + 'SUMMARY\n' + 50*'*' + '\n'
-for i, qoi in enumerate(swp.qois):
-    logstr += "Mesh iteration {:2d}: qoi {:.4e}\n".format(i, qoi)
-logstr += 50*'*' + '\n'
+logstr += 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
+logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
+msg = "Mesh iteration {:2d}: qoi {:.4e} space-time complexity {:.4e}\n"
+for n in range(1, len(swp.qois)):
+    logstr += msg.format(n+1, swp.qois[n], st_complexities[n])
+logstr += 80*'*' + '\n'
 print_output(logstr)
 date = datetime.date.today()
 date = '{:d}-{:d}-{:d}'.format(date.year, date.month, date.day)
