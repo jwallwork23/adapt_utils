@@ -40,7 +40,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         super(AdaptiveTsunamiProblem, self).add_callbacks(i)
         op = self.op
 
-
         # --- Gauge timeseries
 
         names = [g for g in op.gauges]
@@ -57,7 +56,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         #     self.callbacks[i][g] = callback.TimeSeriesCallback2D(
         #         self.fwd_solvers[i], ['elev_2d'], x, y, g, self.di)
         #     self.fwd_solvers[i].add_callback(self.callbacks[i][g], 'export')
-
 
         # --- Quantity of interest
 
