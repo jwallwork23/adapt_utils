@@ -92,3 +92,11 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         boundary_conditions[right_tag] = {'elev': Constant(0.)}
         boundary_conditions[wall_tag] = {'un': Constant(0.)}
         return boundary_conditions
+
+    def set_initial_condition(self, fs):  # TODO: USEME
+        if not hasattr(self, 'inflow'):
+            self.set_inflow()
+        self.initial_value = Function(fs)
+        uv, elev = self.initial_value.split()
+        uv.interpolate(self.inflow)
+        return self.initial_value
