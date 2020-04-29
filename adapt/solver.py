@@ -3,8 +3,8 @@ from thetis.physical_constants import *
 
 import numpy as np
 
-from adapt_utils.adapt.adaptation import AdaptiveMesh
 from adapt_utils.swe.utils import *
+from adapt_utils.misc import suppress_output
 
 
 __all__ = ["AdaptiveProblem"]
@@ -91,6 +91,7 @@ class AdaptiveProblem():
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
         self.set_boundary_conditions()
+        self.callbacks = [{} for mesh in self.meshes]
 
         # Lists of objects to be populated
         self.fwd_solvers = [None for mesh in self.meshes]
@@ -113,12 +114,13 @@ class AdaptiveProblem():
         self.estimators = [{} for mesh in self.meshes]
         self.qois = []
 
-    def set_meshes(self, meshes):  # TODO: levels > 0
+    # TODO: AdaptiveMesh
+    # TODO: levels > 0
+    def set_meshes(self, meshes):
         """
         Build an class:`AdaptiveMesh` object associated with each mesh.
         """
         self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
-        self.ams = [AdaptiveMesh(mesh, levels=self.levels) for mesh in self.meshes]
         msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
         for i, mesh in enumerate(self.meshes):
             self.op.print_debug(msg.format(i, mesh.num_cells()))
