@@ -1,11 +1,13 @@
 from thetis import *
 
+import argparse
+import datetime
+
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 from adapt_utils.swe.utils import ShallowWaterHessianRecoverer
 from adapt_utils.adapt.metric import metric_complexity, time_normalise
-
-import argparse
+from adapt_utils.adapt.adaptation import pragmatic_adapt
 
 
 parser = argparse.ArgumentParser(prog="run_hessian_based")
@@ -21,17 +23,15 @@ parser.add_argument("-num_meshes", help="Number of meshes to consider (default 5
 parser.add_argument("-num_adapt", help="Number of iterations in adaptation loop (default 2)")
 parser.add_argument("-norm_order", help="p for Lp normalisaton (default 1)")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t")
-parser.add_argument("-target", help="Target space-time complexity (default 1.0e+04)")
+parser.add_argument("-target", help="Target space-time complexity (default 1.0e+03)")
 parser.add_argument("-h_min", help="Minimum tolerated element size (default 100m)")
-parser.add_argument("-h_max", help="Maximum tolerated element size (default 100km)")
+parser.add_argument("-h_max", help="Maximum tolerated element size (default 1000km)")
 
 # Misc
 parser.add_argument("-debug", help="Print all debugging statements")
 args = parser.parse_args()
 
-
 # --- Setup
-
 
 # Order for spatial Lp normalisation
 # p = None
@@ -49,39 +49,34 @@ kwargs = {
     'level': int(args.level or 0),
 
     # Adaptation
-    'approach': 'hessian',
     'num_meshes': int(args.num_meshes or 5),
     'num_adapt': int(args.num_adapt or 1),
     'norm_order': p,
     'adapt_field': args.adapt_field or 'elevation',
-    'target': float(args.target or 1.0e+04),  # FIXME
+    'target': float(args.target or 1.0e+03),
     'h_min': float(args.h_min or 1.0e+02),
-    'h_max': float(args.h_max or 1.0e+05),
+    'h_max': float(args.h_max or 1.0e+06),
     'plot_pvd': True,
 
     # Misc
     'debug': bool(args.debug or False),
 }
-paramstr = "\n"
-logstr = 50*'*' + '\n' + 19*' ' + "PARAMETERS\n" + 50*'*' + '\n'
+logstr = 50*'*' + '\n' + 19*' ' + 'PARAMETERS\n' + 50*'*' + '\n'
 for key in kwargs:
     logstr += "    {:12s}: {:}\n".format(key, kwargs[key])
-logstr +=  50*'*'
+logstr += 50*'*' + '\n'
 print_output(logstr)
 
 # Create parameter class and problem object
-op = TohokuOptions(**kwargs)
+op = TohokuOptions(approach='hessian')
+op.update(kwargs)
 swp = AdaptiveTsunamiProblem(op)
-
-average_hessians = [Function(P1_ten, name="Average Hessian") for P1_ten in swp.P1_ten]
-timestep_integrals = np.zeros(swp.num_meshes)
-hessian_file = File(os.path.join(swp.di, 'hessian.pvd'))
-
 
 # --- Mesh adaptation loop
 
-
 for n in range(op.num_adapt):
+    average_hessians = [Function(P1_ten, name="Average Hessian") for P1_ten in swp.P1_ten]
+    timestep_integrals = np.zeros(swp.num_meshes)
     if hasattr(swp, 'hessian_func'):
         delattr(swp, 'hessian_func')
     export_func = None
@@ -106,7 +101,6 @@ for n in range(op.num_adapt):
 
                 # Extract time averaged Hessian
                 average_hessians[i].interpolate(swp.callbacks[i]["average_hessian"].get_value())
-                hessian_file.write(average_hessians[i])
 
                 # Extract timesteps per mesh iteration
                 timestep_integrals[i] = swp.callbacks[i]["timestep"].get_value()
@@ -123,9 +117,7 @@ for n in range(op.num_adapt):
     if n == op.num_adapt - 1:
         break
 
-
     # --- Time normalise metrics
-
 
     time_normalise(average_hessians, timestep_integrals, op=op)
     metric_file = File(os.path.join(swp.di, 'metric.pvd'))
@@ -134,24 +126,14 @@ for n in range(op.num_adapt):
         metric_file.write(H)
         complexities.append(metric_complexity(H))
 
-
     # --- Adapt meshes
 
-
+    print_output("\nEntering adaptation loop {:2d}...\n".format(n+1))
     for i, M in enumerate(average_hessians):
-        swp.meshes[i] = adapt(swp.meshes[i], M)
-    swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
-    swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
-
-    print_output("\nAdaptation step {:2d}".format(n+1))
-    for i, complexity in enumerate(complexities):
-        msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-        print_output(msg.format(i, complexity, swp.num_vertices[1][i], swp.num_cells[1][i]))
-    print_output("")
-
+        print_output("Adaptation step {:d}/{:d}".format(i+1, swp.num_meshes))
+        swp.meshes[i] = pragmatic_adapt(swp.meshes[i], M, op=op)
 
     # ---  Setup for next run / logging
-
 
     swp.set_meshes(swp.meshes)
     swp.create_function_spaces()
@@ -160,12 +142,30 @@ for n in range(op.num_adapt):
     swp.set_fields()
     swp.set_stabilisation()
     swp.set_boundary_conditions()
+    swp.callbacks = [{} for mesh in swp.meshes]
 
+    print_output("\nResulting meshes")
+    swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
+    swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
+    for i, complexity in enumerate(complexities):
+        msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
+        print_output(msg.format(i, complexity, swp.num_vertices[n+1][i], swp.num_cells[n+1][i]))
+    print_output("")
 
-# --- Print summary
+# --- Print summary / logging
 
-logstr += 50*'*' + '\n' + 20*' ' + "SUMMARY\n" + 50*'*'
+logstr += 20*' ' + 'SUMMARY\n' + 50*'*' + '\n'
 for i, qoi in enumerate(swp.qois):
-    logstr += "Mesh iteration {:2d}: qoi {:.4e}".format(i, qoi)
-logstr += 50*'*' 
+    logstr += "Mesh iteration {:2d}: qoi {:.4e}\n".format(i, qoi)
+logstr += 50*'*' + '\n'
 print_output(logstr)
+date = datetime.date.today()
+date = '{:d}-{:d}-{:d}'.format(date.year, date.month, date.day)
+j = 0
+while True:
+    fname = os.path.join(op.di, '{:s}-run-{:d}'.format(date, j))
+    if not os.path.exists(fname):
+        break
+    j += 1
+with open(fname, 'w') as f:
+    f.write(logstr)
