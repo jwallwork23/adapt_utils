@@ -34,11 +34,12 @@ args = parser.parse_args()
 # --- Setup
 
 # Order for spatial Lp normalisation
-# p = None
-# if args.norm_order is not None:  # FIXME: L-inf time normalisation
-#     p = float(args.norm_order)
-#     assert p >= 1.0
 p = 1
+if args.norm_order is not None:
+    if p == 'inf':
+        p = None
+    else:
+        p = float(args.norm_order)
 
 kwargs = {
 
@@ -51,8 +52,9 @@ kwargs = {
     # Adaptation
     'num_meshes': int(args.num_meshes or 5),
     'num_adapt': int(args.num_adapt or 1),
-    'norm_order': p,
     'adapt_field': args.adapt_field or 'elevation',
+    'normalisation': 'complexity',
+    'norm_order': p,
     'target': float(args.target or 5.0e+03),
     'h_min': float(args.h_min or 1.0e+02),
     'h_max': float(args.h_max or 1.0e+06),
@@ -63,7 +65,7 @@ kwargs = {
 }
 logstr = 50*'*' + '\n' + 19*' ' + 'PARAMETERS\n' + 50*'*' + '\n'
 for key in kwargs:
-    logstr += "    {:12s}: {:}\n".format(key, kwargs[key])
+    logstr += "    {:20s}: {:}\n".format(key, kwargs[key])
 logstr += 50*'*' + '\n'
 print_output(logstr)
 

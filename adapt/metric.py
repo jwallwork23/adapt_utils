@@ -77,8 +77,7 @@ def space_normalise(M, op=Options()):
     # Infinite p
     if p is None:
         if op.normalisation == 'complexity':
-            integral = assemble(sqrt(det(M))*dx)
-            M *= pow(op.target/integral, 2/d)
+            M *= pow(op.target/metric_complexity(M), 2/d)
         else:
             M *= d*op.target
         return
@@ -104,12 +103,11 @@ def enforce_element_constraints(M, op=Options()):
     op2.par_loop(kernel, M.function_space().node_set, M.dat(op2.RW))
 
 
-def isotropic_metric(f, noscale=False, normalise=True, op=Options()):
+def isotropic_metric(f, normalise=True, op=Options()):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
     :arg f: Function to adapt to.
-    :kwarg noscale: Toggle scaling by `target` complexity.
     :kwarg normalise: If `False` then we simply take the diagonal matrix with `f` in modulus.
     :kwarg op: :class:`Options` object providing min/max cell size values.
     :return: Isotropic metric corresponding to `f`.
@@ -127,7 +125,7 @@ def isotropic_metric(f, noscale=False, normalise=True, op=Options()):
 
     # Scale indicator
     assert op.normalisation in ('complexity', 'error')
-    rescale = 1 if noscale else op.target
+    rescale = op.target if normalise else 1
 
     # Project into P1 space
     op.print_debug("METRIC: Constructing isotropic metric...")
@@ -237,13 +235,12 @@ def time_normalise(hessians, timestep_integrals=None, enforce_constraints=True, 
     :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
     """
     p = op.norm_order
+    if p is not None:
+        assert p >= 1
     n = len(hessians)
     timestep_integrals = timestep_integrals or np.ones(n)*np.floor(op.end_time/op.dt)/op.num_meshes
     assert len(timestep_integrals) == n
     d = hessians[0].function_space().mesh().topological_dimension()
-
-    if op.normalisation == 'error':
-        raise NotImplementedError  # TODO
 
     # Target space-time complexity
     N_st = op.target*sum(timestep_integrals)  # Multiply instantaneous target by number of timesteps
@@ -251,9 +248,20 @@ def time_normalise(hessians, timestep_integrals=None, enforce_constraints=True, 
     # Compute global normalisation coefficient
     op.print_debug("METRIC: Computing global metric time normalisation factor...")
     integral = 0.0
-    for i, H in enumerate(hessians):
-        integral += assemble(pow(det(H)*timestep_integrals[i]**2, p/(2*p + d))*dx)
-    glob_norm = pow(N_st/integral, 2/d)
+    for i, H in enumerate(hessians):  # TODO: Check whether square is correct
+        if p is None:
+            integral += assemble(sqrt(det(H))*timestep_integrals[i]*dx)
+        else:
+            integral += assemble(pow(det(H)*timestep_integrals[i]**2, p/(2*p + d))*dx)
+    if op.normalisation == 'complexity':
+        glob_norm = pow(N_st/integral, 2/d)
+    elif op.normalisation == 'error':  # FIXME
+        glob_norm = d*N_st
+        # glob_norm = d*op.target
+        if p is not None:
+            glob_norm *= pow(integral, 1/p)
+    else:
+        raise ValueError("Normalisation approach {:s} not recognised.".format(op.normalisation))
     op.print_debug("METRIC: Done!")
     op.print_debug("METRIC: Target space-time complexity = {:.4e}".format(N_st))
     op.print_debug("METRIC: Global normalisation factor = {:.4e}".format(glob_norm))
@@ -261,7 +269,10 @@ def time_normalise(hessians, timestep_integrals=None, enforce_constraints=True, 
     # Normalise on each window
     op.print_debug("METRIC: Normalising metric in time...")
     for i, H in enumerate(hessians):
-        H.interpolate(glob_norm*pow(det(H)*timestep_integrals[i]**2, -1/(2*p + d))*H)
+        H_expr = glob_norm*H
+        if p is not None:
+            H_expr *= pow(det(H)*timestep_integrals[i]**2, -1/(2*p + d))
+        H.interpolate(H_expr)
         H.rename("Time-accurate {:s}".format(H.dat.name))
 
         # Enforce max/min element sizes and anisotropy

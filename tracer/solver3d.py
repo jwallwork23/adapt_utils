@@ -50,13 +50,13 @@ class SteadyTracerProblem3d(SteadyTracerProblem2d):
             F3 = sol*self.u[2] - self.nu*sol.dx(2)
 
         # Construct Hessians
-        H1 = steady_metric(F1, mesh=self.mesh, noscale=True, op=self.op)
+        H1 = steady_metric(F1, mesh=self.mesh, normalise=False, op=self.op)
         H1.rename("Hessian for x-component")
-        H2 = steady_metric(F2, mesh=self.mesh, noscale=True, op=self.op)
+        H2 = steady_metric(F2, mesh=self.mesh, normalise=False, op=self.op)
         H1.rename("Hessian for y-component")
-        H3 = steady_metric(F3, mesh=self.mesh, noscale=True, op=self.op)
+        H3 = steady_metric(F3, mesh=self.mesh, normalise=False, op=self.op)
         H1.rename("Hessian for z-component")
-        Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
+        Hf = steady_metric(source, mesh=self.mesh, normalise=False, op=self.op)
         H1.rename("Hessian for source term")
 
         # Hessians for conservative parts

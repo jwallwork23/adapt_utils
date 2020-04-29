@@ -570,7 +570,7 @@ class SteadyProblem():
         except AssertionError:
             raise NotImplementedError("Should be implemented in derived class.")
         f = self.adjoint_solution if adjoint else self.solution
-        return steady_metric(f, mesh=self.mesh, noscale=True, op=self.op)
+        return steady_metric(f, mesh=self.mesh, normalise=False, op=self.op)
 
     def get_isotropic_metric(self):
         """
@@ -731,11 +731,11 @@ class SteadyProblem():
         elif approach == 'carpio_both':
             self.dwr_indication(adjoint=False)
             self.indicators[approach] = self.indicators['dwr'].copy()
-            self.get_hessian_metric(noscale=False)
+            self.get_hessian_metric(normalise=True)
             M = self.M.copy()
             self.dwr_indication(adjoint=True)
             self.indicators[approach] += self.indicators['dwr_adjoint']
-            self.get_hessian_metric(noscale=False, adjoint=True)
+            self.get_hessian_metric(normalise=True, adjoint=True)
             self.M = metric_intersection(self.M, M)
             amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicators[approach], op=self.op)
             amd.get_anisotropic_metric()
@@ -745,7 +745,7 @@ class SteadyProblem():
             self.dwr_indication(adjoint=adjoint)
             name = 'dwr_adjoint' if adjoint else 'dwr_forward'
             self.indicators[approach] = self.indicators[name]
-            self.get_hessian_metric(noscale=True, adjoint=adjoint)
+            self.get_hessian_metric(normalise=False, adjoint=adjoint)
             amd = AnisotropicMetricDriver(self.am, hessian=self.M, indicator=self.indicators[approach], op=self.op)
             amd.get_anisotropic_metric()
             self.M = amd.p1metric

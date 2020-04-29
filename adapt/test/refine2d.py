@@ -33,7 +33,7 @@ except AssertionError:
 # Check isotropic metric does the same thing
 print('Testing isotropic metric')
 f = Function(amd.P1).assign(1/np.sqrt(2))
-amd.p1metric.assign(isotropic_metric(f, noscale=True))
+amd.p1metric.assign(isotropic_metric(f, normalise=False))
 amd.adapt_mesh()
 try:
     assert np.allclose(coords.dat.data, amd.mesh.coordinates.dat.data)

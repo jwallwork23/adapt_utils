@@ -387,9 +387,9 @@ class SteadyTracerProblem2d(SteadyProblem):
         self.estimate_error(name)
         return name
 
-    def get_hessian_metric(self, adjoint=False, noscale=False):
+    def get_hessian_metric(self, adjoint=False, normalise=True):
         sol = self.get_solution(adjoint)
-        self.M = steady_metric(sol, mesh=self.mesh, noscale=noscale, op=self.op)
+        self.M = steady_metric(sol, mesh=self.mesh, normalise=normalise, op=self.op)
 
     def get_loseille_metric(self, adjoint=False, relax=True):
         adj = self.get_solution(not adjoint)
@@ -433,11 +433,11 @@ class SteadyTracerProblem2d(SteadyProblem):
         #    regions and low resolution elsewhere.
 
         # Construct Hessians
-        H1 = steady_metric(F1, mesh=self.mesh, noscale=True, op=self.op)
+        H1 = steady_metric(F1, mesh=self.mesh, normalise=False, op=self.op)
         H1.rename("Hessian for x-component")
-        H2 = steady_metric(F2, mesh=self.mesh, noscale=True, op=self.op)
+        H2 = steady_metric(F2, mesh=self.mesh, normalise=False, op=self.op)
         H2.rename("Hessian for y-component")
-        Hf = steady_metric(source, mesh=self.mesh, noscale=True, op=self.op)
+        Hf = steady_metric(source, mesh=self.mesh, normalise=False, op=self.op)
         Hf.rename("Hessian for source term")
 
         # Hessians for conservative parts

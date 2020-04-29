@@ -380,7 +380,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
             self.solution_file.write(u, eta)
 
     def get_hessian_metric(self, adjoint=False, **kwargs):
-        kwargs.setdefault('noscale', False)
+        kwargs.setdefault('normalise', True)
         kwargs['op'] = self.op
         sol = self.adjoint_solution if adjoint else self.solution
         self.M = get_hessian_metric(sol, self.op.adapt_field, fields=self.fields, **kwargs)
