@@ -61,8 +61,10 @@ class TsunamiOptions(ShallowWaterOptions):
         self.print_debug("Interpolating bathymetry...")
         # msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
         depth = self.bathymetry.dat.data
-        for i, xy in enumerate(self.default_mesh.coordinates.dat.data):
-            depth[i] -= self.initial_surface.dat.data[i]
+        # if self.initial_surface.function_space().mesh() != fs.mesh():
+        #     self.set_initial_surface(fs)
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data):
+            # depth[i] -= self.initial_surface.dat.data[i]
             depth[i] -= bath_interp(xy[1], xy[0])
             # self.print_debug(msg.format(xy[0], xy[1], depth[i]/1000))
         if cap is not None:
@@ -97,7 +99,8 @@ class TsunamiOptions(ShallowWaterOptions):
         u.assign(0.0)
 
         # Interpolate free surface from inversion data
-        eta.interpolate(self.set_initial_surface(P1))
+        self.set_initial_surface(P1)
+        eta.interpolate(self.initial_surface)
 
         return self.initial_value
 
