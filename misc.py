@@ -10,7 +10,7 @@ from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
 __all__ = ["copy_mesh", "find", "get_finite_element", "get_component_space", "get_component",
-           "check_spd", "get_boundary_nodes", "index_string"]
+           "cg2dg", "check_spd", "get_boundary_nodes", "index_string"]
 
 
 def copy_mesh(mesh):
@@ -48,8 +48,9 @@ def get_component_space(fs, variant='equispaced'):
 
 def get_component(f, index, component_space=None):
     """
-    Extract a single component of a :class:`Function` from a :class:`VectorFunctionSpace` and store
-    it in a :class:`Function` defined on the appropriate (scalar) :class:`FunctionSpace`.
+    Extract component `index` of a :class:`Function` from a :class:`VectorFunctionSpace` and store
+    it in a :class:`Function` defined on the appropriate (scalar) :class:`FunctionSpace`. The
+    component space can either be provided or computed on-the-fly.
     """
     n = f.ufl_shape[0]
     try:
@@ -64,6 +65,47 @@ def get_component(f, index, component_space=None):
     par_loop(('{[i] : 0 <= i < v.dofs}', 's[i] = v[i, %d]' % index), dx,
              {'v': (f, READ), 's': (fi, WRITE)}, is_loopy_kernel=True)
     return fi
+
+
+def cg2dg(f_cg, f_dg=None):
+    """
+    Transfer data from a the degrees of freedom of a Pp field directly to those of the
+    corresponding PpDG field, for some p>1.
+    """
+    n = len(f_cg.ufl_shape)
+    assert f_cg.ufl_element().family() == 'Lagrange'
+    if n == 0:
+        _cg2dg_scalar(f_cg, f_dg)
+    elif n == 1:
+        _cg2dg_vector(f_cg, f_dg)
+    elif n == 2:
+        _cg2dg_tensor(f_cg, f_dg)
+    else:
+        raise NotImplementedError
+
+
+def _cg2dg_scalar(f_cg, f_dg):
+    fs = f_cg.function_space()
+    f_dg = f_dg or Function(FunctionSpace(fs.mesh(), "DG", fs.ufl_element().degree()))
+    index = '{[i] : 0 <= i < cg.dofs}'
+    kernel = 'dg[i] = cg[i]'
+    par_loop((index, kernel), dx, {'cg': (f_cg, READ), 'dg': (f_dg, WRITE)}, is_loopy_kernel=True)
+
+
+def _cg2dg_vector(f_cg, f_dg):
+    fs = f_cg.function_space()
+    f_dg = f_dg or Function(VectorFunctionSpace(fs.mesh(), "DG", fs.ufl_element().degree()))
+    index = '{[i, j] : 0 <= i < cg.dofs and 0 <= j < %d}' % f_cg.ufl_shape
+    kernel = 'dg[i, j] = cg[i, j]'
+    par_loop((index, kernel), dx, {'cg': (f_cg, READ), 'dg': (f_dg, WRITE)}, is_loopy_kernel=True)
+
+
+def _cg2dg_tensor(f_cg, f_dg):
+    fs = f_cg.function_space()
+    f_dg = f_dg or Function(TensorFunctionSpace(fs.mesh(), "DG", fs.ufl_element().degree()))
+    index = '{[i, j, k] : 0 <= i < cg.dofs and 0 <= j < %d and 0 <= k < %d}' % f_cg.ufl_shape
+    kernel = 'dg[i, j, k] = cg[i, j, k]'
+    par_loop((index, kernel), dx, {'cg': (f_cg, READ), 'dg': (f_dg, WRITE)}, is_loopy_kernel=True)
 
 
 def check_spd(M):
