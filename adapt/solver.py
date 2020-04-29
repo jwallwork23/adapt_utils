@@ -330,7 +330,7 @@ class AdaptiveProblem():
             return
 
         # TODO: LaggedTimeIntegralCallback to reduce cost of Hessian computation
-        # TODO: Option to take metric with maximum complexity, rather than time average
+        # TODO: Option to intersect metrics, rather than time average
 
         # # --- Number of timesteps per mesh iteration
 
@@ -387,7 +387,7 @@ class AdaptiveProblem():
     # --- Metric
 
     def get_hessian_metric(self, adjoint=False, **kwargs):
-        kwargs.setdefault('noscale', False)
+        kwargs.setdefault('normalise', True)
         kwargs['op'] = self.op
         self.metrics = []
         solutions = self.adj_solutions if adjoint else self.fwd_solutions

@@ -298,7 +298,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
         if (el.family(), el.degree()) != ('Lagrange', 1):
             self.indicator = project(self.indicator, self.P1)
             self.indicator.rename(name)
-        self.M = isotropic_metric(self.indicator, noscale=True, op=self.op)
+        self.M = isotropic_metric(self.indicator, normalise=False, op=self.op)
         if hasattr(self.op, 'L') and hasattr(self.op, 'T'):
             L, T = self.op.L, self.op.T
             self.M.interpolate(as_matrix([[self.M[0, 0]/L, 0.0], [0.0, self.M[1, 1]/T]]))

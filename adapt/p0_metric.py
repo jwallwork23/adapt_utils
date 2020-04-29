@@ -122,7 +122,7 @@ class AnisotropicMetricDriver():
         self.get_element_size()
         self.get_optimal_element_size()
         indicator = Function(self.P1).interpolate(abs(self.K_hat/self.K_opt))
-        self.p1metric = isotropic_metric(indicator, noscale=True, op=self.op)
+        self.p1metric = isotropic_metric(indicator, normalise=False, op=self.op)
 
     def get_anisotropic_metric(self):
         """
