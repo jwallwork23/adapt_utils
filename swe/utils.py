@@ -3,15 +3,15 @@ from firedrake import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.recovery import DoubleL2ProjectorHessian
 from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.misc import get_component, get_component_space
 
 
-__all__ = ["get_hessian_metric", "ShallowWaterHessianRecoverer", "vorticity", "speed"]
+__all__ = ["get_hessian_metric", "ShallowWaterHessianRecoverer", "vorticity", "speed",
+           "heaviside_approx"]
 
 
 def get_hessian_metric(sol, adapt_field, **kwargs):
-    """
-    Recover `adapt_field` Hessian from shallow water solution tuple `sol`.
-    """
+    """Recover `adapt_field` Hessian from shallow water solution tuple `sol`."""
     op = kwargs.get('op')
     rec = ShallowWaterHessianRecoverer(sol.function_space(), op=op)
     return rec.get_hessian_metric(sol, adapt_field, **kwargs)
@@ -31,8 +31,7 @@ class ShallowWaterHessianRecoverer():
         self.function_space = function_space
         self.mesh = function_space.mesh()
         uv_space, self.elev_space = function_space.split()
-        family, degree = uv_space.ufl_element().family(), uv_space.ufl_element().degree()
-        self.speed_space = FunctionSpace(self.mesh, family, degree)
+        self.speed_space = get_component_space(uv_space)
 
         # Projectors
         self.speed_projector = DoubleL2ProjectorHessian(self.speed_space, op=op)
@@ -69,14 +68,7 @@ class ShallowWaterHessianRecoverer():
 
         # --- Gather fields
 
-        elev_space_fields = {
-            'elevation': eta,
-        }
-        if 'bathymetry' in fields:
-            elev_space_fields['bathymetry'] = fields.get('bathymetry')
         uv_space_fields = {
-            'velocity_x': u[0],
-            'velocity_y': u[1],
             'speed': speed(sol),
             'vorticity': vorticity(sol),
         }
@@ -94,15 +86,20 @@ class ShallowWaterHessianRecoverer():
         if adapt_field == 'elevation':
             return steady_metric(eta, projector=self.elev_projector, **kwargs)
 
+        # Velocity components can be extracted directly
+        for i, field in enumerate(('velocity_x', 'velocity_y')):
+            if adapt_field == field:
+                f = get_component(u, i, component_space=self.speed_space)
+                return steady_metric(f, projector=self.speed_projector, **kwargs)
+
         # Fields which need projecting into speed space
-        # TODO: Use par_loop for velocity_x/y and speed, instead of project
         if adapt_field in uv_space_fields:
             f = project(uv_space_fields[adapt_field], self.speed_space)
             return steady_metric(f, projector=self.speed_projector, **kwargs)
 
         # Fields which need projecting into elevation space
-        if adapt_field in elev_space_fields:
-            f = project(elev_space_fields[adapt_field], self.elev_space)
+        if adapt_field == 'bathymetry':
+            f = project(fields.get('bathymetry'), self.elev_space)
             return steady_metric(f, projector=self.elev_projector, **kwargs)
 
         # The list of fields are averaged/intersected, as appropriate
@@ -127,3 +124,7 @@ def speed(sol):
     """Fluid velocity magnitude, i.e. fluid speed."""
     uv, elev = sol.split()
     return sqrt(inner(uv, uv))
+
+def heaviside_approx(H, alpha):
+    """C0 continuous approximation to Heaviside function."""
+    return 0.5*(H/(sqrt(H**2 + alpha**2))) + 0.5

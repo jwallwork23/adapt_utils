@@ -9,17 +9,13 @@ import scipy.sparse.linalg as sla
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["copy_mesh", "doc", "find", "heaviside_approx", "check_spd", "get_boundary_nodes",
-           "index_string", "UnnestedConditionCheck", "NestedConditionCheck"]
+__all__ = ["copy_mesh", "find", "get_finite_element", "get_component_space", "get_component",
+           "check_spd", "get_boundary_nodes", "index_string"]
 
 
 def copy_mesh(mesh):
+    """Deepcopy a mesh."""
     return Mesh(Function(mesh.coordinates))
-
-
-def doc(anything):
-    """Print the docstring of any class or function."""
-    print_output(anything.__doc__)
 
 
 def find(pattern, path):
@@ -114,6 +110,9 @@ def get_boundary_nodes(fs, segment='on_boundary'):
     :kwarg segment: segment of boundary to get nodes of (default 'on_boundary').
     """
     return fs.boundary_nodes(segment, 'topological')
+
+
+# --- Unused
 
 
 class BaseConditionCheck():
