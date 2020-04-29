@@ -30,21 +30,26 @@ args = parser.parse_args()
 #     assert p >= 1.0
 p = 1
 
-# Parameter class
-op = TohokuOptions(
-    level=int(args.level or 0),
-    num_meshes=int(args.num_meshes or 5),
-    approach='hessian',
-    adapt_field=args.adapt_field or 'elevation',
-    plot_pvd=True,
-    debug=bool(args.debug or False),
-    norm_order=p,
-    target=float(args.target or 1.0e-01),  # FIXME: Desired average instantaneous spatial complexity
-    num_adapt=int(args.num_adapt or 1),
-)
-op.end_time = float(args.end_time or op.end_time)
+kwargs = {
+    'level': int(args.level or 0),
+    'num_meshes': int(args.num_meshes or 5),
+    'approach': 'hessian',
+    'adapt_field': args.adapt_field or 'elevation',
+    'plot_pvd': True,
+    'debug': bool(args.debug or False),
+    'norm_order': p,
+    'target': float(args.target or 1.0e-01),  # FIXME
+    'num_adapt': int(args.num_adapt or 1),
+    'end_time': float(args.end_time or 1500.0)
+}
+paramstr = "\n"
+for key in kwargs:
+    paramstr += "    {:12s}: {:}\n".format(key, kwargs[key])
+print_output("'TohokuOptions' object created with parameters: {:s}".format(paramstr))
+logstr = 50*'*' + '\n' + 19*' ' + "PARAMETERS\n" + 50*'*' + paramstr +  50*'*' 
 
-# Create problem object
+# Create parameter class and problem object
+op = TohokuOptions(**kwargs)
 swp = AdaptiveTsunamiProblem(op)
 
 average_hessians = [Function(P1_ten, name="Average Hessian") for P1_ten in swp.P1_ten]
@@ -141,8 +146,8 @@ for n in range(op.num_adapt):
 
 # --- Print summary
 
-
-print_output(50*'*' + '\n' + 20*' ' + "SUMMARY\n" + 50*'*')
+logstr += 50*'*' + '\n' + 20*' ' + "SUMMARY\n" + 50*'*'
 for i, qoi in enumerate(swp.qois):
-    print_output("Mesh iteration {:2d}: qoi {:.4e}".format(i, qoi))
-print_output(50*'*')
+    logstr += "Mesh iteration {:2d}: qoi {:.4e}".format(i, qoi)
+logstr += 50*'*' 
+print_output(logstr)

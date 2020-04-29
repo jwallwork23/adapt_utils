@@ -57,8 +57,8 @@ def steady_metric(f=None, H=None, projector=None, normalise=True, op=Options()):
     op.print_debug("METRIC: Done!")
 
     # Enforce maximum/minimum element sizes and anisotropy
-    kernel = eigen_kernel(postproc_metric, dim, op=op)
-    op2.par_loop(kernel, V.node_set, M.dat(op2.RW))
+    op.print_debug("METRIC: Enforcing elemental constraints...")
+    enforce_element_constraints(M, op=op)
     op.print_debug("METRIC: Done!")
 
     return M
@@ -93,6 +93,16 @@ def space_normalise(M, op=Options()):
     P1 = FunctionSpace(mesh, "CG", 1)
     M.interpolate(integral*pow(det(M), -1/(2*p + d))*M)
     return
+
+
+def enforce_element_constraints(M, op=Options()):
+    """
+    Post-process a metric `M` so that it obeys the maximum and minimum elemental size constraints
+    and maximal anisotropy specified by :class:`Options` class `op`.
+    """
+    dim = M.function_space().mesh().topopological_dimension()
+    kernel = eigen_kernel(postproc_metric, dim, op=op)
+    op2.par_loop(kernel, M.function_space().node_set, M.dat(op2.RW))
 
 
 def isotropic_metric(f, noscale=False, normalise=True, op=Options()):
@@ -231,28 +241,31 @@ def time_normalise(hessians, timesteps_per_remesh=None, op=Options()):
         For constant timesteps, this equates to the number of timesteps per remesh step.
     :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
     """
-    target = op.target*op.end_time/op.dt  # Desired space-time complexity
     p = op.norm_order
     n = len(hessians)
     if timesteps_per_remesh is None:
-        timesteps_per_remesh = np.ones(n)*op.dt_per_remesh  # TODO: update
+        timesteps_per_remesh = np.ones(n)*np.floor(op.end_time/op.dt)/op.num_meshes
     else:
         assert len(timesteps_per_remesh) == n
         assert n > 0
     d = hessians[0].function_space().mesh().topological_dimension()
     z = zip(hessians, timesteps_per_remesh)
 
+    if op.normalisation == 'error':
+        raise NotImplementedError  # TODO
+
     # Compute global normalisation coefficient
     op.print_debug("METRIC: Computing global metric time normalisation factor...")
-    global_norm = pow(sum(assemble(pow(det(H)*tpr**2, p/(2*p + d))*dx) for H, tpr in z), -2/d)
+    glob_norm = pow(op.target/sum(assemble(pow(det(H)*tpr**2, p/(2*p + d))*dx) for H, tpr in z), 2/d)
     op.print_debug("METRIC: Done!")
-    op.print_debug("METRIC: Global normalisation factor: {:.4e}".format(global_norm))
+    op.print_debug("METRIC: Global normalisation factor: {:.4e}".format(glob_norm))
 
     op.print_debug("METRIC: Normalising metric in time...")
     # Normalise on each window
     for H, tpr in z:
-        H.interpolate(pow(target, 2/d)*global_norm*pow(det(H)*tpr**2, -1/(2*p + d))*H)
+        H.interpolate(glob_norm*pow(det(H)*tpr**2, -1/(2*p + d))*H)
         H.rename("Time-accurate {:s}".format(H.dat.name))
+        enforce_element_constraints(H, op=op)  # Enforce max/min element sizes and anisotropy
     op.print_debug("METRIC: Done!")
 
 
