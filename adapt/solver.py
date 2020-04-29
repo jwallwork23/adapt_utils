@@ -1,5 +1,4 @@
 from thetis import *
-from thetis.physical_constants import *
 
 import numpy as np
 
@@ -320,11 +319,9 @@ class AdaptiveProblem():
 
         # For later use
         self.lhs = self.fwd_solvers[i].timestepper.F
-        # TODO: Check
         assert self.fwd_solutions[i].function_space() == self.fwd_solvers[i].function_spaces.V_2d
 
     def add_callbacks(self, i):
-        op = self.op
 
         if not hasattr(self, 'hessian_func'):
             return
@@ -334,7 +331,7 @@ class AdaptiveProblem():
 
         # # --- Number of timesteps per mesh iteration
 
-        # timestep = lambda sol: 1.0/op.dt
+        # timestep = lambda sol: 1.0/self.op.dt
         # self.callbacks[i]["timestep"] = callback.TimeIntegralCallback(
         #     timestep, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
         #     name="timestep", append_to_log=False
