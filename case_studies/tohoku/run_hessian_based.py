@@ -9,13 +9,23 @@ import argparse
 
 
 parser = argparse.ArgumentParser(prog="run_hessian_based")
-parser.add_argument("-end_time", help="End time of simulation")
-parser.add_argument("-level", help="(Integer) mesh resolution")
-parser.add_argument("-num_meshes", help="Number of meshes to consider")
-parser.add_argument("-num_adapt", help="Number of iterations in adaptation loop")
-parser.add_argument("-norm_order", help="p for Lp normalisaton")
+
+# Timstepping
+parser.add_argument("-end_time", help="End time of simulation (default 25 minutes)")
+
+# Initial mesh
+parser.add_argument("-level", help="(Integer) mesh resolution (default 0)")
+
+# Adaptation
+parser.add_argument("-num_meshes", help="Number of meshes to consider (default 5)")
+parser.add_argument("-num_adapt", help="Number of iterations in adaptation loop (default 2)")
+parser.add_argument("-norm_order", help="p for Lp normalisaton (default 1)")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t")
-parser.add_argument("-target", help="Target space-time complexity")
+parser.add_argument("-target", help="Target space-time complexity (default 1.0e+04)")
+parser.add_argument("-h_min", help="Minimum tolerated element size (default 100m)")
+parser.add_argument("-h_max", help="Maximum tolerated element size (default 100km)")
+
+# Misc
 parser.add_argument("-debug", help="Print all debugging statements")
 args = parser.parse_args()
 
@@ -31,22 +41,33 @@ args = parser.parse_args()
 p = 1
 
 kwargs = {
+
+    # Timestepping
+    'end_time': float(args.end_time or 1500.0),
+
+    # Initial mesh
     'level': int(args.level or 0),
-    'num_meshes': int(args.num_meshes or 5),
+
+    # Adaptation
     'approach': 'hessian',
-    'adapt_field': args.adapt_field or 'elevation',
-    'plot_pvd': True,
-    'debug': bool(args.debug or False),
-    'norm_order': p,
-    'target': float(args.target or 1.0e-01),  # FIXME
+    'num_meshes': int(args.num_meshes or 5),
     'num_adapt': int(args.num_adapt or 1),
-    'end_time': float(args.end_time or 1500.0)
+    'norm_order': p,
+    'adapt_field': args.adapt_field or 'elevation',
+    'target': float(args.target or 1.0e+04),  # FIXME
+    'h_min': float(args.h_min or 1.0e+02),
+    'h_max': float(args.h_max or 1.0e+05),
+    'plot_pvd': True,
+
+    # Misc
+    'debug': bool(args.debug or False),
 }
 paramstr = "\n"
+logstr = 50*'*' + '\n' + 19*' ' + "PARAMETERS\n" + 50*'*' + '\n'
 for key in kwargs:
-    paramstr += "    {:12s}: {:}\n".format(key, kwargs[key])
-print_output("'TohokuOptions' object created with parameters: {:s}".format(paramstr))
-logstr = 50*'*' + '\n' + 19*' ' + "PARAMETERS\n" + 50*'*' + paramstr +  50*'*' 
+    logstr += "    {:12s}: {:}\n".format(key, kwargs[key])
+logstr +=  50*'*'
+print_output(logstr)
 
 # Create parameter class and problem object
 op = TohokuOptions(**kwargs)
@@ -122,13 +143,10 @@ for n in range(op.num_adapt):
     swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
     swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
 
-    # mesh_file = File(os.path.join(swp.di, 'mesh.pvd'))  # FIXME
-    print_output("\nAdaptation step {:2d}".format(n))
+    print_output("\nAdaptation step {:2d}".format(n+1))
     for i, complexity in enumerate(complexities):
-        msg = "  {:2d}: complexity {:7.1f} vertices {:6d} elements {:6d}"
+        msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
         print_output(msg.format(i, complexity, swp.num_vertices[1][i], swp.num_cells[1][i]))
-        mesh_file = File(os.path.join(swp.di, 'mesh_{:d}.pvd'.format(i)))  # FIXME
-        mesh_file.write(swp.meshes[i].coordinates)
     print_output("")
 
 

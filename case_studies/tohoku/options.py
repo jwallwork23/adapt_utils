@@ -97,6 +97,10 @@ class TohokuOptions(TsunamiOptions):
             tup += (50.0e+03, )  # Radius of 50km
             self.region_of_interest.append(tup)
 
+        # Adaptation parameters
+        h_min = 1.0e+02
+        h_max = 1.0e+05
+
     def read_bathymetry_file(self):
         self.print_debug("Reading bathymetry file...")
         nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'bathymetry.nc'), 'r')
