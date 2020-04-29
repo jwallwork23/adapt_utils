@@ -32,36 +32,72 @@ def find(pattern, path):
     return result
 
 
-def heaviside_approx(H, alpha):
-    return 0.5*(H/(sqrt(H**2 + alpha**2))) + 0.5
-
-
-def check_spd(matrix):
+def get_finite_element(fs, variant='equispaced'):
     """
-    Verify that a tensor field `matrix` is symmetric positive-definite (SPD) and hence a Riemannian
+    Extract :class:`FiniteElement` instance from a :class:`FunctionSpace`, with specified variant
+    default.
+    """
+    el = fs.ufl_element()
+    if hasattr(el, 'variant'):
+        variant = el.variant() or variant
+    return FiniteElement(el.family(), fs.mesh().ufl_cell(), el.degree(), variant=variant)
+
+
+def get_component_space(fs, variant='equispaced'):
+    """
+    Extract a single (scalar) :class:`FunctionSpace` component from a :class:`VectorFunctionSpace`.
+    """
+    return FunctionSpace(fs.mesh(), get_finite_element(fs, variant=variant))
+
+
+def get_component(f, index, component_space=None):
+    """
+    Extract a single component of a :class:`Function` from a :class:`VectorFunctionSpace` and store
+    it in a :class:`Function` defined on the appropriate (scalar) :class:`FunctionSpace`.
+    """
+    n = f.ufl_shape[0]
+    try:
+        assert index < n
+    except AssertionError:
+        raise IndexError("Requested index {:d} of a {:d}-vector.".format(index, n))
+
+    # Create appropriate component space
+    fi = Function(component_space or get_component_space(fs))
+
+    # Transfer data
+    par_loop(('{[i] : 0 <= i < v.dofs}', 's[i] = v[i, %d]' % index), dx,
+             {'v': (f, READ), 's': (fi, WRITE)}, is_loopy_kernel=True)
+    return fi
+
+
+def check_spd(M):
+    """
+    Verify that a tensor field `M` is symmetric positive-definite (SPD) and hence a Riemannian
     metric.
     """
-    fs = matrix.function_space()
+    print_output("TEST: Checking matrix is SPD...")
+    fs = M.function_space()
+    fs_vec = VectorFunctionSpace(fs.mesh(), get_finite_element(fs))
+    dim = fs.mesh().topological_dimension()
 
     # Check symmetric
-    diff = interpolate(matrix - transpose(matrix), fs)
     try:
-        assert norm(diff) < 1e-8
+        assert assemble((M - transpose(M))*dx) < 1e-8
     except AssertionError:
-        raise ValueError("Matrix is not symmetric!")
+        raise ValueError("FAIL: Matrix is not symmetric")
+    print_output("PASS: Matrix is indeed symmetric")
 
     # Check positive definite
-    el = fs.ufl_element()
-    evecs = Function(fs)
-    evals = Function(VectorFunctionSpace(fs.mesh(), el.family(), el.degree()))
-    dim = matrix.function_space().mesh().topological_dimension()
+    V = Function(fs, name="Eigenvectors")
+    Λ = Function(fs_vec, name="Eigenvalues")
     kernel = eigen_kernel(get_eigendecomposition, dim)
-    op2.par_loop(kernel, matrix.function_space().node_set, evecs.dat(op2.RW), evals.dat(op2.RW), matrix.dat(op2.READ))
+    op2.par_loop(kernel, fs.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
     try:
-        assert evals.vector().gather().min() > 0.0
+        assert Λ.vector().gather().min() > 0.0
     except AssertionError:
-        raise ValueError("Matrix is not positive definite!")
-    print_output("Matrix is indeed SPD.")
+        raise ValueError("FAIL: Matrix is not positive-definite")
+    print_output("PASS: Matrix is indeed positive-definite")
+    print_output("TEST: Done!")
 
 
 def index_string(index):
