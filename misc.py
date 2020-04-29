@@ -1,6 +1,7 @@
 from thetis import *
 
 import os
+import sys
 import fnmatch
 import numpy as np
 import scipy.sparse as sp
@@ -9,23 +10,14 @@ import scipy.sparse.linalg as sla
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["copy_mesh", "find", "get_finite_element", "get_component_space", "get_component",
-           "cg2dg", "check_spd", "get_boundary_nodes", "index_string"]
+__all__ = ["copy_mesh", "get_finite_element", "get_component_space", "get_component", "cg2dg",
+           "check_spd", "get_boundary_nodes", "index_string",
+           "find", "suppress_output"]
 
 
 def copy_mesh(mesh):
     """Deepcopy a mesh."""
     return Mesh(Function(mesh.coordinates))
-
-
-def find(pattern, path):
-    """Find all files with a specified pattern."""
-    result = []
-    for root, dirs, files in os.walk(path):
-        for name in files:
-            if fnmatch.fnmatch(name, pattern):
-                result.append(os.path.join(root, name))
-    return result
 
 
 def get_finite_element(fs, variant='equispaced'):
@@ -138,6 +130,14 @@ def check_spd(M):
     print_output("TEST: Done!")
 
 
+def get_boundary_nodes(fs, segment='on_boundary'):
+    """
+    :arg fs: function space to get boundary nodes for.
+    :kwarg segment: segment of boundary to get nodes of (default 'on_boundary').
+    """
+    return fs.boundary_nodes(segment, 'topological')
+
+
 def index_string(index):
     """
     :arg index: integer form of index.
@@ -146,12 +146,41 @@ def index_string(index):
     return (5 - len(str(index)))*'0' + str(index)
 
 
-def get_boundary_nodes(fs, segment='on_boundary'):
-    """
-    :arg fs: function space to get boundary nodes for.
-    :kwarg segment: segment of boundary to get nodes of (default 'on_boundary').
-    """
-    return fs.boundary_nodes(segment, 'topological')
+# --- Non-Firedrake specific
+
+
+def find(pattern, path):
+    """Find all files with a specified pattern."""
+    result = []
+    for root, dirs, files in os.walk(path):
+        for name in files:
+            if fnmatch.fnmatch(name, pattern):
+                result.append(os.path.join(root, name))
+    return result
+
+
+class suppress_output(object):
+    """Class used to suppress standard output or another stream."""
+    def __init__(self, stream=None):
+        self.origstream = stream or sys.stdout
+        self.origstreamfd = self.origstream.fileno()
+        self.pipe_out, self.pipe_in = os.pipe()  # Create a pipe to capture stream
+
+    def __enter__(self):
+        self.start()
+        return self
+
+    def __exit__(self, type, value, traceback):
+        self.stop()
+
+    def start(self):
+        """Start diverting stream data to pipe."""
+        os.dup2(self.pipe_in, self.origstreamfd)
+
+    def stop(self):
+        """Stop fiverting stream data to pipe."""
+        os.close(self.pipe_in)
+        os.close(self.pipe_out)
 
 
 # --- Unused
