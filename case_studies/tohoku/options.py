@@ -135,7 +135,7 @@ class TohokuOptions(TsunamiOptions):
 
     def get_update_forcings(self, solver_obj):
         def update_forcings(t):
-            self.print_debug("#### DEBUG t: {:.2f}".format(t))
+            # self.print_debug("#### DEBUG t: {:.2f}".format(t))
             return
         return update_forcings
 
