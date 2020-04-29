@@ -117,6 +117,7 @@ for n in range(op.num_adapt):
                 # timestep_integrals[i] = swp.callbacks[i]["timestep"].get_value()
 
         # Solve step for current mesh iteration
+        print_output("Solving forward equation for iteration {:d}".format(i))
         swp.setup_solver_forward(i)
         swp.solve_forward_step(i, export_func=export_func)
 
@@ -126,11 +127,10 @@ for n in range(op.num_adapt):
 
     # Check QoI convergence
     qoi = swp.quantity_of_interest()
-    print_output("Quantity of interest: {:.4e}".format(qoi))
-    qoi_old = swp.qois[-1]
+    print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
     swp.qois.append(qoi)
     if len(swp.qois) > 1:
-        if np.abs(qoi - qoi_old) < op.qoi_rtol*qoi_old:
+        if np.abs(swp.qois[-1] - swp.qois[-2]) < op.qoi_rtol*swp.qois[-2]:
             print_output("Converged quantity of interest!")
             break
 
@@ -151,12 +151,13 @@ for n in range(op.num_adapt):
 
     # --- Adapt meshes
 
-    print_output("\nEntering adaptation loop {:2d}...\n".format(n+1))
+    print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
     for i, M in enumerate(average_hessians):
-        print_output("Adaptation step {:d}/{:d}".format(i+1, swp.num_meshes))
+        print_output("Adapting mesh {:d}/{:d}...".format(i+1, swp.num_meshes))
         swp.meshes[i] = pragmatic_adapt(swp.meshes[i], M, op=op)
     swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
     swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
+    print_output("Done!")
 
     # ---  Setup for next run / logging
 
