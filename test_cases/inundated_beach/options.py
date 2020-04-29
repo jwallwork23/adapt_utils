@@ -2,7 +2,7 @@ from thetis import *
 from thetis.configuration import *
 
 from adapt_utils.swe.options import ShallowWaterOptions
-from adapt_utils.misc import heaviside_approx
+from adapt_utils.swe.utils import heaviside_approx
 
 import os
 import numpy as np
