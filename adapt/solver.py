@@ -332,14 +332,14 @@ class AdaptiveProblem():
         # TODO: LaggedTimeIntegralCallback to reduce cost of Hessian computation
         # TODO: Option to take metric with maximum complexity, rather than time average
 
-        # --- Number of timesteps per mesh iteration
+        # # --- Number of timesteps per mesh iteration
 
-        timestep = lambda sol: 1.0/op.dt
-        self.callbacks[i]["timestep"] = callback.TimeIntegralCallback(
-            timestep, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
-            name="timestep", append_to_log=False
-        )
-        self.fwd_solvers[i].add_callback(self.callbacks[i]["timestep"], 'timestep')
+        # timestep = lambda sol: 1.0/op.dt
+        # self.callbacks[i]["timestep"] = callback.TimeIntegralCallback(
+        #     timestep, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
+        #     name="timestep", append_to_log=False
+        # )
+        # self.fwd_solvers[i].add_callback(self.callbacks[i]["timestep"], 'timestep')
 
         # --- Time integrated Hessian over each window
 

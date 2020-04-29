@@ -53,7 +53,7 @@ kwargs = {
     'num_adapt': int(args.num_adapt or 1),
     'norm_order': p,
     'adapt_field': args.adapt_field or 'elevation',
-    'target': float(args.target or 1.0e+03),
+    'target': float(args.target or 5.0e+03),
     'h_min': float(args.h_min or 1.0e+02),
     'h_max': float(args.h_max or 1.0e+06),
     'plot_pvd': True,
@@ -76,7 +76,7 @@ swp = AdaptiveTsunamiProblem(op)
 
 for n in range(op.num_adapt):
     average_hessians = [Function(P1_ten, name="Average Hessian") for P1_ten in swp.P1_ten]
-    timestep_integrals = np.zeros(swp.num_meshes)
+    # timestep_integrals = np.zeros(swp.num_meshes)
     if hasattr(swp, 'hessian_func'):
         delattr(swp, 'hessian_func')
     export_func = None
@@ -102,8 +102,8 @@ for n in range(op.num_adapt):
                 # Extract time averaged Hessian
                 average_hessians[i].interpolate(swp.callbacks[i]["average_hessian"].get_value())
 
-                # Extract timesteps per mesh iteration
-                timestep_integrals[i] = swp.callbacks[i]["timestep"].get_value()
+                # # Extract timesteps per mesh iteration
+                # timestep_integrals[i] = swp.callbacks[i]["timestep"].get_value()
 
         # Solve step for current mesh iteration
         swp.setup_solver_forward(i)
@@ -119,7 +119,8 @@ for n in range(op.num_adapt):
 
     # --- Time normalise metrics
 
-    time_normalise(average_hessians, timestep_integrals, op=op)
+    # time_normalise(average_hessians, timestep_integrals, op=op)
+    time_normalise(average_hessians, op=op)
     metric_file = File(os.path.join(swp.di, 'metric.pvd'))
     complexities = []
     for i, H in enumerate(average_hessians):
