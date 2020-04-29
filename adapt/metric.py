@@ -100,7 +100,7 @@ def enforce_element_constraints(M, op=Options()):
     Post-process a metric `M` so that it obeys the maximum and minimum elemental size constraints
     and maximal anisotropy specified by :class:`Options` class `op`.
     """
-    dim = M.function_space().mesh().topopological_dimension()
+    dim = M.function_space().mesh().topological_dimension()
     kernel = eigen_kernel(postproc_metric, dim, op=op)
     op2.par_loop(kernel, M.function_space().node_set, M.dat(op2.RW))
 
@@ -166,13 +166,11 @@ def metric_intersection(*metrics, bdy=None):
     :param bdy: specify domain boundary to intersect over.
     :return: intersection of metrics M1 and M2.
     """
-    op.print_debug("METRIC: Intersecting metrics...")
     n = len(metrics)
     assert n > 0
     M = metrics[0]
     for i in range(1, n):
         M = _metric_intersection_pair(M, metrics[i], bdy=bdy)
-    op.print_debug("METRIC: Done!")
     return M
 
 
@@ -200,7 +198,6 @@ def metric_relaxation(*metrics, weights=None):
     :kwarg weights: weights with which to average
     :return: convex combination
     """
-    op.print_debug("METRIC: Computing metric relaxation...")
     n = len(metrics)
     assert n > 0
     if weights is None:
@@ -212,7 +209,6 @@ def metric_relaxation(*metrics, weights=None):
     for i, Mi in enumerate(metrics):
         assert Mi.function_space() == V
         M += Mi*weights[i]
-    op.print_debug("METRIC: Done!")
     return M
 
 
