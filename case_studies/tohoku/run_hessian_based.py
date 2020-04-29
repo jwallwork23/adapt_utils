@@ -185,13 +185,17 @@ for n in range(op.num_adapt):
         print_output("Converged number of mesh elements!")
         break
 
-# --- Print summary / logging
+# --- Print summary / logging  # TODO: Save meshes to disk
 
 logstr += 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
 logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
 msg = "Mesh iteration {:2d}: qoi {:.4e} space-time complexity {:.4e}\n"
 for n in range(1, len(swp.qois)):
     logstr += msg.format(n+1, swp.qois[n], st_complexities[n])
+logstr += 80*'*' + '\n' + 30*' ' + 'FINAL ELEMENT COUNTS\n' + 80*'*' + '\n'
+l = op.end_time/op.num_meshes
+for i, num_cells in enumerate(swp.num_cells[-1]):
+    logstr += "Time window ({:7.1f},{:7.1f}]: {:7d}\n".format(i*l, (i+1)*l, num_cells)
 logstr += 80*'*' + '\n'
 print_output(logstr)
 date = datetime.date.today()
