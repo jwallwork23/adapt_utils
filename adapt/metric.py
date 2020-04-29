@@ -90,7 +90,6 @@ def space_normalise(M, op=Options()):
         integral = pow(op.target/integral, 2/d)
     else:
         integral = d*op.target*pow(integral, 1/p)
-    P1 = FunctionSpace(mesh, "CG", 1)
     M.interpolate(integral*pow(det(M), -1/(2*p + d))*M)
     return
 
