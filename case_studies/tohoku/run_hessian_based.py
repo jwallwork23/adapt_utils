@@ -155,7 +155,7 @@ for n in range(op.num_adapt):
     for i, H in enumerate(average_hessians):
         metric_file.write(H)
         complexities.append(metric_complexity(H))
-    st_complexities.append(sum(complexities))
+    st_complexities.append(sum(complexities)*op.end_time/op.dt)
 
     # --- Adapt meshes
 
