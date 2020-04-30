@@ -23,8 +23,14 @@ class ShallowWaterHessianRecoverer():
 
     Hessians may be recovered from fields which lie in either the elevation function space or the
     scalar version of the velocity space (i.e. the speed space).
+
+    :arg function_space: :class:`MixedFunctionSpace` instance for prognostic tuple.
+    :kwarg constant_fields: dictionary of fields whose Hessian can be computed once per mesh
+        iteration
+    :kwarg op: :class:`ShallowWaterOptions` parameters class
     """
-    def __init__(self, function_space, op=ShallowWaterOptions()):
+    def __init__(self, function_space, constant_fields={}, op=ShallowWaterOptions(), **kwargs):
+        kwargs.setdefault('normalise', True)
         self.op = op
 
         # FunctionSpaces
@@ -37,6 +43,9 @@ class ShallowWaterHessianRecoverer():
         self.speed_projector = DoubleL2ProjectorHessian(self.speed_space, op=op)
         self.elev_projector = DoubleL2ProjectorHessian(self.elev_space, op=op)
 
+        # Compute Hessian for constant fields
+        self.constant_hessians = {f: steady_metric(constant_fields[f], **kwargs) for f in constant_fields}
+
     def get_hessian_metric(self, sol, adapt_field=None, fields={}, **kwargs):
         """
         Recover the Hessian of the scalar `adapt_field` related to solution tuple `sol`.
@@ -47,7 +56,9 @@ class ShallowWaterHessianRecoverer():
           * 'velocity_y' - the y-component of velocity;
           * 'speed'      - the magnitude of velocity;
           * 'vorticity'  - the fluid vorticity, interpreted as a scalar field;
-          * 'inflow'     - the inner product of inflow velocity and solution velocity;
+          * 'inflow'     - the inner product of inflow velocity and solution velocity.
+
+        Currently supported adaptation fields which are constant in time:
           * 'bathymetry' - the fluid depth at rest.
 
         Multiple fields can be combined using double-understrokes and either 'avg' for metric
@@ -90,6 +101,10 @@ class ShallowWaterHessianRecoverer():
                 metrics = [self.get_hessian_metric(sol, f, fields=fields) for f in adapt_fields]
                 return combine_metrics(*metrics, average=c == 'avg')
 
+        # Fields which are constant in time
+        if adapt_field in self.constant_hessians:
+            return self.constant_hessians[adapt_field]
+
         # Elevation already lives in the correct space
         if adapt_field == 'elevation':
             f = eta
@@ -109,10 +124,6 @@ class ShallowWaterHessianRecoverer():
             proj = self.speed_projector
             return steady_metric(f, projector=self.speed_projector, **kwargs)
 
-        # Fields which need projecting into elevation space
-        elif adapt_field == 'bathymetry':
-            f = project(fields.get('bathymetry'), self.elev_space)
-            proj = self.elev_projector
         else:
             raise ValueError("Adaptation field {:s} not recognised.".format(adapt_field))
         return steady_metric(f, projector=proj, **kwargs)
