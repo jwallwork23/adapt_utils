@@ -1,4 +1,5 @@
 from firedrake import *
+from thetis import callback, rungekutta, timeintegrator
 
 import numpy as np
 
@@ -338,6 +339,90 @@ def get_density_and_quotients(M):
     density.interpolate(d)
     quotients.interpolate(as_vector([h[i]**3/d for i in range(dim)]))
     return density, quotients
+
+
+class IntersectorCallback(callback.DiagnosticCallback):
+    """
+    Callback that intersects metrics contributed at each timestep.
+    """
+    variable_names = ['metric computed over current timestep']
+
+    def __init__(self, metric_callback, solver_obj, **kwargs):
+        kwargs.setdefault('export_to_hdf5', False)
+        kwargs.setdefault('append_to_log', False)
+        super(AccumulatorCallback, self).__init__(solver_obj, **kwargs)
+        self.callback = metric_callback
+        self.intersection = 0
+
+    def __call__(self):
+        intersection_timestep = self.callback()
+        self.intersection = metric_intersection(intersection_timestep)
+        return []  # TODO
+
+    def get_value(self):
+        return self.intersection
+
+    def message_str(self, *args):
+        return '### TODO'
+
+
+class TimeIntersectCallback(IntersectorCallback):
+    # TODO: doc
+    name = 'metric intersection'
+    variable_names = ['value']
+
+    def __init__(self, hessian, solver_obj, timestepper, name=None, **kwargs):
+        # TODO: doc
+        if name is not None:
+            self.name = name
+        dt = timestepper.dt
+
+        # Check if implemented then collect quadrature weights and update values at nodes
+        to_do = (
+            timeintegrator.PressureProjectionPicard,
+            timeintegrator.LeapFrogAM3,
+            timeintegrator.SSPRK22ALE,
+        )
+        if isinstance(timestepper, to_do):
+            raise NotImplementedError  # TODO
+
+        elif issubclass(timestepper.__class__, rungekutta.ERKGeneric):
+            updates = timestepper.tendency
+
+        elif issubclass(timestepper.__class__, rungekutta.ERKGenericShuOsher):
+            updates = timestepper.stage_sol
+
+        elif issubclass(timestepper.__class__, rungekutta.DIRKGeneric):
+            updates = timestepper.k
+
+        elif issubclass(timestepper.__class__, rungekutta.DIRKGenericUForm):
+            updates = timestepper.k.copy()
+            updates.insert(0, timestepper.solution_old)
+
+        elif isinstance(timestepper, timeintegrator.ForwardEuler):
+            updates = [timestepper.solution_old, ]
+
+        elif isinstance(timestepper, timeintegrator.SteadyState):
+            updates = [timestepper.solution, ]
+
+        elif isinstance(timestepper, timeintegrator.CrankNicolson):
+            updates = [timestepper.solution_old, timestepper.solution]
+
+        else:
+            raise ValueError("Timestepper {:s} not recognised.".format(timestepper.__class__.__name__))
+
+        def intersection_callback():
+            """Time integrate spatial integral over a single timestep"""
+            hessians = [hessian(updates) for update in updates]
+            M = metric_intersection(*hessians)
+            M *= dt
+            return M
+
+        super(TimeIntersectionCallback, self).__init__(intersection_callback, solver_obj, **kwargs)
+
+
+
+# --- Work in progress
 
 
 def get_metric_coefficient(a, b, op=Options()):
