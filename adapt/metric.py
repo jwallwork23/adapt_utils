@@ -12,7 +12,7 @@ __all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_
            "metric_average"]
 
 
-def steady_metric(f=None, H=None, projector=None, normalise=True, op=Options()):
+def steady_metric(f=None, H=None, projector=None, **kwargs):
     r"""
     Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
     ``computeSteadyMetric``, from ``adapt.py``, 2016.
@@ -22,10 +22,15 @@ def steady_metric(f=None, H=None, projector=None, normalise=True, op=Options()):
     :kwarg f: Field to compute the Hessian of.
     :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
     :kwarg projector: :class:`DoubleL2Projector` object to compute Hessian.
-    :kwarg normalise: If `False` then we simply take the diagonal matrix with `f` in modulus.
-    :kwarg op: `Options` class object providing min/max cell size values.
+    :kwarg normalise: Toggle spatial normalisation.
+    :kwarg enforce_constraints: Toggle enforcement of element size/anisotropy constraints.
+    :kwarg op: :class:`Options` parameter class.
     :return: Steady metric associated with Hessian `H`.
     """
+    kwargs.setdefault('normalise', True)
+    kwargs.setdefault('enforce_constraints', True)
+    kwargs.setdefault('op', Options())
+    op = kwargs.get('op')
     if f is None:
         try:
             assert H is not None
@@ -48,18 +53,17 @@ def steady_metric(f=None, H=None, projector=None, normalise=True, op=Options()):
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW), H.dat(op2.READ))
     op.print_debug("METRIC: Done!")
 
-    if not normalise:
-        return M
-
     # Apply Lp normalisation
-    op.print_debug("METRIC: Normalising metric in space...")
-    space_normalise(M, op=op)
-    op.print_debug("METRIC: Done!")
+    if kwargs.get('normalise'):
+        op.print_debug("METRIC: Normalising metric in space...")
+        space_normalise(M, op=op)
+        op.print_debug("METRIC: Done!")
 
     # Enforce maximum/minimum element sizes and anisotropy
-    op.print_debug("METRIC: Enforcing elemental constraints...")
-    enforce_element_constraints(M, op=op)
-    op.print_debug("METRIC: Done!")
+    if kwargs.get('enforce_constraints'):
+        op.print_debug("METRIC: Enforcing elemental constraints...")
+        enforce_element_constraints(M, op=op)
+        op.print_debug("METRIC: Done!")
 
     return M
 
