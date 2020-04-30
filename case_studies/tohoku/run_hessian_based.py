@@ -100,10 +100,16 @@ for n in range(op.num_adapt):
         if n < op.num_adapt-1:
 
             # Create double L2 projection operator which will be repeatedly used
-            recoverer = ShallowWaterHessianRecoverer(swp.V[i], op=op)
-            fields = {'bathymetry': swp.bathymetry[i]}
-            fields.update(swp.fields[i])
-            hessian = lambda sol: recoverer.get_hessian_metric(sol, fields=fields, normalise=False)
+            kwargs = {
+                'constant_fields': {'bathymetry': swp.bathymetry[i]},
+                'enforce_constraints': False,
+            }
+            recoverer = ShallowWaterHessianRecoverer(swp.V[i], op=op, **kwargs)
+
+            def hessian(sol):
+                kwargs = {'fields': swp.fields[i], 'enforce_constraints': False}
+                return recoverer.get_hessian_metric(sol, **kwargs)
+
             swp.hessian_func = hessian
 
             def export_func():
