@@ -340,6 +340,7 @@ class AdaptiveProblem():
 
         # --- Time integrated Hessian over each window
 
+        # self.callbacks[i]["average_hessian"] = TimeIntersectCallback(  # TODO: Test
         self.callbacks[i]["average_hessian"] = callback.TimeIntegralCallback(
             self.hessian_func, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
             name="average_hessian", append_to_log=False

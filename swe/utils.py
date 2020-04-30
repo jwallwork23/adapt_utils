@@ -6,8 +6,8 @@ from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.misc import get_component, get_component_space
 
 
-__all__ = ["get_hessian_metric", "ShallowWaterHessianRecoverer", "vorticity", "speed",
-           "heaviside_approx"]
+__all__ = ["get_hessian_metric", "ShallowWaterHessianRecoverer",
+           "vorticity", "speed", "heaviside_approx"]
 
 
 def get_hessian_metric(sol, adapt_field, **kwargs):
@@ -79,10 +79,7 @@ class ShallowWaterHessianRecoverer():
 
         # --- Gather fields
 
-        uv_space_fields = {
-            'speed': speed(sol),
-            'vorticity': vorticity(sol),
-        }
+        uv_space_fields = {'speed': speed(sol), 'vorticity': vorticity(sol)}
         if 'inflow' in fields:
             uv_space_fields['inflow'] = inner(u, fields.get('inflow'))
 

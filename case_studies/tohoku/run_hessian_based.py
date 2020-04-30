@@ -101,14 +101,17 @@ for n in range(op.num_adapt):
 
             # Create double L2 projection operator which will be repeatedly used
             kwargs = {
-                'constant_fields': {'bathymetry': swp.bathymetry[i]},
                 'enforce_constraints': False,
+                'normalise': '__' in op.adapt_field,
+                'noscale': True,
             }
-            recoverer = ShallowWaterHessianRecoverer(swp.V[i], op=op, **kwargs)
+            recoverer = ShallowWaterHessianRecoverer(
+                swp.V[i], op=op,
+                constant_fields={'bathymetry': swp.bathymetry[i]}, **kwargs,
+            )
 
             def hessian(sol):
-                kwargs = {'fields': swp.fields[i], 'enforce_constraints': False}
-                return recoverer.get_hessian_metric(sol, **kwargs)
+                return recoverer.get_hessian_metric(sol, fields=swp.fields[i], **kwargs)
 
             swp.hessian_func = hessian
 
@@ -120,6 +123,8 @@ for n in range(op.num_adapt):
 
                 # Extract time averaged Hessian
                 average_hessians[i].interpolate(swp.callbacks[i]["average_hessian"].get_value())
+
+                # TODO: Test Hessian intersection callback
 
                 # # Extract timesteps per mesh iteration
                 # timestep_integrals[i] = swp.callbacks[i]["timestep"].get_value()
@@ -216,3 +221,4 @@ while True:
     j += 1
 with open(fname, 'w') as f:
     f.write(logstr)
+print_output(fname)
