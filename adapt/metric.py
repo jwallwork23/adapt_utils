@@ -8,10 +8,13 @@ from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hes
 from adapt_utils.adapt.kernels import *
 
 
-__all__ = ["steady_metric", "isotropic_metric", "metric_with_boundary", "metric_intersection",
-           "metric_relaxation", "metric_complexity", "combine_metrics", "time_normalise",
-           "metric_average"]
+__all__ = ["steady_metric", "isotropic_metric", "space_normalise", "time_normalise",
+           "combine_metrics", "metric_intersection", "metric_relaxation", "metric_average",
+           "metric_complexity", "TimeIntersectCallback",
+           "metric_with_boundary"]
 
+
+# TODO: HessianMetric class with functions below as methods
 
 def steady_metric(f=None, H=None, projector=None, **kwargs):
     r"""
@@ -30,6 +33,7 @@ def steady_metric(f=None, H=None, projector=None, **kwargs):
     """
     kwargs.setdefault('normalise', True)
     kwargs.setdefault('enforce_constraints', True)
+    kwargs.setdefault('noscale', False)
     kwargs.setdefault('op', Options())
     op = kwargs.get('op')
     if f is None:
@@ -43,7 +47,6 @@ def steady_metric(f=None, H=None, projector=None, **kwargs):
     mesh = V.mesh()
     dim = mesh.topological_dimension()
     assert dim in (2, 3)  # TODO: test 3d case works
-    assert op.normalisation in ('complexity', 'error')
 
     # Functions to hold metric and its determinant
     M = Function(V).assign(0.0)
@@ -57,7 +60,7 @@ def steady_metric(f=None, H=None, projector=None, **kwargs):
     # Apply Lp normalisation
     if kwargs.get('normalise'):
         op.print_debug("METRIC: Normalising metric in space...")
-        space_normalise(M, op=op)
+        space_normalise(M, noscale=kwargs.get('noscale'), f=f, op=op)
         op.print_debug("METRIC: Done!")
 
     # Enforce maximum/minimum element sizes and anisotropy
@@ -69,42 +72,79 @@ def steady_metric(f=None, H=None, projector=None, **kwargs):
     return M
 
 
-def space_normalise(M, op=Options()):
+def space_normalise(M, f=None, **kwargs):
     """
-    Normalise steady metric `M`.
+    Normalise steady metric `M` based on field `f`.
+
+    Four normalisation approaches are implemented. These include two 'straightforward' approaches:
+
+      * 'norm'       - simply divide by the norm of `f`;
+      * 'abs'        - divide by the maximum of `abs(f)` and some minimum tolerated value (see
+                       equation (18) of [1]);
+
+    and two :math:`\mathcal L_p` normalisation approaches, for :math:`p\geq1` or :math:`p=\infty`:
+
+      * 'complexity' - Lp normalisation with a target metric complexity (see equation (2.10) of [2]);
+      * 'error'      - Lp normalisation with a target interpolation error (see equation (7) of [3]).
 
     NOTE: In the case of 'error' normalisation, 'target' is the inverse of error.
-    """
-    mesh = M.function_space().mesh()
-    d = mesh.topological_dimension()
-    p = op.norm_order
 
-    # Infinite p
-    if p is None:
-        if op.normalisation == 'complexity':
-            M *= pow(op.target/metric_complexity(M), 2/d)
-        else:
-            M *= d*op.target
+
+    [1] Pain et al. "Tetrahedral mesh optimisation and adaptivity for steady-state and transient
+        finite element calculations", Comput. Methods Appl. Mech. Engrg. 190 (2001) pp.3771-3796.
+
+    [2] Loseille & Alauzet, "Continuous mesh framework part II: validations and applications",
+        SIAM Numer. Anal. 49 (2011) pp.61-86.
+
+    [3] Alauzet & Olivier, "An L∞-Lp space-time anisotropic mesh adaptation strategy for
+        time-dependent problems", V European Conference on Computational Fluid Dynamics (2010).
+    """
+    kwargs.setdefault('op', Options())
+    kwargs.setdefault('f_min', 1.0e-08)
+    kwargs.setdefault('noscale', False)
+    op = kwargs.get('op')
+
+    # --- Simple normalisation approaches
+
+    if op.normalisation in ('norm', 'abs'):
+        assert f is not None
+        tol = kwargs.get('f_min')
+        denominator = norm(f) if op.normalisation == 'norm' else max_value(abs(f), tol)
+        M.interpolate(M/denominator)
         return
 
-    # Finite p
-    integral = assemble(pow(det(M), p/(2*p + d))*dx)
+    # --- Lp normalisation
+
+    if op.normalisation not in ('complexity', 'error'):
+        raise ValueError("Normalisation approach {:s} not recognised.".format(op.normalisation))
+    p = op.norm_order
+    mesh = M.function_space().mesh()
+    d = mesh.topological_dimension()
+    target = 1 if kwargs.get('noscale') else op.target
+
+    integral = metric_complexity(M) if p is None else assemble(pow(det(M), p/(2*p + d))*dx)
     assert integral > 1.0e-08
     if op.normalisation == 'complexity':
-        integral = pow(op.target/integral, 2/d)
+        scaling = pow(target/integral, 2/d)
     else:
-        integral = d*op.target*pow(integral, 1/p)
-    M.interpolate(integral*pow(det(M), -1/(2*p + d))*M)
+        scaling = 1 if p is None else pow(integral, 1/p)
+        scaling = d*target*scaling
+    if p is not None:
+        scaling = scaling*pow(det(M), -1/(2*p + d))
+    M.interpolate(scaling*M)
     return
 
 
 def enforce_element_constraints(M, op=Options()):
     """
-    Post-process a metric `M` so that it obeys the maximum and minimum elemental size constraints
-    and maximal anisotropy specified by :class:`Options` class `op`.
+    Post-process a metric `M` so that it obeys the following constraints specified by
+    :class:`Options` class `op`:
+
+      * `h_min`          - minimum element size;
+      * `h_max`          - maximum element size;
+      * `max_anisotropy` - maximum element anisotropy.
     """
-    dim = M.function_space().mesh().topological_dimension()
-    kernel = eigen_kernel(postproc_metric, dim, op=op)
+    kernel = eigen_kernel(postproc_metric, M.function_space().mesh().topological_dimension(), op=op)
     op2.par_loop(kernel, M.function_space().node_set, M.dat(op2.RW))
 
 
@@ -140,7 +180,7 @@ def isotropic_metric(f, normalise=True, op=Options()):
     if not normalise:
         return interpolate(M_diag*Identity(dim), V_ten)
 
-    # Normalise
+    # Normalise  # TODO: Use space_normalise
     op.print_debug("METRIC: Normalising metric...")
     p = op.norm_order
     detM = Function(V).assign(M_diag)
@@ -444,7 +484,8 @@ def get_metric_coefficient(a, b, op=Options()):
     return Constant(sol[0])
 
 
-# TODO: test
+# TODO: Update
+# TODO: Test
 def metric_with_boundary(f=None, H=None, h=None, mesh=None, degree=1, op=Options()):
     r"""
     Computes a Hessian-based steady metric for mesh adaptation, intersected with the corresponding
