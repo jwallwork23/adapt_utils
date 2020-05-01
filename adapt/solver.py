@@ -1,4 +1,5 @@
 from thetis import *
+from firedrake.petsc import PETSc
 
 import numpy as np
 
@@ -254,6 +255,22 @@ class AdaptiveProblem():
             self.set_final_condition()
         else:
             self.project_adjoint_solution(i+1, i)
+
+    def store_plexes(self, di=None):
+        """Save meshes to disk using DMPlex format."""
+        di = di or os.path.join(self.di, self.approach)
+        fname = os.path.join(di, 'plex_{:d}.h5')
+        for i, mesh in enumerate(self.meshes):
+            assert os.path.isdir(di)
+            viewer = PETSc.Viewer().createHDF5(fname.format(i), 'w')
+            viewer(mesh._plex)
+
+    def load_plexes(self, fname):
+        """Load meshes in DMPlex format."""
+        for i in range(self.num_meshes):
+            newplex = PETSc.DMPlex().create()
+            newplex.createFromFile('_'.join([fname, '{:d}.h5'.format(i)]))
+            self.meshes[i] = Mesh(newplex)
 
     # --- Solvers
 
