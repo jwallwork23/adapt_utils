@@ -3,6 +3,9 @@ from thetis import *
 import numpy as np
 
 from adapt_utils.swe.utils import *
+from adapt_utils.adapt.metric import metric_complexity, time_normalise
+from adapt_utils.adapt.adaptation import pragmatic_adapt
+from adapt_utils.swe.utils import ShallowWaterHessianRecoverer
 
 
 __all__ = ["AdaptiveProblem"]
@@ -111,6 +114,7 @@ class AdaptiveProblem():
         self.indicators = [{} for mesh in self.meshes]
         self.estimators = [{} for mesh in self.meshes]
         self.qois = []
+        self.st_complexities = [np.nan]
 
     # TODO: AdaptiveMesh
     # TODO: levels > 0
@@ -154,13 +158,6 @@ class AdaptiveProblem():
 
         # Tracer space
         self.Q = self.P1DG
-
-        # self.test = [TestFunction(V) for V in self.V]
-        # self.tests = [TestFunctions(V) for V in self.V]
-        # self.trial = [TrialFunction(V) for V in self.V]
-        # self.trials = [TrialFunctions(V) for V in self.V]
-        # self.p0test = [TestFunction(P0) for P0 in self.P0]
-        # self.p0trial = [TrialFunction(P0) for P0 in self.P0]
 
     def create_solutions(self):
         """
@@ -381,6 +378,139 @@ class AdaptiveProblem():
             self.transfer_adjoint_solution(i)
             self.setup_solver_adjoint(i)
             self.solve_adjoint_step(i)
+
+    # --- Run scripts
+
+    def run(self):
+        if self.approach == 'fixed_mesh':
+            self.solve_forward()
+        elif self.approach == 'hessian':
+            self.run_hessian_based()
+        else:
+            raise NotImplementedError  # TODO
+
+    def run_hessian_based(self):
+        """
+        Adaptation loop for Hessian based approach.
+
+        Stopping criteria:
+          * iteration count > self.op.num_adapt;
+          * relative change in element count < self.op.element_rtol;
+          * relative change in quantity of interest < self.op.qoi_rtol.
+        """
+        op = self.op
+        for n in range(op.num_adapt):
+            average_hessians = [Function(P1_ten, name="Average Hessian") for P1_ten in self.P1_ten]
+            # timestep_integrals = np.zeros(self.num_meshes)
+            if hasattr(self, 'hessian_func'):
+                delattr(self, 'hessian_func')
+            export_func = None
+
+            for i in range(self.num_meshes):
+
+                # Transfer the solution from the previous mesh / apply initial condition
+                self.transfer_forward_solution(i)
+
+                if n < op.num_adapt-1:
+
+                    # Create double L2 projection operator which will be repeatedly used
+                    kwargs = {
+                        'enforce_constraints': False,
+                        'normalise': '__' in op.adapt_field,
+                        'noscale': True,
+                    }
+                    recoverer = ShallowWaterHessianRecoverer(
+                        self.V[i], op=op,
+                        constant_fields={'bathymetry': self.bathymetry[i]}, **kwargs,
+                    )
+
+                    def hessian(sol):
+                        return recoverer.get_hessian_metric(sol, fields=self.fields[i], **kwargs)
+
+                    self.hessian_func = hessian
+
+                    def export_func():
+
+                        # We only care about the final export in each mesh iteration
+                        if self.fwd_solvers[i].iteration != (i+1)*self.dt_per_mesh:
+                            return
+
+                        # Extract time averaged Hessian
+                        average_hessians[i].interpolate(self.callbacks[i]["average_hessian"].get_value())
+
+                        # TODO: Test Hessian intersection callback
+
+                        # # Extract timesteps per mesh iteration
+                        # timestep_integrals[i] = self.callbacks[i]["timestep"].get_value()
+
+                # Solve step for current mesh iteration
+                print_output("Solving forward equation for iteration {:d}".format(i))
+                self.setup_solver_forward(i)
+                self.solve_forward_step(i, export_func=export_func)
+
+                # TODO: Delete objects to free memory
+
+            # --- Convergence criteria
+
+            # Check QoI convergence
+            qoi = self.quantity_of_interest()
+            print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+            self.qois.append(qoi)
+            if len(self.qois) > 1:
+                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
+                    print_output("Converged quantity of interest!")
+                    break
+
+            # Check maximum number of iterations
+            if n == op.num_adapt - 1:
+                break
+
+            # --- Time normalise metrics
+
+            # time_normalise(average_hessians, timestep_integrals, op=op)
+            time_normalise(average_hessians, op=op)
+            metric_file = File(os.path.join(self.di, 'metric.pvd'))
+            complexities = []
+            for i, H in enumerate(average_hessians):
+                metric_file.write(H)
+                complexities.append(metric_complexity(H))
+            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
+
+            # --- Adapt meshes
+
+            print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+            for i, M in enumerate(average_hessians):
+                print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+            self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
+            self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
+            print_output("Done!")
+
+            # ---  Setup for next run / logging
+
+            self.set_meshes(self.meshes)
+            self.create_function_spaces()
+            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
+            self.create_solutions()
+            self.set_fields()
+            self.set_stabilisation()
+            self.set_boundary_conditions()
+            self.callbacks = [{} for mesh in self.meshes]
+
+            print_output("\nResulting meshes")
+            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
+            for i, c in enumerate(complexities):
+                print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
+            print_output("")
+
+            # Check convergence of *all* element counts
+            converged = True
+            for i, num_cells_ in enumerate(self.num_cells[n-1]):
+                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
+                    converged = False
+            if converged:
+                print_output("Converged number of mesh elements!")
+                break
 
     # --- Metric
 
