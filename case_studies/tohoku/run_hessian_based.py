@@ -5,9 +5,6 @@ import datetime
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
-from adapt_utils.swe.utils import ShallowWaterHessianRecoverer
-from adapt_utils.adapt.metric import metric_complexity, time_normalise
-from adapt_utils.adapt.adaptation import pragmatic_adapt
 
 
 parser = argparse.ArgumentParser(prog="run_hessian_based")
@@ -34,8 +31,6 @@ parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of intere
 # Misc
 parser.add_argument("-debug", help="Print all debugging statements")
 args = parser.parse_args()
-
-# --- Setup
 
 # Order for spatial Lp normalisation
 p = 1
@@ -81,130 +76,14 @@ print_output(logstr)
 op = TohokuOptions(approach='hessian')
 op.update(kwargs)
 swp = AdaptiveTsunamiProblem(op)
+swp.run_hessian_based()
 
-# --- Mesh adaptation loop
-
-st_complexities = [np.nan]
-for n in range(op.num_adapt):
-    average_hessians = [Function(P1_ten, name="Average Hessian") for P1_ten in swp.P1_ten]
-    # timestep_integrals = np.zeros(swp.num_meshes)
-    if hasattr(swp, 'hessian_func'):
-        delattr(swp, 'hessian_func')
-    export_func = None
-
-    for i in range(swp.num_meshes):
-
-        # Transfer the solution from the previous mesh / apply initial condition
-        swp.transfer_forward_solution(i)
-
-        if n < op.num_adapt-1:
-
-            # Create double L2 projection operator which will be repeatedly used
-            kwargs = {
-                'enforce_constraints': False,
-                'normalise': '__' in op.adapt_field,
-                'noscale': True,
-            }
-            recoverer = ShallowWaterHessianRecoverer(
-                swp.V[i], op=op,
-                constant_fields={'bathymetry': swp.bathymetry[i]}, **kwargs,
-            )
-
-            def hessian(sol):
-                return recoverer.get_hessian_metric(sol, fields=swp.fields[i], **kwargs)
-
-            swp.hessian_func = hessian
-
-            def export_func():
-
-                # We only care about the final export in each mesh iteration
-                if swp.fwd_solvers[i].iteration != (i+1)*swp.dt_per_mesh:
-                    return
-
-                # Extract time averaged Hessian
-                average_hessians[i].interpolate(swp.callbacks[i]["average_hessian"].get_value())
-
-                # TODO: Test Hessian intersection callback
-
-                # # Extract timesteps per mesh iteration
-                # timestep_integrals[i] = swp.callbacks[i]["timestep"].get_value()
-
-        # Solve step for current mesh iteration
-        print_output("Solving forward equation for iteration {:d}".format(i))
-        swp.setup_solver_forward(i)
-        swp.solve_forward_step(i, export_func=export_func)
-
-        # TODO: Delete objects to free memory
-
-    # --- Convergence criteria
-
-    # Check QoI convergence
-    qoi = swp.quantity_of_interest()
-    print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-    swp.qois.append(qoi)
-    if len(swp.qois) > 1:
-        if np.abs(swp.qois[-1] - swp.qois[-2]) < op.qoi_rtol*swp.qois[-2]:
-            print_output("Converged quantity of interest!")
-            break
-
-    # Check maximum number of iterations
-    if n == op.num_adapt - 1:
-        break
-
-    # --- Time normalise metrics
-
-    # time_normalise(average_hessians, timestep_integrals, op=op)
-    time_normalise(average_hessians, op=op)
-    metric_file = File(os.path.join(swp.di, 'metric.pvd'))
-    complexities = []
-    for i, H in enumerate(average_hessians):
-        metric_file.write(H)
-        complexities.append(metric_complexity(H))
-    st_complexities.append(sum(complexities)*op.end_time/op.dt)
-
-    # --- Adapt meshes
-
-    print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-    for i, M in enumerate(average_hessians):
-        print_output("Adapting mesh {:d}/{:d}...".format(i+1, swp.num_meshes))
-        swp.meshes[i] = pragmatic_adapt(swp.meshes[i], M, op=op)
-    swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
-    swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
-    print_output("Done!")
-
-    # ---  Setup for next run / logging
-
-    swp.set_meshes(swp.meshes)
-    swp.create_function_spaces()
-    swp.dofs.append([np.array(V.dof_count).sum() for V in swp.V])
-    swp.create_solutions()
-    swp.set_fields()
-    swp.set_stabilisation()
-    swp.set_boundary_conditions()
-    swp.callbacks = [{} for mesh in swp.meshes]
-
-    print_output("\nResulting meshes")
-    for i, complexity in enumerate(complexities):
-        msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-        print_output(msg.format(i, complexity, swp.num_vertices[n+1][i], swp.num_cells[n+1][i]))
-    print_output("")
-
-    # Check convergence of *all* element counts
-    converged = True
-    for i, num_cells in enumerate(swp.num_cells[n]):
-        if np.abs(num_cells - swp.num_cells[n-1][i]) > op.element_rtol*swp.num_cells[n-1][i]:
-            converged = False
-    if converged:
-        print_output("Converged number of mesh elements!")
-        break
-
-# --- Print summary / logging  # TODO: Save meshes to disk
-
+# Print summary / logging  # TODO: Save meshes to disk
 logstr += 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
 logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
 msg = "Mesh iteration {:2d}: qoi {:.4e} space-time complexity {:.4e}\n"
 for n in range(1, len(swp.qois)):
-    logstr += msg.format(n+1, swp.qois[n], st_complexities[n])
+    logstr += msg.format(n+1, swp.qois[n], swp.st_complexities[n])
 logstr += 80*'*' + '\n' + 30*' ' + 'FINAL ELEMENT COUNTS\n' + 80*'*' + '\n'
 l = op.end_time/op.num_meshes
 for i, num_cells in enumerate(swp.num_cells[-1]):
