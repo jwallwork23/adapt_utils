@@ -55,8 +55,7 @@ class ShallowWaterHessianRecoverer():
           * 'velocity_x' - the x-component of velocity;
           * 'velocity_y' - the y-component of velocity;
           * 'speed'      - the magnitude of velocity;
-          * 'vorticity'  - the fluid vorticity, interpreted as a scalar field;
-          * 'inflow'     - the inner product of inflow velocity and solution velocity.
+          * 'vorticity'  - the fluid vorticity, interpreted as a scalar field.
 
         Currently supported adaptation fields which are constant in time:
           * 'bathymetry' - the fluid depth at rest.
@@ -77,11 +76,9 @@ class ShallowWaterHessianRecoverer():
         adapt_field = adapt_field or op.adapt_field
         u, eta = sol.split()
 
-        # --- Gather fields
+        # --- Fields based on velocity
 
-        uv_space_fields = {'speed': speed(sol), 'vorticity': vorticity(sol)}
-        if 'inflow' in fields:
-            uv_space_fields['inflow'] = inner(u, fields.get('inflow'))
+        uv_space_fields = {'speed': speed, 'vorticity': vorticity}
 
         # --- Recover Hessian and construct metric(s)
 
@@ -117,7 +114,7 @@ class ShallowWaterHessianRecoverer():
 
         # Fields which need projecting into speed space
         elif adapt_field in uv_space_fields:
-            f = project(uv_space_fields[adapt_field], self.speed_space)
+            f = project(uv_space_fields[adapt_field](sol), self.speed_space)
             proj = self.speed_projector
             return steady_metric(f, projector=self.speed_projector, **kwargs)
 
@@ -128,8 +125,8 @@ class ShallowWaterHessianRecoverer():
 
 def vorticity(sol):
     """Fluid vorticity, interpreted as a scalar field."""
+    assert sol.function_space().mesh().topological_dimension() == 2
     uv, elev = sol.split()
-    assert uv.function_space().mesh().topological_dimension() == 2
     return curl(uv)
 
 

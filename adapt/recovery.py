@@ -134,9 +134,7 @@ class DoubleL2ProjectorHessian(L2Projector):
 
             a = inner(τ, H)*dx
             L = -inner(div(τ), grad(self.field))*dx
-            for i in range(self.dim):
-                for j in range(self.dim):
-                    L += τ[i, j]*self.n[j]*self.field.dx(i)*ds
+            L += dot(grad(self.field), dot(τ, self.n))*ds
 
         # Double L2 projection, using a mixed formulation for the gradient and Hessian
         elif self.hessian_recovery == 'dL2':
@@ -149,9 +147,7 @@ class DoubleL2ProjectorHessian(L2Projector):
             a = inner(τ, H)*dx
             a += inner(φ, g)*dx
             a += inner(div(τ), g)*dx
-            for i in range(self.dim):
-                for j in range(self.dim):
-                    a += -g[i]*τ[i, j]*self.n[j]*ds
+            a += -dot(g, dot(τ, self.n))*ds
 
             # L = inner(grad(self.field), φ)*dx
             L = self.field*dot(φ, self.n)*ds - self.field*div(φ)*dx  # Enables field to be P0
