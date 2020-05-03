@@ -807,6 +807,7 @@ class SteadyProblem():
 
             op_copy = type(self.op)(mesh=am_copy.mesh)
             op_copy.update(self.op)
+
             tmp = type(self)(op_copy, mesh=am_copy.mesh, discrete_adjoint=self.discrete_adjoint,
                              prev_solution=self.prev_solution, levels=self.levels)
             x = Function(tmp.mesh.coordinates)
@@ -814,8 +815,12 @@ class SteadyProblem():
             x.dat.data[:] = mesh_mover.x.dat.data  # TODO: PyOP2
             tmp.mesh.coordinates.assign(x)  # TODO: May need to modify coords of hierarchy, too
             # Project fields and solutions onto temporary Problem
+
             tmp.project_fields(self)
             tmp.project_solution(self.solution)
+            if self.op.solve_tracer:
+                tmp.project_bathymetry(self.solution_old_bathymetry)
+                tmp.project_tracer(self.solution_old_tracer)
 
             tmp.project_solution(self.adjoint_solution, adjoint=True)
 
@@ -828,12 +833,16 @@ class SteadyProblem():
             self.boundary_conditions = self.op.set_boundary_conditions(self.V)
             self.project_fields(tmp)
             self.project_solution(tmp.solution)
+            if self.op.solve_tracer:
+                self.project_bathymetry(tmp.solution_old_bathymetry)
+                self.project_tracer(tmp.solution_old_tracer)
             self.project_solution(tmp.adjoint_solution, adjoint=True)
 
             # Plot monitor function
             m = interpolate(self.monitor_function(self.mesh), self.P1)
             m.rename("Monitor function")
             self.monitor_file.write(m)
+
             return
 
         # Metric based methods
@@ -842,7 +851,7 @@ class SteadyProblem():
         except AssertionError:
             raise ValueError("Please supply a metric.")
         self.am.pragmatic_adapt(self.M)
-        self.set_mesh(self.am.mesh, hierarchy=None)  # Hiearchy is reconstructed from scratch
+        self.set_mesh(self.am.mesh, hierarchy=None)  # Hierarchy is reconstructed from scratch
 
         print_output("Done adapting. Number of elements: {:d}".format(self.mesh.num_cells()))
         self.num_cells.append(self.mesh.num_cells())
@@ -1050,6 +1059,7 @@ class UnsteadyProblem(SteadyProblem):
         * adapt mesh based on some error estimator of choice.
     """
     def __init__(self, op, mesh, finite_element, **kwargs):
+
         super(UnsteadyProblem, self).__init__(op, mesh, finite_element, **kwargs)
         self.set_start_condition()
         self.step_end = op.end_time if self.approach == 'fixed_mesh' else op.dt*op.dt_per_remesh
@@ -1064,6 +1074,9 @@ class UnsteadyProblem(SteadyProblem):
 
     def set_start_condition(self, adjoint=False):
         self.set_solution(self.op.set_start_condition(self.V, adjoint=adjoint), adjoint)
+        if self.op.solve_tracer:
+            self.solution_old_tracer = Function(self.P1DG).project(self.op.set_tracer_init(self.P1DG))
+            self.solution_old_bathymetry = Function(self.P1).project(self.op.set_bathymetry(self.P1))
         if adjoint:
             self.adjoint_solution_old.assign(self.adjoint_solution)
         else:
@@ -1120,13 +1133,18 @@ class UnsteadyProblem(SteadyProblem):
             for i in range(op.num_adapt):
                 self.adapt_mesh()
                 # Interpolate value from previous step onto new mesh
-
                 if self.remesh_step == 0:
                     self.set_start_condition(adjoint)
                 elif i == 0:
                     self.project_solution(solution, adjoint=adjoint)
+                    if op.solve_tracer:
+                        self.project_bathymetry(bathymetry, adjoint=adjoint)
+                        self.project_tracer(tracer, adjoint=adjoint)
                 else:
                     self.project_solution(solution_old, adjoint=adjoint)
+                    if op.solv_tracer:
+                        self.project_bathymetry(bathymetry, adjoint=adjoint)
+                        self.project_tracer(tracer, adjoint=adjoint)
 
                 # Solve PDE on new mesh
                 op.plot_pvd = i == 0
@@ -1137,6 +1155,9 @@ class UnsteadyProblem(SteadyProblem):
                 # Store solutions from last two steps on first mesh in sequence
                 if i == 0:
                     solution = Function(self.solution)
+                    if op.solve_tracer:
+                        bathymetry = Function(self.solution_old_bathymetry)
+                        tracer = Function(self.solution_old_tracer)
                     if self.step_end + op.dt*op.dt_per_remesh > op.end_time:
                         break  # No need to do adapt for final timestep
 

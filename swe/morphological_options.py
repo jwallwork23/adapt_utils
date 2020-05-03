@@ -21,10 +21,18 @@ class MorphOptions(ShallowWaterOptions):
         self.depth_integrated = False
         super(MorphOptions, self).__init__(**kwargs)
 
+    def set_tracer_init(self, fs):
+        if self.conservative:
+            tracer_init = project(self.depth*self.ceq/self.coeff, fs)
+        else:
+            divisor = interpolate(self.ceq/self.coeff, self.ceq.function_space())
+            tracer_init = project(divisor, fs)
+        return tracer_init
+
     def set_up_suspended(self, mesh, tracer=None):
         P1 = FunctionSpace(mesh, "CG", 1)
         P1DG = FunctionSpace(mesh, "DG", 1)
-        P1_vec = FunctionSpace(mesh, "CG", 1)
+        P1_vec = VectorFunctionSpace(mesh, "CG", 1)
         P1DG_vec = VectorFunctionSpace(mesh, "DG", 1)
 
         R = Constant(2650/1000 - 1)
@@ -62,17 +70,17 @@ class MorphOptions(ShallowWaterOptions):
         if self.t_old.dat.data[:] == 0.0:
             self.set_bathymetry(P1)
         else:
-            self.bathymetry = project(self.bathymetry, P1)
+            self.bathymetry = interpolate(self.bathymetry, P1)
 
-        self.depth = project(self.elev_cg + self.bathymetry, P1)
+        self.depth = interpolate(self.elev_cg + self.bathymetry, P1)
 
-        self.unorm = project(self.horizontal_velocity**2 + self.vertical_velocity**2, P1DG)
+        self.unorm = interpolate(self.horizontal_velocity**2 + self.vertical_velocity**2, P1DG)
 
         self.hc = conditional(self.depth > 0.001, self.depth, 0.001)
         self.aux = conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001)
         self.qfc = 2/(ln(self.aux)/0.4)**2
 
-        self.TOB = project(1000*0.5*self.qfc*self.unorm, P1)
+        self.TOB = interpolate(1000*0.5*self.qfc*self.unorm, P1)
 
         # skin friction coefficient
 
@@ -93,10 +101,10 @@ class MorphOptions(ShallowWaterOptions):
 
         if self.conservative:
             self.tracer_init_value = Constant(self.depth.at([0, 0])*self.ceq.at([0, 0])/self.coeff.at([0, 0]))
-            self.tracer_init = interpolate(self.depth*self.ceq/self.coeff, P1DG)
         else:
             self.tracer_init_value = Constant(self.ceq.at([0, 0])/self.coeff.at([0, 0]))
-            self.tracer_init = interpolate(self.ceq/self.coeff, P1DG)
+
+        self.tracer_init = self.set_tracer_init(self.P1DG)
 
         self.depo, self.ero = self.set_source_tracer(P1DG, solver_obj=None, init=True)
 
@@ -108,8 +116,15 @@ class MorphOptions(ShallowWaterOptions):
                 self.sink = interpolate(self.depo/(self.depth**2), P1DG)
                 self.source = interpolate(self.ero/self.depth, P1DG)
         else:
-            self.sink = interpolate(self.depo/self.depth, P1DG)
-            self.source = interpolate(self.ero/self.depth, P1DG)
+            if self.implicit_source:
+                self.sink = interpolate(self.depo/self.depth, P1DG)
+                self.source = interpolate(self.ero/self.depth, P1DG)
+            else:
+                if self.t_old.dat.data[:] == 0:
+                    self.source = interpolate((-(self.depo*self.tracer_init) + self.ero)/self.depth, P1DG)
+                    self.sink = None
+                else:
+                    self.source = interpolate((-(self.depo*tracer) + self.ero)/self.depth, P1DG)
 
         if self.t_old.dat.data[:] == 0:
             if self.conservative:
@@ -263,8 +278,11 @@ class MorphOptions(ShallowWaterOptions):
                 self.source.interpolate(self.ero/self.depth)
             self.qbsourcedepth.interpolate(-(self.depo*solver_obj.fields.tracer_2d/self.depth) + self.ero)
         else:
-            self.sink.interpolate(self.depo/self.depth)
-            self.source.interpolate(self.ero/self.depth)
+            if self.implicit_source:
+                self.sink.interpolate(self.depo/self.depth)
+                self.source.interpolate(self.ero/self.depth)
+            else:
+                self.source.interpolate((-(self.depo*solver_obj.fields.tracer_2d) + self.ero)/self.depth)
             self.qbsourcedepth.interpolate(-(self.depo*solver_obj.fields.tracer_2d) + self.ero)
 
         if self.convective_vel_flag:
