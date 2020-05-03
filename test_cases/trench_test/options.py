@@ -34,6 +34,8 @@ class TrenchOptions(MorphOptions):
         self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
 
         self.plot_pvd = True
+        self.implicit_source = False
+        self.hessian_recovery = 'dL2'
 
         ts = time.time()
         st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -63,7 +65,7 @@ class TrenchOptions(MorphOptions):
         self.num_hours = 15
 
         # Physical
-        self.base_diffusivity = 0.15
+        self.base_diffusivity = 0.15756753359379702
 
         self.porosity = Constant(0.4)
         self.ks = 0.025
@@ -203,13 +205,7 @@ class TrenchOptions(MorphOptions):
     def get_update_forcings(self, solver_obj):
 
         def update_forcings(t):
-            """
-            if round(t, 2)%18.0 == 0:
-                if self.t_old.dat.data[:] == t:
-                    bath_file = File(self.di + '/bath_timestep.pvd')
-                    bath_file.write(solver_obj.fields.bathymetry_2d)
-                    #import ipdb; ipdb.set_trace()
-            """
+
             self.tracer_list.append(min(solver_obj.fields.tracer_2d.dat.data[:]))
 
             self.update_key_hydro(solver_obj)

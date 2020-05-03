@@ -11,6 +11,7 @@ import time
 import datetime
 import numpy as np
 import firedrake as fire
+import math
 import os
 
 
@@ -238,8 +239,43 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                 dzdx.interpolate(old_bathymetry_2d.dx(0))
                 dzdy.interpolate(old_bathymetry_2d.dx(1))
 
-                # initialise exner equation
-                f = 0
+                if sediment_slide:
+                    # add component to bedload transport to ensure the slope angle does not exceed a certain value
+
+                    # calculate normal to the bed
+                    nx.interpolate(dzdx/th.sqrt(1 + (dzdx**2 + dzdy**2)))
+                    ny.interpolate(dzdy/th.sqrt(1 + (dzdx**2 + dzdy**2)))
+                    nz.interpolate(1/th.sqrt(1 + (dzdx**2 + dzdy**2)))
+
+                    sinbeta.interpolate(th.sqrt(1 - (nz**2)))
+                    betaangle.interpolate(th.asin(sinbeta))
+                    tanbeta.assign(sinbeta/nz)
+
+                    # calculating magnitude of added component
+                    qaval.assign(th.conditional(tanbeta-tanphi > 0, (1-porosity)*0.5*(L**2)*(tanbeta - tanphi)/(th.cos(betaangle*dt*morfac)), 0))
+                    # multiplying by direction
+                    alphaconst.interpolate(th.conditional(sinbeta > 0, - qaval*(nz**2)/sinbeta, 0))
+
+                    # deriving the weak form of this extra component to be added to the finite element formulation of exner equation
+                    grad_test = th.grad(v)
+                    diff_tensor = th.as_matrix([[alphaconst, 0, ], [0, alphaconst, ]])
+                    diff_flux = th.dot(diff_tensor, th.grad(-old_bathymetry_2d))
+
+                    f = th.inner(grad_test, diff_flux)*(fire.dx)
+
+                    degree_h = P1_2d.ufl_element().degree()
+                    sigma = 5.0*degree_h*(degree_h + 1)/fire.CellSize(mesh2d)
+                    if degree_h == 0:
+                        sigma = 1.5 / fire.CellSize(mesh2d)
+
+                    alphaavg = th.avg(sigma)
+                    ds_interior = fire.dS
+                    f += -alphaavg*th.inner(th.jump(v, n), th.dot(th.avg(diff_tensor), th.jump(z_n, n)))*ds_interior
+                    f += -th.inner(th.avg(th.dot(diff_tensor, th.grad(v))), th.jump(z_n, n))*ds_interior
+                    f += -th.inner(th.jump(v, n), th.avg(th.dot(diff_tensor, th.grad(z_n))))*ds_interior
+                else:
+                    # initialise exner equation if not already initialised in sediment slide
+                    f = 0
 
                 if suspendedload:
                     # source term
@@ -263,11 +299,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                         print('Unrecognised suspended sediment transport formula. Please choose "vanrijn" or "soulsby"')
 
                     # calculate depth-averaged source term for sediment concentration equation
-                    ero.interpolate(settling_velocity*ceq)
-                    depo.interpolate(settling_velocity*coeff)
-                    source.interpolate(ero/depth)
-                    sink.interpolate(depo/depth)
-
+                    source.interpolate(-(settling_velocity*coeff*solver_obj.fields.tracer_2d/depth) + (settling_velocity*ceq/depth))
                     # update sediment rate to ensure equilibrium at inflow
                     sediment_rate.assign(ceq.at([0, 0])/coeff.at([0, 0]))
 
@@ -385,7 +417,7 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
                 if suspendedload:
                     # add suspended sediment transport to exner equation multiplied by depth as the exner equation is not depth-averaged
 
-                    qbsourcedepth.interpolate(-(depo*solver_obj.fields.tracer_2d)+ero)
+                    qbsourcedepth.interpolate(source*depth)
                     f += - (qbsourcedepth*v)*fire.dx
 
                 # solve exner equation using finite element methods
@@ -456,6 +488,10 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     cparam = th.Constant((2650-1000)*9.81*average_size*(surbeta2**2))
     # secondary current parameter
     alpha_secc = th.Constant(alpha_secc_fn)
+    # maximum gradient allowed by sediment slide mechanism
+    tanphi = math.tan(angle_fn*math.pi/180)
+    # approximate mesh step size for sediment slide mechanism
+    L = th.Constant(mesh_step_size)
 
     # calculate critical shields parameter thetacr
     R = th.Constant(2650/1000 - 1)
@@ -516,6 +552,23 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
     dzdx = th.Function(V).interpolate(old_bathymetry_2d.dx(0))
     dzdy = th.Function(V).interpolate(old_bathymetry_2d.dx(1))
 
+    if sediment_slide:
+        # add component to bedload transport to ensure the slope angle does not exceed a certain value
+
+        # calculate normal to the bed
+        nx = th.Function(V).interpolate(dzdx/th.sqrt(1 + (dzdx**2 + dzdy**2)))
+        ny = th.Function(V).interpolate(dzdy/th.sqrt(1 + (dzdx**2 + dzdy**2)))
+        nz = th.Function(V).interpolate(1/th.sqrt(1 + (dzdx**2 + dzdy**2)))
+
+        sinbeta = th.Function(V).interpolate(th.sqrt(1 - (nz**2)))
+        betaangle = th.Function(V).interpolate(th.asin(sinbeta))
+        tanbeta = th.Function(V).interpolate(sinbeta/nz)
+
+        # calculating magnitude of added component
+        qaval = th.Function(V).interpolate(th.conditional(tanbeta - tanphi > 0, (1-porosity)*0.5*(L**2)*(tanbeta - tanphi)/(th.cos(betaangle*dt*morfac)), 0))
+        # multiplying by direction
+        alphaconst = th.Function(V).interpolate(th.conditional(sinbeta > 0, - qaval*(nz**2)/sinbeta, 0))
+
     if suspendedload:
         # deposition flux - calculating coefficient to account for stronger conc at bed
         B = th.Function(P1_2d).interpolate(th.conditional(a > depth, a/a, a/depth))
@@ -548,13 +601,10 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
         testtracer = th.Function(P1_2d).interpolate(ceq/coeff)
 
         # calculate depth-averaged source term for sediment concentration equation
-        ero = th.Function(P1_2d).interpolate(settling_velocity*ceq)
-        depo = th.Function(P1_2d).interpolate(settling_velocity*coeff)
-        source = th.Function(P1_2d).interpolate(ero/depth)
-        sink = th.Function(P1_2d).interpolate(depo/depth)
+        source = th.Function(P1_2d).interpolate(-(settling_velocity*coeff*sediment_rate/depth) + (settling_velocity*ceq/depth))
 
         # add suspended sediment transport to exner equation multiplied by depth as the exner equation is not depth-averaged
-        qbsourcedepth = th.Function(V).interpolate(-depo*testtracer + ero)
+        qbsourcedepth = th.Function(V).interpolate(source*depth)
 
         if convectivevel:
             # correction factor to advection velocity in sediment concentration equation
@@ -645,7 +695,6 @@ def morphological(boundary_conditions_fn, morfac, morfac_transport, suspendedloa
         options.fields_to_export = ['uv_2d', 'elev_2d', 'tracer_2d', 'bathymetry_2d']
         options.tracer_advective_velocity_factor = alphatest2
         options.tracer_source_2d = source
-        options.tracer_sink_2d = sink
     else:
         options.solve_tracer = False
         options.fields_to_export = ['uv_2d', 'elev_2d', 'bathymetry_2d']

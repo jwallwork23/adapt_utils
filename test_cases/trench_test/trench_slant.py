@@ -13,7 +13,7 @@ import pandas as pd
 import pylab as plt
 import time
 
-timestep = 0.1
+timestep = 0.2
 
 
 def boundary_conditions_fn_trench(bathymetry_2d, flag, morfac=1, t_new=0, state='initial'):
@@ -45,7 +45,7 @@ def boundary_conditions_fn_trench(bathymetry_2d, flag, morfac=1, t_new=0, state=
 # define mesh
 lx = 16
 ly = 1.1
-nx = np.int(lx*5*2.0)  # this has to be at least double the lx as otherwise don't get trench with right gradient
+nx = np.int(lx*5)  # this has to be at least double the lx as otherwise don't get trench with right gradient
 ny = 5
 mesh2d = th.RectangleMesh(nx, ny, lx, ly)
 
@@ -58,13 +58,13 @@ vectorP1_2d = th.VectorFunctionSpace(mesh2d, 'DG', 1)
 
 # define underlying bathymetry
 bathymetry_2d = th.Function(V, name='Bathymetry')
-initialdepth = th.Constant(0.397)
+initialdepth = th.Constant(0.297)
 depth_riv = th.Constant(initialdepth - 0.397)
 depth_trench = th.Constant(depth_riv - 0.15)
 depth_diff = depth_trench - depth_riv
 
-trench = th.conditional(th.le(x, 5), depth_riv, th.conditional(th.le(x, 6.5), (1/1.5)*depth_diff*(x-6.5) + depth_trench,
-                        th.conditional(th.le(x, 9.5), depth_trench, th.conditional(th.le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
+trench = th.conditional(th.le(x, 5), (0.1*(y-0.55)) + depth_riv, th.conditional(th.le(x, 6.5), (0.1*(y-0.55)) + (1/1.5)*depth_diff*(x-6.5) + depth_trench,
+                        th.conditional(th.le(x, 9.5), (0.1*(y-0.55)) + depth_trench, th.conditional(th.le(x, 11), (0.1*(y-0.55)) - (1/1.5)*depth_diff*(x-11) + depth_riv, (0.1*(y-0.55)) + depth_riv))))
 bathymetry_2d.interpolate(-trench)
 
 
@@ -72,20 +72,21 @@ bathymetry_2d.interpolate(-trench)
 elev_init = th.Function(P1_2d).interpolate(th.Constant(0.4))
 uv_init = th.as_vector((0.51, 0.0))
 
-solver_obj, update_forcings_hydrodynamics = morph.hydrodynamics_only(boundary_conditions_fn_trench, mesh2d, bathymetry_2d, uv_init, elev_init, ks=0.025, average_size=160 * (10**(-6)), dt=0.1, t_end=500)
+solver_obj, update_forcings_hydrodynamics = morph.hydrodynamics_only(boundary_conditions_fn_trench, mesh2d, bathymetry_2d, uv_init, elev_init, ks=0.025, average_size=160 * (10**(-6)), dt=0.25, t_end=500)
 
 # run model
 solver_obj.iterate(update_forcings=update_forcings_hydrodynamics)
 
 
 uv, elev = solver_obj.fields.solution_2d.split()
-morph.export_final_state("hydrodynamics_trench_super_fine", uv, elev)
+morph.export_final_state("hydrodynamics_trench_slant", uv, elev)
+
 
 t1 = time.time()
 
 solver_obj, update_forcings_tracer, diff_bathy, diff_bathy_file = morph.morphological(boundary_conditions_fn=boundary_conditions_fn_trench, morfac=100, morfac_transport=True, suspendedload=True, convectivevel=True,
                                                                                       bedload=True, angle_correction=True, slope_eff=True, seccurrent=False, sediment_slide=False, fluc_bcs=False,
-                                                                                      mesh2d=mesh2d, bathymetry_2d=bathymetry_2d, input_dir='hydrodynamics_trench_super_fine', viscosity_hydro=10**(-6), ks=0.025, average_size=160 * (10**(-6)), dt=timestep, diffusivity=0.15756753359379702, final_time=15*3600)
+                                                                                      mesh2d=mesh2d, bathymetry_2d=bathymetry_2d, input_dir='hydrodynamics_trench_slant', viscosity_hydro=10**(-6), ks=0.025, average_size=160 * (10**(-6)), dt=timestep, diffusivity=0.15756753359379702, final_time=15*3600)
 
 # run model
 solver_obj.iterate(update_forcings=update_forcings_tracer)
@@ -111,7 +112,7 @@ for i in range(len(data[0].dropna())):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv('fixed_output/' + str(nx) + '_bed_trench_output.csv')
+df.to_csv('fixed_output/bed_trench_output.csv')
 
 print("Time: ")
 print(t2-t1)

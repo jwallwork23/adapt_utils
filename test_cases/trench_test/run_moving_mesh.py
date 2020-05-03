@@ -12,7 +12,8 @@ from adapt_utils.norms import local_frobenius_norm
 
 t1 = time.time()
 
-nx = 0.5
+nx = 1.0
+alpha = 100.0
 
 op = TrenchOptions(approach='monge_ampere',
                    plot_timeseries=False,
@@ -20,7 +21,6 @@ op = TrenchOptions(approach='monge_ampere',
                    debug=False,
                    nonlinear_method='relaxation',
                    num_adapt=1,
-                   qoi_mode='inundation_volume',
                    friction='nikuradse',
                    nx=nx,
                    ny=1,
@@ -30,7 +30,7 @@ swp = UnsteadyShallowWaterProblem(op, levels=0)
 swp.setup_solver()
 
 
-def gradient_interface_monitor(mesh, alpha=400.0, gamma=0.0):
+def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
@@ -43,7 +43,7 @@ def gradient_interface_monitor(mesh, alpha=400.0, gamma=0.0):
     # eta = swp.solution.split()[1]
     b = swp.solver_obj.fields.bathymetry_2d
     # bath_gradient = recovery.construct_gradient(b)
-    bath_hess = recovery.construct_hessian(b)
+    bath_hess = recovery.construct_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 
     # current_mesh = eta.function_space().mesh()
@@ -63,7 +63,7 @@ def gradient_interface_monitor(mesh, alpha=400.0, gamma=0.0):
     tau = TestFunction(P1)
     n = FacetNormal(mesh)
 
-    mon_init = project(sqrt(1.0 + alpha * norm_two_proj), P1)
+    mon_init = project(sqrt(Constant(1.0) + alpha * norm_two_proj), P1)
 
     K = 10*(0.4**2)/4
     a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
@@ -95,7 +95,7 @@ for i in range(len(data[0].dropna())):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv('bed_trench_output' + str(nx) + '.csv')
+df.to_csv('adapt_output2/bed_trench_output' + str(nx) + '_' + str(alpha) + '.csv')
 
 plt.plot(datathetis, bathymetrythetis1, '.', linewidth=2, label='adapted mesh')
 plt.legend()
@@ -107,7 +107,7 @@ print(np.sqrt(sum(diff_thetis)))
 print("total time: ")
 print(t2-t1)
 
-f = open("output_frob_norm" + str(nx) + '_' + str(400) + '.txt', "w+")
+f = open("adapt_output2/output_frob_norm" + str(nx) + '_' + str(100.0) + '.txt', "w+")
 f.write(str(np.sqrt(sum(diff_thetis))))
 f.write("\n")
 f.write(str(t2-t1))
