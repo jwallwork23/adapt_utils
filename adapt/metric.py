@@ -13,15 +13,11 @@ __all__ = ["metric_complexity",
 
 
 def metric_complexity(M):
-    r"""
+    """
     Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted
     based thereupon.
     """
     return assemble(sqrt(det(M))*dx)
-
-
-# TODO: SteadyHessianMetric and UnsteadyHessianMetric classes with functions below as methods.
-#       Also duplicate as drivers
 
 
 def steady_metric(f=None, H=None, projector=None, **kwargs):
@@ -387,6 +383,67 @@ def combine_metrics(*metrics, average=True):
 
 
 # --- Work in progress
+
+
+class SteadyHessianMetric():
+    # TODO: doc
+    def __init__(self, f, projector=None, op=Options()):
+        self.op = op
+        self.fs = f.function_space()
+        self.dim = self.fs.mesh().topological_dimension()
+        try:
+            assert self.dim in (2, 3)
+        except AssertionError:
+            raise ValueError("Only 2D and 3D metrics considered.")
+        try:
+            family = self.fs.ufl_element().family()
+            degree = self.fs.ufl_element().degree()
+            assert (family, degree) in [('Lagrange', 1), ('Discontinuous Lagrange', 0)]
+        except AssertionError:
+            raise ValueError("Metric must live in either tensor P0 or P1 space.")
+        if self.fs.ufl_element().value_shape() == (self.dim, self.dim):
+            self.M = f
+        else:
+            self.M = construct_hessian(f, op=op) if projector is None else projector.project(f)
+
+    def complexity(self):
+        """
+        Compute the complexity of a metric, which approximates the number of vertices in a mesh
+        adapted based thereupon.
+        """
+        return assemble(sqrt(det(self.M))*dx)
+
+    def take_absolute_eigenvalues(self):
+        # TODO: doc
+        tmp = self.M.copy(deepcopy=True)  # TODO: temporary
+        self.op.print_debug("METRIC: Constructing metric from Hessian...")
+        kernel = eigen_kernel(metric_from_hessian, self.dim)
+        op2.par_loop(kernel, self.fs.node_set, tmp.dat(op2.RW), self.M.dat(op2.READ))
+        self.M.assign(tmp)
+        self.op.print_debug("METRIC: Done!")
+
+    def normalise(self, noscale=False):
+        # TODO: put doc here
+        self.op.print_debug("METRIC: Normalising metric in space...")
+        space_normalise(self.M, noscale=noscale, op=self.op)  # TODO: put here
+        self.op.print_debug("METRIC: Done!")
+
+    def enforce_element_constraints(M, op=Options()):
+        """
+        Post-process a metric `M` so that it obeys the following constraints specified by
+        :class:`Options` class `op`:
+
+          * `h_min`          - minimum element size;
+          * `h_max`          - maximum element size;
+          * `max_anisotropy` - maximum element anisotropy.
+        """
+        kernel = eigen_kernel(postproc_metric, self.dim, op=self.op)
+        op2.par_loop(kernel, self.fs.node_set, self.M.dat(op2.RW))
+
+
+class UnsteadyHessianMetric():
+    def __init__(self):
+        raise NotImplementedError  # TODO
 
 
 def get_metric_coefficient(a, b, op=Options()):
