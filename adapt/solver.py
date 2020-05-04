@@ -4,7 +4,7 @@ from firedrake.petsc import PETSc
 import numpy as np
 
 from adapt_utils.swe.utils import *
-from adapt_utils.adapt.metric import metric_complexity, time_normalise
+from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.adaptation import pragmatic_adapt
 from adapt_utils.swe.utils import ShallowWaterHessianRecoverer
 
@@ -321,7 +321,8 @@ class AdaptiveProblem():
         self.fwd_solvers[i].assign_initial_conditions(uv=uv, elev=elev)
 
         # NOTE: Callbacks must be added *after* setting initial condition
-        self.add_callbacks(i)
+        if hasattr(self, 'add_callbacks'):
+            self.add_callbacks(i)
 
         # Ensure time level matches solver iteration
         self.fwd_solvers[i].i_export = i*self.dt_per_mesh//op.dt_per_export
@@ -334,32 +335,6 @@ class AdaptiveProblem():
         # For later use
         self.lhs = self.fwd_solvers[i].timestepper.F
         assert self.fwd_solutions[i].function_space() == self.fwd_solvers[i].function_spaces.V_2d
-
-    def add_callbacks(self, i):
-
-        if not hasattr(self, 'hessian_func'):
-            return
-
-        # TODO: LaggedTimeIntegralCallback to reduce cost of Hessian computation
-        # TODO: Option to intersect metrics, rather than time average
-
-        # # --- Number of timesteps per mesh iteration
-
-        # timestep = lambda sol: 1.0/self.op.dt
-        # self.callbacks[i]["timestep"] = callback.TimeIntegralCallback(
-        #     timestep, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
-        #     name="timestep", append_to_log=False
-        # )
-        # self.fwd_solvers[i].add_callback(self.callbacks[i]["timestep"], 'timestep')
-
-        # --- Time integrated Hessian over each window
-
-        # self.callbacks[i]["average_hessian"] = TimeIntersectCallback(  # TODO: Test
-        self.callbacks[i]["average_hessian"] = callback.TimeIntegralCallback(
-            self.hessian_func, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
-            name="average_hessian", append_to_log=False
-        )
-        self.fwd_solvers[i].add_callback(self.callbacks[i]["average_hessian"], 'timestep')
 
     def setup_solver_adjoint(self, i, **kwargs):
         """Setup adjoint solver on mesh `i`."""
@@ -410,19 +385,36 @@ class AdaptiveProblem():
         """
         Adaptation loop for Hessian based approach.
 
+        Field for adaptation is specified by `op.adapt_field`.
+
+        Multiple fields can be combined using double-understrokes and either 'avg' for metric
+        average or 'int' for metric intersection. We assume distributivity of intersection over
+        averaging.
+
+        For example, `adapt_field = 'elevation__avg__velocity_x__int__bathymetry'` would imply
+        first intersecting the Hessians recovered from the x-component of velocity and bathymetry
+        and then averaging the result with the Hessian recovered from the elevation.
+
         Stopping criteria:
           * iteration count > self.op.num_adapt;
           * relative change in element count < self.op.element_rtol;
           * relative change in quantity of interest < self.op.qoi_rtol.
         """
         op = self.op
+        if op.adapt_field in ('all_avg', 'all_int'):
+            c = op.adapt_field[-3:]
+            op.adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
+        adapt_fields = ('__int__'.join(op.adapt_field.split('__avg__'))).split('__int__')
+
         for n in range(op.num_adapt):
-            average_hessians = [Function(P1_ten, name="Average Hessian") for P1_ten in self.P1_ten]
-            # timestep_integrals = np.zeros(self.num_meshes)
+
+            # Arrays to hold Hessians for each field on each window
+            H_windows = [[Function(P1_ten) for P1_ten in self.P1_ten] for f in adapt_fields]
+
             if hasattr(self, 'hessian_func'):
                 delattr(self, 'hessian_func')
+            update_forcings = None
             export_func = None
-
             for i in range(self.num_meshes):
 
                 # Transfer the solution from the previous mesh / apply initial condition
@@ -433,7 +425,7 @@ class AdaptiveProblem():
                     # Create double L2 projection operator which will be repeatedly used
                     kwargs = {
                         'enforce_constraints': False,
-                        'normalise': '__' in op.adapt_field,
+                        'normalise': False,
                         'noscale': True,
                     }
                     recoverer = ShallowWaterHessianRecoverer(
@@ -441,10 +433,21 @@ class AdaptiveProblem():
                         constant_fields={'bathymetry': self.bathymetry[i]}, **kwargs,
                     )
 
-                    def hessian(sol):
-                        return recoverer.get_hessian_metric(sol, fields=self.fields[i], **kwargs)
+                    def hessian(sol, adapt_field):
+                        fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
+                        return recoverer.get_hessian_metric(sol, **fields, **kwargs)
 
-                    self.hessian_func = hessian
+                    # Array to hold time-integrated Hessian UFL expression
+                    H_window = [0 for f in adapt_fields]
+
+                    def update_forcings(t):
+                        """Time-integrate Hessian using Trapezium Rule."""
+                        first_timestep = self.fwd_solvers[i].iteration == 0
+                        final_timestep = self.fwd_solvers[i].iteration == (i+1)*self.dt_per_mesh
+                        weight = (0.5 if first_timestep or final_timestep else 1.0)*op.dt
+                        for j, f in enumerate(adapt_fields):
+                            H_window[j] += weight*hessian(self.fwd_solvers[i].fields.solution_2d, f)
+                        # TODO: Hessian intersection option
 
                     def export_func():
 
@@ -453,19 +456,18 @@ class AdaptiveProblem():
                             return
 
                         # Extract time averaged Hessian
-                        average_hessians[i].interpolate(self.callbacks[i]["average_hessian"].get_value())
-
-                        # TODO: Test Hessian intersection callback
-
-                        # # Extract timesteps per mesh iteration
-                        # timestep_integrals[i] = self.callbacks[i]["timestep"].get_value()
+                        for j, H in enumerate(H_window):
+                            H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
                 print_output("Solving forward equation for iteration {:d}".format(i))
                 self.setup_solver_forward(i)
-                self.solve_forward_step(i, export_func=export_func)
+                self.solve_forward_step(i, export_func=export_func, update_forcings=update_forcings)
 
-                # TODO: Delete objects to free memory
+                # Delete objects to free memory
+                if n < op.num_adapt-1:
+                    del H_window
+                    del recoverer
 
             # --- Convergence criteria
 
@@ -484,21 +486,42 @@ class AdaptiveProblem():
 
             # --- Time normalise metrics
 
-            # time_normalise(average_hessians, timestep_integrals, op=op)
-            time_normalise(average_hessians, op=op)
+            for j in range(len(adapt_fields)):
+                space_time_normalise(H_windows[j], op=op)
+
+            # Combine metrics (if appropriate)
+            metrics = [Function(P1_ten, name="Hessian metric") for P1_ten in self.P1_ten]
+            for i in range(self.num_meshes):
+                H_window = [H_windows[j][i] for j in range(len(adapt_fields))]
+                if 'int' in op.adapt_field:
+                    if 'avg' in op.adapt_field:
+                        raise NotImplementedError  # TODO: mixed case
+                    metrics[i].assign(metric_intersection(*H_window))
+                elif 'avg' in op.adapt_field:
+                    metrics[i].assign(metric_average(*H_window))
+                else:
+                    try:
+                        assert len(adapt_fields) == 1
+                    except AssertionError:
+                        msg = "Field for adaptation '{:s}' not recognised"
+                        raise ValueError(msg.format(op.adapt_field))
+                    metrics[i].assign(H_window[0])
+            del H_windows
+
             metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
-            for i, H in enumerate(average_hessians):
-                metric_file.write(H)
-                complexities.append(metric_complexity(H))
+            for i, M in enumerate(metrics):
+                metric_file.write(M)
+                complexities.append(metric_complexity(M))
             self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
 
             # --- Adapt meshes
 
             print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            for i, M in enumerate(average_hessians):
+            for i, M in enumerate(metrics):
                 print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
                 self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+            del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
             print_output("Done!")

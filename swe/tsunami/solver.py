@@ -37,7 +37,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
 
     def add_callbacks(self, i):
-        super(AdaptiveTsunamiProblem, self).add_callbacks(i)
+        # super(AdaptiveTsunamiProblem, self).add_callbacks(i)
         op = self.op
 
         # --- Gauge timeseries
