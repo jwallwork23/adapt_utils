@@ -60,14 +60,6 @@ class ShallowWaterHessianRecoverer():
         Currently supported adaptation fields which are constant in time:
           * 'bathymetry' - the fluid depth at rest.
 
-        Multiple fields can be combined using double-understrokes and either 'avg' for metric
-        average or 'int' for metric intersection. We assume distributivity of intersection over
-        averaging.
-
-        For example, `adapt_field = 'elevation__avg__velocity_x__int__bathymetry'` would imply
-        first intersecting the Hessians recovered from the x-component of velocity and bathymetry
-        and then averaging the result with the Hessian recovered from the elevation.
-
         NOTE: `sol` could be a forward or adjoint solution tuple.
         """
         kwargs.setdefault('normalise', True)
@@ -75,25 +67,9 @@ class ShallowWaterHessianRecoverer():
         kwargs['op'] = op
         adapt_field = adapt_field or op.adapt_field
         u, eta = sol.split()
-
-        # --- Fields based on velocity
-
         uv_space_fields = {'speed': speed, 'vorticity': vorticity}
 
         # --- Recover Hessian and construct metric(s)
-
-        # Combine the two velocity components with elevation
-        if adapt_field in ('all_avg', 'all_int'):
-            c = adapt_field[-3:]
-            adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
-
-        # The list of fields are averaged/intersected, as appropriate
-        # If both are specified, the list of fields are first intersected and then averaged
-        for c in ('avg', 'int'):
-            if c in adapt_field:
-                adapt_fields = adapt_field.split('__{:s}__'.format(c))
-                metrics = [self.get_hessian_metric(sol, f, fields=fields) for f in adapt_fields]
-                return combine_metrics(*metrics, average=c == 'avg')
 
         # Fields which are constant in time
         if adapt_field in self.constant_hessians:
