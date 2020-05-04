@@ -20,6 +20,7 @@ parser.add_argument("-num_meshes", help="Number of meshes to consider (default 5
 parser.add_argument("-norm_order", help="p for Lp normalisaton (default 1)")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t")
 parser.add_argument("-time_combine", help="Method for time-combining Hessians (default integrate)")
+parser.add_argument("-hessian_lag", help="Compute Hessian every n timesteps (default 4)")
 parser.add_argument("-target", help="Target space-time complexity (default 1.0e+03)")
 parser.add_argument("-h_min", help="Minimum tolerated element size (default 100m)")
 parser.add_argument("-h_max", help="Maximum tolerated element size (default 1000km)")
@@ -47,6 +48,7 @@ kwargs = {
     'num_meshes': int(args.num_meshes or 5),
     'adapt_field': args.adapt_field or 'elevation',
     'hessian_time_combination': args.time_combine or 'integrate',
+    'hessian_timestep_lag': float(args.hessian_lag or 4),
     'normalisation': 'complexity',
     'norm_order': 1 if p is None else None if p == 'inf' else float(p),
     'target': float(args.target or 5.0e+03),

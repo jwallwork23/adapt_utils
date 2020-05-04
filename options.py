@@ -70,6 +70,7 @@ class Options(FrozenConfigurable):
                                                        'ksp_gmres_restart': 20,
                                                        'pc_type': 'sor'}).tag(config=True)
     hessian_time_combination = Unicode('integrate', help="Method used to combine Hessians over timesteps, from {'integrate', 'intersect'}.").tag(config=True)
+    hessian_timestep_lag = PositiveFloat(1, help="Allow lagged Hessian computation by setting greater than one.").tag(config=True)
 
     # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
