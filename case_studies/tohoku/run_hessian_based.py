@@ -10,17 +10,18 @@ from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 parser = argparse.ArgumentParser(prog="run_hessian_based")
 
 # Timstepping
-parser.add_argument("-end_time", help="End time of simulation (default 25 minutes)")
+parser.add_argument("-end_time", help="End time of simulation (default 24 minutes)")
 
 # Initial mesh
 parser.add_argument("-level", help="(Integer) mesh resolution (default 0)")
 
 # Mesh adaptation
-parser.add_argument("-num_meshes", help="Number of meshes to consider (default 5)")
-parser.add_argument("-norm_order", help="p for Lp normalisaton (default 1)")
+parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
+parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
+parser.add_argument("-normalisation", help="Normalisation method (default 'complexity')")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t")
 parser.add_argument("-time_combine", help="Method for time-combining Hessians (default integrate)")
-parser.add_argument("-hessian_lag", help="Compute Hessian every n timesteps (default 4)")
+parser.add_argument("-hessian_lag", help="Compute Hessian every n timesteps (default 6)")
 parser.add_argument("-target", help="Target space-time complexity (default 1.0e+03)")
 parser.add_argument("-h_min", help="Minimum tolerated element size (default 100m)")
 parser.add_argument("-h_max", help="Maximum tolerated element size (default 1000km)")
@@ -39,17 +40,17 @@ p = args.norm_order
 kwargs = {
 
     # Timestepping
-    'end_time': float(args.end_time or 1500.0),
+    'end_time': float(args.end_time or 1440.0),
 
     # Initial mesh
     'level': int(args.level or 0),
 
     # Mesh adaptation
-    'num_meshes': int(args.num_meshes or 5),
+    'num_meshes': int(args.num_meshes or 12),
     'adapt_field': args.adapt_field or 'elevation',
     'hessian_time_combination': args.time_combine or 'integrate',
-    'hessian_timestep_lag': float(args.hessian_lag or 4),
-    'normalisation': 'complexity',
+    'hessian_timestep_lag': float(args.hessian_lag or 6),
+    'normalisation': args.normalisation or 'complexity',
     'norm_order': 1 if p is None else None if p == 'inf' else float(p),
     'target': float(args.target or 5.0e+03),
     'h_min': float(args.h_min or 1.0e+02),
