@@ -1,5 +1,4 @@
 from firedrake import *
-from thetis import callback, rungekutta, timeintegrator
 
 import numpy as np
 
@@ -8,13 +7,22 @@ from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hes
 from adapt_utils.adapt.kernels import *
 
 
-__all__ = ["steady_metric", "isotropic_metric", "space_normalise", "time_normalise",
-           "combine_metrics", "metric_intersection", "metric_relaxation", "metric_average",
-           "metric_complexity", "TimeIntersectCallback",
-           "metric_with_boundary"]
+__all__ = ["metric_complexity",
+           "steady_metric", "isotropic_metric", "space_normalise", "space_time_normalise",
+           "combine_metrics", "metric_intersection", "metric_average"]
 
 
-# TODO: HessianMetric class with functions below as methods
+def metric_complexity(M):
+    r"""
+    Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted
+    based thereupon.
+    """
+    return assemble(sqrt(det(M))*dx)
+
+
+# TODO: SteadyHessianMetric and UnsteadyHessianMetric classes with functions below as methods.
+#       Also duplicate as drivers
+
 
 def steady_metric(f=None, H=None, projector=None, **kwargs):
     r"""
@@ -72,8 +80,68 @@ def steady_metric(f=None, H=None, projector=None, **kwargs):
     return M
 
 
-def space_normalise(M, f=None, **kwargs):
+# TODO: Check equivalent to normalising in space and time separately
+def space_time_normalise(hessians, timestep_integrals=None, enforce_constraints=True, op=Options()):
+    r"""
+    Normalise a list of Hessians in space and time as dictated by equation (1) in
+    [Barral et al. 2016].
+
+    :arg hessians: list of Hessians to be time-normalised.
+    :kwarg timestep_integrals: list of time integrals of 1/timestep over each remesh step.
+        For constant timesteps, this equates to the number of timesteps per remesh step.
+    :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
     """
+    p = op.norm_order
+    if p is not None:
+        assert p >= 1
+    n = len(hessians)
+    timestep_integrals = timestep_integrals or np.ones(n)*np.floor(op.end_time/op.dt)/op.num_meshes
+    assert len(timestep_integrals) == n
+    d = hessians[0].function_space().mesh().topological_dimension()
+
+    # Target space-time complexity
+    N_st = op.target*sum(timestep_integrals)  # Multiply instantaneous target by number of timesteps
+
+    # Compute global normalisation coefficient
+    op.print_debug("METRIC: Computing global metric time normalisation factor...")
+    integral = 0.0
+    for i, H in enumerate(hessians):  # TODO: Check whether square is correct
+        if p is None:
+            integral += assemble(sqrt(det(H))*timestep_integrals[i]*dx)
+        else:
+            integral += assemble(pow(det(H)*timestep_integrals[i]**2, p/(2*p + d))*dx)
+    if op.normalisation == 'complexity':
+        glob_norm = pow(N_st/integral, 2/d)
+    elif op.normalisation == 'error':  # FIXME
+        glob_norm = d*N_st
+        # glob_norm = d*op.target
+        if p is not None:
+            glob_norm *= pow(integral, 1/p)
+    else:
+        raise ValueError("Normalisation approach {:s} not recognised.".format(op.normalisation))
+    op.print_debug("METRIC: Done!")
+    op.print_debug("METRIC: Target space-time complexity = {:.4e}".format(N_st))
+    op.print_debug("METRIC: Global normalisation factor = {:.4e}".format(glob_norm))
+
+    # Normalise on each window
+    op.print_debug("METRIC: Normalising metric in time...")
+    for i, H in enumerate(hessians):
+        H_expr = glob_norm*H
+        if p is not None:
+            H_expr *= pow(det(H)*timestep_integrals[i]**2, -1/(2*p + d))
+        H.interpolate(H_expr)
+        H.rename("Time-accurate {:s}".format(H.dat.name))
+
+        # Enforce max/min element sizes and anisotropy
+        if enforce_constraints:
+            op.print_debug("METRIC: Enforcing size and ansisotropy constraints...")
+            enforce_element_constraints(H, op=op)
+            op.print_debug("METRIC: Done!")
+    op.print_debug("METRIC: Done!")
+
+
+def space_normalise(M, f=None, **kwargs):
+    r"""
     Normalise steady metric `M` based on field `f`.
 
     Four normalisation approaches are implemented. These include two 'straightforward' approaches:
@@ -148,6 +216,59 @@ def enforce_element_constraints(M, op=Options()):
     op2.par_loop(kernel, M.function_space().node_set, M.dat(op2.RW))
 
 
+# TODO: Test identities hold
+def get_density_and_quotients(M):
+    r"""
+    Since metric fields are symmetric, they admit an orthogonal eigendecomposition,
+
+  ..math::
+        M(x) = V(x) \Lambda(x) V(x)^T,
+
+    where :math:`V` and :math:`\Sigma` are matrices holding the eigenvectors and eigenvalues,
+    respectively. Since metric fields are positive definite, we know :math:`\Lambda` is positive.
+
+    The eigenvectors can be interpreted as defining the principal directions. The eigenvalue matrix
+    can be decomposed further to give two meaningful fields: the metric density :math:`d` and
+    anisotropic quotients, encapsulated by the diagonal matrix :math:`R`. These give rise to the
+    decomposition
+
+  ..math::
+        M(x) = d(x)^\frac2n V(x) R(x)^{-\frac2n} V(x)^T
+
+    and are given by
+
+  ..math::
+        d = \sum_{i=1}^n h_i,\quad r_i = h_i^n/d,\quad \forall i=1:n,
+
+    where :math:`h_i := \frac1{\sqrt{\lambda_i}}`.
+    """
+    fs_ten = M.function_space()
+    mesh = fs_ten.mesh()
+    fs_vec = VectorFunctionSpace(mesh, fs_ten.ufl_element())
+    fs = FunctionSpace(mesh, fs_ten.ufl_element())
+    dim = mesh.topological_dimension()
+
+    # Setup fields
+    V = Function(fs_ten, name="Eigenvectors")
+    Λ = Function(fs_vec, name="Eigenvalues")
+    h = Function(fs_vec, name="Sizes")
+    density = Function(fs, name="Metric density")
+    quotients = Function(fs_vec, name="Anisotropic quotients")
+
+    # Compute eigendecomposition
+    kernel = eigen_kernel(get_eigendecomposition, dim)
+    op2.par_loop(kernel, fs_ten.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
+
+    # Extract density and quotients
+    h.interpolate(as_vector([1/sqrt(Λ[i]) for i in range(dim)]))
+    d = Constant(1.0)
+    for i in range(dim):
+        d = d/h[i]
+    density.interpolate(d)
+    quotients.interpolate(as_vector([h[i]**3/d for i in range(dim)]))
+    return density, quotients
+
+
 def isotropic_metric(f, normalise=True, op=Options()):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
@@ -198,6 +319,9 @@ def isotropic_metric(f, normalise=True, op=Options()):
     M_diag = max_value(M_diag, M_diag/pow(op.max_anisotropy, 2))
     op.print_debug("METRIC: Done!")
     return interpolate(M_diag*Identity(dim), V_ten)
+
+
+# --- Metric combination methods
 
 
 def metric_intersection(*metrics, bdy=None):
@@ -260,206 +384,6 @@ def metric_average(*metrics):
 
 def combine_metrics(*metrics, average=True):
     return metric_average(*metrics) if average else metric_intersection(*metrics)
-
-
-def metric_complexity(M):
-    r"""
-    Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted
-    based thereupon.
-    """
-    return assemble(sqrt(det(M))*dx)
-
-
-def time_normalise(hessians, timestep_integrals=None, enforce_constraints=True, op=Options()):
-    r"""
-    Normalise a list of Hessians in time as dictated by equation (1) in [Barral et al. 2016].
-
-    :arg hessians: list of Hessians to be time-normalised.
-    :kwarg timestep_integrals: list of time integrals of 1/timestep over each remesh step.
-        For constant timesteps, this equates to the number of timesteps per remesh step.
-    :kwarg op: :class:`Options` object providing desired average instantaneous metric complexity.
-    """
-    p = op.norm_order
-    if p is not None:
-        assert p >= 1
-    n = len(hessians)
-    timestep_integrals = timestep_integrals or np.ones(n)*np.floor(op.end_time/op.dt)/op.num_meshes
-    assert len(timestep_integrals) == n
-    d = hessians[0].function_space().mesh().topological_dimension()
-
-    # Target space-time complexity
-    N_st = op.target*sum(timestep_integrals)  # Multiply instantaneous target by number of timesteps
-
-    # Compute global normalisation coefficient
-    op.print_debug("METRIC: Computing global metric time normalisation factor...")
-    integral = 0.0
-    for i, H in enumerate(hessians):  # TODO: Check whether square is correct
-        if p is None:
-            integral += assemble(sqrt(det(H))*timestep_integrals[i]*dx)
-        else:
-            integral += assemble(pow(det(H)*timestep_integrals[i]**2, p/(2*p + d))*dx)
-    if op.normalisation == 'complexity':
-        glob_norm = pow(N_st/integral, 2/d)
-    elif op.normalisation == 'error':  # FIXME
-        glob_norm = d*N_st
-        # glob_norm = d*op.target
-        if p is not None:
-            glob_norm *= pow(integral, 1/p)
-    else:
-        raise ValueError("Normalisation approach {:s} not recognised.".format(op.normalisation))
-    op.print_debug("METRIC: Done!")
-    op.print_debug("METRIC: Target space-time complexity = {:.4e}".format(N_st))
-    op.print_debug("METRIC: Global normalisation factor = {:.4e}".format(glob_norm))
-
-    # Normalise on each window
-    op.print_debug("METRIC: Normalising metric in time...")
-    for i, H in enumerate(hessians):
-        H_expr = glob_norm*H
-        if p is not None:
-            H_expr *= pow(det(H)*timestep_integrals[i]**2, -1/(2*p + d))
-        H.interpolate(H_expr)
-        H.rename("Time-accurate {:s}".format(H.dat.name))
-
-        # Enforce max/min element sizes and anisotropy
-        if enforce_constraints:
-            op.print_debug("METRIC: Enforcing size and ansisotropy constraints...")
-            enforce_element_constraints(H, op=op)
-            op.print_debug("METRIC: Done!")
-    op.print_debug("METRIC: Done!")
-
-
-# TODO: Test identities hold
-def get_density_and_quotients(M):
-    r"""
-    Since metric fields are symmetric, they admit an orthogonal eigendecomposition,
-
-  ..math::
-        M(x) = V(x) \Lambda(x) V(x)^T,
-
-    where :math:`V` and :math:`\Sigma` are matrices holding the eigenvectors and eigenvalues,
-    respectively. Since metric fields are positive definite, we know :math:`\Lambda` is positive.
-
-    The eigenvectors can be interpreted as defining the principal directions. The eigenvalue matrix
-    can be decomposed further to give two meaningful fields: the metric density :math:`d` and
-    anisotropic quotients, encapsulated by the diagonal matrix :math:`R`. These give rise to the
-    decomposition
-
-  ..math::
-        M(x) = d(x)^\frac23 V(x) R(x)^{-\frac23} V(x)^T
-
-    and are given by
-
-  ..math::
-        d = \sum_{i=1}^n h_i,\quad r_i = h_i^3/d,\quad \forall i=1:n,
-
-    where :math:`h_i := \frac1{\sqrt{\lambda_i}}`.
-    """
-    fs_ten = M.function_space()
-    mesh = fs_ten.mesh()
-    fs_vec = VectorFunctionSpace(mesh, fs_ten.ufl_element())
-    fs = FunctionSpace(mesh, fs_ten.ufl_element())
-    dim = mesh.topological_dimension()
-
-    # Setup fields
-    V = Function(fs_ten, name="Eigenvectors")
-    Λ = Function(fs_vec, name="Eigenvalues")
-    h = Function(fs_vec, name="Sizes")
-    density = Function(fs, name="Metric density")
-    quotients = Function(fs_vec, name="Anisotropic quotients")
-
-    # Compute eigendecomposition
-    kernel = eigen_kernel(get_eigendecomposition, dim)
-    op2.par_loop(kernel, fs_ten.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
-
-    # Extract density and quotients
-    h.interpolate(as_vector([1/sqrt(Λ[i]) for i in range(dim)]))
-    d = Constant(1.0)
-    for i in range(dim):
-        d = d/h[i]
-    density.interpolate(d)
-    quotients.interpolate(as_vector([h[i]**3/d for i in range(dim)]))
-    return density, quotients
-
-
-class IntersectorCallback(callback.DiagnosticCallback):
-    """
-    Callback that intersects metrics contributed at each timestep.
-    """
-    variable_names = ['metric computed over current timestep']
-
-    def __init__(self, metric_callback, solver_obj, **kwargs):
-        kwargs.setdefault('export_to_hdf5', False)
-        kwargs.setdefault('append_to_log', False)
-        super(AccumulatorCallback, self).__init__(solver_obj, **kwargs)
-        self.callback = metric_callback
-        self.intersection = 0
-
-    def __call__(self):
-        intersection_timestep = self.callback()
-        self.intersection = metric_intersection(intersection_timestep)
-        return []  # TODO
-
-    def get_value(self):
-        return self.intersection
-
-    def message_str(self, *args):
-        return '### TODO'
-
-
-class TimeIntersectCallback(IntersectorCallback):
-    # TODO: doc
-    name = 'metric intersection'
-    variable_names = ['value']
-
-    def __init__(self, hessian, solver_obj, timestepper, name=None, **kwargs):
-        # TODO: doc
-        if name is not None:
-            self.name = name
-        dt = timestepper.dt
-
-        # Check if implemented then collect quadrature weights and update values at nodes
-        to_do = (
-            timeintegrator.PressureProjectionPicard,
-            timeintegrator.LeapFrogAM3,
-            timeintegrator.SSPRK22ALE,
-        )
-        if isinstance(timestepper, to_do):
-            raise NotImplementedError  # TODO
-
-        elif issubclass(timestepper.__class__, rungekutta.ERKGeneric):
-            updates = timestepper.tendency
-
-        elif issubclass(timestepper.__class__, rungekutta.ERKGenericShuOsher):
-            updates = timestepper.stage_sol
-
-        elif issubclass(timestepper.__class__, rungekutta.DIRKGeneric):
-            updates = timestepper.k
-
-        elif issubclass(timestepper.__class__, rungekutta.DIRKGenericUForm):
-            updates = timestepper.k.copy()
-            updates.insert(0, timestepper.solution_old)
-
-        elif isinstance(timestepper, timeintegrator.ForwardEuler):
-            updates = [timestepper.solution_old, ]
-
-        elif isinstance(timestepper, timeintegrator.SteadyState):
-            updates = [timestepper.solution, ]
-
-        elif isinstance(timestepper, timeintegrator.CrankNicolson):
-            updates = [timestepper.solution_old, timestepper.solution]
-
-        else:
-            raise ValueError("Timestepper {:s} not recognised.".format(timestepper.__class__.__name__))
-
-        def intersection_callback():
-            """Time integrate spatial integral over a single timestep"""
-            hessians = [hessian(updates) for update in updates]
-            M = metric_intersection(*hessians)
-            M *= dt
-            return M
-
-        super(TimeIntersectionCallback, self).__init__(intersection_callback, solver_obj, **kwargs)
-
 
 
 # --- Work in progress
