@@ -445,12 +445,18 @@ class AdaptiveProblem():
 
                     def update_forcings(t):
                         """Time-integrate Hessian using Trapezium Rule."""
-                        first_ts = self.fwd_solvers[i].iteration == 0
-                        final_ts = self.fwd_solvers[i].iteration == (i+1)*self.dt_per_mesh
+                        it = self.fwd_solvers[i].iteration
+                        if it % op.hessian_timestep_lag != 0:
+                            return
+                        first_ts = it == 0
+                        final_ts = it == (i+1)*self.dt_per_mesh
+                        dt = op.dt*op.hessian_timestep_lag
                         for j, f in enumerate(adapt_fields):
                             H = hessian(self.fwd_solvers[i].fields.solution_2d, f)
                             if op.hessian_time_combination == 'integrate':
-                                H_window[j] += (0.5 if first_ts or final_ts else 1.0)*op.dt*H
+                                H_window[j] += (0.5 if first_ts or final_ts else 1.0)*dt*H
+                            elif f == 'bathymetry':
+                                H_window[j] = H
                             else:
                                 H_window[j] = H if first_ts else metric_intersection(H, H_window[j])
 
@@ -462,6 +468,8 @@ class AdaptiveProblem():
                         """
                         if self.fwd_solvers[i].iteration == (i+1)*self.dt_per_mesh:
                             for j, H in enumerate(H_window):
+                                if op.hessian_time_combination:
+                                    H_window[j] *= op.dt*self.dt_per_mesh
                                 H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
