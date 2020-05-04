@@ -124,9 +124,8 @@ class TohokuOptions(TsunamiOptions):
         ocean_tag = 100
         coast_tag = 200
         self.boundary_conditions = {
-            # ocean_tag: {'elev': Constant(0.0)},
-            ocean_tag: {'un': Constant(0.0)},
             coast_tag: {'un': Constant(0.0)},
+            ocean_tag: {'un': Constant(0.0), 'elev': Constant(0.0)},  # Weakly reflective boundaries
         }
         # TODO: Sponge at ocean boundary?
         #        - Could potentially do this by defining a gradation to the ocean boundary with a
