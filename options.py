@@ -69,6 +69,7 @@ class Options(FrozenConfigurable):
                                                        'ksp_rtol': 1e-5,
                                                        'ksp_gmres_restart': 20,
                                                        'pc_type': 'sor'}).tag(config=True)
+    hessian_time_combination = Unicode('integrate', help="Method used to combine Hessians over timesteps, from {'integrate', 'intersect'}.").tag(config=True)
 
     # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)

@@ -405,6 +405,9 @@ class AdaptiveProblem():
             c = op.adapt_field[-3:]
             op.adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
         adapt_fields = ('__int__'.join(op.adapt_field.split('__avg__'))).split('__int__')
+        if op.hessian_time_combination not in ('integrate', 'intersect'):
+            msg = "Hessian time combination method '{:s}' not recognised."
+            raise ValueError(msg.format(op.hessian_time_combination))
 
         for n in range(op.num_adapt):
 
@@ -442,22 +445,24 @@ class AdaptiveProblem():
 
                     def update_forcings(t):
                         """Time-integrate Hessian using Trapezium Rule."""
-                        first_timestep = self.fwd_solvers[i].iteration == 0
-                        final_timestep = self.fwd_solvers[i].iteration == (i+1)*self.dt_per_mesh
-                        weight = (0.5 if first_timestep or final_timestep else 1.0)*op.dt
+                        first_ts = self.fwd_solvers[i].iteration == 0
+                        final_ts = self.fwd_solvers[i].iteration == (i+1)*self.dt_per_mesh
                         for j, f in enumerate(adapt_fields):
-                            H_window[j] += weight*hessian(self.fwd_solvers[i].fields.solution_2d, f)
-                        # TODO: Hessian intersection option
+                            H = hessian(self.fwd_solvers[i].fields.solution_2d, f)
+                            if op.hessian_time_combination == 'integrate':
+                                H_window[j] += (0.5 if first_ts or final_ts else 1.0)*op.dt*H
+                            else:
+                                H_window[j] = H if first_ts else metric_intersection(H, H_window[j])
 
                     def export_func():
+                        """
+                        Extract time-averaged Hessian.
 
-                        # We only care about the final export in each mesh iteration
-                        if self.fwd_solvers[i].iteration != (i+1)*self.dt_per_mesh:
-                            return
-
-                        # Extract time averaged Hessian
-                        for j, H in enumerate(H_window):
-                            H_windows[j][i].interpolate(H_window[j])
+                        NOTE: We only care about the final export in each mesh iteration
+                        """
+                        if self.fwd_solvers[i].iteration == (i+1)*self.dt_per_mesh:
+                            for j, H in enumerate(H_window):
+                                H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
                 print_output("Solving forward equation for iteration {:d}".format(i))
