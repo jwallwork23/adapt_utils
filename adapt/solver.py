@@ -448,7 +448,7 @@ class AdaptiveProblem():
                         it = self.fwd_solvers[i].iteration
                         if it % op.hessian_timestep_lag != 0:
                             return
-                        first_ts = it == 0
+                        first_ts = it == i*self.dt_per_mesh
                         final_ts = it == (i+1)*self.dt_per_mesh
                         dt = op.dt*op.hessian_timestep_lag
                         for j, f in enumerate(adapt_fields):
