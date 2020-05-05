@@ -1,5 +1,5 @@
 from adapt_utils.test_cases.inundated_beach.options import BalzanoOptions
-from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
+from adapt_utils.adapt.solver import AdaptiveProblem
 
 import argparse
 
@@ -10,5 +10,5 @@ args = parser.parse_args()
 bathy_type = int(args.bathymetry_type or 1)
 
 op = BalzanoOptions(plot_timeseries=True, bathymetry_type=bathy_type)
-swp = UnsteadyShallowWaterProblem(op, levels=0)
+swp = AdaptiveProblem(op)
 swp.solve()

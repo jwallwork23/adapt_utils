@@ -45,6 +45,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
 
         # Model
         self.family = 'dg-cg'
+        self.sipg_parameter = None
 
         # Tidal farm
         D = self.turbine_diameter

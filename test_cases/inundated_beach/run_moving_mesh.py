@@ -1,7 +1,7 @@
 from thetis import *
 
 from adapt_utils.test_cases.inundated_beach.options import BalzanoOptions
-from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
+from adapt_utils.adapt.solver import AdaptiveProblem
 
 
 op = BalzanoOptions(approach='monge_ampere',
@@ -12,9 +12,8 @@ op = BalzanoOptions(approach='monge_ampere',
                     num_adapt=1,
                     n=2,
                     r_adapt_rtol=1.0e-3)
-swp = UnsteadyShallowWaterProblem(op, levels=0)
-swp.setup_solver()
-
+swp = AdaptiveProblem(op, levels=0)
+swp.setup_solver_forward()
 
 def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this projection is expensive!
     """
@@ -35,5 +34,5 @@ def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this pro
     return 1.0 + alpha*pow(cosh(beta*diff_proj), -2)
 
 
-swp.monitor_function = wet_dry_interface_monitor
-swp.solve(uses_adjoint=False)
+swp.monitor = wet_dry_interface_monitor
+swp.run_moving_mesh()  # FIXME

@@ -15,15 +15,16 @@ plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
 plt.rc('text', usetex=True)
 
 parser = argparse.ArgumentParser()
-parser.add_argument('-approach', help="Mesh adaptation approach.")
-parser.add_argument('-target', help="Target complexity for adaptive approaches.")
-parser.add_argument('-level', help="Number of uniform refinements to apply to the initial mesh.")
-parser.add_argument('-adapt_field', help="Field(s) for adaptation.")
+parser.add_argument('-approach', help="Mesh adaptation approach (default fixed_mesh)")
+parser.add_argument('-target', help="Target complexity for adaptive approaches (default 3200)")
+parser.add_argument('-level', help="Number of uniform refinements to apply to the initial mesh (default 4)")
+parser.add_argument('-adapt_field', help="Field(s) for adaptation (default all_int)")
 parser.add_argument('-offset', help="""
     Number of turbine diameters by which to offset turbines in y-direction.
-    'Aligned' configuration given by offset=0, 'Offset' configuration given by offset=1.""")
-parser.add_argument('-debug', help="Toggle debugging mode.")
-parser.add_argument('-save_plex', help="Save DMPlex to HDF5")
+    'Aligned' configuration given by offset=0, 'Offset' configuration given by offset=1.
+    (Default 0)""")
+parser.add_argument('-debug', help="Toggle debugging mode (default False)")
+parser.add_argument('-save_plex', help="Save DMPlex to HDF5 (default False)")
 args = parser.parse_args()
 save_plex = bool(args.save_plex or False)
 

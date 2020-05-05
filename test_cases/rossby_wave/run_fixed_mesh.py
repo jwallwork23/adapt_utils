@@ -4,7 +4,7 @@ import argparse
 
 from adapt_utils.test_cases.rossby_wave.options import BoydOptions
 from adapt_utils.test_cases.rossby_wave.monitors import *
-from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
+from adapt_utils.adapt.solver import AdaptiveProblem
 
 
 parser = argparse.ArgumentParser()
@@ -36,11 +36,12 @@ kwargs = {
     # 'order': 0,
     'num_adapt': 1,
     'r_adapt_rtol': 1.0e-3,
+    'num_meshes': 1,
 }
 
 op = BoydOptions(**kwargs)
-swp = UnsteadyShallowWaterProblem(op, levels=0)
-swp.setup_solver()
+swp = AdaptiveProblem(op, levels=0)
+swp.setup_solver_forward(0)
 
 if initial_monitor is not None:
     swp.approach = 'monge_ampere'
@@ -51,7 +52,7 @@ if initial_monitor is not None:
 
 fname = '{:s}_{:d}'.format("uniform" if initial_monitor is None else "refined_equator", n_coarse)
 if not read_only:
-    swp.solve(uses_adjoint=False)
+    swp.solve_forward()
     swp.op.write_to_hdf5(fname)
 swp.op.plot_errors()
 
