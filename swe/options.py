@@ -112,8 +112,9 @@ class ShallowWaterOptions(Options):
         if self.bathymetry is None:
             self.set_bathymetry(V)
         if self.wetting_and_drying:
-            bathymetry_displacement = self.wd_dispacement_mc(eta)
-            self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta_cg, V)
+            # bathymetry_displacement = self.wd_dispacement_mc(eta)  # FIXME
+            # self.depth = interpolate(self.bathymetry + bathymetry_displacement + eta_cg, V)
+            self.depth = interpolate(self.bathymetry + eta_cg, V)
         else:
             self.depth = interpolate(self.bathymetry + eta_cg, V)
 

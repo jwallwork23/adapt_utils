@@ -6,9 +6,10 @@ import numpy as np
 import time
 
 from adapt_utils.test_cases.trench_test.options import TrenchOptions
-from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
+from adapt_utils.adapt.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
 from adapt_utils.norms import local_frobenius_norm
+
 
 t1 = time.time()
 
@@ -26,7 +27,7 @@ op = TrenchOptions(approach='monge_ampere',
                    ny=1,
                    r_adapt_rtol=1.0e-3)
 
-swp = UnsteadyShallowWaterProblem(op, levels=0)
+swp = AdaptiveProblem(op)
 swp.setup_solver()
 
 
@@ -73,8 +74,8 @@ def gradient_interface_monitor(mesh, alpha=400.0, gamma=0.0):
     return H
 
 
-swp.monitor_function = gradient_interface_monitor
-swp.solve(uses_adjoint=False)
+swp.monitor = gradient_interface_monitor
+swp.run_moving_mesh()
 
 t2 = time.time()
 

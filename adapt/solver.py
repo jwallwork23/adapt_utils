@@ -378,6 +378,8 @@ class AdaptiveProblem():
             self.solve_forward()
         elif self.approach == 'hessian':
             self.run_hessian_based()
+        elif self.approach in ('monge_ampere'):
+            self.run_moving_mesh()
         else:
             raise NotImplementedError  # TODO
 
@@ -564,6 +566,13 @@ class AdaptiveProblem():
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
+
+    def run_moving_mesh(self):
+        try:
+            assert hasattr(self, 'monitor')
+        except AssertionError:
+            raise AttributeError("Cannot perform mesh movement without a monitor function.")
+        raise NotImplementedError  # TODO
 
     # --- Metric
 
