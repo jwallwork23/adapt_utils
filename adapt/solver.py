@@ -365,39 +365,39 @@ class AdaptiveProblem():
         """Solve adjoint PDE on mesh `i`."""
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def solve(self, adjoint=False):
+    def solve(self, adjoint=False, **kwargs):
         if adjoint:
-            self.solve_adjoint()
+            self.solve_adjoint(**kwargs)
         else:
-            self.solve_forward()
+            self.solve_forward(**kwargs)
 
-    def solve_forward(self):
+    def solve_forward(self, **kwargs):
         """Solve forward problem on the full sequence of meshes."""
         for i in range(self.num_meshes):
             self.transfer_forward_solution(i)
             self.setup_solver_forward(i)
-            self.solve_forward_step(i)
+            self.solve_forward_step(i, **kwargs)
 
-    def solve_adjoint(self):
+    def solve_adjoint(self, **kwargs):
         """Solve adjoint problem on the full sequence of meshes."""
         for i in range(self.num_meshes - 1, -1):
             self.transfer_adjoint_solution(i)
             self.setup_solver_adjoint(i)
-            self.solve_adjoint_step(i)
+            self.solve_adjoint_step(i, **kwargs)
 
     # --- Run scripts
 
-    def run(self):
+    def run(self, **kwargs):
         if self.approach == 'fixed_mesh':
-            self.solve_forward()
+            self.solve_forward(**kwargs)
         elif self.approach == 'hessian':
-            self.run_hessian_based()
+            self.run_hessian_based(**kwargs)
         elif self.approach in ('monge_ampere'):
-            self.run_moving_mesh()
+            self.run_moving_mesh(**kwargs)
         else:
             raise NotImplementedError  # TODO
 
-    def run_hessian_based(self):
+    def run_hessian_based(self, **kwargs):
         """
         Adaptation loop for Hessian based approach.
 
@@ -581,7 +581,7 @@ class AdaptiveProblem():
                 print_output("Converged number of mesh elements!")
                 break
 
-    def run_moving_mesh(self):
+    def run_moving_mesh(self, **kwargs):
         try:
             assert hasattr(self, 'monitor')
         except AssertionError:
