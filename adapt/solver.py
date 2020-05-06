@@ -164,20 +164,34 @@ class AdaptiveProblem():
         """
         Set up `Function`s in the prognostic space to hold the forward and adjoint solutions.
         """
-        self.fwd_solutions = []
-        self.adj_solutions = []
-        for V in self.V:
-            fwd = Function(V, name='Forward solution')
-            u, eta = fwd.split()
-            u.rename("Fluid velocity")
-            eta.rename("Elevation")
-            self.fwd_solutions.append(fwd)
+        if self.tracer_options.tracer_only:
+            self.fwd_solutions = None
+            self.adj_solutions = None
+        else:
+            self.fwd_solutions = []
+            self.adj_solutions = []
+            for V in self.V:
+                fwd = Function(V, name='Forward solution')
+                u, eta = fwd.split()
+                u.rename("Fluid velocity")
+                eta.rename("Elevation")
+                self.fwd_solutions.append(fwd)
 
-            adj = Function(V, name='Adjoint solution')
-            z, zeta = adj.split()
-            z.rename("Adjoint fluid velocity")
-            zeta.rename("Adjoint elevation")
-            self.adj_solutions.append(adj)
+                adj = Function(V, name='Adjoint solution')
+                z, zeta = adj.split()
+                z.rename("Adjoint fluid velocity")
+                zeta.rename("Adjoint elevation")
+                self.adj_solutions.append(adj)
+
+        if self.tracer_options.solve_tracer:
+            self.fwd_tracer_solutions = []
+            self.adj_tracer_solutions = []
+            for Q in self.Q:
+                self.fwd_tracer_solutions.append(Function(Q, name="Forward tracer solution"))
+                self.adj_tracer_solutions.append(Function(Q, name="Adjoint tracer solution"))
+        else:
+            self.fwd_tracer_solutions = None
+            self.adj_tracer_solutions = None
 
     def set_fields(self):
         """Set velocity field, viscosity, etc (on each mesh)."""
