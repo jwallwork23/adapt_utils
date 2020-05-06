@@ -164,7 +164,7 @@ class AdaptiveProblem():
         """
         Set up `Function`s in the prognostic space to hold the forward and adjoint solutions.
         """
-        if self.tracer_options.tracer_only:
+        if self.tracer_options['tracer_only']:
             self.fwd_solutions = None
             self.adj_solutions = None
         else:
@@ -183,7 +183,7 @@ class AdaptiveProblem():
                 zeta.rename("Adjoint elevation")
                 self.adj_solutions.append(adj)
 
-        if self.tracer_options.solve_tracer:
+        if self.tracer_options['solve_tracer']:
             self.fwd_tracer_solutions = []
             self.adj_tracer_solutions = []
             for Q in self.Q:
