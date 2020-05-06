@@ -1,23 +1,28 @@
 from firedrake import op2
-try:
-    from firedrake.slate.slac.compiler import PETSC_ARCH
-except ImportError:
-    import os
 
-    PETSC_ARCH = os.path.join(os.environ.get('PETSC_DIR'), os.environ.get('PETSC_ARCH'))
-    if not os.path.exists(os.path.join(PETSC_ARCH, 'include/eigen3')):
-        PETSC_ARCH = '/usr/local'
+import os
 
 from adapt_utils.options import Options
 
 
 __all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecomposition",
            "set_eigendecomposition", "set_eigendecomposition_transpose", "intersect",
-           "anisotropic_refinement", "metric_from_hessian", "postproc_metric", "include_dir",
+           "anisotropic_refinement", "metric_from_hessian", "postproc_metric",
            "gemv", "matscale", "singular_value_decomposition", "get_maximum_length_edge"]
 
 
+# --- Find Eigen include files
+
+try:
+    from firedrake.slate.slac.compiler import PETSC_ARCH
+except ImportError:
+    PETSC_ARCH = os.path.join(os.environ.get('PETSC_DIR'), os.environ.get('PETSC_ARCH'))
+if not os.path.isdir(os.path.join(PETSC_ARCH, 'include/eigen3')):
+    PETSC_ARCH = '/usr/local'
 include_dir = ["%s/include/eigen3" % PETSC_ARCH]
+
+
+# --- C++ kernels
 
 get_eigendecomposition_str = """
 #include <Eigen/Dense>
@@ -355,6 +360,8 @@ for (int i=0; i<max_vector.dofs; i++) {
 }
 """
 
+
+# --- Python interpreters for C++ kernels
 
 def eigen_kernel(kernel, *args, **kwargs):
     """Helper function to easily pass Eigen kernels to Firedrake via PyOP2."""
