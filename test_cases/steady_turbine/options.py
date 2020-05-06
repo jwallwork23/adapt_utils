@@ -18,19 +18,13 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.mesh_path = 'xcoarse_{:d}.msh'.format(self.offset)
 
         # Physical
-        # self.base_viscosity = 1.0
         self.base_viscosity = 0.5
-        # self.base_viscosity = 1.030e-3
-        # self.inflow_velocity = [3.0, 0.0]
-        self.inflow_velocity = [5.0, 0.0]
-        # NOTE: 5 ms^{-1} is a typical fast flow in Pentland Firth
+        self.inflow_velocity = [5.0, 0.0]  # a typical fast flow in Pentland Firth
 
         super(Steady2TurbineOptions, self).__init__(**kwargs)
 
         # Domain
-        # self.domain_length = 1000.0
         self.domain_length = 1200.0
-        # self.domain_width = 300.0
         self.domain_width = 500.0
         outer_res = 40.0
         inner_res = 8.0
@@ -62,7 +56,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.default_mesh = Mesh(self.mesh_path)
 
     def set_bathymetry(self, fs):
-        self.bathymetry = Constant(40.0)
+        self.bathymetry = Function(fs).assign(40.0)
         return self.bathymetry
 
     def set_inflow(self, fs):
@@ -90,11 +84,11 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         if not hasattr(self, 'inflow'):
             self.set_inflow(fs.sub()[0])
         boundary_conditions[left_tag] = {'uv': self.inflow}
-        boundary_conditions[right_tag] = {'elev': Constant(0.)}
-        boundary_conditions[wall_tag] = {'un': Constant(0.)}
+        boundary_conditions[right_tag] = {'elev': Constant(0.0)}
+        boundary_conditions[wall_tag] = {'un': Constant(0.0)}
         return boundary_conditions
 
-    def set_initial_condition(self, fs):  # TODO: USEME
+    def set_initial_condition(self, fs):
         if not hasattr(self, 'inflow'):
             self.set_inflow()
         self.initial_value = Function(fs)
