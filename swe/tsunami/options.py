@@ -245,10 +245,12 @@ class TsunamiOptions(ShallowWaterOptions):
         return self.kernel
 
     def set_final_condition(self, fs):
-        # if not hasattr(self, 'kernel'):
-        #     self.set_qoi_kernel(fs)
-        # return self.kernel
-        return Function(fs)
+        ftc = Function(fs)
+        if np.allclose(self.start_time, self.end_time):
+            if not hasattr(self, 'kernel'):
+                self.set_qoi_kernel(fs)
+            ftc.assign(self.kernel)
+        return ftc
 
     def plot_qoi(self):  # FIXME
         """Timeseries plot of instantaneous QoI."""
