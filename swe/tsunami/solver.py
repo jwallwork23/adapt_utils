@@ -99,6 +99,15 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.adj_solutions_old[i].assign(self.adj_solutions[i])  # Assign previous value
         z_old, zeta_old = split(self.adj_solutions_old[i])
 
+        def TaylorHood(f0, f1):
+            F = -inner(z_test, grad(b*f1))*dx
+            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx
+            F += g*inner(grad(zeta_test), f0)*dx
+            # F += -g*inner(zeta_test, f0)*ds
+            return F
+
+        print_output("### TODO: Implement adjoint bcs other than freeslip")
+
         # Time derivative
         a = inner(z_test, z)*dx + inner(zeta_test, zeta)*dx
         L = inner(z_test, z_old)*dx + inner(zeta_test, zeta_old)*dx
@@ -109,23 +118,16 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         except AssertionError:
             raise NotImplementedError  # TODO
         print_output("### TODO: Implement adjoint ts other than Crank-Nicolson")
-        a += -0.5*dtc*inner(z_test, grad(b*zeta))*dx
-        a += -0.5*dtc*inner(z_test, f*as_vector((-z[1], z[0])))*dx
-        a += 0.5*dtc*g*inner(grad(zeta_test), z)*dx
-        # a += -0.5*dtc*g*inner(zeta_test, dot(z, n))*ds
-        print_output("### TODO: Implement adjoint bcs other than freeslip")
-        L += 0.5*dtc*inner(z_test, grad(b*zeta_old))*dx
-        L += 0.5*dtc*inner(z_test, f*as_vector((-z_old[1], z_old[0])))*dx
-        L += -0.5*dtc*g*inner(grad(zeta_test), z_old)*dx
-        # L += 0.5*dtc*g*inner(zeta_test, dot(z_old, n))*ds
+        a += 0.5*dtc*TaylorHood(z, zeta)
+        L -= 0.5*dtc*TaylorHood(z_old, zeta_old)
 
         # dJdq forcing term
         self.get_qoi_kernels(i)
         t = op.dt*(i+1)*self.dt_per_mesh
         self.time_kernel = Constant(1.0 if t >= op.start_time else 0.0)
         dJdu, dJdeta = self.kernels[i].split()
-        L += dtc*inner(z_test, self.time_kernel*dJdu)*dx  # TODO
-        L += dtc*inner(zeta_test, self.time_kernel*dJdeta)*dx  # TODO
+        L += dtc*inner(z_test, self.time_kernel*dJdu)*dx
+        L += dtc*inner(zeta_test, self.time_kernel*dJdeta)*dx
 
         # Solver object
         problem = LinearVariationalProblem(a, L, self.adj_solutions[i])
