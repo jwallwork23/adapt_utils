@@ -49,7 +49,7 @@ class TohokuOptions(TsunamiOptions):
         # self.dt = 0.01
         self.dt_per_export = int(60.0/self.dt)
         self.start_time = 15*60.0
-        self.end_time = 25*60.0
+        self.end_time = 24*60.0
         # self.end_time = 60*60.0
 
         # Gauges where we have timeseries
