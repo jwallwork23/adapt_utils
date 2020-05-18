@@ -32,8 +32,8 @@ class BubbleOptions(TracerOptions):
         self.dt = 0.015
         # self.end_time = self.period/4 + self.dt
         self.end_time = self.period/2 + self.dt
-        # self.dt_per_export = 10
-        self.dt_per_export = 1
+        self.dt_per_export = 10
+        # self.dt_per_export = 1
         self.dt_per_remesh = 10
 
     def set_boundary_conditions(self, fs):
