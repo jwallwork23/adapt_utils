@@ -153,6 +153,7 @@ class AdaptiveProblem():
         self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
         # self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
         # self.P2 = [FunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
+        self.P2_vec = [VectorFunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
 
         # Shallow water space
         self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
@@ -167,6 +168,8 @@ class AdaptiveProblem():
         if self.tracer_options['tracer_only']:
             self.fwd_solutions = None
             self.adj_solutions = None
+            self.fwd_solutions_old = None
+            self.adj_solutions_old = None
         else:
             self.fwd_solutions = []
             self.adj_solutions = []
@@ -182,16 +185,19 @@ class AdaptiveProblem():
                 z.rename("Adjoint fluid velocity")
                 zeta.rename("Adjoint elevation")
                 self.adj_solutions.append(adj)
+            self.fwd_solutions_old = [fwd.copy(deepcopy=True) for fwd in self.fwd_solutions]
+            self.adj_solutions_old = [adj.copy(deepcopy=True) for adj in self.adj_solutions]
 
         if self.tracer_options['solve_tracer']:
-            self.fwd_tracer_solutions = []
-            self.adj_tracer_solutions = []
-            for Q in self.Q:
-                self.fwd_tracer_solutions.append(Function(Q, name="Forward tracer solution"))
-                self.adj_tracer_solutions.append(Function(Q, name="Adjoint tracer solution"))
+            self.fwd_tracer_solutions = [Function(Q, name="Forward tracer solution") for Q in self.Q]
+            self.adj_tracer_solutions = [Function(Q, name="Adjoint tracer solution") for Q in self.Q]
+            self.fwd_tracer_solutions_old = [fwd.copy(deepcopy=True) for fwd in self.fwd_tracer_solutions]
+            self.adj_tracer_solutions_old = [adj.copy(deepcopy=True) for adj in self.adj_tracer_solutions]
         else:
             self.fwd_tracer_solutions = None
             self.adj_tracer_solutions = None
+            self.fwd_tracer_solutions_old = None
+            self.adj_tracer_solutions_old = None
 
     def set_fields(self):
         """Set velocity field, viscosity, etc (on each mesh)."""
