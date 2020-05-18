@@ -228,10 +228,8 @@ class TsunamiOptions(ShallowWaterOptions):
         #     fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
         #     fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
-    def set_qoi_kernel(self, solver_obj):
-        # V = solver_obj.function_spaces.U_2d*solver_obj.function_spaces.P0_2d  # (Arbitrary)
-        V = solver_obj.function_spaces.V_2d
-        b = self.ball(V, source=False)
+    def set_qoi_kernel(self, fs):
+        b = self.ball(fs, source=False)
 
         # TODO: Normalise by area computed on fine reference mesh
         # area = assemble(b*dx)
@@ -239,12 +237,18 @@ class TsunamiOptions(ShallowWaterOptions):
         # rescaling = 1.0 if np.allclose(area, 0.0) else area_fine_mesh/area
         rescaling = 1.0
 
-        self.kernel = Function(V, name="QoI kernel")
+        self.kernel = Function(fs, name="QoI kernel")
         kernel_u, kernel_eta = self.kernel.split()
         kernel_u.rename("QoI kernel (uv component)")
         kernel_eta.rename("QoI kernel (elev component)")
         kernel_eta.interpolate(rescaling*b)
         return self.kernel
+
+    def set_final_condition(self, fs):
+        # if not hasattr(self, 'kernel'):
+        #     self.set_qoi_kernel(fs)
+        # return self.kernel
+        return Function(fs)
 
     def plot_qoi(self):  # FIXME
         """Timeseries plot of instantaneous QoI."""

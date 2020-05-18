@@ -26,7 +26,7 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, level=0, locations=["Fukushima Daiichi", ], **kwargs):
+    def __init__(self, level=0, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
         self.base_viscosity = 0.0
@@ -81,6 +81,7 @@ class TohokuOptions(TsunamiOptions):
             "Tokyo": {"lonlat": (139.6917, 35.6895)},
         }
         self.locations_of_interest = {loc: locations_of_interest[loc] for loc in locations}
+        radii = {locations[i]: r for i, r in enumerate(radii)}
 
         # Convert coordinates to UTM and create timeseries array
         for loc in (self.gauges, self.locations_of_interest):
@@ -91,11 +92,8 @@ class TohokuOptions(TsunamiOptions):
                 loc[l]["coords"] = loc[l]["utm"]
 
         # Regions of interest
-        self.region_of_interest = []
-        for loc in self.locations_of_interest:
-            tup = self.locations_of_interest[loc]["coords"]
-            tup += (50.0e+03, )  # Radius of 50km
-            self.region_of_interest.append(tup)
+        loi = self.locations_of_interest
+        self.region_of_interest = [loi[loc]["coords"] + (radii[loc], ) for loc in loi]
 
     def read_bathymetry_file(self):
         self.print_debug("Reading bathymetry file...")

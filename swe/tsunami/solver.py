@@ -82,32 +82,30 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
     def setup_solver_adjoint(self, i, **kwargs):
         """Setup continuous adjoint solver on mesh `i`."""
         op = self.op
-        dtc = Constant(self.timestepping_options.timestep)
+        dtc = Constant(op.dt)
         g = Constant(op.g)
-        b = self.bathymetry
-        f = self.fields['coriolis_frequency']
+        b = self.bathymetry[i]
+        f = self.fields[i]['coriolis_frequency']
         # n = FacetNormal(self.meshes[i])
 
         # Taylor-Hood mixed function space
         try:
-            assert self.shallow_water_options.element_family == 'TaylorHood'
+            assert self.shallow_water_options['element_family'] == 'taylor-hood'
         except AssertionError:
             raise NotImplementedError  # TODO
         print_output("### TODO: Implement adjoint solver other than Taylor-Hood")
-        z, zeta = TrialFunctions(self.V)
-        z_test, zeta_test = TestFunctions(self.V)
+        z, zeta = TrialFunctions(self.V[i])
+        z_test, zeta_test = TestFunctions(self.V[i])
         self.adj_solutions_old[i].assign(self.adj_solutions[i])  # Assign previous value
-        z_old, zeta_old = self.adj_solutions_old[i].split()
+        z_old, zeta_old = split(self.adj_solutions_old[i])
 
         # Time derivative
-        a = -inner(z_test, z)*dx
-        a += -inner(zeta_test, zeta)*dx
-        L = inner(z_test, z_old)*dx
-        L += inner(zeta_test, zeta_old)*dx
+        a = inner(z_test, z)*dx + inner(zeta_test, zeta)*dx
+        L = inner(z_test, z_old)*dx + inner(zeta_test, zeta_old)*dx
 
         # Crank-Nicolson timestepping
         try:
-            assert self.timestepping_options.timestepper_type == 'CrankNicolson'
+            assert self.timestepping_options['timestepper_type'] == 'CrankNicolson'
         except AssertionError:
             raise NotImplementedError  # TODO
         print_output("### TODO: Implement adjoint ts other than Crank-Nicolson")
@@ -126,20 +124,33 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         t = op.dt*(i+1)*self.dt_per_mesh
         self.time_kernel = Constant(1.0 if t >= op.start_time else 0.0)
         dJdu, dJdeta = self.kernels[i].split()
-        L += dtc*inner(z_test, self.time_kernel*dJdu)*dx
-        L += dtc*inner(zeta_test, self.time_kernel*dJdeta)*dx
+        L += dtc*inner(z_test, self.time_kernel*dJdu)*dx  # TODO
+        L += dtc*inner(zeta_test, self.time_kernel*dJdeta)*dx  # TODO
 
         # Solver object
         problem = LinearVariationalProblem(a, L, self.adj_solutions[i])
-        self.fwd_solvers[i] = LinearVariationalSolver(problem, solver_parameters=op.adjoint_params)
+        self.adj_solvers[i] = LinearVariationalSolver(problem, solver_parameters=op.adjoint_params)
 
     def solve_adjoint_step(self, i, **kwargs):
         """Solve adjoint PDE on mesh `i`."""
         op = self.op
         t = op.dt*(i+1)*self.dt_per_mesh
         end_time = op.dt*i*self.dt_per_mesh
+        op.print_debug("Entering adjoint time loop...")
+        j = 0
+        self.adjoint_solution_file._topology = None  # Account for mesh adaptations
+        z, zeta = self.adj_solutions[i].split()
+        # self.adjoint_solution_file.write(z, zeta)
+        self.adjoint_solution_file.write(zeta)
         while t > end_time:
             self.time_kernel.assign(1.0 if t >= op.start_time else 0.0)
-            self.fwd_solvers[i].solve()
+            self.adj_solvers[i].solve()
             self.adj_solutions_old[i].assign(self.adj_solutions[i])
+            if j > 0 and j % op.dt_per_export == 0:
+                z, zeta = self.adj_solutions[i].split()
+                # self.adjoint_solution_file.write(z, zeta)
+                self.adjoint_solution_file.write(zeta)
+                op.print_debug("t = {:6.1f}".format(t))
             t -= op.dt
+            j += 1
+        op.print_debug("Done!")

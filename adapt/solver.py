@@ -132,10 +132,14 @@ class AdaptiveProblem():
         p = self.op.degree
         assert p >= 0
         family = self.op.family
-        u_element = VectorElement("DG", triangle, p)
-        if family == 'dg-dg':
+        if family == 'taylor-hood':
+            u_element = VectorElement("CG", triangle, p+1)
+            eta_element = FiniteElement("CG", triangle, p, variant='equispaced')
+        elif family == 'dg-dg':
+            u_element = VectorElement("DG", triangle, p)
             eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
         elif family == 'dg-cg':
+            u_element = VectorElement("DG", triangle, p)
             eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
         else:
             raise NotImplementedError("Cannot build element {:s} of order {:d}".format(family, p))
@@ -386,7 +390,7 @@ class AdaptiveProblem():
 
     def solve_adjoint(self, **kwargs):
         """Solve adjoint problem on the full sequence of meshes."""
-        for i in range(self.num_meshes - 1, -1):
+        for i in range(self.num_meshes - 1, -1, -1):
             self.transfer_adjoint_solution(i)
             self.setup_solver_adjoint(i)
             self.solve_adjoint_step(i, **kwargs)
@@ -608,7 +612,7 @@ class AdaptiveProblem():
     # --- Goal-oriented
 
     def get_qoi_kernels(self, i):
-        self.kernels[i] = self.op.set_qoi_kernel(self.fwd_solvers[i])
+        self.kernels[i] = self.op.set_qoi_kernel(self.V[i])
 
     def get_bnd_functions(self, i, *args):
         swt = shallowwater_eq.ShallowWaterTerm(self.V[i], self.bathymetry)
