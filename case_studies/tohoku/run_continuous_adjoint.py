@@ -11,11 +11,12 @@ parser.add_argument("-start_time")  # TODO: doc
 parser.add_argument("-num_meshes", help="Number of meshes to consider")
 parser.add_argument("-debug", help="Print all debugging statements")
 parser.add_argument("-radius")  # TODO: doc
+parser.add_argument("-family")  # TODO: doc
 args = parser.parse_args()
 
 # Set parameters for fixed mesh run
 op = TohokuOptions(
-    family='taylor-hood',
+    family=args.family or 'taylor-hood',
     level=int(args.level or 0),
     approach='fixed_mesh',
     plot_pvd=True,

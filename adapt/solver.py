@@ -133,8 +133,8 @@ class AdaptiveProblem():
         assert p >= 0
         family = self.op.family
         if family == 'taylor-hood':
-            u_element = VectorElement("CG", triangle, p+1)
-            eta_element = FiniteElement("CG", triangle, p, variant='equispaced')
+            u_element = VectorElement("Lagrange", triangle, p+1)
+            eta_element = FiniteElement("Lagrange", triangle, p, variant='equispaced')
         elif family == 'dg-dg':
             u_element = VectorElement("DG", triangle, p)
             eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
@@ -157,7 +157,7 @@ class AdaptiveProblem():
         self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
         # self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
         # self.P2 = [FunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
-        self.P2_vec = [VectorFunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
+        # self.P2_vec = [VectorFunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
 
         # Shallow water space
         self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]

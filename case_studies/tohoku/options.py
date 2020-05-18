@@ -42,7 +42,7 @@ class TohokuOptions(TsunamiOptions):
         self.set_initial_surface()
         self.set_bathymetry()
 
-        # Timestepping: export once per minute for 25 minutes
+        # Timestepping: export once per minute for 24 minutes
         self.timestepper = 'CrankNicolson'
         # self.timestepper = 'SSPRK33'
         self.dt = 5.0

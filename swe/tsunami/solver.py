@@ -86,26 +86,68 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         g = Constant(op.g)
         b = self.bathymetry[i]
         f = self.fields[i]['coriolis_frequency']
-        # n = FacetNormal(self.meshes[i])
+        n = FacetNormal(self.meshes[i])
 
-        # Taylor-Hood mixed function space
-        try:
-            assert self.shallow_water_options['element_family'] == 'taylor-hood'
-        except AssertionError:
-            raise NotImplementedError  # TODO
-        print_output("### TODO: Implement adjoint solver other than Taylor-Hood")
+        # Mixed function space
         z, zeta = TrialFunctions(self.V[i])
         z_test, zeta_test = TestFunctions(self.V[i])
         self.adj_solutions_old[i].assign(self.adj_solutions[i])  # Assign previous value
         z_old, zeta_old = split(self.adj_solutions_old[i])
 
         def TaylorHood(f0, f1):
+
+            # - ∇ (b ζ)
             F = -inner(z_test, grad(b*f1))*dx
+
+            # - f perp(z)
             F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx
+
+            # - g ∇ . z
             F += g*inner(grad(zeta_test), f0)*dx
             # F += -g*inner(zeta_test, f0)*ds
             return F
 
+        def Mixed(f0, f1):
+
+            # - ∇ (b ζ)
+            F = -inner(z_test, grad(b*f1))*dx
+
+            # - f perp(z)
+            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx
+
+            # - g ∇ . z
+            F += g*inner(grad(zeta_test), f0)*dx
+            # F += -g*inner(zeta_test*n, f0)*ds
+            F += -g*inner(avg(zeta_test*n), avg(f0))*dS  # TODO: Check
+            return F
+
+        def EqualOrder(f0, f1):  # TODO: test
+
+            # - ∇ (b ζ)
+            F = inner(div(z_test), b*f1)*dx
+            F += -inner(z_test, b*f1*n)*ds
+            zeta_star = avg(f1) + sqrt(avg(b)/g)*jump(f0, n)
+            F += zeta_star*jump(z_test, n)*dS
+
+            # - f perp(z)
+            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx
+
+            # - g ∇ . z
+            F += g*inner(grad(zeta_test), f0)*dx
+            z_rie = avg(f0) + sqrt(g/avg(b))*jump(f1, n)
+            F += g*inner(jump(zeta_test, n), avg(b)*z_rie)*dS
+            # F += -g*inner(zeta_test, f0)*ds
+            return F
+
+        family = self.shallow_water_options['element_family']
+        if family == 'taylor-hood':
+            G = TaylorHood
+        elif family == 'dg-cg':
+            G = Mixed
+        elif family == 'dg-dg':
+            G = EqualOrder
+        else:
+            raise ValueError("Mixed discretisation {:s} not supported.".format(family))
         print_output("### TODO: Implement adjoint bcs other than freeslip")
 
         # Time derivative
@@ -118,8 +160,8 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         except AssertionError:
             raise NotImplementedError  # TODO
         print_output("### TODO: Implement adjoint ts other than Crank-Nicolson")
-        a += 0.5*dtc*TaylorHood(z, zeta)
-        L -= 0.5*dtc*TaylorHood(z_old, zeta_old)
+        a += 0.5*dtc*G(z, zeta)
+        L -= 0.5*dtc*G(z_old, zeta_old)
 
         # dJdq forcing term
         self.get_qoi_kernels(i)
@@ -140,18 +182,25 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         end_time = op.dt*i*self.dt_per_mesh
         op.print_debug("Entering adjoint time loop...")
         j = 0
+
+        # Need to project to P1 for plotting
         self.adjoint_solution_file._topology = None  # Account for mesh adaptations
         z, zeta = self.adj_solutions[i].split()
-        # self.adjoint_solution_file.write(z, zeta)
-        self.adjoint_solution_file.write(zeta)
+        z_out = Function(self.P1_vec[i], name="Projected adjoint velocity")
+        zeta_out = Function(self.P1[i], name="Projected adjoint elevation")
+        z_out.project(z)
+        zeta_out.project(zeta)
+        self.adjoint_solution_file.write(z_out, zeta_out)
+
         while t > end_time:
             self.time_kernel.assign(1.0 if t >= op.start_time else 0.0)
             self.adj_solvers[i].solve()
             self.adj_solutions_old[i].assign(self.adj_solutions[i])
             if j > 0 and j % op.dt_per_export == 0:
                 z, zeta = self.adj_solutions[i].split()
-                # self.adjoint_solution_file.write(z, zeta)
-                self.adjoint_solution_file.write(zeta)
+                zeta_out.project(zeta)
+                z_out.project(z)
+                self.adjoint_solution_file.write(z_out, zeta_out)
                 op.print_debug("t = {:6.1f}".format(t))
             t -= op.dt
             j += 1
