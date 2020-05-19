@@ -5,10 +5,11 @@ import argparse
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
-from adapt_utils.adapt.metric import isotropic_metric, space_time_normalise
+from adapt_utils.adapt.metric import isotropic_metric, space_time_normalise, metric_complexity
+from adapt_utils.adapt.adaptation import pragmatic_adapt
 
 
-parser = argparse.ArgumentParser(prog="plot_dwp_indicators")
+parser = argparse.ArgumentParser(prog="run_dwp")
 
 # Space-time domain
 parser.add_argument("-end_time", help="End time of simulation")
@@ -40,7 +41,7 @@ parser.add_argument("-radii", help="Radii of interest, separated by commas")
 
 # Misc
 parser.add_argument("-debug", help="Print all debugging statements")
-args = parser.parse_args()
+args, unknown = parser.parse_known_args()
 p = args.norm_order
 
 # Collect locations and radii
@@ -84,7 +85,7 @@ kwargs = {
     # Outer loop
     'element_rtol': float(args.element_rtol or 0.005),
     'qoi_rtol': float(args.qoi_rtol or 0.005),
-    'num_adapt': int(args.num_adapt or 1),  # TODO: temp
+    'num_adapt': int(args.num_adapt or 35),
 
     # Misc
     'debug': bool(args.debug or False),
@@ -99,8 +100,20 @@ swp = AdaptiveTsunamiProblem(op)
 
 for n in range(op.num_adapt):
 
-    # Solve forward to get checkpoints
-    swp.solve_forward()
+    # --- Solve forward to get checkpoints
+
+    swp.solution_file.__init__(swp.solution_file.filename)
+    for i in range(swp.num_meshes):
+        swp.solution_file._topology = None
+
+        def export_func():
+            proj = Function(swp.P1[i], name="Projected elevation")
+            proj.project(swp.fwd_solvers[i].fields.elev_2d)
+            swp.solution_file.write(proj)
+
+        swp.transfer_forward_solution(i)
+        swp.setup_solver_forward(i)
+        swp.solve_forward_step(i, export_func=export_func)
 
     # --- Convergence criteria
 
@@ -160,13 +173,58 @@ for n in range(op.num_adapt):
         indicators[i].interpolate(I)
         metrics[i].assign(isotropic_metric(indicators[i], noscale=True, normalise=False))
 
-    # Normalise metrics
+    # --- Normalise metrics
+
     space_time_normalise(metrics, op=op)
 
     # Output to .pvd and .vtu
     metric_file = File(os.path.join(swp.di, 'metric.pvd'))
-    for indicator, metric in zip(indicators, metrics):
+    complexities = []
+    for indicator, M in zip(indicators, metrics):
         swp.indicator_file._topology = None
         swp.indicator_file.write(indicator)
         metric_file._topology = None
-        metric_file.write(metric)
+        metric_file.write(M)
+        complexities.append(metric_complexity(M))
+    swp.st_complexities.append(sum(complexities)*op.end_time/op.dt)
+
+    # --- Adapt meshes
+
+    print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+    for i, M in enumerate(metrics):
+        print_output("Adapting mesh {:d}/{:d}...".format(i+1, swp.num_meshes))
+        swp.meshes[i] = pragmatic_adapt(swp.meshes[i], M, op=op)
+    del metrics
+    swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
+    swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
+    print_output("Done!")
+
+    # ---  Setup for next run / logging
+
+    swp.set_meshes(swp.meshes)
+    swp.create_function_spaces()
+    swp.dofs.append([np.array(V.dof_count).sum() for V in swp.V])
+    swp.create_solutions()
+    swp.set_fields()
+    swp.set_stabilisation()
+    swp.set_boundary_conditions()
+    swp.callbacks = [{} for mesh in swp.meshes]
+
+    print_output("\nResulting meshes")
+    msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
+    for i, c in enumerate(complexities):
+        print_output(msg.format(i, c, swp.num_vertices[n+1][i], swp.num_cells[n+1][i]))
+    print_output("")
+
+    # Check convergence of *all* element counts
+    converged = True
+    for i, num_cells_ in enumerate(swp.num_cells[n-1]):
+        if np.abs(swp.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
+            converged = False
+    if converged:
+        print_output("Converged number of mesh elements!")
+        break
+
+print_output("Gradation parameters:")
+for key in unknown:
+    print_output("{:30s}: {:}".format(key, unknown[key]))

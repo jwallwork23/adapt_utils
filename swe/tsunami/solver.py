@@ -60,8 +60,10 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         # --- Quantity of interest
 
         self.get_qoi_kernels(i)
-        kernel_file = File(os.path.join(self.di, 'kernel_mesh{:d}.pvd'.format(i)))
-        kernel_file.write(self.kernels[i].split()[1])
+        self.kernel_file._topology = None
+        kernel_proj = project(self.kernels[i].split()[1], self.P1[i])
+        kernel_proj.rename("QoI kernel")
+        self.kernel_file.write(kernel_proj)
         kt = Constant(0.0)  # Kernel in time
 
         def qoi(sol):
