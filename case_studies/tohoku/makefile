@@ -34,6 +34,13 @@ fixed_mesh:
 	@python3 run_fixed_mesh.py
 	@echo "Done!"
 
+# TODO: Hessian based
+
+dwp:
+	@echo "Solving Tohoku tsunami problem using 'dual weighted primal' adaptation..."
+	@python3 run_dwp.py -dm_plex_prescribed_boundary_labels 200 -dm_plex_prescribed_boundary_sizes 10e3
+	@echo "Done!"
+
 clean:
 	@echo "Cleaning directory..."
 	@rm -rf outputs/*.pvd
