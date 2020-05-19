@@ -381,16 +381,18 @@ class AdaptiveProblem():
         else:
             self.solve_forward(**kwargs)
 
-    def solve_forward(self, **kwargs):
+    def solve_forward(self, reverse=False, **kwargs):
         """Solve forward problem on the full sequence of meshes."""
-        for i in range(self.num_meshes):
+        R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
+        for i in R:
             self.transfer_forward_solution(i)
             self.setup_solver_forward(i)
             self.solve_forward_step(i, **kwargs)
 
-    def solve_adjoint(self, **kwargs):
+    def solve_adjoint(self, reverse=True, **kwargs):
         """Solve adjoint problem on the full sequence of meshes."""
-        for i in range(self.num_meshes - 1, -1, -1):
+        R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
+        for i in R:
             self.transfer_adjoint_solution(i)
             self.setup_solver_adjoint(i)
             self.solve_adjoint_step(i, **kwargs)
