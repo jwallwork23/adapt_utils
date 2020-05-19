@@ -265,7 +265,7 @@ def get_density_and_quotients(M):
     return density, quotients
 
 
-def isotropic_metric(f, normalise=True, op=Options()):
+def isotropic_metric(f, **kwargs):
     r"""
     Given a scalar error indicator field `f`, construct an associated isotropic metric field.
 
@@ -274,6 +274,11 @@ def isotropic_metric(f, normalise=True, op=Options()):
     :kwarg op: :class:`Options` object providing min/max cell size values.
     :return: Isotropic metric corresponding to `f`.
     """
+    kwargs.setdefault('normalise', True)
+    kwargs.setdefault('enforce_constraints', True)
+    kwargs.setdefault('noscale', False)
+    kwargs.setdefault('op', Options())
+    op = kwargs.get('op')
     try:
         assert f is not None
         assert len(f.ufl_element().value_shape()) == 0
@@ -285,35 +290,38 @@ def isotropic_metric(f, normalise=True, op=Options()):
     dim = mesh.topological_dimension()
     assert dim in (2, 3)
 
-    # Scale indicator
-    assert op.normalisation in ('complexity', 'error')
-    rescale = op.target if normalise else 1
-
     # Project into P1 space
     op.print_debug("METRIC: Constructing isotropic metric...")
-    M_diag = project(max_value(abs(rescale*f), 1e-10), V)
+    M_diag = project(max_value(abs(f), 1e-10), V)
     M_diag.interpolate(abs(M_diag))  # Ensure positivity
     op.print_debug("METRIC: Done!")
-    if not normalise:
-        return interpolate(M_diag*Identity(dim), V_ten)
 
-    # Normalise  # TODO: Use space_normalise
-    op.print_debug("METRIC: Normalising metric...")
-    p = op.norm_order
-    detM = Function(V).assign(M_diag)
-    if p is not None:
-        assert p >= 1
-        detM *= M_diag
-        M_diag *= pow(detM, -1/(2*p + dim))
-        detM.interpolate(pow(detM, p/(2*p + dim)))
-    if op.normalisation == 'complexity':
-        M_diag *= pow(rescale/assemble(detM*ds), 2/dim)
-    else:
+    # Normalise
+    if kwargs.get('normalise'):
+        op.print_debug("METRIC: Normalising metric...")
+        assert op.normalisation in ('complexity', 'error')
+        rescale = 1.0 if kwargs.get('noscale') else op.target
+        p = op.norm_order
+        detM = M_diag.copy(deepcopy=True)
         if p is not None:
-            M_diag *= pow(assemble(detM*ds), 1/p)
-    M_diag = max_value(1/pow(op.h_max, 2), min_value(M_diag, 1/pow(op.h_min, 2)))
-    M_diag = max_value(M_diag, M_diag/pow(op.max_anisotropy, 2))
-    op.print_debug("METRIC: Done!")
+            assert p >= 1
+            detM *= M_diag
+            M_diag *= pow(detM, -1/(2*p + dim))
+            detM.interpolate(pow(detM, p/(2*p + dim)))
+        if op.normalisation == 'complexity':
+            M_diag *= pow(rescale/assemble(detM*dx), 2/dim)
+        else:
+            if p is not None:
+                M_diag *= pow(assemble(detM*dx), 1/p)
+            M_diag *= dim/rescale
+        op.print_debug("METRIC: Done!")
+
+    # Enforce maximum/minimum element sizes
+    if kwargs.get('enforce_constraints'):
+        op.print_debug("METRIC: Enforcing elemental constraints...")
+        M_diag = max_value(1/pow(op.h_max, 2), min_value(M_diag, 1/pow(op.h_min, 2)))
+        op.print_debug("METRIC: Done!")
+
     return interpolate(M_diag*Identity(dim), V_ten)
 
 
