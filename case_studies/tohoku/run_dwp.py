@@ -130,3 +130,10 @@ while True:
 with open(os.path.join(di, 'log'), 'w') as logfile:
     logfile.write(logstr)
 print_output(di)
+
+# Plot element counts on a pie chart
+import matplotlib.pyplot as plt
+N = swp.num_cells[-1]
+plt.pie(N, labels=["Mesh {:d} ({:d})".format(i, n) for i, n in enumerate(N)])
+plt.title("Element counts for DWP adaptation")
+plt.show()
