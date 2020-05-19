@@ -87,15 +87,15 @@ class TelemacOptions(TracerOptions):
 
     def set_source(self, fs):
         x0, y0, r0 = self.source_loc[0]
-        nrm = assemble(self.ball(fs, source=True)*dx)
+        nrm = assemble(self.ball(fs.mesh(), source=True)*dx)
         scaling = 1.0 if np.allclose(nrm, 0.0) else pi*r0*r0/nrm
         scaling *= 0.5*self.source_value
         # scaling *= self.source_value
-        self.source = self.ball(fs, source=True, scale=scaling)
+        self.source = self.ball(fs.mesh(), source=True, scale=scaling)
         return self.source
 
     def set_qoi_kernel(self, fs):
-        b = self.ball(fs, source=False)
+        b = self.ball(fs.mesh(), source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = 1.0 if np.allclose(area, 0.0) else area_exact/area

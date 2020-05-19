@@ -113,7 +113,7 @@ class LeVequeOptions(TracerOptions):
         return self.initial_value
 
     def set_qoi_kernel(self, fs):
-        b = self.ball(fs, source=False)
+        b = self.ball(fs.mesh(), source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
@@ -121,7 +121,7 @@ class LeVequeOptions(TracerOptions):
         return self.kernel
 
     def set_final_condition(self, fs):
-        b = self.ball(fs, source=False)
+        b = self.ball(fs.mesh(), source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1

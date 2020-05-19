@@ -106,77 +106,22 @@ class Options(FrozenConfigurable):
         self.qoi_rtol = tol
         self.estimator_rtol = tol
 
-    def ball(self, fs, scale=1.0, source=False):
-        """
-        Ball indicator function associated with region(s) of interest
+    def box(self, mesh, scale=1.0, source=False):
+        r"""
+        Rectangular indicator function associated with region(s) of interest.
 
-        :arg fs: Desired `FunctionSpace`.
+        Takes the value `scale` in the region
+
+      ..math::
+            (x0 - r_x < x < x0 + r_x) && (y0 - r_y < y < y0 + r_y)
+
+        centred about (x0, y0) and zero elsewhere. Similarly for other dimensions.
+
         :kwarg scale: Scale factor for indicator.
         :kwarg source: Toggle source term or region of interest location.
         """
-        dim = fs.mesh().topological_dimension()
-        assert dim in (2, 3)
-        x = SpatialCoordinate(fs)
-        locs = self.source_loc if source else self.region_of_interest
-        for j in range(len(locs)):
-            expr = lt(sum((x[i]-locs[j][i])**2 for i in range(dim)), locs[j][dim]**2 + 1e-10)
-            b = expr if j == 0 else Or(b, expr)
-        return conditional(b, scale, 0.0)
-
-    # TODO: Circular version - use for tsunami RoI
-    def bump(self, fs, scale=1.0, source=False):
-        """
-        Rectangular bump function associated with region(s) of interest
-
-        :arg fs: Desired `FunctionSpace`.
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        dim = fs.mesh().topological_dimension()
-        assert dim in (2, 3)
-        x = SpatialCoordinate(fs)
-        locs = self.source_loc if source else self.region_of_interest
-        b = 0
-        for j in range(len(locs)):
-            vol = 1.0
-            expr = scale
-            for i in range(dim):
-                r0 = locs[j][dim] if len(locs) == dim else locs[j][dim+i]
-                vol *= r0
-                expr = expr*exp(1 - 1/(1 - ((x[0]-locs[j][0])/r0)**2))
-            b += conditional(lt(sum((x[i]-locs[j][i])**2 for i in range(dim)), vol), expr, 0.0)
-        return b
-
-    def gaussian(self, fs, scale=1.0, source=False):
-        """
-        Gaussian function associated with region(s) of interest
-
-        :arg fs: Desired `FunctionSpace`.
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        dim = fs.mesh().topological_dimension()
-        assert dim in (2, 3)
-        x = SpatialCoordinate(fs)
-        locs = self.source_loc if source else self.region_of_interest
-        b = 0
-        for j in range(len(locs)):
-            r0_sq = locs[j][dim]**2
-            r_sq = sum((x[i]-locs[j][i])**2 for i in range(dim))
-            b += conditional(lt(r_sq, r0_sq), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
-        return b
-
-    def box(self, fs, scale=1.0, source=False):
-        """
-        Rectangular indicator function associated with region(s) of interest
-
-        :arg fs: Desired `FunctionSpace`.
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        dim = fs.mesh().topological_dimension()
-        assert dim in (2, 3)
-        x = SpatialCoordinate(fs)
+        dim = mesh.topological_dimension()
+        x = SpatialCoordinate(mesh)
         locs = self.source_loc if source else self.region_of_interest
         for j in range(len(locs)):
             expr = And(gt(x[0], locs[j][0]-locs[j][dim]), lt(x[0], locs[j][0]+locs[j][dim]))
@@ -185,6 +130,84 @@ class Options(FrozenConfigurable):
                 expr = And(expr, And(gt(x[i], locs[j][i]-r0), lt(x[i], locs[j][i]+r0)))
             b = expr if j == 0 else Or(b, expr)
         return conditional(b, scale, 0.0)
+
+    def ball(self, mesh, scale=1.0, source=False):
+        r"""
+        Ball indicator function associated with region(s) of interest.
+
+        Takes the value `scale` in the region
+
+      ..math::
+            (x - x_0)^2 + (y - y_0)^2 < r_0^2
+
+        and zero elsewhere. Similarly for other dimensions.
+
+        :kwarg scale: Scale factor for indicator.
+        :kwarg source: Toggle source term or region of interest location.
+        """
+        dim = mesh.topological_dimension()
+        x = SpatialCoordinate(mesh)
+        locs = self.source_loc if source else self.region_of_interest
+        for j in range(len(locs)):
+            r0 = locs[j][dim] if len(locs) == dim else locs[j][dim+i]
+            expr = lt(sum((x[i]-locs[j][i])**2 for i in range(dim)), r0**2 + 1e-10)
+            b = expr if j == 0 else Or(b, expr)
+        return conditional(b, scale, 0.0)
+
+    # TODO: Circular version - use for tsunami RoI
+    def bump(self, mesh, scale=1.0, source=False):
+        r"""
+        Rectangular bump function associated with region(s) of interest. (A smooth approximation
+        to the box function.)
+
+        Takes the form
+
+      ..math::
+            \exp\left(1 - \frac1{\left1 - \left(\frac{x - x_0}{r_x}\right)^2\right)}\right)
+            * \exp\left(1 - \frac1{\left1 - \left(\frac{y - y_0}{r_y}\right)^2\right)}\right)
+
+        scaled by `scale` inside the box region. Similarly for other dimensions.
+            
+        :kwarg scale: Scale factor for indicator.
+        :kwarg source: Toggle source term or region of interest location.
+        """
+        dim = mesh.topological_dimension()
+        x = SpatialCoordinate(mesh)
+        locs = self.source_loc if source else self.region_of_interest
+        b = 0
+        for j in range(len(locs)):
+            vol = 1.0
+            expr = scale
+            for i in range(dim):
+                ri = locs[j][dim] if len(locs) == dim else locs[j][dim+i]
+                vol *= ri
+                expr = expr*exp(1 - 1/(1 - ((x[0]-locs[j][0])/ri)**2))
+            b += conditional(lt(sum((x[i]-locs[j][i])**2 for i in range(dim)), vol), expr, 0.0)
+        return b
+
+    def gaussian(self, mesh, scale=1.0, source=False):
+        r"""
+        Gaussian bell associated with region(s) of interest.
+
+        Takes the form
+
+      ..math::
+            \exp\left(1 - \frac1{1 - \frac{x^2 + y^2}{r_0^2}}\right)
+
+        scaled by `scale` inside the ball region. Similarly for other dimensions.
+
+        :kwarg scale: Scale factor for indicator.
+        :kwarg source: Toggle source term or region of interest location.
+        """
+        dim = mesh.topological_dimension()
+        x = SpatialCoordinate(mesh)
+        locs = self.source_loc if source else self.region_of_interest
+        b = 0
+        for j in range(len(locs)):
+            r0_sq = locs[j][dim]**2
+            r_sq = sum((x[i]-locs[j][i])**2 for i in range(dim))
+            b += conditional(lt(r_sq, r0_sq), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
+        return b
 
     def set_start_condition(self, fs, adjoint=False):
         return self.set_final_condition(fs) if adjoint else self.set_initial_condition(fs)

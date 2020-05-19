@@ -63,7 +63,7 @@ class BubbleOptions(TracerOptions):
         return self.source
 
     def set_initial_condition(self, fs):
-        self.initial_value = self.ball(fs, source=True)
+        self.initial_value = interpolate(self.ball(fs.mesh(), source=True), fs)
         return self.initial_value
 
     def get_update_forcings(self, solver_obj=None):
