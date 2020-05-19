@@ -32,12 +32,14 @@ class TsunamiOptions(ShallowWaterOptions):
         self.params = {
             "ksp_type": "gmres",
             "pc_type": "fieldsplit",
-            "pc_fieldsplit_type": "multiplicative",
+            "pc_fieldsplit_type": "multiplicative",  # Block Gauss-Seidel
+            # "pc_fieldsplit_type": "symmetric_multiplicative",  # Symmetric version
         }
         self.adjoint_params = {
             "ksp_type": "gmres",
             "pc_type": "fieldsplit",
-            "pc_fieldsplit_type": "multiplicative",
+            "pc_fieldsplit_type": "multiplicative",  # Block Gauss-Seidel
+            # "pc_fieldsplit_type": "symmetric_multiplicative",  # Symmetric version
         }
 
     def get_utm_mesh(self):

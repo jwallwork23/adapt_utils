@@ -107,6 +107,7 @@ class AdaptiveProblem():
         self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
         # self.adjoint_solution_fpath_hdf5 = os.path.join(self.di, 'adjoint_solution.hdf5')
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+        self.kernel_file = File(os.path.join(self.di, 'kernel.pvd'))
 
         # Storage for diagnostics over mesh adaptation loop
         self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
