@@ -365,7 +365,13 @@ class AdaptiveProblem():
         raise NotImplementedError("Should be implemented in derived class.")
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None):
-        """Solve forward PDE on mesh `i`."""
+        """
+        Solve forward PDE on mesh `i`.
+
+        :kwarg update_forcings: a function which takes simulation time as an argument and is
+            evaluated at the start of every timestep.
+        :kwarg export_func: a function with no arguments which is evaluated at every export step.
+        """
         update_forcings = update_forcings or self.op.get_update_forcings(self.fwd_solvers[i])
         export_func = export_func or self.op.get_export_func(self.fwd_solvers[i])
         self.fwd_solvers[i].iterate(update_forcings=update_forcings, export_func=export_func)
@@ -376,6 +382,14 @@ class AdaptiveProblem():
         raise NotImplementedError("Should be implemented in derived class.")
 
     def solve(self, adjoint=False, **kwargs):
+        """
+        Solve the forward or adjoint problem (as specified by the `adjoint` boolean kwarg) on the
+        full sequence of meshes.
+
+        NOTE: The implementation contains a very simple checkpointing scheme, in the sense that
+            the final solution computed on mesh `i` is stored in `self.fwd_solvers[i]` or
+            `self.adj_solutions[i]`, as appropriate.
+        """
         if adjoint:
             self.solve_adjoint(**kwargs)
         else:
