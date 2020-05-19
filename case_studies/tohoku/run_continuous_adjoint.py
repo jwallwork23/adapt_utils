@@ -58,11 +58,6 @@ op = TohokuOptions(
 )
 assert op.start_time >= 0.0
 assert op.start_time <= op.end_time
-op.adjoint_params = {
-    "ksp_type": "gmres",
-    "pc_type": "fieldsplit",
-    "pc_fieldsplit_type": "multiplicative",
-}
 
 # Setup problem object
 swp = AdaptiveTsunamiProblem(op)

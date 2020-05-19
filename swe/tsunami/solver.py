@@ -71,7 +71,8 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
 
         self.callbacks[i]["qoi"] = callback.TimeIntegralCallback(
             qoi, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
-            name="qoi", append_to_log=op.debug
+            # name="qoi", append_to_log=op.debug
+            name="qoi", append_to_log=False
         )
         self.fwd_solvers[i].add_callback(self.callbacks[i]["qoi"], 'timestep')
 
@@ -175,8 +176,14 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         problem = LinearVariationalProblem(a, L, self.adj_solutions[i])
         self.adj_solvers[i] = LinearVariationalSolver(problem, solver_parameters=op.adjoint_params)
 
-    def solve_adjoint_step(self, i, **kwargs):
-        """Solve adjoint PDE on mesh `i`."""
+    def solve_adjoint_step(self, i, export_func=None, update_forcings=None):
+        """
+        Solve adjoint PDE on mesh `i`.
+
+        :kwarg update_forcings: a function which takes simulation time as an argument and is
+            evaluated at the start of every timestep.
+        :kwarg export_func: a function with no arguments which is evaluated at every export step.
+        """
         op = self.op
         t = op.dt*(i+1)*self.dt_per_mesh
         end_time = op.dt*i*self.dt_per_mesh
@@ -188,20 +195,23 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         z, zeta = self.adj_solutions[i].split()
         z_out = Function(self.P1_vec[i], name="Projected adjoint velocity")
         zeta_out = Function(self.P1[i], name="Projected adjoint elevation")
-        z_out.project(z)
-        zeta_out.project(zeta)
-        self.adjoint_solution_file.write(z_out, zeta_out)
 
         while t > end_time:
-            self.time_kernel.assign(1.0 if t >= op.start_time else 0.0)
-            self.adj_solvers[i].solve()
-            self.adj_solutions_old[i].assign(self.adj_solutions[i])
-            if j > 0 and j % op.dt_per_export == 0:
+            if update_forcings is not None:
+                update_forcings(t)
+            if j % op.dt_per_export == 0:
+                print_output("t = {:6.1f}".format(t))
+                if export_func is not None:
+                    export_func()
                 z, zeta = self.adj_solutions[i].split()
                 zeta_out.project(zeta)
                 z_out.project(z)
                 self.adjoint_solution_file.write(z_out, zeta_out)
-                op.print_debug("t = {:6.1f}".format(t))
+            self.time_kernel.assign(1.0 if t >= op.start_time else 0.0)
+            self.adj_solvers[i].solve()
+            self.adj_solutions_old[i].assign(self.adj_solutions[i])
             t -= op.dt
             j += 1
+        assert j % op.dt_per_export == 0
+        export_func()
         op.print_debug("Done!")

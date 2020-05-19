@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import *
 from adapt_utils.norms import total_variation, lp_norm
-# from adapt_utils.misc import find
 
 
 __all__ = ["TsunamiOptions"]
@@ -28,6 +27,18 @@ class TsunamiOptions(ShallowWaterOptions):
         self.base_viscosity = 1.0e-3
         self.gauges = {}
         self.locations_of_interest = {}
+
+        # Solver
+        self.params = {
+            "ksp_type": "gmres",
+            "pc_type": "fieldsplit",
+            "pc_fieldsplit_type": "multiplicative",
+        }
+        self.adjoint_params = {
+            "ksp_type": "gmres",
+            "pc_type": "fieldsplit",
+            "pc_fieldsplit_type": "multiplicative",
+        }
 
     def get_utm_mesh(self):
         zone = self.force_zone_number
@@ -248,10 +259,9 @@ class TsunamiOptions(ShallowWaterOptions):
 
     def set_final_condition(self, fs):
         ftc = Function(fs)
-        if np.allclose(self.start_time, self.end_time):
-            if not hasattr(self, 'kernel'):
-                self.set_qoi_kernel(fs)
-            ftc.assign(self.kernel)
+        if not hasattr(self, 'kernel'):
+            self.set_qoi_kernel(fs)
+        ftc.assign(self.kernel)
         return ftc
 
     def plot_qoi(self):  # FIXME
