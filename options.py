@@ -106,7 +106,7 @@ class Options(FrozenConfigurable):
         self.qoi_rtol = tol
         self.estimator_rtol = tol
 
-    def ball(self, fs, scale=1., source=False):
+    def ball(self, fs, scale=1.0, source=False):
         """
         Ball indicator function associated with region(s) of interest
 
@@ -114,30 +114,17 @@ class Options(FrozenConfigurable):
         :kwarg scale: Scale factor for indicator.
         :kwarg source: Toggle source term or region of interest location.
         """
-        mesh = fs.mesh()
-        dim = mesh.topological_dimension()
+        dim = fs.mesh().topological_dimension()
         assert dim in (2, 3)
-        if dim == 2:
-            x, y = SpatialCoordinate(fs)
-        else:
-            x, y, z = SpatialCoordinate(fs)
+        x = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
-        eps = 1e-10
         for j in range(len(locs)):
-            x0 = locs[j][0]
-            y0 = locs[j][1]
-            r = locs[j][2] if dim == 2 else locs[j][3]
-            if dim == 3:
-                z0 = locs[j][2]
-                expr = lt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0), r*r + eps)
-            else:
-                expr = lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps)
+            expr = lt(sum((x[i]-locs[j][i])**2 for i in range(dim)), locs[j][dim]**2 + 1e-10)
             b = expr if j == 0 else Or(b, expr)
-        expr = conditional(b, scale, 0.)
-        # return interpolate(expr, fs)
-        return expr
+        return conditional(b, scale, 0.0)
 
-    def bump(self, fs, scale=1., source=False):
+    # TODO: Circular version - use for tsunami RoI
+    def bump(self, fs, scale=1.0, source=False):
         """
         Rectangular bump function associated with region(s) of interest
 
@@ -145,39 +132,22 @@ class Options(FrozenConfigurable):
         :kwarg scale: Scale factor for indicator.
         :kwarg source: Toggle source term or region of interest location.
         """
-        mesh = fs.mesh()
-        dim = mesh.topological_dimension()
+        dim = fs.mesh().topological_dimension()
         assert dim in (2, 3)
-        if dim == 2:
-            x, y = SpatialCoordinate(fs)
-        else:
-            x, y, z = SpatialCoordinate(fs)
+        x = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
-        i = 0
+        b = 0
         for j in range(len(locs)):
-            x0 = locs[j][0]
-            y0 = locs[j][1]
-            r0 = locs[j][2] if dim == 2 else locs[j][3]
-            if dim == 2 and len(locs) == 4:
-                r1 = locs[j][3]
-            elif dim == 3 and len(locs) > 4:
-                r1 = locs[j][4]
-            else:
-                r1 = r0
-            expr1 = (x-x0)*(x-x0) + (y-y0)*(y-y0)
-            expr2 = scale*exp(1 - 1/(1 - (x-x0)*(x-x0)/r0**2))*exp(1 - 1/(1 - (y-y0)*(y-y0)/r1**2))
-            vol = r0*r1
-            if dim == 3:
-                z0 = locs[j][2]
-                r2 = r0 if len(locs) < 6 else locs[j][5]
-                expr1 += (z-z0)*(z-z0)
-                expr2 *= exp(1 - 1/(1 - (z-z0)*(z-z0)/r2**2))
-                vol *= r2
-            i += conditional(lt(expr1, vol), expr2, 0)
-        # return interpolate(i, fs)
-        return i
+            vol = 1.0
+            expr = scale
+            for i in range(dim):
+                r0 = locs[j][dim] if len(locs) == dim else locs[j][dim+i]
+                vol *= r0
+                expr = expr*exp(1 - 1/(1 - ((x[0]-locs[j][0])/r0)**2))
+            b += conditional(lt(sum((x[i]-locs[j][i])**2 for i in range(dim)), vol), expr, 0.0)
+        return b
 
-    def gaussian(self, fs, scale=1., source=False):
+    def gaussian(self, fs, scale=1.0, source=False):
         """
         Gaussian function associated with region(s) of interest
 
@@ -185,28 +155,18 @@ class Options(FrozenConfigurable):
         :kwarg scale: Scale factor for indicator.
         :kwarg source: Toggle source term or region of interest location.
         """
-        mesh = fs.mesh()
-        dim = mesh.topological_dimension()
+        dim = fs.mesh().topological_dimension()
         assert dim in (2, 3)
-        if dim == 2:
-            x, y = SpatialCoordinate(fs)
-        else:
-            x, y, z = SpatialCoordinate(fs)
+        x = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
-        i = 0
+        b = 0
         for j in range(len(locs)):
-            x0 = locs[j][0]
-            y0 = locs[j][1]
-            r = locs[j][2] if dim == 2 else locs[j][3]
-            expr = (x-x0)*(x-x0) + (y-y0)*(y-y0)
-            if dim == 3:
-                z0 = locs[j][2]
-                expr += (z-z0)*(z-z0)
-            i += conditional(lt(expr, r*r), scale*exp(1 - 1/(1 - expr/r**2)), 0)
-        # return interpolate(i, fs)
-        return i
+            r0_sq = locs[j][dim]**2
+            r_sq = sum((x[i]-locs[j][i])**2 for i in range(dim))
+            b += conditional(lt(r_sq, r0_sq), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
+        return b
 
-    def box(self, fs, scale=1., source=False):
+    def box(self, fs, scale=1.0, source=False):
         """
         Rectangular indicator function associated with region(s) of interest
 
@@ -214,33 +174,17 @@ class Options(FrozenConfigurable):
         :kwarg scale: Scale factor for indicator.
         :kwarg source: Toggle source term or region of interest location.
         """
-        mesh = fs.mesh()
-        dim = mesh.topological_dimension()
+        dim = fs.mesh().topological_dimension()
         assert dim in (2, 3)
-        if dim == 2:
-            x, y = SpatialCoordinate(fs)
-        else:
-            x, y, z = SpatialCoordinate(fs)
+        x = SpatialCoordinate(fs)
         locs = self.source_loc if source else self.region_of_interest
         for j in range(len(locs)):
-            x0 = locs[j][0]
-            y0 = locs[j][1]
-            r0 = locs[j][2] if dim == 2 else locs[j][3]
-            if dim == 2 and len(locs) == 4:
-                r1 = locs[j][3]
-            elif dim == 3 and len(locs) > 4:
-                r1 = locs[j][4]
-            else:
-                r1 = r0
-            expr = And(And(gt(x, x0-r0), lt(x, x0+r0)), And(gt(y, y0-r1), lt(y, y0+r1)))
-            if dim == 3:
-                r2 = r0 if len(locs) < 6 else locs[j][5]
-                z0 = locs[j][2]
-                expr = And(expr, And(gt(z, z0-r2), lt(z, z0+r2)))
+            expr = And(gt(x[0], locs[j][0]-locs[j][dim]), lt(x[0], locs[j][0]+locs[j][dim]))
+            for i in range(1, dim):
+                r0 = locs[j][dim] if len(locs) == dim else locs[j][dim+i]
+                expr = And(expr, And(gt(x[i], locs[j][i]-r0), lt(x[i], locs[j][i]+r0)))
             b = expr if j == 0 else Or(b, expr)
-        expr = conditional(b, scale, 0.)
-        # return interpolate(expr, fs)
-        return expr
+        return conditional(b, scale, 0.0)
 
     def set_start_condition(self, fs, adjoint=False):
         return self.set_final_condition(fs) if adjoint else self.set_initial_condition(fs)
