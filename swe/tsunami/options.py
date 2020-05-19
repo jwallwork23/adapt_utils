@@ -229,7 +229,8 @@ class TsunamiOptions(ShallowWaterOptions):
         #     fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
 
     def set_qoi_kernel(self, fs):
-        b = self.ball(fs.mesh(), source=False)
+        # b = self.ball(fs.mesh(), source=False)
+        b = self.circular_bump(fs.mesh(), source=False)
 
         # TODO: Normalise by area computed on fine reference mesh
         # area = assemble(b*dx)
