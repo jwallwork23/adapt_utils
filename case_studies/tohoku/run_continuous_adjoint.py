@@ -16,7 +16,8 @@ args = parser.parse_args()
 
 # Set parameters for fixed mesh run
 op = TohokuOptions(
-    family=args.family or 'taylor-hood',
+    # family=args.family or 'taylor-hood',
+    family=args.family or 'dg-cg',
     level=int(args.level or 0),
     approach='fixed_mesh',
     plot_pvd=True,

@@ -49,8 +49,7 @@ class PowerOptions(TracerOptions):
 
     def set_source(self, fs):
         self.source = Function(fs)
-        # self.source.interpolate(self.bump(fs, source=True))
-        self.source.interpolate(self.box(fs, source=True))
+        self.source.interpolate(self.bump(fs.mesh(), source=True))
         area = assemble(self.source*dx)
         rescaling = 0.04/area if area != 0. else 1.
         self.source.interpolate(rescaling*self.source)
@@ -59,8 +58,7 @@ class PowerOptions(TracerOptions):
 
     def set_qoi_kernel(self, fs):  # FIXME: update
         self.kernel = Function(fs)
-        # self.kernel.interpolate(self.bump(fs))
-        self.kernel.interpolate(self.box(fs))
+        self.kernel.interpolate(self.bump(fs.mesh()))
         area = assemble(self.kernel*dx)
         rescaling = 0.04/area if area != 0. else 1.
         self.kernel.interpolate(rescaling*self.kernel)

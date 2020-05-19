@@ -19,8 +19,8 @@ class AdaptiveTurbineProblem(AdaptiveShallowWaterProblem):
         """
         op = self.op
         num_turbines = len(op.region_of_interest)
-        scaling = num_turbines/assemble(op.bump(self.P1)*dx)
-        self.turbine_density = op.bump(self.P1, scale=scaling)
+        scaling = num_turbines/assemble(op.bump(self.mesh)*dx)
+        self.turbine_density = op.bump(self.mesh, scale=scaling)
         # scaling = num_turbines/assemble(op.box(self.P0)*dx)
         # self.turbine_density = op.box(self.P0, scale=scaling)
         self.farm_options = TidalTurbineFarmOptions()
