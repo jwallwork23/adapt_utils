@@ -40,11 +40,11 @@ kwargs = {
     # Timestepping
     'end_time': float(args.end_time or 1440.0),
 
-    # Initial mesh
+    # Space-time domain
     'level': int(args.level or 0),
+    'num_meshes': int(args.num_meshes or 12),
 
     # Mesh adaptation
-    'num_meshes': int(args.num_meshes or 12),
     'adapt_field': args.adapt_field or 'elevation',
     'hessian_time_combination': args.time_combine or 'integrate',
     'hessian_timestep_lag': float(args.hessian_lag or 6),
@@ -53,7 +53,6 @@ kwargs = {
     'target': float(args.target or 5.0e+03),
     'h_min': float(args.h_min or 1.0e+02),
     'h_max': float(args.h_max or 1.0e+06),
-    'plot_pvd': True,
 
     # Outer loop
     'element_rtol': float(args.element_rtol or 0.005),
@@ -62,6 +61,7 @@ kwargs = {
 
     # Misc
     'debug': bool(args.debug or False),
+    'plot_pvd': True,
 }
 save_plex = bool(args.save_plex or False)
 logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
