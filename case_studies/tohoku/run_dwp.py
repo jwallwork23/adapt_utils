@@ -1,7 +1,7 @@
 from thetis import *
 
-import os
 import argparse
+import datetime
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
@@ -65,7 +65,7 @@ kwargs = {
 
     # Space-time domain
     'level': int(args.level or 2),
-    'num_meshes': int(args.num_meshes or 6),
+    'num_meshes': int(args.num_meshes or 12),
 
     # Solver
     'family': args.family or 'dg-cg',
@@ -92,139 +92,41 @@ kwargs = {
     'plot_pvd': True,
 }
 assert 0.0 <= kwargs['start_time'] <= kwargs['end_time']
+logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
+for key in kwargs:
+    logstr += "    {:32s}: {:}\n".format(key, kwargs[key])
+print_output(logstr + 80*'*' + '\n')
+
+# Create parameter class and problem object
 op = TohokuOptions(approach='dwp')
 op.update(kwargs)
-
-# Setup problem object
 swp = AdaptiveTsunamiProblem(op)
+swp.run_dwp()
 
-for n in range(op.num_adapt):
-
-    # --- Solve forward to get checkpoints
-
-    swp.solution_file.__init__(swp.solution_file.filename)
-    for i in range(swp.num_meshes):
-        swp.solution_file._topology = None
-
-        def export_func():
-            proj = Function(swp.P1[i], name="Projected elevation")
-            proj.project(swp.fwd_solvers[i].fields.elev_2d)
-            swp.solution_file.write(proj)
-
-        swp.transfer_forward_solution(i)
-        swp.setup_solver_forward(i)
-        swp.solve_forward_step(i, export_func=export_func)
-
-    # --- Convergence criteria
-
-    # Check QoI convergence
-    qoi = swp.quantity_of_interest()
-    print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-    swp.qois.append(qoi)
-    if len(swp.qois) > 1:
-        if np.abs(swp.qois[-1] - swp.qois[-2]) < op.qoi_rtol*swp.qois[-2]:
-            print_output("Converged quantity of interest!")
-            break
-
-    # # Check maximum number of iterations
-    if n == op.num_adapt - 1:
-        break
-
-    # Loop over mesh windows *in reverse*
-    indicators = [Function(P1, name="DWP indicator") for P1 in swp.P1]
-    metrics = [Function(P1_ten, name="Metric") for P1_ten in swp.P1_ten]
-    for i in range(swp.num_meshes-1, -1, -1):
-
-        # --- Solve adjoint on current window
-
-        adj_solutions_step = []
-
-        def export_func():
-            adj_solutions_step.append(swp.adj_solutions[i].copy(deepcopy=True))
-
-        swp.transfer_adjoint_solution(i)
-        swp.setup_solver_adjoint(i)
-        swp.solve_adjoint_step(i, export_func=export_func)
-
-        # --- Solve forward on current window
-
-        fwd_solutions_step = []
-
-        def export_func():
-            fwd_solutions_step.append(swp.fwd_solvers[i].fields.solution_2d.copy(deepcopy=True))
-
-        swp.transfer_forward_solution(i)
-        swp.setup_solver_forward(i)
-        swp.solve_forward_step(i, export_func=export_func)
-
-        # --- Assemble indicators and metrics
-
-        n_fwd = len(fwd_solutions_step)
-        n_adj = len(adj_solutions_step)
-        if n_fwd != n_adj:
-            raise ValueError("Mismatching number of indicators ({:d} vs {:d})".format(n_fwd, n_adj))
-        I = 0
-        op.print_debug("DWP indicators on mesh {:2d}".format(i))
-        for j, solutions in enumerate(zip(fwd_solutions_step, reversed(adj_solutions_step))):
-            scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule  # TODO: Other integrators
-            fwd_dot_adj = abs(inner(*solutions))
-            op.print_debug("    ||<q, q*>||_L2 = {:.4e}".format(assemble(fwd_dot_adj*fwd_dot_adj*dx)))
-            I += op.dt*swp.dt_per_mesh*scaling*fwd_dot_adj
-        indicators[i].interpolate(I)
-        metrics[i].assign(isotropic_metric(indicators[i], noscale=True, normalise=False))
-
-    # --- Normalise metrics
-
-    space_time_normalise(metrics, op=op)
-
-    # Output to .pvd and .vtu
-    metric_file = File(os.path.join(swp.di, 'metric.pvd'))
-    complexities = []
-    for indicator, M in zip(indicators, metrics):
-        swp.indicator_file._topology = None
-        swp.indicator_file.write(indicator)
-        metric_file._topology = None
-        metric_file.write(M)
-        complexities.append(metric_complexity(M))
-    swp.st_complexities.append(sum(complexities)*op.end_time/op.dt)
-
-    # --- Adapt meshes
-
-    print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-    for i, M in enumerate(metrics):
-        print_output("Adapting mesh {:d}/{:d}...".format(i+1, swp.num_meshes))
-        swp.meshes[i] = pragmatic_adapt(swp.meshes[i], M, op=op)
-    del metrics
-    swp.num_cells.append([mesh.num_cells() for mesh in swp.meshes])
-    swp.num_vertices.append([mesh.num_vertices() for mesh in swp.meshes])
-    print_output("Done!")
-
-    # ---  Setup for next run / logging
-
-    swp.set_meshes(swp.meshes)
-    swp.create_function_spaces()
-    swp.dofs.append([np.array(V.dof_count).sum() for V in swp.V])
-    swp.create_solutions()
-    swp.set_fields()
-    swp.set_stabilisation()
-    swp.set_boundary_conditions()
-    swp.callbacks = [{} for mesh in swp.meshes]
-
-    print_output("\nResulting meshes")
-    msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-    for i, c in enumerate(complexities):
-        print_output(msg.format(i, c, swp.num_vertices[n+1][i], swp.num_cells[n+1][i]))
-    print_output("")
-
-    # Check convergence of *all* element counts
-    converged = True
-    for i, num_cells_ in enumerate(swp.num_cells[n-1]):
-        if np.abs(swp.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
-            converged = False
-    if converged:
-        print_output("Converged number of mesh elements!")
-        break
-
-print_output("Gradation parameters:")
+# Print summary / logging
 for i in range(len(unknown)//2):
-    print_output("{:30s}: {:}".format(unknown[2*i][1:], unknown[2*i+1]))
+    logstr += "    {:32s}: {:}\n".format(unknown[2*i][1:], unknown[2*i+1]))
+logstr += 80*'*' + '\n'
+logstr += 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
+logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
+msg = "Mesh iteration {:2d}: qoi {:.4e} space-time complexity {:.4e}\n"
+for n in range(1, len(swp.qois)):
+    logstr += msg.format(n+1, swp.qois[n], swp.st_complexities[n])
+logstr += 80*'*' + '\n' + 30*' ' + 'FINAL ELEMENT COUNTS\n' + 80*'*' + '\n'
+l = op.end_time/op.num_meshes
+for i, num_cells in enumerate(swp.num_cells[-1]):
+    logstr += "Time window ({:7.1f},{:7.1f}]: {:7d}\n".format(i*l, (i+1)*l, num_cells)
+logstr += 80*'*' + '\n'
+print_output(logstr)
+date = datetime.date.today()
+date = '{:d}-{:d}-{:d}'.format(date.year, date.month, date.day)
+j = 0
+while True:
+    di = os.path.join(op.di, '{:s}-run-{:d}'.format(date, j))
+    if not os.path.exists(di):
+        create_directory(di)
+        break
+    j += 1
+with open(os.path.join(di, 'log'), 'w') as logfile:
+    logfile.write(logstr)
+print_output(di)

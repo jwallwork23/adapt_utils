@@ -1,6 +1,7 @@
 from thetis import *
 from firedrake.petsc import PETSc
 
+import os
 import numpy as np
 
 from adapt_utils.swe.utils import *
@@ -419,6 +420,8 @@ class AdaptiveProblem():
             self.solve_forward(**kwargs)
         elif self.approach == 'hessian':
             self.run_hessian_based(**kwargs)
+        elif self.approach == 'dwp':
+            self.run_dwp(**kwargs)
         elif self.approach in ('monge_ampere'):
             self.run_moving_mesh(**kwargs)
         else:
@@ -567,6 +570,136 @@ class AdaptiveProblem():
             metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
             for i, M in enumerate(metrics):
+                metric_file.write(M)
+                complexities.append(metric_complexity(M))
+            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
+
+            # --- Adapt meshes
+
+            print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+            for i, M in enumerate(metrics):
+                print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+            del metrics
+            self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
+            self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
+            print_output("Done!")
+
+            # ---  Setup for next run / logging
+
+            self.set_meshes(self.meshes)
+            self.create_function_spaces()
+            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
+            self.create_solutions()
+            self.set_fields()
+            self.set_stabilisation()
+            self.set_boundary_conditions()
+            self.callbacks = [{} for mesh in self.meshes]
+
+            print_output("\nResulting meshes")
+            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
+            for i, c in enumerate(complexities):
+                print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
+            print_output("")
+
+            # Check convergence of *all* element counts
+            converged = True
+            for i, num_cells_ in enumerate(self.num_cells[n-1]):
+                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
+                    converged = False
+            if converged:
+                print_output("Converged number of mesh elements!")
+                break
+
+    def run_dwp(self, **kwargs):
+        op = self.op
+        for n in range(op.num_adapt):
+
+            # --- Solve forward to get checkpoints
+
+            self.solution_file.__init__(self.solution_file.filename)
+            for i in range(self.num_meshes):
+                self.solution_file._topology = None
+
+                def export_func():
+                    proj = Function(self.P1[i], name="Projected elevation")
+                    proj.project(self.fwd_solvers[i].fields.elev_2d)
+                    self.solution_file.write(proj)
+
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward(i)
+                self.fwd_solvers[i].export_initial_state = i == 0
+                self.solve_forward_step(i, export_func=export_func)
+
+            # --- Convergence criteria
+
+            # Check QoI convergence
+            qoi = self.quantity_of_interest()
+            print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+            self.qois.append(qoi)
+            if len(self.qois) > 1:
+                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
+                    print_output("Converged quantity of interest!")
+                    break
+
+            # Check maximum number of iterations
+            if n == op.num_adapt - 1:
+                break
+
+            # Loop over mesh windows *in reverse*
+            indicators = [Function(P1, name="DWP indicator") for P1 in self.P1]
+            metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            for i in range(self.num_meshes-1, -1, -1):
+
+                # --- Solve adjoint on current window
+
+                adj_solutions_step = []
+
+                def export_func():
+                    adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
+
+                self.transfer_adjoint_solution(i)
+                self.setup_solver_adjoint(i)
+                self.solve_adjoint_step(i, export_func=export_func)
+
+                # --- Solve forward on current window
+
+                fwd_solutions_step = []
+
+                def export_func():
+                    fwd_solutions_step.append(self.fwd_solvers[i].fields.solution_2d.copy(deepcopy=True))
+
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward(i)
+                self.solve_forward_step(i, export_func=export_func)
+
+                # --- Assemble indicators and metrics
+
+                n_fwd = len(fwd_solutions_step)
+                n_adj = len(adj_solutions_step)
+                if n_fwd != n_adj:
+                    raise ValueError("Mismatching number of indicators ({:d} vs {:d})".format(n_fwd, n_adj))
+                I = 0
+                op.print_debug("DWP indicators on mesh {:2d}".format(i))
+                for j, solutions in enumerate(zip(fwd_solutions_step, reversed(adj_solutions_step))):
+                    scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule  # TODO: Other integrators
+                    fwd_dot_adj = abs(inner(*solutions))
+                    op.print_debug("    ||<q, q*>||_L2 = {:.4e}".format(assemble(fwd_dot_adj*fwd_dot_adj*dx)))
+                    I += op.dt*self.dt_per_mesh*scaling*fwd_dot_adj
+                indicators[i].interpolate(I)
+                metrics[i].assign(isotropic_metric(indicators[i], noscale=True, normalise=False))
+
+            # --- Normalise metrics
+
+            space_time_normalise(metrics, op=op)
+
+            # Output to .pvd and .vtu
+            metric_file = File(os.path.join(self.di, 'metric.pvd'))
+            complexities = []
+            for indicator, M in zip(indicators, metrics):
+                self.indicator_file._topology = None
+                self.indicator_file.write(indicator)
+                metric_file._topology = None
                 metric_file.write(M)
                 complexities.append(metric_complexity(M))
             self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
