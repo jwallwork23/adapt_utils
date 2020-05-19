@@ -230,7 +230,8 @@ class TsunamiOptions(ShallowWaterOptions):
 
     def set_qoi_kernel(self, fs):
         # b = self.ball(fs.mesh(), source=False)
-        b = self.circular_bump(fs.mesh(), source=False)
+        # b = self.circular_bump(fs.mesh(), source=False)
+        b = self.gaussian(fs.mesh(), source=False)
 
         # TODO: Normalise by area computed on fine reference mesh
         # area = assemble(b*dx)

@@ -9,14 +9,12 @@ from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 parser = argparse.ArgumentParser(prog="run_hessian_based")
 
-# Timstepping
+# Space-time domain
 parser.add_argument("-end_time", help="End time of simulation (default 24 minutes)")
-
-# Initial mesh
 parser.add_argument("-level", help="(Integer) mesh resolution (default 0)")
+parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
 
 # Mesh adaptation
-parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
 parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
 parser.add_argument("-normalisation", help="Normalisation method (default 'complexity')")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t")
