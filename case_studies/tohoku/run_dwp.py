@@ -226,5 +226,5 @@ for n in range(op.num_adapt):
         break
 
 print_output("Gradation parameters:")
-for key in unknown:
-    print_output("{:30s}: {:}".format(key, unknown[key]))
+for i in range(len(unknown)//2):
+    print_output("{:30s}: {:}".format(unknown[2*i][1:], unknown[2*i+1]))
