@@ -98,60 +98,23 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         z_old, zeta_old = split(self.adj_solutions_old[i])
 
         def TaylorHood(f0, f1):
-
-            # - ∇ (b ζ)
-            F = -inner(z_test, b*grad(f1))*dx
-
-            # - f perp(z)
-            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx
-
-            # - g ∇ . z
-            F += g*inner(grad(zeta_test), f0)*dx
-            # F += -g*inner(zeta_test, f0)*ds
+            F = -inner(z_test, b*grad(f1))*dx                     # - ∇ (b ζ)
+            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx  # - f perp(z)
+            F += g*inner(grad(zeta_test), f0)*dx                  # - g ∇ . z
             return F
 
         def Mixed(f0, f1):
-
-            # - ∇ (b ζ)
-            F = -inner(z_test, b*grad(f1))*dx
-
-            # - f perp(z)
-            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx
-
-            # - g ∇ . z
-            F += g*inner(grad(zeta_test), f0)*dx
-            # F += -g*inner(zeta_test*n, f0)*ds
-            F += -g*inner(avg(zeta_test*n), avg(f0))*dS  # TODO: Check
-            return F
-
-        def EqualOrder(f0, f1):  # TODO: test
-
-            # - ∇ (b ζ)
-            F = inner(div(b*z_test), f1)*dx
-            F += -inner(b*z_test, f1*n)*ds
-            zeta_star = avg(f1) + sqrt(avg(b)/g)*jump(f0, n)
-            F += zeta_star*jump(z_test, n)*dS
-
-            # - f perp(z)
-            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx
-
-            # - g ∇ . z
-            F += g*inner(grad(zeta_test), f0)*dx
-            z_rie = avg(f0) + sqrt(g/avg(b))*jump(f1, n)
-            F += g*inner(jump(zeta_test, n), avg(b)*z_rie)*dS
-            # F += -g*inner(zeta_test, f0)*ds
+            F = -inner(z_test, b*grad(f1))*dx                     # - ∇ (b ζ)
+            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx  # - f perp(z)
+            F += g*inner(grad(zeta_test), f0)*dx                  # - g ∇ . z
+            # F += -g*inner(avg(zeta_test*n), avg(f0))*dS           # flux term
             return F
 
         family = self.shallow_water_options['element_family']
-        if family == 'taylor-hood':
-            G = TaylorHood
-        elif family == 'dg-cg':
-            G = Mixed
-        elif family == 'dg-dg':
-            G = EqualOrder
-        else:
+        try:
+            G = {'taylor-hood': TaylorHood, 'dg-cg': Mixed}[family]
+        except KeyError:
             raise ValueError("Mixed discretisation {:s} not supported.".format(family))
-        print_output("### TODO: Implement adjoint bcs other than freeslip")
 
         # Time derivative
         a = inner(z_test, z)*dx + inner(zeta_test, zeta)*dx
@@ -166,6 +129,32 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         a += 0.5*dtc*G(z, zeta)
         L -= 0.5*dtc*G(z_old, zeta_old)
 
+        # Boundary conditions
+        # ===================
+        #   In the forward, we permit only free-slip conditions for the velocity and Dirichlet
+        #   conditions for the elevation. Suppose these are imposed on Gamma_1 and Gamma_2, which
+        #   are not necessarily disjoint. Then the adjoint has a free-slip condition for the adjoint
+        #   velocity on the complement of Gamma_2 and Dirichlet conditions for the elevation on the
+        #   complement of Gamma_1.
+        boundary_markers = self.meshes[i].exterior_facets.unique_markers
+        if self.boundary_conditions[i] == {}:  # Default Thetis boundary conditions are free-slip
+            self.boundary_conditions[i] = {j: {'un': Constant(0.0)} for j in boundary_markers}
+        for j in boundary_markers:
+            for bc in self.boundary_conditions[i].get(j):
+                if bc not in ('un', 'elev'):
+                    msg = "Have not considered continuous adjoint for boundary condition {:s}"
+                    raise NotImplementedError(msg.format(bc))
+        dbcs = []
+        for j in boundary_markers:
+            bcs = self.boundary_conditions[i].get(j)
+            if 'un' in bcs and 'elev' not in bcs:
+                L += g*inner(zeta_test, bcs['un'])*ds(j)
+            if 'elev' in bcs and 'un' not in bcs:
+                if zeta.ufl_element().family() == 'Lagrange':
+                    dbcs.append(DirichletBC(zeta.function_space(), 0, j))
+                else:
+                    raise NotImplementedError("Weak boundary conditions not yet implemented")  # TODO
+
         # dJdq forcing term
         self.get_qoi_kernels(i)
         t = op.dt*(i+1)*self.dt_per_mesh
@@ -175,7 +164,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         L += dtc*inner(zeta_test, self.time_kernel*dJdeta)*dx
 
         # Solver object
-        problem = LinearVariationalProblem(a, L, self.adj_solutions[i])
+        problem = LinearVariationalProblem(a, L, self.adj_solutions[i], bcs=dbcs)
         self.adj_solvers[i] = LinearVariationalSolver(problem, solver_parameters=op.adjoint_params)
 
     def solve_adjoint_step(self, i, export_func=None, update_forcings=None):
@@ -215,5 +204,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
             t -= op.dt
             j += 1
         assert j % op.dt_per_export == 0
-        export_func()
+        if export_func is not None:
+            export_func()
         op.print_debug("Done!")
