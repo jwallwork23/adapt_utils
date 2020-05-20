@@ -32,12 +32,12 @@ parser.add_argument("-element_rtol", help="Relative tolerance for element count 
 parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
 
 # QoI
-parser.add_argument("-start_time", help="Start time of period of interest")
+parser.add_argument("-start_time", help="Start time of period of interest (default 720s i.e. 12min)")
 parser.add_argument("-locations", help="""
 Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
-'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}.
+'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
 """)
-parser.add_argument("-radii", help="Radii of interest, separated by commas")
+parser.add_argument("-radii", help="Radii of interest, separated by commas (default 100km)")
 
 # Misc
 parser.add_argument("-debug", help="Print all debugging statements")
@@ -71,7 +71,7 @@ kwargs = {
     'family': args.family or 'dg-cg',
 
     # QoI
-    'start_time': float(args.start_time or 0.0),
+    'start_time': float(args.start_time or 720.0),
     'radii': radii,
     'locations': locations,
 
