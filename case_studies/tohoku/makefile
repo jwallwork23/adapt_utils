@@ -41,6 +41,16 @@ dwp:
 	@python3 run_dwp.py -dm_plex_prescribed_boundary_labels 200 -dm_plex_prescribed_boundary_sizes 10e3
 	@echo "Done!"
 
+qmesh_linear:
+	@echo "Running convergence analysis using linear shallow water equations..."
+	@python3 run_qmesh_convergence.py
+	@echo "Done!"
+
+qmesh_nonlinear:
+	@echo "Running convergence analysis using nonlinear shallow water equations..."
+	@python3 run_qmesh_convergence.py -nonlinear 1
+	@echo "Done!"
+
 clean:
 	@echo "Cleaning directory..."
 	@rm -rf outputs/*.pvd

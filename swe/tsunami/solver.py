@@ -73,8 +73,8 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
 
         self.callbacks[i]["qoi"] = callback.TimeIntegralCallback(
             qoi, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
-            # name="qoi", append_to_log=op.debug
-            name="qoi", append_to_log=False
+            name="qoi", append_to_log=op.debug
+            # name="qoi", append_to_log=False
         )
         self.fwd_solvers[i].add_callback(self.callbacks[i]["qoi"], 'timestep')
 

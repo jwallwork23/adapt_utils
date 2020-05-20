@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(prog="run_continuous_adjoint")
 # Space-time domain
 parser.add_argument("-end_time", help="""
 End time of simulation in seconds (default 1440s, i.e. 24mins)""")
-parser.add_argument("-level", help="(Integer) resolution for initial mesh")
+parser.add_argument("-level", help="(Integer) resolution for initial mesh (default 2)")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (for testing, default 1)")
 
 # Solver
@@ -19,7 +19,7 @@ parser.add_argument("-family", help="Element family for mixed FE space (default 
 
 # QoI
 parser.add_argument("-start_time", help="""
-Start time of period of interest in seconds (default 720s, i.e. 12mins)""")
+Start time of period of interest in seconds (default 1200s, i.e. 20mins)""")
 parser.add_argument("-locations", help="""
 Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
 'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')""")
@@ -46,8 +46,7 @@ if len(locations) != len(radii):
 # Set parameters for fixed mesh adjoint run
 op = TohokuOptions(
     start_time=float(args.start_time or 0.0),
-    end_time=float(args.end_time or 720.0),
-    # family=args.family or 'taylor-hood',
+    end_time=float(args.end_time or 1200.0),
     family=args.family or 'dg-cg',
     level=int(args.level or 2),
     approach='fixed_mesh',
