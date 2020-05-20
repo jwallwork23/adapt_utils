@@ -100,7 +100,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         def TaylorHood(f0, f1):
 
             # - ∇ (b ζ)
-            F = -inner(z_test, grad(b*f1))*dx
+            F = -inner(z_test, b*grad(f1))*dx
 
             # - f perp(z)
             F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx
@@ -113,7 +113,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         def Mixed(f0, f1):
 
             # - ∇ (b ζ)
-            F = -inner(z_test, grad(b*f1))*dx
+            F = -inner(z_test, b*grad(f1))*dx
 
             # - f perp(z)
             F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx
@@ -127,8 +127,8 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         def EqualOrder(f0, f1):  # TODO: test
 
             # - ∇ (b ζ)
-            F = inner(div(z_test), b*f1)*dx
-            F += -inner(z_test, b*f1*n)*ds
+            F = inner(div(b*z_test), f1)*dx
+            F += -inner(b*z_test, f1*n)*ds
             zeta_star = avg(f1) + sqrt(avg(b)/g)*jump(f0, n)
             F += zeta_star*jump(z_test, n)*dS
 
