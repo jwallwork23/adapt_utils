@@ -13,13 +13,13 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
 
     # -- Setup
 
-    def __init__(self, *args, extension=None, **kwargs):
+    def __init__(self, *args, extension=None, nonlinear=False, **kwargs):
         self.extension = extension
         super(AdaptiveTsunamiProblem, self).__init__(*args, **kwargs)
         self.callbacks = [{} for mesh in self.meshes]
 
         # Use linearised equations
-        self.shallow_water_options['use_nonlinear_equations'] = False
+        self.shallow_water_options['use_nonlinear_equations'] = nonlinear
 
         # # Don't bother plotting velocity
         # self.io_options['fields_to_export'] = ['elev_2d'] if self.op.plot_pvd else []
@@ -180,8 +180,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         op = self.op
         t = op.dt*(i+1)*self.dt_per_mesh
         end_time = op.dt*i*self.dt_per_mesh
-        op.print_debug("Entering adjoint time loop...")
-        j = 0
 
         # Need to project to P1 for plotting
         self.adjoint_solution_file._topology = None  # Account for mesh adaptations
@@ -189,6 +187,8 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         z_out = Function(self.P1_vec[i], name="Projected adjoint velocity")
         zeta_out = Function(self.P1[i], name="Projected adjoint elevation")
 
+        j = 0
+        op.print_debug("Entering adjoint time loop...")
         while t > end_time:
             if update_forcings is not None:
                 update_forcings(t)
