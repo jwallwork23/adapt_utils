@@ -67,8 +67,7 @@ save_plex = bool(args.save_plex or False)
 logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
 for key in kwargs:
     logstr += "    {:24s}: {:}\n".format(key, kwargs[key])
-logstr += 80*'*' + '\n'
-print_output(logstr)
+print_output(logstr + 80*'*' + '\n')
 
 # Create parameter class and problem object
 op = TohokuOptions(approach='hessian')
@@ -77,7 +76,11 @@ swp = AdaptiveTsunamiProblem(op)  # TODO: Option to load plexes
 swp.run_hessian_based()
 
 # Print summary / logging
-logstr += 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
+with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
+    for line in gitlog:
+        words = line.split()
+    kwargs['adapt_utils git commit'] = words[1]
+logstr += 80*'*' + '\n' + 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
 logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
 msg = "Mesh iteration {:2d}: qoi {:.4e} space-time complexity {:.4e}\n"
 for n in range(1, len(swp.qois)):

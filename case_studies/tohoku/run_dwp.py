@@ -104,8 +104,12 @@ swp = AdaptiveTsunamiProblem(op)
 swp.run_dwp()
 
 # Print summary / logging
+with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
+    for line in gitlog:
+        words = line.split()
+    logstr += "    {:32s}: {:}\n".format('adapt_utils git commit', words[1])
 for i in range(len(unknown)//2):
-    logstr += "    {:32s}: {:}\n".format(unknown[2*i][1:], unknown[2*i+1]))
+    logstr += "    {:32s}: {:}\n".format(unknown[2*i][1:], unknown[2*i+1])
 logstr += 80*'*' + '\n'
 logstr += 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
 logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
