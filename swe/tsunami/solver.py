@@ -139,21 +139,23 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         boundary_markers = self.meshes[i].exterior_facets.unique_markers
         if self.boundary_conditions[i] == {}:  # Default Thetis boundary conditions are free-slip
             self.boundary_conditions[i] = {j: {'un': Constant(0.0)} for j in boundary_markers}
-        for j in boundary_markers:
-            for bc in self.boundary_conditions[i].get(j):
-                if bc not in ('un', 'elev'):
-                    msg = "Have not considered continuous adjoint for boundary condition {:s}"
-                    raise NotImplementedError(msg.format(bc))
         dbcs = []
         for j in boundary_markers:
             bcs = self.boundary_conditions[i].get(j)
-            if 'un' in bcs and 'elev' not in bcs:
-                L += g*inner(zeta_test, bcs['un'])*ds(j)
-            if 'elev' in bcs and 'un' not in bcs:
+            if 'un' in bcs:
+                if 'elev' in bcs:
+                    a += -0.5*dtc*g*inner(zeta_test, dot(z, n))*ds(j)
+                    L += 0.5*dtc*g*inner(zeta_test, dot(z_old, n))*ds(j)
+                else:
+                    L += dtc*g*inner(zeta_test, bcs['un'])*ds(j)
+            elif 'elev' in bcs:
                 if zeta.ufl_element().family() == 'Lagrange':
                     dbcs.append(DirichletBC(zeta.function_space(), 0, j))
                 else:
                     raise NotImplementedError("Weak boundary conditions not yet implemented")  # TODO
+            else:
+                msg = "Have not considered continuous adjoint for boundary condition {:s}"
+                raise NotImplementedError(msg.format(bc))
 
         # dJdq forcing term
         self.get_qoi_kernels(i)
