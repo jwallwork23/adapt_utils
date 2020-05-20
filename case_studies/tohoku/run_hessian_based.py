@@ -24,6 +24,15 @@ parser.add_argument("-target", help="Target space-time complexity (default 1.0e+
 parser.add_argument("-h_min", help="Minimum tolerated element size (default 100m)")
 parser.add_argument("-h_max", help="Maximum tolerated element size (default 1000km)")
 
+# QoI
+parser.add_argument("-start_time", help="""
+Start time of period of interest in seconds (default 1200s i.e. 20min)""")
+parser.add_argument("-locations", help="""
+Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
+'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
+""")
+parser.add_argument("-radii", help="Radii of interest, separated by commas (default 100km)")
+
 # Outer loop
 parser.add_argument("-num_adapt", help="Maximum number of adaptation loop iterations (default 35)")
 parser.add_argument("-element_rtol", help="Relative tolerance for element count (default 0.005)")
@@ -34,6 +43,19 @@ parser.add_argument("-save_plex", help="Save final set of mesh DMPlexes to disk"
 parser.add_argument("-debug", help="Print all debugging statements")
 args = parser.parse_args()
 p = args.norm_order
+
+# Collect locations and radii
+if args.locations is None:
+    locations = ['Fukushima Daiichi', ]
+else:
+    locations = args.locations.split(',')
+if args.radii is None:
+    radii = [100.0e+03 for l in locations]
+else:
+    radii = [float(r) for r in args.radii.split(',')]
+if len(locations) != len(radii):
+    msg = "Number of locations ({:d}) and radii ({:d}) do not match."
+    raise ValueError(msg.format(len(locations), len(radii)))
 
 kwargs = {
 
@@ -53,6 +75,11 @@ kwargs = {
     'target': float(args.target or 5.0e+03),
     'h_min': float(args.h_min or 1.0e+02),
     'h_max': float(args.h_max or 1.0e+06),
+
+    # QoI
+    'start_time': float(args.start_time or 1200.0),
+    'radii': radii,
+    'locations': locations,
 
     # Outer loop
     'element_rtol': float(args.element_rtol or 0.005),

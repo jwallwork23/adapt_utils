@@ -15,7 +15,7 @@ runs = args.runs.split(',')
 assert len(dates) == len(runs)
 
 for date, run in zip(dates, runs):
-    filename = os.path.join(di, '-run'.join([date, run]), 'log')
+    filename = os.path.join(di, '-'.join([date, 'run', run]), 'log')
     use = False
     elements, qois = [], []
     nonlinear = False

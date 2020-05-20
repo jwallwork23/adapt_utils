@@ -12,9 +12,9 @@ from adapt_utils.adapt.adaptation import pragmatic_adapt
 parser = argparse.ArgumentParser(prog="run_dwp")
 
 # Space-time domain
-parser.add_argument("-end_time", help="End time of simulation")
-parser.add_argument("-level", help="(Integer) mesh resolution")
-parser.add_argument("-num_meshes", help="Number of meshes to consider")
+parser.add_argument("-end_time", help="End time of simulation in seconds (default 1400s i.e. 24min)")
+parser.add_argument("-level", help="(Integer) resolution for initial mesh (default 0)")
+parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
 
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space")
@@ -32,7 +32,8 @@ parser.add_argument("-element_rtol", help="Relative tolerance for element count 
 parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
 
 # QoI
-parser.add_argument("-start_time", help="Start time of period of interest (default 720s i.e. 12min)")
+parser.add_argument("-start_time", help="""
+Start time of period of interest (default 1200s i.e. 20mins)""")
 parser.add_argument("-locations", help="""
 Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
 'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
