@@ -24,23 +24,68 @@ class TsunamiOptions(ShallowWaterOptions):
         super(TsunamiOptions, self).__init__(**kwargs)
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False
-        self.base_viscosity = 1.0e-3
         self.gauges = {}
         self.locations_of_interest = {}
 
+        # Stabilisation
+        # =============
+        # In some cases qmesh generated meshes can have tiny elements with sharp angles
+        # near the coast. To account for this, we set a large SIPG parameter value. (If
+        # we use the automatic SIPG functionality then it would return an enormous value.)
+        self.base_viscosity = 1.0e-03
+        self.sipg_parameter = Constant(100.0)
+
         # Solver
+        # =====
+        # The time-dependent shallow water system looks like
+        #
+        #                             ------------------------- -----   -----
+        #       ------------- -----   |                 |     | |   |   |   |
+        #       | A00 | A01 | | U |   |  T + C + V + D  |  G  | | U |   | 0 |
+        # A x = ------------- ----- = |                 |     | |   | = |   |  = b,
+        #       | A10 | A11 | | H |   ------------------------- -----   -----
+        #       ------------- -----   |        B        |  T  | | H |   | 0 |
+        #                             ------------------------- -----   -----
+        #
+        # where:
+        #  * T - time derivative;
+        #  * C - Coriolis;
+        #  * V - viscosity;
+        #  * D - quadratic drag;
+        #  * G - gravity;
+        #  * B - bathymetry.
+        #
+        # We apply a multiplicative fieldsplit preconditioner, i.e. block Gauss-Seidel:
+        #
+        #     ---------------- ------------ ----------------
+        #     | I |     0    | |   I  | 0 | | A00^{-1} | 0 |
+        # P = ---------------- ------------ ----------------.
+        #     | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
+        #     ---------------- ------------ ----------------
         self.params = {
-            "ksp_type": "gmres",
-            "pc_type": "fieldsplit",
-            "pc_fieldsplit_type": "multiplicative",  # Block Gauss-Seidel
-            # "pc_fieldsplit_type": "symmetric_multiplicative",  # Symmetric version
+            "ksp_type": "gmres",                     # default
+            "ksp_converged_reason": None,
+            "pc_type": "fieldsplit",                 # default
+            "pc_fieldsplit_type": "multiplicative",  # default
+            "fieldsplit_U_2d": {
+                "ksp_type": "preonly",               # default
+                "ksp_max_it": 10000,                 # default
+                "ksp_rtol": 1.0e-05,                 # default
+                "pc_type": "sor",                    # default
+                # "ksp_view": None,
+                # "ksp_converged_reason": None,
+            },
+            "fieldsplit_H_2d": {
+                "ksp_type": "preonly",               # default
+                "ksp_max_it": 10000,                 # default
+                "ksp_rtol": 1.0e-05,                 # default
+                # "pc_type": "sor",                  # default
+                "pc_type": "jacobi",
+                # "ksp_view": None,
+                # "ksp_converged_reason": None,
+            },
         }
-        self.adjoint_params = {
-            "ksp_type": "gmres",
-            "pc_type": "fieldsplit",
-            "pc_fieldsplit_type": "multiplicative",  # Block Gauss-Seidel
-            # "pc_fieldsplit_type": "symmetric_multiplicative",  # Symmetric version
-        }
+        self.adjoint_params.update(self.params)
 
     def get_utm_mesh(self):
         zone = self.force_zone_number
