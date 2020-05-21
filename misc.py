@@ -12,7 +12,7 @@ from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 __all__ = ["copy_mesh", "get_finite_element", "get_component_space", "get_component", "cg2dg",
            "check_spd", "get_boundary_nodes", "index_string",
-           "find", "suppress_output"]
+           "find", "suppress_output", "knownargs2dict", "unknownargs2dict"]
 
 
 def copy_mesh(mesh):
@@ -51,7 +51,7 @@ def get_component(f, index, component_space=None):
         raise IndexError("Requested index {:d} of a {:d}-vector.".format(index, n))
 
     # Create appropriate component space
-    fi = Function(component_space or get_component_space(fs))
+    fi = Function(component_space or get_component_space(f.function_space()))
 
     # Transfer data
     par_loop(('{[i] : 0 <= i < v.dofs}', 's[i] = v[i, %d]' % index), dx,
@@ -157,6 +157,36 @@ def find(pattern, path):
             if fnmatch.fnmatch(name, pattern):
                 result.append(os.path.join(root, name))
     return result
+
+
+def knownargs2dict(ka):
+    """Extract all public attributes from namespace `ka` and return as a dictionary."""
+    out = {}
+    for arg in [arg for arg in dir(ka) if arg[0] != '_']:
+        attr = ka.__getattribute__(arg)
+        if attr is not None:
+            if attr == '1':
+                out[arg] = None
+            # TODO: Account for integers
+            # TODO: Account for floats
+            else:
+                out[arg] = attr
+    return out
+
+
+def unknownargs2dict(ua):
+    """Extract all public attributes from list `ua` and return as a dictionary."""
+    out = {}
+    for i in range(len(ua)//2):
+        key = ua[2*i][1:]
+        val = ua[2*i+1]
+        if val == '1':
+            out[key] = None
+        # TODO: Account for integers
+        # TODO: Account for floats
+        else:
+            out[key] = val
+    return out
 
 
 class suppress_output(object):
