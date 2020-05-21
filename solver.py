@@ -603,7 +603,7 @@ class SteadyProblem():
         H_scaled = Function(self.P1_ten).assign(0.0)
         kernel = eigen_kernel(matscale, self.mesh.topological_dimension())
         op2.par_loop(kernel, self.P1.node_set, H_scaled.dat(op2.RW), H.dat(op2.READ), self.indicator.dat(op2.READ))
-        self.M = steady_metric(self.solution if adjoint else self.adjoint_solution, H=H, op=self.op)
+        self.M = steady_metric(self.solution if adjoint else self.adjoint_solution, H=H_scaled, op=self.op)
 
     def plot_mesh(self):
         meshfile = File(os.path.join(self.di, 'mesh.pvd'))
