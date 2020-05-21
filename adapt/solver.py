@@ -74,6 +74,8 @@ class AdaptiveProblem():
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
             # 'check_volume_conservation_2d': True,
         }
+        if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
+            self.shallow_water_options['sipg_parameter'] = op.sipg_parameter
         self.tracer_options = {  # TODO
             'solve_tracer': op.solve_tracer,
             'tracer_only': not op.solve_swe,
