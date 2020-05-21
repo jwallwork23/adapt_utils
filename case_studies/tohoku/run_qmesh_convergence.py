@@ -19,7 +19,7 @@ parser.add_argument("-family", help="Element family for mixed FE space (default 
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
 
 # Outer loop
-parser.add_argument("-levels", help="Number of mesh levels to consider (default 10)")
+parser.add_argument("-levels", help="Number of mesh levels to consider (default 4)")
 
 # QoI
 parser.add_argument("-start_time", help="""
@@ -111,3 +111,4 @@ while True:
 with open(os.path.join(logdir, 'log'), 'w') as logfile:
     logfile.write(logstr)
 print_output(logstr)
+print_output(logdir)

@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(prog="run_continuous_adjoint")
 # Space-time domain
 parser.add_argument("-end_time", help="""
 End time of simulation in seconds (default 1440s, i.e. 24mins)""")
-parser.add_argument("-level", help="(Integer) resolution for initial mesh (default 2)")
+parser.add_argument("-level", help="(Integer) resolution for initial mesh (default 0)")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (for testing, default 1)")
 
 # Solver
@@ -48,7 +48,7 @@ op = TohokuOptions(
     start_time=float(args.start_time or 0.0),
     end_time=float(args.end_time or 1200.0),
     family=args.family or 'dg-cg',
-    level=int(args.level or 2),
+    level=int(args.level or 0),
     approach='fixed_mesh',
     plot_pvd=True,
     debug=bool(args.debug or False),

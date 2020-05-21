@@ -26,16 +26,21 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, level=0, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
+    def __init__(self, mesh=None, level=0, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
+
+        # Stabilisation
+        self.use_automatic_sipg_parameter = False
+        self.sipg_parameter = None
         self.base_viscosity = 0.0
+        # self.base_viscosity = 1.0e-03
 
         # Mesh
         self.print_debug("Loading mesh...")
         self.resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
         self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}.msh'.format(level))
-        self.default_mesh = Mesh(self.meshfile)
+        self.default_mesh = mesh or Mesh(self.meshfile)
         self.print_debug("Done!")
 
         # Fields
@@ -121,8 +126,10 @@ class TohokuOptions(TsunamiOptions):
     def set_boundary_conditions(self, fs):
         ocean_tag = 100
         coast_tag = 200
+        fukushima_tag = 300
         self.boundary_conditions = {
             coast_tag: {'un': Constant(0.0)},
+            fukushima_tag: {'un': Constant(0.0)},
             ocean_tag: {'un': Constant(0.0), 'elev': Constant(0.0)},  # Weakly reflective boundaries
         }
         # TODO: Sponge at ocean boundary?
