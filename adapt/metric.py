@@ -7,7 +7,7 @@ from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hes
 from adapt_utils.adapt.kernels import *
 
 
-__all__ = ["metric_complexity",
+__all__ = ["metric_complexity", "cell_size_metric",
            "steady_metric", "isotropic_metric", "space_normalise", "space_time_normalise",
            "combine_metrics", "metric_intersection", "metric_average"]
 
@@ -325,30 +325,34 @@ def isotropic_metric(f, **kwargs):
     return interpolate(M_diag*Identity(dim), V_ten)
 
 
+def cell_size_metric(mesh, op=Options()):
+    P1 = FunctionSpace(mesh, "CG", 1)
+    return isotropic_metric(interpolate(pow(CellSize(mesh), -2), P1), normalise=False, op=op)
+
+
 # --- Metric combination methods
 
 
-def metric_intersection(*metrics, bdy=None):
+def metric_intersection(*metrics, **kwargs):
     r"""
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
 
     :arg metrics: metrics to be intersected.
-    :param bdy: specify domain boundary to intersect over.
+    :param boundary_tag: specify domain boundary to intersect over.
     :return: intersection of metrics M1 and M2.
     """
     n = len(metrics)
     assert n > 0
     M = metrics[0]
     for i in range(1, n):
-        M = _metric_intersection_pair(M, metrics[i], bdy=bdy)
+        M = _metric_intersection_pair(M, metrics[i], **kwargs)
     return M
 
 
-def _metric_intersection_pair(M1, M2, bdy=None):
-    if bdy is not None:
-        raise NotImplementedError  # FIXME: boundary intersection below does not work
+def _metric_intersection_pair(M1, M2, boundary_tag=None):
     V = M1.function_space()
-    node_set = V.boundary_nodes(bdy, 'topological') if bdy is not None else V.node_set
+    # node_set = V.boundary_nodes(bdy, 'topological') if bdy is not None else V.node_set
+    node_set = V.node_set if boundary_tag is None else DirichletBC(V, 0, boundary_tag).node_set
     dim = V.mesh().topological_dimension()
     assert dim in (2, 3)
     assert V == M2.function_space()
