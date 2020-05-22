@@ -173,130 +173,6 @@ class TsunamiOptions(ShallowWaterOptions):
         self.coriolis.interpolate(2*self.Omega*sin(radians(lat)))
         return self.coriolis
 
-    # TODO: Plot multiple mesh approaches
-    def plot_timeseries(self, gauge, plot_lp=False, cutoff=24, plot_pdf=False, plot_png=True, nonlinear=False):
-        """
-        Plot timeseries for `gauge` under all stored mesh resolutions.
-
-        :arg gauge: tag for gauge to be plotted.
-        :kwarg plot_lp: toggle plotting of Lp errors.
-        :kwarg cutoff: time cutoff level.
-        """
-        if gauge not in self.gauges:
-            msg = "Gauge '{:s}' is not valid. Choose from {:}."
-            raise ValueError(msg.format(gauge, self.gauges.keys()))
-        fexts = []
-        if plot_pdf:
-            fexts.append('pdf')
-        if plot_png:
-            fexts.append('png')
-
-        fig, ax = plt.subplots(figsize=(10.0, 5.0))
-
-        # Plot measurements
-        print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
-        if 'data' in self.gauges[gauge]:
-            y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
-        else:
-            y_data = np.array([])
-        t = np.linspace(0, float(len(y_data)-1), len(y_data))  # TODO: Read from 'time' in HDF5 file
-        ax.plot(t, y_data, label='Data', linestyle='solid')
-
-        # Dictionary for norms and errors of timeseries
-        if 'data' in self.gauges[gauge]:
-            errors = {'tv': {'data': total_variation(y_data), 'name': 'total variation'}}
-            if plot_lp:
-                errors['l1'] = {'data': lp_norm(y_data, p=1), 'name': r'$\ell_1$ error'}
-                errors['l2'] = {'data': lp_norm(y_data, p=2), 'name': r'$\ell_2$ error'}
-                errors['linf'] = {'data': lp_norm(y_data, p='inf'), 'name': r'$\ell_\infty$ error'}
-            for key in errors:
-                errors[key]['abs'] = []
-                errors[key]['rel'] = []
-
-        # Loop over runs
-        num_cells = []
-        for level in range(4):
-            tag = 'nonlinear_level{:d}'.format(level)
-            if not nonlinear:
-                tag = tag[3:]
-            fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, '0.hdf5']))
-            if not os.path.exists(fname):
-                continue
-            fname = os.path.join(self.di, '_'.join(['meshdata', tag, '0.hdf5']))
-            if not os.path.exists(fname):
-                continue
-            with h5py.File(fname, 'r') as f:
-                num_cells.append(f['num_cells'][()])
-
-            # Global time and profile arrays
-            T = np.array([])
-            Y = np.array([])
-
-            # Loop over mesh iterations  # FIXME: Only currently works for fixed mesh
-            for i in range(self.num_meshes):
-                fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, str(i)+'.hdf5']))
-                assert os.path.exists(fname)
-                with h5py.File(fname, 'r') as f:
-                    y = f[gauge][()]
-                    y = y.reshape(len(y),)[:cutoff+1]
-
-                    if i == 0:
-                        y0 = y[0]
-                    y -= y0
-                    y = np.round(y, 2)  # Ensure consistent precision  # TODO: Update as above
-                    t = f["time"][()]
-                    t = t.reshape(len(t),)[:cutoff+1]/60.0
-
-                # Put arrays from individual meshes into global arrays
-                T = np.concatenate((T, t))
-                Y = np.concatenate((Y, y))
-
-            # Plot timeseries for current mesh
-            label = '{:s} ({:d} elements)'.format(self.approach, num_cells[-1])
-            label = label.replace('_', ' ').title()
-            ax.plot(T, Y, label=label, linestyle='dashed', marker='x')
-
-            # Compute absolute and relative errors
-            if 'data' in self.gauges[gauge]:
-                error = np.array(Y[:cutoff+1]) - np.array(y_data[:cutoff+1])
-                if plot_lp:
-                    for p in ('l1', 'l2', 'linf'):
-                        errors[p]['abs'].append(lp_norm(error, p=p))
-                errors['tv']['abs'].append(total_variation(error))
-                for key in errors:
-                    errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
-
-        # plt.xlabel(r"Time $[\mathrm{min}]$")
-        plt.xlabel("Time [min]")
-        # plt.ylabel(r"Free surface displacement $[\mathrm m]$")
-        plt.ylabel("Free surface displacement [m]")
-        plt.xlim([0, cutoff])
-        plt.ylim([-2, 5])
-        plt.grid(True)
-
-        # Legend to one side
-        box = ax.get_position()
-        ax.set_position([box.x0, box.y0, box.width*0.8, box.height])
-        ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-
-        fname = "gauge_timeseries_{:s}_{:s}linear".format(gauge, 'non' if nonlinear else '')
-        for fext in fexts:
-            fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
-
-        # Plot relative errors
-        if 'data' not in self.gauges[gauge]:
-            raise ValueError("Data not found.")
-        for key in errors:
-            fig, ax = plt.subplots(figsize=(3.2, 4.8))
-            ax.semilogx(num_cells, 100.0*np.array(errors[key]['rel']), marker='o')
-            plt.xlabel("Number of elements")
-            # plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
-            plt.ylabel("Relative {:s} (%)".format(errors[key]['name']))
-            plt.grid(True)
-            fname = "gauge_{:s}_error_{:s}_{:s}linear".format(key, gauge, 'non' if nonlinear else '')
-            for fext in fexts:
-                fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
-
     def set_qoi_kernel(self, fs):
         # b = self.ball(fs.mesh(), source=False)
         # b = self.circular_bump(fs.mesh(), source=False)
@@ -321,3 +197,139 @@ class TsunamiOptions(ShallowWaterOptions):
             self.set_qoi_kernel(fs)
         ftc.assign(self.kernel)
         return ftc
+
+    # TODO: Plot multiple mesh approaches
+    def plot_timeseries(self, gauge, **kwargs):
+        """
+        Plot timeseries for `gauge` under all stored mesh resolutions.
+
+        :arg gauge: tag for gauge to be plotted.
+        :kwarg cutoff: time cutoff level.
+        """
+        cutoff = kwargs.get('cutoff', 24)
+        if gauge not in self.gauges:
+            msg = "Gauge '{:s}' is not valid. Choose from {:}."
+            raise ValueError(msg.format(gauge, self.gauges.keys()))
+        fexts = []
+        if kwargs.get('plot_pdf', False):
+            fexts.append('pdf')
+        if kwargs.get('plot_png', True):
+            fexts.append('png')
+
+        # Get data
+        print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
+        if 'data' in self.gauges[gauge]:
+            y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
+        else:
+            y_data = np.array([])
+        y_data = np.array(y_data[:cutoff+1])
+        t = np.linspace(0, float(len(y_data)-1), len(y_data))  # TODO: Read from 'time' in HDF5 file
+
+        def evaluate_error(dat, name):
+            """Helper function for evaluating timeseries error."""
+            if name == 'tv':
+                return total_variation(dat)
+            elif name[0] == 'l':
+                return lp_norm(dat, p=name)
+            else:
+                raise ValueError("Error type '{:s}' not recognised.".format(name))
+
+        # Dictionary for norms and errors of timeseries
+        if 'data' in self.gauges[gauge]:
+            errors = {
+                'tv': {'name': 'total variation'},
+                # 'l1': {'name': r'$\ell_1$ error'},
+                # 'l2': {'name': r'$\ell_2$ error'},
+                # 'linf': {'name': r'$\ell_\infty$ error'},
+            }
+            for key in errors:
+                errors[key]['data'] = evaluate_error(y_data, key)
+                for linearity in ('linear', 'nonlinear'):
+                    errors[key][linearity] = {'abs': [], 'rel': []}
+
+        # Consider cases of both linear and nonlinear shallow water equations
+        num_cells = []
+        for linearity in ('linear', 'nonlinear'):
+
+            # Plot observations
+            fig, ax = plt.subplots(figsize=(10.0, 5.0))
+            ax.plot(t, y_data, label='Data', linestyle='solid')
+
+            # Loop over runs
+            for level in range(4):
+                tag = '{:s}_level{:d}'.format(linearity, level)
+                fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, '0.hdf5']))
+                if not os.path.exists(fname):
+                    continue
+                fname = os.path.join(self.di, '_'.join(['meshdata', tag, '0.hdf5']))
+                if not os.path.exists(fname):
+                    continue
+                if len(num_cells) < level+1:
+                    with h5py.File(fname, 'r') as f:
+                        num_cells.append(f['num_cells'][()])
+
+                # Global time and profile arrays
+                T = np.array([])
+                Y = np.array([])
+
+                # Loop over mesh iterations  # FIXME: Only currently works for fixed mesh
+                for i in range(self.num_meshes):
+                    fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, str(i)+'.hdf5']))
+                    assert os.path.exists(fname)
+                    with h5py.File(fname, 'r') as f:
+                        y = f[gauge][()]
+                        y = y.reshape(len(y),)[:cutoff+1]
+
+                        if i == 0:
+                            y0 = y[0]
+                        y -= y0
+                        y = np.round(y, 2)  # Ensure consistent precision  # TODO: Update as above
+                        t = f["time"][()]
+                        t = t.reshape(len(t),)[:cutoff+1]/60.0
+
+                    # Put arrays from individual meshes into global arrays
+                    T = np.concatenate((T, t))
+                    Y = np.concatenate((Y, y))
+
+                # Plot timeseries for current mesh
+                label = '{:s} ({:d} elements)'.format(self.approach, num_cells[-1])
+                label = label.replace('_', ' ').title()
+                ax.plot(T, Y, label=label, linestyle='dashed', marker='x')
+
+                # Compute absolute and relative errors
+                if 'data' in self.gauges[gauge]:
+                    error = np.array(Y[:cutoff+1]) - y_data
+                    for key in errors:
+                        err = evaluate_error(error, key)
+                        errors[key][linearity]['abs'].append(err)
+                        errors[key][linearity]['rel'].append(err/errors[key]['data'])
+
+            # Plot labels etc.
+            ax.set_xlabel("Time [min]")
+            ax.set_ylabel("Free surface displacement [m]")
+            ax.set_xlim([0, cutoff])
+            ax.set_ylim([-2, 5])
+            plt.grid(True)
+            box = ax.get_position()
+            ax.set_position([box.x0, box.y0, box.width*0.8, box.height])
+            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            fname = "gauge_timeseries_{:s}_{:s}".format(gauge, linearity)
+            for fext in fexts:
+                fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
+
+        # Plot relative errors
+        if 'data' not in self.gauges[gauge]:
+            raise ValueError("Data not found.")
+        for key in errors:
+            fig, ax = plt.subplots(figsize=(3.2, 4.8))
+            for linearity in ('linear', 'nonlinear'):
+                relative_errors = 100.0*np.array(errors[key][linearity]['rel'])
+                cells = num_cells[:len(relative_errors)]
+                ax.semilogx(cells, relative_errors, marker='o', label=linearity.title())
+            ax.set_xlabel("Number of elements")
+            ax.set_ylabel("Relative {:s} (%)".format(errors[key]['name']))
+            plt.grid(True)
+            ax.legend()
+            fname = "gauge_{:s}_error_{:s}".format(key, gauge)
+            for fext in fexts:
+                fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
