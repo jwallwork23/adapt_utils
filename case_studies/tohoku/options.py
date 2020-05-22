@@ -67,13 +67,8 @@ class TohokuOptions(TsunamiOptions):
             "804": {"lonlat": (142.1867, 39.6272)},
             "806": {"lonlat": (141.1856, 36.9714)},
         }
-        # TODO: Use converted pressure timeseries
-        self.gauges["P02"]["data"] = [0.00, 0.07, 0.12, 0.46, 0.85, 1.20, 1.55, 1.90, 2.25, 2.50,
-                                      2.80, 3.10, 3.90, 4.80, 4.46, 2.25, -0.45, -0.17, -1.60,
-                                      -0.82, -0.44, -0.26, -0.08, 0.13, 0.42, 0.71]
-        self.gauges["P06"]["data"] = [0.00, 0.10, 0.30, 0.65, 1.05, 1.35, 1.65, 1.95, 2.25, 2.55,
-                                      2.90, 3.50, 4.50, 4.85, 3.90, 1.55, -0.35, -1.05, -0.65,
-                                      -0.30, -0.15, 0.05, 0.18, 0.35, 0.53, 0.74]
+        self.pressure_gauges = ("P02", "P06")
+        self.gps_gauges = ("801", "802", "803", "804", "806")
 
         # Possible coastal locations of interest, including major cities and nuclear power plants
         locations_of_interest = {
@@ -177,3 +172,32 @@ class TohokuOptions(TsunamiOptions):
             axes.annotate(loc, xy=(x, y), xytext=xytext, fontsize=10, color=color, ha=ha)
             circle = plt.Circle((x, y), 0.1, color=color)
             axes.add_patch(circle)
+
+    def get_gauge_data(self, gauge, sample=1):
+        """Read gauge data for `gauge` from file, averaging over every `sample` points."""
+        if gauge[0] == '8' and sample > 1:
+            assert sample % 5 == 0
+            sample //= 5
+        time_prev = 0.0
+        di = os.path.join(os.path.dirname(__file__), 'resources', 'gauges')
+        fname = os.path.join(di, '{:s}.dat'.format(gauge))
+        num_lines = sum(1 for line in open(fname, 'r'))
+        self.gauges[gauge]['data'] = []
+        self.gauges[gauge]['time'] = []
+        with open(fname, 'r') as f:
+            running = 0.0
+            for i in range(num_lines):
+                time, dat = f.readline().split()
+                time = float(time)
+                dat = float(dat)
+                running += dat  # TODO: How to deal with NaNs?
+                if sample == 1:
+                    self.gauges[gauge]['time'].append(time)
+                    self.gauges[gauge]['data'].append(dat)
+                elif i % sample == 0 and i > 0:
+                    if time < time_prev:
+                        break  # FIXME
+                    self.gauges[gauge]['time'].append(0.5*(time + time_prev))
+                    self.gauges[gauge]['data'].append(running/sample)
+                    running = 0.0
+                    time_prev = time
