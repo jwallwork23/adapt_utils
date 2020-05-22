@@ -198,6 +198,9 @@ class TsunamiOptions(ShallowWaterOptions):
         ftc.assign(self.kernel)
         return ftc
 
+    def get_gauge_data(self, gauge, **kwargs):
+        raise NotImplementedError("Implement in derived class")
+
     # TODO: Plot multiple mesh approaches
     def plot_timeseries(self, gauge, **kwargs):
         """
@@ -206,7 +209,9 @@ class TsunamiOptions(ShallowWaterOptions):
         :arg gauge: tag for gauge to be plotted.
         :kwarg cutoff: time cutoff level.
         """
+        print_output("Plotting timeseries for gauge {:s}...".format(gauge))
         cutoff = kwargs.get('cutoff', 24)
+        sample = kwargs.get('sample', 30)
         if gauge not in self.gauges:
             msg = "Gauge '{:s}' is not valid. Choose from {:}."
             raise ValueError(msg.format(gauge, self.gauges.keys()))
@@ -217,13 +222,14 @@ class TsunamiOptions(ShallowWaterOptions):
             fexts.append('png')
 
         # Get data
-        print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
-        if 'data' in self.gauges[gauge]:
-            y_data = np.array(self.gauges[gauge]["data"])  # TODO: Store in a HDF5 file
-        else:
-            y_data = np.array([])
-        y_data = np.array(y_data[:cutoff+1])
-        t = np.linspace(0, float(len(y_data)-1), len(y_data))  # TODO: Read from 'time' in HDF5 file
+        if 'data' not in self.gauges[gauge]:
+            self.get_gauge_data(gauge, sample=sample)
+        data, time = self.gauges[gauge]['data'], self.gauges[gauge]['time']
+        time = np.array([t/60.0 for t in time if t/60 <= cutoff + 1])
+        data = np.array([d for d, t in zip(data, time)])
+        data -= data[0]
+        time -= time[0]
+        assert len(time) == len(data)
 
         def evaluate_error(dat, name):
             """Helper function for evaluating timeseries error."""
@@ -238,22 +244,22 @@ class TsunamiOptions(ShallowWaterOptions):
         if 'data' in self.gauges[gauge]:
             errors = {
                 'tv': {'name': 'total variation'},
-                # 'l1': {'name': r'$\ell_1$ error'},
-                # 'l2': {'name': r'$\ell_2$ error'},
-                # 'linf': {'name': r'$\ell_\infty$ error'},
+                'l1': {'name': r'$\ell_1$ error'},
+                'l2': {'name': r'$\ell_2$ error'},
+                'linf': {'name': r'$\ell_\infty$ error'},
             }
             for key in errors:
-                errors[key]['data'] = evaluate_error(y_data, key)
+                errors[key]['data'] = evaluate_error(data, key)
                 for linearity in ('linear', 'nonlinear'):
                     errors[key][linearity] = {'abs': [], 'rel': []}
 
         # Consider cases of both linear and nonlinear shallow water equations
-        num_cells = []
         for linearity in ('linear', 'nonlinear'):
+            num_cells = []
 
             # Plot observations
             fig, ax = plt.subplots(figsize=(10.0, 5.0))
-            ax.plot(t, y_data, label='Data', linestyle='solid')
+            ax.plot(time, data, label='Data', linestyle='solid')
 
             # Loop over runs
             for level in range(4):
@@ -264,9 +270,8 @@ class TsunamiOptions(ShallowWaterOptions):
                 fname = os.path.join(self.di, '_'.join(['meshdata', tag, '0.hdf5']))
                 if not os.path.exists(fname):
                     continue
-                if len(num_cells) < level+1:
-                    with h5py.File(fname, 'r') as f:
-                        num_cells.append(f['num_cells'][()])
+                with h5py.File(fname, 'r') as f:
+                    num_cells.append(f['num_cells'][()])
 
                 # Global time and profile arrays
                 T = np.array([])
@@ -277,38 +282,46 @@ class TsunamiOptions(ShallowWaterOptions):
                     fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, str(i)+'.hdf5']))
                     assert os.path.exists(fname)
                     with h5py.File(fname, 'r') as f:
-                        y = f[gauge][()]
-                        y = y.reshape(len(y),)[:cutoff+1]
+                        gauge_time = f["time"][()]
+                        gauge_time = gauge_time.reshape(len(gauge_time),)
+                        gauge_time = np.array([t/60.0 for t in gauge_time if t <= 60*cutoff])
+                        gauge_data = f[gauge][()]
+                        gauge_data = gauge_data.reshape(len(gauge_data),)
 
+                        # Set first value as reference point
                         if i == 0:
-                            y0 = y[0]
-                        y -= y0
-                        y = np.round(y, 2)  # Ensure consistent precision  # TODO: Update as above
-                        t = f["time"][()]
-                        t = t.reshape(len(t),)[:cutoff+1]/60.0
+                            gauge_data0 = gauge_data[0]
+                        gauge_data -= gauge_data0
 
                     # Put arrays from individual meshes into global arrays
-                    T = np.concatenate((T, t))
-                    Y = np.concatenate((Y, y))
+                    Y = np.concatenate((Y, gauge_data))
+                    T = np.concatenate((T, gauge_time))
 
                 # Plot timeseries for current mesh
                 label = '{:s} ({:d} elements)'.format(self.approach, num_cells[-1])
                 label = label.replace('_', ' ').title()
                 ax.plot(T, Y, label=label, linestyle='dashed', marker='x')
 
+                r = 1
+                if len(data) % len(Y) == 0:
+                    r = len(data)//len(Y)
+                else:
+                    msg = "Gauge data and observations have incompatible lengths ({:d} vs {:d})"
+                    raise ValueError(msg.format(len(gauge_data), len(data)))
+
                 # Compute absolute and relative errors
                 if 'data' in self.gauges[gauge]:
-                    error = np.array(Y[:cutoff+1]) - y_data
+                    error = np.array(Y[:cutoff+1]) - data[::r]
                     for key in errors:
                         err = evaluate_error(error, key)
                         errors[key][linearity]['abs'].append(err)
                         errors[key][linearity]['rel'].append(err/errors[key]['data'])
 
             # Plot labels etc.
+            ax.set_title("{:s} timeseries ({:s})".format(gauge, linearity))
             ax.set_xlabel("Time [min]")
             ax.set_ylabel("Free surface displacement [m]")
             ax.set_xlim([0, cutoff])
-            ax.set_ylim([-2, 5])
             plt.grid(True)
             box = ax.get_position()
             ax.set_position([box.x0, box.y0, box.width*0.8, box.height])
@@ -316,8 +329,11 @@ class TsunamiOptions(ShallowWaterOptions):
             fname = "gauge_timeseries_{:s}_{:s}".format(gauge, linearity)
             for fext in fexts:
                 fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
+            plt.close()
 
-        # Plot relative errors
+        # Plot relative errors  # TODO: account for NaNs
+        print_output("Done!")
+        print_output("Plotting errors for gauge {:s}...".format(gauge))
         if 'data' not in self.gauges[gauge]:
             raise ValueError("Data not found.")
         for key in errors:
@@ -326,6 +342,7 @@ class TsunamiOptions(ShallowWaterOptions):
                 relative_errors = 100.0*np.array(errors[key][linearity]['rel'])
                 cells = num_cells[:len(relative_errors)]
                 ax.semilogx(cells, relative_errors, marker='o', label=linearity.title())
+            ax.set_title("{:s} ({:s})".format(gauge, linearity))
             ax.set_xlabel("Number of elements")
             ax.set_ylabel("Relative {:s} (%)".format(errors[key]['name']))
             plt.grid(True)
@@ -333,3 +350,5 @@ class TsunamiOptions(ShallowWaterOptions):
             fname = "gauge_{:s}_error_{:s}".format(key, gauge)
             for fext in fexts:
                 fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
+            plt.close()
+        print_output("Done!")
