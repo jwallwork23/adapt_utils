@@ -76,5 +76,5 @@ if not just_plot:
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
     swp.solve_forward()
     print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
-op.plot_timeseries("P02", nonlinear=nonlinear)
-op.plot_timeseries("P06", nonlinear=nonlinear)
+op.plot_timeseries("P02")
+op.plot_timeseries("P06")
