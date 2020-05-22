@@ -1,6 +1,7 @@
 from thetis import *
 
 import os
+import h5py
 
 from adapt_utils.swe.adapt_solver import AdaptiveShallowWaterProblem
 
@@ -20,10 +21,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
 
         # Use linearised equations
         self.shallow_water_options['use_nonlinear_equations'] = nonlinear
-
-        # # Don't bother plotting velocity
-        # self.io_options['fields_to_export'] = ['elev_2d'] if self.op.plot_pvd else []
-        # self.io_options['fields_to_export_hdf5'] = ['elev_2d'] if self.op.save_hdf5 else []
 
     def set_fields(self):
         self.fields = []
@@ -56,6 +53,15 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         #     self.callbacks[i][g] = callback.TimeSeriesCallback2D(
         #         self.fwd_solvers[i], ['elev_2d'], x, y, g, self.di)
         #     self.fwd_solvers[i].add_callback(self.callbacks[i][g], 'export')
+
+        # --- Mesh data
+
+        fname = "meshdata"
+        if self.extension is not None:
+            fname = '_'.join([fname, self.extension])
+        fname = '_'.join([fname, str(i)])
+        with h5py.File(os.path.join(self.di, fname+'.hdf5'), 'w') as f:
+            f.create_dataset('num_cells', data=self.num_cells[-1][i])
 
         # --- Quantity of interest
 

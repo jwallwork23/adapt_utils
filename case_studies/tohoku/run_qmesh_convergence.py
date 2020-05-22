@@ -66,25 +66,30 @@ kwargs = {
     'plot_pvd': True,
     'debug': bool(args.debug or False),
 }
-levels = int(args.levels or 10)
+levels = int(args.levels or 4)
 nonlinear = bool(args.nonlinear or False)
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs/qmesh'))
 
 qois = []
 num_cells = []
 for level in range(levels):
+    ext = "{:s}linear_level{:d}".format('non' if nonlinear else '', level)
 
     # Set parameters
     op = TohokuOptions(approach='fixed_mesh', level=level)
     op.update(kwargs)
 
     # Solve
-    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
+    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
     swp.solve_forward()
     qoi = swp.quantity_of_interest()
     print_output("Quantity of interest: {:.4e}".format(qoi))
+
+    # Diagnostics
     qois.append(qoi)
     num_cells.append(swp.num_cells[0][0])
+op.plot_timeseries("P02", nonlinear=nonlinear)
+op.plot_timeseries("P06", nonlinear=nonlinear)
 
 # Print/log results
 with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
