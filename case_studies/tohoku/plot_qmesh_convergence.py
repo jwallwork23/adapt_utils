@@ -41,7 +41,7 @@ for date, run in zip(dates, runs):
     # init_diff = np.zeros(len(qois)) if qois_old is None else qois[0] - qois_old[0]
     # qois_old = qois
     # plt.semilogx(elements, qois - init_diff, label='Nonlinear SWEs' if nonlinear else 'Linear SWEs')
-    plt.semilogx(elements, qois, label='Nonlinear SWEs' if nonlinear else 'Linear SWEs')
+    plt.semilogx(elements, qois, linestyle='--', marker='o', label='Nonlinear SWEs' if nonlinear else 'Linear SWEs')
 plt.xlabel("Element count")
 plt.ylabel(r"Quantity of interest, $J(\mathbf{u},\eta)$")
 plt.legend()

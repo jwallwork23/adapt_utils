@@ -4,6 +4,7 @@ from thetis.configuration import *
 import scipy.interpolate as si
 import numpy as np
 import h5py
+import matplotlib
 import matplotlib.pyplot as plt
 
 from adapt_utils.swe.options import ShallowWaterOptions
@@ -173,18 +174,24 @@ class TsunamiOptions(ShallowWaterOptions):
         return self.coriolis
 
     # TODO: Plot multiple mesh approaches
-    def plot_timeseries(self, gauge, extension=None, plot_lp=False, cutoff=25):
+    def plot_timeseries(self, gauge, plot_lp=False, cutoff=24, plot_pdf=False, plot_png=True, nonlinear=False):
         """
         Plot timeseries for `gauge` under all stored mesh resolutions.
+
+        :arg gauge: tag for gauge to be plotted.
+        :kwarg plot_lp: toggle plotting of Lp errors.
+        :kwarg cutoff: time cutoff level.
         """
-        try:
-            assert gauge in self.gauges
-        except AssertionError:
+        if gauge not in self.gauges:
             msg = "Gauge '{:s}' is not valid. Choose from {:}."
             raise ValueError(msg.format(gauge, self.gauges.keys()))
+        fexts = []
+        if plot_pdf:
+            fexts.append('pdf')
+        if plot_png:
+            fexts.append('png')
 
-        fig = plt.figure(figsize=[10.0, 5.0])
-        ax = fig.add_subplot(111)
+        fig, ax = plt.subplots(figsize=(10.0, 5.0))
 
         # Plot measurements
         print_output("#### TODO: Get gauge data in higher precision")  # TODO: And update below
@@ -206,49 +213,58 @@ class TsunamiOptions(ShallowWaterOptions):
                 errors[key]['abs'] = []
                 errors[key]['rel'] = []
 
-        # Global time and profile arrays
-        T = np.array([])
-        Y = np.array([])
+        # Loop over runs
+        num_cells = []
+        for level in range(4):
+            tag = 'nonlinear_level{:d}'.format(level)
+            if not nonlinear:
+                tag = tag[3:]
+            fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, '0.hdf5']))
+            if not os.path.exists(fname):
+                continue
+            fname = os.path.join(self.di, '_'.join(['meshdata', tag, '0.hdf5']))
+            if not os.path.exists(fname):
+                continue
+            with h5py.File(fname, 'r') as f:
+                num_cells.append(f['num_cells'][()])
 
-        # TODO: Plot multiple runs on single plot
-        # Loop over mesh iterations
-        for i in range(self.num_meshes):
-            fname = os.path.join(self.di, 'diagnostic_gauges')
-            if extension is not None:
-                fname = '_'.join([fname, extension])
-            fname = '_'.join([fname, '{:d}.hdf5'.format(i)])
-            assert os.path.exists(fname)
-            f = h5py.File(fname, 'r')
-            y = f[gauge][()]
-            y = y.reshape(len(y),)[:cutoff+1]
+            # Global time and profile arrays
+            T = np.array([])
+            Y = np.array([])
 
-            if i == 0:
-                y0 = y[0]
-            y -= y0
-            y = np.round(y, 2)  # Ensure consistent precision  # TODO: Update according to above
-            t = f["time"][()]
-            t = t.reshape(len(t),)[:cutoff+1]/60.0
+            # Loop over mesh iterations  # FIXME: Only currently works for fixed mesh
+            for i in range(self.num_meshes):
+                fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, str(i)+'.hdf5']))
+                assert os.path.exists(fname)
+                with h5py.File(fname, 'r') as f:
+                    y = f[gauge][()]
+                    y = y.reshape(len(y),)[:cutoff+1]
 
-            # Put arrays from individual meshes into global arrays
-            T = np.concatenate((T, t))
-            Y = np.concatenate((Y, y))
+                    if i == 0:
+                        y0 = y[0]
+                    y -= y0
+                    y = np.round(y, 2)  # Ensure consistent precision  # TODO: Update as above
+                    t = f["time"][()]
+                    t = t.reshape(len(t),)[:cutoff+1]/60.0
 
-        # Plot timeseries for current mesh
-        label = self.approach.replace('_', ' ').title()
-        ax.plot(T, Y, label=label, linestyle='dashed', marker='x')
-        f.close()
+                # Put arrays from individual meshes into global arrays
+                T = np.concatenate((T, t))
+                Y = np.concatenate((Y, y))
 
-        # TODO
-        # # Compute absolute and relative errors
-        # if 'data' in self.gauges[gauge]:
-        #     Y_cutoff = np.array(Y[:len(y_data)])
-        #     error = Y_cutoff - np.array(y_data)
-        #     if plot_lp:
-        #         for p in ('l1', 'l2', 'linf'):
-        #             errors[p]['abs'].append(lp_norm(error, p=p))
-        #     errors['tv']['abs'].append(total_variation(error))
-        #     for key in errors:
-        #         errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
+            # Plot timeseries for current mesh
+            label = '{:s} ({:d} elements)'.format(self.approach, num_cells[-1])
+            label = label.replace('_', ' ').title()
+            ax.plot(T, Y, label=label, linestyle='dashed', marker='x')
+
+            # Compute absolute and relative errors
+            if 'data' in self.gauges[gauge]:
+                error = np.array(Y[:cutoff+1]) - np.array(y_data[:cutoff+1])
+                if plot_lp:
+                    for p in ('l1', 'l2', 'linf'):
+                        errors[p]['abs'].append(lp_norm(error, p=p))
+                errors['tv']['abs'].append(total_variation(error))
+                for key in errors:
+                    errors[key]['rel'].append(errors[key]['abs'][-1]/errors[key]['data'])
 
         # plt.xlabel(r"Time $[\mathrm{min}]$")
         plt.xlabel("Time [min]")
@@ -263,28 +279,23 @@ class TsunamiOptions(ShallowWaterOptions):
         ax.set_position([box.x0, box.y0, box.width*0.8, box.height])
         ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
 
-        fname = "gauge_timeseries_{:s}".format(gauge)
-        if extension is not None:
-            fname = '_'.join([fname, str(extension)])
-        fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
-        fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
+        fname = "gauge_timeseries_{:s}_{:s}linear".format(gauge, 'non' if nonlinear else '')
+        for fext in fexts:
+            fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
 
-        # TODO
-        # # Plot relative errors
-        # if 'data' not in self.gauges[gauge]:
-        #     raise ValueError("Data not found.")
-        # for key in errors:
-        #     fig = plt.figure(figsize=[3.2, 4.8])
-        #     ax = fig.add_subplot(111)
-        #     ax.semilogx(resolutions, 100.0*np.array(errors[key]['rel']), marker='o')
-        #     plt.xlabel("Number of elements")
-        #     plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
-        #     plt.grid(True)
-        #     fname = "gauge_{:s}_error_{:s}".format(key, gauge)
-        #     if extension is not None:
-        #         fname = '_'.join([fname, str(extension)])
-        #     fig.savefig(os.path.join(self.di, '.'.join([fname, 'png'])))
-        #     fig.savefig(os.path.join(self.di, '.'.join([fname, 'pdf'])))
+        # Plot relative errors
+        if 'data' not in self.gauges[gauge]:
+            raise ValueError("Data not found.")
+        for key in errors:
+            fig, ax = plt.subplots(figsize=(3.2, 4.8))
+            ax.semilogx(num_cells, 100.0*np.array(errors[key]['rel']), marker='o')
+            plt.xlabel("Number of elements")
+            # plt.ylabel(r"Relative {:s} (\%)".format(errors[key]['name']))
+            plt.ylabel("Relative {:s} (%)".format(errors[key]['name']))
+            plt.grid(True)
+            fname = "gauge_{:s}_error_{:s}_{:s}linear".format(key, gauge, 'non' if nonlinear else '')
+            for fext in fexts:
+                fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
 
     def set_qoi_kernel(self, fs):
         # b = self.ball(fs.mesh(), source=False)
@@ -310,17 +321,3 @@ class TsunamiOptions(ShallowWaterOptions):
             self.set_qoi_kernel(fs)
         ftc.assign(self.kernel)
         return ftc
-
-    def plot_qoi(self):  # FIXME
-        """Timeseries plot of instantaneous QoI."""
-        print_output("#### TODO: Update plotting to use callback")
-        plt.figure()
-        T = self.trange/3600
-        qois = [q/1.0e9 for q in self.qois]
-        qoi = self.evaluate_qoi()/1.0e9
-        plt.plot(T, qois, linestyle='dashed', color='b', marker='x')
-        plt.fill_between(T, np.zeros_like(qois), qois)
-        plt.xlabel(r"Time [$\mathrm h$]")
-        plt.ylabel(r"Instantaneous QoI [$\mathrm{km}^3$]")
-        plt.title(r"Time integrated QoI: ${:.1f}\,\mathrm k\mathrm m^3\,\mathrm h$".format(qoi))
-        plt.savefig(os.path.join(self.di, "qoi_timeseries_{:s}.pdf".format(self.qoi_mode)))

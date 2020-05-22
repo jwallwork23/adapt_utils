@@ -28,6 +28,7 @@ parser.add_argument("-radii", help="Radii of interest, separated by commas (defa
 
 # Misc
 parser.add_argument("-debug", help="Print all debugging statements")
+parser.add_argument("-just_plot", help="Only plot gauge timeseries and errors")
 args = parser.parse_args()
 
 # Collect locations and radii
@@ -47,7 +48,6 @@ if len(locations) != len(radii):
 kwargs = {
 
     # Space-time domain
-    'level': int(args.level or 0),
     'num_meshes': int(args.num_meshes or 1),
     'end_time': float(args.end_time or 1440.0),
 
@@ -64,12 +64,17 @@ kwargs = {
     'plot_pvd': True,
     'debug': bool(args.debug or False),
 }
-op = TohokuOptions(approach='fixed_mesh')
+level = int(args.level or 0)
+nonlinear = bool(args.nonlinear or False)
+ext = '{:s}linear_level{:d}'.format('non' if nonlinear else '', level)
+op = TohokuOptions(approach='fixed_mesh', level=level)
 op.update(kwargs)
 
 # Solve
-swp = AdaptiveTsunamiProblem(op, nonlinear=bool(args.nonlinear or False))
-swp.solve_forward()
-print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
-op.plot_timeseries("P02")
-op.plot_timeseries("P06")
+just_plot = bool(args.just_plot or False)
+if not just_plot:
+    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
+    swp.solve_forward()
+    print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
+op.plot_timeseries("P02", nonlinear=nonlinear)
+op.plot_timeseries("P06", nonlinear=nonlinear)
