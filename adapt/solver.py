@@ -614,25 +614,33 @@ class AdaptiveProblem():
                 print_output("Converged number of mesh elements!")
                 break
 
+    def get_checkpoints(self):
+        """
+        Run the forward model for the entire time period in order to get checkpoints.
+
+        For mesh 0, the checkpoint
+        """
+        self.solution_file.__init__(self.solution_file.filename)
+        for i in range(self.num_meshes):
+            self.solution_file._topology = None
+
+            def export_func():
+                proj = Function(self.P1[i], name="Projected elevation")
+                proj.project(self.fwd_solvers[i].fields.elev_2d)
+                self.solution_file.write(proj)
+
+            self.transfer_forward_solution(i)
+            self.setup_solver_forward(i)
+            self.fwd_solvers[i].export_initial_state = i == 0
+            self.solve_forward_step(i, export_func=export_func)
+
     def run_dwp(self, **kwargs):
         op = self.op
         for n in range(op.num_adapt):
 
             # --- Solve forward to get checkpoints
 
-            self.solution_file.__init__(self.solution_file.filename)
-            for i in range(self.num_meshes):
-                self.solution_file._topology = None
-
-                def export_func():
-                    proj = Function(self.P1[i], name="Projected elevation")
-                    proj.project(self.fwd_solvers[i].fields.elev_2d)
-                    self.solution_file.write(proj)
-
-                self.transfer_forward_solution(i)
-                self.setup_solver_forward(i)
-                self.fwd_solvers[i].export_initial_state = i == 0
-                self.solve_forward_step(i, export_func=export_func)
+            self.get_checkpoints()
 
             # --- Convergence criteria
 
