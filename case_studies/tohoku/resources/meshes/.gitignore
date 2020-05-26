@@ -1,0 +1,6 @@
+*.shp
+*.shx
+*.geo
+*.nc
+*.ipynb
+log

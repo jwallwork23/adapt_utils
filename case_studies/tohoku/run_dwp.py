@@ -141,4 +141,5 @@ import matplotlib.pyplot as plt
 N = swp.num_cells[-1]
 plt.pie(N, labels=["Mesh {:d} ({:d})".format(i, n) for i, n in enumerate(N)])
 plt.title("Element counts for DWP adaptation")
+plt.savefig(os.path.join(di, 'pie.png'))
 plt.show()

@@ -244,9 +244,9 @@ class TsunamiOptions(ShallowWaterOptions):
         if 'data' in self.gauges[gauge]:
             errors = {
                 'tv': {'name': 'total variation'},
-                'l1': {'name': r'$\ell_1$ error'},
+                # 'l1': {'name': r'$\ell_1$ error'},
                 'l2': {'name': r'$\ell_2$ error'},
-                'linf': {'name': r'$\ell_\infty$ error'},
+                # 'linf': {'name': r'$\ell_\infty$ error'},
             }
             for key in errors:
                 errors[key]['data'] = evaluate_error(data, key)
