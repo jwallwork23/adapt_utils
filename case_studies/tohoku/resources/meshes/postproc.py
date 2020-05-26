@@ -13,7 +13,7 @@ from adapt_utils.case_studies.tohoku.options import TohokuOptions
 for level in range(4):
     op = TohokuOptions(level=level, h_min=1e3, h_max=1e6)
     mesh = op.default_mesh
-    fname = op.meshfile[:-4]
+    fname = op.meshfile
 
     P0 = FunctionSpace(mesh, "DG", 0)
     h = interpolate(CellSize(mesh), P0)
@@ -21,7 +21,7 @@ for level in range(4):
     M = cell_size_metric(mesh, op=op)
 
     newmesh = adapt(mesh, M)
-    viewer = PETSc.Viewer().createHDF5(fname + '.hdf5', 'w')
+    viewer = PETSc.Viewer().createHDF5(fname + '.h5', 'w')
     viewer(newmesh._plex)
 
     print("\n" + 40*"=" + "\n           before     after\n" + 40*"=")

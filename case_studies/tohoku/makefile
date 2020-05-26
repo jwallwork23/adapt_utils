@@ -1,5 +1,7 @@
 all: dir mesh uniform metric_based monitor_based fixed_mesh
 
+# --- Setup
+
 dir:
 	@echo "Creating output directory..."
 	@mkdir -p outputs/meshes
@@ -13,25 +15,28 @@ mesh:
 	@python3 meshgen.py 3
 	@python3 meshgen.py 4
 	@echo "Done!"
+	@echo "Post-processing meshes..."
+	@python3 resources/meshes/postproc.py -dm_plex_prescribed_boundary_labels 100,200,300 -dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3 -dm_plex_remesh_bd
+	@echo "Done!"
 
+# Plotting
+
+# TODO: Update
 uniform:
 	@echo "Plotting bathymetry, initial surface and Coriolis parameter on uniform mesh..."
 	@python3 plot_uniform.py
 	@echo "Done!"
 
+# TODO: Update
 metric_based:
 	@echo "Plotting bathymetry and initial surface on mesh adapted to bathymetry Hessian..."
 	@python3 plot_metric_based.py
 	@echo "Done!"
 
+# TODO: Update
 monitor_based:
 	@echo "Plotting bathymetry and initial surface on mesh adapted to bathymetry Hessian..."
 	@python3 plot_monitor_based.py
-	@echo "Done!"
-
-fixed_mesh:
-	@echo "Solving Tohoku tsunami problem on a fixed mesh..."
-	@python3 run_fixed_mesh.py
 	@echo "Done!"
 
 # --- Convergence analysis
@@ -46,7 +51,12 @@ qmesh_nonlinear:
 	@python3 run_qmesh_convergence.py -nonlinear 1
 	@echo "Done!"
 
-# --- Adaptive runs
+# --- Run scripts
+
+fixed_mesh:
+	@echo "Solving Tohoku tsunami problem on a fixed mesh..."
+	@python3 run_fixed_mesh.py
+	@echo "Done!"
 #
 #  NOTE: We specify different gradation parameters for different boundary segments:
 #    * Artificial open ocean (tag 100): 100 km;
@@ -62,6 +72,8 @@ dwp:
 	@echo "Solving Tohoku tsunami problem using 'dual weighted primal' adaptation..."
 	@python3 run_dwp.py -dm_plex_prescribed_boundary_labels 100,200,300 -dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3 -dm_plex_remesh_bd
 	@echo "Done!"
+
+# Cleanup
 
 clean:
 	@echo "Cleaning directory..."
