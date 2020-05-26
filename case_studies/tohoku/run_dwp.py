@@ -72,7 +72,8 @@ kwargs = {
     'family': args.family or 'dg-cg',
 
     # QoI
-    'start_time': float(args.start_time or 720.0),
+    'start_time': float(args.start_time or 1200.0),
+    # 'start_time': float(args.start_time or 720.0),
     'radii': radii,
     'locations': locations,
 
@@ -95,7 +96,7 @@ kwargs = {
 assert 0.0 <= kwargs['start_time'] <= kwargs['end_time']
 logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
 for key in kwargs:
-    logstr += "    {:32s}: {:}\n".format(key, kwargs[key])
+    logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
 print_output(logstr + 80*'*' + '\n')
 
 # Create parameter class and problem object
@@ -108,9 +109,9 @@ swp.run_dwp()
 with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
     for line in gitlog:
         words = line.split()
-    logstr += "    {:32s}: {:}\n".format('adapt_utils git commit', words[1])
+    logstr += "    {:34s}: {:}\n".format('adapt_utils git commit', words[1])
 for i in range(len(unknown)//2):
-    logstr += "    {:32s}: {:}\n".format(unknown[2*i][1:], unknown[2*i+1])
+    logstr += "    {:34s}: {:}\n".format(unknown[2*i][1:], unknown[2*i+1])
 logstr += 80*'*' + '\n'
 logstr += 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
 logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
@@ -121,6 +122,7 @@ logstr += 80*'*' + '\n' + 30*' ' + 'FINAL ELEMENT COUNTS\n' + 80*'*' + '\n'
 l = op.end_time/op.num_meshes
 for i, num_cells in enumerate(swp.num_cells[-1]):
     logstr += "Time window ({:7.1f},{:7.1f}]: {:7d}\n".format(i*l, (i+1)*l, num_cells)
+logstr += "Average: {:7d}\n".format(int(np.mean(num_cells)))
 logstr += 80*'*' + '\n'
 print_output(logstr)
 date = datetime.date.today()
