@@ -325,6 +325,7 @@ class AdaptiveProblem():
         op.print_debug(options.timestepper_options.solver_parameters)
 
         # Parameters
+        options.estimate_error = op.estimate_error
         options.update(self.fields[i])
         options.update(self.shallow_water_options)
         options.update(self.tracer_options)
@@ -796,6 +797,7 @@ class AdaptiveProblem():
                 fwd_solutions_step = []
                 adj_solutions_step = []
                 enriched_adj_solutions_step = []
+                prolong, restrict, inject = dmhooks.get_transfer_operators(self.meshes[i]._plex)
 
                 # --- Solve forward on current window
 
@@ -831,23 +833,31 @@ class AdaptiveProblem():
                 if n_fwd != n_adj:
                     msg = "Mismatching number of indicators ({:d} vs {:d})"
                     raise ValueError(msg.format(n_fwd, n_adj))
-                I = 0
-                op.print_debug("DWR indicators on mesh {:2d}".format(i))
                 adj_solutions_step = reversed(adj_solutions_step)
                 enriched_adj_solutions_step = reversed(enriched_adj_solutions_step)
+                I = 0
+                op.print_debug("DWR indicators on mesh {:2d}".format(i))
                 indicator_enriched = Function(ep.P0[i])
+                fwd_proj = Function(ep.V)
                 adj_error = Function(ep.V)
+                ts = self.fwd_solvers[i].timestepper
+                bcs = self.fwd_solvers[i].bnd_functions['shallow_water']
+                ts.setup_error_estimator(fwd_proj, adj_error, bcs)
                 for j in range(len(fwd_solutions_step)):
                     scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule  # TODO: Other integrators
+
+                    # Prolong forward solution
+                    prolong(fwd_solutions_step[j], fwd_proj)
 
                     # Approximate adjoint error in enriched space
                     prolong(adj_solutions_step[j], adj_error)
                     adj_error *= -1
                     adj_error += enriched_adj_solutions_step[j]
 
-                    raise NotImplementedError  # TODO
-                    # indicator_enriched = ...
+                    # Compute dual weighted residual
+                    indicator_enriched.interpolate(abs(ts.error_estimator.weighted_residual()))
 
+                    # Time-integrate
                     I += op.dt*self.dt_per_mesh*scaling*indicator_enriched
                 indicator_enriched_cts = interpolate(I, ep.P1[i])
 

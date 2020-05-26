@@ -60,6 +60,7 @@ if len(locations) != len(radii):
 
 # Set parameters for fixed mesh run
 kwargs = {
+    'estimate_error': True,
 
     # Timestepping
     'end_time': float(args.end_time or 1440.0),
