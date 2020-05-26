@@ -657,15 +657,16 @@ class AdaptiveProblem():
             if n == op.num_adapt - 1:
                 break
 
-            # Loop over mesh windows *in reverse*
+            # --- Loop over mesh windows *in reverse*
+
             for i, P1 in enumerate(self.P1):
                 self.indicators[i]['dwp'] = Function(P1, name="DWP indicator")
             metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
             for i in range(self.num_meshes-1, -1, -1):
+                fwd_solutions_step = []
+                adj_solutions_step = []
 
                 # --- Solve forward on current window
-
-                fwd_solutions_step = []
 
                 def export_func():
                     fwd_solutions_step.append(self.fwd_solvers[i].fields.solution_2d.copy(deepcopy=True))
@@ -675,8 +676,6 @@ class AdaptiveProblem():
                 self.solve_forward_step(i, export_func=export_func)
 
                 # --- Solve adjoint on current window
-
-                adj_solutions_step = []
 
                 def export_func():
                     adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
@@ -690,7 +689,8 @@ class AdaptiveProblem():
                 n_fwd = len(fwd_solutions_step)
                 n_adj = len(adj_solutions_step)
                 if n_fwd != n_adj:
-                    raise ValueError("Mismatching number of indicators ({:d} vs {:d})".format(n_fwd, n_adj))
+                    msg = "Mismatching number of indicators ({:d} vs {:d})"
+                    raise ValueError(msg.format(n_fwd, n_adj))
                 I = 0
                 op.print_debug("DWP indicators on mesh {:2d}".format(i))
                 for j, solutions in enumerate(zip(fwd_solutions_step, reversed(adj_solutions_step))):
@@ -745,8 +745,8 @@ class AdaptiveProblem():
             msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
             print_output(msg.format(
                 self.st_complexities[-1],
-                sum(self.num_vertices[n+1]),
-                sum(self.num_cells[n+1]),
+                sum(self.num_vertices[n+1])*self.dt_per_mesh,
+                sum(self.num_cells[n+1])*self.dt_per_mesh,
             ))
 
             # Check convergence of *all* element counts
@@ -760,7 +760,163 @@ class AdaptiveProblem():
 
     def run_dwr(self, **kwargs):
         op = self.op
-        raise NotImplementedError  # TODO
+        for n in range(op.num_adapt):
+
+            # --- Solve forward to get checkpoints
+
+            self.get_checkpoints()
+
+            # --- Convergence criteria
+
+            # Check QoI convergence
+            qoi = self.quantity_of_interest()
+            print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+            self.qois.append(qoi)
+            if len(self.qois) > 1:
+                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
+                    print_output("Converged quantity of interest!")
+                    break
+
+            # Check maximum number of iterations
+            if n == op.num_adapt - 1:
+                break
+
+            # --- Setup problem on enriched space
+
+            hierarchies = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
+            refined_meshes = [hierarchy[1] for hierarchy in hierarchies]
+            ep = type(self)(op, refined_meshes, discrete_adjoint=self.discrete_adjoint)
+
+            # --- Loop over mesh windows *in reverse*
+
+            for i, P1 in enumerate(self.P1):
+                self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
+            metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            for i in range(self.num_meshes-1, -1, -1):
+                fwd_solutions_step = []
+                adj_solutions_step = []
+                enriched_adj_solutions_step = []
+
+                # --- Solve forward on current window
+
+                def export_func():
+                    fwd_solutions_step.append(self.fwd_solvers[i].fields.solution_2d.copy(deepcopy=True))
+
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward(i)
+                self.solve_forward_step(i, export_func=export_func)
+
+                # --- Solve adjoint on current window
+
+                def export_func():
+                    adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
+
+                self.transfer_adjoint_solution(i)
+                self.setup_solver_adjoint(i)
+                self.solve_adjoint_step(i, export_func=export_func)
+
+                # --- Solve adjoint on current window in enriched space
+
+                def export_func():
+                    enriched_adj_solutions_step.append(ep.adj_solutions[i].copy(deepcopy=True))
+
+                ep.transfer_adjoint_solution(i)
+                ep.setup_solver_adjoint(i)
+                ep.solve_adjoint_step(i, export_func=export_func)
+
+                # --- Assemble indicators and metrics
+
+                n_fwd = len(fwd_solutions_step)
+                n_adj = len(adj_solutions_step)
+                if n_fwd != n_adj:
+                    msg = "Mismatching number of indicators ({:d} vs {:d})"
+                    raise ValueError(msg.format(n_fwd, n_adj))
+                I = 0
+                op.print_debug("DWR indicators on mesh {:2d}".format(i))
+                adj_solutions_step = reversed(adj_solutions_step)
+                enriched_adj_solutions_step = reversed(enriched_adj_solutions_step)
+                indicator_enriched = Function(ep.P0[i])
+                adj_error = Function(ep.V)
+                for j in range(len(fwd_solutions_step)):
+                    scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule  # TODO: Other integrators
+
+                    # Approximate adjoint error in enriched space
+                    prolong(adj_solutions_step[j], adj_error)
+                    adj_error *= -1
+                    adj_error += enriched_adj_solutions_step[j]
+
+                    raise NotImplementedError  # TODO
+                    # indicator_enriched = ...
+
+                    I += op.dt*self.dt_per_mesh*scaling*indicator_enriched
+                indicator_enriched_cts = interpolate(I, ep.P1[i])
+
+                inject(indicator_enriched_cts, self.indicators[i]['dwr'])
+                metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
+
+            del indicator_enriched_cts
+            del adj_error
+            del indicator_enriched
+            del ep
+            del refined_meshes
+            del hierarchies
+
+            # --- Normalise metrics
+
+            space_time_normalise(metrics, op=op)
+
+            # Output to .pvd and .vtu
+            # metric_file = File(os.path.join(self.di, 'metric.pvd'))
+            complexities = []
+            for i, M in enumerate(metrics):
+                self.indicator_file._topology = None
+                self.indicator_file.write(self.indicators[i]['dwr'])
+                # metric_file._topology = None
+                # metric_file.write(M)
+                complexities.append(metric_complexity(M))
+            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
+
+            # --- Adapt meshes
+
+            print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+            for i, M in enumerate(metrics):
+                print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+            del metrics
+            self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
+            self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
+            print_output("Done!")
+
+            # ---  Setup for next run / logging
+
+            self.set_meshes(self.meshes)
+            self.create_function_spaces()
+            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
+            self.create_solutions()
+            self.set_fields()
+            self.set_stabilisation()
+            self.set_boundary_conditions()
+            self.callbacks = [{} for mesh in self.meshes]
+
+            print_output("\nResulting meshes")
+            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
+            for i, c in enumerate(complexities):
+                print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
+            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
+            print_output(msg.format(
+                self.st_complexities[-1],
+                sum(self.num_vertices[n+1])*self.dt_per_mesh,
+                sum(self.num_cells[n+1])*self.dt_per_mesh,
+            ))
+
+            # Check convergence of *all* element counts
+            converged = True
+            for i, num_cells_ in enumerate(self.num_cells[n-1]):
+                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
+                    converged = False
+            if converged:
+                print_output("Converged number of mesh elements!")
+                break
 
     def run_moving_mesh(self, **kwargs):
         try:
