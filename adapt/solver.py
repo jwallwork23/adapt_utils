@@ -29,7 +29,7 @@ class AdaptiveProblem():
 
     # --- Setup
 
-    def __init__(self, op, meshes=None, discrete_adjoint=True, levels=0, hierarchies=None):
+    def __init__(self, op, meshes=None, discrete_adjoint=True):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -37,9 +37,6 @@ class AdaptiveProblem():
         self.stabilisation = op.stabilisation
         self.discrete_adjoint = discrete_adjoint
         self.approach = op.approach
-        self.levels = levels
-        if levels > 0:
-            raise NotImplementedError  # TODO
 
         # Sub options
         self.timestepping_options = {
@@ -122,7 +119,6 @@ class AdaptiveProblem():
         self.st_complexities = [np.nan]
 
     # TODO: AdaptiveMesh
-    # TODO: levels > 0
     def set_meshes(self, meshes):
         """
         Build an class:`AdaptiveMesh` object associated with each mesh.
@@ -569,10 +565,10 @@ class AdaptiveProblem():
                     metrics[i].assign(H_window[0])
             del H_windows
 
-            metric_file = File(os.path.join(self.di, 'metric.pvd'))
+            # metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
             for i, M in enumerate(metrics):
-                metric_file.write(M)
+                # metric_file.write(M)
                 complexities.append(metric_complexity(M))
             self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
 
@@ -602,7 +598,12 @@ class AdaptiveProblem():
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
             for i, c in enumerate(complexities):
                 print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
-            print_output("")
+            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
+            print_output(msg.format(
+                self.st_complexities[-1],
+                sum(self.num_vertices[n+1]),
+                sum(self.num_cells[n+1]),
+            ))
 
             # Check convergence of *all* element counts
             converged = True
@@ -649,20 +650,10 @@ class AdaptiveProblem():
                 break
 
             # Loop over mesh windows *in reverse*
-            indicators = [Function(P1, name="DWP indicator") for P1 in self.P1]
+            for i, P1 in enumerate(self.P1):
+                self.indicators[i]['dwp'] = Function(P1, name="DWP indicator")
             metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
             for i in range(self.num_meshes-1, -1, -1):
-
-                # --- Solve adjoint on current window
-
-                adj_solutions_step = []
-
-                def export_func():
-                    adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
-
-                self.transfer_adjoint_solution(i)
-                self.setup_solver_adjoint(i)
-                self.solve_adjoint_step(i, export_func=export_func)
 
                 # --- Solve forward on current window
 
@@ -674,6 +665,17 @@ class AdaptiveProblem():
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward(i)
                 self.solve_forward_step(i, export_func=export_func)
+
+                # --- Solve adjoint on current window
+
+                adj_solutions_step = []
+
+                def export_func():
+                    adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
+
+                self.transfer_adjoint_solution(i)
+                self.setup_solver_adjoint(i)
+                self.solve_adjoint_step(i, export_func=export_func)
 
                 # --- Assemble indicators and metrics
 
@@ -688,21 +690,21 @@ class AdaptiveProblem():
                     fwd_dot_adj = abs(inner(*solutions))
                     op.print_debug("    ||<q, q*>||_L2 = {:.4e}".format(assemble(fwd_dot_adj*fwd_dot_adj*dx)))
                     I += op.dt*self.dt_per_mesh*scaling*fwd_dot_adj
-                indicators[i].interpolate(I)
-                metrics[i].assign(isotropic_metric(indicators[i], noscale=True, normalise=False))
+                self.indicators[i]['dwp'].interpolate(I)
+                metrics[i].assign(isotropic_metric(self.indicators[i]['dwp'], normalise=False))
 
             # --- Normalise metrics
 
             space_time_normalise(metrics, op=op)
 
             # Output to .pvd and .vtu
-            metric_file = File(os.path.join(self.di, 'metric.pvd'))
+            # metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
-            for indicator, M in zip(indicators, metrics):
+            for i, M in enumerate(metrics):
                 self.indicator_file._topology = None
-                self.indicator_file.write(indicator)
-                metric_file._topology = None
-                metric_file.write(M)
+                self.indicator_file.write(self.indicators[i]['dwp'])
+                # metric_file._topology = None
+                # metric_file.write(M)
                 complexities.append(metric_complexity(M))
             self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
 
@@ -732,7 +734,12 @@ class AdaptiveProblem():
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
             for i, c in enumerate(complexities):
                 print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
-            print_output("")
+            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
+            print_output(msg.format(
+                self.st_complexities[-1],
+                sum(self.num_vertices[n+1]),
+                sum(self.num_cells[n+1]),
+            ))
 
             # Check convergence of *all* element counts
             converged = True
@@ -742,6 +749,10 @@ class AdaptiveProblem():
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
+
+    def run_dwr(self, **kwargs):
+        op = self.op
+        raise NotImplementedError  # TODO
 
     def run_moving_mesh(self, **kwargs):
         try:

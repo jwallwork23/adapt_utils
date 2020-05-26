@@ -34,13 +34,7 @@ fixed_mesh:
 	@python3 run_fixed_mesh.py
 	@echo "Done!"
 
-# TODO: Hessian based
-
-dwp:
-	@echo "Solving Tohoku tsunami problem using 'dual weighted primal' adaptation..."
-	# @python3 run_dwp.py -dm_plex_prescribed_boundary_labels 200,300 -dm_plex_prescribed_boundary_sizes 10e3,10e3
-	@python3 run_dwp.py -dm_plex_prescribed_boundary_labels 100,200,300 -dm_plex_prescribed_boundary_sizes 100e3,20e3,5e3 -dm_plex_remesh_bd
-	@echo "Done!"
+# --- Convergence analysis
 
 qmesh_linear:
 	@echo "Running convergence analysis using linear shallow water equations..."
@@ -50,6 +44,23 @@ qmesh_linear:
 qmesh_nonlinear:
 	@echo "Running convergence analysis using nonlinear shallow water equations..."
 	@python3 run_qmesh_convergence.py -nonlinear 1
+	@echo "Done!"
+
+# --- Adaptive runs
+#
+#  NOTE: We specify different gradation parameters for different boundary segments:
+#    * Artificial open ocean (tag 100): 100 km;
+#    * Coast outside of Fukushima (tag 200): 10 km;
+#    * Coast around Fukushima (tag 300): 5 km.
+#
+#  NOTE: The -dm_plex_remesh_bd option can deform the domain boundary, which is why we specify a
+#    gradation for the open ocean boundary.
+
+# TODO: Hessian based
+
+dwp:
+	@echo "Solving Tohoku tsunami problem using 'dual weighted primal' adaptation..."
+	@python3 run_dwp.py -dm_plex_prescribed_boundary_labels 100,200,300 -dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3 -dm_plex_remesh_bd
 	@echo "Done!"
 
 clean:

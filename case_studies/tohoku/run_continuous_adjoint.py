@@ -13,6 +13,7 @@ parser.add_argument("-end_time", help="""
 End time of simulation in seconds (default 1440s, i.e. 24mins)""")
 parser.add_argument("-level", help="(Integer) resolution for initial mesh (default 0)")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (for testing, default 1)")
+parser.add_argument("-levels", help="Number of iso-P2 refinements (for testing, default 0)")
 
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space (default 'dg-cg')")
@@ -59,8 +60,14 @@ op = TohokuOptions(
 assert op.start_time >= 0.0
 assert op.start_time <= op.end_time
 
+# Wrap mesh(es) in an iso-P2 refined mesh hiearchy and choose the finest level(s)
+levels = int(args.levels or 0)
+base_meshes = [op.default_mesh for i in range(op.num_meshes)]
+hierarchies = [MeshHierarchy(mesh, levels) for mesh in base_meshes]
+meshes = [hierarchy[levels] for hierarchy in hierarchies]
+
 # Setup problem object
-swp = AdaptiveTsunamiProblem(op)
+swp = AdaptiveTsunamiProblem(op, meshes=meshes)
 
 # Take a look at the smoothed kernel function(s) *or* solve adjoint equation
 plot_kernels = bool(args.plot_kernel) or False
