@@ -26,7 +26,7 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, mesh=None, level=0, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
+    def __init__(self, mesh=None, postproc=True, level=0, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
 
@@ -39,8 +39,16 @@ class TohokuOptions(TsunamiOptions):
         # Mesh
         self.print_debug("Loading mesh...")
         self.resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
-        self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}.msh'.format(level))
-        self.default_mesh = mesh or Mesh(self.meshfile)
+        self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(level))
+        if mesh is None:
+            if postproc:
+                newplex = PETSc.DMPlex().create()
+                newplex.createFromFile(self.meshfile + '.h5')
+                self.default_mesh = Mesh(newplex)
+            else:
+                self.default_mesh = Mesh(self.meshfile + '.msh')
+        else:
+            self.default_mesh = mesh
         self.print_debug("Done!")
 
         # Fields

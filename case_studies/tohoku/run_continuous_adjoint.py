@@ -1,4 +1,4 @@
-from firedrake import project
+from firedrake import project, MeshHierarchy
 
 import argparse
 
