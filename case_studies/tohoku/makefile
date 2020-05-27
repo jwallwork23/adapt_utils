@@ -71,8 +71,9 @@ fixed_mesh:
 
 dwp:
 	@echo "Solving Tohoku tsunami problem using 'dual weighted primal' adaptation..."
-	@python3 run_dwp.py -dm_plex_prescribed_boundary_labels 100,200,300 -dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3
+	@python3 run_dwp.py -dm_plex_prescribed_boundary_labels 200,300 -dm_plex_prescribed_boundary_sizes 10e3,5e3
 	@echo "Done!"
+# @python3 run_dwp.py -dm_plex_prescribed_boundary_labels 100,200,300 -dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3
 
 # Cleanup
 
