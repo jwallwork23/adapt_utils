@@ -192,11 +192,8 @@ class TsunamiOptions(ShallowWaterOptions):
         return self.kernel
 
     def set_final_condition(self, fs):
-        ftc = Function(fs)
-        if not hasattr(self, 'kernel'):
-            self.set_qoi_kernel(fs)
-        ftc.assign(self.kernel)
-        return ftc
+        self.set_qoi_kernel(fs)
+        return Function(fs, name="Final time condition").assign(self.kernel)
 
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")
