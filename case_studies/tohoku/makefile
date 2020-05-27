@@ -64,13 +64,14 @@ fixed_mesh:
 #    * Coast around Fukushima (tag 300): 5 km.
 #
 #  NOTE: The -dm_plex_remesh_bd option can deform the domain boundary, which is why we specify a
-#    gradation for the open ocean boundary.
+#    gradation for the open ocean boundary. Instead of applying it here, we use it in the mesh
+#    postprocessing (see `mesh` above).
 
 # TODO: Hessian based
 
 dwp:
 	@echo "Solving Tohoku tsunami problem using 'dual weighted primal' adaptation..."
-	@python3 run_dwp.py -dm_plex_prescribed_boundary_labels 100,200,300 -dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3 -dm_plex_remesh_bd
+	@python3 run_dwp.py -dm_plex_prescribed_boundary_labels 100,200,300 -dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3
 	@echo "Done!"
 
 # Cleanup
