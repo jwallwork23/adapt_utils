@@ -798,6 +798,7 @@ class AdaptiveProblem():
                 break
 
     def run_dwr(self, **kwargs):
+        # TODO: doc
         op = self.op
         for n in range(op.num_adapt):
 
@@ -833,17 +834,27 @@ class AdaptiveProblem():
             metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
             for i in range(self.num_meshes-1, -1, -1):
                 fwd_solutions_step = []
+                fwd_solutions_step_old = []
                 adj_solutions_step = []
                 enriched_adj_solutions_step = []
-                prolong, restrict, inject = dmhooks.get_transfer_operators(self.meshes[i]._plex)
+                tm = dmhooks.get_transfer_manager(self.meshes[i]._plex)
+
+                # --- Setup forward solver for enriched problem
+
+                # TODO: Any need to transfer fwd sol?
+                ep.setup_solver_forward(i)
+                ets = ep.fwd_solvers[i].timestepper
 
                 # --- Solve forward on current window
 
                 def export_func():
-                    fwd_solutions_step.append(self.fwd_solvers[i].fields.solution_2d.copy(deepcopy=True))
+                    fwd_solutions_step.append(ts.solution.copy(deepcopy=True))
+                    fwd_solutions_step_old.append(ts.solution_old.copy(deepcopy=True))
+                    # TODO: Also need store fields at each export (in general case)
 
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward(i)
+                ts = self.fwd_solvers[i].timestepper
                 self.solve_forward_step(i, export_func=export_func)
 
                 # --- Solve adjoint on current window
@@ -876,30 +887,35 @@ class AdaptiveProblem():
                 I = 0
                 op.print_debug("DWR indicators on mesh {:2d}".format(i))
                 indicator_enriched = Function(ep.P0[i])
-                fwd_proj = Function(ep.V)
-                adj_error = Function(ep.V)
-                ts = self.fwd_solvers[i].timestepper
+                fwd_proj = Function(ep.V[i])
+                fwd_old_proj = Function(ep.V[i])
+                adj_error = Function(ep.V[i])
                 bcs = self.fwd_solvers[i].bnd_functions['shallow_water']
-                ts.setup_error_estimator(fwd_proj, adj_error, bcs)
+                ets.setup_error_estimator(fwd_proj, fwd_old_proj, adj_error, bcs)
+
+                # Loop over exported timesteps
                 for j in range(len(fwd_solutions_step)):
                     scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule  # TODO: Other integrators
 
-                    # Prolong forward solution
-                    prolong(fwd_solutions_step[j], fwd_proj)
+                    # Prolong forward solution at current and previous timestep
+                    tm.prolong(fwd_solutions_step[j], fwd_proj)
+                    tm.prolong(fwd_solutions_step_old[j], fwd_old_proj)
 
                     # Approximate adjoint error in enriched space
-                    prolong(adj_solutions_step[j], adj_error)
+                    tm.prolong(adj_solutions_step[j], adj_error)
                     adj_error *= -1
                     adj_error += enriched_adj_solutions_step[j]
 
                     # Compute dual weighted residual
-                    indicator_enriched.interpolate(abs(ts.error_estimator.weighted_residual()))
+                    indicator_enriched.interpolate(abs(ets.error_estimator.weighted_residual()))
 
                     # Time-integrate
                     I += op.dt*self.dt_per_mesh*scaling*indicator_enriched
                 indicator_enriched_cts = interpolate(I, ep.P1[i])
 
-                inject(indicator_enriched_cts, self.indicators[i]['dwr'])
+                ep.fwd_solver[i] = None
+
+                tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
                 metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
 
             del indicator_enriched_cts
