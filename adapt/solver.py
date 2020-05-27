@@ -415,16 +415,30 @@ class AdaptiveProblem():
     # --- Run scripts
 
     def run(self, **kwargs):
-        if self.approach == 'fixed_mesh':
-            self.solve_forward(**kwargs)
-        elif self.approach == 'hessian':
-            self.run_hessian_based(**kwargs)
-        elif self.approach == 'dwp':
-            self.run_dwp(**kwargs)
-        elif self.approach in ('monge_ampere'):
-            self.run_moving_mesh(**kwargs)
-        else:
-            raise NotImplementedError  # TODO
+        """
+        Run simulation using mesh adaptation approach specified by `self.approach`.
+
+        For metric-based approaches, a fixed point iteration loop is used.
+        """
+        run_scripts = {
+
+            # Non-adaptive
+            'fixed_mesh': self.solve_forward,
+
+            # Metric-based, no adjoint
+            'hessian': self.run_hessian_based,
+
+            # Metric-based with adjoint
+            'dwp': self.run_dwp,
+            'dwr': self.run_dwr,
+
+            # Mesh movement
+            'monge_ampere': self.run_moving_mesh,
+        }
+        try:
+            run_scripts[self.approach](**kwargs)
+        except KeyError:
+            raise ValueError("Approach '{:s}' not recognised".format(self.approach))
 
     def run_hessian_based(self, **kwargs):
         """
@@ -602,8 +616,8 @@ class AdaptiveProblem():
             msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
             print_output(msg.format(
                 self.st_complexities[-1],
-                sum(self.num_vertices[n+1]),
-                sum(self.num_cells[n+1]),
+                sum(self.num_vertices[n+1])*self.dt_per_mesh,
+                sum(self.num_cells[n+1])*self.dt_per_mesh,
             ))
 
             # Check convergence of *all* element counts
@@ -619,7 +633,8 @@ class AdaptiveProblem():
         """
         Run the forward model for the entire time period in order to get checkpoints.
 
-        For mesh 0, the checkpoint
+        For mesh 0, the checkpoint is just the initial condition. For all other meshes, it is
+        the final solution tuple on the previous mesh (which will need to be interpolated).
         """
         self.solution_file.__init__(self.solution_file.filename)
         for i in range(self.num_meshes):
@@ -636,6 +651,29 @@ class AdaptiveProblem():
             self.solve_forward_step(i, export_func=export_func)
 
     def run_dwp(self, **kwargs):
+        r"""
+        The "dual weighted primal" approach, first used (not under this name) in [1]. For shallow
+        water tsunami propagation problems with a quantity of interest of the form
+
+      ..math::
+            J(u, \eta) = \int_{t_0}^{t_f} \int_R \eta \;\mathrm dx\;\mathrm dt,
+
+        where :math:`eta` is free surface displacement and :math:`R\subset\Omega` is a spatial
+        region of interest, it can be shown [1] that
+
+      ..math::
+            \int_R q(x, t=t_0) \cdot \hat q(x, t=t_0) \;\mathrm dx = \int_R q(x, t=t_f) \cdot \hat q(x, t=t_f) \;\mathrm dx
+
+        under certain boundary condition assumptions. Here :math:`q=(u,\eta)` and :math:`\hat q`
+        denotes the adjoint solution. Note that the choice of :math:`[t_0, t_f] \subseteq [0, T]`
+        is arbitrary, so the above holds at all time levels.
+
+        This motivates using error indicators of the form :math:`|q \cdot \hat q|`.
+
+        [1] B. Davis & R. LeVeque, "Adjoint Methods for Guiding Adaptive Mesh Refinement in
+            Tsunami Modelling", Pure and Applied Geophysics, 173, Springer International
+            Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
+        """
         op = self.op
         for n in range(op.num_adapt):
 
