@@ -122,7 +122,7 @@ logstr += 80*'*' + '\n' + 30*' ' + 'FINAL ELEMENT COUNTS\n' + 80*'*' + '\n'
 l = op.end_time/op.num_meshes
 for i, num_cells in enumerate(swp.num_cells[-1]):
     logstr += "Time window ({:7.1f},{:7.1f}]: {:7d}\n".format(i*l, (i+1)*l, num_cells)
-logstr += "Average: {:7d}\n".format(int(np.mean(num_cells)))
+logstr += "Average: {:7d}\n".format(int(np.mean(swp.num_cells[-1])))
 logstr += 80*'*' + '\n'
 print_output(logstr)
 date = datetime.date.today()
