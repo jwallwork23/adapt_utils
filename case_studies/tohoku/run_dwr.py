@@ -103,7 +103,9 @@ print_output(logstr + 80*'*' + '\n')
 # Create parameter class and problem object
 op = TohokuOptions(approach='dwr')
 op.update(kwargs)
-swp = AdaptiveTsunamiProblem(op)
+# meshes = [Mesh(Function(op.default_mesh.coordinates)) for i in range(op.num_meshes)]
+meshes = None
+swp = AdaptiveTsunamiProblem(op, meshes=meshes)
 swp.run_dwr()
 
 # Print summary / logging

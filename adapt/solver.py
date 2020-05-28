@@ -59,6 +59,7 @@ class AdaptiveProblem():
             'output_directory': op.di,
             'fields_to_export': ['uv_2d', 'elev_2d'] if op.plot_pvd else [],
             'fields_to_export_hdf5': ['uv_2d', 'elev_2d'] if op.save_hdf5 else [],
+            'no_exports': True,  # TODO: TEMPORARY
         }
         self.shallow_water_options = {
             'use_nonlinear_equations': True,
@@ -823,8 +824,19 @@ class AdaptiveProblem():
 
             # --- Setup problem on enriched space
 
-            hierarchies = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
-            refined_meshes = [hierarchy[1] for hierarchy in hierarchies]
+            same_mesh = True
+            for mesh in self.meshes:
+                if mesh != self.meshes[0]:
+                    same_mesh = False
+                    break
+            if same_mesh:
+                print_output("All meshes are identical so we use an identical hierarchy.")
+                hierarchy = MeshHierarchy(self.meshes[0], 1)
+                refined_meshes = [hierarchy[1] for mesh in self.meshes]
+            else:
+                print_output("Meshes differ so we create separate hierarchies.")
+                hierarchies = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
+                refined_meshes = [hierarchy[1] for hierarchy in hierarchies]
             ep = type(self)(op, refined_meshes, discrete_adjoint=self.discrete_adjoint)
 
             # --- Loop over mesh windows *in reverse*
@@ -882,8 +894,8 @@ class AdaptiveProblem():
                 if n_fwd != n_adj:
                     msg = "Mismatching number of indicators ({:d} vs {:d})"
                     raise ValueError(msg.format(n_fwd, n_adj))
-                adj_solutions_step = reversed(adj_solutions_step)
-                enriched_adj_solutions_step = reversed(enriched_adj_solutions_step)
+                adj_solutions_step = list(reversed(adj_solutions_step))
+                enriched_adj_solutions_step = list(reversed(enriched_adj_solutions_step))
                 I = 0
                 op.print_debug("DWR indicators on mesh {:2d}".format(i))
                 indicator_enriched = Function(ep.P0[i])
@@ -913,7 +925,7 @@ class AdaptiveProblem():
                     I += op.dt*self.dt_per_mesh*scaling*indicator_enriched
                 indicator_enriched_cts = interpolate(I, ep.P1[i])
 
-                ep.fwd_solver[i] = None
+                ep.fwd_solvers[i] = None
 
                 tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
                 metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
@@ -923,7 +935,10 @@ class AdaptiveProblem():
             del indicator_enriched
             del ep
             del refined_meshes
-            del hierarchies
+            if same_mesh:
+                del hierarchy
+            else:
+                del hierarchies
 
             # --- Normalise metrics
 
