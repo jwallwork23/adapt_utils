@@ -88,7 +88,7 @@ kwargs = {
     # Outer loop
     'element_rtol': float(args.element_rtol or 0.005),
     'qoi_rtol': float(args.qoi_rtol or 0.005),
-    'num_adapt': int(args.num_adapt or 35),
+    'num_adapt': int(args.num_adapt or 5),  # As recommended in [Belme et al. 2012]
 
     # Misc
     'debug': bool(args.debug or False),
@@ -103,9 +103,7 @@ print_output(logstr + 80*'*' + '\n')
 # Create parameter class and problem object
 op = TohokuOptions(approach='dwr')
 op.update(kwargs)
-# meshes = [Mesh(Function(op.default_mesh.coordinates)) for i in range(op.num_meshes)]
-meshes = None
-swp = AdaptiveTsunamiProblem(op, meshes=meshes)
+swp = AdaptiveTsunamiProblem(op)
 swp.run_dwr()
 
 # Print summary / logging
