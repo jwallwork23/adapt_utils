@@ -162,6 +162,41 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         u, eta = self.fwd_solutions[i].split()
         u_out = Function(self.P1_vec[i], name="Projected velocity")
         eta_out = Function(self.P1[i], name="Projected elevation")
+        kernel_out = Function(self.P1[i], name="QoI kernel")
+
+        class QoICallback(object):
+            """Simple callback class to time integrate a quantity of interest."""
+            def __init__(self, kernel):
+                self.timeseries = []
+                self.ks = kernel         # Kernel in space
+                self.kt = Constant(0.0)  # Kernel in time
+
+            def append(self, sol, t=0.0):
+                self.kt.assign(1.0 if t >= op.start_time else 0.0)
+                self.timeseries.append(assemble(self.kt*inner(self.ks, sol)*dx))
+
+            def get_value(self):
+                N = len(self.timeseries)
+                assert N >= 2
+                val = 0.5*op.dt*(self.timeseries[0] + self.timeseries[-1])
+                for i in range(1, N-1):
+                    val += op.dt*self.timeseries[i]
+                return val
+
+        # Setup callbacks
+        self.callbacks[i]['gauges'] = {gauge: [] for gauge in op.gauges}
+        self.callbacks[i]['gauges']['time'] = []
+        fname = "meshdata"
+        if self.extension is not None:
+            fname = '_'.join([fname, self.extension])
+        fname = '_'.join([fname, str(i)])
+        with h5py.File(os.path.join(self.di, fname+'.hdf5'), 'w') as f:
+            f.create_dataset('num_cells', data=self.num_cells[-1][i])
+        self.get_qoi_kernels(i)
+        self.callbacks[i]['qoi'] = QoICallback(self.kernels[i])
+        self.callbacks[i]['qoi'].append(self.fwd_solutions[i])
+
+        # --- Time integrate
 
         j = 0
         op.print_debug("Entering adjoint time loop...")
@@ -173,17 +208,48 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
                 if export_func is not None:
                     export_func()
                 u, eta = self.fwd_solutions[i].split()
+
+                # Evaluate free surface at gauges
+                self.callbacks[i]["gauges"]["time"].append(t)
+                for gauge in op.gauges:
+                    self.callbacks[i]["gauges"][gauge].append(eta.at(op.gauges[gauge]["coords"]))
+
+                # Plot to pvd
+                self.solution_file._topology = None
+                self.kernel_file._topology = None
                 eta_out.project(eta)
                 u_out.project(u)
+                kernel_out.project(self.kernels[i].split()[1])
                 self.solution_file.write(u_out, eta_out)
+                self.kernel_file.write(kernel_out)
+
+            # Solve
             self.fwd_solvers[i].solve()
             self.fwd_solutions_old[i].assign(self.fwd_solutions[i])
+
+            # Evaluate quantity of interest
+            self.callbacks[i]["qoi"].append(self.fwd_solutions[i], t=t)
+
+            # Increment
             t += op.dt
             j += 1
         assert j % op.dt_per_export == 0
         if export_func is not None:
             export_func()
+        self.callbacks[i]["gauges"]["time"].append(t)
+        for gauge in op.gauges:
+            self.callbacks[i]["gauges"][gauge].append(eta.at(op.gauges[gauge]["coords"]))
         op.print_debug("Done!")
+
+        # Save to HDF5
+        fname = "diagnostic_gauges"
+        if self.extension is not None:
+            fname = '_'.join([fname, self.extension])
+        fname = '_'.join([fname, str(i)])
+        with h5py.File(os.path.join(self.di, fname+'.hdf5'), 'w') as f:
+            for gauge in op.gauges:
+                f.create_dataset(gauge, data=self.callbacks[i]["gauges"][gauge])
+            f.create_dataset("time", data=self.callbacks[i]["gauges"]["time"])
 
     def setup_solver_adjoint(self, i, **kwargs):
         """Setup continuous adjoint solver on mesh `i`."""
