@@ -246,7 +246,11 @@ class TsunamiOptions(ShallowWaterOptions):
                 # 'linf': {'name': r'$\ell_\infty$ error'},
             }
             for key in errors:
-                errors[key]['data'] = evaluate_error(data, key)
+                cleaned_data = []
+                for d in data:
+                    if not np.isnan(d):
+                        cleaned_data.append(d)
+                errors[key]['data'] = evaluate_error(cleaned_data, key)
                 for linearity in ('linear', 'nonlinear'):
                     errors[key][linearity] = {'abs': [], 'rel': []}
 
@@ -308,7 +312,15 @@ class TsunamiOptions(ShallowWaterOptions):
 
                 # Compute absolute and relative errors
                 if 'data' in self.gauges[gauge]:
-                    error = np.array(Y[:cutoff+1]) - data[::r]
+                    y = list(Y[:cutoff+1])
+                    d = data[::r]
+                    yd = []
+                    for i in range(len(d)):
+                        if np.isnan(d[i]):
+                            y.pop(i)
+                        else:
+                            yd.append(d[i])
+                    error = np.array(y) - np.array(yd)
                     for key in errors:
                         err = evaluate_error(error, key)
                         errors[key][linearity]['abs'].append(err)
@@ -328,7 +340,7 @@ class TsunamiOptions(ShallowWaterOptions):
                 fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
             plt.close()
 
-        # Plot relative errors  # TODO: account for NaNs
+        # Plot relative errors
         print_output("Done!")
         print_output("Plotting errors for gauge {:s}...".format(gauge))
         if 'data' not in self.gauges[gauge]:
@@ -339,12 +351,13 @@ class TsunamiOptions(ShallowWaterOptions):
                 relative_errors = 100.0*np.array(errors[key][linearity]['rel'])
                 cells = num_cells[:len(relative_errors)]
                 ax.semilogx(cells, relative_errors, marker='o', label=linearity.title())
-            ax.set_title("{:s} ({:s})".format(gauge, linearity))
+            ax.set_title("{:s}".format(gauge))
             ax.set_xlabel("Number of elements")
             ax.set_ylabel("Relative {:s} (%)".format(errors[key]['name']))
             plt.grid(True)
             ax.legend()
             fname = "gauge_{:s}_error_{:s}".format(key, gauge)
+            plt.tight_layout()
             for fext in fexts:
                 fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
             plt.close()
