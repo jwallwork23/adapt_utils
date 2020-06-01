@@ -89,6 +89,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         return self.qoi
 
     def setup_solver_forward(self, i, **kwargs):
+        nonlinear = self.shallow_water_options['use_nonlinear_equations']
 
         # For DG cases use Thetis
         family = self.shallow_water_options['element_family']
@@ -105,7 +106,10 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         n = FacetNormal(self.meshes[i])
 
         # Mixed function space
-        u, eta = TrialFunctions(self.V[i])
+        if nonlinear:
+            u, eta = split(self.fwd_solutions[i])
+        else:
+            u, eta = TrialFunctions(self.V[i])
         u_test, eta_test = TestFunctions(self.V[i])
         self.fwd_solutions_old[i].assign(self.fwd_solutions[i])  # Assign previous value
         u_old, eta_old = split(self.fwd_solutions_old[i])
@@ -114,6 +118,8 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
             F = inner(u_test, g*grad(f1))*dx                     # g∇ η
             F += inner(u_test, f*as_vector((-f0[1], f0[0])))*dx  # f perp(u)
             F += -inner(grad(eta_test), b*f0)*dx                 # ∇ . bu
+            if nonlinear:
+                F += inner(u_test, dot(f0, nabla_grad(f0)))*dx   # u . ∇ u
             return F
 
         # Time derivative
@@ -145,8 +151,16 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
                 dbcs.append(DirichletBC(self.V[i].sub(1), 0, j))
 
         # Solver object
-        problem = LinearVariationalProblem(a, L, self.fwd_solutions[i], bcs=dbcs)
-        self.fwd_solvers[i] = LinearVariationalSolver(problem, solver_parameters=op.params)
+        kwargs = {
+            'solver_parameters': op.params,
+            'options_prefix': 'forward',
+        }
+        if nonlinear:
+            problem = NonlinearVariationalProblem(L-a, self.fwd_solutions[i], bcs=dbcs)
+            self.fwd_solvers[i] = NonlinearVariationalSolver(problem, **kwargs)
+        else:
+            problem = LinearVariationalProblem(a, L, self.fwd_solutions[i], bcs=dbcs)
+            self.fwd_solvers[i] = LinearVariationalSolver(problem, **kwargs)
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None):
         family = self.shallow_water_options['element_family']
@@ -335,8 +349,12 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         L += dtc*inner(zeta_test, self.time_kernel*dJdeta)*dx
 
         # Solver object
+        kwargs = {
+            'solver_parameters': op.adjoint_params,
+            'options_prefix': 'adjoint',
+        }
         problem = LinearVariationalProblem(a, L, self.adj_solutions[i], bcs=dbcs)
-        self.adj_solvers[i] = LinearVariationalSolver(problem, solver_parameters=op.adjoint_params)
+        self.adj_solvers[i] = LinearVariationalSolver(problem, **kwargs)
 
     def solve_adjoint_step(self, i, export_func=None, update_forcings=None):
         """
