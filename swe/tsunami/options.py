@@ -208,7 +208,7 @@ class TsunamiOptions(ShallowWaterOptions):
         """
         print_output("Plotting timeseries for gauge {:s}...".format(gauge))
         cutoff = kwargs.get('cutoff', 24)
-        sample = kwargs.get('sample', 30)
+        sample = kwargs.get('sample', 60)
         if gauge not in self.gauges:
             msg = "Gauge '{:s}' is not valid. Choose from {:}."
             raise ValueError(msg.format(gauge, self.gauges.keys()))
