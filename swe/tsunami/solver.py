@@ -113,7 +113,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         def TaylorHood(f0, f1):
             F = inner(u_test, g*grad(f1))*dx                     # g∇ η
             F += inner(u_test, f*as_vector((-f0[1], f0[0])))*dx  # f perp(u)
-            F += -g*inner(grad(eta_test), b*f0)*dx               # ∇ . bu
+            F += -inner(grad(eta_test), b*f0)*dx                 # ∇ . bu
             return F
 
         # Time derivative
@@ -142,13 +142,13 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
                 a += -0.5*dtc*b*inner(eta_test, dot(u, n))*ds(j)
                 L += 0.5*dtc*b*inner(eta_test, dot(u_old, n))*ds(j)
             if 'elev' in bcs:
-                dbcs.append(DirichletBC(eta.function_space(), 0, j))
+                dbcs.append(DirichletBC(self.V[i].sub(1), 0, j))
 
         # Solver object
         problem = LinearVariationalProblem(a, L, self.fwd_solutions[i], bcs=dbcs)
         self.fwd_solvers[i] = LinearVariationalSolver(problem, solver_parameters=op.params)
 
-    def solve_forward_step(self, i, **kwargs):
+    def solve_forward_step(self, i, update_forcings=None, export_func=None):
         family = self.shallow_water_options['element_family']
         if family != 'taylor-hood':
             super(AdaptiveTsunamiProblem, self).solve_forward_step(i, **kwargs)
@@ -176,7 +176,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
                 eta_out.project(eta)
                 u_out.project(u)
                 self.solution_file.write(u_out, eta_out)
-            self.time_kernel.assign(1.0 if t >= op.start_time else 0.0)
             self.fwd_solvers[i].solve()
             self.fwd_solutions_old[i].assign(self.fwd_solutions[i])
             t += op.dt
