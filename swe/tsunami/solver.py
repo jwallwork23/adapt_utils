@@ -88,6 +88,104 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.qoi = sum(c["qoi"].get_value() for c in self.callbacks)
         return self.qoi
 
+    def setup_solver_forward(self, i, **kwargs):
+
+        # For DG cases use Thetis
+        family = self.shallow_water_options['element_family']
+        if family != 'taylor-hood':
+            super(AdaptiveTsunamiProblem, self).setup_solver_forward(i, **kwargs)
+            return
+
+        # Collect parameters and fields
+        op = self.op
+        dtc = Constant(op.dt)
+        g = Constant(op.g)
+        b = self.bathymetry[i]
+        f = self.fields[i]['coriolis_frequency']
+        n = FacetNormal(self.meshes[i])
+
+        # Mixed function space
+        u, eta = TrialFunctions(self.V[i])
+        u_test, eta_test = TestFunctions(self.V[i])
+        self.fwd_solutions_old[i].assign(self.fwd_solutions[i])  # Assign previous value
+        u_old, eta_old = split(self.fwd_solutions_old[i])
+
+        def TaylorHood(f0, f1):
+            F = inner(u_test, g*grad(f1))*dx                     # g∇ η
+            F += inner(u_test, f*as_vector((-f0[1], f0[0])))*dx  # f perp(u)
+            F += -g*inner(grad(eta_test), b*f0)*dx               # ∇ . bu
+            return F
+
+        # Time derivative
+        a = inner(u_test, u)*dx + inner(eta_test, eta)*dx
+        L = inner(u_test, u_old)*dx + inner(eta_test, eta_old)*dx
+
+        # Crank-Nicolson timestepping
+        try:
+            assert self.timestepping_options['timestepper_type'] == 'CrankNicolson'
+        except AssertionError:
+            raise NotImplementedError  # TODO
+        print_output("### TODO: Implement forward ts other than Crank-Nicolson")
+        a += 0.5*dtc*TaylorHood(u, eta)
+        L -= 0.5*dtc*TaylorHood(u_old, eta_old)
+
+        # Boundary conditions
+        boundary_markers = self.meshes[i].exterior_facets.unique_markers
+        if self.boundary_conditions[i] == {}:  # Default Thetis boundary conditions are free-slip
+            self.boundary_conditions[i] = {j: {'un': Constant(0.0)} for j in boundary_markers}
+        dbcs = []
+        for j in boundary_markers:
+            bcs = self.boundary_conditions[i].get(j)
+            if 'un' in bcs:
+                L += dtc*b*inner(eta_test, bcs['un'])*ds(j)
+            else:
+                a += -0.5*dtc*b*inner(eta_test, dot(u, n))*ds(j)
+                L += 0.5*dtc*b*inner(eta_test, dot(u_old, n))*ds(j)
+            if 'elev' in bcs:
+                dbcs.append(DirichletBC(eta.function_space(), 0, j))
+
+        # Solver object
+        problem = LinearVariationalProblem(a, L, self.fwd_solutions[i], bcs=dbcs)
+        self.fwd_solvers[i] = LinearVariationalSolver(problem, solver_parameters=op.params)
+
+    def solve_forward_step(self, i, **kwargs):
+        family = self.shallow_water_options['element_family']
+        if family != 'taylor-hood':
+            super(AdaptiveTsunamiProblem, self).solve_forward_step(i, **kwargs)
+            return
+        op = self.op
+        t = op.dt*i*self.dt_per_mesh
+        end_time = op.dt*(i+1)*self.dt_per_mesh
+
+        # Need to project to P1 for plotting
+        self.solution_file._topology = None  # Account for mesh adaptations
+        u, eta = self.fwd_solutions[i].split()
+        u_out = Function(self.P1_vec[i], name="Projected velocity")
+        eta_out = Function(self.P1[i], name="Projected elevation")
+
+        j = 0
+        op.print_debug("Entering adjoint time loop...")
+        while t < end_time:
+            if update_forcings is not None:
+                update_forcings(t)
+            if j % op.dt_per_export == 0:
+                print_output("t = {:6.1f}".format(t))
+                if export_func is not None:
+                    export_func()
+                u, eta = self.fwd_solutions[i].split()
+                eta_out.project(eta)
+                u_out.project(u)
+                self.solution_file.write(u_out, eta_out)
+            self.time_kernel.assign(1.0 if t >= op.start_time else 0.0)
+            self.fwd_solvers[i].solve()
+            self.fwd_solutions_old[i].assign(self.fwd_solutions[i])
+            t += op.dt
+            j += 1
+        assert j % op.dt_per_export == 0
+        if export_func is not None:
+            export_func()
+        op.print_debug("Done!")
+
     def setup_solver_adjoint(self, i, **kwargs):
         """Setup continuous adjoint solver on mesh `i`."""
         op = self.op
