@@ -56,9 +56,13 @@ kwargs = {
 
     # Physics
     'bathymetry_cap': 30.0,  # FIXME
+    # 'bathymetry_cap': None,
 
     # Solver
     'family': args.family or 'dg-cg',
+    # 'use_wetting_and_drying': True,
+    'use_wetting_and_drying': False,
+    'wetting_and_drying_alpha': Constant(2.0),
 
     # QoI
     'start_time': float(args.start_time or 1200.0),
@@ -121,4 +125,7 @@ print_output(logstr)
 print_output(logdir)
 
 # Plot timeseries
-op.plot_all_timeseries()
+for g in op.gps_gauges:
+    op.plot_timeseries(g, sample=30)
+for g in op.pressure_gauges:
+    op.plot_timeseries(g, sample=60)
