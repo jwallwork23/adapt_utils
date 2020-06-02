@@ -20,7 +20,7 @@ class TsunamiOptions(ShallowWaterOptions):
     Parameter class for general tsunami propagation problems.
     """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
-    bathymetry_cap = PositiveFloat(30.0, help="Minimum depth").tag(config=True)
+    bathymetry_cap = NonNegativeFloat(30.0, allow_none=True, help="Minimum depth").tag(config=True)
 
     def __init__(self, **kwargs):
         super(TsunamiOptions, self).__init__(**kwargs)
@@ -65,6 +65,7 @@ class TsunamiOptions(ShallowWaterOptions):
         #     | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
         #     ---------------- ------------ ----------------
         self.params = {
+            "snes_converged_reason": None,
             "ksp_type": "gmres",                     # default
             "ksp_converged_reason": None,
             "pc_type": "fieldsplit",                 # default
@@ -198,10 +199,6 @@ class TsunamiOptions(ShallowWaterOptions):
 
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")
-
-    def plot_all_timeseries(self, **kwargs):
-        for gauge in self.gauges:
-            self.plot_timeseries(gauge, **kwargs)
 
     # TODO: Plot multiple mesh approaches
     def plot_timeseries(self, gauge, **kwargs):

@@ -89,7 +89,10 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         return self.qoi
 
     def setup_solver_forward(self, i, **kwargs):
+        op = self.op
         nonlinear = self.shallow_water_options['use_nonlinear_equations']
+        wd = self.shallow_water_options['use_wetting_and_drying']
+        alpha = self.shallow_water_options['wetting_and_drying_alpha']
 
         # For DG cases use Thetis
         family = self.shallow_water_options['element_family']
@@ -98,7 +101,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
             return
 
         # Collect parameters and fields
-        op = self.op
         dtc = Constant(op.dt)
         g = Constant(op.g)
         b = self.bathymetry[i]
@@ -112,8 +114,25 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.fwd_solutions_old[i].assign(self.fwd_solutions[i])  # Assign previous value
         u_old, eta_old = split(self.fwd_solutions_old[i])
 
+        def depth(elev):
+            """Depth expression (modified if wetting and drying used)."""
+            if not nonlinear:
+                return b
+            H = b + elev
+            if wd:
+                H += 0.5*(sqrt(H**2 + alpha**2) - H)
+            return H
+
+        def eta_tilde(elev):
+            """Modified elevation field"""
+            elev_modified = elev
+            if nonlinear and wd:
+                H = elev + b
+                elev_modified = elev_modified + 0.5*(sqrt(H**2 + alpha**2) - H)
+            return elev_modified
+
         def TaylorHood(uv, elev):
-            H = b + elev if nonlinear else b
+            H = depth(elev)
             F = inner(u_test, g*grad(elev))*dx                          # g∇ η
             F += inner(u_test, f*as_vector((-uv[1], uv[0])))*dx         # f perp(u)
             F += -inner(grad(eta_test), H*uv)*dx                        # ∇ . (Hu)
@@ -124,8 +143,8 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
             return F
 
         # Time derivative
-        a = inner(u_test, u)*dx + inner(eta_test, eta)*dx
-        L = inner(u_test, u_old)*dx + inner(eta_test, eta_old)*dx
+        a = inner(u_test, u)*dx + inner(eta_test, eta_tilde(eta))*dx
+        L = inner(u_test, u_old)*dx + inner(eta_test, eta_tilde(eta_old))*dx
 
         # Crank-Nicolson timestepping
         try:
@@ -144,10 +163,10 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         for j in boundary_markers:
             bcs = self.boundary_conditions[i].get(j)
             if 'un' in bcs:
-                L += dtc*b*inner(eta_test, bcs['un'])*ds(j)
+                L += dtc*depth(eta_old)*inner(eta_test, bcs['un'])*ds(j)
             else:
-                a += -0.5*dtc*b*inner(eta_test, dot(u, n))*ds(j)
-                L += 0.5*dtc*b*inner(eta_test, dot(u_old, n))*ds(j)
+                a += -0.5*dtc*depth(eta)*inner(eta_test, dot(u, n))*ds(j)
+                L += 0.5*dtc*depth(eta_old)*inner(eta_test, dot(u_old, n))*ds(j)
             if 'elev' in bcs:
                 dbcs.append(DirichletBC(self.V[i].sub(1), 0, j))
 
@@ -165,8 +184,13 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None):
         family = self.shallow_water_options['element_family']
+        nonlinear = self.shallow_water_options['use_nonlinear_equations']
+        wd = self.shallow_water_options['use_wetting_and_drying']
+        alpha = self.shallow_water_options['wetting_and_drying_alpha']
+        b = self.bathymetry[i]
         if family != 'taylor-hood':
-            super(AdaptiveTsunamiProblem, self).solve_forward_step(i, **kwargs)
+            super(AdaptiveTsunamiProblem, self).solve_forward_step(i,
+                    update_forcings=update_forcings, export_func=export_func)
             return
         op = self.op
         t = op.dt*i*self.dt_per_mesh
@@ -216,6 +240,14 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.bathymetry_file._topology = None
         self.bathymetry_file.write(self.bathymetry[i])
 
+        def eta_tilde(elev):
+            """Modified elevation field"""
+            elev_modified = Function(elev, name="Projected modified elevation")
+            if nonlinear and wd:
+                H = elev + b
+                elev_modifed.interpolate(elev + 0.5*(sqrt(H**2 + alpha**2) - H))
+            return elev_modified
+
         # --- Time integrate
 
         j = 0
@@ -237,7 +269,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
                 # Plot to pvd
                 self.solution_file._topology = None
                 self.kernel_file._topology = None
-                eta_out.project(eta)
+                eta_out.project(eta_tilde(eta))
                 u_out.project(u)
                 kernel_out.project(self.kernels[i].split()[1])
                 self.solution_file.write(u_out, eta_out)
