@@ -103,23 +103,24 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         g = Constant(op.g)
         b = self.bathymetry[i]
         f = self.fields[i]['coriolis_frequency']
+        # Cd = self.fields[i]['quadratic_drag_coefficient']
         n = FacetNormal(self.meshes[i])
 
         # Mixed function space
-        if nonlinear:
-            u, eta = split(self.fwd_solutions[i])
-        else:
-            u, eta = TrialFunctions(self.V[i])
+        u, eta = split(self.fwd_solutions[i]) if nonlinear else TrialFunctions(self.V[i])
         u_test, eta_test = TestFunctions(self.V[i])
         self.fwd_solutions_old[i].assign(self.fwd_solutions[i])  # Assign previous value
         u_old, eta_old = split(self.fwd_solutions_old[i])
 
-        def TaylorHood(f0, f1):
-            F = inner(u_test, g*grad(f1))*dx                     # g∇ η
-            F += inner(u_test, f*as_vector((-f0[1], f0[0])))*dx  # f perp(u)
-            F += -inner(grad(eta_test), b*f0)*dx                 # ∇ . bu
+        def TaylorHood(uv, elev):
+            H = b + elev if nonlinear else b
+            F = inner(u_test, g*grad(elev))*dx                          # g∇ η
+            F += inner(u_test, f*as_vector((-uv[1], uv[0])))*dx         # f perp(u)
+            F += -inner(grad(eta_test), H*uv)*dx                        # ∇ . (Hu)
             if nonlinear:
-                F += inner(u_test, dot(f0, nabla_grad(f0)))*dx   # u . ∇ u
+                F += inner(u_test, dot(uv, nabla_grad(uv)))*dx          # u . ∇ u
+                # if Cd is not None:
+                #     F += Cd*sqrt(inner(uv, uv))*inner(u_test, uv)*dx  # Cd ||u|| u
             return F
 
         # Time derivative
