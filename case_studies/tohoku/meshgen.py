@@ -113,7 +113,7 @@ class MeshSetup:
         TohokuMesh.writeShapefile(os.path.join(self.di, 'meshes', self.name + '.shp'))
 
 
-for i in range(4):
+for i in range(5):
     ms = MeshSetup(i)
     qmesh.setLogOutputFile(ms.log)  # Store QMESH log for later reference
     qmesh.initialise()              # Initialise QGIS API
