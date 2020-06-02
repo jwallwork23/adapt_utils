@@ -76,7 +76,7 @@ di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs/qmesh'))
 qois = []
 num_cells = []
 for level in range(levels):
-    print_output("Running qmesh convergence on level {:d}".format(leve))
+    print_output("Running qmesh convergence on level {:d}".format(level))
     ext = "{:s}linear_level{:d}".format('non' if nonlinear else '', level)
 
     # Set parameters
@@ -92,7 +92,6 @@ for level in range(levels):
     # Diagnostics
     qois.append(qoi)
     num_cells.append(swp.num_cells[0][0])
-op.plot_all_timeseries()
 
 # Print/log results
 with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
@@ -120,3 +119,6 @@ with open(os.path.join(logdir, 'log'), 'w') as logfile:
     logfile.write(logstr)
 print_output(logstr)
 print_output(logdir)
+
+# Plot timeseries
+op.plot_all_timeseries()
