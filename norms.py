@@ -40,7 +40,9 @@ def _lp_norm_clean(f, p):
 def _total_variation_clean(f):
     """Calculate the total variation of a 1D array which does not contain NaNs."""
     n, tv, i0 = len(f), 0.0, 0
-    if n == 1:
+    if n == 0:
+        return 0.0
+    elif n == 1:
         assert np.allclose(f[0], 0.0)
         return 0.0
     sign_ = np.sign(f[1] - f[i0])
