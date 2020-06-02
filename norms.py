@@ -3,15 +3,27 @@ from firedrake import *
 import numpy as np
 
 
-__all__ = ["lp_norm", "total_variation", "local_norm", "frobenius_norm", "local_frobenius_norm",
+__all__ = ["lp_norm", "total_variation", "timeseries_error",
+           "local_norm", "frobenius_norm", "local_frobenius_norm",
            "local_edge_integral", "local_interior_edge_integral", "local_boundary_integral"]
 
 
-def lp_norm(f, p=2):
-    """
-    Calculate the lp norm of a 1D array `f`, where `p` is either `None` or `'infty'` (denoting the
-    infinity norm), or `p >= 1`.
-    """
+def _split_by_nan(f):
+    """Split a list containing NaNs into separate lists."""
+    f_split = [[], ]
+    nan_slots = []
+    for i, fi in enumerate(f):
+        if np.isnan(fi):
+            if len(f_split[-1]) > 0:
+                f_split.append([])
+            nan_slots.append(i)
+        else:
+            f_split[-1].append(fi)
+    return f_split, nan_slots
+
+
+def _lp_norm_clean(f, p):
+    r""":math:`\ell_p` norm of a 1D array which does not contain NaNs"""
     if p is None or 'inf' in p:
         return f.max()
     elif p.startswith('l'):
@@ -25,20 +37,12 @@ def lp_norm(f, p=2):
         raise ValueError("Norm type {:} not recognised.".format(p))
 
 
-def _split_by_nan(f):
-    """Split a list containing NaNs into separate lists."""
-    f_split = [[], ]
-    for i, fi in enumerate(f):
-        if np.isnan(fi) and len(f_split[-1]) > 0:
-            f_split.append([])
-        else:
-            f_split[-1].append(fi)
-    return f_split
-
-
 def _total_variation_clean(f):
     """Calculate the total variation of a 1D array which does not contain NaNs."""
     n, tv, i0 = len(f), 0.0, 0
+    if n == 1:
+        assert np.allclose(f[0], 0.0)
+        return 0.0
     sign_ = np.sign(f[1] - f[i0])
     for i in range(2, n):
         sign = np.sign(f[i] - f[i-1])
@@ -51,9 +55,51 @@ def _total_variation_clean(f):
     return tv
 
 
+def _timeseries_norm_clean(f, norm_type):
+    return _total_variation_clean(f) if norm_type == 'tv' else _lp_norm_clean(f, p=norm_type)
+
+
+def lp_norm(f, p='l2'):
+    r"""
+    Calculate the :math:`\ell_p` norm of a 1D array.
+    
+    :kwarg p: `None` or `'linf'` denotes infinity norm. Otherwise choose `'lp'` with :math:`p >= 1`.
+    """
+    return timeseries_error(f, norm_type=p)
+
+
 def total_variation(f):
     """Calculate the total variation of a 1D array which may contain NaNs."""
-    return sum(_total_variation_clean(fi) for fi in _split_by_nan(f))
+    return timeseries_error(f, norm_type='tv')
+
+
+def timeseries_error(f, g=None, relative=False, norm_type='tv'):
+    """Helper function for evaluating error of a 1D array."""
+    if norm_type != 'tv' and norm_type[0] != 'l':
+        raise ValueError("Error type '{:s}' not recognised.".format(norm_type))
+    n = len(f)
+
+    # Remove NaNs from data
+    f_split, nan_slots = _split_by_nan(f)
+
+    # Norm
+    if g is None:
+        return sum(_timeseries_norm_clean(fi, norm_type) for fi in f_split)
+
+    # Error
+    assert n == len(g)
+    g_split = [[], ]
+    for i in range(n):
+        if i in nan_slots:
+            if len(g_split[-1]) > 0:
+                g_split.append([])
+        else:
+            g_split[-1].append(g[i])
+    diff = [[fij - gij for fij, gij in zip(fi, gi)] for fi, gi in zip(f_split, g_split)]
+    error = sum(_timeseries_norm_clean(di, norm_type) for di in diff)
+    if relative:
+        error /= sum(_timeseries_norm_clean(fi, norm_type) for fi in f_split)
+    return error
 
 
 def local_norm(f, norm_type='L2'):
