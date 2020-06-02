@@ -210,10 +210,15 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.callbacks[i]['qoi'] = QoICallback(self.kernels[i])
         self.callbacks[i]['qoi'].append(self.fwd_solutions[i])
 
+        # Plot bathymetry
+        self.bathymetry[i].rename("Bathymetry")
+        self.bathymetry_file._topology = None
+        self.bathymetry_file.write(self.bathymetry[i])
+
         # --- Time integrate
 
         j = 0
-        op.print_debug("Entering adjoint time loop...")
+        op.print_debug("Entering forward time loop...")
         while t < end_time:
             if update_forcings is not None:
                 update_forcings(t)

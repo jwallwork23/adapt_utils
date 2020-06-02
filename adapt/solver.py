@@ -107,6 +107,7 @@ class AdaptiveProblem():
         # self.solution_fpath_hdf5 = os.path.join(self.di, 'solution.hdf5')
         self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
         # self.adjoint_solution_fpath_hdf5 = os.path.join(self.di, 'adjoint_solution.hdf5')
+        self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         self.kernel_file = File(os.path.join(self.di, 'kernel.pvd'))
 
