@@ -47,6 +47,8 @@ qmesh_nonlinear:
 	@python3 run_qmesh_convergence.py -nonlinear 1
 	@echo "Done!"
 
+qmesh: qmesh_linear qmesh_nonlinear
+
 # --- Run scripts
 
 fixed_mesh:
