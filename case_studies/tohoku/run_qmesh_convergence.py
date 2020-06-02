@@ -88,8 +88,7 @@ for level in range(levels):
     # Diagnostics
     qois.append(qoi)
     num_cells.append(swp.num_cells[0][0])
-op.plot_timeseries("P02")
-op.plot_timeseries("P06")
+op.plot_all_timeseries()
 
 # Print/log results
 with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:

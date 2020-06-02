@@ -100,10 +100,10 @@ class TsunamiOptions(ShallowWaterOptions):
         x, y = SpatialCoordinate(self.lonlat_mesh)
         self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
 
-    def set_bathymetry(self, fs=None, dat=None, cap=30.0):
+    def set_bathymetry(self, fs=None, dat=None, cap=10.0):
         assert hasattr(self, 'initial_surface')
         if cap is not None:
-            assert cap > 0.0
+            assert cap >= 0.0
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
         self.bathymetry = Function(fs, name="Bathymetry")
 
@@ -197,6 +197,10 @@ class TsunamiOptions(ShallowWaterOptions):
 
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")
+
+    def plot_all_timeseries(self, **kwargs):
+        for gauge in self.gauges:
+            self.plot_timeseries(gauge, **kwargs)
 
     # TODO: Plot multiple mesh approaches
     def plot_timeseries(self, gauge, **kwargs):
