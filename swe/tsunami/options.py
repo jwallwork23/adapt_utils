@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 
 from adapt_utils.swe.options import ShallowWaterOptions
 from adapt_utils.swe.tsunami.conversion import *
-from adapt_utils.norms import total_variation, lp_norm
+from adapt_utils.norms import timeseries_error
 
 
 __all__ = ["TsunamiOptions"]
@@ -20,6 +20,7 @@ class TsunamiOptions(ShallowWaterOptions):
     Parameter class for general tsunami propagation problems.
     """
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
+    bathymetry_cap = PositiveFloat(30.0, help="Minimum depth").tag(config=True)
 
     def __init__(self, **kwargs):
         super(TsunamiOptions, self).__init__(**kwargs)
@@ -100,10 +101,10 @@ class TsunamiOptions(ShallowWaterOptions):
         x, y = SpatialCoordinate(self.lonlat_mesh)
         self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
 
-    def set_bathymetry(self, fs=None, dat=None, cap=10.0):
+    def set_bathymetry(self, fs=None, dat=None):
         assert hasattr(self, 'initial_surface')
-        if cap is not None:
-            assert cap >= 0.0
+        if self.bathymetry_cap is not None:
+            assert self.bathymetry_cap >= 0.0
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
         self.bathymetry = Function(fs, name="Bathymetry")
 
@@ -126,8 +127,8 @@ class TsunamiOptions(ShallowWaterOptions):
             # depth[i] -= self.initial_surface.dat.data[i]
             depth[i] -= bath_interp(xy[1], xy[0])
             # self.print_debug(msg.format(xy[0], xy[1], depth[i]/1000))
-        if cap is not None:
-            self.bathymetry.interpolate(max_value(cap, self.bathymetry))
+        if self.bathymetry_cap is not None:
+            self.bathymetry.interpolate(max_value(self.bathymetry_cap, self.bathymetry))
         self.print_debug("Done!")
         return self.bathymetry
 
@@ -232,15 +233,6 @@ class TsunamiOptions(ShallowWaterOptions):
         time -= time[0]
         assert len(time) == len(data)
 
-        def evaluate_error(dat, name):
-            """Helper function for evaluating timeseries error."""
-            if name == 'tv':
-                return total_variation(dat)
-            elif name[0] == 'l':
-                return lp_norm(dat, p=name)
-            else:
-                raise ValueError("Error type '{:s}' not recognised.".format(name))
-
         # Dictionary for norms and errors of timeseries
         if 'data' in self.gauges[gauge]:
             errors = {
@@ -249,14 +241,10 @@ class TsunamiOptions(ShallowWaterOptions):
                 'l2': {'name': r'$\ell_2$ error'},
                 # 'linf': {'name': r'$\ell_\infty$ error'},
             }
-            for key in errors:
-                cleaned_data = []
-                for d in data:
-                    if not np.isnan(d):
-                        cleaned_data.append(d)
-                errors[key]['data'] = evaluate_error(cleaned_data, key)
+            for norm_type in errors:
+                errors[norm_type]['data'] = timeseries_error(data, norm_type=norm_type)
                 for linearity in ('linear', 'nonlinear'):
-                    errors[key][linearity] = {'abs': [], 'rel': []}
+                    errors[norm_type][linearity] = {'abs': [], 'rel': []}
 
         # Consider cases of both linear and nonlinear shallow water equations
         for linearity in ('linear', 'nonlinear'):
@@ -316,19 +304,10 @@ class TsunamiOptions(ShallowWaterOptions):
 
                 # Compute absolute and relative errors
                 if 'data' in self.gauges[gauge]:
-                    y = list(Y[:cutoff+1])
-                    d = data[::r]
-                    yd = []
-                    for i in range(len(d)):
-                        if np.isnan(d[i]):
-                            y.pop(i)
-                        else:
-                            yd.append(d[i])
-                    error = np.array(y) - np.array(yd)
-                    for key in errors:
-                        err = evaluate_error(error, key)
-                        errors[key][linearity]['abs'].append(err)
-                        errors[key][linearity]['rel'].append(err/errors[key]['data'])
+                    for norm_type in errors:
+                        err = timeseries_error(data[::r], Y[:cutoff+1], norm_type=norm_type)
+                        errors[norm_type][linearity]['abs'].append(err)
+                        errors[norm_type][linearity]['rel'].append(err/errors[norm_type]['data'])
 
             # Plot labels etc.
             ax.set_title("{:s} timeseries ({:s})".format(gauge, linearity))
