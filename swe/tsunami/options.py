@@ -244,15 +244,16 @@ class TsunamiOptions(ShallowWaterOptions):
                     errors[norm_type][linearity] = {'abs': [], 'rel': []}
 
         # Consider cases of both linear and nonlinear shallow water equations
+        num_cells = {}
         for linearity in ('linear', 'nonlinear'):
-            num_cells = []
+            num_cells[linearity] = []
 
             # Plot observations
             fig, ax = plt.subplots(figsize=(10.0, 5.0))
             ax.plot(time, data, label='Data', linestyle='solid')
 
             # Loop over runs
-            for level in range(4):
+            for level in range(5):
                 tag = '{:s}_level{:d}'.format(linearity, level)
                 fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, '0.hdf5']))
                 if not os.path.exists(fname):
@@ -261,7 +262,7 @@ class TsunamiOptions(ShallowWaterOptions):
                 if not os.path.exists(fname):
                     continue
                 with h5py.File(fname, 'r') as f:
-                    num_cells.append(f['num_cells'][()])
+                    num_cells[linearity].append(f['num_cells'][()])
 
                 # Global time and profile arrays
                 T = np.array([])
@@ -288,7 +289,7 @@ class TsunamiOptions(ShallowWaterOptions):
                     T = np.concatenate((T, gauge_time))
 
                 # Plot timeseries for current mesh
-                label = '{:s} ({:d} elements)'.format(self.approach, num_cells[-1])
+                label = '{:s} ({:d} elements)'.format(self.approach, num_cells[linearity][-1])
                 label = label.replace('_', ' ').title()
                 ax.plot(T, Y, label=label, linestyle='dashed', marker='x')
 
@@ -329,7 +330,7 @@ class TsunamiOptions(ShallowWaterOptions):
             fig, ax = plt.subplots(figsize=(3.2, 4.8))
             for linearity in ('linear', 'nonlinear'):
                 relative_errors = 100.0*np.array(errors[key][linearity]['rel'])
-                cells = num_cells[:len(relative_errors)]
+                cells = num_cells[linearity][:len(relative_errors)]
                 ax.semilogx(cells, relative_errors, marker='o', label=linearity.title())
             ax.set_title("{:s}".format(gauge))
             ax.set_xlabel("Number of elements")
