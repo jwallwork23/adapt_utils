@@ -61,12 +61,13 @@ if len(locations) != len(radii):
 # Set parameters for fixed mesh run
 kwargs = {
 
-    # Timestepping
-    'end_time': float(args.end_time or 1440.0),
-
     # Space-time domain
     'level': int(args.level or 2),
+    'end_time': float(args.end_time or 1440.0),
     'num_meshes': int(args.num_meshes or 12),
+
+    # Physics
+    'bathymetry_cap': 30.0,  # FIXME
 
     # Solver
     'family': args.family or 'dg-cg',

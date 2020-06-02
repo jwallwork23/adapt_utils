@@ -19,7 +19,7 @@ parser.add_argument("-family", help="Element family for mixed FE space (default 
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
 
 # Outer loop
-parser.add_argument("-levels", help="Number of mesh levels to consider (default 4)")
+parser.add_argument("-levels", help="Number of mesh levels to consider (default 5)")
 
 # QoI
 parser.add_argument("-start_time", help="""
@@ -54,6 +54,9 @@ kwargs = {
     'num_meshes': int(args.num_meshes or 1),
     'end_time': float(args.end_time or 1440.0),
 
+    # Physics
+    'bathymetry_cap': 30.0,  # FIXME
+
     # Solver
     'family': args.family or 'dg-cg',
 
@@ -66,13 +69,14 @@ kwargs = {
     'plot_pvd': True,
     'debug': bool(args.debug or False),
 }
-levels = int(args.levels or 4)
+levels = int(args.levels or 5)
 nonlinear = bool(args.nonlinear or False)
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs/qmesh'))
 
 qois = []
 num_cells = []
 for level in range(levels):
+    print_output("Running qmesh convergence on level {:d}".format(leve))
     ext = "{:s}linear_level{:d}".format('non' if nonlinear else '', level)
 
     # Set parameters
