@@ -11,7 +11,7 @@ from adapt_utils.case_studies.tohoku.options import TohokuOptions
 
 
 for level in range(4):
-    op = TohokuOptions(level=level, h_min=1e3, h_max=1e6)
+    op = TohokuOptions(level=level, h_min=1e3, h_max=1e6, postproc=False)
     mesh = op.default_mesh
     fname = op.meshfile
 
