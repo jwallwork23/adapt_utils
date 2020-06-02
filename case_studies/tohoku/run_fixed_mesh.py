@@ -51,6 +51,9 @@ kwargs = {
     'num_meshes': int(args.num_meshes or 1),
     'end_time': float(args.end_time or 1440.0),
 
+    # Physics
+    'bathymetry_cap': 30.0,  # FIXME
+
     # Solver
     'family': args.family or 'dg-cg',
 
@@ -58,7 +61,6 @@ kwargs = {
     'start_time': float(args.start_time or 1200.0),
     'radii': radii,
     'locations': locations,
-
 
     # Misc
     'plot_pvd': True,
@@ -76,5 +78,4 @@ if not just_plot:
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
     swp.solve_forward()
     print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
-op.plot_timeseries("P02")
-op.plot_timeseries("P06")
+op.plot_all_timeseries()
