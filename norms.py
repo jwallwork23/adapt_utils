@@ -25,8 +25,19 @@ def lp_norm(f, p=2):
         raise ValueError("Norm type {:} not recognised.".format(p))
 
 
-def total_variation(f):
-    """Calculate the total variation of a 1D array f."""
+def _split_by_nan(f):
+    """Split a list containing NaNs into separate lists."""
+    f_split = [[], ]
+    for i, fi in enumerate(f):
+        if np.isnan(fi) and len(f_split[-1]) > 0:
+            f_split.append([])
+        else:
+            f_split[-1].append(fi)
+    return f_split
+
+
+def _total_variation_clean(f):
+    """Calculate the total variation of a 1D array which does not contain NaNs."""
     n, tv, i0 = len(f), 0.0, 0
     sign_ = np.sign(f[1] - f[i0])
     for i in range(2, n):
@@ -38,6 +49,11 @@ def total_variation(f):
             tv += np.abs(f[i] - f[i0])
         sign_ = sign
     return tv
+
+
+def total_variation(f):
+    """Calculate the total variation of a 1D array which may contain NaNs."""
+    return sum(_total_variation_clean(fi) for fi in _split_by_nan(f))
 
 
 def local_norm(f, norm_type='L2'):
