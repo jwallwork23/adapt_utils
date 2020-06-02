@@ -201,7 +201,7 @@ class TsunamiOptions(ShallowWaterOptions):
         raise NotImplementedError("Implement in derived class")
 
     # TODO: Plot multiple mesh approaches
-    def plot_timeseries(self, gauge, **kwargs):
+    def plot_timeseries(self, gauge, axes=None, **kwargs):
         """
         Plot timeseries for `gauge` under all stored mesh resolutions.
 
@@ -217,8 +217,13 @@ class TsunamiOptions(ShallowWaterOptions):
         fexts = []
         if kwargs.get('plot_pdf', False):
             fexts.append('pdf')
-        if kwargs.get('plot_png', True):
+        if kwargs.get('plot_png', axes is None):
             fexts.append('png')
+        plot_errors = axes is None
+        plot_nonlinear = axes is None
+        linearities = ('linear', )
+        if plot_nonlinear:
+            linearities += ('nonlinear', )
 
         # Get data
         if 'data' not in self.gauges[gauge]:
@@ -245,12 +250,13 @@ class TsunamiOptions(ShallowWaterOptions):
 
         # Consider cases of both linear and nonlinear shallow water equations
         num_cells = {}
-        for linearity in ('linear', 'nonlinear'):
+        for linearity in linearities:
             num_cells[linearity] = []
 
             # Plot observations
-            fig, ax = plt.subplots(figsize=(10.0, 5.0))
-            ax.plot(time, data, label='Data', linestyle='solid')
+            if axes is None:
+                fig, axes = plt.subplots(figsize=(10.0, 5.0))
+            axes.plot(time, data, label='Data', linestyle='solid')
 
             # Loop over runs
             for level in range(5):
@@ -291,7 +297,7 @@ class TsunamiOptions(ShallowWaterOptions):
                 # Plot timeseries for current mesh
                 label = '{:s} ({:d} elements)'.format(self.approach, num_cells[linearity][-1])
                 label = label.replace('_', ' ').title()
-                ax.plot(T, Y, label=label, linestyle='dashed', marker='x')
+                axes.plot(T, Y, label=label, linestyle='dashed', marker='x')
 
                 r = 1
                 if len(data) % len(Y) == 0:
@@ -308,35 +314,38 @@ class TsunamiOptions(ShallowWaterOptions):
                         errors[norm_type][linearity]['rel'].append(err/errors[norm_type]['data'])
 
             # Plot labels etc.
-            ax.set_title("{:s} timeseries ({:s})".format(gauge, linearity))
-            ax.set_xlabel("Time [min]")
-            ax.set_ylabel("Free surface displacement [m]")
-            ax.set_xlim([0, cutoff])
+            axes.set_title("{:s} timeseries ({:s})".format(gauge, linearity))
+            axes.set_xlabel("Time [min]")
+            axes.set_ylabel("Free surface displacement [m]")
+            axes.set_xlim([0, cutoff])
             plt.grid(True)
-            box = ax.get_position()
-            ax.set_position([box.x0, box.y0, box.width*0.8, box.height])
-            ax.legend(loc='center left', bbox_to_anchor=(1, 0.5))
+            box = axes.get_position()
+            axes.set_position([box.x0, box.y0, box.width*0.8, box.height])
+            axes.legend(loc='center left', bbox_to_anchor=(1, 0.5))
             fname = "gauge_timeseries_{:s}_{:s}".format(gauge, linearity)
             for fext in fexts:
                 fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
-            plt.close()
+            axes = None
+        print_output("Done!")
+
+        if not plot_errors:
+            return
 
         # Plot relative errors
-        print_output("Done!")
         print_output("Plotting errors for gauge {:s}...".format(gauge))
         if 'data' not in self.gauges[gauge]:
             raise ValueError("Data not found.")
         for key in errors:
-            fig, ax = plt.subplots(figsize=(3.2, 4.8))
-            for linearity in ('linear', 'nonlinear'):
+            fig, axes = plt.subplots(figsize=(3.2, 4.8))
+            for linearity in linearities:
                 relative_errors = 100.0*np.array(errors[key][linearity]['rel'])
                 cells = num_cells[linearity][:len(relative_errors)]
-                ax.semilogx(cells, relative_errors, marker='o', label=linearity.title())
-            ax.set_title("{:s}".format(gauge))
-            ax.set_xlabel("Number of elements")
-            ax.set_ylabel("Relative {:s} (%)".format(errors[key]['name']))
+                axes.semilogx(cells, relative_errors, marker='o', label=linearity.title())
+            axes.set_title("{:s}".format(gauge))
+            axes.set_xlabel("Number of elements")
+            axes.set_ylabel("Relative {:s} (%)".format(errors[key]['name']))
             plt.grid(True)
-            ax.legend()
+            axes.legend()
             fname = "gauge_{:s}_error_{:s}".format(key, gauge)
             plt.tight_layout()
             for fext in fexts:
