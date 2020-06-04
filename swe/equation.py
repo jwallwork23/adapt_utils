@@ -4,6 +4,8 @@ from thetis.utility import *
 from thetis.shallowwater_eq import *
 
 
+g_grav = physical_constants['g_grav']
+
 class ExternalPressureGradientTerm(ShallowWaterMomentumTerm):
     def residual(self, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions=None):
         total_h = self.depth.get_total_depth(eta_old)
