@@ -201,6 +201,7 @@ class TsunamiOptions(ShallowWaterOptions):
         raise NotImplementedError("Implement in derived class")
 
     # TODO: Plot multiple mesh approaches
+    # TODO: UPDATE
     def plot_timeseries(self, gauge, axes=None, **kwargs):
         """
         Plot timeseries for `gauge` under all stored mesh resolutions.

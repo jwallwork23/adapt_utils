@@ -22,256 +22,29 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
     def add_callbacks(self, i):
         op = self.op
 
-        # # --- Gauge timeseries
-
+        # Gauge timeseries
         for gauge in op.gauges:
             self.callbacks[i].add(GaugeCallback(self, i, gauge), 'export')
-        # gauge_names = [g for g in op.gauges]
-        # gauge_locations = [op.gauges[g]["coords"] for g in gauge_names]
-        # fname = "gauges"
-        # if self.extension is not None:
-        #     fname = '_'.join([fname, self.extension])
-        # fname = '_'.join([fname, str(i)])
-        # cb = callback.DetectorsCallback(
-        #     self.fwd_solvers[i], gauge_locations, ['elev_2d'], fname, gauge_names)
-        # self.callbacks[i].add_callback(cb, 'export')
-        # # for g in gauge_names:
-        # #     x, y = op.gauges[g]["coords"]
-        # #     self.callbacks[i][g] = callback.TimeSeriesCallback2D(
-        # #         self.fwd_solvers[i], ['elev_2d'], x, y, g, self.di)
-        # #     self.fwd_solvers[i].add_callback(self.callbacks[i][g], 'export')
 
-        # # --- Mesh data
-
-        # fname = "meshdata"
-        # if self.extension is not None:
-        #     fname = '_'.join([fname, self.extension])
-        # fname = '_'.join([fname, str(i)])
-        # with h5py.File(os.path.join(self.di, fname+'.hdf5'), 'w') as f:
-        #     f.create_dataset('num_cells', data=self.num_cells[-1][i])
-
-        # # --- Quantity of interest
-
+        # Quantity of interest
         self.get_qoi_kernels(i)
         self.callbacks[i].add(QoICallback(self, i), 'timestep')
-        # self.kernel_file._topology = None
-        # kernel_proj = project(self.kernels[i].split()[1], self.P1[i])
-        # kernel_proj.rename("QoI kernel")
-        # self.kernel_file.write(kernel_proj)
-        # kt = Constant(0.0)  # Kernel in time
-
-        # def qoi(sol):
-        #     t = self.fwd_solvers[i].simulation_time
-        #     kt.assign(1.0 if t >= op.start_time else 0.0)
-        #     return assemble(kt*inner(self.kernels[i], sol)*dx)
-
-        # self.callbacks[i]["qoi"] = callback.TimeIntegralCallback(
-        #     qoi, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
-        #     name="qoi", append_to_log=op.debug
-        #     # name="qoi", append_to_log=False
-        # )
-        # self.fwd_solvers[i].add_callback(self.callbacks[i]["qoi"], 'timestep')
 
     def quantity_of_interest(self):
         self.qoi = sum(c['timestep']['qoi'].time_integrate() for c in self.callbacks)
         return self.qoi
 
-    def save_gauge_data(self):
-        timeseries = []
-        for gauge in self.op.gauges:
-            for i in range(self.num_meshes):
-                timeseries.extend(self.callbacks['export'][gauge].timeseries)
-        print(timeseries)
+    def save_gauge_data(self, fname):
+        fname = "diagnostic_gauges_{:s}.hdf5".format(fname)
+        with h5py.File(os.path.join(self.di, fname), 'w') as f:
+            for gauge in self.op.gauges:
+                timeseries = []
+                for i in range(self.num_meshes):
+                    timeseries.extend(self.callbacks[i]['export'][gauge].timeseries)
+                f.create_dataset(gauge, data=np.array(timeseries))
+            f.create_dataset("num_cells", data=np.array(self.num_cells[-1]))
 
-    def setup_solver_forward(self, i, **kwargs):
-        op = self.op
-        nonlinear = self.shallow_water_options['use_nonlinear_equations']
-        wd = self.shallow_water_options['use_wetting_and_drying']
-        alpha = self.shallow_water_options['wetting_and_drying_alpha']
-
-        # For DG cases use Thetis
-        family = self.shallow_water_options['element_family']
-        if family != 'taylor-hood':
-            super(AdaptiveTsunamiProblem, self).setup_solver_forward(i, **kwargs)
-            return
-
-        # Collect parameters and fields
-        dtc = Constant(op.dt)
-        g = Constant(op.g)
-        b = self.bathymetry[i]
-        f = self.fields[i]['coriolis_frequency']
-        # Cd = self.fields[i]['quadratic_drag_coefficient']
-        n = FacetNormal(self.meshes[i])
-
-        # Mixed function space
-        u, eta = split(self.fwd_solutions[i]) if nonlinear else TrialFunctions(self.V[i])
-        u_test, eta_test = TestFunctions(self.V[i])
-        self.fwd_solutions_old[i].assign(self.fwd_solutions[i])  # Assign previous value
-        u_old, eta_old = split(self.fwd_solutions_old[i])
-
-        def eta_tilde(elev):
-            """Modified elevation field"""
-            elev_modified = elev
-            if nonlinear and wd:
-                H = elev + b
-                elev_modified = elev_modified + 0.5*(sqrt(H**2 + alpha**2) - H)
-            return elev_modified
-
-        def TaylorHood(uv, elev):
-            H = self.depth[i].get_total_depth(elev)
-            F = inner(u_test, g*grad(elev))*dx                          # g∇ η
-            F += inner(u_test, f*as_vector((-uv[1], uv[0])))*dx         # f perp(u)
-            F += -inner(grad(eta_test), H*uv)*dx                        # ∇ . (Hu)
-            if nonlinear:
-                F += inner(u_test, dot(uv, nabla_grad(uv)))*dx          # u . ∇ u
-                # if Cd is not None:
-                #     F += Cd*sqrt(inner(uv, uv))*inner(u_test, uv)*dx  # Cd ||u|| u
-            return F
-
-        # Time derivative
-        a = inner(u_test, u)*dx + inner(eta_test, eta_tilde(eta))*dx
-        L = inner(u_test, u_old)*dx + inner(eta_test, eta_tilde(eta_old))*dx
-
-        # Crank-Nicolson timestepping
-        try:
-            assert self.timestepping_options['timestepper_type'] == 'CrankNicolson'
-        except AssertionError:
-            raise NotImplementedError  # TODO
-        print_output("### TODO: Implement forward ts other than Crank-Nicolson")
-        a += 0.5*dtc*TaylorHood(u, eta)
-        L -= 0.5*dtc*TaylorHood(u_old, eta_old)
-
-        # Boundary conditions
-        boundary_markers = self.meshes[i].exterior_facets.unique_markers
-        if self.boundary_conditions[i] == {}:  # Default Thetis boundary conditions are free-slip
-            self.boundary_conditions[i] = {
-                'shallow_water': {j: {'un': Constant(0.0)} for j in boundary_markers},
-            }
-        dbcs = []
-        for j in boundary_markers:
-            bcs = self.boundary_conditions[i]['shallow_water'].get(j)
-            if 'un' in bcs:
-                L += dtc*self.depth[i].get_total_depth(eta_old)*inner(eta_test, bcs['un'])*ds(j)
-            else:
-                a += -0.5*dtc*self.depth[i].get_total_depth(eta)*inner(eta_test, dot(u, n))*ds(j)
-                L += 0.5*dtc*self.depth[i].get_total_depth(eta_old)*inner(eta_test, dot(u_old, n))*ds(j)
-            if 'elev' in bcs:
-                dbcs.append(DirichletBC(self.V[i].sub(1), 0, j))
-
-        # Solver object
-        kwargs = {
-            'solver_parameters': op.params,
-            'options_prefix': 'forward',
-        }
-        if nonlinear:
-            problem = NonlinearVariationalProblem(L-a, self.fwd_solutions[i], bcs=dbcs)
-            self.fwd_solvers[i] = NonlinearVariationalSolver(problem, **kwargs)
-        else:
-            problem = LinearVariationalProblem(a, L, self.fwd_solutions[i], bcs=dbcs)
-            self.fwd_solvers[i] = LinearVariationalSolver(problem, **kwargs)
-
-    def solve_forward_step(self, i, update_forcings=None, export_func=None):
-        family = self.shallow_water_options['element_family']
-        nonlinear = self.shallow_water_options['use_nonlinear_equations']
-        wd = self.shallow_water_options['use_wetting_and_drying']
-        alpha = self.shallow_water_options['wetting_and_drying_alpha']
-        b = self.bathymetry[i]
-        if family != 'taylor-hood':
-            super(AdaptiveTsunamiProblem, self).solve_forward_step(i,
-                    update_forcings=update_forcings, export_func=export_func)
-            return
-        op = self.op
-        t = op.dt*i*self.dt_per_mesh
-        end_time = op.dt*(i+1)*self.dt_per_mesh
-
-        # Need to project to P1 for plotting
-        self.solution_file._topology = None  # Account for mesh adaptations
-        u, eta = self.fwd_solutions[i].split()
-        u_out = Function(self.P1_vec[i], name="Projected velocity")
-        eta_out = Function(self.P1[i], name="Projected elevation")
-        kernel_out = Function(self.P1[i], name="QoI kernel")
-
-        # Setup callbacks
-        self.callbacks[i]['gauges'] = {gauge: [] for gauge in op.gauges}
-        self.callbacks[i]['gauges']['time'] = []
-        fname = "meshdata"
-        if self.extension is not None:
-            fname = '_'.join([fname, self.extension])
-        fname = '_'.join([fname, str(i)])
-        with h5py.File(os.path.join(self.di, fname+'.hdf5'), 'w') as f:
-            f.create_dataset('num_cells', data=self.num_cells[-1][i])
-        self.get_qoi_kernels(i)
-        self.callbacks[i]['qoi'] = QoICallback(self.kernels[i], op)
-        self.callbacks[i]['qoi'].append(self.fwd_solutions[i])
-
-        # Plot bathymetry
-        self.bathymetry[i].rename("Bathymetry")
-        self.bathymetry_file._topology = None
-        self.bathymetry_file.write(self.bathymetry[i])
-
-        def eta_tilde(elev):
-            """Modified elevation field"""
-            elev_modified = Function(elev, name="Projected modified elevation")
-            if nonlinear and wd:
-                H = elev + b
-                elev_modifed.interpolate(elev + 0.5*(sqrt(H**2 + alpha**2) - H))
-            return elev_modified
-
-        # --- Time integrate
-
-        j = 0
-        op.print_debug("Entering forward time loop...")
-        while t < end_time:
-            if update_forcings is not None:
-                update_forcings(t)
-            if j % op.dt_per_export == 0:
-                print_output("t = {:6.1f}".format(t))
-                if export_func is not None:
-                    export_func()
-                u, eta = self.fwd_solutions[i].split()
-
-                # Evaluate free surface at gauges
-                self.callbacks[i]["gauges"]["time"].append(t)
-                for gauge in op.gauges:
-                    self.callbacks[i]["gauges"][gauge].append(eta.at(op.gauges[gauge]["coords"]))
-
-                # Plot to pvd
-                self.solution_file._topology = None
-                self.kernel_file._topology = None
-                eta_out.project(eta_tilde(eta))
-                u_out.project(u)
-                kernel_out.project(self.kernels[i].split()[1])
-                self.solution_file.write(u_out, eta_out)
-                self.kernel_file.write(kernel_out)
-
-            # Solve
-            self.fwd_solvers[i].solve()
-            self.fwd_solutions_old[i].assign(self.fwd_solutions[i])
-
-            # Evaluate quantity of interest
-            self.callbacks[i]["qoi"].append(self.fwd_solutions[i], t=t)
-
-            # Increment
-            t += op.dt
-            j += 1
-        assert j % op.dt_per_export == 0
-        if export_func is not None:
-            export_func()
-        self.callbacks[i]["gauges"]["time"].append(t)
-        for gauge in op.gauges:
-            self.callbacks[i]["gauges"][gauge].append(eta.at(op.gauges[gauge]["coords"]))
-        op.print_debug("Done!")
-
-        # Save to HDF5
-        fname = "diagnostic_gauges"
-        if self.extension is not None:
-            fname = '_'.join([fname, self.extension])
-        fname = '_'.join([fname, str(i)])
-        with h5py.File(os.path.join(self.di, fname+'.hdf5'), 'w') as f:
-            for gauge in op.gauges:
-                f.create_dataset(gauge, data=self.callbacks[i]["gauges"][gauge])
-            f.create_dataset("time", data=self.callbacks[i]["gauges"]["time"])
-
+    # TODO: Use Thetis equation / timeintegrator
     def setup_solver_adjoint(self, i, **kwargs):
         """Setup continuous adjoint solver on mesh `i`."""
         op = self.op
@@ -363,6 +136,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         problem = LinearVariationalProblem(a, L, self.adj_solutions[i], bcs=dbcs)
         self.adj_solvers[i] = LinearVariationalSolver(problem, **kwargs)
 
+    # TODO: Use Thetis equation / timeintegrator
     def solve_adjoint_step(self, i, export_func=None, update_forcings=None):
         """
         Solve adjoint PDE on mesh `i`.
