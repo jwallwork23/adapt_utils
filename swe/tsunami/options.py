@@ -65,9 +65,9 @@ class TsunamiOptions(ShallowWaterOptions):
         #     | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
         #     ---------------- ------------ ----------------
         self.params = {
-            "snes_converged_reason": None,
+            # "snes_converged_reason": None,
             "ksp_type": "gmres",                     # default
-            "ksp_converged_reason": None,
+            # "ksp_converged_reason": None,
             "pc_type": "fieldsplit",                 # default
             "pc_fieldsplit_type": "multiplicative",  # default
             "fieldsplit_U_2d": {

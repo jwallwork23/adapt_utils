@@ -72,7 +72,10 @@ class AdaptiveProblem():
             'use_wetting_and_drying': op.wetting_and_drying,
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
             # 'check_volume_conservation_2d': True,
+            'tidal_turbine_farms': {},
         })
+        if nonlinear:
+            op.params['snes_type'] = 'ksponly'
         if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
             self.shallow_water_options['sipg_parameter'] = op.sipg_parameter
         self.tracer_options = AttrDict({  # TODO
@@ -93,15 +96,19 @@ class AdaptiveProblem():
         self.create_solutions()
         op.print_debug(op.indent + "SETUP: Creating fields...")
         self.set_fields()
-        op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
-        self.set_boundary_conditions()
-        op.print_debug(op.indent + "SETUP: Creating equations...")
-        self.create_equations()
         op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
         self.set_stabilisation()
-        op.print_debug(op.indent + "SETUP: Creating timesteppers...")
-        self.create_timesteppers()
-        self.callbacks = [{} for mesh in self.meshes]
+        op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
+        self.set_boundary_conditions()
+        self.callbacks = [{} for mesh in self.meshes]  # TODO: CallbackManager
+        self.equations = [AttrDict() for mesh in self.meshes]
+        self.error_estimators = [AttrDict() for mesh in self.meshes]
+        self.timesteppers = [AttrDict() for mesh in self.meshes]
+        implemented_steppers = {  # TODO: Other cases
+            'CrankNicolson': thetis.timeintegrator.CrankNicolson,
+        }
+        assert self.timestepping_options.timestepper_type in implemented_steppers
+        self.integrator = implemented_steppers[self.timestepping_options.timestepper_type]
 
         # Lists of objects to be populated
         self.fwd_solvers = [None for mesh in self.meshes]
@@ -175,6 +182,7 @@ class AdaptiveProblem():
         # Tracer space
         self.Q = self.P1DG
 
+    # TODO: solutions_old no longer needed - get it from timestepper
     def create_solutions(self):
         """
         Set up `Function`s in the prognostic space to hold the forward and adjoint solutions.
@@ -257,6 +265,7 @@ class AdaptiveProblem():
 
                     # Penalty parameter for shallow water
                     if not self.tracer_options.tracer_only:
+                        self.shallow_water_options.use_lax_friedrichs_velocity = True
                         nu = self.fields[i].horizontal_viscosity
                         if nu is not None:
                             p = self.V[i].sub(0).ufl_element().degree()
@@ -298,14 +307,11 @@ class AdaptiveProblem():
 
     # --- Equations
 
-    def create_equations(self):
-        self.equations = []
-        for i in range(self.num_meshes):
-            self.equations.append(AttrDict())
-            if not self.tracer_options.tracer_only:
-                self._create_shallow_water_equations(i)
-            if self.tracer_options.solve_tracer:
-                self._create_tracer_equation(i)
+    def create_equations(self, i):
+        if not self.tracer_options.tracer_only:
+            self._create_shallow_water_equations(i)
+        if self.tracer_options.solve_tracer:
+            self._create_tracer_equation(i)
 
     def _create_shallow_water_equations(self, i):
         self.equations[i].shallow_water = ShallowWaterEquations(
@@ -320,14 +326,11 @@ class AdaptiveProblem():
 
     # --- Error estimators
 
-    def create_error_estimators(self):
-        self.error_estimators = []
-        for i in range(self.num_meshes):
-            self.error_estimators.append(AttrDict())
-            if not self.tracer_options.tracer_only:
-                self._create_shallow_water_error_estimator(i)
-            if self.tracer_options.solve_tracer:
-                self._create_tracer_error_estimator(i)
+    def create_error_estimator(self, i):
+        if not self.tracer_options.tracer_only:
+            self._create_shallow_water_error_estimator(i)
+        if self.tracer_options.solve_tracer:
+            self._create_tracer_error_estimator(i)
 
     def _create_shallow_water_error_estimator(self, i):
         raise NotImplementedError  # TODO
@@ -337,19 +340,11 @@ class AdaptiveProblem():
 
     # --- Timestepping
 
-    def create_timesteppers(self):
-        steppers = {  # TODO: Other cases
-            'CrankNicolson': thetis.timeintegrator.CrankNicolson,
-        }
-        assert self.timestepping_options.timestepper_type in steppers
-        integrator = steppers[self.timestepping_options.timestepper_type]
-        self.timesteppers = []
-        for i in range(self.num_meshes):
-            self.timesteppers.append(AttrDict())
-            if not self.tracer_options.tracer_only:
-                self._create_shallow_water_timestepper(i, integrator)
-            if self.tracer_options.solve_tracer:
-                self._create_tracer_timestepper(i, integrator)
+    def create_timestepper(self, i):
+        if not self.tracer_options.tracer_only:
+            self._create_shallow_water_timestepper(i, self.integrator)
+        if self.tracer_options.solve_tracer:
+            self._create_tracer_timestepper(i, self.integrator)
 
     def _create_shallow_water_timestepper(self, i, integrator):
         fields = {
@@ -376,6 +371,7 @@ class AdaptiveProblem():
         if hasattr(self.timestepping_options, 'implicitness_theta'):
             kwargs['theta'] = self.timestepping_options.implicitness_theta
         self.timesteppers[i].shallow_water = integrator(*args, **kwargs)
+        # self.lhs = self.timesteppers[i].shallow_water.F
 
     def _create_tracer_timestepper(self, i, integrator):
         raise NotImplementedError  # TODO
@@ -436,72 +432,16 @@ class AdaptiveProblem():
 
     # --- Solvers
 
-    def setup_solver_forward(self, i, extra_setup=None):
+    # TODO: Callbacks
+    # TODO: Estimate error
+    # TODO: Turbine setup
+    def setup_solver_forward(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
-        if extra_setup is not None:
-            self.extra_setup = extra_setup
-
-        # Create solver object
-        self.fwd_solvers[i] = solver2d.FlowSolver2d(self.meshes[i], self.bathymetry[i])
-        options = self.fwd_solvers[i].options
-        options.update(self.io_options)
-
-        # Timestepping
-        options.simulation_end_time = (i+1)*op.end_time/self.num_meshes - 0.5*op.dt
-        options.update(self.timestepping_options)
-        if hasattr(options.timestepper_options, 'implicitness_theta'):
-            options.timestepper_options.implicitness_theta = op.implicitness_theta
-        if hasattr(options.timestepper_options, 'use_automatic_timestep'):
-            options.timestepper_options.use_automatic_timestep = op.use_automatic_timestep
-
-        # Solver parameters
-        if op.params != {}:
-            options.timestepper_options.solver_parameters = op.params
-        if not self.shallow_water_options['use_nonlinear_equations']:
-            options.timestepper_options.solver_parameters['snes_type'] = 'ksponly'
-        op.print_debug(options.timestepper_options.solver_parameters)
-
-        # Parameters
-        options.estimate_error = op.estimate_error
-        options.update(self.fields[i])
-        options.update(self.shallow_water_options)
-        options.update(self.tracer_options)
-        options.use_lax_friedrichs_velocity = self.stabilisation == 'lax_friedrichs'
-        options.lax_friedrichs_velocity_scaling_factor = self.stabilisation_parameters[i]
-        if op.solve_tracer:
-            raise NotImplementedError  # TODO
-
-        # Boundary conditions
-        self.fwd_solvers[i].bnd_functions = self.boundary_conditions[i]
-
-        # NOTE: Extra setup must be done *before* setting initial condition
-        if hasattr(self, 'extra_setup'):
-            self.extra_setup(i)
-
-        # Initial conditions
-        uv, elev = self.fwd_solutions[i].split()
-        self.fwd_solvers[i].assign_initial_conditions(uv=uv, elev=elev)
-
-        # NOTE: Callbacks must be added *after* setting initial condition
-        if hasattr(self, 'add_callbacks'):
-            self.add_callbacks(i)
-
-        # Ensure time level matches solver iteration
-        self.fwd_solvers[i].i_export = i*self.dt_per_mesh//op.dt_per_export
-        self.fwd_solvers[i].next_export_t = i*op.dt*self.dt_per_mesh
-        self.fwd_solvers[i].iteration = i*self.dt_per_mesh
-        self.fwd_solvers[i].simulation_time = i*op.dt*self.dt_per_mesh
-        for e in self.fwd_solvers[i].exporters.values():
-            e.set_next_export_ix(self.fwd_solvers[i].i_export)
-
-        # For later use
-        self.lhs = self.fwd_solvers[i].timestepper.F
-        assert self.fwd_solutions[i].function_space() == self.fwd_solvers[i].function_spaces.V_2d
-
-    def setup_solver_adjoint(self, i, **kwargs):
-        """Setup adjoint solver on mesh `i`."""
-        raise NotImplementedError("Should be implemented in derived class.")
+        op.print_debug(op.indent + "SETUP: Creating equations on mesh {:d}...".format(i))
+        self.create_equations(i)
+        op.print_debug(op.indent + "SETUP: Creating timesteppers on mesh {:d}...".format(i))
+        self.create_timestepper(i)
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None):
         """
@@ -511,17 +451,36 @@ class AdaptiveProblem():
             evaluated at the start of every timestep.
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
         """
+        op = self.op
         update_forcings = update_forcings or self.op.get_update_forcings(self.fwd_solvers[i])
         export_func = export_func or self.op.get_export_func(self.fwd_solvers[i])
+        if i == 0:
+            export_func()
 
-        def wrapped_export_func():
-            """Extract forward solution and wrap the user-provided export function."""
-            self.fwd_solutions[i].assign(self.fwd_solvers[i].fields.solution_2d)
-            if export_func is not None:
+        t_epsilon = 1.0e-05
+        iteration = 0
+        t = i*op.dt*self.dt_per_mesh
+        end_time = (i+1)*op.dt*self.dt_per_mesh
+        update_forcings(t)
+        op.print_debug("Entering forward timeloop on mesh {:d}...".format(i))
+        print_output("t = {:.2f}".format(t))  # TODO: Formatting
+        while t <= end_time - t_epsilon:
+            if not self.tracer_options.tracer_only:
+                self.timesteppers[i]['shallow_water'].advance(t, update_forcings)
+            if self.tracer_options.solve_tracer:
+                self.timesteppers[i]['tracer'].advance(t, update_forcings)
+            iteration += 1
+            t += op.dt
+            # self.callbacks.evaluate(mode='timestep')
+            if iteration % op.dt_per_export == 0:
+                print_output("t = {:.2f}".format(t))  # TODO: Formatting
                 export_func()
+                # self.callbacks.evaluate(mode='export')
+        op.print_debug("Done!")
 
-        self.fwd_solvers[i].iterate(update_forcings=update_forcings, export_func=wrapped_export_func)
-        self.fwd_solutions[i].assign(self.fwd_solvers[i].fields.solution_2d)
+    def setup_solver_adjoint(self, i, **kwargs):
+        """Setup adjoint solver on mesh `i`."""
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def solve_adjoint_step(self, i, **kwargs):
         """Solve adjoint PDE on mesh `i`."""
@@ -752,7 +711,7 @@ class AdaptiveProblem():
             self.set_fields()
             self.set_stabilisation()
             self.set_boundary_conditions()
-            self.callbacks = [{} for mesh in self.meshes]
+            self.callbacks = [{} for mesh in self.meshes]  # TODO: CallbackManager
 
             print_output("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
@@ -921,7 +880,7 @@ class AdaptiveProblem():
             self.set_fields()
             self.set_stabilisation()
             self.set_boundary_conditions()
-            self.callbacks = [{} for mesh in self.meshes]
+            self.callbacks = [{} for mesh in self.meshes]  # TODO: CallbackManager
 
             print_output("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
@@ -1120,7 +1079,7 @@ class AdaptiveProblem():
             self.set_fields()
             self.set_stabilisation()
             self.set_boundary_conditions()
-            self.callbacks = [{} for mesh in self.meshes]
+            self.callbacks = [{} for mesh in self.meshes]  # TODO: CallbackManager
 
             print_output("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
