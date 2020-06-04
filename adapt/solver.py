@@ -216,8 +216,16 @@ class AdaptiveProblem():
                 'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
             })
-        self.bathymetry = [self.op.set_bathymetry(P1DG) for P1DG in self.P1DG]
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
+        self.bathymetry = [self.op.set_bathymetry(P1DG) for P1DG in self.P1DG]
+        self.depth = [None for bathymetry in self.bathymetry]
+        for i, bathymetry in enumerate(self.bathymetry):
+            self.depth[i] = DepthExpression(
+                bathymetry,
+                use_nonlinear_equations=self.shallow_water_options['use_nonlinear_equations'],
+                use_wetting_and_drying=self.shallow_water_options['use_wetting_and_drying'],
+                wetting_and_drying_alpha=self.shallow_water_options['wetting_and_drying_alpha'],
+            )
 
     # TODO: Allow different / mesh dependent stabilisation parameters
     # TODO: Tracer stabilisation
