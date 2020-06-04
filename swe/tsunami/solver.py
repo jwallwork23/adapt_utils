@@ -20,21 +20,20 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.callbacks = [{} for mesh in self.meshes]
 
     def add_callbacks(self, i):
-        # super(AdaptiveTsunamiProblem, self).add_callbacks(i)
         op = self.op
 
         # --- Gauge timeseries
 
-        names = [g for g in op.gauges]
-        locs = [op.gauges[g]["coords"] for g in names]
+        gauge_names = [g for g in op.gauges]
+        gauge_locations = [op.gauges[g]["coords"] for g in gauge_names]
         fname = "gauges"
         if self.extension is not None:
             fname = '_'.join([fname, self.extension])
         fname = '_'.join([fname, str(i)])
-        self.callbacks[i]['gauges'] = callback.DetectorsCallback(
-            self.fwd_solvers[i], locs, ['elev_2d'], fname, names)
-        self.fwd_solvers[i].add_callback(self.callbacks[i]['gauges'], 'export')
-        # for g in names:
+        cb = callback.DetectorsCallback(
+            self.fwd_solvers[i], gauge_locations, ['elev_2d'], fname, gauge_names)
+        self.callbacks[i].add_callback(cb, 'export')
+        # for g in gauge_names:
         #     x, y = op.gauges[g]["coords"]
         #     self.callbacks[i][g] = callback.TimeSeriesCallback2D(
         #         self.fwd_solvers[i], ['elev_2d'], x, y, g, self.di)

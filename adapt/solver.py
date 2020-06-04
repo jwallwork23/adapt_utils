@@ -1,4 +1,5 @@
 from thetis import *
+from thetis.callback import CallbackManager
 from firedrake.petsc import PETSc
 
 import os
@@ -87,6 +88,35 @@ class AdaptiveProblem():
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
+        self.setup_all(meshes)
+        implemented_steppers = {  # TODO: Other cases
+            'CrankNicolson': thetis.timeintegrator.CrankNicolson,
+        }
+        assert self.timestepping_options.timestepper_type in implemented_steppers
+        self.integrator = implemented_steppers[self.timestepping_options.timestepper_type]
+
+        # Outputs
+        self.di = create_directory(self.op.di)
+        self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
+        # self.solution_fpath_hdf5 = os.path.join(self.di, 'solution.hdf5')
+        self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
+        # self.adjoint_solution_fpath_hdf5 = os.path.join(self.di, 'adjoint_solution.hdf5')
+        # self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
+        self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
+        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+        self.kernel_file = File(os.path.join(self.di, 'kernel.pvd'))
+
+        # Storage for diagnostics over mesh adaptation loop
+        self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
+        self.num_vertices = [[mesh.num_vertices() for mesh in self.meshes], ]
+        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]
+        self.indicators = [{} for mesh in self.meshes]
+        self.estimators = [{} for mesh in self.meshes]
+        self.qois = []
+        self.st_complexities = [np.nan]
+
+    def setup_all(self, meshes):
+        op = self.op
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
         op.print_debug(op.indent + "SETUP: Creating function spaces...")
@@ -100,39 +130,14 @@ class AdaptiveProblem():
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
         self.set_boundary_conditions()
-        self.callbacks = [{} for mesh in self.meshes]  # TODO: CallbackManager
+        op.print_debug(op.indent + "SETUP: Creating CallbackManagers...")
+        self.callbacks = [CallbackManager() for mesh in self.meshes]
         self.equations = [AttrDict() for mesh in self.meshes]
         self.error_estimators = [AttrDict() for mesh in self.meshes]
         self.timesteppers = [AttrDict() for mesh in self.meshes]
-        implemented_steppers = {  # TODO: Other cases
-            'CrankNicolson': thetis.timeintegrator.CrankNicolson,
-        }
-        assert self.timestepping_options.timestepper_type in implemented_steppers
-        self.integrator = implemented_steppers[self.timestepping_options.timestepper_type]
-
-        # Lists of objects to be populated
         self.fwd_solvers = [None for mesh in self.meshes]
         self.adj_solvers = [None for mesh in self.meshes]
         self.kernels = [None for mesh in self.meshes]
-
-        # Outputs
-        self.di = create_directory(self.op.di)
-        self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
-        # self.solution_fpath_hdf5 = os.path.join(self.di, 'solution.hdf5')
-        self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
-        # self.adjoint_solution_fpath_hdf5 = os.path.join(self.di, 'adjoint_solution.hdf5')
-        self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
-        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
-        self.kernel_file = File(os.path.join(self.di, 'kernel.pvd'))
-
-        # Storage for diagnostics over mesh adaptation loop
-        self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
-        self.num_vertices = [[mesh.num_vertices() for mesh in self.meshes], ]
-        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]
-        self.indicators = [{} for mesh in self.meshes]
-        self.estimators = [{} for mesh in self.meshes]
-        self.qois = []
-        self.st_complexities = [np.nan]
 
     def set_meshes(self, meshes):
         """
@@ -341,6 +346,8 @@ class AdaptiveProblem():
     # --- Timestepping
 
     def create_timestepper(self, i):
+        if i == 0:
+            self.simulation_time = 0.0
         if not self.tracer_options.tracer_only:
             self._create_shallow_water_timestepper(i, self.integrator)
         if self.tracer_options.solve_tracer:
@@ -375,6 +382,11 @@ class AdaptiveProblem():
 
     def _create_tracer_timestepper(self, i, integrator):
         raise NotImplementedError  # TODO
+
+    # --- Callbacks
+
+    def add_callbacks(self, i):
+        raise NotImplementedError("Implement in derived class")
 
     # --- Helper functions
 
@@ -452,6 +464,9 @@ class AdaptiveProblem():
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
         """
         op = self.op
+        solve_swe = not self.tracer_options.tracer_only
+        solve_tracer = self.tracer_options.solve_tracer
+
         update_forcings = update_forcings or self.op.get_update_forcings(self.fwd_solvers[i])
         export_func = export_func or self.op.get_export_func(self.fwd_solvers[i])
         if i == 0:
@@ -459,21 +474,42 @@ class AdaptiveProblem():
 
         t_epsilon = 1.0e-05
         iteration = 0
-        t = i*op.dt*self.dt_per_mesh
+        start_time = i*op.dt*self.dt_per_mesh
         end_time = (i+1)*op.dt*self.dt_per_mesh
-        update_forcings(t)
-        op.print_debug("Entering forward timeloop on mesh {:d}...".format(i))
-        print_output("t = {:.2f}".format(t))  # TODO: Formatting
-        while t <= end_time - t_epsilon:
-            if not self.tracer_options.tracer_only:
-                self.timesteppers[i]['shallow_water'].advance(t, update_forcings)
-            if self.tracer_options.solve_tracer:
-                self.timesteppers[i]['tracer'].advance(t, update_forcings)
+        try:
+            assert np.allclose(self.simulation_time, start_time)
+        except AssertionError:
+            msg = "Mismatching start time: {:.2f} vs {:.2f}"
+            raise ValueError(msg.format(self.simulation_time, start_time))
+        update_forcings(self.simulation_time)
+        op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
+        print_output("t = {:.2f}".format(self.simulation_time))  # TODO: Formatting
+
+        if solve_swe:
+            proj_u = Function(self.P1_vec[i], name="Projected velocity")
+            proj_eta = Function(self.P1[i], name="Projected elevation")
+        if solve_tracer:
+            proj_tracer = Function(self.P1[i], name="Projected tracer")
+        self.solution_file._topology = None
+        # self.tracer_file._topology = None
+        while self.simulation_time <= end_time - t_epsilon:
+            if solve_swe:
+                self.timesteppers[i]['shallow_water'].advance(self.simulation_time, update_forcings)
+            if solve_tracer:
+                self.timesteppers[i]['tracer'].advance(self.simulation_time, update_forcings)
             iteration += 1
-            t += op.dt
+            self.simulation_time += op.dt
             # self.callbacks.evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
-                print_output("t = {:.2f}".format(t))  # TODO: Formatting
+                print_output("t = {:.2f}".format(self.simulation_time))  # TODO: Formatting
+                if solve_swe:
+                    u, eta = self.fwd_solutions[i].split()
+                    proj_u.project(u)
+                    proj_eta.project(eta)
+                    self.solution_file.write(proj_u, proj_eta)
+                # if solve_tracer:
+                #     proj_tracer.project(self.fwd_solutions_tracer[i])
+                #     self.tracer_file.write(proj_tracer)
                 export_func()
                 # self.callbacks.evaluate(mode='export')
         op.print_debug("Done!")
@@ -704,14 +740,8 @@ class AdaptiveProblem():
 
             # ---  Setup for next run / logging
 
-            self.set_meshes(self.meshes)
-            self.create_function_spaces()
+            self.setup_all(self.meshes)
             self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
-            self.create_solutions()
-            self.set_fields()
-            self.set_stabilisation()
-            self.set_boundary_conditions()
-            self.callbacks = [{} for mesh in self.meshes]  # TODO: CallbackManager
 
             print_output("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
@@ -873,14 +903,8 @@ class AdaptiveProblem():
 
             # ---  Setup for next run / logging
 
-            self.set_meshes(self.meshes)
-            self.create_function_spaces()
+            self.setup_all(self.meshes)
             self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
-            self.create_solutions()
-            self.set_fields()
-            self.set_stabilisation()
-            self.set_boundary_conditions()
-            self.callbacks = [{} for mesh in self.meshes]  # TODO: CallbackManager
 
             print_output("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
@@ -1072,14 +1096,8 @@ class AdaptiveProblem():
 
             # ---  Setup for next run / logging
 
-            self.set_meshes(self.meshes)
-            self.create_function_spaces()
+            self.setup_all(self.meshes)
             self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
-            self.create_solutions()
-            self.set_fields()
-            self.set_stabilisation()
-            self.set_boundary_conditions()
-            self.callbacks = [{} for mesh in self.meshes]  # TODO: CallbackManager
 
             print_output("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
