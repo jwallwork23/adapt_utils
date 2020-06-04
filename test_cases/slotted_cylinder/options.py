@@ -84,11 +84,11 @@ class LeVequeOptions(TracerOptions):
 
     def set_boundary_conditions(self, fs):
         zero = Constant(self.bg, domain=fs.mesh())
-        self.boundary_conditions = {}
-        self.adjoint_boundary_conditions = {}
+        self.boundary_conditions = {'tracer': {}}
+        self.adjoint_boundary_conditions = {'tracer': {}}
         for i in range(1, 5):
-            self.boundary_conditions[i] = {i: {'value': zero}}
-            self.adjoint_boundary_conditions[i] = {i: {'diff_flux': zero}}
+            self.boundary_conditions['tracer'][i] = {i: {'value': zero}}
+            self.adjoint_boundary_conditions['tracer'][i] = {i: {'diff_flux': zero}}
         return self.boundary_conditions
 
     def set_velocity(self, fs):

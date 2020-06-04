@@ -80,12 +80,15 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         left_tag = 1
         right_tag = 2
         wall_tag = 3
-        boundary_conditions = {}
         if not hasattr(self, 'inflow'):
             self.set_inflow(fs.sub()[0])
-        boundary_conditions[left_tag] = {'uv': self.inflow}
-        boundary_conditions[right_tag] = {'elev': Constant(0.0)}
-        boundary_conditions[wall_tag] = {'un': Constant(0.0)}
+        boundary_conditions = {
+            'shallow_water': {
+                left_tag: {'uv': self.inflow},
+                right_tag: {'elev': Constant(0.0)},
+                wall_tag: {'un': Constant(0.0)},
+            }
+        }
         return boundary_conditions
 
     def set_initial_condition(self, fs):

@@ -30,12 +30,14 @@ class PowerOptions(TracerOptions):
 
     def set_boundary_conditions(self, fs):
         zero = Constant(0.0, domain=fs.mesh())
-        boundary_conditions = {}
-        boundary_conditions[1] = {'value': zero}
-        # boundary_conditions[2] = {'diff_flux': zero}
-        boundary_conditions[2] = {}
-        boundary_conditions[3] = {'diff_flux': zero}
-        boundary_conditions[4] = {'diff_flux': zero}
+        boundary_conditions = {
+            'tracer': {
+                1: {'value': zero},
+                # 2: {'diff_flux': zero},
+                2: {},
+                3: {'diff_flux': zero},
+                4: {'diff_flux': zero},
+        }
         return boundary_conditions
 
     def set_diffusivity(self, fs):

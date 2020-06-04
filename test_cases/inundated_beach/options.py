@@ -151,11 +151,11 @@ class BalzanoOptions(ShallowWaterOptions):
         outflow_tag = 2
         bottom_wall_tag = 3
         top_wall_tag = 4
-        boundary_conditions = {}
-        boundary_conditions[inflow_tag] = {'elev': self.elev_in}
-        boundary_conditions[outflow_tag] = {'un': Constant(0.0)}
-        boundary_conditions[bottom_wall_tag] = {'un': Constant(0.0)}
-        boundary_conditions[top_wall_tag] = {'un': Constant(0.0)}
+        boundary_conditions = {'tracer': {}}
+        boundary_conditions['tracer'][inflow_tag] = {'elev': self.elev_in}
+        boundary_conditions['tracer'][outflow_tag] = {'un': Constant(0.0)}
+        boundary_conditions['tracer'][bottom_wall_tag] = {'un': Constant(0.0)}
+        boundary_conditions['tracer'][top_wall_tag] = {'un': Constant(0.0)}
         return boundary_conditions
 
     def update_boundary_conditions(self, t=0.0):
