@@ -41,13 +41,41 @@ class ExternalPressureGradientTerm(ShallowWaterMomentumTerm):
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-                if funcs is not None:
+                if funcs is not None and self.options.get('element_family') != 'taylor-hood':
                     eta_ext, uv_ext = self.get_bnd_functions(head, uv, bnd_marker, bnd_conditions)
                     # Compute linear riemann solution with eta, eta_ext, uv, uv_ext
                     un_jump = inner(uv - uv_ext, self.normal)
                     eta_rie = 0.5*(head + eta_ext) + sqrt(total_h/g_grav)*un_jump
                     f += g_grav*(eta_rie-head)*dot(self.u_test, self.normal)*ds_bnd
-        return -f  # TODO: P2-P1 version
+        return -f
+
+
+class HUDivTerm(ShallowWaterContinuityTerm):
+    def residual(self, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions=None):
+        total_h = self.depth.get_total_depth(eta_old)
+
+        f = -inner(grad(self.eta_test), total_h*uv)*self.dx
+        if self.eta_is_dg:
+            h = avg(total_h)
+            uv_rie = avg(uv) + sqrt(g_grav/h)*jump(eta, self.normal)
+            hu_star = h*uv_rie
+            f += inner(jump(self.eta_test, self.normal), hu_star)*self.dS
+        for bnd_marker in self.boundary_markers:
+            funcs = bnd_conditions.get(bnd_marker)
+            ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+            if funcs is not None and self.options.get('element_family') != 'taylor-hood':
+                eta_ext, uv_ext = self.get_bnd_functions(eta, uv, bnd_marker, bnd_conditions)
+                eta_ext_old, uv_ext_old = self.get_bnd_functions(eta_old, uv_old, bnd_marker, bnd_conditions)
+                # Compute linear riemann solution with eta, eta_ext, uv, uv_ext
+                total_h_ext = self.depth.get_total_depth(eta_ext_old)
+                h_av = 0.5*(total_h + total_h_ext)
+                eta_jump = eta - eta_ext
+                un_rie = 0.5*inner(uv + uv_ext, self.normal) + sqrt(g_grav/h_av)*eta_jump
+                un_jump = inner(uv_old - uv_ext_old, self.normal)
+                eta_rie = 0.5*(eta_old + eta_ext_old) + sqrt(h_av/g_grav)*un_jump
+                h_rie = self.depth.get_total_depth(eta_rie)
+                f += h_rie*un_rie*self.eta_test*ds_bnd
+        return -f
 
 
 class HorizontalAdvectionTerm(ShallowWaterMomentumTerm):
@@ -55,6 +83,9 @@ class HorizontalAdvectionTerm(ShallowWaterMomentumTerm):
 
         if not self.options.use_nonlinear_equations:
             return 0
+
+        if self.options.get('element_family') == 'taylor-hood':
+            raise NotImplementedError  # TODO
 
         horiz_advection_by_parts = True
 
@@ -104,7 +135,7 @@ class HorizontalAdvectionTerm(ShallowWaterMomentumTerm):
                     uv_av = 0.5*(uv_ext + uv)
                     f += (uv_av[0]*self.u_test[0]*un_rie
                           + uv_av[1]*self.u_test[1]*un_rie)*ds_bnd
-            return -f  # TODO: P2-P1 version
+            return -f
 
 
 class HorizontalViscosityTerm(ShallowWaterMomentumTerm):
@@ -114,6 +145,8 @@ class HorizontalViscosityTerm(ShallowWaterMomentumTerm):
         nu = fields_old.get('viscosity_h')
         if nu is None:
             return 0
+
+        # TODO: Account for case of no Neumann conditions
 
         n = self.normal
         h = self.cellsize
@@ -163,7 +196,7 @@ class HorizontalViscosityTerm(ShallowWaterMomentumTerm):
         if self.options.use_grad_depth_viscosity_term:
             f += -dot(self.u_test, dot(grad(total_h)/total_h, stress))*self.dx
 
-        return -f  # TODO: P2-P1 version
+        return -f
 
 
 class BaseShallowWaterEquation(Equation):

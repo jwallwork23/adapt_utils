@@ -45,6 +45,6 @@ class GaugeCallback(TimeseriesCallback):
         gauge_location = prob.op.gauges[gauge]["coords"]
 
         def extract(t):
-            return eta.at(gauge_location)
+            return float(eta.at(gauge_location))
 
         super(GaugeCallback, self).__init__(prob, extract, i, gauge)

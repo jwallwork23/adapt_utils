@@ -38,6 +38,7 @@ class AdaptiveProblem():
         self.stabilisation = op.stabilisation
         self.discrete_adjoint = discrete_adjoint
         self.approach = op.approach
+        self.nonlinear = nonlinear
 
         # Sub options
         self.timestepping_options = AttrDict({
@@ -443,7 +444,6 @@ class AdaptiveProblem():
 
     # --- Solvers
 
-    # TODO: Callbacks
     # TODO: Estimate error
     # TODO: Turbine setup
     def setup_solver_forward(self, i):
@@ -453,6 +453,16 @@ class AdaptiveProblem():
         self.create_equations(i)
         op.print_debug(op.indent + "SETUP: Creating timesteppers on mesh {:d}...".format(i))
         self.create_timestepper(i)
+        ts = self.timesteppers[i]['shallow_water']
+        if op.family == 'taylor-hood':
+            dbcs = []
+            op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
+            bcs = self.boundary_conditions[i]
+            for j in bcs:
+                if 'value' in bcs[j]:
+                    bcs.append(DirichletBC(self.V[i].sub(1), bcs[j]['value'], j))
+            prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
+            ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix=ts.name)
         op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i)
 
@@ -474,6 +484,7 @@ class AdaptiveProblem():
         if i == 0:
             export_func()
             self.callbacks[i].evaluate(mode='export')
+            self.callbacks[i].evaluate(mode='timestep')
 
         # We need to project to P1 for vtk outputs
         if solve_swe:
