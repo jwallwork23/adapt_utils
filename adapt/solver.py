@@ -8,6 +8,7 @@ from adapt_utils.swe.utils import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.adaptation import pragmatic_adapt
 from adapt_utils.swe.utils import ShallowWaterHessianRecoverer
+from adapt_utils.swe.equation import ShallowWaterEquations
 
 
 __all__ = ["AdaptiveProblem"]
@@ -78,6 +79,8 @@ class AdaptiveProblem():
             'solve_tracer': op.solve_tracer,
             'tracer_only': not op.solve_swe,
         })
+        if hasattr(op, 'sipg_parameter_tracer') and op.sipg_parameter_tracer is not None:
+            self.tracer_options['sipg_parameter_tracer'] = op.sipg_parameter_tracer
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
@@ -90,10 +93,12 @@ class AdaptiveProblem():
         self.create_solutions()
         op.print_debug(op.indent + "SETUP: Creating fields...")
         self.set_fields()
-        op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
-        self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
         self.set_boundary_conditions()
+        op.print_debug(op.indent + "SETUP: Creating equations...")
+        self.create_equations()
+        op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
+        self.set_stabilisation()
         self.callbacks = [{} for mesh in self.meshes]
 
         # Lists of objects to be populated
@@ -120,7 +125,6 @@ class AdaptiveProblem():
         self.qois = []
         self.st_complexities = [np.nan]
 
-    # TODO: AdaptiveMesh
     def set_meshes(self, meshes):
         """
         Build an class:`AdaptiveMesh` object associated with each mesh.
@@ -128,6 +132,8 @@ class AdaptiveProblem():
         self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
         msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
         for i, mesh in enumerate(self.meshes):
+            bnd_len = compute_boundary_length(mesh)
+            mesh.boundary_len = bnd_len
             self.op.print_debug(msg.format(i, mesh.num_cells()))
 
     def set_finite_element(self):
@@ -227,14 +233,50 @@ class AdaptiveProblem():
                 wetting_and_drying_alpha=self.shallow_water_options.wetting_and_drying_alpha,
             )
 
-    # TODO: Allow different / mesh dependent stabilisation parameters
-    # TODO: Tracer stabilisation
     def set_stabilisation(self):
-        """ Set stabilisation mode and parameter(s) on each mesh."""
+        """ Set stabilisation mode and corresponding parameter on each mesh."""
         self.stabilisation = self.stabilisation or 'no'
-        try:
-            assert self.stabilisation in ('no', 'lax_friedrichs')
-        except AssertionError:
+        if self.stabilisation == 'no':
+            return
+        elif self.stabilisation == 'lax_friedrichs':
+            sipg = Constant(10.0)
+            if hasattr(self.shallow_water_options, 'sipg_parameter'):
+                sipg = self.shallow_water_options.sipg_parameter
+            self.stabilisation_parameters = [sipg for mesh in self.meshes]
+            if self.tracer_options.solve_tracer:
+                sipg = Constant(10.0)
+                if hasattr(self.tracer_options, 'sipg_parameter'):
+                    sipg = self.tracer_options.sipg_parameter
+                self.stabilisation_parameters = [sipg for mesh in self.meshes]
+            if self.shallow_water_options.use_automatic_sipg_parameter:
+                for i, mesh in enumerate(self.meshes):
+                    theta = get_minimum_angles_2d(mesh)
+                    cot_theta = 1.0/tan(theta)
+
+                    # Penalty parameter for shallow water
+                    if not self.tracer_options.tracer_only:
+                        nu = self.fields[i].horizontal_viscosity
+                        if nu is not None:
+                            p = self.V[i].sub(0).ufl_element().degree()
+                            alpha = Contant(5.0*p*(p+1)) if p != 0 else 1.5
+                            alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                            self.stabilisation_parameters[i] = interpolate(alpha, self.P0[i])
+
+                    # Penalty parameter for tracer
+                    if self.tracer_options.solve_tracer:
+                        nu = self.fields[i].horizontal_diffusivity
+                        if nu is not None:
+                            p = self.Q[i].ufl_element().degree()
+                            alpha = Contant(5.0*p*(p+1)) if p != 0 else 1.5
+                            alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                            self.stabilisation_parameters_tracer[i] = interpolate(alpha, self.P0[i])
+        elif self.stabilisation == 'su':
+            assert self.tracer_options.tracer_only
+            raise NotImplementedError  # TODO
+        elif self.stabilisation == 'supg':
+            assert self.tracer_options.tracer_only
+            raise NotImplementedError  # TODO
+        else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
         self.stabilisation_parameters = []
@@ -305,6 +347,28 @@ class AdaptiveProblem():
             newplex = PETSc.DMPlex().create()
             newplex.createFromFile('_'.join([fname, '{:d}.h5'.format(i)]))
             self.meshes[i] = Mesh(newplex)
+
+    # --- Equations
+
+    def create_equations(self):
+        self.equations = []
+        for i in range(self.num_meshes):
+            self.equations.append(AttrDict)
+            if not self.tracer_options.tracer_only:
+                self.create_shallow_water_equations(i)
+            if self.tracer_options.solve_tracer:
+                self.create_tracer_equation(i)
+
+    def create_shallow_water_equations(self, i):
+        self.equations[i].shallow_water = ShallowWaterEquations(
+            self.V[i],
+            self.depth[i],
+            self.shallow_water_options,
+        )
+        self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
+
+    def create_tracer_equation(self, i):
+        raise NotImplementedError  # TODO
 
     # --- Solvers
 
