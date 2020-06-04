@@ -166,9 +166,9 @@ class BoydOptions(ShallowWaterOptions):
         Set no slip boundary conditions uv = 0 along North and South boundaries.
         """
         dirichlet = {'uv': Constant(as_vector([0., 0.]), domain=fs.mesh())}
-        boundary_conditions = {}
+        boundary_conditions = {'shallow_water': {}}
         for tag in fs.mesh().exterior_facets.unique_markers:
-            boundary_conditions[tag] = dirichlet
+            boundary_conditions['shallow_water'][tag] = dirichlet
         return boundary_conditions
 
     def set_qoi_kernel(self, fs):

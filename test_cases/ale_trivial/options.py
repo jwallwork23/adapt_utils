@@ -50,7 +50,10 @@ class ALEAdvectionOptions(TracerOptions):
         return self.source
 
     def set_boundary_conditions(self, fs):
-        self.boundary_conditions = {1: {'diff_flux': Constant(0.0)}, 2: {'diff_flux': Constant(0.0)}}
+        self.boundary_conditions['tracer'] = {
+            1: {'diff_flux': Constant(0.0)},
+            2: {'diff_flux': Constant(0.0)},
+        }
         return self.boundary_conditions
 
     def set_initial_condition(self, fs):

@@ -130,7 +130,7 @@ class TohokuOptions(TsunamiOptions):
         ocean_tag = 100
         coast_tag = 200
         fukushima_tag = 300
-        self.boundary_conditions = {
+        self.boundary_conditions['shallow_water'] = {
             coast_tag: {'un': Constant(0.0)},
             fukushima_tag: {'un': Constant(0.0)},
             ocean_tag: {'un': Constant(0.0), 'elev': Constant(0.0)},  # Weakly reflective boundaries

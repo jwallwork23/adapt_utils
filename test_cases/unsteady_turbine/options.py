@@ -80,9 +80,12 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         self.set_boundary_surface(fs.sub(1))
         inflow_tag = 4
         outflow_tag = 2
-        boundary_conditions = {}
-        boundary_conditions[inflow_tag] = {'elev': self.elev_in}
-        boundary_conditions[outflow_tag] = {'elev': self.elev_out}
+        boundary_conditions = {
+            'shallow_water': {
+                inflow_tag: {'elev': self.elev_in},
+                outflow_tag: {'elev': self.elev_out},
+            }
+        }
         return boundary_conditions
 
     def set_initial_condition(self, fs):

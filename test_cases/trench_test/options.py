@@ -177,9 +177,12 @@ class TrenchOptions(MorphOptions):
     def set_boundary_conditions(self, fs):
         inflow_tag = 1
         outflow_tag = 2
-        boundary_conditions = {}
-        boundary_conditions[inflow_tag] = {'flux': Constant(-0.22)}
-        boundary_conditions[outflow_tag] = {'elev': Constant(0.397)}
+        boundary_conditions = {
+            'tracer': {
+                inflow_tag: {'flux': Constant(-0.22)},
+                outflow_tag: {'elev': Constant(0.397)},
+            }
+        }
         return boundary_conditions
 
     def set_boundary_conditions_tracer(self, fs):
