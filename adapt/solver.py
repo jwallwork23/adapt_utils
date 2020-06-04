@@ -862,7 +862,7 @@ class AdaptiveProblem():
 
                 # --- Setup forward solver for enriched problem
 
-                # TODO: Any need to transfer fwd sol?
+                # TODO: Need to transfer fwd sol in nonlinear case
                 ep.setup_solver_forward(i)
                 ets = ep.fwd_solvers[i].timestepper
 
