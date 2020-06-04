@@ -30,7 +30,7 @@ class AdaptiveProblem():
 
     # --- Setup
 
-    def __init__(self, op, meshes=None, discrete_adjoint=True):
+    def __init__(self, op, meshes=None, discrete_adjoint=True, nonlinear=True):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -63,7 +63,7 @@ class AdaptiveProblem():
             'no_exports': True,  # TODO: TEMPORARY
         })
         self.shallow_water_options = AttrDict({
-            'use_nonlinear_equations': True,
+            'use_nonlinear_equations': nonlinear,
             'element_family': op.family,
             'polynomial_degree': op.degree,
             'use_grad_div_viscosity_term': op.grad_div_viscosity,
@@ -99,6 +99,8 @@ class AdaptiveProblem():
         self.create_equations()
         op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
         self.set_stabilisation()
+        op.print_debug(op.indent + "SETUP: Creating timesteppers...")
+        self.create_timesteppers()
         self.callbacks = [{} for mesh in self.meshes]
 
         # Lists of objects to be populated
@@ -223,7 +225,7 @@ class AdaptiveProblem():
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
             })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
-        self.bathymetry = [self.op.set_bathymetry(P1DG) for P1DG in self.P1DG]
+        self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
         self.depth = [None for bathymetry in self.bathymetry]
         for i, bathymetry in enumerate(self.bathymetry):
             self.depth[i] = DepthExpression(
@@ -294,6 +296,90 @@ class AdaptiveProblem():
         """Apply final time condition for adjoint solution on final mesh."""
         self.adj_solutions[-1].assign(self.op.set_final_condition(self.V[-1]))
 
+    # --- Equations
+
+    def create_equations(self):
+        self.equations = []
+        for i in range(self.num_meshes):
+            self.equations.append(AttrDict())
+            if not self.tracer_options.tracer_only:
+                self._create_shallow_water_equations(i)
+            if self.tracer_options.solve_tracer:
+                self._create_tracer_equation(i)
+
+    def _create_shallow_water_equations(self, i):
+        self.equations[i].shallow_water = ShallowWaterEquations(
+            self.V[i],
+            self.depth[i],
+            self.shallow_water_options,
+        )
+        self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
+
+    def _create_tracer_equation(self, i):
+        raise NotImplementedError  # TODO
+
+    # --- Error estimators
+
+    def create_error_estimators(self):
+        self.error_estimators = []
+        for i in range(self.num_meshes):
+            self.error_estimators.append(AttrDict())
+            if not self.tracer_options.tracer_only:
+                self._create_shallow_water_error_estimator(i)
+            if self.tracer_options.solve_tracer:
+                self._create_tracer_error_estimator(i)
+
+    def _create_shallow_water_error_estimator(self, i):
+        raise NotImplementedError  # TODO
+
+    def _create_tracer_error_estimator(self, i):
+        raise NotImplementedError  # TODO
+
+    # --- Timestepping
+
+    def create_timesteppers(self):
+        steppers = {  # TODO: Other cases
+            'CrankNicolson': thetis.timeintegrator.CrankNicolson,
+        }
+        assert self.timestepping_options.timestepper_type in steppers
+        integrator = steppers[self.timestepping_options.timestepper_type]
+        self.timesteppers = []
+        for i in range(self.num_meshes):
+            self.timesteppers.append(AttrDict())
+            if not self.tracer_options.tracer_only:
+                self._create_shallow_water_timestepper(i, integrator)
+            if self.tracer_options.solve_tracer:
+                self._create_tracer_timestepper(i, integrator)
+
+    def _create_shallow_water_timestepper(self, i, integrator):
+        fields = {
+            'linear_drag_coefficient': None,
+            'quadratic_drag_coefficient': self.fields[i].quadratic_drag_coefficient,
+            'manning_drag_coefficient': self.fields[i].manning_drag_coefficient,
+            'viscosity_h': self.fields[i].horizontal_viscosity,
+            'lax_friedrichs_velocity_scaling_factor': self.stabilisation_parameters[i],
+            'coriolis': self.fields[i].coriolis_frequency,
+            'wind_stress': None,
+            'atmospheric_pressure': None,
+            'momentum_source': None,
+            'volume_source': None,
+        }
+        dt = self.timestepping_options.timestep
+        args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, dt, )
+        kwargs = {
+            'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
+            # 'error_estimator': self.error_estimators[i]['shallow_water'],  # TODO
+            'solver_parameters': self.op.params,  # TODO: Split into SW and tracer
+        }
+        if hasattr(self.timestepping_options, 'use_semi_implicit_linearization'):
+            kwargs['semi_implicit'] = self.timestepping_options.use_semi_implicit_linearization
+        if hasattr(self.timestepping_options, 'implicitness_theta'):
+            kwargs['theta'] = self.timestepping_options.implicitness_theta
+        self.timesteppers[i].shallow_water = integrator(*args, **kwargs)
+
+    def _create_tracer_timestepper(self, i, integrator):
+        raise NotImplementedError  # TODO
+
     # --- Helper functions
 
     def project(self, f, i, j):
@@ -348,28 +434,6 @@ class AdaptiveProblem():
             newplex.createFromFile('_'.join([fname, '{:d}.h5'.format(i)]))
             self.meshes[i] = Mesh(newplex)
 
-    # --- Equations
-
-    def create_equations(self):
-        self.equations = []
-        for i in range(self.num_meshes):
-            self.equations.append(AttrDict)
-            if not self.tracer_options.tracer_only:
-                self.create_shallow_water_equations(i)
-            if self.tracer_options.solve_tracer:
-                self.create_tracer_equation(i)
-
-    def create_shallow_water_equations(self, i):
-        self.equations[i].shallow_water = ShallowWaterEquations(
-            self.V[i],
-            self.depth[i],
-            self.shallow_water_options,
-        )
-        self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
-
-    def create_tracer_equation(self, i):
-        raise NotImplementedError  # TODO
-
     # --- Solvers
 
     def setup_solver_forward(self, i, extra_setup=None):
@@ -409,7 +473,7 @@ class AdaptiveProblem():
             raise NotImplementedError  # TODO
 
         # Boundary conditions
-        self.fwd_solvers[i].bnd_functions['shallow_water'] = self.boundary_conditions[i]
+        self.fwd_solvers[i].bnd_functions = self.boundary_conditions[i]
 
         # NOTE: Extra setup must be done *before* setting initial condition
         if hasattr(self, 'extra_setup'):
