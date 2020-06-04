@@ -377,7 +377,14 @@ class AdaptiveProblem():
         """
         update_forcings = update_forcings or self.op.get_update_forcings(self.fwd_solvers[i])
         export_func = export_func or self.op.get_export_func(self.fwd_solvers[i])
-        self.fwd_solvers[i].iterate(update_forcings=update_forcings, export_func=export_func)
+
+        def wrapped_export_func():
+            """Extract forward solution and wrap the user-provided export function."""
+            self.fwd_solutions[i].assign(self.fwd_solvers[i].fields.solution_2d)
+            if export_func is not None:
+                export_func()
+
+        self.fwd_solvers[i].iterate(update_forcings=update_forcings, export_func=wrapped_export_func)
         self.fwd_solutions[i].assign(self.fwd_solvers[i].fields.solution_2d)
 
     def solve_adjoint_step(self, i, **kwargs):
@@ -641,11 +648,12 @@ class AdaptiveProblem():
         self.solution_file.__init__(self.solution_file.filename)
         for i in range(self.num_meshes):
             self.solution_file._topology = None
+            proj = Function(self.P1[i], name="Projected elevation")
 
             def export_func():
-                proj = Function(self.P1[i], name="Projected elevation")
-                proj.project(self.fwd_solvers[i].fields.elev_2d)
-                self.solution_file.write(proj)
+                if self.op.family != 'taylor-hood':
+                    proj.project(self.fwd_solvers[i].fields.elev_2d)
+                    self.solution_file.write(proj)
 
             self.transfer_forward_solution(i)
             self.setup_solver_forward(i)
@@ -710,7 +718,7 @@ class AdaptiveProblem():
                 # --- Solve forward on current window
 
                 def export_func():
-                    fwd_solutions_step.append(self.fwd_solvers[i].fields.solution_2d.copy(deepcopy=True))
+                    fwd_solutions_step.append(self.fwd_solutions[i].copy(deepcopy=True))
 
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward(i)
