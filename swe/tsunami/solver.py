@@ -3,6 +3,7 @@ from thetis import *
 import os
 import h5py
 
+from adapt_utils.callback import *
 from adapt_utils.swe.adapt_solver import AdaptiveShallowWaterProblem
 
 
@@ -17,61 +18,70 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
     def __init__(self, *args, extension=None, nonlinear=False, **kwargs):
         self.extension = extension
         super(AdaptiveTsunamiProblem, self).__init__(*args, nonlinear=nonlinear, **kwargs)
-        self.callbacks = [{} for mesh in self.meshes]
 
     def add_callbacks(self, i):
         op = self.op
 
-        # --- Gauge timeseries
+        # # --- Gauge timeseries
 
-        gauge_names = [g for g in op.gauges]
-        gauge_locations = [op.gauges[g]["coords"] for g in gauge_names]
-        fname = "gauges"
-        if self.extension is not None:
-            fname = '_'.join([fname, self.extension])
-        fname = '_'.join([fname, str(i)])
-        cb = callback.DetectorsCallback(
-            self.fwd_solvers[i], gauge_locations, ['elev_2d'], fname, gauge_names)
-        self.callbacks[i].add_callback(cb, 'export')
-        # for g in gauge_names:
-        #     x, y = op.gauges[g]["coords"]
-        #     self.callbacks[i][g] = callback.TimeSeriesCallback2D(
-        #         self.fwd_solvers[i], ['elev_2d'], x, y, g, self.di)
-        #     self.fwd_solvers[i].add_callback(self.callbacks[i][g], 'export')
+        for gauge in op.gauges:
+            self.callbacks[i].add(GaugeCallback(self, i, gauge), 'export')
+        # gauge_names = [g for g in op.gauges]
+        # gauge_locations = [op.gauges[g]["coords"] for g in gauge_names]
+        # fname = "gauges"
+        # if self.extension is not None:
+        #     fname = '_'.join([fname, self.extension])
+        # fname = '_'.join([fname, str(i)])
+        # cb = callback.DetectorsCallback(
+        #     self.fwd_solvers[i], gauge_locations, ['elev_2d'], fname, gauge_names)
+        # self.callbacks[i].add_callback(cb, 'export')
+        # # for g in gauge_names:
+        # #     x, y = op.gauges[g]["coords"]
+        # #     self.callbacks[i][g] = callback.TimeSeriesCallback2D(
+        # #         self.fwd_solvers[i], ['elev_2d'], x, y, g, self.di)
+        # #     self.fwd_solvers[i].add_callback(self.callbacks[i][g], 'export')
 
-        # --- Mesh data
+        # # --- Mesh data
 
-        fname = "meshdata"
-        if self.extension is not None:
-            fname = '_'.join([fname, self.extension])
-        fname = '_'.join([fname, str(i)])
-        with h5py.File(os.path.join(self.di, fname+'.hdf5'), 'w') as f:
-            f.create_dataset('num_cells', data=self.num_cells[-1][i])
+        # fname = "meshdata"
+        # if self.extension is not None:
+        #     fname = '_'.join([fname, self.extension])
+        # fname = '_'.join([fname, str(i)])
+        # with h5py.File(os.path.join(self.di, fname+'.hdf5'), 'w') as f:
+        #     f.create_dataset('num_cells', data=self.num_cells[-1][i])
 
-        # --- Quantity of interest
+        # # --- Quantity of interest
 
         self.get_qoi_kernels(i)
-        self.kernel_file._topology = None
-        kernel_proj = project(self.kernels[i].split()[1], self.P1[i])
-        kernel_proj.rename("QoI kernel")
-        self.kernel_file.write(kernel_proj)
-        kt = Constant(0.0)  # Kernel in time
+        self.callbacks[i].add(QoICallback(self, i), 'timestep')
+        # self.kernel_file._topology = None
+        # kernel_proj = project(self.kernels[i].split()[1], self.P1[i])
+        # kernel_proj.rename("QoI kernel")
+        # self.kernel_file.write(kernel_proj)
+        # kt = Constant(0.0)  # Kernel in time
 
-        def qoi(sol):
-            t = self.fwd_solvers[i].simulation_time
-            kt.assign(1.0 if t >= op.start_time else 0.0)
-            return assemble(kt*inner(self.kernels[i], sol)*dx)
+        # def qoi(sol):
+        #     t = self.fwd_solvers[i].simulation_time
+        #     kt.assign(1.0 if t >= op.start_time else 0.0)
+        #     return assemble(kt*inner(self.kernels[i], sol)*dx)
 
-        self.callbacks[i]["qoi"] = callback.TimeIntegralCallback(
-            qoi, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
-            name="qoi", append_to_log=op.debug
-            # name="qoi", append_to_log=False
-        )
-        self.fwd_solvers[i].add_callback(self.callbacks[i]["qoi"], 'timestep')
+        # self.callbacks[i]["qoi"] = callback.TimeIntegralCallback(
+        #     qoi, self.fwd_solvers[i], self.fwd_solvers[i].timestepper,
+        #     name="qoi", append_to_log=op.debug
+        #     # name="qoi", append_to_log=False
+        # )
+        # self.fwd_solvers[i].add_callback(self.callbacks[i]["qoi"], 'timestep')
 
     def quantity_of_interest(self):
-        self.qoi = sum(c["qoi"].get_value() for c in self.callbacks)
+        self.qoi = sum(c['timestep']['qoi'].time_integrate() for c in self.callbacks)
         return self.qoi
+
+    def save_gauge_data(self):
+        timeseries = []
+        for gauge in self.op.gauges:
+            for i in range(self.num_meshes):
+                timeseries.extend(self.callbacks['export'][gauge].timeseries)
+        print(timeseries)
 
     def setup_solver_forward(self, i, **kwargs):
         op = self.op
@@ -181,25 +191,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         eta_out = Function(self.P1[i], name="Projected elevation")
         kernel_out = Function(self.P1[i], name="QoI kernel")
 
-        class QoICallback(object):
-            """Simple callback class to time integrate a quantity of interest."""
-            def __init__(self, kernel):
-                self.timeseries = []
-                self.ks = kernel         # Kernel in space
-                self.kt = Constant(0.0)  # Kernel in time
-
-            def append(self, sol, t=0.0):
-                self.kt.assign(1.0 if t >= op.start_time else 0.0)
-                self.timeseries.append(assemble(self.kt*inner(self.ks, sol)*dx))
-
-            def get_value(self):
-                N = len(self.timeseries)
-                assert N >= 2
-                val = 0.5*op.dt*(self.timeseries[0] + self.timeseries[-1])
-                for i in range(1, N-1):
-                    val += op.dt*self.timeseries[i]
-                return val
-
         # Setup callbacks
         self.callbacks[i]['gauges'] = {gauge: [] for gauge in op.gauges}
         self.callbacks[i]['gauges']['time'] = []
@@ -210,7 +201,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         with h5py.File(os.path.join(self.di, fname+'.hdf5'), 'w') as f:
             f.create_dataset('num_cells', data=self.num_cells[-1][i])
         self.get_qoi_kernels(i)
-        self.callbacks[i]['qoi'] = QoICallback(self.kernels[i])
+        self.callbacks[i]['qoi'] = QoICallback(self.kernels[i], op)
         self.callbacks[i]['qoi'].append(self.fwd_solutions[i])
 
         # Plot bathymetry

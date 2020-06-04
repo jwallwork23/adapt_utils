@@ -5,11 +5,10 @@ from firedrake.petsc import PETSc
 import os
 import numpy as np
 
-from adapt_utils.swe.utils import *
-from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.adaptation import pragmatic_adapt
-from adapt_utils.swe.utils import ShallowWaterHessianRecoverer
+from adapt_utils.adapt.metric import *
 from adapt_utils.swe.equation import ShallowWaterEquations
+from adapt_utils.swe.utils import *
 
 
 __all__ = ["AdaptiveProblem"]
@@ -454,6 +453,8 @@ class AdaptiveProblem():
         self.create_equations(i)
         op.print_debug(op.indent + "SETUP: Creating timesteppers on mesh {:d}...".format(i))
         self.create_timestepper(i)
+        op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
+        self.add_callbacks(i)
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None):
         """
@@ -467,10 +468,21 @@ class AdaptiveProblem():
         solve_swe = not self.tracer_options.tracer_only
         solve_tracer = self.tracer_options.solve_tracer
 
+        # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self.fwd_solvers[i])
         export_func = export_func or self.op.get_export_func(self.fwd_solvers[i])
         if i == 0:
             export_func()
+            self.callbacks[i].evaluate(mode='export')
+
+        # We need to project to P1 for vtk outputs
+        if solve_swe:
+            proj_u = Function(self.P1_vec[i], name="Projected velocity")
+            proj_eta = Function(self.P1[i], name="Projected elevation")
+            self.solution_file._topology = None
+        if solve_tracer:
+            proj_tracer = Function(self.P1[i], name="Projected tracer")
+            self.tracer_file._topology = None
 
         t_epsilon = 1.0e-05
         iteration = 0
@@ -484,14 +496,6 @@ class AdaptiveProblem():
         update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         print_output("t = {:.2f}".format(self.simulation_time))  # TODO: Formatting
-
-        if solve_swe:
-            proj_u = Function(self.P1_vec[i], name="Projected velocity")
-            proj_eta = Function(self.P1[i], name="Projected elevation")
-        if solve_tracer:
-            proj_tracer = Function(self.P1[i], name="Projected tracer")
-        self.solution_file._topology = None
-        # self.tracer_file._topology = None
         while self.simulation_time <= end_time - t_epsilon:
             if solve_swe:
                 self.timesteppers[i]['shallow_water'].advance(self.simulation_time, update_forcings)
@@ -499,7 +503,7 @@ class AdaptiveProblem():
                 self.timesteppers[i]['tracer'].advance(self.simulation_time, update_forcings)
             iteration += 1
             self.simulation_time += op.dt
-            # self.callbacks.evaluate(mode='timestep')
+            self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
                 print_output("t = {:.2f}".format(self.simulation_time))  # TODO: Formatting
                 if solve_swe:
@@ -511,7 +515,7 @@ class AdaptiveProblem():
                 #     proj_tracer.project(self.fwd_solutions_tracer[i])
                 #     self.tracer_file.write(proj_tracer)
                 export_func()
-                # self.callbacks.evaluate(mode='export')
+                self.callbacks[i].evaluate(mode='export')
         op.print_debug("Done!")
 
     def setup_solver_adjoint(self, i, **kwargs):
