@@ -22,17 +22,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         # Use linearised equations
         self.shallow_water_options['use_nonlinear_equations'] = nonlinear
 
-    def set_fields(self):
-        self.fields = []
-        for P1 in self.P1:
-            self.fields.append({
-                'horizontal_viscosity': self.op.set_viscosity(P1),
-                'coriolis_frequency': self.op.set_coriolis(P1),
-                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
-                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
-            })
-        self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-
     def add_callbacks(self, i):
         # super(AdaptiveTsunamiProblem, self).add_callbacks(i)
         op = self.op
@@ -114,15 +103,6 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.fwd_solutions_old[i].assign(self.fwd_solutions[i])  # Assign previous value
         u_old, eta_old = split(self.fwd_solutions_old[i])
 
-        def depth(elev):
-            """Depth expression (modified if wetting and drying used)."""
-            if not nonlinear:
-                return b
-            H = b + elev
-            if wd:
-                H += 0.5*(sqrt(H**2 + alpha**2) - H)
-            return H
-
         def eta_tilde(elev):
             """Modified elevation field"""
             elev_modified = elev
@@ -132,7 +112,7 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
             return elev_modified
 
         def TaylorHood(uv, elev):
-            H = depth(elev)
+            H = self.depth.get_total_depth(elev)
             F = inner(u_test, g*grad(elev))*dx                          # g∇ η
             F += inner(u_test, f*as_vector((-uv[1], uv[0])))*dx         # f perp(u)
             F += -inner(grad(eta_test), H*uv)*dx                        # ∇ . (Hu)
@@ -163,10 +143,10 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         for j in boundary_markers:
             bcs = self.boundary_conditions[i].get(j)
             if 'un' in bcs:
-                L += dtc*depth(eta_old)*inner(eta_test, bcs['un'])*ds(j)
+                L += dtc*self.depth.get_total_depth(eta_old)*inner(eta_test, bcs['un'])*ds(j)
             else:
-                a += -0.5*dtc*depth(eta)*inner(eta_test, dot(u, n))*ds(j)
-                L += 0.5*dtc*depth(eta_old)*inner(eta_test, dot(u_old, n))*ds(j)
+                a += -0.5*dtc*self.depth.get_total_depth(eta)*inner(eta_test, dot(u, n))*ds(j)
+                L += 0.5*dtc*self.depth.get_total_depth(eta_old)*inner(eta_test, dot(u_old, n))*ds(j)
             if 'elev' in bcs:
                 dbcs.append(DirichletBC(self.V[i].sub(1), 0, j))
 
