@@ -39,11 +39,11 @@ class AdaptiveProblem():
         self.approach = op.approach
 
         # Sub options
-        self.timestepping_options = {
+        self.timestepping_options = AttrDict({
             'timestep': op.dt,
             'simulation_export_time': op.dt*op.dt_per_export,
             'timestepper_type': op.timestepper,
-        }
+        })
         self.num_timesteps = int(np.floor(op.end_time/op.dt))
         self.num_meshes = op.num_meshes
         try:
@@ -55,13 +55,13 @@ class AdaptiveProblem():
             assert self.dt_per_mesh % op.dt_per_export == 0
         except AssertionError:
             raise ValueError("Timesteps per export should divide timesteps per mesh iteration.")
-        self.io_options = {
+        self.io_options = AttrDict({
             'output_directory': op.di,
             'fields_to_export': ['uv_2d', 'elev_2d'] if op.plot_pvd else [],
             'fields_to_export_hdf5': ['uv_2d', 'elev_2d'] if op.save_hdf5 else [],
             'no_exports': True,  # TODO: TEMPORARY
-        }
-        self.shallow_water_options = {
+        })
+        self.shallow_water_options = AttrDict({
             'use_nonlinear_equations': True,
             'element_family': op.family,
             'polynomial_degree': op.degree,
@@ -71,13 +71,13 @@ class AdaptiveProblem():
             'use_wetting_and_drying': op.wetting_and_drying,
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
             # 'check_volume_conservation_2d': True,
-        }
+        })
         if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
             self.shallow_water_options['sipg_parameter'] = op.sipg_parameter
-        self.tracer_options = {  # TODO
+        self.tracer_options = AttrDict({  # TODO
             'solve_tracer': op.solve_tracer,
             'tracer_only': not op.solve_swe,
-        }
+        })
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
@@ -171,7 +171,7 @@ class AdaptiveProblem():
         """
         Set up `Function`s in the prognostic space to hold the forward and adjoint solutions.
         """
-        if self.tracer_options['tracer_only']:
+        if self.tracer_options.tracer_only:
             self.fwd_solutions = None
             self.adj_solutions = None
             self.fwd_solutions_old = None
@@ -194,7 +194,7 @@ class AdaptiveProblem():
             self.fwd_solutions_old = [fwd.copy(deepcopy=True) for fwd in self.fwd_solutions]
             self.adj_solutions_old = [adj.copy(deepcopy=True) for adj in self.adj_solutions]
 
-        if self.tracer_options['solve_tracer']:
+        if self.tracer_options.solve_tracer:
             self.fwd_tracer_solutions = [Function(Q, name="Forward tracer solution") for Q in self.Q]
             self.adj_tracer_solutions = [Function(Q, name="Adjoint tracer solution") for Q in self.Q]
             self.fwd_tracer_solutions_old = [fwd.copy(deepcopy=True) for fwd in self.fwd_tracer_solutions]
@@ -207,9 +207,9 @@ class AdaptiveProblem():
 
     def set_fields(self):
         """Set velocity field, viscosity, etc (on each mesh)."""
-        self.fields = []
-        for P1 in self.P1:
-            self.fields.append({
+        self.fields = [AttrDict() for P1 in self.P1]
+        for i, P1 in enumerate(self.P1):
+            self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
                 'horizontal_diffusivity': self.op.set_diffusivity(P1),
                 'coriolis_frequency': self.op.set_coriolis(P1),
@@ -222,9 +222,9 @@ class AdaptiveProblem():
         for i, bathymetry in enumerate(self.bathymetry):
             self.depth[i] = DepthExpression(
                 bathymetry,
-                use_nonlinear_equations=self.shallow_water_options['use_nonlinear_equations'],
-                use_wetting_and_drying=self.shallow_water_options['use_wetting_and_drying'],
-                wetting_and_drying_alpha=self.shallow_water_options['wetting_and_drying_alpha'],
+                use_nonlinear_equations=self.shallow_water_options.use_nonlinear_equations,
+                use_wetting_and_drying=self.shallow_water_options.use_wetting_and_drying,
+                wetting_and_drying_alpha=self.shallow_water_options.wetting_and_drying_alpha,
             )
 
     # TODO: Allow different / mesh dependent stabilisation parameters
