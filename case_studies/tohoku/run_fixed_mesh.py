@@ -1,4 +1,4 @@
-from thetis import print_output, Constant
+from thetis import *
 
 import argparse
 
@@ -81,8 +81,9 @@ just_plot = bool(args.just_plot or False)
 if not just_plot:
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
     swp.solve_forward()
+
     print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
-for g in op.gps_gauges:
-    op.plot_timeseries(g, sample=30)
+# for g in op.gps_gauges:
+#     op.plot_timeseries(g, sample=30)
 for g in op.pressure_gauges:
     op.plot_timeseries(g, sample=60)
