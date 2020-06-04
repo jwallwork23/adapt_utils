@@ -81,9 +81,10 @@ just_plot = bool(args.just_plot or False)
 if not just_plot:
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
     swp.solve_forward()
+    swp.save_gauge_data()
 
     print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
 # for g in op.gps_gauges:
 #     op.plot_timeseries(g, sample=30)
-for g in op.pressure_gauges:
-    op.plot_timeseries(g, sample=60)
+# for g in op.pressure_gauges:
+#     op.plot_timeseries(g, sample=60)
