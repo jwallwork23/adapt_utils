@@ -65,7 +65,10 @@ fixed_mesh:
 #    gradation for the open ocean boundary. Instead of applying it here, we use it in the mesh
 #    postprocessing (see `mesh` above).
 
-# TODO: Hessian based
+hessian:
+	@echo "Solving Tohoku tsunami problem using anisotropic 'hessian' adaptation..."
+	@python3 run_hessian_based.py -dm_plex_prescribed_boundary_labels 200,300 -dm_plex_prescribed_boundary_sizes 10e3,5e3
+	@echo "Done!"
 
 dwp:
 	@echo "Solving Tohoku tsunami problem using isotropic 'dual weighted primal' adaptation..."

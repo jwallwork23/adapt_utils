@@ -163,17 +163,30 @@ class AdaptiveProblem(object):
             mesh.boundary_len = bnd_len
             self.op.print_debug(msg.format(i, mesh.num_cells()))
 
+    # TODO: Tracer
     def set_finite_element(self):
+        """
+        There are three options for the shallow water mixed finite element pair:
+          * Taylor-Hood (continuous Galerkin)   P2-P1      'cg-cg';
+          * equal order discontinuous Galerkin  PpDG-PpDG  'dg-dg';
+          * mixed continuous-discontinuous      P1DG-P2.
+
+        There are two options for the tracer finite element:
+          * Continuous Galerkin     Pp    'cg';
+          * Discontinuous Galerkin  PpDG  'dg'.
+        """
         p = self.op.degree
         assert p >= 0
         family = self.op.family
         if family == 'cg-cg':
+            assert p == 1
             u_element = VectorElement("Lagrange", triangle, p+1)
             eta_element = FiniteElement("Lagrange", triangle, p, variant='equispaced')
         elif family == 'dg-dg':
             u_element = VectorElement("DG", triangle, p)
             eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
         elif family == 'dg-cg':
+            assert p == 1
             u_element = VectorElement("DG", triangle, p)
             eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
         else:
@@ -263,8 +276,7 @@ class AdaptiveProblem(object):
 
     def set_stabilisation(self):
         """ Set stabilisation mode and corresponding parameter on each mesh."""
-        self.stabilisation = self.stabilisation or 'no'
-        if self.stabilisation == 'no':
+        if self.stabilisation is None:
             return
         elif self.stabilisation == 'lax_friedrichs':
             raise NotImplementedError  # TODO
@@ -568,8 +580,8 @@ class AdaptiveProblem(object):
         solve_tracer = self.tracer_options.solve_tracer
 
         # Callbacks
-        update_forcings = update_forcings or self.op.get_update_forcings(self.fwd_solvers[i])
-        export_func = export_func or self.op.get_export_func(self.fwd_solvers[i])
+        update_forcings = update_forcings or self.op.get_update_forcings(self)
+        export_func = export_func or self.op.get_export_func(self)
         print_output(80*'=')
         # if i == 0:
         export_func()
@@ -611,7 +623,7 @@ class AdaptiveProblem(object):
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
-                print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
+                print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
                 if solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
                     proj_u.project(u)
@@ -658,8 +670,8 @@ class AdaptiveProblem(object):
         solve_tracer = self.tracer_options.solve_tracer
 
         # Callbacks
-        update_forcings = update_forcings or self.op.get_update_forcings(self.adj_solvers[i])
-        export_func = export_func or self.op.get_export_func(self.adj_solvers[i])
+        update_forcings = update_forcings or self.op.get_update_forcings(self)
+        export_func = export_func or self.op.get_export_func(self)
         print_output(80*'=')
         # if i == self.num_meshes-1:
         export_func()
@@ -700,7 +712,7 @@ class AdaptiveProblem(object):
             self.simulation_time -= op.dt
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
-                print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
+                print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
                 if solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
@@ -768,6 +780,7 @@ class AdaptiveProblem(object):
         except KeyError:
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
 
+    # TODO: Tracer
     def run_hessian_based(self, **kwargs):
         """
         Adaptation loop for Hessian based approach.
@@ -831,20 +844,21 @@ class AdaptiveProblem(object):
                     # Array to hold time-integrated Hessian UFL expression
                     H_window = [0 for f in adapt_fields]
 
-                    def update_forcings(t):
+                    def update_forcings(t):  # TODO: Other timesteppers
                         """Time-integrate Hessian using Trapezium Rule."""
-                        it = self.fwd_solvers[i].iteration
-                        if it % op.hessian_timestep_lag != 0:
+                        iteration = int(self.simulation_time/op.dt)
+                        if iteration % op.hessian_timestep_lag != 0:
+                            iteration += 1
                             return
-                        first_ts = it == i*self.dt_per_mesh
-                        final_ts = it == (i+1)*self.dt_per_mesh
+                        first_ts = iteration == i*self.dt_per_mesh
+                        final_ts = iteration == (i+1)*self.dt_per_mesh
                         dt = op.dt*op.hessian_timestep_lag
                         for j, f in enumerate(adapt_fields):
-                            H = hessian(self.fwd_solvers[i].fields.solution_2d, f)
-                            if op.hessian_time_combination == 'integrate':
-                                H_window[j] += (0.5 if first_ts or final_ts else 1.0)*dt*H
-                            elif f == 'bathymetry':
+                            H = hessian(self.fwd_solutions[i], f)
+                            if f == 'bathymetry':
                                 H_window[j] = H
+                            elif op.hessian_time_combination == 'integrate':
+                                H_window[j] += (0.5 if first_ts or final_ts else 1.0)*dt*H
                             else:
                                 H_window[j] = H if first_ts else metric_intersection(H, H_window[j])
 
@@ -854,16 +868,15 @@ class AdaptiveProblem(object):
 
                         NOTE: We only care about the final export in each mesh iteration
                         """
-                        if self.fwd_solvers[i].iteration == (i+1)*self.dt_per_mesh:
+                        if np.allclose(self.simulation_time, (i+1)*op.dt*self.dt_per_mesh):
                             for j, H in enumerate(H_window):
-                                if op.hessian_time_combination:
+                                if op.hessian_time_combination == 'intersect':
                                     H_window[j] *= op.dt*self.dt_per_mesh
                                 H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
-                print_output("Solving forward equation for iteration {:d}".format(i))
                 self.setup_solver_forward(i)
-                self.solve_forward_step(i, export_func=export_func, update_forcings=update_forcings)
+                self.solve_forward_step(i, export_func=export_func, update_forcings=update_forcings, plot_pvd=op.plot_pvd)
 
                 # Delete objects to free memory
                 if n < op.num_adapt-1:
@@ -952,6 +965,8 @@ class AdaptiveProblem(object):
                 print_output("Converged number of mesh elements!")
                 break
 
+    # TODO: Tracer
+    # TODO: Modify indicator for time interval
     def run_dwp(self, **kwargs):
         r"""
         The "dual weighted primal" approach, first used (not under this name) in [1]. For shallow
@@ -1096,6 +1111,7 @@ class AdaptiveProblem(object):
                 print_output("Converged number of mesh elements!")
                 break
 
+    # TODO: Tracer
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
@@ -1307,6 +1323,7 @@ class AdaptiveProblem(object):
     def get_qoi_kernels(self, i):
         self.kernels[i] = self.op.set_qoi_kernel(self.V[i])
 
+    # NOTE: This will become redundant once error estimators hooked up
     def get_bnd_functions(self, i, *args):
         swt = shallowwater_eq.ShallowWaterTerm(self.V[i], self.bathymetry)
         return swt.get_bnd_functions(*args, self.boundary_conditions[i])
