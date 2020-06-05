@@ -22,7 +22,7 @@ class RippleOptions(ShallowWaterOptions):
         # Discretisation
         self.stabilisation = 'no'
         self.degree = 1
-        # self.family = 'taylor-hood'
+        # self.family = 'cg-cg'
 
         # Initial condition
         self.source_loc = [(lx/2, lx/2, 0.0, 0.1)]

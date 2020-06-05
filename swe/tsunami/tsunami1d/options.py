@@ -68,7 +68,7 @@ class Tsunami1dOptions(ShallowWaterOptions):
         # Discretisation
         self.stabilisation = 'no'
         self.degree = 1
-        # self.family = 'taylor-hood'
+        # self.family = 'cg-cg'
 
         # Initial/final condition
         self.source_loc = [(125.0e+3/self.L, self.start_time, 25.0e+3/self.L)]
