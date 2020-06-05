@@ -9,7 +9,9 @@ from adapt_utils.adapt.adaptation import pragmatic_adapt
 from adapt_utils.adapt.metric import *
 from adapt_utils.swe.equation import ShallowWaterEquations
 from adapt_utils.swe.adjoint import AdjointShallowWaterEquations
+from adapt_utils.swe.error_estimation import ShallowWaterGOErrorEstimator
 from adapt_utils.swe.utils import *
+from adapt_utils.tracer.error_estimation import TracerGOErrorEstimator
 from adapt_utils.ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
@@ -244,7 +246,7 @@ class AdaptiveProblemBase(object):
         full sequence of meshes.
 
         NOTE: The implementation contains a very simple checkpointing scheme, in the sense that
-            the final solution computed on mesh `i` is stored in `self.fwd_solvers[i]` or
+            the final solution computed on mesh `i` is stored in `self.fwd_solutions[i]` or
             `self.adj_solutions[i]`, as appropriate.
         """
         if adjoint:
@@ -615,13 +617,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
-            # 'error_estimator': self.error_estimators[i]['shallow_water'],  # TODO
             'solver_parameters': self.op.params,  # TODO: Split into SW and tracer
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
-        if self.error_estimators[i].shallow_water is not None:
+        if 'shallow_water' in self.error_estimators[i]:
             kwargs['error_estimator'] = self.error_estimators[i].shallow_water
         self.timesteppers[i].shallow_water = integrator(*args, **kwargs)
         # self.lhs = self.timesteppers[i].shallow_water.F
@@ -633,13 +634,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         args = (self.equations[i].tracer, self.fwd_solutions_tracer[i], fields, dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
-            # 'error_estimator': self.error_estimators[i]['tracer'],  # TODO
             'solver_parameters': self.op.params,  # TODO: Split into SW and tracer
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
-        if self.error_estimators[i].tracer is not None:
+        if 'tracer' in self.error_estimators[i].tracer:
             kwargs['error_estimator'] = self.error_estimators[i].tracer
         self.timesteppers[i].tracer = integrator(*args, **kwargs)
 
@@ -1214,6 +1214,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 break
 
     # TODO: Tracer
+    # TODO: Enable move to base class
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
@@ -1255,7 +1256,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 print_output("Meshes differ so we create separate hierarchies.")
                 hierarchies = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
                 refined_meshes = [hierarchy[1] for hierarchy in hierarchies]
-            ep = type(self)(op, refined_meshes, discrete_adjoint=self.discrete_adjoint)
+            ep = type(self)(op,
+                meshes=refined_meshes,
+                nonlinear=self.nonlinear,
+                discrete_adjoint=self.discrete_adjoint,
+            )
 
             # --- Loop over mesh windows *in reverse*
 
@@ -1285,6 +1290,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     fwd_solutions_step_old.append(ts.solution_old.copy(deepcopy=True))
                     # TODO: Also need store fields at each export (in general case)
 
+                self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward(i)
                 self.solve_forward_step(i, export_func=export_func)
@@ -1303,6 +1309,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 def export_func():
                     enriched_adj_solutions_step.append(ep.adj_solutions[i].copy(deepcopy=True))
 
+                ep.simulation_time = (i+1)*op.dt*self.dt_per_mesh  # TODO: Shouldn't be needed
                 ep.transfer_adjoint_solution(i)
                 ep.setup_solver_adjoint(i)
                 ep.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
@@ -1322,7 +1329,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 fwd_proj = Function(ep.V[i])
                 fwd_old_proj = Function(ep.V[i])
                 adj_error = Function(ep.V[i])
-                bcs = self.fwd_solvers[i].bnd_functions['shallow_water']
+                bcs = self.boundary_conditions[i]['shallow_water']  # TODO: Tracer option
                 ets.setup_error_estimator(fwd_proj, fwd_old_proj, adj_error, bcs)
 
                 # Loop over exported timesteps
@@ -1344,9 +1351,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     # Time-integrate
                     I += op.dt*self.dt_per_mesh*scaling*indicator_enriched
                 indicator_enriched_cts = interpolate(I, ep.P1[i])
-
-                ep.fwd_solvers[i] = None
-
                 tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
                 metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
 
