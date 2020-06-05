@@ -7,13 +7,38 @@ import os
 __all__ = ["Options"]
 
 
+# TODO: Improve doc
 class Options(FrozenConfigurable):
     name = 'Common parameters for mesh adaptive simulations'
 
-    # Spatial discretisation  # TODO: use a notation which is more general
-    family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
-    degree_increase = NonNegativeInteger(1, help="Polynomial degree increase in enriched space").tag(config=True)
-    degree = NonNegativeInteger(1, help="Order of function space").tag(config=True)
+    # Spatial discretisation
+    family = Unicode('dg-dg', help="""
+    Mixed finite element pair to use for the shallow water system. Choose from:
+      'cg-cg': Taylor-Hood                    (P2-P1);
+      'dg-dg': Equal order DG                 (PpDG-PpDG);
+      'dg-cg': Mixed continuous-discontinuous (P1DG-P2),
+    where p is the polynomial order specified by :attr:`degree`.
+    """).tag(config=True)
+    tracer_family = Unicode('dg', help="""
+    Finite element pair to use for the tracer transport model. Choose from:
+      'cg': Continuous Galerkin    (Pp);
+      'dg': Discontinuous Galerkin (PpDG),
+    where p is the polynomial order specified by :attr:`degree_tracer`.
+    """).tag(config=True)
+    degree = NonNegativeInteger(1, help="""
+    Polynomial order for shallow water finite element pair :attr:`family'.
+    """).tag(config=True)
+    degree_tracer = NonNegativeInteger(1, help="""
+    Polynomial order for tracer finite element pair :attr:`tracer_family'.
+    """).tag(config=True)
+    degree_increase = NonNegativeInteger(0, help="""
+    When defining an enriched shallow water finite element space, how much should the
+    polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+    """).tag(config=True)
+    degree_increase_tracer = NonNegativeInteger(1, help="""
+    When defining an enriched tracer finite element space, how much should the
+    polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+    """).tag(config=True)
 
     # Time discretisation
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
@@ -263,13 +288,13 @@ class Options(FrozenConfigurable):
     def exact_qoi(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def get_update_forcings(self, solver_obj):
+    def get_update_forcings(self, prob):
         """Should be implemented in derived class."""
         def update_forcings(t):
             return
         return update_forcings
 
-    def get_export_func(self, solver_obj):
+    def get_export_func(self, prob):
         """Should be implemented in derived class."""
         def export_func():
             return
@@ -279,6 +304,7 @@ class Options(FrozenConfigurable):
         if self.debug:
             print_output(msg)
 
+    # TODO: USEME
     def get_mesh_velocity(self):
         """
         Prescribed a mesh velocity.
