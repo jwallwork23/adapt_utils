@@ -4,6 +4,9 @@ from thetis.shallowwater_eq import ShallowWaterTerm
 from thetis.utility import *
 
 
+__all__ = ["AdjointShallowWaterEquations"]
+
+
 g_grav = physical_constants['g_grav']
 rho_0 = physical_constants['rho0']
 
@@ -197,6 +200,26 @@ class TurbineDragTerm(AdjointShallowWaterMomentumTerm):
         return -f
 
 
+class MomentumSourceTerm(AdjointShallowWaterMomentumTerm):
+    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        f = 0
+        momentum_source = fields_old.get('momentum_source')
+
+        if momentum_source is not None:
+            f += inner(momentum_source, self.z_test)*self.dx
+        return f
+
+
+class ContinuitySourceTerm(AdjointShallowWaterContinuityTerm):
+    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        f = 0
+        volume_source = fields_old.get('volume_source')
+
+        if volume_source is not None:
+            f += inner(volume_source, self.zeta_test)*self.dx
+        return f
+
+
 # TODO
 class BathymetryDisplacementMassTerm(AdjointShallowWaterContinuityTerm):
     def residual(self, solution):
@@ -226,9 +249,11 @@ class BaseAdjointShallowWaterEquation(Equation):
         self.add_term(LinearDragTerm(*args), 'explicit')
         self.add_term(BottomDrag3DTerm(*args), 'source')
         self.add_term(TurbineDragTerm(*args), 'implicit')
+        self.add_term(MomentumSourceTerm(*args), 'source')
 
     def add_continuity_terms(self, *args):
         self.add_term(ExternalPressureGradientTerm(*args), 'implicit')
+        self.add_term(ContinuitySourceTerm(*args), 'source')
 
     def residual_z_zeta(self, label, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions):
         f = 0
@@ -244,7 +269,7 @@ class AdjointShallowWaterEquations(BaseAdjointShallowWaterEquation):
         :arg depth: :class: `DepthExpression` containing depth info
         :arg options: :class:`.AttrDict` object containing all circulation model options
         """
-        super(ShallowWaterEquations, self).__init__(function_space, depth, options)
+        super(AdjointShallowWaterEquations, self).__init__(function_space, depth, options)
 
         if options.get('use_wetting_and_drying'):
             raise NotImplementedError  # TODO

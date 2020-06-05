@@ -8,12 +8,17 @@ import numpy as np
 from adapt_utils.adapt.adaptation import pragmatic_adapt
 from adapt_utils.adapt.metric import *
 from adapt_utils.swe.equation import ShallowWaterEquations
+from adapt_utils.swe.adjoint import AdjointShallowWaterEquations
 from adapt_utils.swe.utils import *
 
 
 __all__ = ["AdaptiveProblem"]
 
 
+# TODO: Tracer model
+# TODO: Mesh movement
+# TODO: Steady state
+# TODO: Discrete adjoint
 class AdaptiveProblem(object):
     """
     Solver object for adaptive mesh simulations with a number of meshes which is known a priori.
@@ -26,6 +31,9 @@ class AdaptiveProblem(object):
     meshes, as opposed to a single mesh which is updated on-the-fly. Whilst this approach has
     increased memory requirements compared with the on-the-fly strategy, it is beneficial for
     goal-oriented mesh adaptation, where an outer loop is required.
+
+    Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
+    performed on-the-fly on each mesh in the sequence.
     """
 
     # --- Setup
@@ -45,6 +53,7 @@ class AdaptiveProblem(object):
             'timestep': op.dt,
             'simulation_export_time': op.dt*op.dt_per_export,
             'timestepper_type': op.timestepper,
+            'simulation_end_time': op.end_time,
         })
         self.num_timesteps = int(np.floor(op.end_time/op.dt))
         self.num_meshes = op.num_meshes
@@ -97,11 +106,12 @@ class AdaptiveProblem(object):
 
         # Outputs
         self.di = create_directory(self.op.di)
-        self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
-        # self.solution_fpath_hdf5 = os.path.join(self.di, 'solution.hdf5')
-        self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
-        # self.adjoint_solution_fpath_hdf5 = os.path.join(self.di, 'adjoint_solution.hdf5')
-        # self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
+        if not self.tracer_options.tracer_only:
+            self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
+            self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
+        if self.tracer_options.solve_tracer:
+            self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
+            self.adjoint_tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
         self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         self.kernel_file = File(os.path.join(self.di, 'kernel.pvd'))
@@ -430,6 +440,14 @@ class AdaptiveProblem(object):
 
     def _create_adjoint_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
+
+        # Account for dJdq
+        self.get_qoi_kernels(i)
+        dJdu, dJdeta = self.kernels[i].split()
+        self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
+        fields['momentum_source'] = self.time_kernel*dJdu
+        fields['volume_source'] = self.time_kernel*dJdeta
+
         dt = self.timestepping_options.timestep
         args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, dt, )
         kwargs = {
@@ -513,6 +531,7 @@ class AdaptiveProblem(object):
 
     # TODO: Estimate error
     # TODO: Turbine setup
+    # TODO: Tracer
     def setup_solver_forward(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
@@ -521,15 +540,15 @@ class AdaptiveProblem(object):
         op.print_debug(op.indent + "SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
         self.create_timestepper(i)
         ts = self.timesteppers[i]['shallow_water']
+        dbcs = []
         if op.family == 'cg-cg':
-            dbcs = []
             op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
-            bcs = self.boundary_conditions[i]
+            bcs = self.boundary_conditions[i]['shallow_water']
             for j in bcs:
                 if 'value' in bcs[j]:
                     bcs.append(DirichletBC(self.V[i].sub(1), bcs[j]['value'], j))
-            prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
-            ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix=ts.name)
+        prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
+        ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward")
         op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i)
 
@@ -573,31 +592,33 @@ class AdaptiveProblem(object):
             raise ValueError(msg.format(self.simulation_time, start_time))
         update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        msg = "mesh {:2d}  time {:8.2f}"
-        print_output(msg.format(i, self.simulation_time))
+        msg = "mesh {:2d}/{:2d}  time {:8.2f}"
+        print_output(msg.format(i+1, self.num_meshes, self.simulation_time))
+        ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
             if solve_swe:
-                self.timesteppers[i]['shallow_water'].advance(self.simulation_time, update_forcings)
+                ts.shallow_water.advance(self.simulation_time, update_forcings)
             if solve_tracer:
-                self.timesteppers[i]['tracer'].advance(self.simulation_time, update_forcings)
+                ts.tracer.advance(self.simulation_time, update_forcings)
             iteration += 1
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
-                print_output(msg.format(i, self.simulation_time))
+                print_output(msg.format(i+1, self.num_meshes, self.simulation_time))
                 if solve_swe:
                     u, eta = self.fwd_solutions[i].split()
                     proj_u.project(u)
                     proj_eta.project(eta)
                     self.solution_file.write(proj_u, proj_eta)
-                # if solve_tracer:
-                #     proj_tracer.project(self.fwd_solutions_tracer[i])
-                #     self.tracer_file.write(proj_tracer)
+                if solve_tracer:
+                    proj_tracer.project(self.fwd_solutions_tracer[i])
+                    self.tracer_file.write(proj_tracer)
                 export_func()
                 self.callbacks[i].evaluate(mode='export')
         op.print_debug("Done!")
         print_output(80*'=')
 
+    # TODO: Tracer
     def setup_solver_adjoint(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
@@ -606,20 +627,79 @@ class AdaptiveProblem(object):
         op.print_debug(op.indent + "SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
         self.create_adjoint_timestepper(i)
         ts = self.timesteppers[i]['adjoint_shallow_water']
+        dbcs = []
         if op.family == 'cg-cg':
-            dbcs = []
             op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
-            bcs = self.boundary_conditions[i]
+            bcs = self.boundary_conditions[i]['shallow_water']
             for j in bcs:
                 if 'un' not in bcs[j]:
                     bcs.append(DirichletBC(self.V[i].sub(1), 0, j))
-            prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
-            ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix=ts.name)
+        prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
+        ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint")
 
-    # TODO
-    def solve_adjoint_step(self, i, **kwargs):
-        """Solve adjoint PDE on mesh `i`."""
-        raise NotImplementedError("Should be implemented in derived class.")
+    def solve_adjoint_step(self, i, update_forcings=None, export_func=None):
+        """
+        Solve adjoint PDE on mesh `i` *backwards in time*.
+
+        :kwarg update_forcings: a function which takes simulation time as an argument and is
+            evaluated at the start of every timestep.
+        :kwarg export_func: a function with no arguments which is evaluated at every export step.
+        """
+        op = self.op
+        solve_swe = not self.tracer_options.tracer_only
+        solve_tracer = self.tracer_options.solve_tracer
+
+        # Callbacks
+        update_forcings = update_forcings or self.op.get_update_forcings(self.adj_solvers[i])
+        export_func = export_func or self.op.get_export_func(self.adj_solvers[i])
+        if i == self.num_meshes-1:
+            print_output(80*'=')
+            export_func()
+
+        # We need to project to P1 for vtk outputs
+        if solve_swe:
+            proj_z = Function(self.P1_vec[i], name="Projected adjoint velocity")
+            proj_zeta = Function(self.P1[i], name="Projected adjoint elevation")
+            self.solution_file._topology = None
+        if solve_tracer:
+            proj_tracer = Function(self.P1[i], name="Projected adjoint tracer")
+            self.tracer_file._topology = None
+
+        t_epsilon = 1.0e-05
+        iteration = 0
+        start_time = (i+1)*op.dt*self.dt_per_mesh
+        end_time = i*op.dt*self.dt_per_mesh
+        try:
+            assert np.allclose(self.simulation_time, start_time)
+        except AssertionError:
+            msg = "Mismatching start time: {:.2f} vs {:.2f}"
+            raise ValueError(msg.format(self.simulation_time, start_time))
+        update_forcings(self.simulation_time)
+        op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
+        msg = "mesh {:2d}/{:2d}  time {:8.2f}"
+        print_output(msg.format(i+1, self.num_meshes, self.simulation_time))
+        ts = self.timesteppers[i]
+        while self.simulation_time >= end_time + t_epsilon:
+            if solve_swe:
+                ts.adjoint_shallow_water.advance(self.simulation_time, update_forcings)
+            if solve_tracer:
+                ts.adjoint_tracer.advance(self.simulation_time, update_forcings)
+            iteration += 1
+            self.simulation_time -= op.dt
+            self.callbacks[i].evaluate(mode='timestep')
+            if iteration % op.dt_per_export == 0:
+                print_output(msg.format(i+1, self.num_meshes, self.simulation_time))
+                if solve_swe:
+                    z, zeta = self.adj_solutions[i].split()
+                    proj_z.project(z)
+                    proj_zeta.project(zeta)
+                    self.adjoint_solution_file.write(proj_z, proj_zeta)
+                if solve_tracer:
+                    proj_tracer.project(self.adj_solutions_tracer[i])
+                    self.adjoint_tracer_file.write(proj_tracer)
+                export_func()
+        op.print_debug("Done!")
+        print_output(80*'=')
 
     def solve(self, adjoint=False, **kwargs):
         """
@@ -670,9 +750,6 @@ class AdaptiveProblem(object):
             # Metric-based with adjoint
             'dwp': self.run_dwp,
             'dwr': self.run_dwr,
-
-            # Mesh movement
-            'monge_ampere': self.run_moving_mesh,
         }
         try:
             run_scripts[self.approach](**kwargs)
@@ -1198,13 +1275,6 @@ class AdaptiveProblem(object):
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
-
-    def run_moving_mesh(self, **kwargs):
-        try:
-            assert hasattr(self, 'monitor')
-        except AssertionError:
-            raise AttributeError("Cannot perform mesh movement without a monitor function.")
-        raise NotImplementedError  # TODO
 
     # --- Metric
 
