@@ -10,6 +10,7 @@ from adapt_utils.adapt.metric import *
 from adapt_utils.swe.equation import ShallowWaterEquations
 from adapt_utils.swe.adjoint import AdjointShallowWaterEquations
 from adapt_utils.swe.utils import *
+from adapt_utils.ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
 __all__ = ["AdaptiveProblem"]
@@ -58,10 +59,13 @@ class AdaptiveProblemBase(object):
         # Setup problem
         self.setup_all(meshes)
         implemented_steppers = {  # TODO: Other timesteppers
-            'CrankNicolson': thetis.timeintegrator.CrankNicolson,
+            'CrankNicolson': CrankNicolson,
+            'SteadyState': SteadyState,
         }
         assert op.timestepper in implemented_steppers
         self.integrator = implemented_steppers[self.op.timestepper]
+        if op.timestepper == 'SteadyState':
+            assert op.end_time < op.dt
 
         # Outputs
         self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
@@ -1254,9 +1258,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 # TODO: Need to transfer fwd sol in nonlinear case
                 ep.setup_solver_forward(i)
-                ets = ep.fwd_solvers[i].timestepper
+                ets = ep.timesteppers[i]['shallow_water']  # TODO: Tracer option
 
                 # --- Solve forward on current window
+
+                ts = self.timesteppers[i]['shallow_water']  # TODO: Tracer option
 
                 def export_func():
                     fwd_solutions_step.append(ts.solution.copy(deepcopy=True))
@@ -1265,7 +1271,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward(i)
-                ts = self.fwd_solvers[i].timestepper
                 self.solve_forward_step(i, export_func=export_func)
 
                 # --- Solve adjoint on current window
