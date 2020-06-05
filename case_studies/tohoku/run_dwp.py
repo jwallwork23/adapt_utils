@@ -17,7 +17,7 @@ parser.add_argument("-level", help="(Integer) resolution for initial mesh (defau
 parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
 
 # Solver
-parser.add_argument("-family", help="Element family for mixed FE space")
+parser.add_argument("-family", help="Element family for mixed FE space (default cg-cg)")
 
 # Mesh adaptation
 parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
@@ -70,7 +70,7 @@ kwargs = {
     'bathymetry_cap': 30.0,  # FIXME
 
     # Solver
-    'family': args.family or 'dg-cg',
+    'family': args.family or 'cg-cg',
 
     # QoI
     'start_time': float(args.start_time or 1200.0),

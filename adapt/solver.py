@@ -124,6 +124,7 @@ class AdaptiveProblem(object):
         self.estimators = [{} for mesh in self.meshes]
         self.qois = []
         self.st_complexities = [np.nan]
+        self.outer_iteration = 0
 
     def setup_all(self, meshes):
         """
@@ -567,17 +568,21 @@ class AdaptiveProblem(object):
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self.fwd_solvers[i])
         export_func = export_func or self.op.get_export_func(self.fwd_solvers[i])
-        if i == 0:
-            print_output(80*'=')
-            export_func()
-            self.callbacks[i].evaluate(mode='export')
+        print_output(80*'=')
+        # if i == 0:
+        export_func()
+        self.callbacks[i].evaluate(mode='export')
 
         # We need to project to P1 for vtk outputs
         if solve_swe:
+            if i == 0:
+                self.solution_file.__init__(self.solution_file.filename)
             proj_u = Function(self.P1_vec[i], name="Projected velocity")
             proj_eta = Function(self.P1[i], name="Projected elevation")
             self.solution_file._topology = None
         if solve_tracer:
+            if i == 0:
+                self.tracer_file.__init__(self.tracer_file.filename)
             proj_tracer = Function(self.P1[i], name="Projected tracer")
             self.tracer_file._topology = None
 
@@ -592,8 +597,8 @@ class AdaptiveProblem(object):
             raise ValueError(msg.format(self.simulation_time, start_time))
         update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        msg = "mesh {:2d}/{:2d}  time {:8.2f}"
-        print_output(msg.format(i+1, self.num_meshes, self.simulation_time))
+        msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
+        print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
             if solve_swe:
@@ -604,7 +609,7 @@ class AdaptiveProblem(object):
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
-                print_output(msg.format(i+1, self.num_meshes, self.simulation_time))
+                print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
                 if solve_swe:
                     u, eta = self.fwd_solutions[i].split()
                     proj_u.project(u)
@@ -652,18 +657,22 @@ class AdaptiveProblem(object):
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self.adj_solvers[i])
         export_func = export_func or self.op.get_export_func(self.adj_solvers[i])
-        if i == self.num_meshes-1:
-            print_output(80*'=')
-            export_func()
+        print_output(80*'=')
+        # if i == self.num_meshes-1:
+        export_func()
 
         # We need to project to P1 for vtk outputs
         if solve_swe:
+            if i == self.num_meshes-1:
+                self.adjoint_solution_file.__init__(self.adjoint_solution_file.filename)
             proj_z = Function(self.P1_vec[i], name="Projected adjoint velocity")
             proj_zeta = Function(self.P1[i], name="Projected adjoint elevation")
-            self.solution_file._topology = None
+            self.adjoint_solution_file._topology = None
         if solve_tracer:
+            if i == self.num_meshes-1:
+                self.adjoint_tracer_file.__init__(self.adjoint_tracer_file.filename)
             proj_tracer = Function(self.P1[i], name="Projected adjoint tracer")
-            self.tracer_file._topology = None
+            self.adjoint_tracer_file._topology = None
 
         t_epsilon = 1.0e-05
         iteration = 0
@@ -676,8 +685,8 @@ class AdaptiveProblem(object):
             raise ValueError(msg.format(self.simulation_time, start_time))
         update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        msg = "mesh {:2d}/{:2d}  time {:8.2f}"
-        print_output(msg.format(i+1, self.num_meshes, self.simulation_time))
+        msg = "{:2d} {:s} ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
+        print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time >= end_time + t_epsilon:
             if solve_swe:
@@ -688,7 +697,7 @@ class AdaptiveProblem(object):
             self.simulation_time -= op.dt
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
-                print_output(msg.format(i+1, self.num_meshes, self.simulation_time))
+                print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
                 if solve_swe:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
@@ -785,6 +794,7 @@ class AdaptiveProblem(object):
             raise ValueError(msg.format(op.hessian_time_combination))
 
         for n in range(op.num_adapt):
+            self.outer_iteration = n
 
             # Arrays to hold Hessians for each field on each window
             H_windows = [[Function(P1_ten) for P1_ten in self.P1_ten] for f in adapt_fields]
@@ -965,6 +975,7 @@ class AdaptiveProblem(object):
         """
         op = self.op
         for n in range(op.num_adapt):
+            self.outer_iteration = n
 
             # --- Solve forward to get checkpoints
 
@@ -1086,6 +1097,7 @@ class AdaptiveProblem(object):
         # TODO: doc
         op = self.op
         for n in range(op.num_adapt):
+            self.outer_iteration = n
 
             # --- Solve forward to get checkpoints
 
