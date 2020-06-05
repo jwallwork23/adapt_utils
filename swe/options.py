@@ -31,7 +31,7 @@ class ShallowWaterOptions(Options):
     # Model
     grad_div_viscosity = Bool(False).tag(config=True)
     grad_depth_viscosity = Bool(False).tag(config=True)
-    family = Enum(['dg-dg', 'rt-dg', 'dg-cg', 'taylor-hood'], default_value='dg-dg').tag(config=True)
+    family = Enum(['dg-dg', 'rt-dg', 'dg-cg', 'cg-cg'], default_value='dg-dg').tag(config=True)
     wetting_and_drying = Bool(False).tag(config=True)
     wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(4.3)).tag(config=True)
 

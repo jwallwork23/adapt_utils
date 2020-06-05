@@ -60,22 +60,22 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         self.adj_solutions_old[i].assign(self.adj_solutions[i])  # Assign previous value
         z_old, zeta_old = split(self.adj_solutions_old[i])
 
-        def TaylorHood(f0, f1):
-            F = -inner(z_test, b*grad(f1))*dx                     # - ∇ (b ζ)
-            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx  # - f perp(z)
-            F += g*inner(grad(zeta_test), f0)*dx                  # - g ∇ . z
+        def TaylorHood(uv, elev):
+            F = -inner(z_test, b*grad(elev))*dx                   # - ∇ (b ζ)
+            F += -inner(z_test, f*as_vector((-uv[1], uv[0])))*dx  # - f perp(z)
+            F += g*inner(grad(zeta_test), uv)*dx                  # - g ∇ . z
             return F
 
-        def Mixed(f0, f1):
-            F = -inner(z_test, b*grad(f1))*dx                     # - ∇ (b ζ)
-            F += -inner(z_test, f*as_vector((-f0[1], f0[0])))*dx  # - f perp(z)
-            F += g*inner(grad(zeta_test), f0)*dx                  # - g ∇ . z
-            # F += -g*inner(avg(zeta_test*n), avg(f0))*dS           # flux term
+        def Mixed(uv, elev):
+            F = -inner(z_test, b*grad(elev))*dx                   # - ∇ (b ζ)
+            F += -inner(z_test, f*as_vector((-uv[1], uv[0])))*dx  # - f perp(z)
+            F += g*inner(grad(zeta_test), uv)*dx                  # - g ∇ . z
+            # F += -g*inner(avg(zeta_test*n), avg(uv))*dS         # flux term
             return F
 
         family = self.shallow_water_options['element_family']
         try:
-            G = {'taylor-hood': TaylorHood, 'dg-cg': Mixed}[family]
+            G = {'cg-cg': TaylorHood, 'dg-cg': Mixed}[family]
         except KeyError:
             raise ValueError("Mixed discretisation {:s} not supported.".format(family))
 
@@ -100,11 +100,12 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
         #   velocity on the complement of Gamma_2 and Dirichlet conditions for the elevation on the
         #   complement of Gamma_1.
         boundary_markers = self.meshes[i].exterior_facets.unique_markers
-        if self.boundary_conditions[i] == {}:  # Default Thetis boundary conditions are free-slip
-            self.boundary_conditions[i] = {j: {'un': Constant(0.0)} for j in boundary_markers}
+        BCs = self.boundary_conditions[i]['shallow_water']
+        if BCs == {}:  # Default Thetis boundary conditions are free-slip
+            BCs = {j: {'un': Constant(0.0)} for j in boundary_markers}
         dbcs = []
         for j in boundary_markers:
-            bcs = self.boundary_conditions[i].get(j)
+            bcs = BCs.get(j)
             if 'un' in bcs:
                 if 'elev' in bcs:
                     a += -0.5*dtc*g*inner(zeta_test, dot(z, n))*ds(j)

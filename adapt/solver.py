@@ -158,7 +158,7 @@ class AdaptiveProblem(object):
         p = self.op.degree
         assert p >= 0
         family = self.op.family
-        if family == 'taylor-hood':
+        if family == 'cg-cg':
             u_element = VectorElement("Lagrange", triangle, p+1)
             eta_element = FiniteElement("Lagrange", triangle, p, variant='equispaced')
         elif family == 'dg-dg':
@@ -521,7 +521,7 @@ class AdaptiveProblem(object):
         op.print_debug(op.indent + "SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
         self.create_timestepper(i)
         ts = self.timesteppers[i]['shallow_water']
-        if op.family == 'taylor-hood':
+        if op.family == 'cg-cg':
             dbcs = []
             op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
             bcs = self.boundary_conditions[i]
@@ -606,7 +606,7 @@ class AdaptiveProblem(object):
         op.print_debug(op.indent + "SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
         self.create_adjoint_timestepper(i)
         ts = self.timesteppers[i]['adjoint_shallow_water']
-        if op.family == 'taylor-hood':
+        if op.family == 'cg-cg':
             dbcs = []
             op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
             bcs = self.boundary_conditions[i]

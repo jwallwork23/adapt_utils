@@ -41,7 +41,7 @@ class ExternalPressureGradientTerm(ShallowWaterMomentumTerm):
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-                if funcs is not None and self.options.get('element_family') != 'taylor-hood':
+                if funcs is not None and self.options.get('element_family') != 'cg-cg':
                     eta_ext, uv_ext = self.get_bnd_functions(head, uv, bnd_marker, bnd_conditions)
                     # Compute linear riemann solution with eta, eta_ext, uv, uv_ext
                     un_jump = inner(uv - uv_ext, self.normal)
@@ -63,7 +63,7 @@ class HUDivTerm(ShallowWaterContinuityTerm):
         for bnd_marker in self.boundary_markers:
             funcs = bnd_conditions.get(bnd_marker)
             ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-            if funcs is not None and self.options.get('element_family') != 'taylor-hood':
+            if funcs is not None and self.options.get('element_family') != 'cg-cg':
                 eta_ext, uv_ext = self.get_bnd_functions(eta, uv, bnd_marker, bnd_conditions)
                 eta_ext_old, uv_ext_old = self.get_bnd_functions(eta_old, uv_old, bnd_marker, bnd_conditions)
                 # Compute linear riemann solution with eta, eta_ext, uv, uv_ext
@@ -84,7 +84,7 @@ class HorizontalAdvectionTerm(ShallowWaterMomentumTerm):
         if not self.options.use_nonlinear_equations:
             return 0
 
-        if self.options.get('element_family') == 'taylor-hood':
+        if self.options.get('element_family') == 'cg-cg':
             raise NotImplementedError  # TODO
 
         horiz_advection_by_parts = True
