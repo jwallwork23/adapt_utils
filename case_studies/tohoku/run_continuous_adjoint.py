@@ -49,6 +49,7 @@ op = TohokuOptions(
     start_time=float(args.start_time or 0.0),
     end_time=float(args.end_time or 1200.0),
     family=args.family or 'cg-cg',
+    stabilisation=None,  # TODO: Lax-Friedrichs
     level=int(args.level or 0),
     approach='fixed_mesh',
     plot_pvd=True,

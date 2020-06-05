@@ -71,7 +71,8 @@ kwargs = {
     'bathymetry_cap': 30.0,  # FIXME
 
     # Solver
-    'family': args.family or 'dg-cg',
+    'family': args.family or 'cg-cg',
+    'stabilsation': None,  # TODO: Lax-Friedrichs
 
     # QoI
     'start_time': float(args.start_time or 1200.0),

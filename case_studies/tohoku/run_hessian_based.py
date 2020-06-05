@@ -14,6 +14,9 @@ parser.add_argument("-end_time", help="End time of simulation (default 24 minute
 parser.add_argument("-level", help="(Integer) mesh resolution (default 0)")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
 
+# Solver
+parser.add_argument("-family", help="Element family for mixed FE space (default cg-cg)")
+
 # Mesh adaptation
 parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
 parser.add_argument("-normalisation", help="Normalisation method (default 'complexity')")
@@ -41,7 +44,7 @@ parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of intere
 # Misc
 parser.add_argument("-save_plex", help="Save final set of mesh DMPlexes to disk")
 parser.add_argument("-debug", help="Print all debugging statements")
-args = parser.parse_args()
+args, unknown = parser.parse_known_args()
 p = args.norm_order
 
 # Collect locations and radii
@@ -66,6 +69,10 @@ kwargs = {
 
     # Physics
     'bathymetry_cap': 30.0,  # FIXME
+
+    # Solver
+    'family': args.family or 'cg-cg',
+    'stabilisation': None,  # TODO: Lax-Friedrichs
 
     # Mesh adaptation
     'adapt_field': args.adapt_field or 'elevation',
@@ -94,7 +101,7 @@ kwargs = {
 save_plex = bool(args.save_plex or False)
 logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
 for key in kwargs:
-    logstr += "    {:24s}: {:}\n".format(key, kwargs[key])
+    logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
 print_output(logstr + 80*'*' + '\n')
 
 # Create parameter class and problem object
@@ -107,7 +114,9 @@ swp.run_hessian_based()
 with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
     for line in gitlog:
         words = line.split()
-    kwargs['adapt_utils git commit'] = words[1]
+    logstr += "    {:34s}: {:}\n".format('adapt_utils git commit', words[1])
+for i in range(len(unknown)//2):
+    logstr += "    {:34s}: {:}\n".format(unknown[2*i][1:], unknown[2*i+1])
 logstr += 80*'*' + '\n' + 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
 logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
 msg = "Mesh iteration {:2d}: qoi {:.4e} space-time complexity {:.4e}\n"

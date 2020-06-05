@@ -71,6 +71,7 @@ kwargs = {
 
     # Solver
     'family': args.family or 'cg-cg',
+    'stabilsation': None,  # TODO: Lax-Friedrichs
 
     # QoI
     'start_time': float(args.start_time or 1200.0),

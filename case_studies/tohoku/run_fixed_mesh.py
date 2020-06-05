@@ -56,7 +56,8 @@ kwargs = {
     # 'bathymetry_cap': None,
 
     # Solver
-    'family': args.family or 'dg-cg',
+    'family': args.family or 'cg-cg',
+    'stabilsation': None,  # TODO: Lax-Friedrichs
     # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
     'wetting_and_drying_alpha': Constant(10.0),
