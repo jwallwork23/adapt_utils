@@ -68,8 +68,8 @@ class AdaptiveProblem(object):
             raise ValueError("Timesteps per export should divide timesteps per mesh iteration.")
         self.io_options = AttrDict({
             'output_directory': op.di,
-            'fields_to_export': ['uv_2d', 'elev_2d'] if op.plot_pvd else [],
-            'fields_to_export_hdf5': ['uv_2d', 'elev_2d'] if op.save_hdf5 else [],
+            'fields_to_export': ['uv_2d', 'elev_2d'] if op.plot_pvd else [],  # TODO: Update
+            'fields_to_export_hdf5': ['uv_2d', 'elev_2d'] if op.save_hdf5 else [],  # TODO: Update
             'no_exports': True,  # TODO: TEMPORARY
         })
         self.shallow_water_options = AttrDict({
@@ -553,7 +553,7 @@ class AdaptiveProblem(object):
         op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i)
 
-    def solve_forward_step(self, i, update_forcings=None, export_func=None):
+    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
         Solve forward PDE on mesh `i`.
 
@@ -574,13 +574,13 @@ class AdaptiveProblem(object):
         self.callbacks[i].evaluate(mode='export')
 
         # We need to project to P1 for vtk outputs
-        if solve_swe:
+        if solve_swe and plot_pvd:
             if i == 0:
                 self.solution_file.__init__(self.solution_file.filename)
             proj_u = Function(self.P1_vec[i], name="Projected velocity")
             proj_eta = Function(self.P1[i], name="Projected elevation")
             self.solution_file._topology = None
-        if solve_tracer:
+        if solve_tracer and plot_pvd:
             if i == 0:
                 self.tracer_file.__init__(self.tracer_file.filename)
             proj_tracer = Function(self.P1[i], name="Projected tracer")
@@ -598,7 +598,7 @@ class AdaptiveProblem(object):
         update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
-        print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
+        print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
             if solve_swe:
@@ -610,12 +610,12 @@ class AdaptiveProblem(object):
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
                 print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
-                if solve_swe:
+                if solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
                     proj_u.project(u)
                     proj_eta.project(eta)
                     self.solution_file.write(proj_u, proj_eta)
-                if solve_tracer:
+                if solve_tracer and plot_pvd:
                     proj_tracer.project(self.fwd_solutions_tracer[i])
                     self.tracer_file.write(proj_tracer)
                 export_func()
@@ -642,7 +642,7 @@ class AdaptiveProblem(object):
         prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
         ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint")
 
-    def solve_adjoint_step(self, i, update_forcings=None, export_func=None):
+    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.
 
@@ -662,13 +662,13 @@ class AdaptiveProblem(object):
         export_func()
 
         # We need to project to P1 for vtk outputs
-        if solve_swe:
+        if solve_swe and plot_pvd:
             if i == self.num_meshes-1:
                 self.adjoint_solution_file.__init__(self.adjoint_solution_file.filename)
             proj_z = Function(self.P1_vec[i], name="Projected adjoint velocity")
             proj_zeta = Function(self.P1[i], name="Projected adjoint elevation")
             self.adjoint_solution_file._topology = None
-        if solve_tracer:
+        if solve_tracer and plot_pvd:
             if i == self.num_meshes-1:
                 self.adjoint_tracer_file.__init__(self.adjoint_tracer_file.filename)
             proj_tracer = Function(self.P1[i], name="Projected adjoint tracer")
@@ -685,8 +685,8 @@ class AdaptiveProblem(object):
             raise ValueError(msg.format(self.simulation_time, start_time))
         update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        msg = "{:2d} {:s} ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
-        print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
+        msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
+        print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time >= end_time + t_epsilon:
             if solve_swe:
@@ -698,12 +698,12 @@ class AdaptiveProblem(object):
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
                 print_output(msg.format(self.outer_iteration, ' '*i, i+1, self.num_meshes, self.simulation_time))
-                if solve_swe:
+                if solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
                     proj_zeta.project(zeta)
                     self.adjoint_solution_file.write(proj_z, proj_zeta)
-                if solve_tracer:
+                if solve_tracer and plot_pvd:
                     proj_tracer.project(self.adj_solutions_tracer[i])
                     self.adjoint_tracer_file.write(proj_tracer)
                 export_func()
@@ -1014,7 +1014,7 @@ class AdaptiveProblem(object):
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward(i)
-                self.solve_forward_step(i, export_func=export_func)
+                self.solve_forward_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Solve adjoint on current window
 
@@ -1023,7 +1023,7 @@ class AdaptiveProblem(object):
 
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint(i)
-                self.solve_adjoint_step(i, export_func=export_func)
+                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Assemble indicators and metrics
 
@@ -1173,7 +1173,7 @@ class AdaptiveProblem(object):
 
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint(i)
-                self.solve_adjoint_step(i, export_func=export_func)
+                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Solve adjoint on current window in enriched space
 
@@ -1182,7 +1182,7 @@ class AdaptiveProblem(object):
 
                 ep.transfer_adjoint_solution(i)
                 ep.setup_solver_adjoint(i)
-                ep.solve_adjoint_step(i, export_func=export_func)
+                ep.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Assemble indicators and metrics
 
