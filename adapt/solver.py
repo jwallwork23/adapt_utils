@@ -73,6 +73,7 @@ class AdaptiveProblem(object):
             'use_grad_div_viscosity_term': op.grad_div_viscosity,
             'use_grad_depth_viscosity_term': op.grad_depth_viscosity,
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
+            # 'use_lax_friedrichs_velocity': op.stabilisation == 'lax_friedrichs'  # TODO
             'use_wetting_and_drying': op.wetting_and_drying,
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
             # 'check_volume_conservation_2d': True,
@@ -83,8 +84,6 @@ class AdaptiveProblem(object):
         if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
             self.shallow_water_options['sipg_parameter'] = op.sipg_parameter
         self.tracer_options = AttrDict({  # TODO
-            'solve_tracer': op.solve_tracer,
-            'tracer_only': not op.solve_swe,
             # 'check_tracer_conservation': True,
             # 'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs'  # TODO
             # 'lax_friedrichs_tracer_scaling_factor': op.stabilisation_parameter  # TODO
@@ -104,10 +103,10 @@ class AdaptiveProblem(object):
 
         # Outputs
         self.di = create_directory(self.op.di)
-        if not self.tracer_options.tracer_only:
+        if op.solve_swe:
             self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
             self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
-        if self.tracer_options.solve_tracer:
+        if op.solve_tracer:
             self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
             self.adjoint_tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
         self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
@@ -133,7 +132,7 @@ class AdaptiveProblem(object):
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
         op.print_debug(op.indent + "SETUP: Creating function spaces...")
-        self.set_finite_element()
+        self.set_finite_elements()
         self.create_function_spaces()
         op.print_debug(op.indent + "SETUP: Creating solutions...")
         self.create_solutions()
@@ -154,7 +153,11 @@ class AdaptiveProblem(object):
 
     def set_meshes(self, meshes):
         """
-        Build an class:`AdaptiveMesh` object associated with each mesh.
+        Build a mesh associated with each mesh.
+
+        NOTE: If a single mesh is passed to the constructor then it is symlinked into each slot
+              rather than explicitly copied. This rears its head in :attr:`run_dwr`, where a the
+              enriched meshes are build from a single mesh hierarchy.
         """
         self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
         msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
@@ -163,8 +166,7 @@ class AdaptiveProblem(object):
             mesh.boundary_len = bnd_len
             self.op.print_debug(msg.format(i, mesh.num_cells()))
 
-    # TODO: Tracer
-    def set_finite_element(self):
+    def set_finite_elements(self):
         """
         There are three options for the shallow water mixed finite element pair:
           * Taylor-Hood (continuous Galerkin)   P2-P1      'cg-cg';
@@ -175,28 +177,38 @@ class AdaptiveProblem(object):
           * Continuous Galerkin     Pp    'cg';
           * Discontinuous Galerkin  PpDG  'dg'.
         """
-        p = self.op.degree
-        assert p >= 0
-        family = self.op.family
-        if family == 'cg-cg':
-            assert p == 1
-            u_element = VectorElement("Lagrange", triangle, p+1)
-            eta_element = FiniteElement("Lagrange", triangle, p, variant='equispaced')
-        elif family == 'dg-dg':
-            u_element = VectorElement("DG", triangle, p)
-            eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
-        elif family == 'dg-cg':
-            assert p == 1
-            u_element = VectorElement("DG", triangle, p)
-            eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
-        else:
-            raise NotImplementedError("Cannot build element {:s} of order {:d}".format(family, p))
-        self.finite_element = u_element*eta_element
+        if self.op.solve_swe:
+            p = self.op.degree
+            family = self.op.family
+            if family == 'cg-cg':
+                assert p == 1
+                u_element = VectorElement("Lagrange", triangle, p+1)
+                eta_element = FiniteElement("Lagrange", triangle, p, variant='equispaced')
+            elif family == 'dg-dg':
+                u_element = VectorElement("DG", triangle, p)
+                eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
+            elif family == 'dg-cg':
+                assert p == 1
+                u_element = VectorElement("DG", triangle, p)
+                eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
+            else:
+                raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
+            self.finite_element = u_element*eta_element
 
-    def create_function_spaces(self):  # NOTE: Keep minimal
+        if self.op.solve_tracer:
+            p = self.op.degree_tracer
+            family = self.op.tracer_family
+            if family == 'cg':
+                self.finite_element_tracer = FiniteElement("Lagrange", triangle, p)
+            elif family == 'dg':
+                self.finite_element_tracer = FiniteElement("DG", triangle, p)
+            else:
+                raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
+
+    def create_function_spaces(self):
         """
-        Build the finite element space, `V`, for the prognostic solution, along with various other
-        useful spaces and test functions and trial functions based upon them.
+        Build finite element spaces `V` and `Q`, for the prognostic solutions of the shallow water
+        and tracer models, along with various other useful spaces.
         """
         self.P0 = [FunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
         self.P1 = [FunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
@@ -204,56 +216,39 @@ class AdaptiveProblem(object):
         self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
         self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
         # self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
-        # self.P2 = [FunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
-        # self.P2_vec = [VectorFunctionSpace(mesh, "CG", 2) for mesh in self.meshes]
 
         # Shallow water space
-        self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
+        if self.op.solve_swe:
+            self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
 
         # Tracer space
-        self.Q = self.P1DG
+        if self.op.solve_tracer:
+            self.Q = [FunctionSpace(mesh, self.finite_element_tracer) for mesh in self.meshes]
 
-    # TODO: solutions_old no longer needed - get it from timestepper
     def create_solutions(self):
         """
-        Set up `Function`s in the prognostic space to hold the forward and adjoint solutions.
+        Set up `Function`s in the prognostic spaces to hold forward and adjoint solutions.
         """
-        if self.tracer_options.tracer_only:
-            self.fwd_solutions = None
-            self.adj_solutions = None
-            self.fwd_solutions_old = None
-            self.adj_solutions_old = None
-        else:
-            self.fwd_solutions = []
-            self.adj_solutions = []
-            for V in self.V:
-                fwd = Function(V, name='Forward solution')
-                u, eta = fwd.split()
+        self.fwd_solutions = [None for mesh in self.meshes]
+        self.adj_solutions = [None for mesh in self.meshes]
+        self.fwd_solutions_tracer = [None for mesh in self.meshes]
+        self.adj_solutions_tracer = [None for mesh in self.meshes]
+        if self.op.solve_swe:
+            for i, V in enumerate(self.V):
+                self.fwd_solutions[i] = Function(V, name='Forward solution')
+                u, eta = self.fwd_solutions[i].split()
                 u.rename("Fluid velocity")
                 eta.rename("Elevation")
-                self.fwd_solutions.append(fwd)
-
-                adj = Function(V, name='Adjoint solution')
-                z, zeta = adj.split()
+                self.adj_solutions[i] = Function(V, name='Adjoint solution')
+                z, zeta = self.adj_solutions[i].split()
                 z.rename("Adjoint fluid velocity")
                 zeta.rename("Adjoint elevation")
-                self.adj_solutions.append(adj)
-            self.fwd_solutions_old = [fwd.copy(deepcopy=True) for fwd in self.fwd_solutions]
-            self.adj_solutions_old = [adj.copy(deepcopy=True) for adj in self.adj_solutions]
-
-        if self.tracer_options.solve_tracer:
+        if self.op.solve_tracer:
             self.fwd_tracer_solutions = [Function(Q, name="Forward tracer solution") for Q in self.Q]
             self.adj_tracer_solutions = [Function(Q, name="Adjoint tracer solution") for Q in self.Q]
-            self.fwd_tracer_solutions_old = [fwd.copy(deepcopy=True) for fwd in self.fwd_tracer_solutions]
-            self.adj_tracer_solutions_old = [adj.copy(deepcopy=True) for adj in self.adj_tracer_solutions]
-        else:
-            self.fwd_tracer_solutions = None
-            self.adj_tracer_solutions = None
-            self.fwd_tracer_solutions_old = None
-            self.adj_tracer_solutions_old = None
 
     def set_fields(self):
-        """Set velocity field, viscosity, etc (on each mesh)."""
+        """Set velocity field, viscosity, etc *on each mesh*."""
         self.fields = [AttrDict() for P1 in self.P1]
         for i, P1 in enumerate(self.P1):
             self.fields[i].update({
@@ -281,10 +276,10 @@ class AdaptiveProblem(object):
         elif self.stabilisation == 'lax_friedrichs':
             raise NotImplementedError  # TODO
         elif self.stabilisation == 'su':
-            assert self.tracer_options.tracer_only
+            assert self.op.solve_tracer and not self.op.solve_swe
             raise NotImplementedError  # TODO
         elif self.stabilisation == 'supg':
-            assert self.tracer_options.tracer_only
+            assert self.op.solve_tracer and not self.op.solve_swe
             raise NotImplementedError  # TODO
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
@@ -298,7 +293,7 @@ class AdaptiveProblem(object):
         # if hasattr(self.shallow_water_options, 'sipg_parameter'):
         #     sipg = self.shallow_water_options.sipg_parameter
         # symmetrisation_parameters = [sipg for mesh in self.meshes]
-        # if self.tracer_options.solve_tracer:
+        # if self.op.solve_tracer:
         #     sipg = Constant(10.0)
         #     if hasattr(self.tracer_options, 'sipg_parameter'):
         #         sipg = self.tracer_options.sipg_parameter
@@ -309,7 +304,7 @@ class AdaptiveProblem(object):
         #         cot_theta = 1.0/tan(theta)
 
         #         # Penalty parameter for shallow water
-        #         if not self.tracer_options.tracer_only:
+        #         if self.op.solve_swe:
         #             self.shallow_water_options.use_lax_friedrichs_velocity = True
         #             nu = self.fields[i].horizontal_viscosity
         #             if nu is not None:
@@ -319,7 +314,7 @@ class AdaptiveProblem(object):
         #                 symmetrisation_parameters[i] = interpolate(alpha, self.P0[i])
 
         #         # Penalty parameter for tracer
-        #         if self.tracer_options.solve_tracer:
+        #         if self.op.solve_tracer:
         #             nu = self.fields[i].horizontal_diffusivity
         #             if nu is not None:
         #                 p = self.Q[i].ufl_element().degree()
@@ -328,6 +323,7 @@ class AdaptiveProblem(object):
         #                 symmetrisation_parameters_tracer[i] = interpolate(alpha, self.P0[i])
 
     def set_boundary_conditions(self):
+        """Set boundary conditions *for both shallow water and tracer models*"""
         self.boundary_conditions = [self.op.set_boundary_conditions(V) for V in self.V]
 
     def set_initial_condition(self):
@@ -347,15 +343,15 @@ class AdaptiveProblem(object):
             self.create_forward_equations(i)
 
     def create_forward_equations(self, i):
-        if not self.tracer_options.tracer_only:
+        if self.op.solve_swe:
             self._create_forward_shallow_water_equations(i)
-        if self.tracer_options.solve_tracer:
+        if self.op.solve_tracer:
             self._create_forward_tracer_equation(i)
 
     def create_adjoint_equations(self, i):
-        if not self.tracer_options.tracer_only:
+        if self.op.solve_swe:
             self._create_adjoint_shallow_water_equations(i)
-        if self.tracer_options.solve_tracer:
+        if self.op.solve_tracer:
             self._create_adjoint_tracer_equation(i)
 
     def _create_forward_shallow_water_equations(self, i):
@@ -383,9 +379,9 @@ class AdaptiveProblem(object):
     # --- Error estimators
 
     def create_error_estimator(self, i):
-        if not self.tracer_options.tracer_only:
+        if self.op.solve_swe:
             self._create_forward_shallow_water_error_estimator(i)
-        if self.tracer_options.solve_tracer:
+        if self.op.solve_tracer:
             self._create_forward_tracer_error_estimator(i)
 
     def _create_forward_shallow_water_error_estimator(self, i):
@@ -405,17 +401,17 @@ class AdaptiveProblem(object):
     def create_forward_timestepper(self, i):
         if i == 0:
             self.simulation_time = 0.0
-        if not self.tracer_options.tracer_only:
+        if self.op.solve_swe:
             self._create_forward_shallow_water_timestepper(i, self.integrator)
-        if self.tracer_options.solve_tracer:
+        if self.op.solve_tracer:
             self._create_forward_tracer_timestepper(i, self.integrator)
 
     def create_adjoint_timestepper(self, i):
         if i == self.num_meshes-1:
             self.simulation_time = self.timestepping_options.simulation_end_time
-        if not self.tracer_options.tracer_only:
+        if self.op.solve_swe:
             self._create_adjoint_shallow_water_timestepper(i, self.integrator)
-        if self.tracer_options.solve_tracer:
+        if self.op.solve_tracer:
             self._create_adjoint_tracer_timestepper(i, self.integrator)
 
     def _get_fields_for_shallow_water_timestepper(self, i):
@@ -557,9 +553,9 @@ class AdaptiveProblem(object):
         dbcs = []
         if op.family == 'cg-cg':
             op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
-            bcs = self.boundary_conditions[i]['shallow_water']
-            for j in bcs:
-                if 'value' in bcs[j]:
+            bcs = self.boundary_conditions[i]
+            for j in bcs['shallow_water']:
+                if 'value' in bcs['shallow_water'][j]:
                     bcs.append(DirichletBC(self.V[i].sub(1), bcs[j]['value'], j))
         prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
         ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward")
@@ -576,8 +572,6 @@ class AdaptiveProblem(object):
         """
         op = self.op
         plot_pvd &= op.plot_pvd
-        solve_swe = not self.tracer_options.tracer_only
-        solve_tracer = self.tracer_options.solve_tracer
 
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self)
@@ -588,13 +582,13 @@ class AdaptiveProblem(object):
         self.callbacks[i].evaluate(mode='export')
 
         # We need to project to P1 for vtk outputs
-        if solve_swe and plot_pvd:
+        if op.solve_swe and plot_pvd:
             if i == 0:
                 self.solution_file.__init__(self.solution_file.filename)
             proj_u = Function(self.P1_vec[i], name="Projected velocity")
             proj_eta = Function(self.P1[i], name="Projected elevation")
             self.solution_file._topology = None
-        if solve_tracer and plot_pvd:
+        if op.solve_tracer and plot_pvd:
             if i == 0:
                 self.tracer_file.__init__(self.tracer_file.filename)
             proj_tracer = Function(self.P1[i], name="Projected tracer")
@@ -615,21 +609,21 @@ class AdaptiveProblem(object):
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
-            if solve_swe:
+            if op.solve_swe:
                 ts.shallow_water.advance(self.simulation_time, update_forcings)
-            if solve_tracer:
+            if op.solve_tracer:
                 ts.tracer.advance(self.simulation_time, update_forcings)
             iteration += 1
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
                 print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
-                if solve_swe and plot_pvd:
+                if op.solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
                     proj_u.project(u)
                     proj_eta.project(eta)
                     self.solution_file.write(proj_u, proj_eta)
-                if solve_tracer and plot_pvd:
+                if op.solve_tracer and plot_pvd:
                     proj_tracer.project(self.fwd_solutions_tracer[i])
                     self.tracer_file.write(proj_tracer)
                 export_func()
@@ -649,9 +643,9 @@ class AdaptiveProblem(object):
         dbcs = []
         if op.family == 'cg-cg':
             op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
-            bcs = self.boundary_conditions[i]['shallow_water']
-            for j in bcs:
-                if 'un' not in bcs[j]:
+            bcs = self.boundary_conditions[i]
+            for j in bcs['shallow_water']:
+                if 'un' not in bcs['shallow_water'][j]:
                     bcs.append(DirichletBC(self.V[i].sub(1), 0, j))
         prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
         ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint")
@@ -666,8 +660,6 @@ class AdaptiveProblem(object):
         """
         op = self.op
         plot_pvd &= op.plot_pvd
-        solve_swe = not self.tracer_options.tracer_only
-        solve_tracer = self.tracer_options.solve_tracer
 
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self)
@@ -677,13 +669,13 @@ class AdaptiveProblem(object):
         export_func()
 
         # We need to project to P1 for vtk outputs
-        if solve_swe and plot_pvd:
+        if op.solve_swe and plot_pvd:
             if i == self.num_meshes-1:
                 self.adjoint_solution_file.__init__(self.adjoint_solution_file.filename)
             proj_z = Function(self.P1_vec[i], name="Projected adjoint velocity")
             proj_zeta = Function(self.P1[i], name="Projected adjoint elevation")
             self.adjoint_solution_file._topology = None
-        if solve_tracer and plot_pvd:
+        if op.solve_tracer and plot_pvd:
             if i == self.num_meshes-1:
                 self.adjoint_tracer_file.__init__(self.adjoint_tracer_file.filename)
             proj_tracer = Function(self.P1[i], name="Projected adjoint tracer")
@@ -704,21 +696,21 @@ class AdaptiveProblem(object):
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time >= end_time + t_epsilon:
-            if solve_swe:
+            if op.solve_swe:
                 ts.adjoint_shallow_water.advance(self.simulation_time, update_forcings)
-            if solve_tracer:
+            if op.solve_tracer:
                 ts.adjoint_tracer.advance(self.simulation_time, update_forcings)
             iteration += 1
             self.simulation_time -= op.dt
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
                 print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
-                if solve_swe and plot_pvd:
+                if op.solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
                     proj_zeta.project(zeta)
                     self.adjoint_solution_file.write(proj_z, proj_zeta)
-                if solve_tracer and plot_pvd:
+                if op.solve_tracer and plot_pvd:
                     proj_tracer.project(self.adj_solutions_tracer[i])
                     self.adjoint_tracer_file.write(proj_tracer)
                 export_func()
