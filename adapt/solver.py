@@ -48,7 +48,7 @@ class AdaptiveProblem(object):
         self.approach = op.approach
         self.nonlinear = nonlinear
 
-        # Sub options
+        # Subsets of options
         self.timestepping_options = AttrDict({
             'timestep': op.dt,
             'simulation_export_time': op.dt*op.dt_per_export,
@@ -66,12 +66,6 @@ class AdaptiveProblem(object):
             assert self.dt_per_mesh % op.dt_per_export == 0
         except AssertionError:
             raise ValueError("Timesteps per export should divide timesteps per mesh iteration.")
-        self.io_options = AttrDict({
-            'output_directory': op.di,
-            'fields_to_export': ['uv_2d', 'elev_2d'] if op.plot_pvd else [],  # TODO: Update
-            'fields_to_export_hdf5': ['uv_2d', 'elev_2d'] if op.save_hdf5 else [],  # TODO: Update
-            'no_exports': True,  # TODO: TEMPORARY
-        })
         self.shallow_water_options = AttrDict({
             'use_nonlinear_equations': nonlinear,
             'element_family': op.family,
@@ -91,6 +85,10 @@ class AdaptiveProblem(object):
         self.tracer_options = AttrDict({  # TODO
             'solve_tracer': op.solve_tracer,
             'tracer_only': not op.solve_swe,
+            # 'check_tracer_conservation': True,
+            # 'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs'  # TODO
+            # 'lax_friedrichs_tracer_scaling_factor': op.stabilisation_parameter  # TODO
+            # 'use_limiter_for_tracers': True,  # TODO
         })
         if hasattr(op, 'sipg_parameter_tracer') and op.sipg_parameter_tracer is not None:
             self.tracer_options['sipg_parameter_tracer'] = op.sipg_parameter_tracer
@@ -269,38 +267,7 @@ class AdaptiveProblem(object):
         if self.stabilisation == 'no':
             return
         elif self.stabilisation == 'lax_friedrichs':
-            sipg = Constant(10.0)
-            if hasattr(self.shallow_water_options, 'sipg_parameter'):
-                sipg = self.shallow_water_options.sipg_parameter
-            self.stabilisation_parameters = [sipg for mesh in self.meshes]
-            if self.tracer_options.solve_tracer:
-                sipg = Constant(10.0)
-                if hasattr(self.tracer_options, 'sipg_parameter'):
-                    sipg = self.tracer_options.sipg_parameter
-                self.stabilisation_parameters = [sipg for mesh in self.meshes]
-            if self.shallow_water_options.use_automatic_sipg_parameter:
-                for i, mesh in enumerate(self.meshes):
-                    theta = get_minimum_angles_2d(mesh)
-                    cot_theta = 1.0/tan(theta)
-
-                    # Penalty parameter for shallow water
-                    if not self.tracer_options.tracer_only:
-                        self.shallow_water_options.use_lax_friedrichs_velocity = True
-                        nu = self.fields[i].horizontal_viscosity
-                        if nu is not None:
-                            p = self.V[i].sub(0).ufl_element().degree()
-                            alpha = Contant(5.0*p*(p+1)) if p != 0 else 1.5
-                            alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                            self.stabilisation_parameters[i] = interpolate(alpha, self.P0[i])
-
-                    # Penalty parameter for tracer
-                    if self.tracer_options.solve_tracer:
-                        nu = self.fields[i].horizontal_diffusivity
-                        if nu is not None:
-                            p = self.Q[i].ufl_element().degree()
-                            alpha = Contant(5.0*p*(p+1)) if p != 0 else 1.5
-                            alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                            self.stabilisation_parameters_tracer[i] = interpolate(alpha, self.P0[i])
+            raise NotImplementedError  # TODO
         elif self.stabilisation == 'su':
             assert self.tracer_options.tracer_only
             raise NotImplementedError  # TODO
@@ -313,6 +280,40 @@ class AdaptiveProblem(object):
         self.stabilisation_parameters = []
         for i in range(self.num_meshes):
             self.stabilisation_parameters.append(self.op.stabilisation_parameter)
+
+        # FIXME: Hookup
+        # sipg = Constant(10.0)
+        # if hasattr(self.shallow_water_options, 'sipg_parameter'):
+        #     sipg = self.shallow_water_options.sipg_parameter
+        # symmetrisation_parameters = [sipg for mesh in self.meshes]
+        # if self.tracer_options.solve_tracer:
+        #     sipg = Constant(10.0)
+        #     if hasattr(self.tracer_options, 'sipg_parameter'):
+        #         sipg = self.tracer_options.sipg_parameter
+        #     symmetrisation_parameters = [sipg for mesh in self.meshes]
+        # if self.shallow_water_options.use_automatic_sipg_parameter:
+        #     for i, mesh in enumerate(self.meshes):
+        #         theta = get_minimum_angles_2d(mesh)
+        #         cot_theta = 1.0/tan(theta)
+
+        #         # Penalty parameter for shallow water
+        #         if not self.tracer_options.tracer_only:
+        #             self.shallow_water_options.use_lax_friedrichs_velocity = True
+        #             nu = self.fields[i].horizontal_viscosity
+        #             if nu is not None:
+        #                 p = self.V[i].sub(0).ufl_element().degree()
+        #                 alpha = Contant(5.0*p*(p+1)) if p != 0 else 1.5
+        #                 alpha = alpha*get_sipg_ratio(nu)*cot_theta
+        #                 symmetrisation_parameters[i] = interpolate(alpha, self.P0[i])
+
+        #         # Penalty parameter for tracer
+        #         if self.tracer_options.solve_tracer:
+        #             nu = self.fields[i].horizontal_diffusivity
+        #             if nu is not None:
+        #                 p = self.Q[i].ufl_element().degree()
+        #                 alpha = Contant(5.0*p*(p+1)) if p != 0 else 1.5
+        #                 alpha = alpha*get_sipg_ratio(nu)*cot_theta
+        #                 symmetrisation_parameters_tracer[i] = interpolate(alpha, self.P0[i])
 
     def set_boundary_conditions(self):
         self.boundary_conditions = [self.op.set_boundary_conditions(V) for V in self.V]
@@ -411,7 +412,7 @@ class AdaptiveProblem(object):
             'quadratic_drag_coefficient': self.fields[i].quadratic_drag_coefficient,
             'manning_drag_coefficient': self.fields[i].manning_drag_coefficient,
             'viscosity_h': self.fields[i].horizontal_viscosity,
-            'lax_friedrichs_velocity_scaling_factor': self.stabilisation_parameters[i],
+            # 'lax_friedrichs_velocity_scaling_factor': self.stabilisation_parameters[i],  # TODO
             'coriolis': self.fields[i].coriolis_frequency,
             'wind_stress': None,
             'atmospheric_pressure': None,
@@ -562,6 +563,7 @@ class AdaptiveProblem(object):
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
         """
         op = self.op
+        plot_pvd &= op.plot_pvd
         solve_swe = not self.tracer_options.tracer_only
         solve_tracer = self.tracer_options.solve_tracer
 
@@ -651,6 +653,7 @@ class AdaptiveProblem(object):
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
         """
         op = self.op
+        plot_pvd &= op.plot_pvd
         solve_swe = not self.tracer_options.tracer_only
         solve_tracer = self.tracer_options.solve_tracer
 
