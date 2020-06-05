@@ -47,7 +47,8 @@ class Options(FrozenConfigurable):
     end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
     num_meshes = PositiveInteger(1, help="Number of meshes in :class:`AdaptiveProblem` solver").tag(config=True)
     dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
-    use_automatic_timestep = Bool(False).tag(config=True)
+    use_semi_implicit_linearisation = Bool(False).tag(config=True)  # TODO: doc
+    implicitness_theta = NonNegativeFloat(0.5).tag(config=True)  # TODO: doc
 
     # Boundary conditions
     boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)
