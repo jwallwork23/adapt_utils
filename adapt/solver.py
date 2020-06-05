@@ -14,7 +14,7 @@ from adapt_utils.swe.utils import *
 __all__ = ["AdaptiveProblem"]
 
 
-class AdaptiveProblem():
+class AdaptiveProblem(object):
     """
     Solver object for adaptive mesh simulations with a number of meshes which is known a priori.
     In the steady state case, the number of meshes is clearly known to be one. In the unsteady
@@ -116,6 +116,10 @@ class AdaptiveProblem():
         self.st_complexities = [np.nan]
 
     def setup_all(self, meshes):
+        """
+        Setup everything which isn't explicitly associated with either the forward or adjoint
+        problem.
+        """
         op = self.op
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
@@ -312,13 +316,25 @@ class AdaptiveProblem():
 
     # --- Equations
 
-    def create_equations(self, i):
-        if not self.tracer_options.tracer_only:
-            self._create_shallow_water_equations(i)
-        if self.tracer_options.solve_tracer:
-            self._create_tracer_equation(i)
+    def create_equations(self, i, adjoint=False):
+        if adjoint:
+            self.create_adjoint_equations(i)
+        else:
+            self.create_forward_equations(i)
 
-    def _create_shallow_water_equations(self, i):
+    def create_forward_equations(self, i):
+        if not self.tracer_options.tracer_only:
+            self._create_forward_shallow_water_equations(i)
+        if self.tracer_options.solve_tracer:
+            self._create_forward_tracer_equation(i)
+
+    def create_adjoint_equations(self, i):
+        if not self.tracer_options.tracer_only:
+            self._create_adjoint_shallow_water_equations(i)
+        if self.tracer_options.solve_tracer:
+            self._create_adjoint_tracer_equation(i)
+
+    def _create_forward_shallow_water_equations(self, i):
         self.equations[i].shallow_water = ShallowWaterEquations(
             self.V[i],
             self.depth[i],
@@ -326,34 +342,59 @@ class AdaptiveProblem():
         )
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
-    def _create_tracer_equation(self, i):
+    def _create_adjoint_shallow_water_equations(self, i):
+        self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
+            self.V[i],
+            self.depth[i],
+            self.shallow_water_options,
+        )
+        self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
+
+    def _create_forward_tracer_equation(self, i):
+        raise NotImplementedError  # TODO
+
+    def _create_adjoint_tracer_equation(self, i):
         raise NotImplementedError  # TODO
 
     # --- Error estimators
 
     def create_error_estimator(self, i):
         if not self.tracer_options.tracer_only:
-            self._create_shallow_water_error_estimator(i)
+            self._create_forward_shallow_water_error_estimator(i)
         if self.tracer_options.solve_tracer:
-            self._create_tracer_error_estimator(i)
+            self._create_forward_tracer_error_estimator(i)
 
-    def _create_shallow_water_error_estimator(self, i):
+    def _create_forward_shallow_water_error_estimator(self, i):
         raise NotImplementedError  # TODO
 
-    def _create_tracer_error_estimator(self, i):
+    def _create_forward_tracer_error_estimator(self, i):
         raise NotImplementedError  # TODO
 
     # --- Timestepping
 
-    def create_timestepper(self, i):
+    def create_timestepper(self, i, adjoint=False):
+        if adjoint:
+            self.create_adjoint_timestepper(i)
+        else:
+            self.create_forward_timestepper(i)
+
+    def create_forward_timestepper(self, i):
         if i == 0:
             self.simulation_time = 0.0
         if not self.tracer_options.tracer_only:
-            self._create_shallow_water_timestepper(i, self.integrator)
+            self._create_forward_shallow_water_timestepper(i, self.integrator)
         if self.tracer_options.solve_tracer:
-            self._create_tracer_timestepper(i, self.integrator)
+            self._create_forward_tracer_timestepper(i, self.integrator)
 
-    def _create_shallow_water_timestepper(self, i, integrator):
+    def create_adjoint_timestepper(self, i):
+        if i == self.num_meshes-1:
+            self.simulation_time = self.timestepping_options.simulation_end_time
+        if not self.tracer_options.tracer_only:
+            self._create_adjoint_shallow_water_timestepper(i, self.integrator)
+        if self.tracer_options.solve_tracer:
+            self._create_adjoint_tracer_timestepper(i, self.integrator)
+
+    def _get_fields_for_shallow_water_timestepper(self, i):
         fields = {
             'linear_drag_coefficient': None,
             'quadratic_drag_coefficient': self.fields[i].quadratic_drag_coefficient,
@@ -366,6 +407,13 @@ class AdaptiveProblem():
             'momentum_source': None,
             'volume_source': None,
         }
+        return fields
+
+    def _get_fields_for_tracer_timestepper(self, i):
+        raise NotImplementedError  # TODO
+
+    def _create_forward_shallow_water_timestepper(self, i, integrator):
+        fields = self._get_fields_for_shallow_water_timestepper(i)
         dt = self.timestepping_options.timestep
         args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, dt, )
         kwargs = {
@@ -380,7 +428,26 @@ class AdaptiveProblem():
         self.timesteppers[i].shallow_water = integrator(*args, **kwargs)
         # self.lhs = self.timesteppers[i].shallow_water.F
 
-    def _create_tracer_timestepper(self, i, integrator):
+    def _create_adjoint_shallow_water_timestepper(self, i, integrator):
+        fields = self._get_fields_for_shallow_water_timestepper(i)
+        dt = self.timestepping_options.timestep
+        args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, dt, )
+        kwargs = {
+            'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
+            # 'error_estimator': self.error_estimators[i]['shallow_water'],  # TODO
+            'solver_parameters': self.op.adjoint_params,  # TODO: Split into SW and tracer
+        }
+        if hasattr(self.timestepping_options, 'use_semi_implicit_linearization'):
+            kwargs['semi_implicit'] = self.timestepping_options.use_semi_implicit_linearization
+        if hasattr(self.timestepping_options, 'implicitness_theta'):
+            kwargs['theta'] = self.timestepping_options.implicitness_theta
+        self.timesteppers[i].adjoint_shallow_water = integrator(*args, **kwargs)
+        # self.lhs = self.timesteppers[i].shallow_water.F
+
+    def _create_forward_tracer_timestepper(self, i, integrator):
+        raise NotImplementedError  # TODO
+
+    def _create_adjoint_tracer_timestepper(self, i, integrator):
         raise NotImplementedError  # TODO
 
     # --- Callbacks
@@ -449,9 +516,9 @@ class AdaptiveProblem():
     def setup_solver_forward(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
-        op.print_debug(op.indent + "SETUP: Creating equations on mesh {:d}...".format(i))
-        self.create_equations(i)
-        op.print_debug(op.indent + "SETUP: Creating timesteppers on mesh {:d}...".format(i))
+        op.print_debug(op.indent + "SETUP: Creating forward equations on mesh {:d}...".format(i))
+        self.create_forward_equations(i)
+        op.print_debug(op.indent + "SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
         self.create_timestepper(i)
         ts = self.timesteppers[i]['shallow_water']
         if op.family == 'taylor-hood':
@@ -482,9 +549,9 @@ class AdaptiveProblem():
         update_forcings = update_forcings or self.op.get_update_forcings(self.fwd_solvers[i])
         export_func = export_func or self.op.get_export_func(self.fwd_solvers[i])
         if i == 0:
+            print_output(80*'=')
             export_func()
             self.callbacks[i].evaluate(mode='export')
-            self.callbacks[i].evaluate(mode='timestep')
 
         # We need to project to P1 for vtk outputs
         if solve_swe:
@@ -506,7 +573,8 @@ class AdaptiveProblem():
             raise ValueError(msg.format(self.simulation_time, start_time))
         update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        print_output("t = {:.2f}".format(self.simulation_time))  # TODO: Formatting
+        msg = "mesh {:2d}  time {:8.2f}"
+        print_output(msg.format(i, self.simulation_time))
         while self.simulation_time <= end_time - t_epsilon:
             if solve_swe:
                 self.timesteppers[i]['shallow_water'].advance(self.simulation_time, update_forcings)
@@ -516,7 +584,7 @@ class AdaptiveProblem():
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')
             if iteration % op.dt_per_export == 0:
-                print_output("t = {:.2f}".format(self.simulation_time))  # TODO: Formatting
+                print_output(msg.format(i, self.simulation_time))
                 if solve_swe:
                     u, eta = self.fwd_solutions[i].split()
                     proj_u.project(u)
@@ -528,11 +596,27 @@ class AdaptiveProblem():
                 export_func()
                 self.callbacks[i].evaluate(mode='export')
         op.print_debug("Done!")
+        print_output(80*'=')
 
-    def setup_solver_adjoint(self, i, **kwargs):
-        """Setup adjoint solver on mesh `i`."""
-        raise NotImplementedError("Should be implemented in derived class.")
+    def setup_solver_adjoint(self, i):
+        """Setup forward solver on mesh `i`."""
+        op = self.op
+        op.print_debug(op.indent + "SETUP: Creating adjoint equations on mesh {:d}...".format(i))
+        self.create_adjoint_equations(i)
+        op.print_debug(op.indent + "SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
+        self.create_adjoint_timestepper(i)
+        ts = self.timesteppers[i]['adjoint_shallow_water']
+        if op.family == 'taylor-hood':
+            dbcs = []
+            op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
+            bcs = self.boundary_conditions[i]
+            for j in bcs:
+                if 'un' not in bcs[j]:
+                    bcs.append(DirichletBC(self.V[i].sub(1), 0, j))
+            prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
+            ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix=ts.name)
 
+    # TODO
     def solve_adjoint_step(self, i, **kwargs):
         """Solve adjoint PDE on mesh `i`."""
         raise NotImplementedError("Should be implemented in derived class.")
@@ -778,28 +862,6 @@ class AdaptiveProblem():
                 print_output("Converged number of mesh elements!")
                 break
 
-    def get_checkpoints(self):
-        """
-        Run the forward model for the entire time period in order to get checkpoints.
-
-        For mesh 0, the checkpoint is just the initial condition. For all other meshes, it is
-        the final solution tuple on the previous mesh (which will need to be interpolated).
-        """
-        self.solution_file.__init__(self.solution_file.filename)
-        for i in range(self.num_meshes):
-            self.solution_file._topology = None
-            proj = Function(self.P1[i], name="Projected elevation")
-
-            def export_func():
-                if self.op.family != 'taylor-hood':
-                    proj.project(self.fwd_solvers[i].fields.elev_2d)
-                    self.solution_file.write(proj)
-
-            self.transfer_forward_solution(i)
-            self.setup_solver_forward(i)
-            self.fwd_solvers[i].export_initial_state = i == 0
-            self.solve_forward_step(i, export_func=export_func)
-
     def run_dwp(self, **kwargs):
         r"""
         The "dual weighted primal" approach, first used (not under this name) in [1]. For shallow
@@ -829,7 +891,8 @@ class AdaptiveProblem():
 
             # --- Solve forward to get checkpoints
 
-            self.get_checkpoints()
+            # self.get_checkpoints()
+            self.solve_forward()
 
             # --- Convergence criteria
 
@@ -860,6 +923,7 @@ class AdaptiveProblem():
                 def export_func():
                     fwd_solutions_step.append(self.fwd_solutions[i].copy(deepcopy=True))
 
+                self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward(i)
                 self.solve_forward_step(i, export_func=export_func)
@@ -948,7 +1012,8 @@ class AdaptiveProblem():
 
             # --- Solve forward to get checkpoints
 
-            self.get_checkpoints()
+            # self.get_checkpoints()
+            self.solve_forward()
 
             # --- Convergence criteria
 
