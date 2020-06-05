@@ -15,11 +15,7 @@ from adapt_utils.swe.utils import *
 __all__ = ["AdaptiveProblem"]
 
 
-# TODO: Tracer model
-# TODO: Mesh movement
-# TODO: Steady state
-# TODO: Discrete adjoint
-class AdaptiveProblem(object):
+class AdaptiveProblemBase(object):
     """
     Solver object for adaptive mesh simulations with a number of meshes which is known a priori.
     In the steady state case, the number of meshes is clearly known to be one. In the unsteady
@@ -35,9 +31,6 @@ class AdaptiveProblem(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-
-    # --- Setup
-
     def __init__(self, op, meshes=None, discrete_adjoint=True, nonlinear=True):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
@@ -60,51 +53,17 @@ class AdaptiveProblem(object):
             assert self.dt_per_mesh % op.dt_per_export == 0
         except AssertionError:
             raise ValueError("Timesteps per export should divide timesteps per mesh iteration.")
-
-        # Subsets of options
-        self.shallow_water_options = AttrDict({
-            'use_nonlinear_equations': nonlinear,
-            'element_family': op.family,
-            'polynomial_degree': op.degree,
-            'use_grad_div_viscosity_term': op.grad_div_viscosity,
-            'use_grad_depth_viscosity_term': op.grad_depth_viscosity,
-            'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
-            # 'use_lax_friedrichs_velocity': op.stabilisation == 'lax_friedrichs'  # TODO
-            'use_wetting_and_drying': op.wetting_and_drying,
-            'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
-            # 'check_volume_conservation_2d': True,
-            'tidal_turbine_farms': {},
-        })
-        if nonlinear:
-            op.params['snes_type'] = 'ksponly'
-        if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
-            self.shallow_water_options['sipg_parameter'] = op.sipg_parameter
-        self.tracer_options = AttrDict({  # TODO
-            # 'check_tracer_conservation': True,
-            # 'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs'  # TODO
-            # 'lax_friedrichs_tracer_scaling_factor': op.stabilisation_parameter  # TODO
-            # 'use_limiter_for_tracers': True,  # TODO
-        })
-        if hasattr(op, 'sipg_parameter_tracer') and op.sipg_parameter_tracer is not None:
-            self.tracer_options['sipg_parameter_tracer'] = op.sipg_parameter_tracer
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
         self.setup_all(meshes)
-        implemented_steppers = {  # TODO: Other cases
+        implemented_steppers = {  # TODO: Other timesteppers
             'CrankNicolson': thetis.timeintegrator.CrankNicolson,
         }
-        assert self.op.dtper_type in implemented_steppers
-        self.integrator = implemented_steppers[self.op.dtper_type]
+        assert op.timestepper in implemented_steppers
+        self.integrator = implemented_steppers[self.op.timestepper]
 
         # Outputs
-        self.di = create_directory(self.op.di)
-        if op.solve_swe:
-            self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
-            self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
-        if op.solve_tracer:
-            self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
-            self.adjoint_tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
         self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         self.kernel_file = File(os.path.join(self.di, 'kernel.pvd'))
@@ -140,11 +99,12 @@ class AdaptiveProblem(object):
         self.set_boundary_conditions()
         op.print_debug(op.indent + "SETUP: Creating CallbackManagers...")
         self.callbacks = [CallbackManager() for mesh in self.meshes]
+        op.print_debug(op.indent + "SETUP: Creating output files...")
+        self.di = create_directory(op.di)
+        self.create_outfiles()
         self.equations = [AttrDict() for mesh in self.meshes]
         self.error_estimators = [AttrDict() for mesh in self.meshes]
         self.timesteppers = [AttrDict() for mesh in self.meshes]
-        self.fwd_solvers = [None for mesh in self.meshes]
-        self.adj_solvers = [None for mesh in self.meshes]
         self.kernels = [None for mesh in self.meshes]
 
     def set_meshes(self, meshes):
@@ -161,6 +121,221 @@ class AdaptiveProblem(object):
             bnd_len = compute_boundary_length(mesh)
             mesh.boundary_len = bnd_len
             self.op.print_debug(msg.format(i, mesh.num_cells()))
+
+    def set_finite_elements(self):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_function_spaces(self):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_solutions(self):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def set_fields(self):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def set_stabilisation(self):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def set_boundary_conditions(self):
+        """Set boundary conditions *for all models*"""
+        self.boundary_conditions = [self.op.set_boundary_conditions(V) for V in self.V]
+
+    def create_outfiles(self):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def set_initial_condition(self):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def set_final_condition(self):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_equations(self, i, adjoint=False):
+        if adjoint:
+            self.create_adjoint_equations(i)
+        else:
+            self.create_forward_equations(i)
+
+    def create_forward_equations(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_adjoint_equations(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_error_estimator(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_timestepper(self, i, adjoint=False):
+        if adjoint:
+            self.create_adjoint_timestepper(i)
+        else:
+            self.create_forward_timestepper(i)
+
+    def create_forward_timestepper(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_adjoint_timestepper(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def add_callbacks(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def project(self, f, i, j):
+        """Project field `f` from mesh `i` onto mesh `j`."""
+        if f[i] is None or isinstance(f[i], Constant):
+            return
+        elif f[i].function_space() == f[j].function_space():
+            f[j].assign(f[i])
+        else:
+            for fik, fjk in zip(f[i].split(), f[j].split()):
+                fjk.project(fik)
+
+    # TODO: What about tracers?
+    def project_forward_solution(self, i, j):
+        """Project forward solution from mesh `i` to mesh `j`."""
+        self.project(self.fwd_solutions, i, j)
+
+    # TODO: What about tracers?
+    def project_adjoint_solution(self, i, j):
+        """Project adjoint solution from mesh `i` to mesh `j`."""
+        self.project(self.adj_solutions, i, j)
+
+    def transfer_solution(self, i, adjoint=False):
+        if adjoint:
+            self.transfer_adjoint_solution()
+        else:
+            self.transfer_forward_solution()
+
+    def transfer_forward_solution(self, i):
+        if i == 0:
+            self.set_initial_condition()
+        else:
+            self.project_forward_solution(i-1, i)
+
+    def transfer_adjoint_solution(self, i):
+        if i == self.num_meshes - 1:
+            self.set_final_condition()
+        else:
+            self.project_adjoint_solution(i+1, i)
+
+    def store_plexes(self, di=None):
+        """Save meshes to disk using DMPlex format."""
+        di = di or os.path.join(self.di, self.approach)
+        fname = os.path.join(di, 'plex_{:d}.h5')
+        for i, mesh in enumerate(self.meshes):
+            assert os.path.isdir(di)
+            viewer = PETSc.Viewer().createHDF5(fname.format(i), 'w')
+            viewer(mesh._plex)
+
+    def load_plexes(self, fname):
+        """Load meshes in DMPlex format."""
+        for i in range(self.num_meshes):
+            newplex = PETSc.DMPlex().create()
+            newplex.createFromFile('_'.join([fname, '{:d}.h5'.format(i)]))
+            self.meshes[i] = Mesh(newplex)
+
+    def solve(self, adjoint=False, **kwargs):
+        """
+        Solve the forward or adjoint problem (as specified by the `adjoint` boolean kwarg) on the
+        full sequence of meshes.
+
+        NOTE: The implementation contains a very simple checkpointing scheme, in the sense that
+            the final solution computed on mesh `i` is stored in `self.fwd_solvers[i]` or
+            `self.adj_solutions[i]`, as appropriate.
+        """
+        if adjoint:
+            self.solve_adjoint(**kwargs)
+        else:
+            self.solve_forward(**kwargs)
+
+    def solve_forward(self, reverse=False, **kwargs):
+        """Solve forward problem on the full sequence of meshes."""
+        R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
+        for i in R:
+            self.transfer_forward_solution(i)
+            self.setup_solver_forward(i)
+            self.solve_forward_step(i, **kwargs)
+
+    def solve_adjoint(self, reverse=True, **kwargs):
+        """Solve adjoint problem on the full sequence of meshes."""
+        R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
+        for i in R:
+            self.transfer_adjoint_solution(i)
+            self.setup_solver_adjoint(i)
+            self.solve_adjoint_step(i, **kwargs)
+
+    def quantity_of_interest(self):
+        """Functional of interest which takes the PDE solution as input."""
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def run(self, **kwargs):
+        """
+        Run simulation using mesh adaptation approach specified by `self.approach`.
+
+        For metric-based approaches, a fixed point iteration loop is used.
+        """
+        run_scripts = {
+
+            # Non-adaptive
+            'fixed_mesh': self.solve_forward,
+
+            # Metric-based, no adjoint
+            'hessian': self.run_hessian_based,
+
+            # Metric-based with adjoint
+            'dwp': self.run_dwp,
+            'dwr': self.run_dwr,
+        }
+        try:
+            run_scripts[self.approach](**kwargs)
+        except KeyError:
+            raise ValueError("Approach '{:s}' not recognised".format(self.approach))
+
+
+# TODO: Tracer model
+# TODO: Mesh movement
+# TODO: Steady state
+# TODO: Discrete adjoint
+class AdaptiveProblem(AdaptiveProblemBase):
+    """Default model: 2D coupled shallow water + tracer transport."""
+    # TODO: equations and supported terms
+    def __init__(self, op, nonlinear=True, **kwargs):
+
+        # Problem-specific options
+        self.shallow_water_options = AttrDict({
+            'use_nonlinear_equations': nonlinear,
+            'element_family': op.family,
+            'polynomial_degree': op.degree,
+            'use_grad_div_viscosity_term': op.grad_div_viscosity,
+            'use_grad_depth_viscosity_term': op.grad_depth_viscosity,
+            'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
+            # 'use_lax_friedrichs_velocity': op.stabilisation == 'lax_friedrichs'  # TODO
+            'use_wetting_and_drying': op.wetting_and_drying,
+            'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
+            # 'check_volume_conservation_2d': True,
+            'tidal_turbine_farms': {},
+        })
+        if nonlinear:
+            op.params['snes_type'] = 'ksponly'
+        if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
+            self.shallow_water_options['sipg_parameter'] = op.sipg_parameter
+        self.tracer_options = AttrDict({  # TODO
+            # 'check_tracer_conservation': True,
+            # 'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs'  # TODO
+            # 'lax_friedrichs_tracer_scaling_factor': op.stabilisation_parameter  # TODO
+            # 'use_limiter_for_tracers': True,  # TODO
+        })
+        if hasattr(op, 'sipg_parameter_tracer') and op.sipg_parameter_tracer is not None:
+            self.tracer_options['sipg_parameter_tracer'] = op.sipg_parameter_tracer
+        super(AdaptiveProblem, self).__init__(op, nonlinear=nonlinear, **kwargs)
+
+    def create_outfiles(self):
+        if self.op.solve_swe:
+            self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
+            self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
+        if self.op.solve_tracer:
+            self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
+            self.adjoint_tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
 
     def set_finite_elements(self):
         """
@@ -315,10 +490,6 @@ class AdaptiveProblem(object):
         #                 alpha = alpha*get_sipg_ratio(nu)*cot_theta
         #                 symmetrisation_parameters_tracer[i] = interpolate(alpha, self.P0[i])
 
-    def set_boundary_conditions(self):
-        """Set boundary conditions *for both shallow water and tracer models*"""
-        self.boundary_conditions = [self.op.set_boundary_conditions(V) for V in self.V]
-
     def set_initial_condition(self):
         """Apply initial condition for forward solution on first mesh."""
         self.fwd_solutions[0].assign(self.op.set_initial_condition(self.V[0]))
@@ -328,12 +499,6 @@ class AdaptiveProblem(object):
         self.adj_solutions[-1].assign(self.op.set_final_condition(self.V[-1]))
 
     # --- Equations
-
-    def create_equations(self, i, adjoint=False):
-        if adjoint:
-            self.create_adjoint_equations(i)
-        else:
-            self.create_forward_equations(i)
 
     def create_forward_equations(self, i):
         if self.op.solve_swe:
@@ -384,12 +549,6 @@ class AdaptiveProblem(object):
         raise NotImplementedError  # TODO
 
     # --- Timestepping
-
-    def create_timestepper(self, i, adjoint=False):
-        if adjoint:
-            self.create_adjoint_timestepper(i)
-        else:
-            self.create_forward_timestepper(i)
 
     def create_forward_timestepper(self, i):
         if i == 0:
@@ -513,65 +672,6 @@ class AdaptiveProblem(object):
         self.timesteppers[i].adjoint_tracer = integrator(*args, **kwargs)
         raise NotImplementedError  # TODO
 
-    # --- Callbacks
-
-    def add_callbacks(self, i):
-        raise NotImplementedError("Implement in derived class")
-
-    # --- Helper functions
-
-    def project(self, f, i, j):
-        """Project field `f` from mesh `i` onto mesh `j`."""
-        if f[i] is None or isinstance(f[i], Constant):
-            return
-        elif f[i].function_space() == f[j].function_space():
-            f[j].assign(f[i])
-        else:
-            for fik, fjk in zip(f[i].split(), f[j].split()):
-                fjk.project(fik)
-
-    def project_forward_solution(self, i, j):
-        """Project forward solution from mesh `i` to mesh `j`."""
-        self.project(self.fwd_solutions, i, j)
-
-    def project_adjoint_solution(self, i, j):
-        """Project adjoint solution from mesh `i` to mesh `j`."""
-        self.project(self.adj_solutions, i, j)
-
-    def transfer_solution(self, i, adjoint=False):
-        if adjoint:
-            self.transfer_adjoint_solution()
-        else:
-            self.transfer_forward_solution()
-
-    def transfer_forward_solution(self, i):
-        if i == 0:
-            self.set_initial_condition()
-        else:
-            self.project_forward_solution(i-1, i)
-
-    def transfer_adjoint_solution(self, i):
-        if i == self.num_meshes - 1:
-            self.set_final_condition()
-        else:
-            self.project_adjoint_solution(i+1, i)
-
-    def store_plexes(self, di=None):
-        """Save meshes to disk using DMPlex format."""
-        di = di or os.path.join(self.di, self.approach)
-        fname = os.path.join(di, 'plex_{:d}.h5')
-        for i, mesh in enumerate(self.meshes):
-            assert os.path.isdir(di)
-            viewer = PETSc.Viewer().createHDF5(fname.format(i), 'w')
-            viewer(mesh._plex)
-
-    def load_plexes(self, fname):
-        """Load meshes in DMPlex format."""
-        for i in range(self.num_meshes):
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile('_'.join([fname, '{:d}.h5'.format(i)]))
-            self.meshes[i] = Mesh(newplex)
-
     # --- Solvers
 
     # TODO: Estimate error
@@ -618,14 +718,10 @@ class AdaptiveProblem(object):
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
-            if i == 0:
-                self.solution_file.__init__(self.solution_file.filename)
             proj_u = Function(self.P1_vec[i], name="Projected velocity")
             proj_eta = Function(self.P1[i], name="Projected elevation")
             self.solution_file._topology = None
         if op.solve_tracer and plot_pvd:
-            if i == 0:
-                self.tracer_file.__init__(self.tracer_file.filename)
             proj_tracer = Function(self.P1[i], name="Projected tracer")
             self.tracer_file._topology = None
 
@@ -705,14 +801,10 @@ class AdaptiveProblem(object):
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
-            if i == self.num_meshes-1:
-                self.adjoint_solution_file.__init__(self.adjoint_solution_file.filename)
             proj_z = Function(self.P1_vec[i], name="Projected adjoint velocity")
             proj_zeta = Function(self.P1[i], name="Projected adjoint elevation")
             self.adjoint_solution_file._topology = None
         if op.solve_tracer and plot_pvd:
-            if i == self.num_meshes-1:
-                self.adjoint_tracer_file.__init__(self.adjoint_tracer_file.filename)
             proj_tracer = Function(self.P1[i], name="Projected adjoint tracer")
             self.adjoint_tracer_file._topology = None
 
@@ -752,60 +844,24 @@ class AdaptiveProblem(object):
         op.print_debug("Done!")
         print_output(80*'=')
 
-    def solve(self, adjoint=False, **kwargs):
-        """
-        Solve the forward or adjoint problem (as specified by the `adjoint` boolean kwarg) on the
-        full sequence of meshes.
+    # --- Metric
 
-        NOTE: The implementation contains a very simple checkpointing scheme, in the sense that
-            the final solution computed on mesh `i` is stored in `self.fwd_solvers[i]` or
-            `self.adj_solutions[i]`, as appropriate.
-        """
-        if adjoint:
-            self.solve_adjoint(**kwargs)
-        else:
-            self.solve_forward(**kwargs)
+    def get_hessian_metric(self, adjoint=False, **kwargs):
+        kwargs.setdefault('normalise', True)
+        kwargs['op'] = self.op
+        self.metrics = []
+        solutions = self.adj_solutions if adjoint else self.fwd_solutions
+        for i, sol in enumerate(solutions):
+            fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
+            self.metrics.append(get_hessian_metric(sol, fields=fields, **kwargs))
 
-    def solve_forward(self, reverse=False, **kwargs):
-        """Solve forward problem on the full sequence of meshes."""
-        R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
-        for i in R:
-            self.transfer_forward_solution(i)
-            self.setup_solver_forward(i)
-            self.solve_forward_step(i, **kwargs)
+    # --- Goal-oriented
 
-    def solve_adjoint(self, reverse=True, **kwargs):
-        """Solve adjoint problem on the full sequence of meshes."""
-        R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
-        for i in R:
-            self.transfer_adjoint_solution(i)
-            self.setup_solver_adjoint(i)
-            self.solve_adjoint_step(i, **kwargs)
+    # TODO: What about tracer?
+    def get_qoi_kernels(self, i):
+        self.kernels[i] = self.op.set_qoi_kernel(self.V[i])
 
     # --- Run scripts
-
-    def run(self, **kwargs):
-        """
-        Run simulation using mesh adaptation approach specified by `self.approach`.
-
-        For metric-based approaches, a fixed point iteration loop is used.
-        """
-        run_scripts = {
-
-            # Non-adaptive
-            'fixed_mesh': self.solve_forward,
-
-            # Metric-based, no adjoint
-            'hessian': self.run_hessian_based,
-
-            # Metric-based with adjoint
-            'dwp': self.run_dwp,
-            'dwr': self.run_dwr,
-        }
-        try:
-            run_scripts[self.approach](**kwargs)
-        except KeyError:
-            raise ValueError("Approach '{:s}' not recognised".format(self.approach))
 
     # TODO: Tracer
     def run_hessian_based(self, **kwargs):
@@ -1333,44 +1389,3 @@ class AdaptiveProblem(object):
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
-
-    # --- Metric
-
-    def get_hessian_metric(self, adjoint=False, **kwargs):
-        kwargs.setdefault('normalise', True)
-        kwargs['op'] = self.op
-        self.metrics = []
-        solutions = self.adj_solutions if adjoint else self.fwd_solutions
-        for i, sol in enumerate(solutions):
-            fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
-            self.metrics.append(get_hessian_metric(sol, fields=fields, **kwargs))
-
-    # --- Goal-oriented
-
-    def get_qoi_kernels(self, i):
-        self.kernels[i] = self.op.set_qoi_kernel(self.V[i])
-
-    # NOTE: This will become redundant once error estimators hooked up
-    def get_bnd_functions(self, i, *args):
-        swt = shallowwater_eq.ShallowWaterTerm(self.V[i], self.bathymetry)
-        return swt.get_bnd_functions(*args, self.boundary_conditions[i])
-
-    def get_strong_residual_forward(self):
-        raise NotImplementedError  # TODO: Use thetis/error_estimation_2d
-
-    def get_dwr_residual_forward(self):
-        raise NotImplementedError  # TODO: Use thetis/error_estimation_2d
-
-    def get_dwr_flux_forward(self):
-        raise NotImplementedError  # TODO: Use thetis/error_estimation_2d
-
-    def dwr_indication(self, adjoint=False):
-        """
-        Indicate errors in the quantity of interest by the Dual Weighted Residual method. This is
-        inherently problem-dependent.
-        """
-        raise NotImplementedError("Should be implemented in derived class.")
-
-    def quantity_of_interest(self):
-        """Functional of interest which takes the PDE solution as input."""
-        raise NotImplementedError("Should be implemented in derived class.")
