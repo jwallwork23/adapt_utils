@@ -2,6 +2,7 @@ from __future__ import absolute_import
 from thetis.equation import *
 from thetis.utility import *
 from thetis.shallowwater_eq import *
+from thetis.shallowwater_eq import TurbineDragTerm, BathymetryDisplacementMassTerm
 
 
 __all__ = ["ShallowWaterEquations"]
