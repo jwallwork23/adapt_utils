@@ -166,7 +166,7 @@ class AdaptiveProblemBase(object):
     def create_adjoint_equations(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_error_estimator(self, i):
+    def create_error_estimators(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
     def create_timestepper(self, i, adjoint=False):
@@ -540,16 +540,27 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Error estimators
 
-    def create_error_estimator(self, i):
+    def create_error_estimators(self, i):
         if self.op.solve_swe:
-            self._create_forward_shallow_water_error_estimator(i)
+            self._create_shallow_water_error_estimator(i)
         if self.op.solve_tracer:
-            self._create_forward_tracer_error_estimator(i)
+            self._create_tracer_error_estimator(i)
 
-    def _create_forward_shallow_water_error_estimator(self, i):
-        raise NotImplementedError  # TODO
+    def _create_shallow_water_error_estimator(self, i):
+        self.error_estimators[i].shallow_water = ShallowWaterGOErrorEstimator(
+            self.V[i],
+            self.depth[i],
+            self.shallow_water_options,
+        )
 
-    def _create_forward_tracer_error_estimator(self, i):
+    # TODO: Conservative case
+    def _create_tracer_error_estimator(self, i):
+        self.error_estimators[i].tracer = TracerGOErrorEstimator(
+            self.Q[i],
+            self.depth[i],
+            use_lax_friedrichs=self.op.stabilisation == 'lax_friedrichs',
+            sipg_parameter=self.op.sipg_parameter_tracer,  # TODO: This is not the right one!
+        )
         raise NotImplementedError  # TODO
 
     # --- Timestepping
@@ -610,6 +621,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
+        if self.error_estimators[i].shallow_water is not None:
+            kwargs['error_estimator'] = self.error_estimators[i].shallow_water
         self.timesteppers[i].shallow_water = integrator(*args, **kwargs)
         # self.lhs = self.timesteppers[i].shallow_water.F
 
@@ -626,6 +639,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
+        if self.error_estimators[i].tracer is not None:
+            kwargs['error_estimator'] = self.error_estimators[i].tracer
         self.timesteppers[i].tracer = integrator(*args, **kwargs)
 
     # TODO: Reduce duplication (3)
@@ -1257,6 +1272,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # --- Setup forward solver for enriched problem
 
                 # TODO: Need to transfer fwd sol in nonlinear case
+                ep.create_error_estimators(i)  # These get passed to the timesteppers under the hood
                 ep.setup_solver_forward(i)
                 ets = ep.timesteppers[i]['shallow_water']  # TODO: Tracer option
 
