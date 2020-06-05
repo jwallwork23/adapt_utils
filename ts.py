@@ -32,6 +32,8 @@ class CrankNicolson(thetis_ts.CrankNicolson):
     def __init__(self, *args, error_estimator=None, **kwargs):
         super(CrankNicolson, self).__init__(*args, **kwargs)
         self.error_estimator = error_estimator
+        self.semi_implicit = kwargs.get("semi_implicit")
+        self.theta = kwargs.get("theta")
         print_output("#### TODO: Setup strong residual for Crank-Nicolson")  # TODO
 
     def setup_error_estimator(self, solution, solution_old, adjoint, bnd_conditions):
