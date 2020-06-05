@@ -48,13 +48,7 @@ class AdaptiveProblem(object):
         self.approach = op.approach
         self.nonlinear = nonlinear
 
-        # Subsets of options
-        self.timestepping_options = AttrDict({
-            'timestep': op.dt,
-            'simulation_export_time': op.dt*op.dt_per_export,
-            'timestepper_type': op.timestepper,
-            'simulation_end_time': op.end_time,
-        })
+        # Timestepping export details
         self.num_timesteps = int(np.floor(op.end_time/op.dt))
         self.num_meshes = op.num_meshes
         try:
@@ -66,6 +60,8 @@ class AdaptiveProblem(object):
             assert self.dt_per_mesh % op.dt_per_export == 0
         except AssertionError:
             raise ValueError("Timesteps per export should divide timesteps per mesh iteration.")
+
+        # Subsets of options
         self.shallow_water_options = AttrDict({
             'use_nonlinear_equations': nonlinear,
             'element_family': op.family,
@@ -98,8 +94,8 @@ class AdaptiveProblem(object):
         implemented_steppers = {  # TODO: Other cases
             'CrankNicolson': thetis.timeintegrator.CrankNicolson,
         }
-        assert self.timestepping_options.timestepper_type in implemented_steppers
-        self.integrator = implemented_steppers[self.timestepping_options.timestepper_type]
+        assert self.op.dtper_type in implemented_steppers
+        self.integrator = implemented_steppers[self.op.dtper_type]
 
         # Outputs
         self.di = create_directory(self.op.di)
@@ -177,23 +173,22 @@ class AdaptiveProblem(object):
           * Continuous Galerkin     Pp    'cg';
           * Discontinuous Galerkin  PpDG  'dg'.
         """
-        if self.op.solve_swe:
-            p = self.op.degree
-            family = self.op.family
-            if family == 'cg-cg':
-                assert p == 1
-                u_element = VectorElement("Lagrange", triangle, p+1)
-                eta_element = FiniteElement("Lagrange", triangle, p, variant='equispaced')
-            elif family == 'dg-dg':
-                u_element = VectorElement("DG", triangle, p)
-                eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
-            elif family == 'dg-cg':
-                assert p == 1
-                u_element = VectorElement("DG", triangle, p)
-                eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
-            else:
-                raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
-            self.finite_element = u_element*eta_element
+        p = self.op.degree
+        family = self.op.family
+        if family == 'cg-cg':
+            assert p == 1
+            u_element = VectorElement("Lagrange", triangle, p+1)
+            eta_element = FiniteElement("Lagrange", triangle, p, variant='equispaced')
+        elif family == 'dg-dg':
+            u_element = VectorElement("DG", triangle, p)
+            eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
+        elif family == 'dg-cg':
+            assert p == 1
+            u_element = VectorElement("DG", triangle, p)
+            eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
+        else:
+            raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
+        self.finite_element = u_element*eta_element
 
         if self.op.solve_tracer:
             p = self.op.degree_tracer
@@ -218,8 +213,7 @@ class AdaptiveProblem(object):
         # self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
 
         # Shallow water space
-        if self.op.solve_swe:
-            self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
+        self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
 
         # Tracer space
         if self.op.solve_tracer:
@@ -233,16 +227,15 @@ class AdaptiveProblem(object):
         self.adj_solutions = [None for mesh in self.meshes]
         self.fwd_solutions_tracer = [None for mesh in self.meshes]
         self.adj_solutions_tracer = [None for mesh in self.meshes]
-        if self.op.solve_swe:
-            for i, V in enumerate(self.V):
-                self.fwd_solutions[i] = Function(V, name='Forward solution')
-                u, eta = self.fwd_solutions[i].split()
-                u.rename("Fluid velocity")
-                eta.rename("Elevation")
-                self.adj_solutions[i] = Function(V, name='Adjoint solution')
-                z, zeta = self.adj_solutions[i].split()
-                z.rename("Adjoint fluid velocity")
-                zeta.rename("Adjoint elevation")
+        for i, V in enumerate(self.V):
+            self.fwd_solutions[i] = Function(V, name='Forward solution')
+            u, eta = self.fwd_solutions[i].split()
+            u.rename("Fluid velocity")
+            eta.rename("Elevation")
+            self.adj_solutions[i] = Function(V, name='Adjoint solution')
+            z, zeta = self.adj_solutions[i].split()
+            z.rename("Adjoint fluid velocity")
+            zeta.rename("Adjoint elevation")
         if self.op.solve_tracer:
             self.fwd_tracer_solutions = [Function(Q, name="Forward tracer solution") for Q in self.Q]
             self.adj_tracer_solutions = [Function(Q, name="Adjoint tracer solution") for Q in self.Q]
@@ -408,7 +401,7 @@ class AdaptiveProblem(object):
 
     def create_adjoint_timestepper(self, i):
         if i == self.num_meshes-1:
-            self.simulation_time = self.timestepping_options.simulation_end_time
+            self.simulation_time = self.op.end_time
         if self.op.solve_swe:
             self._create_adjoint_shallow_water_timestepper(i, self.integrator)
         if self.op.solve_tracer:
@@ -430,24 +423,49 @@ class AdaptiveProblem(object):
         return fields
 
     def _get_fields_for_tracer_timestepper(self, i):
-        raise NotImplementedError  # TODO
+        u, eta = self.fwd_solutions[i].split()
+        fields = {
+            'elev_2d': eta,
+            'uv_2d': u,
+            'diffusivity_h': self.fields[i].horizontal_diffusivity,
+            # 'source': self.fields[i].tracer_source_2d,  # TODO
+            # 'lax_friedrichs_tracer_scaling_factor': self.stabilisation_parameters[i],  # TODO
+            # 'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,  # TODO
+        }
+        return fields
 
+    # TODO: Reduce duplication (1)
     def _create_forward_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
-        dt = self.timestepping_options.timestep
+        dt = self.op.dt
         args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             # 'error_estimator': self.error_estimators[i]['shallow_water'],  # TODO
             'solver_parameters': self.op.params,  # TODO: Split into SW and tracer
         }
-        if hasattr(self.timestepping_options, 'use_semi_implicit_linearization'):
-            kwargs['semi_implicit'] = self.timestepping_options.use_semi_implicit_linearization
-        if hasattr(self.timestepping_options, 'implicitness_theta'):
-            kwargs['theta'] = self.timestepping_options.implicitness_theta
+        if self.op.timestepper == 'CrankNicolson':
+            kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
+            kwargs['theta'] = self.op.implicitness_theta
         self.timesteppers[i].shallow_water = integrator(*args, **kwargs)
         # self.lhs = self.timesteppers[i].shallow_water.F
 
+    # TODO: Reduce duplication (2)
+    def _create_forward_tracer_timestepper(self, i, integrator):
+        fields = self._get_fields_for_tracer_timestepper(i)
+        dt = self.op.dt
+        args = (self.equations[i].tracer, self.fwd_solutions_tracer[i], fields, dt, )
+        kwargs = {
+            'bnd_conditions': self.boundary_conditions[i]['tracer'],
+            # 'error_estimator': self.error_estimators[i]['tracer'],  # TODO
+            'solver_parameters': self.op.params,  # TODO: Split into SW and tracer
+        }
+        if self.op.timestepper == 'CrankNicolson':
+            kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
+            kwargs['theta'] = self.op.implicitness_theta
+        self.timesteppers[i].tracer = integrator(*args, **kwargs)
+
+    # TODO: Reduce duplication (3)
     def _create_adjoint_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
 
@@ -458,24 +476,41 @@ class AdaptiveProblem(object):
         fields['momentum_source'] = self.time_kernel*dJdu
         fields['volume_source'] = self.time_kernel*dJdeta
 
-        dt = self.timestepping_options.timestep
+        dt = self.op.dt
         args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             # 'error_estimator': self.error_estimators[i]['shallow_water'],  # TODO
             'solver_parameters': self.op.adjoint_params,  # TODO: Split into SW and tracer
         }
-        if hasattr(self.timestepping_options, 'use_semi_implicit_linearization'):
-            kwargs['semi_implicit'] = self.timestepping_options.use_semi_implicit_linearization
-        if hasattr(self.timestepping_options, 'implicitness_theta'):
-            kwargs['theta'] = self.timestepping_options.implicitness_theta
+        if self.op.timestepper == 'CrankNicolson':
+            kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
+            kwargs['theta'] = self.op.implicitness_theta
         self.timesteppers[i].adjoint_shallow_water = integrator(*args, **kwargs)
         # self.lhs = self.timesteppers[i].shallow_water.F
 
-    def _create_forward_tracer_timestepper(self, i, integrator):
-        raise NotImplementedError  # TODO
-
+    # TODO: Reduce duplication (4)
     def _create_adjoint_tracer_timestepper(self, i, integrator):
+        fields = self._get_fields_for_tracer_timestepper(i)
+
+        # Account for dJdc
+        raise NotImplementedError  # TODO
+        # self.get_qoi_kernel_tracer(i)
+        # dJdc = self.kernel_tracer[i]
+        self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
+        fields['source'] = self.time_kernel*dJdc
+
+        dt = self.op.dt
+        args = (self.equations[i].adjoint_tracer, self.fwd_solutions_tracer[i], fields, dt, )
+        kwargs = {
+            'bnd_conditions': self.boundary_conditions[i]['tracer'],
+            # 'error_estimator': self.error_estimators[i]['tracer'],  # TODO
+            'solver_parameters': self.op.params,  # TODO: Split into SW and tracer
+        }
+        if self.op.timestepper == 'CrankNicolson':
+            kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
+            kwargs['theta'] = self.op.implicitness_theta
+        self.timesteppers[i].adjoint_tracer = integrator(*args, **kwargs)
         raise NotImplementedError  # TODO
 
     # --- Callbacks
