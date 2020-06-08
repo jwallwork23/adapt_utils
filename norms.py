@@ -64,7 +64,7 @@ def _timeseries_norm_clean(f, norm_type):
 def lp_norm(f, p='l2'):
     r"""
     Calculate the :math:`\ell_p` norm of a 1D array.
-    
+
     :kwarg p: `None` or `'linf'` denotes infinity norm. Otherwise choose `'lp'` with :math:`p >= 1`.
     """
     return timeseries_error(f, norm_type=p)

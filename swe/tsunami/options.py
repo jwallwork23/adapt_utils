@@ -4,7 +4,6 @@ from thetis.configuration import *
 import scipy.interpolate as si
 import numpy as np
 import h5py
-import matplotlib
 import matplotlib.pyplot as plt
 
 from adapt_utils.swe.options import ShallowWaterOptions

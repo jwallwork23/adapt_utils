@@ -1,7 +1,6 @@
 """
 Generate a hierarchy of meshes for the Tohoku tsunami problem.
 """
-import numpy as np
 import os
 import qmesh
 

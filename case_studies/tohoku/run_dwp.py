@@ -5,8 +5,6 @@ import datetime
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
-from adapt_utils.adapt.metric import isotropic_metric, space_time_normalise, metric_complexity
-from adapt_utils.adapt.adaptation import pragmatic_adapt
 
 
 parser = argparse.ArgumentParser(prog="run_dwp")

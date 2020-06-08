@@ -37,6 +37,7 @@ class PowerOptions(TracerOptions):
                 2: {},
                 3: {'diff_flux': zero},
                 4: {'diff_flux': zero},
+            }
         }
         return boundary_conditions
 

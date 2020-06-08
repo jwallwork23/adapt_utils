@@ -20,10 +20,10 @@ class SteadyState(thetis_ts.SteadyState):
     def setup_error_estimator(self, solution, adjoint, bnd_conditions):
         assert self.error_estimator is not None
         u = solution
-        u_star = adjoint
         f = self.fields
         bnd = bnd_conditions
         self.error_estimator.setup_components('all', u, u, z, z, f, f, bnd)
+
 
 class CrankNicolson(thetis_ts.CrankNicolson):
     """

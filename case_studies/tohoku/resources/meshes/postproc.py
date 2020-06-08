@@ -40,35 +40,35 @@ for level in range(4):
     ))
 
     fig, ax = plt.subplots(figsize=(7, 8))
-    triplot(mesh, axes=ax);
-    ax.legend();
-    ax.get_xaxis().set_visible(False);
-    ax.get_yaxis().set_visible(False);
-    ax.axis('off');
+    triplot(mesh, axes=ax)
+    ax.legend()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    ax.axis('off')
     plt.savefig(fname + ".pdf")
 
     fig, ax = plt.subplots(figsize=(7, 8))
-    triplot(mesh, axes=ax);
-    ax.set_xlim([400e3, 700e3]);
-    ax.set_ylim([4050e3, 4450e3]);
-    ax.get_xaxis().set_visible(False);
-    ax.get_yaxis().set_visible(False);
-    ax.axis('off');
+    triplot(mesh, axes=ax)
+    ax.set_xlim([400e3, 700e3])
+    ax.set_ylim([4050e3, 4450e3])
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    ax.axis('off')
     plt.savefig(fname + "_zoom.pdf")
 
     fig, ax = plt.subplots(figsize=(7, 8))
-    triplot(newmesh, axes=ax);
-    ax.legend();
-    ax.get_xaxis().set_visible(False);
-    ax.get_yaxis().set_visible(False);
-    ax.axis('off');
+    triplot(newmesh, axes=ax)
+    ax.legend()
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    ax.axis('off')
     plt.savefig(fname + "_postproc.pdf")
 
     fig, ax = plt.subplots(figsize=(7, 8))
-    triplot(newmesh, axes=ax);
-    ax.set_xlim([400e3, 700e3]);
-    ax.set_ylim([4050e3, 4450e3]);
-    ax.get_xaxis().set_visible(False);
-    ax.get_yaxis().set_visible(False);
-    ax.axis('off');
+    triplot(newmesh, axes=ax)
+    ax.set_xlim([400e3, 700e3])
+    ax.set_ylim([4050e3, 4450e3])
+    ax.get_xaxis().set_visible(False)
+    ax.get_yaxis().set_visible(False)
+    ax.axis('off')
     plt.savefig(fname + "_postproc_zoom.pdf")
