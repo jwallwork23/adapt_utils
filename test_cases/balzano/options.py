@@ -68,17 +68,11 @@ class BalzanoOptions(ShallowWaterOptions):
         self.dt_per_export = 6
         self.dt_per_remesh = 6
         self.timestepper = 'CrankNicolson'
-        # self.implicitness_theta = 0.5  # TODO
+        self.implicitness_theta = 0.5
 
         # Adaptivity
         self.h_min = 1e-8
         self.h_max = 10.
-
-        # Goal-Oriented
-        self.qoi_mode = 'inundation_volume'
-
-        P1DG = FunctionSpace(self.default_mesh, "DG", 1)  # FIXME
-        self.get_initial_depth(VectorFunctionSpace(self.default_mesh, "CG", 2)*P1DG)  # FIXME
 
         # Timeseries
         self.wd_obs = []
@@ -88,27 +82,24 @@ class BalzanoOptions(ShallowWaterOptions):
 
         # Outputs  (NOTE: self.di has changed)
         self.eta_tilde_file = File(os.path.join(self.di, 'eta_tilde.pvd'))
-        self.eta_tilde = Function(P1DG, name='Modified elevation')
 
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
-            self.quadratic_drag_coefficient = interpolate(self.get_cfactor(), fs)
-        return self.quadratic_drag_coefficient
+            return interpolate(self.get_cfactor(), fs)
 
-    def get_cfactor(self):
+    def get_cfactor(self, depth):
         try:
             assert hasattr(self, 'depth')
         except AssertionError:
             raise ValueError("Depth is undefined.")
         ksp = Constant(3*self.average_size)
-        hc = conditional(self.depth > 0.001, self.depth, 0.001)
+        hc = conditional(depth > 0.001, depth, 0.001)
         aux = max_value(11.036*hc/ksp, 1.001)
         return 2*(0.4**2)/(ln(aux)**2)
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
-            self.manning_drag_coefficient = Constant(self.friction_coeff or 0.02)
-        return self.manning_drag_coefficient
+            return Constant(self.friction_coeff or 0.02)
 
     def set_bathymetry(self, fs, **kwargs):
         max_depth = 5.0
@@ -145,7 +136,8 @@ class BalzanoOptions(ShallowWaterOptions):
 
     def set_boundary_conditions(self, fs):
         if not hasattr(self, 'elev_in'):
-            self.set_boundary_surface()
+            self.elev_in = Constant(0.0)
+            # self.elev_out = Constant(0.0)
         self.elev_in.assign(self.elev_func(0.0))
         inflow_tag = 1
         outflow_tag = 2
@@ -171,9 +163,10 @@ class BalzanoOptions(ShallowWaterOptions):
         eta.assign(0.0)
         return self.initial_value
 
-    def get_update_forcings(self, solver_obj):
-        eta = solver_obj.fields.elev_2d
-        bathymetry_displacement = solver_obj.eq_sw.depth.wd_bathymetry_displacement
+    def get_update_forcings(self, prob, i):
+        u, eta = prob.fwd_solutions[i].split()
+        bathymetry_displacement = prob.equations[i].shallow_water.depth.wd_bathymetry_displacement
+        depth = prob.depth[i]
 
         def update_forcings(t):
             self.update_boundary_conditions(t=t)
@@ -181,45 +174,46 @@ class BalzanoOptions(ShallowWaterOptions):
             # Update bathymetry and friction
             if self.friction == 'nikuradse':
                 if self.wetting_and_drying:
-                    self.depth.project(eta + bathymetry_displacement(eta) + self.bathymetry)
-                self.quadratic_drag_coefficient.interpolate(self.get_cfactor())
+                    depth.project(eta + bathymetry_displacement(eta) + prob.bathymetry[i])
+                prob.fields[i].quadratic_drag_coefficient.interpolate(self.get_cfactor(depth))
 
         return update_forcings
 
-    def get_export_func(self, solver_obj):
-        bathymetry_displacement = solver_obj.eq_sw.depth.wd_bathymetry_displacement
-        eta = solver_obj.fields.elev_2d
-        b = solver_obj.fields.bathymetry_2d
+    def get_export_func(self, prob, i):
+        eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
+        self.eta_tilde_file._topology = None
+        u, eta = prob.fwd_solutions[i].split()
+        b = prob.bathymetry[i]
+        wd = Function(prob.P1DG[i], name="Heaviside approximation")
 
         def export_func():
-            self.eta_tilde.project(eta + bathymetry_displacement(eta))
-            self.eta_tilde_file.write(self.eta_tilde)
+            eta_tilde.project(self.get_eta_tilde(prob, i))
+            self.eta_tilde_file.write(eta_tilde)
 
             if self.plot_timeseries:
 
                 # Store modified bathymetry timeseries
-                P1DG = solver_obj.function_spaces.P1DG_2d
-                wd = project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha), P1DG)
+                wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
 
-    def plot_heaviside(self):
-        """Timeseries plot of approximate Heavyside function."""
-        scaling = 0.7
-        plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
-        plt.gcf().subplots_adjust(bottom=0.15)
-        T = [[t/3600]*20 for t in self.trange]
-        X = [self.xrange for t in T]
+    # def plot_heaviside(self):  # TODO
+    #     """Timeseries plot of approximate Heavyside function."""
+    #     scaling = 0.7
+    #     plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
+    #     plt.gcf().subplots_adjust(bottom=0.15)
+    #     T = [[t/3600]*20 for t in self.trange]
+    #     X = [self.xrange for t in T]
 
-        cset1 = plt.contourf(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
-        plt.clim(0.0, 1.2)
-        # cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
-        plt.clim(0.0, 1.2)
-        # cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels=[0.5])
-        cb = plt.colorbar(cset1, ticks=np.linspace(0, 1, 6))
-        cb.set_label(r"$\mathcal H(\eta-b)$")
-        plt.ylim(min(X[0]), max(X[0]))
-        plt.xlabel(r"Time [$\mathrm h$]")
-        plt.ylabel(r"$x$ [$\mathrm m$]")
-        plt.savefig(os.path.join(self.di, "heaviside_timeseries.pdf"))
+    #     cset1 = plt.contourf(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
+    #     plt.clim(0.0, 1.2)
+    #     # cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
+    #     plt.clim(0.0, 1.2)
+    #     # cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels=[0.5])
+    #     cb = plt.colorbar(cset1, ticks=np.linspace(0, 1, 6))
+    #     cb.set_label(r"$\mathcal H(\eta-b)$")
+    #     plt.ylim(min(X[0]), max(X[0]))
+    #     plt.xlabel(r"Time [$\mathrm h$]")
+    #     plt.ylabel(r"$x$ [$\mathrm m$]")
+    #     plt.savefig(os.path.join(self.di, "heaviside_timeseries.pdf"))

@@ -764,8 +764,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         plot_pvd &= op.plot_pvd
 
         # Callbacks
-        update_forcings = update_forcings or self.op.get_update_forcings(self)
-        export_func = export_func or self.op.get_export_func(self)
+        update_forcings = update_forcings or self.op.get_update_forcings(self, i)
+        export_func = export_func or self.op.get_export_func(self, i)
         print_output(80*'=')
         # if i == 0:
         export_func()
@@ -848,8 +848,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         plot_pvd &= op.plot_pvd
 
         # Callbacks
-        update_forcings = update_forcings or self.op.get_update_forcings(self)
-        export_func = export_func or self.op.get_export_func(self)
+        update_forcings = update_forcings or self.op.get_update_forcings(self, i)
+        export_func = export_func or self.op.get_export_func(self, i)
         print_output(80*'=')
         # if i == self.num_meshes-1:
         export_func()
