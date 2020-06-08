@@ -29,6 +29,10 @@ balzano/screenshots/
 balzano/__pycache__/
 balzano/videos/
 balzano/strip.geo
+trench/outputs/
+trench/screenshots/
+trench/__pycache__/
+trench/mesh.geo
 rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/__pycache__/

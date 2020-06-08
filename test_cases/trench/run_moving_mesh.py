@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import time
 
-from adapt_utils.test_cases.trench_test.options import TrenchOptions
+from adapt_utils.test_cases.trench.options import TrenchOptions
 from adapt_utils.adapt.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
 from adapt_utils.norms import local_frobenius_norm
@@ -21,7 +21,6 @@ op = TrenchOptions(approach='monge_ampere',
                    debug=False,
                    nonlinear_method='relaxation',
                    num_adapt=1,
-                   qoi_mode='inundation_volume',
                    friction='nikuradse',
                    nx=nx,
                    ny=1,
