@@ -141,6 +141,10 @@ class AdaptiveProblemBase(object):
         raise NotImplementedError("To be implemented in derived class")
 
     def set_stabilisation(self):
+        for i in range(self.num_meshes):
+            self.set_stabilisation_step(i)
+
+    def set_stabilisation_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
     def set_boundary_conditions(self):
@@ -184,7 +188,8 @@ class AdaptiveProblemBase(object):
         raise NotImplementedError("To be implemented in derived class")
 
     def add_callbacks(self, i):
-        raise NotImplementedError("To be implemented in derived class")
+        """To be implemented in derived class"""
+        pass
 
     def project(self, f, i, j):
         """Project field `f` from mesh `i` onto mesh `j`."""
@@ -308,7 +313,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def __init__(self, op, nonlinear=True, **kwargs):
 
         # Problem-specific options
-        self.shallow_water_options = AttrDict({
+        self.shallow_water_options = [AttrDict() for i in range(op.num_meshes)]
+        static_options = {
             'use_nonlinear_equations': nonlinear,
             'element_family': op.family,
             'polynomial_degree': op.degree,
@@ -316,23 +322,30 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'use_grad_depth_viscosity_term': op.grad_depth_viscosity,
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
             # 'use_lax_friedrichs_velocity': op.stabilisation == 'lax_friedrichs'  # TODO
+            'use_lax_friedrichs_velocity': False,
             'use_wetting_and_drying': op.wetting_and_drying,
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
-            # 'check_volume_conservation_2d': True,
-            'tidal_turbine_farms': {},
-        })
+            # 'check_volume_conservation_2d': True,  # TODO
+            'norm_smoother': Constant(0.0),  # TODO: Allow modification
+        }
+        for i, swo in enumerate(self.shallow_water_options):
+            swo.update(static_options)
+            swo.tidal_turbine_farms = {}  # TODO
+            if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
+                swo['sipg_parameter'] = op.sipg_parameter
         if nonlinear:
             op.params['snes_type'] = 'ksponly'
-        if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
-            self.shallow_water_options['sipg_parameter'] = op.sipg_parameter
-        self.tracer_options = AttrDict({  # TODO
-            # 'check_tracer_conservation': True,
-            # 'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs'  # TODO
-            # 'lax_friedrichs_tracer_scaling_factor': op.stabilisation_parameter  # TODO
+        self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
+        static_options = {
+            'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
+            # 'check_tracer_conservation': True,  # TODO
+            'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs'  # TODO
             # 'use_limiter_for_tracers': True,  # TODO
-        })
-        if hasattr(op, 'sipg_parameter_tracer') and op.sipg_parameter_tracer is not None:
-            self.tracer_options['sipg_parameter_tracer'] = op.sipg_parameter_tracer
+        }
+        for i, to in enumerate(self.tracer_options):
+            to.update(static_options)
+            if hasattr(op, 'sipg_parameter_tracer') and op.sipg_parameter_tracer is not None:
+                swo['sipg_parameter_tracer'] = op.sipg_parameter_tracer
         super(AdaptiveProblem, self).__init__(op, nonlinear=nonlinear, **kwargs)
 
     def create_outfiles(self):
@@ -438,63 +451,86 @@ class AdaptiveProblem(AdaptiveProblemBase):
         for i, bathymetry in enumerate(self.bathymetry):
             self.depth[i] = DepthExpression(
                 bathymetry,
-                use_nonlinear_equations=self.shallow_water_options.use_nonlinear_equations,
-                use_wetting_and_drying=self.shallow_water_options.use_wetting_and_drying,
-                wetting_and_drying_alpha=self.shallow_water_options.wetting_and_drying_alpha,
+                use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
             )
 
-    def set_stabilisation(self):
-        """ Set stabilisation mode and corresponding parameter on each mesh."""
+    def set_stabilisation_step(self, i):
+        """ Set stabilisation mode and corresponding parameter on the ith mesh."""
+        self.minimum_angles = [None for mesh in self.meshes]
+        if self.op.use_automatic_sipg_parameter:
+            for i, mesh in enumerate(self.meshes):
+                self.minimum_angles[i] = get_minimum_angles_2d(mesh)
+        if self.op.solve_swe:
+            self._set_shallow_water_stabilisation_step(i)
+        if self.op.solve_tracer:
+            self._set_tracer_stabilisation_step(i)
+
+    def _set_shallow_water_stabilisation_step(self, i):
+        op = self.op
+
+        # Symmetric Interior Penalty Galerkin (SIPG) method
+        sipg = None
+        if hasattr(op, 'sipg_parameter'):
+            sipg = op.sipg_parameter
+        if self.shallow_water_options[i].use_automatic_sipg_parameter:
+            for i, mesh in enumerate(self.meshes):
+                cot_theta = 1.0/tan(self.minimum_angles[i])
+
+                # Penalty parameter for shallow water
+                nu = self.fields[i].horizontal_viscosity
+                if nu is not None:
+                    p = self.V[i].sub(0).ufl_element().degree()
+                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                    alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                    sipg = interpolate(alpha, self.P0[i])
+        self.shallow_water_options[i].sipg_parameter = sipg
+
+        # Stabilisation
         if self.stabilisation is None:
             return
         elif self.stabilisation == 'lax_friedrichs':
-            raise NotImplementedError  # TODO
-        elif self.stabilisation == 'su':
-            assert self.op.solve_tracer and not self.op.solve_swe
-            raise NotImplementedError  # TODO
-        elif self.stabilisation == 'supg':
-            assert self.op.solve_tracer and not self.op.solve_swe
+            assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
+            self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
             raise NotImplementedError  # TODO
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
-        self.stabilisation_parameters = []
-        for i in range(self.num_meshes):
-            self.stabilisation_parameters.append(self.op.stabilisation_parameter)
 
-        # FIXME: Hookup
-        # sipg = Constant(10.0)
-        # if hasattr(self.shallow_water_options, 'sipg_parameter'):
-        #     sipg = self.shallow_water_options.sipg_parameter
-        # symmetrisation_parameters = [sipg for mesh in self.meshes]
-        # if self.op.solve_tracer:
-        #     sipg = Constant(10.0)
-        #     if hasattr(self.tracer_options, 'sipg_parameter'):
-        #         sipg = self.tracer_options.sipg_parameter
-        #     symmetrisation_parameters = [sipg for mesh in self.meshes]
-        # if self.shallow_water_options.use_automatic_sipg_parameter:
-        #     for i, mesh in enumerate(self.meshes):
-        #         theta = get_minimum_angles_2d(mesh)
-        #         cot_theta = 1.0/tan(theta)
+    def _set_tracer_stabilisation_step(self, i):
+        op = self.op
 
-        #         # Penalty parameter for shallow water
-        #         if self.op.solve_swe:
-        #             self.shallow_water_options.use_lax_friedrichs_velocity = True
-        #             nu = self.fields[i].horizontal_viscosity
-        #             if nu is not None:
-        #                 p = self.V[i].sub(0).ufl_element().degree()
-        #                 alpha = Contant(5.0*p*(p+1)) if p != 0 else 1.5
-        #                 alpha = alpha*get_sipg_ratio(nu)*cot_theta
-        #                 symmetrisation_parameters[i] = interpolate(alpha, self.P0[i])
+        # Symmetric Interior Penalty Galerkin (SIPG) method
+        sipg = None
+        if hasattr(op, 'sipg_parameter_tracer'):
+            sipg = op.sipg_parameter_tracer
+        if self.tracer_options[i].use_automatic_sipg_parameter:
+            for i, mesh in enumerate(self.meshes):
+                cot_theta = 1.0/tan(self.minimum_angles[i])
 
-        #         # Penalty parameter for tracer
-        #         if self.op.solve_tracer:
-        #             nu = self.fields[i].horizontal_diffusivity
-        #             if nu is not None:
-        #                 p = self.Q[i].ufl_element().degree()
-        #                 alpha = Contant(5.0*p*(p+1)) if p != 0 else 1.5
-        #                 alpha = alpha*get_sipg_ratio(nu)*cot_theta
-        #                 symmetrisation_parameters_tracer[i] = interpolate(alpha, self.P0[i])
+                # Penalty parameter for shallow water
+                nu = self.fields[i].horizontal_diffusivity
+                if nu is not None:
+                    p = self.Q[i].ufl_element().degree()
+                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                    alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                    sipg = interpolate(alpha, self.P0[i])
+        self.tracer_options[i].sipg_parameter = sipg
+
+        # Stabilisation
+        if self.stabilisation is None:
+            return
+        elif self.stabilisation == 'lax_friedrichs':
+            assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')
+            self.tracer_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
+        elif self.stabilisation == 'su':
+            raise NotImplementedError  # TODO
+        elif self.stabilisation == 'supg':
+            raise NotImplementedError  # TODO
+        else:
+            msg = "Stabilisation method {:s} not recognised for {:s}"
+            raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
 
     def set_initial_condition(self):
         """Apply initial condition for forward solution on first mesh."""
@@ -522,7 +558,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].shallow_water = ShallowWaterEquations(
             self.V[i],
             self.depth[i],
-            self.shallow_water_options,
+            self.shallow_water_options[i],
         )
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
@@ -530,7 +566,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
             self.V[i],
             self.depth[i],
-            self.shallow_water_options,
+            self.shallow_water_options[i],
         )
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
@@ -552,7 +588,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.error_estimators[i].shallow_water = ShallowWaterGOErrorEstimator(
             self.V[i],
             self.depth[i],
-            self.shallow_water_options,
+            self.shallow_water_options[i],
         )
 
     # TODO: Conservative case
@@ -1295,7 +1331,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward(i)
-                self.solve_forward_step(i, export_func=export_func)
+                self.solve_forward_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Solve adjoint on current window
 
