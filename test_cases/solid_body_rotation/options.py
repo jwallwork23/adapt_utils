@@ -4,14 +4,14 @@ from thetis.configuration import *
 import math
 import os
 
-from adapt_utils.tracer.options import TracerOptions
+from adapt_utils.swe.options import ShallowWaterOptions
 
 
 __all__ = ["LeVequeOptions"]
 
 
 # NOTE: Could set three different tracers in Thetis implementation
-class LeVequeOptions(TracerOptions):
+class LeVequeOptions(ShallowWaterOptions):
     r"""
     Parameters for test case in [LeVeque 1996]. The analytical final time solution is the initial
     condition, since there is no diffusivity.
@@ -28,14 +28,15 @@ class LeVequeOptions(TracerOptions):
     The QoI considered in this test case may be viewed as an extension of the QoI considered in the
     [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
-    def __init__(self, shape=0, mesh_type='circle', refinement_level=0, background_concentration=0.0, **kwargs):
-        n = refinement_level
+    def __init__(self, shape=0, mesh_type='circle', n=0, background_concentration=0.0, **kwargs):
+        self.shape = shape
+        self.solve_swe = False
+        self.solve_tracer = True
 
         # Temporal discretisation
         self.dt = pi/300.0
-        self.end_time = 2*pi + self.dt
+        self.end_time = 2*pi
         self.dt_per_export = 10
-        self.dt_per_remesh = 10
 
         super(LeVequeOptions, self).__init__(**kwargs)
         self.bg = background_concentration
@@ -62,20 +63,20 @@ class LeVequeOptions(TracerOptions):
         self.set_region_of_interest(shape=shape)
 
         # Physics
-        self.base_diffusivity = 0.
+        self.base_diffusivity = 0.0
 
         # Spatial discretisation
-        if self.family in ('CG', 'cg', 'Lagrange'):
+        if self.tracer_family == 'cg':
             self.stabilisation = 'SUPG'
-        elif self.family in ('DG', 'dg', 'Discontinuous Lagrange'):
-            self.stabilisation = 'no'
-        else:
-            raise NotImplementedError
+        elif self.tracer_family == 'dg':
+            self.stabilisation = 'lax_friedrichs'
+            self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
 
         # Solver
-        self.params = self.iterative_params
-        # self.params["ksp_monitor"] = None
-        # self.params["ksp_converged_reason"] =  None
+        self.params = {
+            'ksp_type': 'gmres',
+            'pc_type': 'sor',
+        }
 
     def set_region_of_interest(self, shape=0):
         assert shape in (0, 1, 2)
@@ -83,18 +84,15 @@ class LeVequeOptions(TracerOptions):
         self.region_of_interest = [(self.source_loc[shape][0], self.source_loc[shape][1], 0.175)]
 
     def set_boundary_conditions(self, fs):
-        zero = Constant(self.bg, domain=fs.mesh())
-        self.boundary_conditions = {'tracer': {}}
-        self.adjoint_boundary_conditions = {'tracer': {}}
+        boundary_conditions = {'tracer': {}}
         for i in range(1, 5):
-            self.boundary_conditions['tracer'][i] = {i: {'value': zero}}
-            self.adjoint_boundary_conditions['tracer'][i] = {i: {'diff_flux': zero}}
-        return self.boundary_conditions
+            boundary_conditions['tracer'][i] = {i: {'value': Constant(self.bg)}}
+        return boundary_conditions
 
     def set_velocity(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
-        self.fluid_velocity = interpolate(as_vector((0.5 - y, x - 0.5)), fs)
-        return self.fluid_velocity
+        fluid_velocity = interpolate(as_vector((0.5 - y, x - 0.5)), fs)
+        return fluid_velocity
 
     def set_initial_condition(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
@@ -109,29 +107,24 @@ class LeVequeOptions(TracerOptions):
             sqrt(pow(x-cyl_x0, 2) + pow(y-cyl_y0, 2)) < cyl_r0, conditional(
                 And(And(x > slot_left, x < slot_right), y < slot_top), 0.0, 1.0), 0.0)
 
-        self.initial_value = interpolate(self.bg + bell + cone + slot_cyl, fs)
-        return self.initial_value
+        return interpolate(self.bg + bell + cone + slot_cyl, fs)
 
     def set_qoi_kernel(self, fs):
         b = self.ball(fs.mesh(), source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
-        self.kernel = rescaling*b
-        return self.kernel
+        return rescaling*b
 
     def set_final_condition(self, fs):
         b = self.ball(fs.mesh(), source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
-        self.final_value = interpolate(rescaling*b, fs)
-        return self.final_value
+        return interpolate(rescaling*b, fs)
 
     def exact_solution(self, fs):
-        if not hasattr(self, 'initial_value'):
-            self.set_initial_condition(fs)
-        return self.initial_value
+        return self.set_initial_condition(fs)
 
     def exact_qoi(self):
         h = 1  # Height of cone and cylinder
@@ -167,5 +160,5 @@ class LeVequeOptions(TracerOptions):
                                            0.0, 1.0), 0.0)
 
         sol = self.bg + bell + cone + slot_cyl
-        self.set_qoi_kernel(fs)
-        return assemble(self.kernel*sol*dx(degree=12))
+        kernel = self.set_qoi_kernel(fs)
+        return assemble(kernel*sol*dx(degree=12))
