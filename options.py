@@ -193,7 +193,7 @@ class Options(FrozenConfigurable):
             * \exp\left(1 - \frac1{\left1 - \left(\frac{y - y_0}{r_y}\right)^2\right)}\right)
 
         scaled by `scale` inside the box region. Similarly for other dimensions.
-            
+
         :kwarg scale: Scale factor for indicator.
         :kwarg source: Toggle source term or region of interest location.
         """

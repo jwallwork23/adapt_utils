@@ -105,7 +105,6 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         return flux_terms
 
 
-
 class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
     """
     :class:`TracerGOErrorEstimatorTerm` object associated with the :class:`HorizontalDiffusionTerm`
@@ -142,7 +141,6 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
             flux_terms += inner(dot(avg(diff_tensor), grad(arg_av)),
                                 jump(solution, self.normal))*ds_interior
         return flux_terms
-
 
     def boundary_flux(self, solution, solution_old, arg, arg_old, fields, fields_old, bnd_conditions):
         if fields_old.get('diffusivity_h') is None:

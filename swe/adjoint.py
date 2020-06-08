@@ -21,7 +21,7 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         velocity on the complement of Γ₂ and Dirichlet conditions for the elevation on the
         complement of Γ₁.
         """
-        bnd_len = self.boundary_len[bnd_id]
+        # bnd_len = self.boundary_len[bnd_id]
         funcs = bnd_conditions.get(bnd_id)
         if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
             zeta_ext = zeta_in  # assume symmetry
@@ -75,8 +75,6 @@ class AdjointShallowWaterContinuityTerm(AdjointShallowWaterTerm):
 
 class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        total_h = self.depth.get_total_depth(zeta_old)
-
         z_by_parts = True  # So we can enforce free-slip conditions
 
         if z_by_parts:
@@ -119,7 +117,7 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
 
 class HorizontalViscosityTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        total_h = self.depth.get_total_depth(zeta_old)
+        # total_h = self.depth.get_total_depth(zeta_old)
 
         nu = fields_old.get('viscosity_h')
         if nu is None:
@@ -140,7 +138,7 @@ class CoriolisTerm(AdjointShallowWaterMomentumTerm):
 class WindStressTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         wind_stress = fields_old.get('wind_stress')
-        total_h = self.depth.get_total_depth(zeta_old)
+        # total_h = self.depth.get_total_depth(zeta_old)
         f = 0
         if wind_stress is not None:
             raise NotImplementedError  # TODO
@@ -158,7 +156,7 @@ class AtmosphericPressureTerm(AdjointShallowWaterMomentumTerm):
 
 class QuadraticDragTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        total_h = self.depth.get_total_depth(zeta_old)
+        # total_h = self.depth.get_total_depth(zeta_old)
         manning_drag_coefficient = fields_old.get('manning_drag_coefficient')
         C_D = fields_old.get('quadratic_drag_coefficient')
         f = 0
@@ -182,7 +180,7 @@ class LinearDragTerm(AdjointShallowWaterMomentumTerm):
 
 class BottomDrag3DTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        total_h = self.depth.get_total_depth(zeta_old)
+        # total_h = self.depth.get_total_depth(zeta_old)
         bottom_drag = fields_old.get('bottom_drag')
         z_bottom = fields_old.get('z_bottom')
         f = 0
@@ -193,7 +191,7 @@ class BottomDrag3DTerm(AdjointShallowWaterMomentumTerm):
 
 class TurbineDragTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        total_h = self.depth.get_total_depth(zeta_old)
+        # total_h = self.depth.get_total_depth(zeta_old)
         f = 0
         for subdomain_id, farm_options in self.options.tidal_turbine_farms.items():
             raise NotImplementedError  # TODO

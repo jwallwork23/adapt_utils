@@ -1256,11 +1256,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 print_output("Meshes differ so we create separate hierarchies.")
                 hierarchies = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
                 refined_meshes = [hierarchy[1] for hierarchy in hierarchies]
-            ep = type(self)(op,
+            ep = type(self)(
+                op,
                 meshes=refined_meshes,
                 nonlinear=self.nonlinear,
                 discrete_adjoint=self.discrete_adjoint,
             )
+            ep.outer_iteration = n
 
             # --- Loop over mesh windows *in reverse*
 

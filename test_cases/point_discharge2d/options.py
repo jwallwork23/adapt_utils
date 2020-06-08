@@ -50,7 +50,7 @@ class TelemacOptions(TracerOptions):
         # calibrated_r = 0.06245
         calibrated_r = 0.07980 if centred else 0.07972
         self.source_loc = [(1.+self.offset, 5., calibrated_r)]
-        self.region_of_interest = [(20., 5., 0.5)] if centred else [(20., 7.5, 0.5)]
+        self.region_of_interest = [(20.0, 5., 0.5)] if centred else [(20.0, 7.5, 0.5)]
         self.source_value = 100.0
         self.source_discharge = 0.1
 

@@ -175,7 +175,6 @@ class HUDivGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorContinuityTerm):
         z, zeta = split(arg)
 
         total_h = self.depth.get_total_depth(eta_old)
-        hu_by_parts = self.u_continuity in ['dg', 'hdiv']
 
         # Term arising from integration by parts
         loc = self.p0test*zeta*dot(total_h*uv, self.normal)
