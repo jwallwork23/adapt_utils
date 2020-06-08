@@ -22,7 +22,7 @@ parser.add_argument("-family", help="Element family for mixed FE space (default 
 # Mesh adaptation
 parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
 parser.add_argument("-normalisation", help="Normalisation method (default 'complexity')")
-parser.add_argument("-target", help="Target space-time complexity (default 1.0e+03)")
+parser.add_argument("-target", help="Target space-time complexity (default 5.0e+03)")
 parser.add_argument("-h_min", help="Minimum tolerated element size (default 100m)")
 parser.add_argument("-h_max", help="Maximum tolerated element size (default 1000km)")
 
