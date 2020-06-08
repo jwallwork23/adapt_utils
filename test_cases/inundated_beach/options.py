@@ -55,7 +55,7 @@ class BalzanoOptions(ShallowWaterOptions):
         self.friction_coeff = 0.025
 
         # Stabilisation
-        self.stabilisation = 'no'
+        self.stabilisation = None
 
         # Boundary conditions
         h_amp = 0.5  # Ocean boundary forcing amplitude
@@ -151,11 +151,14 @@ class BalzanoOptions(ShallowWaterOptions):
         outflow_tag = 2
         bottom_wall_tag = 3
         top_wall_tag = 4
-        boundary_conditions = {'tracer': {}}
-        boundary_conditions['tracer'][inflow_tag] = {'elev': self.elev_in}
-        boundary_conditions['tracer'][outflow_tag] = {'un': Constant(0.0)}
-        boundary_conditions['tracer'][bottom_wall_tag] = {'un': Constant(0.0)}
-        boundary_conditions['tracer'][top_wall_tag] = {'un': Constant(0.0)}
+        boundary_conditions = {'shallow_water':
+            {
+                inflow_tag: {'elev': self.elev_in},
+                outflow_tag: {'un': Constant(0.0)},
+                bottom_wall_tag: {'un': Constant(0.0)},
+                top_wall_tag: {'un': Constant(0.0)},
+            }
+        }
         return boundary_conditions
 
     def update_boundary_conditions(self, t=0.0):
