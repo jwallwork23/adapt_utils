@@ -37,9 +37,9 @@ rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/__pycache__/
 rossby_wave/run_ale.py
-slotted_cylinder/outputs/
-slotted_cylinder/screenshots/
-slotted_cylinder/__pycache__/
+solid_body_rotation/outputs/
+solid_body_rotation/screenshots/
+solid_body_rotation/__pycache__/
 tsunami1d/outputs/
 tsunami1d/__pycache__/
 ale_advection/outputs/

@@ -1,5 +1,7 @@
 all: clean mesh
 
+# --- Mesh
+
 circle: uniform_circle plot_circle print_circle
 
 square: uniform_square plot_square print_square
@@ -8,6 +10,8 @@ mesh:
 	@echo "Generating Delauney mesh of circular domain..."
 	@gmsh -2 circle.geo
 	@echo "Done!"
+
+# --- Uniform convergence
 
 uniform: uniform_circle uniform_square
 
@@ -52,6 +56,8 @@ plot_square:
 	@python3 plot_convergence.py -mesh_type square
 	@echo "Done!"
 	@gio open outputs/fixed_mesh/convergence_square.pdf
+
+# --- Cleanup
 
 clean:
 	@echo "Cleaning directory..."
