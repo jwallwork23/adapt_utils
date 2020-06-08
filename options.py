@@ -56,7 +56,6 @@ class Options(FrozenConfigurable):
 
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.").tag(config=True)
-    stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0), help="Scalar stabilisation parameter.").tag(config=True)
     use_automatic_sipg_parameter = Bool(True, help="Toggle automatic generation of symmetric interior penalty method.").tag(config=True)
 
     # Solver parameters
@@ -289,13 +288,13 @@ class Options(FrozenConfigurable):
     def exact_qoi(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def get_update_forcings(self, prob):
+    def get_update_forcings(self, prob, i):
         """Should be implemented in derived class."""
         def update_forcings(t):
             return
         return update_forcings
 
-    def get_export_func(self, prob):
+    def get_export_func(self, prob, i):
         """Should be implemented in derived class."""
         def export_func():
             return

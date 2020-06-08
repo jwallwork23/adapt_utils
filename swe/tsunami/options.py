@@ -102,11 +102,10 @@ class TsunamiOptions(ShallowWaterOptions):
         self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
 
     def set_bathymetry(self, fs=None, dat=None):
-        assert hasattr(self, 'initial_surface')
         if self.bathymetry_cap is not None:
             assert self.bathymetry_cap >= 0.0
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
-        self.bathymetry = Function(fs, name="Bathymetry")
+        bathymetry = Function(fs, name="Bathymetry")
 
         # Interpolate bathymetry data *in lonlat space*
         lon, lat, elev = dat or self.read_bathymetry_file()
@@ -120,21 +119,20 @@ class TsunamiOptions(ShallowWaterOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating bathymetry...")
         # msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
-        depth = self.bathymetry.dat.data
-        # if self.initial_surface.function_space().mesh() != fs.mesh():
-        #     self.set_initial_surface(fs)
+        depth = bathymetry.dat.data
+        # initial_surface = self.set_initial_surface(fs)  # DUPLICATED
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
-            # depth[i] -= self.initial_surface.dat.data[i]
+            # depth[i] -= initial_surface.dat.data[i]  # TODO?
             depth[i] -= bath_interp(xy[1], xy[0])
             # self.print_debug(msg.format(xy[0], xy[1], depth[i]/1000))
         if self.bathymetry_cap is not None:
-            self.bathymetry.interpolate(max_value(self.bathymetry_cap, self.bathymetry))
+            bathymetry.interpolate(max_value(self.bathymetry_cap, bathymetry))
         self.print_debug("Done!")
-        return self.bathymetry
+        return bathymetry
 
     def set_initial_surface(self, fs=None):
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
-        self.initial_surface = Function(fs, name="Initial free surface")
+        initial_surface = Function(fs, name="Initial free surface")
 
         # Interpolate bathymetry data *in lonlat space*
         lon, lat, elev = self.read_surface_file()
@@ -145,34 +143,31 @@ class TsunamiOptions(ShallowWaterOptions):
         self.print_debug("Interpolating initial surface...")
         # msg = "Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
-            self.initial_surface.dat.data[i] = surf_interp(xy[1], xy[0])
-            # self.print_debug(msg.format(xy[0], xy[1], self.initial_surface.dat.data[i]))
+            initial_surface.dat.data[i] = surf_interp(xy[1], xy[0])
+            # self.print_debug(msg.format(xy[0], xy[1], initial_surface.dat.data[i]))
         self.print_debug("Done!")
-        return self.initial_surface
+        return initial_surface
 
     def set_initial_condition(self, fs):
         P1 = FunctionSpace(fs.mesh(), "CG", 1)
-        self.initial_value = Function(fs)
-        u, eta = self.initial_value.split()
+        initial_value = Function(fs)
+        u, eta = initial_value.split()
 
         # (Naively) assume zero initial velocity
         u.assign(0.0)
 
         # Interpolate free surface from inversion data
-        self.set_initial_surface(P1)
-        eta.interpolate(self.initial_surface)
+        eta.interpolate(self.set_initial_surface(P1))
 
-        return self.initial_value
+        return initial_value
 
     def set_coriolis(self, fs):
-        self.coriolis = Function(fs)
         x, y = SpatialCoordinate(fs.mesh())
         lat, lon = to_latlon(
             x, y, self.force_zone_number,
             northern=True, coords=fs.mesh().coordinates, force_longitude=True
         )
-        self.coriolis.interpolate(2*self.Omega*sin(radians(lat)))
-        return self.coriolis
+        return interpolate(2*self.Omega*sin(radians(lat)), fs)
 
     def set_qoi_kernel(self, fs):
         # b = self.ball(fs.mesh(), source=False)
@@ -185,16 +180,15 @@ class TsunamiOptions(ShallowWaterOptions):
         # rescaling = 1.0 if np.allclose(area, 0.0) else area_fine_mesh/area
         rescaling = 1.0
 
-        self.kernel = Function(fs, name="QoI kernel")
-        kernel_u, kernel_eta = self.kernel.split()
+        kernel = Function(fs, name="QoI kernel")
+        kernel_u, kernel_eta = kernel.split()
         kernel_u.rename("QoI kernel (uv component)")
         kernel_eta.rename("QoI kernel (elev component)")
         kernel_eta.interpolate(rescaling*b)
-        return self.kernel
+        return kernel
 
     def set_final_condition(self, fs):
-        self.set_qoi_kernel(fs)
-        return Function(fs, name="Final time condition").assign(self.kernel)
+        return Function(fs, name="Final time condition").assign(self.set_qoi_kernel(fs))
 
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")

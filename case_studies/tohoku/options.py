@@ -51,10 +51,6 @@ class TohokuOptions(TsunamiOptions):
             self.default_mesh = mesh
         self.print_debug("Done!")
 
-        # Fields
-        self.set_initial_surface()
-        self.set_bathymetry()
-
         # Timestepping: export once per minute for 24 minutes
         self.timestepper = 'CrankNicolson'
         # self.timestepper = 'SSPRK33'
@@ -130,21 +126,17 @@ class TohokuOptions(TsunamiOptions):
         ocean_tag = 100
         coast_tag = 200
         fukushima_tag = 300
-        self.boundary_conditions['shallow_water'] = {
-            coast_tag: {'un': Constant(0.0)},
-            fukushima_tag: {'un': Constant(0.0)},
-            ocean_tag: {'un': Constant(0.0), 'elev': Constant(0.0)},  # Weakly reflective boundaries
+        boundary_conditions = {
+            'shallow_water': {
+                coast_tag: {'un': Constant(0.0)},
+                fukushima_tag: {'un': Constant(0.0)},
+                ocean_tag: {'un': Constant(0.0), 'elev': Constant(0.0)},  # Weakly reflective
+            }
         }
         # TODO: Sponge at ocean boundary?
         #        - Could potentially do this by defining a gradation to the ocean boundary with a
         #          different PhysID.
-        return self.boundary_conditions
-
-    def get_update_forcings(self, solver_obj):
-        def update_forcings(t):
-            # self.print_debug("#### DEBUG t: {:.2f}".format(t))
-            return
-        return update_forcings
+        return boundary_conditions
 
     def annotate_plot(self, axes, coords="lonlat", gauges=False):
         """
@@ -177,7 +169,7 @@ class TohokuOptions(TsunamiOptions):
             elif loc in ("Tokyo", "Hamaoka"):
                 xytext = (x + 0.3, y-0.6)
             ha = "center" if gauges else "left"
-            axes.annotate(loc, xy=(x, y), xytext=xytext, fontsize=10, color=color, ha=ha)
+            axes.annotate(loc, xy=(x, y), xytext=xytext, fontsize=12, color=color, ha=ha)
             circle = plt.Circle((x, y), 0.1, color=color)
             axes.add_patch(circle)
 

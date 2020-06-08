@@ -11,7 +11,6 @@ class MorphOptions(ShallowWaterOptions):
     """
     Parameter class for general morphological problems.
     """
-
     def __init__(self, **kwargs):
         self.slope_eff = False
         self.angle_correction = False
@@ -21,11 +20,11 @@ class MorphOptions(ShallowWaterOptions):
         self.depth_integrated = False
         super(MorphOptions, self).__init__(**kwargs)
 
-    def set_up_suspended(self, mesh, tracer=None):
-        P1 = FunctionSpace(mesh, "CG", 1)
-        P1DG = FunctionSpace(mesh, "DG", 1)
-        P1_vec = FunctionSpace(mesh, "CG", 1)
-        P1DG_vec = VectorFunctionSpace(mesh, "DG", 1)
+    def set_up_suspended(self, prob, i, tracer=None):  # TODO: Tracer?
+        P1 = prob.P1[i]
+        P1DG = prob.P1DG[i]
+        P1_vec = prob.P1_vec[i]
+        P1DG_vec = prob.P1DG_vec[i]
 
         R = Constant(2650/1000 - 1)
         self.dstar = Constant(self.average_size*((self.g*R)/(self.base_viscosity**2))**(1/3))
@@ -54,10 +53,10 @@ class MorphOptions(ShallowWaterOptions):
         self.uv_d = project(self.uv_d, P1DG_vec)
         self.eta_d = project(self.eta_d, P1DG)
 
-        self.u_cg = project(self.uv_d, P1_vec)
+        self.u_cg = project(self.uv_d, P1_vec)  # TODO: uv_d = project(uv_init, P1DG_vec)
         self.horizontal_velocity = project(self.u_cg[0], P1)
         self.vertical_velocity = project(self.u_cg[1], P1)
-        self.elev_cg = project(self.eta_d, P1)
+        self.elev_cg = project(self.eta_d, P1)  # TODO: eta_d = project(eta_init, P1DG)
 
         if self.t_old.dat.data[:] == 0.0:
             self.set_bathymetry(P1)
@@ -76,7 +75,7 @@ class MorphOptions(ShallowWaterOptions):
 
         # skin friction coefficient
 
-        self.cfactor = self.get_cfactor()
+        self.cfactor = self.get_cfactor(self.depth)
         # mu - ratio between skin friction and normal friction
         self.mu = interpolate(conditional(self.qfc > 0, self.cfactor/self.qfc, 0), P1DG)
 
@@ -219,10 +218,10 @@ class MorphOptions(ShallowWaterOptions):
         self.aux = conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001) <<<<<<< HEAD
         self.qfc = 2/(ln(self.aux)/0.4)**2
         # calculate skin friction coefficient
-        self.cfactor.interpolate(self.get_cfactor())
+        self.cfactor.interpolate(self.get_cfactor(self.depth))
 
         if self.friction == 'nikuradse':
-            self.quadratic_drag_coefficient.project(self.get_cfactor())
+            self.quadratic_drag_coefficient.project(self.get_cfactor(self.depth))
 
         # mu - ratio between skin friction and normal friction
         self.mu.interpolate(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))

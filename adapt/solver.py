@@ -768,7 +768,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         export_func = export_func or self.op.get_export_func(self, i)
         print_output(80*'=')
         # if i == 0:
-        export_func()
+        if export_func is not None:
+            export_func()
         self.callbacks[i].evaluate(mode='export')
 
         # We need to project to P1 for vtk outputs
@@ -812,7 +813,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if op.solve_tracer and plot_pvd:
                     proj_tracer.project(self.fwd_solutions_tracer[i])
                     self.tracer_file.write(proj_tracer)
-                export_func()
+                if export_func is not None:
+                    export_func()
                 self.callbacks[i].evaluate(mode='export')
         op.print_debug("Done!")
         print_output(80*'=')
@@ -852,7 +854,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         export_func = export_func or self.op.get_export_func(self, i)
         print_output(80*'=')
         # if i == self.num_meshes-1:
-        export_func()
+        if export_func is not None:
+            export_func()
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
@@ -895,7 +898,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if op.solve_tracer and plot_pvd:
                     proj_tracer.project(self.adj_solutions_tracer[i])
                     self.adjoint_tracer_file.write(proj_tracer)
-                export_func()
+                if export_func is not None:
+                    export_func()
         op.print_debug("Done!")
         print_output(80*'=')
 

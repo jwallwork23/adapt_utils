@@ -97,10 +97,6 @@ class BalzanoOptions(ShallowWaterOptions):
         aux = max_value(11.036*hc/ksp, 1.001)
         return 2*(0.4**2)/(ln(aux)**2)
 
-    def set_manning_drag_coefficient(self, fs):
-        if self.friction == 'manning':
-            return Constant(self.friction_coeff or 0.02)
-
     def set_bathymetry(self, fs, **kwargs):
         max_depth = 5.0
         x, y = SpatialCoordinate(fs.mesh())

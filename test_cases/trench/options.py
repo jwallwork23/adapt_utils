@@ -25,64 +25,37 @@ class TrenchOptions(MorphOptions):
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, **kwargs):
         super(TrenchOptions, self).__init__(**kwargs)
-
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
-        self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)
-        self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
-        self.P1_vec = VectorFunctionSpace(self.default_mesh, "CG", 1)
-        self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
-
         self.plot_pvd = True
 
-        ts = time.time()
-        st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-        outputdir = 'outputs' + st
-
-        self.di = outputdir  # "morph_output"
-
-        # Physical
+        # Physics
         self.base_viscosity = 1e-6
-
+        self.base_diffusivity = 0.15
         self.gravity = Constant(9.81)
-
-        self.wetting_and_drying = False
-
+        self.porosity = Constant(0.4)
+        self.ks = 0.025
         try:
             assert friction in ('nikuradse', 'manning')
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
         self.average_size = 160e-6  # Average sediment size
-
-        self.grad_depth_viscosity = True
-        self.tracer_list = []
-
-        self.bathymetry_file = File(self.di + "/bathy.pvd")
-
-        self.num_hours = 15
-
-        # Physical
-        self.base_diffusivity = 0.15
-
-        self.porosity = Constant(0.4)
-        self.ks = 0.025
-
-        self.solve_tracer = True
-
-        try:
-            assert friction in ('nikuradse', 'manning')
-        except AssertionError:
-            raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
-        self.friction = friction
         self.morfac = 100
 
-        # Initial
-        input_dir = 'hydrodynamics_trench'
+        # Model
+        self.solve_tracer = True
+        self.wetting_and_drying = False
+        self.grad_depth_viscosity = True
 
-        self.eta_init, self.uv_init = self.initialise_fields(input_dir, self.di)
-        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
-        self.eta_d = Function(self.P1DG).project(self.eta_init)
+        # I/O
+        ts = time.time()
+        st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+        self.input_dir = 'hydrodynamics_trench'
+        outputdir = 'outputs' + st
+        self.di = outputdir  # "morph_output"
+        self.tracer_list = []
+        self.bathymetry_file = File(self.di + "/bathy.pvd")
 
         self.convective_vel_flag = True
 
@@ -90,15 +63,15 @@ class TrenchOptions(MorphOptions):
 
         self.slope_eff = True
         self.angle_correction = True
-        self.set_up_suspended(self.default_mesh)
-        self.set_up_bedload(self.default_mesh)
+        self.set_up_suspended(self.default_mesh)  # TODO: Update
+        self.set_up_bedload(self.default_mesh)  # TODO: Update
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
 
         # Time integration
-
         self.dt = 0.3
+        self.num_hours = 15
         self.end_time = self.num_hours*3600.0/self.morfac
         self.dt_per_export = 60
         self.dt_per_remesh = 60
@@ -108,9 +81,6 @@ class TrenchOptions(MorphOptions):
         # Adaptivity
         self.h_min = 1e-8
         self.h_max = 10.
-
-        # Goal-Oriented
-        self.qoi_mode = 'inundation_volume'
 
         # Timeseries
         self.wd_obs = []
@@ -122,36 +92,19 @@ class TrenchOptions(MorphOptions):
         # Outputs  (NOTE: self.di has changed)
         self.bath_file = File(os.path.join(self.di, 'bath_export.pvd'))
 
-    def set_source_tracer(self, fs, solver_obj=None, init=False):
-        if init:
-            self.depo = Function(fs).project(self.settling_velocity * self.coeff)
-            self.ero = Function(fs).project(self.settling_velocity * self.ceq)
-        else:
-            self.depo.interpolate(self.settling_velocity * self.coeff)
-            self.ero.interpolate(self.settling_velocity * self.ceq)
-        return self.depo, self.ero
+    def set_source_tracer(self, fs, solver_obj=None):
+        depo = project(self.settling_velocity * self.coeff, fs)
+        ero = project(self.settling_velocity * self.ceq, fs)
+        return depo, ero
+
+    def get_cfactor(self, depth):
+        ksp = Constant(3*self.average_size)
+        hclip = conditional(ksp > self.depth, ksp, depth)
+        return conditional(depth > self.ksp, 2*((2.5*ln(11.036*hclip/self.ksp))**(-2)), 0)
 
     def set_quadratic_drag_coefficient(self, fs):
         if self.friction == 'nikuradse':
-            self.quadratic_drag_coefficient = project(self.get_cfactor(), fs)
-        return self.quadratic_drag_coefficient
-
-    def get_cfactor(self):
-        try:
-            assert hasattr(self, 'depth')
-        except AssertionError:
-            raise ValueError("Depth is undefined.")
-        self.ksp = Constant(3*self.average_size)
-        hclip = conditional(self.ksp > self.depth, self.ksp, self.depth)
-        return Function(self.P1DG).interpolate(conditional(self.depth > self.ksp, 2*((2.5*ln(11.036*hclip/self.ksp))**(-2)), Constant(0.0)))
-
-    def set_manning_drag_coefficient(self, fs):
-        if self.friction == 'manning':
-            if hasattr(self, 'friction_coeff'):
-                self.manning_drag_coefficient = Constant(self.friction_coeff)
-            else:
-                self.manning_drag_coefficient = Constant(0.02)
-        return self.manning_drag_coefficient
+            return project(self.get_cfactor(), fs)
 
     def set_bathymetry(self, fs, **kwargs):
 
@@ -162,33 +115,20 @@ class TrenchOptions(MorphOptions):
         x, y = SpatialCoordinate(fs.mesh())
         trench = conditional(le(x, 5), depth_riv, conditional(le(x, 6.5), (1/1.5)*depth_diff*(x-6.5) + depth_trench,
                              conditional(le(x, 9.5), depth_trench, conditional(le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
-        self.bathymetry = Function(fs, name="Bathymetry")
-        self.bathymetry.interpolate(-trench)
-        return self.bathymetry
-
-    def set_viscosity(self, fs):
-        self.viscosity = Function(fs)
-        self.viscosity.assign(self.base_viscosity)
-        return self.viscosity
-
-    def set_coriolis(self, fs):
-        return
+        return interpolate(-trench, fs)
 
     def set_boundary_conditions(self, fs):
         inflow_tag = 1
         outflow_tag = 2
         boundary_conditions = {
-            'tracer': {
+            'shallow_water': {
                 inflow_tag: {'flux': Constant(-0.22)},
                 outflow_tag: {'elev': Constant(0.397)},
-            }
+            },
+            'tracer': {
+                inflow_tag: {'value': self.tracer_init_value},
+            },
         }
-        return boundary_conditions
-
-    def set_boundary_conditions_tracer(self, fs):
-        inflow_tag = 1
-        boundary_conditions = {}
-        boundary_conditions[inflow_tag] = {'value': self.tracer_init_value}
         return boundary_conditions
 
     def set_initial_condition(self, fs):
@@ -197,11 +137,12 @@ class TrenchOptions(MorphOptions):
 
         :arg fs: `FunctionSpace` in which the initial condition should live.
         """
-        self.initial_value = Function(fs, name="Initial condition")
-        u, eta = self.initial_value.split()
-        u.project(self.uv_init)
-        eta.project(self.eta_init)
-        return self.initial_value
+        eta_init, uv_init = self.initialise_fields(self.input_dir, self.di)
+        initial_value = Function(fs, name="Initial condition")
+        u, eta = initial_value.split()
+        u.project(uv_init)
+        eta.project(eta_init)
+        return initial_value
 
     def get_update_forcings(self, solver_obj):
 
@@ -261,13 +202,9 @@ class TrenchOptions(MorphOptions):
             chk.close()
         return elev_init, uv_init,
 
-    def get_export_func(self, solver_obj):
-        self.bath_export = solver_obj.fields.bathymetry_2d
+    def get_export_func(self, prob, i):
 
         def export_func():
-            self.bath_file.write(self.bath_export)
-        return export_func
+            self.bath_file.write(prob.bathymetry[i])
 
-    def set_boundary_surface(self):
-        """Set the initial displacement of the boundary elevation."""
-        pass
+        return export_func
