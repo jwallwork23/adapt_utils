@@ -1,4 +1,4 @@
-from adapt_utils.test_cases.inundated_beach.options import BalzanoOptions
+from adapt_utils.test_cases.balzano.options import BalzanoOptions
 from adapt_utils.adapt.solver import AdaptiveProblem
 
 import argparse
