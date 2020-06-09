@@ -96,6 +96,9 @@ class LeVequeOptions(ShallowWaterOptions):
         u, eta = prob.fwd_solutions[0].split()
         u.interpolate(as_vector((0.5 - y, x - 0.5)))
 
+    def set_bathymetry(self, fs):
+        return Constant(1.0)
+
     def set_initial_condition_tracer(self, prob):
         x, y = SpatialCoordinate(prob.meshes[0])
         bell_x0, bell_y0, bell_r0 = self.source_loc[0]
