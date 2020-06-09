@@ -1,5 +1,5 @@
 from adapt_utils.swe.spacetime.solver import *
-from adapt_utils.test_cases.linear_sw_ripple.options import RippleOptions
+from adapt_utils.test_cases.spacetime_ripple.options import RippleOptions
 
 
 debug = False
