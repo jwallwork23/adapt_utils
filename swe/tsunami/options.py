@@ -23,6 +23,8 @@ class TsunamiOptions(ShallowWaterOptions):
 
     def __init__(self, **kwargs):
         super(TsunamiOptions, self).__init__(**kwargs)
+        self.solve_swe = True
+        self.solve_tracer = False
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False
         self.gauges = {}
@@ -35,59 +37,6 @@ class TsunamiOptions(ShallowWaterOptions):
         # we use the automatic SIPG functionality then it would return an enormous value.)
         self.base_viscosity = 1.0e-03
         self.sipg_parameter = Constant(100.0)
-
-        # Solver
-        # =====
-        # The time-dependent shallow water system looks like
-        #
-        #                             ------------------------- -----   -----
-        #       ------------- -----   |                 |     | |   |   |   |
-        #       | A00 | A01 | | U |   |  T + C + V + D  |  G  | | U |   | 0 |
-        # A x = ------------- ----- = |                 |     | |   | = |   |  = b,
-        #       | A10 | A11 | | H |   ------------------------- -----   -----
-        #       ------------- -----   |        B        |  T  | | H |   | 0 |
-        #                             ------------------------- -----   -----
-        #
-        # where:
-        #  * T - time derivative;
-        #  * C - Coriolis;
-        #  * V - viscosity;
-        #  * D - quadratic drag;
-        #  * G - gravity;
-        #  * B - bathymetry.
-        #
-        # We apply a multiplicative fieldsplit preconditioner, i.e. block Gauss-Seidel:
-        #
-        #     ---------------- ------------ ----------------
-        #     | I |     0    | |   I  | 0 | | A00^{-1} | 0 |
-        # P = ---------------- ------------ ----------------.
-        #     | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
-        #     ---------------- ------------ ----------------
-        self.params = {
-            # "snes_converged_reason": None,
-            "ksp_type": "gmres",                     # default
-            # "ksp_converged_reason": None,
-            "pc_type": "fieldsplit",                 # default
-            "pc_fieldsplit_type": "multiplicative",  # default
-            "fieldsplit_U_2d": {
-                "ksp_type": "preonly",               # default
-                "ksp_max_it": 10000,                 # default
-                "ksp_rtol": 1.0e-05,                 # default
-                "pc_type": "sor",                    # default
-                # "ksp_view": None,
-                # "ksp_converged_reason": None,
-            },
-            "fieldsplit_H_2d": {
-                "ksp_type": "preonly",               # default
-                "ksp_max_it": 10000,                 # default
-                "ksp_rtol": 1.0e-05,                 # default
-                # "pc_type": "sor",                  # default
-                "pc_type": "jacobi",
-                # "ksp_view": None,
-                # "ksp_converged_reason": None,
-            },
-        }
-        self.adjoint_params.update(self.params)
 
     def get_utm_mesh(self):
         zone = self.force_zone_number
@@ -148,18 +97,14 @@ class TsunamiOptions(ShallowWaterOptions):
         self.print_debug("Done!")
         return initial_surface
 
-    def set_initial_condition(self, fs):
-        P1 = FunctionSpace(fs.mesh(), "CG", 1)
-        initial_value = Function(fs)
-        u, eta = initial_value.split()
+    def set_initial_condition(self, prob):
+        u, eta = prob.fwd_solutions[0].split()
 
         # (Naively) assume zero initial velocity
         u.assign(0.0)
 
         # Interpolate free surface from inversion data
-        eta.interpolate(self.set_initial_surface(P1))
-
-        return initial_value
+        eta.interpolate(self.set_initial_surface(prob.P1[0]))
 
     def set_coriolis(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
@@ -187,8 +132,8 @@ class TsunamiOptions(ShallowWaterOptions):
         kernel_eta.interpolate(rescaling*b)
         return kernel
 
-    def set_final_condition(self, fs):
-        return Function(fs, name="Final time condition").assign(self.set_qoi_kernel(fs))
+    def set_final_condition(self, prob):
+        prob.adj_solutions[-1].assign(self.set_qoi_kernel(prob.V[-1]))
 
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")

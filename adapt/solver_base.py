@@ -141,7 +141,7 @@ class AdaptiveProblemBase(object):
 
     def set_boundary_conditions(self):
         """Set boundary conditions *for all models*"""
-        self.boundary_conditions = [self.op.set_boundary_conditions(V) for V in self.V]
+        self.boundary_conditions = [self.op.set_boundary_conditions(self, i) for i in range(self.num_meshes)]
 
     def create_outfiles(self):
         raise NotImplementedError("To be implemented in derived class")

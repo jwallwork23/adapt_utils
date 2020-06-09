@@ -26,6 +26,8 @@ class TrenchOptions(MorphOptions):
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, **kwargs):
         super(TrenchOptions, self).__init__(**kwargs)
+        self.solve_swe = True
+        self.solve_tracer = True
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
@@ -45,7 +47,6 @@ class TrenchOptions(MorphOptions):
         self.morfac = 100
 
         # Model
-        self.solve_tracer = True
         self.wetting_and_drying = False
         self.grad_depth_viscosity = True
 
@@ -93,7 +94,7 @@ class TrenchOptions(MorphOptions):
         # Outputs  (NOTE: self.di has changed)
         self.bath_file = File(os.path.join(self.di, 'bath_export.pvd'))
 
-    def set_source_tracer(self, fs, solver_obj=None):
+    def set_source_tracer(self, fs, solver_obj=None):  # TODO: Hook up
         depo = project(self.settling_velocity * self.coeff, fs)
         ero = project(self.settling_velocity * self.ceq, fs)
         return depo, ero
@@ -118,7 +119,7 @@ class TrenchOptions(MorphOptions):
                              conditional(le(x, 9.5), depth_trench, conditional(le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
         return interpolate(-trench, fs)
 
-    def set_boundary_conditions(self, fs):
+    def set_boundary_conditions(self, prob, i):
         inflow_tag = 1
         outflow_tag = 2
         boundary_conditions = {
@@ -127,23 +128,21 @@ class TrenchOptions(MorphOptions):
                 outflow_tag: {'elev': Constant(0.397)},
             },
             'tracer': {
-                inflow_tag: {'value': self.tracer_init_value},
+                inflow_tag: {'value': self.tracer_init_value},  # TODO: set_initial_condition_tracer
             },
         }
         return boundary_conditions
 
-    def set_initial_condition(self, fs):
+    def set_initial_condition(self, prob):
         """
         Set initial elevation and velocity using asymptotic solution.
 
         :arg fs: `FunctionSpace` in which the initial condition should live.
         """
         eta_init, uv_init = self.initialise_fields(self.input_dir, self.di)
-        initial_value = Function(fs, name="Initial condition")
-        u, eta = initial_value.split()
+        u, eta = prob.fwd_solutions[0].split()
         u.project(uv_init)
         eta.project(eta_init)
-        return initial_value
 
     def get_update_forcings(self, solver_obj):
 

@@ -1,6 +1,8 @@
 from thetis import *
 from thetis.configuration import *
 
+import numpy as np
+
 from adapt_utils.tracer.options import TracerOptions
 
 
@@ -21,15 +23,18 @@ class PowerOptions(TracerOptions):
     """
     def __init__(self, centred=True, **kwargs):
         super(PowerOptions, self).__init__(**kwargs)
+        self.solve_swe = False
+        self.solve_tracer = True
         self.default_mesh = SquareMesh(40, 40, 4, 4)
 
         # Source / receiver
         self.source_loc = [(1., 2., 0.1)] if centred else [(1., 1.5, 0.1)]
         self.region_of_interest = [(3., 2., 0.1)] if centred else [(3., 2.5, 0.1)]
-        self.base_diffusivity = 1.
+        self.base_diffusivity = 1.0
+        self.base_velocity = [15.0, 0.0]
 
-    def set_boundary_conditions(self, fs):
-        zero = Constant(0.0, domain=fs.mesh())
+    def set_boundary_conditions(self, prob, i):
+        zero = Constant(0.0)
         boundary_conditions = {
             'tracer': {
                 1: {'value': zero},
@@ -41,28 +46,18 @@ class PowerOptions(TracerOptions):
         }
         return boundary_conditions
 
-    def set_diffusivity(self, fs):
-        self.diffusivity = Constant(self.base_diffusivity)
-        return self.diffusivity
+    def set_initial_condition(self, prob):
+        u, eta = prob.fwd_solutions[0].split()
+        u.interpolate(as_vector(self.base_velocity))
 
-    def set_velocity(self, fs):
-        self.fluid_velocity = Function(fs)
-        self.fluid_velocity.interpolate(as_vector((15., 0.)))
-        return self.fluid_velocity
-
-    def set_source(self, fs):
-        self.source = Function(fs)
-        self.source.interpolate(self.bump(fs.mesh(), source=True))
-        area = assemble(self.source*dx)
-        rescaling = 0.04/area if area != 0. else 1.
-        self.source.interpolate(rescaling*self.source)
-        self.source.rename("Source term")
-        return self.source
+    def set_source(self, fs):  # TODO
+        source = self.bump(fs.mesh(), source=True)
+        area = assemble(source*dx)
+        rescaling = 1.0 if np.allclose(area, 0.0) else 0.04/area
+        return interpolate(rescaling*source)
 
     def set_qoi_kernel(self, fs):  # FIXME: update
-        self.kernel = Function(fs)
-        self.kernel.interpolate(self.bump(fs.mesh()))
-        area = assemble(self.kernel*dx)
-        rescaling = 0.04/area if area != 0. else 1.
-        self.kernel.interpolate(rescaling*self.kernel)
-        return self.kernel
+        kernel = self.bump(fs.mesh())
+        area = assemble(kernel*dx)
+        rescaling = 1.0 if np.allclose(area, 0.0) else 0.04/area
+        return interpolate(rescaling*kernel, fs)

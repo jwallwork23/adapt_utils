@@ -27,6 +27,8 @@ class TelemacOptions(TracerOptions):
     """
     def __init__(self, n=0, offset=1.0, centred=False, **kwargs):
         super(TelemacOptions, self).__init__(**kwargs)
+        self.solve_swe = False
+        self.solve_tracer = True
 
         # Domain
         self.set_default_mesh(n=n)
@@ -68,8 +70,8 @@ class TelemacOptions(TracerOptions):
     def set_default_mesh(self, n=0):
         self.default_mesh = RectangleMesh(100*2**n, 20*2**n, 50, 10)
 
-    def set_boundary_conditions(self, fs):
-        zero = Constant(0.0, domain=fs.mesh())
+    def set_boundary_conditions(self, prob, i):
+        zero = Constant(0.0)
         boundary_conditions = {
             'tracer': {
                 1: {'value': zero},
@@ -80,33 +82,23 @@ class TelemacOptions(TracerOptions):
         }
         return boundary_conditions
 
-    def set_diffusivity(self, fs):
-        self.diffusivity = Constant(self.base_diffusivity)
-        return self.diffusivity
-
-    def set_velocity(self, fs):
-        self.fluid_velocity = Constant(as_vector(self.base_velocity))
-        return self.fluid_velocity
-
-    def set_source(self, fs):
+    def set_source(self, fs):  # TODO
         x0, y0, r0 = self.source_loc[0]
         nrm = assemble(self.ball(fs.mesh(), source=True)*dx)
         scaling = 1.0 if np.allclose(nrm, 0.0) else pi*r0*r0/nrm
         scaling *= 0.5*self.source_value
         # scaling *= self.source_value
-        self.source = self.ball(fs.mesh(), source=True, scale=scaling)
-        return self.source
+        return self.ball(fs.mesh(), source=True, scale=scaling)
 
     def set_qoi_kernel(self, fs):
         b = self.ball(fs.mesh(), source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = 1.0 if np.allclose(area, 0.0) else area_exact/area
-        self.kernel = rescaling*b
-        return self.kernel
+        return rescaling*b
 
     def exact_solution(self, fs):
-        self.solution = Function(fs)
+        solution = Function(fs)
         mesh = fs.mesh()
         x, y = SpatialCoordinate(mesh)
         x0, y0, r = self.source_loc[0]
@@ -115,11 +107,11 @@ class TelemacOptions(TracerOptions):
         # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
-        self.solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
-        self.solution.rename('Analytic tracer concentration')
+        solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
+        solution.rename('Analytic tracer concentration')
         outfile = File(os.path.join(self.di, 'analytic.pvd'))
-        outfile.write(self.solution)  # NOTE: use 40 discretisation levels in ParaView
-        return self.solution
+        outfile.write(solution)  # NOTE: use 40 discretisation levels in ParaView
+        return solution
 
     def exact_qoi(self, fs1, fs2):
         mesh = fs1.mesh()
@@ -131,5 +123,5 @@ class TelemacOptions(TracerOptions):
         q = 1
         r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
         sol = 0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu)
-        self.set_qoi_kernel(fs2)
-        return assemble(self.kernel*sol*dx(degree=12))
+        kernel = self.set_qoi_kernel(fs2)
+        return assemble(kernel*sol*dx(degree=12))

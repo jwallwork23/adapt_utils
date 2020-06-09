@@ -9,12 +9,12 @@ __all__ = ["ALEAdvectionOptions"]
 class ALEAdvectionOptions(TracerOptions):
     def __init__(self, n=40, approach='ale', *args, **kwargs):
         super(ALEAdvectionOptions, self).__init__(*args, approach=approach, **kwargs)
-        if self.family in ('CG', 'cg', 'Lagrange'):
+        self.solve_swe = False
+        self.solve_tracer = True
+        if self.tracer_family == 'cg':
             self.stabilisation = 'SUPG'
-        elif self.family in ('DG', 'dg', 'Discontinuous Lagrange'):
-            self.stabilisation = 'no'
-        else:
-            raise NotImplementedError
+        elif self.tracer_family == 'dg':
+            self.stabilisation = None
         self.num_adapt = 1
         self.nonlinear_method = 'relaxation'
 
@@ -30,34 +30,18 @@ class ALEAdvectionOptions(TracerOptions):
         self.base_diffusivity = 0.0
         self.base_velocity = [1.0, 0.0]
 
-        self.params = {
-            "ksp_type": "gmres",
-            "pc_type": "sor",
-            # "ksp_monitor": None,
-            # "ksp_converged_reason": None,
-        }
-
-    def set_velocity(self, fs):
-        self.fluid_velocity = interpolate(as_vector(self.base_velocity), fs)
-        return self.fluid_velocity
-
-    def set_diffusivity(self, fs):
-        self.diffusivity = Constant(self.base_diffusivity)
-        return self.diffusivity
-
-    def set_source(self, fs):
+    def set_source(self, fs):  # TODO
         self.source = Function(fs, name="Tracer source")
         return self.source
 
-    def set_boundary_conditions(self, fs):
-        self.boundary_conditions['tracer'] = {
+    def set_boundary_conditions(self, prob, i):
+        boundary_conditions['tracer'] = {
             1: {'diff_flux': Constant(0.0)},
             2: {'diff_flux': Constant(0.0)},
         }
-        return self.boundary_conditions
+        return boundary_conditions
 
-    def set_initial_condition(self, fs):
-        x, y = SpatialCoordinate(fs.mesh())
+    def set_initial_condition_tracer(self, prob):
+        x, y = SpatialCoordinate(prob.meshes[0])
         x0, y0 = 5.0, 5.0
-        self.initial_value = interpolate(exp(-((x-x0)**2 + (y-y0)**2)), fs)
-        return self.initial_value
+        prob.fwd_solutions_tracer[0].interpolate(exp(-((x-x0)**2 + (y-y0)**2)))

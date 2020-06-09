@@ -29,9 +29,9 @@ class LeVequeOptions(ShallowWaterOptions):
     [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
     def __init__(self, shape=0, mesh_type='circle', n=0, background_concentration=0.0, **kwargs):
-        self.shape = shape
         self.solve_swe = False
         self.solve_tracer = True
+        self.shape = shape
 
         # Temporal discretisation
         self.dt = pi/300.0
@@ -73,9 +73,11 @@ class LeVequeOptions(ShallowWaterOptions):
             self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
 
         # Solver
-        self.params = {
-            'ksp_type': 'gmres',
-            'pc_type': 'sor',
+        self.solver_parameters = {
+            'tracer': {
+                'ksp_type': 'gmres',
+                'pc_type': 'sor',
+            }
         }
 
     def set_region_of_interest(self, shape=0):
@@ -83,19 +85,19 @@ class LeVequeOptions(ShallowWaterOptions):
         self.shape = shape
         self.region_of_interest = [(self.source_loc[shape][0], self.source_loc[shape][1], 0.175)]
 
-    def set_boundary_conditions(self, fs):
+    def set_boundary_conditions(self, prob, i):
         boundary_conditions = {'tracer': {}}
         for i in range(1, 5):
             boundary_conditions['tracer'][i] = {i: {'value': Constant(self.bg)}}
         return boundary_conditions
 
-    def set_velocity(self, fs):
-        x, y = SpatialCoordinate(fs.mesh())
-        fluid_velocity = interpolate(as_vector((0.5 - y, x - 0.5)), fs)
-        return fluid_velocity
+    def set_initial_condition(self, prob):
+        x, y = SpatialCoordinate(prob.meshes[0])
+        u, eta = prob.fwd_solutions[0].split()
+        u.interpolate(as_vector((0.5 - y, x - 0.5)))
 
-    def set_initial_condition(self, fs):
-        x, y = SpatialCoordinate(fs.mesh())
+    def set_initial_condition_tracer(self, prob):
+        x, y = SpatialCoordinate(prob.meshes[0])
         bell_x0, bell_y0, bell_r0 = self.source_loc[0]
         cone_x0, cone_y0, cone_r0 = self.source_loc[1]
         cyl_x0, cyl_y0, cyl_r0 = self.source_loc[2]
@@ -107,7 +109,7 @@ class LeVequeOptions(ShallowWaterOptions):
             sqrt(pow(x-cyl_x0, 2) + pow(y-cyl_y0, 2)) < cyl_r0, conditional(
                 And(And(x > slot_left, x < slot_right), y < slot_top), 0.0, 1.0), 0.0)
 
-        return interpolate(self.bg + bell + cone + slot_cyl, fs)
+        prob.fwd_solutions_tracer[0].interpolate(self.bg + bell + cone + slot_cyl)
 
     def set_qoi_kernel(self, fs):
         b = self.ball(fs.mesh(), source=False)
@@ -116,15 +118,16 @@ class LeVequeOptions(ShallowWaterOptions):
         rescaling = area_exact/area if area != 0. else 1
         return rescaling*b
 
-    def set_final_condition(self, fs):
+    def set_final_condition_tracer(self, prob):
         b = self.ball(fs.mesh(), source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
-        return interpolate(rescaling*b, fs)
+        prob.adj_solutions[-1].interpolate(rescaling*b)
 
     def exact_solution(self, fs):
-        return self.set_initial_condition(fs)
+        raise NotImplementedError  # TODO
+        # return self.set_initial_condition(fs)
 
     def exact_qoi(self):
         h = 1  # Height of cone and cylinder

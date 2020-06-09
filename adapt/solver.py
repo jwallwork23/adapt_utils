@@ -47,8 +47,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             swo.tidal_turbine_farms = {}  # TODO
             if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
                 swo['sipg_parameter'] = op.sipg_parameter
-        if nonlinear:
-            op.params['snes_type'] = 'ksponly'
+        if not nonlinear:
+            for model in op.solver_parameters:
+                op.solver_parameters[model]['snes_type'] = 'ksponly'
+                op.adjoint_solver_parameters[model]['snes_type'] = 'ksponly'
         self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
         static_options = {
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
@@ -254,16 +256,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def set_initial_condition(self):
         """Apply initial condition(s) for forward solution(s) on first mesh."""
         if self.op.solve_swe:
-            self.fwd_solutions[0].assign(self.op.set_initial_condition(self.V[0]))
+            self.op.set_initial_condition(self)
         if self.op.solve_tracer:
-            self.fwd_solutions_tracer[0].assign(self.op.set_initial_condition_tracer(self.Q[0]))
+            self.op.set_initial_condition_tracer(self)
 
     def set_final_condition(self):
         """Apply final time condition(s) for adjoint solution(s) on final mesh."""
         if self.op.solve_swe:
-            self.adj_solutions[-1].assign(self.op.set_final_condition(self.V[-1]))
+            self.op.set_final_condition(self)
         if self.op.solve_tracer:
-            self.adj_solutions_tracer[-1].assign(self.op.set_final_condition_tracer(self.Q[-1]))
+            self.op.set_final_condition_tracer(self)
 
     def project_forward_solution(self, i, j):
         """Project forward solution(s) from mesh `i` to mesh `j`."""
@@ -364,13 +366,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'quadratic_drag_coefficient': self.fields[i].quadratic_drag_coefficient,
             'manning_drag_coefficient': self.fields[i].manning_drag_coefficient,
             'viscosity_h': self.fields[i].horizontal_viscosity,
-            'lax_friedrichs_velocity_scaling_factor': self.shallow_water_options[i].lax_friedrichs_velocity_scaling_factor,
             'coriolis': self.fields[i].coriolis_frequency,
             'wind_stress': None,
             'atmospheric_pressure': None,
             'momentum_source': None,
             'volume_source': None,
         }
+        if self.stabilisation == 'lax_friedrichs':
+            fields['lax_friedrichs_velocity_scaling_factor'] = self.shallow_water_options[i].lax_friedrichs_velocity_scaling_factor
         return fields
 
     def _get_fields_for_tracer_timestepper(self, i):
@@ -380,9 +383,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'uv_2d': u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             # 'source': self.fields[i].tracer_source_2d,  # TODO
-            'lax_friedrichs_tracer_scaling_factor': self.tracer_options[i].lax_friedrichs_tracer_scaling_factor,
             # 'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,  # TODO
         }
+        if self.stabilisation == 'lax_friedrichs':
+            fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
 
     # TODO: Reduce duplication (1)
@@ -392,7 +396,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
-            'solver_parameters': self.op.params,  # TODO: Split into SW and tracer
+            'solver_parameters': self.op.solver_parameters['shallow_water'],
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
@@ -409,7 +413,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         args = (self.equations[i].tracer, self.fwd_solutions_tracer[i], fields, dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
-            'solver_parameters': self.op.params,  # TODO: Split into SW and tracer
+            'solver_parameters': self.op.solver_parameters['tracer'],
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
@@ -434,7 +438,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             # 'error_estimator': self.error_estimators[i]['shallow_water'],  # TODO
-            'solver_parameters': self.op.adjoint_params,  # TODO: Split into SW and tracer
+            'solver_parameters': self.op.adjoint_solver_parameters['shallow_water'],
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
@@ -458,7 +462,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
             # 'error_estimator': self.error_estimators[i]['tracer'],  # TODO
-            'solver_parameters': self.op.params,  # TODO: Split into SW and tracer
+            'solver_parameters': self.op.adjoint_solver_parameters['tracer'],
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation

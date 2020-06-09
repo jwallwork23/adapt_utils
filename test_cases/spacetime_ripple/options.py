@@ -9,6 +9,8 @@ __all__ = ["RippleOptions"]
 class RippleOptions(ShallowWaterOptions):
     def __init__(self, nx=16, nt=25, shelf=False, **kwargs):
         super(RippleOptions, self).__init__(**kwargs)
+        self.solve_swe = True
+        self.solve_tracer = False
         self.shelf = shelf
         lx = 4.0
         self.dt = 0.05
@@ -29,33 +31,35 @@ class RippleOptions(ShallowWaterOptions):
 
         # Physical parameters
         self.g.assign(9.81)
-        self.depth = 0.1
+        self.base_bathymetry = 0.1
         self.base_viscosity = 0.0
 
         # Solver parameters
-        self.params = {
-            # 'mat_type': 'matfree',
-            'mat_type': 'aij',
-            'ksp_type': 'preonly',
-            # 'pc_type': 'python',
-            # 'pc_python_type': 'firedrake.AssembledPC',
-            # 'assembled_pc_type': 'lu'
-            'pc_type': 'lu',
-            'pc_factor_mat_solver_type': 'mumps',
-            'ksp_monitor': None,
+        self.solver_parameters = {
+            'shallow_water': {
+                # 'mat_type': 'matfree',
+                'mat_type': 'aij',
+                'ksp_type': 'preonly',
+                # 'pc_type': 'python',
+                # 'pc_python_type': 'firedrake.AssembledPC',
+                # 'assembled_pc_type': 'lu'
+                'pc_type': 'lu',
+                'pc_factor_mat_solver_type': 'mumps',
+                'ksp_monitor': None,
+            }
         }
+        self.adjoint_solver_parameters.update(self.solver_parameters)
 
     def set_bathymetry(self, fs):
+        b = base_bathymetry
         if self.shelf:
             x, y, t = SpatialCoordinate(fs.mesh())
-            self.bathymetry = interpolate(conditional(le(x, 0.5), self.depth/10, self.depth), fs)
+            return interpolate(conditional(le(x, 0.5), b/10, b), fs)
         else:
-            self.bathymetry = Constant(self.depth)
-        return self.bathymetry
+            return Constant(b)
 
-    def set_initial_condition(self, fs):
-        initial_value = Function(fs)
-        args = initial_value.split()
+    def set_initial_condition(self, prob):
+        args = prob.fwd_solutions[0].split()
         if len(args) == 3:
             udiv = args[2]
             udiv.assign(0.0)
@@ -64,10 +68,9 @@ class RippleOptions(ShallowWaterOptions):
         x, y, t = SpatialCoordinate(fs.mesh())
         x0, y0, t0, r = self.source_loc[0]  # TODO: we haven't used r
         eta.interpolate(0.001*exp(-((x-x0)*(x-x0) + (y-y0)*(y-y0))/0.04))
-        return initial_value
 
-    def set_boundary_conditions(self, fs):
-        args = self.set_initial_condition(fs).split()
+    def set_boundary_conditions(self, prob, i):
+        args = self.set_initial_condition(prob.V[i]).split()
         u, eta = args[:2]
         # udiv = args[2]
         boundary_conditions = {
