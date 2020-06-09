@@ -147,10 +147,10 @@ class AdaptiveProblemBase(object):
         raise NotImplementedError("To be implemented in derived class")
 
     def set_initial_condition(self):
-        raise NotImplementedError("To be implemented in derived class")
+        self.op.set_initial_condition(self)
 
     def set_final_condition(self):
-        raise NotImplementedError("To be implemented in derived class")
+        self.op.set_final_condition(self)
 
     def create_equations(self, i, adjoint=False):
         if adjoint:
@@ -167,16 +167,16 @@ class AdaptiveProblemBase(object):
     def create_error_estimators(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_timestepper(self, i, adjoint=False):
+    def create_timesteppers(self, i, adjoint=False):
         if adjoint:
-            self.create_adjoint_timestepper(i)
+            self.create_adjoint_timesteppers(i)
         else:
-            self.create_forward_timestepper(i)
+            self.create_forward_timesteppers(i)
 
-    def create_forward_timestepper(self, i):
+    def create_forward_timesteppers(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_adjoint_timestepper(self, i):
+    def create_adjoint_timesteppers(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
     def add_callbacks(self, i):

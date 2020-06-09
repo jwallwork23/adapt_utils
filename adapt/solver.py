@@ -311,8 +311,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
-    def _create_forward_tracer_equation(self, i):
-        raise NotImplementedError  # TODO
+    def _create_forward_tracer_equation(self, i):  # TODO: Conservative form
+        self.equations[i].tracer = TracerEquation2D(
+            self.Q[i],
+            self.depth[i],
+            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
+            sipg_parameter=self.tracer_options[i].sipg_parameter_tracer,
+        )
+        # TODO: limiters
+        self.equations[i].tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     def _create_adjoint_tracer_equation(self, i):
         raise NotImplementedError  # TODO
@@ -344,7 +351,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Timestepping
 
-    def create_forward_timestepper(self, i):
+    def create_forward_timesteppers(self, i):
         if i == 0:
             self.simulation_time = 0.0
         if self.op.solve_swe:
@@ -352,7 +359,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_tracer:
             self._create_forward_tracer_timestepper(i, self.integrator)
 
-    def create_adjoint_timestepper(self, i):
+    def create_adjoint_timesteppers(self, i):
         if i == self.num_meshes-1:
             self.simulation_time = self.op.end_time
         if self.op.solve_swe:
@@ -474,25 +481,35 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # TODO: Estimate error
     # TODO: Turbine setup
-    # TODO: Tracer
     def setup_solver_forward(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
         op.print_debug(op.indent + "SETUP: Creating forward equations on mesh {:d}...".format(i))
         self.create_forward_equations(i)
         op.print_debug(op.indent + "SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
-        self.create_timestepper(i)
-        ts = self.timesteppers[i]['shallow_water']
-        dbcs = []
-        if op.family == 'cg-cg':
-            op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
-            bcs = self.boundary_conditions[i]
-            for j in bcs['shallow_water']:
-                if 'value' in bcs['shallow_water'][j]:
-                    bcs.append(DirichletBC(self.V[i].sub(1), bcs[j]['value'], j))
-        prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
-        ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward")
-        op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
+        self.create_timesteppers(i)
+        bcs = self.boundary_conditions[i]
+        if op.solve_swe:
+            ts = self.timesteppers[i]['shallow_water']
+            dbcs = []
+            if op.family == 'cg-cg':
+                op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
+                for j in bcs['shallow_water']:
+                    if 'elev' in bcs['shallow_water'][j]:
+                        dbcs.append(DirichletBC(self.V[i].sub(1), bcs['shallow_water'][j]['elev'], j))
+            prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
+            ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward")
+        if op.solve_tracer:
+            ts = self.timesteppers[i]['tracer']
+            dbcs = []
+            if op.tracer_family == 'cg':
+                op.print_debug(op.indent + "SETUP: Applying tracer DirichletBCs on mesh {:d}...".format(i))
+                for j in bcs['tracer']:
+                    if 'value' in bcs['tracer'][j]:
+                        dbcs.append(DirichletBC(self.Q[i], bcs['tracer'][j]['value'], j))
+            prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
+            ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_tracer")
+            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i)
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
@@ -543,6 +560,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 ts.shallow_water.advance(self.simulation_time, update_forcings)
             if op.solve_tracer:
                 ts.tracer.advance(self.simulation_time, update_forcings)
+                # TODO: limiters
             iteration += 1
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')
@@ -562,24 +580,32 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug("Done!")
         print_output(80*'=')
 
-    # TODO: Tracer
     def setup_solver_adjoint(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
         op.print_debug(op.indent + "SETUP: Creating adjoint equations on mesh {:d}...".format(i))
         self.create_adjoint_equations(i)
         op.print_debug(op.indent + "SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
-        self.create_adjoint_timestepper(i)
+        self.create_adjoint_timesteppers(i)
         ts = self.timesteppers[i]['adjoint_shallow_water']
         dbcs = []
-        if op.family == 'cg-cg':
-            op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
-            bcs = self.boundary_conditions[i]
-            for j in bcs['shallow_water']:
-                if 'un' not in bcs['shallow_water'][j]:
-                    bcs.append(DirichletBC(self.V[i].sub(1), 0, j))
-        prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
-        ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint")
+        bcs = self.boundary_conditions[i]
+        if op.solve_swe:
+            if op.family == 'cg-cg':
+                op.print_debug(op.indent + "SETUP: Applying adjoint DirichletBCs on mesh {:d}...".format(i))
+                for j in bcs['shallow_water']:
+                    if 'un' not in bcs['shallow_water'][j]:
+                        dbcs.append(DirichletBC(self.V[i].sub(1), 0, j))
+            prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
+            ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint")
+        if op.solve_tracer:
+            ts = self.timesteppers[i]['adjoint_tracer']
+            dbcs = []
+            if op.family == 'cg':
+                op.print_debug(op.indent + "SETUP: Applying adjoint tracer DirichletBCs on mesh {:d}...".format(i))
+                raise NotImplementedError  # TODO
+            prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
+            ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
 
     def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
@@ -628,6 +654,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 ts.adjoint_shallow_water.advance(self.simulation_time, update_forcings)
             if op.solve_tracer:
                 ts.adjoint_tracer.advance(self.simulation_time, update_forcings)
+                # TODO: tracer
             iteration += 1
             self.simulation_time -= op.dt
             self.callbacks[i].evaluate(mode='timestep')
