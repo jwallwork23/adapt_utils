@@ -20,7 +20,7 @@ class RippleOptions(ShallowWaterOptions):
         self.t_final_tag = 6
 
         # Discretisation
-        self.stabilisation = 'no'
+        self.stabilisation = None
         self.degree = 1
         # self.family = 'cg-cg'
 
@@ -30,6 +30,7 @@ class RippleOptions(ShallowWaterOptions):
         # Physical parameters
         self.g.assign(9.81)
         self.depth = 0.1
+        self.base_viscosity = 0.0
 
         # Solver parameters
         self.params = {
@@ -53,34 +54,29 @@ class RippleOptions(ShallowWaterOptions):
         return self.bathymetry
 
     def set_initial_condition(self, fs):
-        self.initial_value = Function(fs)
-        if fs.ufl_element().num_sub_elements() == 2:
-            u, eta = self.initial_value.split()
-        else:
-            u, eta, udiv = self.initial_value.split()
+        initial_value = Function(fs)
+        args = initial_value.split()
+        if len(args) == 3:
+            udiv = args[2]
             udiv.assign(0.0)
+        u, eta = args[:2]
         u.assign(0.0)
         x, y, t = SpatialCoordinate(fs.mesh())
         x0, y0, t0, r = self.source_loc[0]  # TODO: we haven't used r
         eta.interpolate(0.001*exp(-((x-x0)*(x-x0) + (y-y0)*(y-y0))/0.04))
-        return self.initial_value
-
-    def set_coriolis(self, fs):
-        self.coriolis = Constant(0.0)
-        return self.coriolis
-
-    def set_viscosity(self, fs):
-        self.viscosity = Constant(0.0)
-        return self.viscosity
+        return initial_value
 
     def set_boundary_conditions(self, fs):
-        if not hasattr(self, 'initial_value'):
-            self.set_initial_condition(fs)
-        if fs.ufl_element().num_sub_elements() == 2:
-            u, eta = self.initial_value.split()
-        else:
-            u, eta, udiv = self.initial_value.split()
-        self.boundary_conditions = {'shallow_water': {5: {'uv': u, 'elev': eta}, 6: {}}}
-        freeslip = {'un': Constant(0.0)}
-        for i in range(1, 5):
-            self.boundary_conditions['shallow_water'][i] = freeslip
+        args = self.set_initial_condition(fs).split()
+        u, eta = args[:2]
+        # udiv = args[2]
+        boundary_conditions = {
+            'shallow_water': {
+                1: {'un': Constant(0.0)},
+                2: {'un': Constant(0.0)},
+                3: {'un': Constant(0.0)},
+                4: {'un': Constant(0.0)},
+                5: {'uv': u, 'elev': eta},
+                6: {},
+            },
+        }
