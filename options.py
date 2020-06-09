@@ -132,7 +132,7 @@ class Options(FrozenConfigurable):
         self.qoi_rtol = tol
         self.estimator_rtol = tol
 
-    def box(self, mesh, scale=1.0, source=False):
+    def box(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
         Rectangular indicator function associated with region(s) of interest.
 
@@ -149,6 +149,7 @@ class Options(FrozenConfigurable):
         dim = mesh.topological_dimension()
         x = SpatialCoordinate(mesh)
         locs = self.source_loc if source else self.region_of_interest
+        locs = custom_locs or locs
         for j in range(len(locs)):
             expr = And(gt(x[0], locs[j][0]-locs[j][dim]), lt(x[0], locs[j][0]+locs[j][dim]))
             for i in range(1, dim):
@@ -157,7 +158,7 @@ class Options(FrozenConfigurable):
             b = expr if j == 0 else Or(b, expr)
         return conditional(b, scale, 0.0)
 
-    def ball(self, mesh, scale=1.0, source=False):
+    def ball(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
         Ball indicator function associated with region(s) of interest.
 
@@ -174,13 +175,15 @@ class Options(FrozenConfigurable):
         dim = mesh.topological_dimension()
         x = SpatialCoordinate(mesh)
         locs = self.source_loc if source else self.region_of_interest
+        locs = custom_locs or locs
+        b = 0
         for j in range(len(locs)):
-            r0 = locs[j][dim]
-            expr = lt(sum((x[i]-locs[j][i])**2 for i in range(dim)), r0**2 + 1e-10)
-            b = expr if j == 0 else Or(b, expr)
-        return conditional(b, scale, 0.0)
+            r0_sq = locs[j][dim]**2
+            r_sq = sum((x[i]-locs[j][i])**2 for i in range(dim))
+            b += conditional(lt(r_sq, r0_sq + 1.0e-10), scale, 0)
+        return b
 
-    def bump(self, mesh, scale=1.0, source=False):
+    def bump(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
         Rectangular bump function associated with region(s) of interest. (A smooth approximation
         to the box function.)
@@ -199,6 +202,7 @@ class Options(FrozenConfigurable):
         dim = mesh.topological_dimension()
         x = SpatialCoordinate(mesh)
         locs = self.source_loc if source else self.region_of_interest
+        locs = custom_locs or locs
         b = 0
         for j in range(len(locs)):
             vol = 1.0
@@ -210,7 +214,7 @@ class Options(FrozenConfigurable):
             b += conditional(lt(sum((x[i]-locs[j][i])**2 for i in range(dim)), vol), expr, 0.0)
         return b
 
-    def circular_bump(self, mesh, scale=1.0, source=False):
+    def circular_bump(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
         Circular bump function associated with region(s) of interest. (A smooth approximation to
         the ball function.)
@@ -229,14 +233,15 @@ class Options(FrozenConfigurable):
         dim = mesh.topological_dimension()
         x = SpatialCoordinate(mesh)
         locs = self.source_loc if source else self.region_of_interest
+        locs = custom_locs or locs
         b = 0
         for j in range(len(locs)):
             r0_sq = locs[j][dim]**2
             r_sq = sum((x[i]-locs[j][i])**2 for i in range(dim))
-            b += conditional(lt(r_sq, r0_sq + 1e-10), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
+            b += conditional(lt(r_sq, r0_sq + 1.0e-10), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
         return b
 
-    def gaussian(self, mesh, scale=1.0, source=False):
+    def gaussian(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
         Gaussian bell associated with region(s) of interest.
 
@@ -253,6 +258,7 @@ class Options(FrozenConfigurable):
         dim = mesh.topological_dimension()
         x = SpatialCoordinate(mesh)
         locs = self.source_loc if source else self.region_of_interest
+        locs = custom_locs or locs
         b = 0
         for j in range(len(locs)):
             r0_sq = locs[j][dim]**2

@@ -138,12 +138,11 @@ class TohokuOptions(TsunamiOptions):
         #          different PhysID.
         return boundary_conditions
 
-    def annotate_plot(self, axes, coords="lonlat", gauges=False):
+    def annotate_plot(self, axes, coords="utm", gauges=False):
         """
         Annotate a plot on axes `axes` in coordinate system `coords` with all gauges or locations of
         interest, as determined by the Boolean kwarg `gauges`.
         """
-        coords = coords or "lonlat"
         try:
             assert coords in ("lonlat", "utm")
         except AssertionError:
