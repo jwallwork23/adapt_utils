@@ -7,6 +7,7 @@ from adapt_utils.swe.options import ShallowWaterOptions
 __all__ = ["MorphOptions"]
 
 
+# TODO: Move into AdaptiveMorphologicalProblem
 class MorphOptions(ShallowWaterOptions):
     """
     Parameter class for general morphological problems.
