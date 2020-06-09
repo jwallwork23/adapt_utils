@@ -10,6 +10,7 @@ from adapt_utils.swe.equation import ShallowWaterEquations
 from adapt_utils.swe.adjoint import AdjointShallowWaterEquations
 from adapt_utils.swe.error_estimation import ShallowWaterGOErrorEstimator
 from adapt_utils.swe.utils import *
+from adapt_utils.tracer.equation import TracerEquation2D
 from adapt_utils.tracer.error_estimation import TracerGOErrorEstimator
 
 
@@ -120,7 +121,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
         self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
         self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
-        # self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
+        self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
 
         # Shallow water space
         self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
@@ -389,7 +390,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'elev_2d': eta,
             'uv_2d': u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
+            'source': None,
             # 'source': self.fields[i].tracer_source_2d,  # TODO
+            'tracer_advective_velocity_factor': None,
             # 'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,  # TODO
         }
         if self.stabilisation == 'lax_friedrichs':
@@ -877,7 +880,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 print_output("Converged number of mesh elements!")
                 break
 
-    # TODO: Tracer
+    # TODO: Tracer?
     # TODO: Modify indicator for time interval
     def run_dwp(self, **kwargs):
         r"""
