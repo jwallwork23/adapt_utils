@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.morphological_options import MorphOptions
+from adapt_utils.swe.morphological_options import MorphOptions  # TODO: Will change
 
 import os
 import time
@@ -15,6 +15,7 @@ rc('text', usetex=True)
 __all__ = ["TrenchOptions"]
 
 
+# TODO: Hookup with AdaptiveMorphologicalProblem
 class TrenchOptions(MorphOptions):
     """
     Parameters for test case described in [1].
