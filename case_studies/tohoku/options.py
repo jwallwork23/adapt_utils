@@ -122,7 +122,7 @@ class TohokuOptions(TsunamiOptions):
         self.print_debug("Done!")
         return lon, lat, elev
 
-    def set_boundary_conditions(self, fs):
+    def set_boundary_conditions(self, prob, i):
         ocean_tag = 100
         coast_tag = 200
         fukushima_tag = 300
