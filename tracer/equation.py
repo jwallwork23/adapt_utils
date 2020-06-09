@@ -5,6 +5,7 @@ from thetis.tracer_eq_2d import *
 
 
 # TODO: Extend Thetis tracer_2d model to consider CG case
+# TODO: Conservative form
 
 
 class TracerEquation2D(Equation):
