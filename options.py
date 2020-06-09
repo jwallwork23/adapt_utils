@@ -116,7 +116,7 @@ class Options(FrozenConfigurable):
         self.default_mesh = mesh
         self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)
-        self.end_time -= 0.5*self.dt
+        self.end_time -= 0.25*self.dt
         if self.debug:
             # set_log_level(DEBUG)
             set_log_level(INFO)

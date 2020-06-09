@@ -45,17 +45,19 @@ class AdaptiveProblemBase(object):
         self.nonlinear = nonlinear
 
         # Timestepping export details
-        self.num_timesteps = int(np.floor(op.end_time/op.dt))
+        self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
         self.num_meshes = op.num_meshes
         try:
             assert self.num_timesteps % op.num_meshes == 0
         except AssertionError:
-            raise ValueError("Number of meshes should divide total number of timesteps.")
+            msg = "Number of meshes {:d} should divide total number of timesteps {:d}."
+            raise ValueError(msg.format(op.num_meshes, self.num_timesteps))
         self.dt_per_mesh = self.num_timesteps//op.num_meshes
         try:
             assert self.dt_per_mesh % op.dt_per_export == 0
         except AssertionError:
-            raise ValueError("Timesteps per export should divide timesteps per mesh iteration.")
+            msg = "Timesteps per export {:d} should divide timesteps per mesh iteration {:d}."
+            raise ValueError(msg.format(op.dt_per_export, self.dt_per_mesh))
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
@@ -201,12 +203,10 @@ class AdaptiveProblemBase(object):
             for fik, fjk in zip(f[i].split(), f[j].split()):
                 fjk.project(fik)
 
-    # TODO: What about tracers?
     def project_forward_solution(self, i, j):
         """Project forward solution from mesh `i` to mesh `j`."""
         self.project(self.fwd_solutions, i, j)
 
-    # TODO: What about tracers?
     def project_adjoint_solution(self, i, j):
         """Project adjoint solution from mesh `i` to mesh `j`."""
         self.project(self.adj_solutions, i, j)
@@ -304,6 +304,7 @@ class AdaptiveProblemBase(object):
 
 
 # TODO: Tracer model
+# TODO: Multiple tracers
 # TODO: Mesh movement
 # TODO: Steady state
 # TODO: Discrete adjoint
@@ -446,15 +447,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
             })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
-        self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-        self.depth = [None for bathymetry in self.bathymetry]
-        for i, bathymetry in enumerate(self.bathymetry):
-            self.depth[i] = DepthExpression(
-                bathymetry,
-                use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-            )
+        if self.op.solve_swe:
+            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
+            self.depth = [None for bathymetry in self.bathymetry]
+            for i, bathymetry in enumerate(self.bathymetry):
+                self.depth[i] = DepthExpression(
+                    bathymetry,
+                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+                )
+
+    # --- Stabilisation
 
     def set_stabilisation_step(self, i):
         """ Set stabilisation mode and corresponding parameter on the ith mesh."""
@@ -532,13 +536,35 @@ class AdaptiveProblem(AdaptiveProblemBase):
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
 
+    # --- Solution initialisation and transfer
+
     def set_initial_condition(self):
-        """Apply initial condition for forward solution on first mesh."""
-        self.fwd_solutions[0].assign(self.op.set_initial_condition(self.V[0]))
+        """Apply initial condition(s) for forward solution(s) on first mesh."""
+        if self.op.solve_swe:
+            self.fwd_solutions[0].assign(self.op.set_initial_condition(self.V[0]))
+        if self.op.solve_tracer:
+            self.fwd_solutions_tracer[0].assign(self.op.set_initial_condition_tracer(self.Q[0]))
 
     def set_final_condition(self):
-        """Apply final time condition for adjoint solution on final mesh."""
-        self.adj_solutions[-1].assign(self.op.set_final_condition(self.V[-1]))
+        """Apply final time condition(s) for adjoint solution(s) on final mesh."""
+        if self.op.solve_swe:
+            self.adj_solutions[-1].assign(self.op.set_final_condition(self.V[-1]))
+        if self.op.solve_tracer:
+            self.adj_solutions_tracer[-1].assign(self.op.set_final_condition_tracer(self.Q[-1]))
+
+    def project_forward_solution(self, i, j):
+        """Project forward solution(s) from mesh `i` to mesh `j`."""
+        if self.op.solve_swe:
+            self.project(self.fwd_solutions, i, j)
+        if self.op.solve_tracer:
+            self.project(self.fwd_solutions_tracer, i, j)
+
+    def project_adjoint_solution(self, i, j):
+        """Project adjoint solution(s) from mesh `i` to mesh `j`."""
+        if self.op.solve_swe:
+            self.project(self.adj_solutions, i, j)
+        if self.op.solve_tracer:
+            self.project(self.adj_solutions_tracer, i, j)
 
     # --- Equations
 

@@ -64,7 +64,7 @@ op = LeVequeOptions(**kwargs)
 print_output("Element count: {:d}".format(op.default_mesh.num_cells()))
 
 # Run model
-tp = AdaptiveProblem(op=op)
+tp = AdaptiveProblem(op)
 tp.solve()
 
 # Print outputs
