@@ -241,6 +241,7 @@ class Options(FrozenConfigurable):
             b += conditional(lt(r_sq, r0_sq + 1.0e-10), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
         return b
 
+    # TODO: Allow case of different radii for each direction
     def gaussian(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
         Gaussian bell associated with region(s) of interest.
