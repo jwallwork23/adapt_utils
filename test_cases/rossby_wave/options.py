@@ -16,6 +16,8 @@ plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 
 
+# TODO: Update
+# TODO: Use paralellised version
 class BoydOptions(ShallowWaterOptions):
     """
     Parameters for test case in [Boyd et al. 1996].
@@ -29,6 +31,8 @@ class BoydOptions(ShallowWaterOptions):
         :kwarg n: mesh resolution
         """
         super(BoydOptions, self).__init__(mesh=mesh, **kwargs)
+        self.solve_swe = True
+        self.solve_tracer = False
         self.periodic = periodic  # TODO: needed?
         self.n = n
         self.order = order
@@ -36,6 +40,7 @@ class BoydOptions(ShallowWaterOptions):
 
         # Physics
         self.g.assign(1.0)
+        self.base_viscosity = 0.0
 
         # Initial mesh
         self.lx = 48
@@ -145,12 +150,7 @@ class BoydOptions(ShallowWaterOptions):
         self.exact_solution_file = File(os.path.join(self.di, 'exact.pvd'))
 
     def set_bathymetry(self, fs):
-        self.bathymetry = Constant(1.0, domain=fs.mesh())
-        return self.bathymetry
-
-    def set_viscosity(self, fs):
-        self.viscosity = Constant(0.0, domain=fs.mesh())
-        return self.viscosity
+        return Constant(1.0)
 
     def set_coriolis(self, fs):
         """
@@ -158,24 +158,19 @@ class BoydOptions(ShallowWaterOptions):
 
         :arg fs: `FunctionSpace` in which the solution should live.
         """
-        self.coriolis = interpolate(SpatialCoordinate(fs.mesh())[1], fs)
-        return self.coriolis
+        return interpolate(SpatialCoordinate(fs.mesh())[1], fs)
 
-    def set_boundary_conditions(self, fs):
+    def set_boundary_conditions(self, prob, i):
         """
         Set no slip boundary conditions uv = 0 along North and South boundaries.
         """
-        dirichlet = {'uv': Constant(as_vector([0., 0.]), domain=fs.mesh())}
+        dirichlet = {'uv': Constant(as_vector([0., 0.]))}
         boundary_conditions = {'shallow_water': {}}
         for tag in fs.mesh().exterior_facets.unique_markers:
             boundary_conditions['shallow_water'][tag] = dirichlet
         return boundary_conditions
 
-    def set_qoi_kernel(self, fs):
-        # raise NotImplementedError  # TODO: Kelvin wave?
-        return
-
-    def get_exact_solution(self, fs, t=0.0):
+    def get_exact_solution(self, fs, t):
         """
         Evaluate asymptotic solution of chosen order.
 
@@ -204,23 +199,21 @@ class BoydOptions(ShallowWaterOptions):
             self.terms['eta'] += C*self.φ*0.5625*(-5 + 2*y*y)*self.Ψ
             self.terms['eta'] += self.φ*self.φ*self.hermite_sum['eta']
 
-        self.exact_solution = Function(fs, name="Order {:d} asymptotic solution".format(self.order))
-        u, eta = self.exact_solution.split()
+        solution = Function(fs, name="Order {:d} asymptotic solution".format(self.order))
+        u, eta = solution.split()
         u.interpolate(as_vector([self.terms['u'], self.terms['v']]))
         eta.interpolate(self.terms['eta'])
         u.rename('Asymptotic velocity')
         eta.rename('Asymptotic elevation')
-        return self.exact_solution
+        return solution
 
-    def set_initial_condition(self, fs):
+    def set_initial_condition(self, prob):
         """
         Set initial elevation and velocity using asymptotic solution.
 
         :arg fs: `FunctionSpace` in which the initial condition should live.
         """
-        self.get_exact_solution(fs, t=0.0)
-        self.initial_value = self.exact_solution.copy(deepcopy=True)
-        return self.initial_value
+        prob.fwd_solutions[0].assign(self.get_exact_solution(fs, t=0.0))
 
     def get_reference_mesh(self, n=50):
         """

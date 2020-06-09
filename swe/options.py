@@ -14,6 +14,7 @@ class ShallowWaterOptions(Options):
     # Physics
     base_viscosity = NonNegativeFloat(0.0).tag(config=True)
     base_diffusivity = NonNegativeFloat(0.0).tag(config=True)
+    base_velocity = [0.0, 0.0]
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
     friction = Unicode(None, allow_none=True).tag(config=True)
     friction_coeff = NonNegativeFloat(None, allow_none=True).tag(config=True)
@@ -43,7 +44,72 @@ class ShallowWaterOptions(Options):
 
     def __init__(self, **kwargs):
         self.degree_increase = 0
+
+        # Solver
+        # =====
+        # The time-dependent shallow water system looks like
+        #
+        #                             ------------------------- -----   -----
+        #       ------------- -----   |                 |     | |   |   |   |
+        #       | A00 | A01 | | U |   |  T + C + V + D  |  G  | | U |   | 0 |
+        # A x = ------------- ----- = |                 |     | |   | = |   |  = b,
+        #       | A10 | A11 | | H |   ------------------------- -----   -----
+        #       ------------- -----   |        B        |  T  | | H |   | 0 |
+        #                             ------------------------- -----   -----
+        #
+        # where:
+        #  * T - time derivative;
+        #  * C - Coriolis;
+        #  * V - viscosity;
+        #  * D - quadratic drag;
+        #  * G - gravity;
+        #  * B - bathymetry.
+        #
+        # We apply a multiplicative fieldsplit preconditioner, i.e. block Gauss-Seidel:
+        #
+        #     ---------------- ------------ ----------------
+        #     | I |     0    | |   I  | 0 | | A00^{-1} | 0 |
+        # P = ---------------- ------------ ----------------.
+        #     | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
+        #     ---------------- ------------ ----------------
+        self.solver_parameters = {
+            "shallow_water": {
+                # "snes_converged_reason": None,
+                "ksp_type": "gmres",
+                # "ksp_converged_reason": None,
+                "pc_type": "fieldsplit",
+                "pc_fieldsplit_type": "multiplicative",
+                "fieldsplit_U_2d": {
+                    "ksp_type": "preonly",
+                    "ksp_max_it": 10000,
+                    "ksp_rtol": 1.0e-05,
+                    "pc_type": "sor",
+                    # "ksp_view": None,
+                    # "ksp_converged_reason": None,
+                },
+                "fieldsplit_H_2d": {
+                    "ksp_type": "preonly",
+                    "ksp_max_it": 10000,
+                    "ksp_rtol": 1.0e-05,
+                    # "pc_type": "sor",
+                    "pc_type": "jacobi",
+                    # "ksp_view": None,
+                    # "ksp_converged_reason": None,
+                },
+            },
+            "tracer": {
+                "ksp_type": "gmres",
+                "pc_type": "sor",
+                # "ksp_monitor": None,
+                # "ksp_converged_reason": None,
+            }
+        }
+        self.adjoint_solver_parameters.update(self.solver_parameters)
         super(ShallowWaterOptions, self).__init__(**kwargs)
+
+    def set_initial_condition(self, prob):
+        u, eta = prob.fwd_solutions[0].split()
+        u.interpolate(as_vector(self.base_velocity))
 
     def set_bathymetry(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")

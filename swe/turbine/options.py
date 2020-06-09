@@ -24,11 +24,10 @@ lu_params = {
     'pc_factor_mat_solver_type': 'mumps',
 }
 # TODO: 'Physics based' fieldsplit approach
-default_params = lu_params
+default_params = {'shallow_water': lu_params}
 keys = {key for key in default_params if 'snes' not in key}
 default_adjoint_params = {}
-for key in keys:
-    default_adjoint_params[key] = default_params[key]
+default_adjoint_params.update(default_params)
 
 
 class SteadyTurbineOptions(ShallowWaterOptions):
@@ -44,45 +43,37 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.base_bathymetry = 40.0
         self.set_bathymetry(bathymetry_space)
         super(SteadyTurbineOptions, self).__init__(**kwargs)
+        self.solve_swe = True
+        self.solve_tracer = False
         self.timestepper = timestepper
         self.dt = 20.0
         self.end_time = num_iterations*self.dt - 0.2
 
         # Solver parameters
-        self.params = default_params
-        self.adjoint_params = default_adjoint_params
+        self.solver_parameters = default_params
+        self.adjoint_solver_parameters = default_adjoint_params
 
         # Adaptivity
         self.h_min = 1e-5
         self.h_max = 500.0
 
-    def set_viscosity(self, fs):
-        self.viscosity.assign(self.base_viscosity)
-        return self.viscosity
-
-    def set_inflow(self, fs):
-        """Should be implemented in derived class."""
-        pass
-
     def get_max_depth(self):
         if hasattr(self, 'bathymetry'):
             if isinstance(self.bathymetry, Constant):
-                self.max_depth = self.bathymetry.values()[0]
+                return self.bathymetry.values()[0]
             elif isinstance(self.bathymetry, Function):
-                self.max_depth = self.bathymetry.vector().gather().max()
+                return self.bathymetry.vector().gather().max()
             else:
                 raise ValueError("Bathymetry format cannot be understood.")
         else:
             assert hasattr(self, 'base_bathymetry')
-            self.max_depth = self.base_bathymetry
+            return self.base_bathymetry
 
     def set_bathymetry(self, fs):
-        self.bathymetry = Constant(self.base_bathymetry)
-        return self.bathymetry
+        return Constant(self.base_bathymetry)
 
     def set_quadratic_drag_coefficient(self, fs):
-        self.quadratic_drag_coefficient = Constant(0.0025)
-        return self.quadratic_drag_coefficient
+        return Constant(0.0025)
 
     def thrust_coefficient_correction(self):
         """
@@ -98,6 +89,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         # NOTE: We're not yet correcting power output here, so that will be overestimated
 
 
+# TODO
 class UnsteadyTurbineOptions(SteadyTurbineOptions):
     def __init__(self, **kwargs):
         super(UnsteadyTurbineOptions, self).__init__(**kwargs)

@@ -59,8 +59,8 @@ class Options(FrozenConfigurable):
     use_automatic_sipg_parameter = Bool(True, help="Toggle automatic generation of symmetric interior penalty method.").tag(config=True)
 
     # Solver parameters
-    params = PETScSolverParameters({}).tag(config=True)
-    adjoint_params = PETScSolverParameters({}).tag(config=True)
+    solver_parameters = PETScSolverParameters({}, help="Solver parameters for the forward model, separated by equation set.").tag(config=True)
+    adjoint_solver_parameters = PETScSolverParameters({}, help="Solver parameters for the adjoint models, separated by equation set.").tag(config=True)
 
     # Outputs
     debug = Bool(False, help="Toggle debugging mode for more verbose screen output.").tag(config=True)

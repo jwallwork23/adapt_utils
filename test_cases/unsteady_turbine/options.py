@@ -18,10 +18,8 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
     array_width = PositiveInteger(3).tag(config=True)
     thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
     meshfile = os.path.join(os.path.dirname(__file__), 'channel.msh')
-    params = PETScSolverParameters({}).tag(config=True)  # TODO
 
     def __init__(self, **kwargs):
-        self.base_viscosity = 3.0
         super(Unsteady15TurbineOptions, self).__init__(**kwargs)
         self.domain_length = 3000.0
         self.domain_width = 1000.0
@@ -30,7 +28,10 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         except OSError:
             raise ValueError("Mesh fine not generated.")
         self.default_mesh = Mesh(self.meshfile)
-        self.bathymetry.assign(50.0)
+
+        # Physics
+        self.base_viscosity = 3.0
+        self.base_bathymetry = 50.0
 
         # Timestepping
         self.dt = 3.0
@@ -59,25 +60,26 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         self.omega = 2*pi/self.T_tide
 
         # Solver parameters and discretisation
-        self.lax_friedrichs = False  # TODO: temp
+        self.stabilisation = None
+        # self.stabilisation = 'lax_friedrichs'
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
         self.family = 'dg-cg'
 
     def set_viscosity(self, fs):
         sponge = False
-        self.viscosity = Function(fs)
         if sponge:
             x, y = SpatialCoordinate(fs.mesh())
             xmax = 1000.0
             ramp = 0.5
             eps = 20.0
-            self.viscosity.interpolate(self.base_viscosity + exp(ramp*(x-xmax+eps)))
+            return interpolate(self.base_viscosity + exp(ramp*(x-xmax+eps)), fs)
         else:
-            self.viscosity.assign(self.base_viscosity)
+            return Constant(self.base_viscosity)
 
-    def set_boundary_conditions(self, fs):
-        self.set_boundary_surface(fs.sub(1))
+    def set_boundary_conditions(self, prob, i):
+        uv_in, self.elev_in = Function(prob.V[i])
+        uv_out, self.elev_out = Function(prob.V[i])
         inflow_tag = 4
         outflow_tag = 2
         boundary_conditions = {
@@ -88,10 +90,10 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
         }
         return boundary_conditions
 
-    def set_initial_condition(self, fs):
-        self.initial_condition = Function(fs)
-        u, eta = self.initial_condition.split()
-        x, y = SpatialCoordinate(fs.mesh())
+    # TODO: update_forcings for elev_in and elev_out
+
+    def set_initial_condition(self, prob):
+        u, eta = prob.fwd_solutions[0].split()
+        x, y = SpatialCoordinate(prob.meshes[0])
         u.interpolate(as_vector([1e-8, 0.0]))
         eta.interpolate(-1/3000*x)
-        return self.initial_condition

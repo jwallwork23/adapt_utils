@@ -61,6 +61,7 @@ class BalzanoOptions(ShallowWaterOptions):
         h_amp = 0.5  # Ocean boundary forcing amplitude
         h_T = self.num_hours/2*3600  # Ocean boundary forcing period
         self.elev_func = lambda t: h_amp*(-cos(2*pi*(t-(6*3600))/h_T)+1)
+        self.elev_in = Constant(self.elev_func(0.0))
 
         # Time integration
         self.dt = 600.0
@@ -97,50 +98,34 @@ class BalzanoOptions(ShallowWaterOptions):
         aux = max_value(11.036*hc/ksp, 1.001)
         return 2*(0.4**2)/(ln(aux)**2)
 
-    def set_bathymetry(self, fs, **kwargs):
+    def set_bathymetry(self, fs):
         max_depth = 5.0
         x, y = SpatialCoordinate(fs.mesh())
-        self.bathymetry = Function(fs, name="Bathymetry")
         L = self.basin_x
         ξ = lambda X: L - X  # Coordinate transformation
         b1 = ξ(x)/L*max_depth
-        if self.bathymetry_type == 1:
-            self.bathymetry.interpolate(b1)
-        elif self.bathymetry_type == 2:
-            self.bathymetry.interpolate(
-                conditional(le(abs(ξ(x) - 4000.0), 1000.0),
-                            conditional(ge(ξ(x), 4000.0),
-                                        (3000.0 + 2*(ξ(x) - 4000.0))/L*max_depth,
-                                        3000.0/L*max_depth),
-                            b1))
-        else:
-            self.bathymetry.interpolate(
-                conditional(le(abs(ξ(x) - 4000.0), 1000.0),
-                            conditional(ge(ξ(x), 4000.0),
-                                        (2000.0 + 3*(ξ(x) - 4000.0))/L*max_depth,
-                                        (3000.0 - (ξ(x) - 3000.0))/L*max_depth),
-                            b1))
-        return self.bathymetry
+        expr = b1
+        if self.bathymetry_type == 2:
+            expr = conditional(le(abs(ξ(x) - 4000.0), 1000.0),
+                        conditional(ge(ξ(x), 4000.0),
+                                    (3000.0 + 2*(ξ(x) - 4000.0))/L*max_depth,
+                                    3000.0/L*max_depth),
+                        b1)
+        elif self.bathymetry_type == 3:
+            expr = conditional(le(abs(ξ(x) - 4000.0), 1000.0),
+                        conditional(ge(ξ(x), 4000.0),
+                                    (2000.0 + 3*(ξ(x) - 4000.0))/L*max_depth,
+                                    (3000.0 - (ξ(x) - 3000.0))/L*max_depth),
+                        b1)
+        return interpolate(expr, fs)
 
-    def set_viscosity(self, fs):
-        self.viscosity = Function(fs)
-        self.viscosity.assign(self.base_viscosity)
-        return self.viscosity
-
-    def set_coriolis(self, fs):
-        return
-
-    def set_boundary_conditions(self, fs):
-        if not hasattr(self, 'elev_in'):
-            self.elev_in = Constant(0.0)
-            # self.elev_out = Constant(0.0)
-        self.elev_in.assign(self.elev_func(0.0))
+    def set_boundary_conditions(self, prob, i):
         inflow_tag = 1
         outflow_tag = 2
         bottom_wall_tag = 3
         top_wall_tag = 4
-        boundary_conditions = {'shallow_water':
-            {
+        boundary_conditions = {
+            'shallow_water': {
                 inflow_tag: {'elev': self.elev_in},
                 outflow_tag: {'un': Constant(0.0)},
                 bottom_wall_tag: {'un': Constant(0.0)},
@@ -152,12 +137,10 @@ class BalzanoOptions(ShallowWaterOptions):
     def update_boundary_conditions(self, t=0.0):
         self.elev_in.assign(self.elev_func(t) if 6*3600 <= t <= 18*3600 else 0.0)
 
-    def set_initial_condition(self, fs):
-        self.initial_value = Function(fs, name="Initial condition")
-        u, eta = self.initial_value.split()
+    def set_initial_condition(self, prob):
+        u, eta = prob.fwd_solutions[0].split()
         u.interpolate(as_vector([1.0e-7, 0.0]))
         eta.assign(0.0)
-        return self.initial_value
 
     def get_update_forcings(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()
