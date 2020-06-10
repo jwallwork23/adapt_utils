@@ -2,6 +2,7 @@ from thetis import *
 from thetis.configuration import *
 
 import os
+# import math
 
 
 __all__ = ["Options"]
@@ -132,7 +133,7 @@ class Options(FrozenConfigurable):
         self.qoi_rtol = tol
         self.estimator_rtol = tol
 
-    def box(self, mesh, scale=1.0, source=False, custom_locs=None):
+    def box(self, mesh, scale=1.0, source=False, custom_locs=None, rotation=None):
         r"""
         Rectangular indicator function associated with region(s) of interest.
 
@@ -147,18 +148,30 @@ class Options(FrozenConfigurable):
         :kwarg source: Toggle source term or region of interest location.
         """
         dim = mesh.topological_dimension()
+        dims = range(dim)
         x = SpatialCoordinate(mesh)
         locs = self.source_loc if source else self.region_of_interest
         locs = custom_locs or locs
+
+        # Get distances from origins and RHS values
+        X = []
+        r = []
         for j in range(len(locs)):
-            X = abs(x[0] - locs[j][0])
-            expr = lt(X, locs[j][dim])
-            for i in range(1, dim):
-                r0 = locs[j][dim] if len(locs) == dim else locs[j][dim+i]
-                X = abs(x[i] - locs[j][i])
-                expr = And(expr, lt(X, r0))
-            b = expr if j == 0 else Or(b, expr)
-        return conditional(b, scale, 0.0)
+            X.append([x[i] - locs[j][i] for i in dims])
+            r_inner = []
+            for i in dims:
+                r_inner.append(locs[j][dim] if len(locs[j]) == dim+1 else locs[j][dim+i])
+            r.append(r_inner)
+
+        # # Apply rotations (if requested)  # TODO
+        # if rotation is not None:
+        #     assert dim == 2
+        #     cos_theta = math.cos(rotation)
+        #     sin_theta = math.sin(rotation)
+
+        # Combine to get indicator
+        expr = [combine(And, *[lt(abs(X[j][i]), r[j][i]) for i in dims]) for j in range(len(locs))]
+        return conditional(combine(Or, *expr), scale, 0.0)
 
     def ball(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
@@ -399,3 +412,19 @@ class Options(FrozenConfigurable):
         else:
             raise ValueError("Mesh velocity {:s} not recognised.".format(self.prescribed_velocity))
         return self.mesh_velocity
+
+
+def abs(u):
+    """Hack due to the fact `abs` seems to be broken in conditional statements."""
+    return conditional(u < 0, -u, u)
+
+
+def combine(operator, *args):
+    """Helper function for repeatedly application of binary operators."""
+    n = len(args)
+    if n == 0:
+        raise ValueError
+    elif n == 1:
+        return args[0]
+    else:
+        return operator(args[0], combine(operator, *args[1:]))
