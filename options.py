@@ -139,7 +139,7 @@ class Options(FrozenConfigurable):
         Takes the value `scale` in the region
 
       ..math::
-            (x0 - r_x < x < x0 + r_x) && (y0 - r_y < y < y0 + r_y)
+            (|x - x0| < r_x) && (|y - y0| < r_y)
 
         centred about (x0, y0) and zero elsewhere. Similarly for other dimensions.
 
@@ -151,10 +151,12 @@ class Options(FrozenConfigurable):
         locs = self.source_loc if source else self.region_of_interest
         locs = custom_locs or locs
         for j in range(len(locs)):
-            expr = And(gt(x[0], locs[j][0]-locs[j][dim]), lt(x[0], locs[j][0]+locs[j][dim]))
+            X = abs(x[0] - locs[j][0])
+            expr = lt(X, locs[j][dim])
             for i in range(1, dim):
                 r0 = locs[j][dim] if len(locs) == dim else locs[j][dim+i]
-                expr = And(expr, And(gt(x[i], locs[j][i]-r0), lt(x[i], locs[j][i]+r0)))
+                X = abs(x[i] - locs[j][i])
+                expr = And(expr, lt(X, r0))
             b = expr if j == 0 else Or(b, expr)
         return conditional(b, scale, 0.0)
 
@@ -176,12 +178,12 @@ class Options(FrozenConfigurable):
         x = SpatialCoordinate(mesh)
         locs = self.source_loc if source else self.region_of_interest
         locs = custom_locs or locs
-        b = 0
         for j in range(len(locs)):
             r0_sq = locs[j][dim]**2
-            r_sq = sum((x[i]-locs[j][i])**2 for i in range(dim))
-            b += conditional(lt(r_sq, r0_sq + 1.0e-10), scale, 0)
-        return b
+            r_sq = sum((x[i] - locs[j][i])**2 for i in range(dim))
+            expr = lt(r_sq, r0_sq + 1.0e-10)
+            b = expr if j == 0 else Or(b, expr)
+        return conditional(b, scale, 0)
 
     def bump(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
@@ -196,6 +198,8 @@ class Options(FrozenConfigurable):
 
         scaled by `scale` inside the box region. Similarly for other dimensions.
 
+        Note that we assume the provided regions are disjoint for this indicator.
+
         :kwarg scale: Scale factor for indicator.
         :kwarg source: Toggle source term or region of interest location.
         """
@@ -207,11 +211,14 @@ class Options(FrozenConfigurable):
         for j in range(len(locs)):
             vol = 1.0
             expr = scale
+            S = 0
             for i in range(dim):
                 ri = locs[j][dim] if len(locs) == dim else locs[j][dim+i]
                 vol *= ri
-                expr = expr*exp(1 - 1/(1 - ((x[0]-locs[j][0])/ri)**2))
-            b += conditional(lt(sum((x[i]-locs[j][i])**2 for i in range(dim)), vol), expr, 0.0)
+                X_sq = (x[i] - locs[j][i])**2
+                S += X_sq
+                expr = expr*exp(1 - 1/(1 - X_sq/(ri**2)))
+            b += conditional(lt(S, vol), expr, 0.0)
         return b
 
     def circular_bump(self, mesh, scale=1.0, source=False, custom_locs=None):
@@ -237,7 +244,7 @@ class Options(FrozenConfigurable):
         b = 0
         for j in range(len(locs)):
             r0_sq = locs[j][dim]**2
-            r_sq = sum((x[i]-locs[j][i])**2 for i in range(dim))
+            r_sq = sum((x[i] - locs[j][i])**2 for i in range(dim))
             b += conditional(lt(r_sq, r0_sq + 1.0e-10), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
         return b
 
@@ -263,7 +270,7 @@ class Options(FrozenConfigurable):
         b = 0
         for j in range(len(locs)):
             r0_sq = locs[j][dim]**2
-            r_sq = sum((x[i]-locs[j][i])**2 for i in range(dim))
+            r_sq = sum((x[i] - locs[j][i])**2 for i in range(dim))
             b += conditional(lt(r_sq, r0_sq), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
         return b
 
