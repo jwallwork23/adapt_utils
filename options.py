@@ -2,10 +2,26 @@ from thetis import *
 from thetis.configuration import *
 
 import os
-# import math
+import math
 
 
 __all__ = ["Options"]
+
+
+def abs(u):
+    """Hack due to the fact `abs` seems to be broken in conditional statements."""
+    return conditional(u < 0, -u, u)
+
+
+def combine(operator, *args):
+    """Helper function for repeatedly application of binary operators."""
+    n = len(args)
+    if n == 0:
+        raise ValueError
+    elif n == 1:
+        return args[0]
+    else:
+        return operator(args[0], combine(operator, *args[1:]))
 
 
 # TODO: Improve doc
@@ -146,6 +162,9 @@ class Options(FrozenConfigurable):
 
         :kwarg scale: Scale factor for indicator.
         :kwarg source: Toggle source term or region of interest location.
+        :kwarg custom_locs: a tuple of coordinate and distances which overrides the
+            source or region of interest tuples.
+        :kwarg rotation: angle by which to rotate the box.
         """
         dim = mesh.topological_dimension()
         dims = range(dim)
@@ -163,11 +182,14 @@ class Options(FrozenConfigurable):
                 r_inner.append(locs[j][dim] if len(locs[j]) == dim+1 else locs[j][dim+i])
             r.append(r_inner)
 
-        # # Apply rotations (if requested)  # TODO
-        # if rotation is not None:
-        #     assert dim == 2
-        #     cos_theta = math.cos(rotation)
-        #     sin_theta = math.sin(rotation)
+        # Apply rotations
+        if rotation is not None:
+            assert dim == 2
+            cos_theta = math.cos(rotation)
+            sin_theta = math.sin(rotation)
+            R = [[cos_theta, -sin_theta], [sin_theta, cos_theta]]
+            for j in range(len(locs)):
+                X[j] = np.dot(R, X[j])
 
         # Combine to get indicator
         expr = [combine(And, *[lt(abs(X[j][i]), r[j][i]) for i in dims]) for j in range(len(locs))]
@@ -198,6 +220,7 @@ class Options(FrozenConfigurable):
             b = expr if j == 0 else Or(b, expr)
         return conditional(b, scale, 0)
 
+    # TODO: Rotation option, as with box
     def bump(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
         Rectangular bump function associated with region(s) of interest. (A smooth approximation
@@ -262,6 +285,7 @@ class Options(FrozenConfigurable):
         return b
 
     # TODO: Allow case of different radii for each direction
+    # TODO: Rotation option, as with box
     def gaussian(self, mesh, scale=1.0, source=False, custom_locs=None):
         r"""
         Gaussian bell associated with region(s) of interest.
@@ -412,19 +436,3 @@ class Options(FrozenConfigurable):
         else:
             raise ValueError("Mesh velocity {:s} not recognised.".format(self.prescribed_velocity))
         return self.mesh_velocity
-
-
-def abs(u):
-    """Hack due to the fact `abs` seems to be broken in conditional statements."""
-    return conditional(u < 0, -u, u)
-
-
-def combine(operator, *args):
-    """Helper function for repeatedly application of binary operators."""
-    n = len(args)
-    if n == 0:
-        raise ValueError
-    elif n == 1:
-        return args[0]
-    else:
-        return operator(args[0], combine(operator, *args[1:]))
