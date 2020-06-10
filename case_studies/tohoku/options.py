@@ -70,8 +70,9 @@ class TohokuOptions(TsunamiOptions):
             "803": {"lonlat": (141.8944, 38.8578)},
             "804": {"lonlat": (142.1867, 39.6272)},
             "806": {"lonlat": (141.1856, 36.9714)},
+            "21418": {"lonlat": (148.655, 38.735)},
         }
-        self.pressure_gauges = ("P02", "P06")
+        self.pressure_gauges = ("P02", "P06", "21418")
         self.gps_gauges = ("801", "802", "803", "804", "806")
 
         # Possible coastal locations of interest, including major cities and nuclear power plants
