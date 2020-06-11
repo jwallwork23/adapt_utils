@@ -1,27 +1,11 @@
+from __future__ import absolute_import
 from thetis import *
 from thetis.configuration import *
-
 import os
-import math
+from . import misc
 
 
 __all__ = ["Options"]
-
-
-def abs(u):
-    """Hack due to the fact `abs` seems to be broken in conditional statements."""
-    return conditional(u < 0, -u, u)
-
-
-def combine(operator, *args):
-    """Helper function for repeatedly application of binary operators."""
-    n = len(args)
-    if n == 0:
-        raise ValueError
-    elif n == 1:
-        return args[0]
-    else:
-        return operator(args[0], combine(operator, *args[1:]))
 
 
 # TODO: Improve doc
@@ -149,167 +133,27 @@ class Options(FrozenConfigurable):
         self.qoi_rtol = tol
         self.estimator_rtol = tol
 
-    def box(self, mesh, scale=1.0, source=False, custom_locs=None, rotation=None):
-        r"""
-        Rectangular indicator function associated with region(s) of interest.
+    # TODO: Collapse indicators to one function and include type in RoI and source specifications
 
-        Takes the value `scale` in the region
-
-      ..math::
-            (|x - x0| < r_x) && (|y - y0| < r_y)
-
-        centred about (x0, y0) and zero elsewhere. Similarly for other dimensions.
-
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        :kwarg custom_locs: a tuple of coordinate and distances which overrides the
-            source or region of interest tuples.
-        :kwarg rotation: angle by which to rotate the box.
-        """
-        dim = mesh.topological_dimension()
-        dims = range(dim)
-        x = SpatialCoordinate(mesh)
+    def box(self, mesh, source=False, **kwargs):
         locs = self.source_loc if source else self.region_of_interest
-        locs = custom_locs or locs
+        return misc.box(locs, mesh, **kwargs)
 
-        # Get distances from origins and RHS values
-        X = []
-        r = []
-        for j in range(len(locs)):
-            X.append([x[i] - locs[j][i] for i in dims])
-            r_inner = []
-            for i in dims:
-                r_inner.append(locs[j][dim] if len(locs[j]) == dim+1 else locs[j][dim+i])
-            r.append(r_inner)
-
-        # Apply rotations
-        if rotation is not None:
-            assert dim == 2
-            cos_theta = math.cos(rotation)
-            sin_theta = math.sin(rotation)
-            R = [[cos_theta, -sin_theta], [sin_theta, cos_theta]]
-            for j in range(len(locs)):
-                X[j] = np.dot(R, X[j])
-
-        # Combine to get indicator
-        expr = [combine(And, *[lt(abs(X[j][i]), r[j][i]) for i in dims]) for j in range(len(locs))]
-        return conditional(combine(Or, *expr), scale, 0.0)
-
-    def ball(self, mesh, scale=1.0, source=False, custom_locs=None):
-        r"""
-        Ball indicator function associated with region(s) of interest.
-
-        Takes the value `scale` in the region
-
-      ..math::
-            (x - x_0)^2 + (y - y_0)^2 < r_0^2
-
-        and zero elsewhere. Similarly for other dimensions.
-
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        dim = mesh.topological_dimension()
-        x = SpatialCoordinate(mesh)
+    def ball(self, mesh, source=False, **kwargs):  # TODO: ellipse
         locs = self.source_loc if source else self.region_of_interest
-        locs = custom_locs or locs
-        for j in range(len(locs)):
-            r0_sq = locs[j][dim]**2
-            r_sq = sum((x[i] - locs[j][i])**2 for i in range(dim))
-            expr = lt(r_sq, r0_sq + 1.0e-10)
-            b = expr if j == 0 else Or(b, expr)
-        return conditional(b, scale, 0)
+        return misc.ellipse(locs, mesh, **kwargs)
 
-    # TODO: Rotation option, as with box
-    def bump(self, mesh, scale=1.0, source=False, custom_locs=None):
-        r"""
-        Rectangular bump function associated with region(s) of interest. (A smooth approximation
-        to the box function.)
-
-        Takes the form
-
-      ..math::
-            \exp\left(1 - \frac1{\left1 - \left(\frac{x - x_0}{r_x}\right)^2\right)}\right)
-            * \exp\left(1 - \frac1{\left1 - \left(\frac{y - y_0}{r_y}\right)^2\right)}\right)
-
-        scaled by `scale` inside the box region. Similarly for other dimensions.
-
-        Note that we assume the provided regions are disjoint for this indicator.
-
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        dim = mesh.topological_dimension()
-        x = SpatialCoordinate(mesh)
+    def bump(self, mesh, source=False, **kwargs):
         locs = self.source_loc if source else self.region_of_interest
-        locs = custom_locs or locs
-        b = 0
-        for j in range(len(locs)):
-            vol = 1.0
-            expr = scale
-            S = 0
-            for i in range(dim):
-                ri = locs[j][dim] if len(locs) == dim else locs[j][dim+i]
-                vol *= ri
-                X_sq = (x[i] - locs[j][i])**2
-                S += X_sq
-                expr = expr*exp(1 - 1/(1 - X_sq/(ri**2)))
-            b += conditional(lt(S, vol), expr, 0.0)
-        return b
+        return misc.bump(locs, mesh, **kwargs)
 
-    def circular_bump(self, mesh, scale=1.0, source=False, custom_locs=None):
-        r"""
-        Circular bump function associated with region(s) of interest. (A smooth approximation to
-        the ball function.)
-
-        Defining the radius :math:`r^2 := (x - x_0)^2 + (y - y_0)^2`, the circular bump takes the
-        form
-
-      ..math::
-            \exp\left(1 - \frac1{\left1 - \frac{r^2}{r_0^2}\right)}\right)
-
-        scaled by `scale` inside the ball region. Similarly for other dimensions.
-
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        dim = mesh.topological_dimension()
-        x = SpatialCoordinate(mesh)
+    def circular_bump(self, mesh, source=False, **kwargs):
         locs = self.source_loc if source else self.region_of_interest
-        locs = custom_locs or locs
-        b = 0
-        for j in range(len(locs)):
-            r0_sq = locs[j][dim]**2
-            r_sq = sum((x[i] - locs[j][i])**2 for i in range(dim))
-            b += conditional(lt(r_sq, r0_sq + 1.0e-10), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
-        return b
+        return misc.circular_bump(locs, mesh, **kwargs)
 
-    # TODO: Allow case of different radii for each direction
-    # TODO: Rotation option, as with box
-    def gaussian(self, mesh, scale=1.0, source=False, custom_locs=None):
-        r"""
-        Gaussian bell associated with region(s) of interest.
-
-        Takes the form
-
-      ..math::
-            \exp\left(1 - \frac1{1 - \frac{x^2 + y^2}{r_0^2}}\right)
-
-        scaled by `scale` inside the ball region. Similarly for other dimensions.
-
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        dim = mesh.topological_dimension()
-        x = SpatialCoordinate(mesh)
+    def gaussian(self, mesh, source=False, **kwargs):
         locs = self.source_loc if source else self.region_of_interest
-        locs = custom_locs or locs
-        b = 0
-        for j in range(len(locs)):
-            r0_sq = locs[j][dim]**2
-            r_sq = sum((x[i] - locs[j][i])**2 for i in range(dim))
-            b += conditional(lt(r_sq, r0_sq), scale*exp(1 - 1/(1 - r_sq/r0_sq)), 0)
-        return b
+        return misc.gaussian(locs, mesh, **kwargs)
 
     def set_start_condition(self, fs, adjoint=False):
         return self.set_final_condition(fs) if adjoint else self.set_initial_condition(fs)
