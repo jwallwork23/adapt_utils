@@ -150,7 +150,7 @@ def bump(locs, mesh, scale=1.0, rotation=None):
         rotate(X, rotation)
 
     # Combine to get indicator
-    q = [[abs(X[j][i]/r[j][i]) for i in dims] for j in L]  # Quotients of distances
+    q = [[(X[j][i]/r[j][i])**2 for i in dims] for j in L]  # Quotients of squared distances
     conditions = [combine(And, *[lt(q[j][i], 1) for i in dims]) for j in L]
     bumps = [prod([exp(1 - 1/(1 - q[j][i])) for i in dims]) for j in L]
     return sum([conditional(conditions[j], scale*bumps[j], 0) for j in L])
