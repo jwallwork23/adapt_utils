@@ -17,11 +17,15 @@ from adapt_utils.tracer.error_estimation import TracerGOErrorEstimator
 __all__ = ["AdaptiveProblem"]
 
 
-# TODO: Tracer model
-# TODO: Multiple tracers
-# TODO: Mesh movement
-# TODO: Steady state
-# TODO: Discrete adjoint
+# TODO SOON:
+#  * Conservative tracer
+#  * Mesh movement
+#  * Discrete adjoint
+#  * Steady state
+
+# TODO LATER:
+#  * Multiple tracers
+
 class AdaptiveProblem(AdaptiveProblemBase):
     """Default model: 2D coupled shallow water + tracer transport."""
     # TODO: equations and supported terms
@@ -81,7 +85,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         There are three options for the shallow water mixed finite element pair:
           * Taylor-Hood (continuous Galerkin)   P2-P1      'cg-cg';
           * equal order discontinuous Galerkin  PpDG-PpDG  'dg-dg';
-          * mixed continuous-discontinuous      P1DG-P2.
+          * mixed continuous-discontinuous      P1DG-P2    'dg-cg'.
 
         There are two options for the tracer finite element:
           * Continuous Galerkin     Pp    'cg';
@@ -537,9 +541,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
             proj_u = Function(self.P1_vec[i], name="Projected velocity")
             proj_eta = Function(self.P1[i], name="Projected elevation")
             self.solution_file._topology = None
+            if i == 0:
+                u, eta = self.fwd_solutions[i].split()
+                proj_u.project(u)
+                proj_eta.project(eta)
+                self.solution_file.write(proj_u, proj_eta)
         if op.solve_tracer and plot_pvd:
             proj_tracer = Function(self.P1[i], name="Projected tracer")
             self.tracer_file._topology = None
+            if i == 0:
+                proj_tracer.project(self.fwd_solutions_tracer[i])
+                self.tracer_file.write(proj_tracer)
 
         t_epsilon = 1.0e-05
         iteration = 0
@@ -631,9 +643,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
             proj_z = Function(self.P1_vec[i], name="Projected adjoint velocity")
             proj_zeta = Function(self.P1[i], name="Projected adjoint elevation")
             self.adjoint_solution_file._topology = None
+            if i == self.num_meshes-1:
+                z, zeta = self.adj_solutions[i].split()
+                proj_z.project(z)
+                proj_zeta.project(zeta)
+                self.adjoint_solution_file.write(proj_z, proj_zeta)
         if op.solve_tracer and plot_pvd:
             proj_tracer = Function(self.P1[i], name="Projected adjoint tracer")
             self.adjoint_tracer_file._topology = None
+            if i == self.num_meshes-1:
+                proj_tracer.project(self.adj_solutions_tracer[i])
+                self.adjoint_tracer_file.write(proj_tracer)
 
         t_epsilon = 1.0e-05
         iteration = 0
