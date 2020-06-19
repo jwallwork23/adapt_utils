@@ -18,13 +18,20 @@ __all__ = ["AdaptiveProblem"]
 
 
 # TODO SOON:
-#  * Conservative tracer
 #  * Mesh movement
+#    - ALE formulation
+#    - Monge-Ampere
 #  * Discrete adjoint
+#    - It works but needs to be hooked up to the solve_adjoint routine.
 #  * Steady state
+#    - Should work, just needs testing.
+#  * Turbines
+#    - Check 2-turbine works
 
 # TODO LATER:
 #  * Multiple tracers
+#  * Conservative tracer
+#  * Tracer limiters
 
 class AdaptiveProblem(AdaptiveProblemBase):
     """Default model: 2D coupled shallow water + tracer transport."""
