@@ -10,7 +10,7 @@ import argparse
 import matplotlib.pyplot as plt
 
 from adapt_utils.test_cases.solid_body_rotation.options import LeVequeOptions
-from adapt_utils.adapt.solver import AdaptiveProblem
+from adapt_utils.adapt.solver_discrete import AdaptiveDiscreteAdjointProblem
 
 
 def write(text, out):
@@ -57,12 +57,20 @@ kwargs = {
 op = LeVequeOptions(**kwargs)
 print_output("Element count: {:d}".format(op.default_mesh.num_cells()))
 
+
+class MyProblem(AdaptiveDiscreteAdjointProblem):
+    """Custom subclass with an appropriate QoI"""
+
+    def quantity_of_interest(self):
+        c = self.fwd_solutions_tracer[0]
+        return assemble(c*c*dx)
+
 # Run model
-tp = AdaptiveProblem(op)
+tp = MyProblem(op)
 tp.solve()
 
-J = assemble(tp.fwd_solutions_tracer[0]*tp.fwd_solutions_tracer[0]*dx)
-g = compute_gradient(J, Control(tp.fwd_solutions[0])).split()[0]
+u = Control(tp.fwd_solutions[0])       # fluid velocity - elevation tuple
+g = tp.compute_gradient(u).split()[0]  # gradient w.r.t. velocity
 tricontourf(g)
 plt.title("Gradient of QoI w.r.t. fluid speed")
 plt.show()

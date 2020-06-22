@@ -22,8 +22,6 @@ __all__ = ["AdaptiveProblem"]
 #    - ALE formulation
 #    - Monge-Ampere
 #  * Discrete adjoint
-#    - It works but needs to be hooked up to the solve_adjoint routine.
-#    - Maybe there should just be a subclassed AdaptiveProblem?
 #    - For steady state problems we can just take the adjoint of the form as in SNAS paper
 #  * Steady state
 #    - Should work, just needs testing.
@@ -1099,7 +1097,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 op,
                 meshes=refined_meshes,
                 nonlinear=self.nonlinear,
-                discrete_adjoint=self.discrete_adjoint,  # TODO: Is this still used?
             )
             ep.outer_iteration = n
 
