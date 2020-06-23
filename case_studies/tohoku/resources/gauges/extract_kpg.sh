@@ -18,7 +18,7 @@ tar -xzvf kusiro4698.tar.gz
 for i in 1 2; do
 
 	# Clear output file
-        out="kpg$i.txt"
+        out="KPG$i.txt"
 	if [ -f $out ]; then
 		echo "Overwriting old log file $out"
 		rm $out
@@ -38,6 +38,8 @@ for i in 1 2; do
 			fi
 
 			# Extract data and append to output file
+			#   NOTE that we need to choose the
+			#   appropriate channels, CD4B and CD4D.
 			fname="kpg$i"
 			fname+="_mmh.20110311_"
 			fname+=$h
