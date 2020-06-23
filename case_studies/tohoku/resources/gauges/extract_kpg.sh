@@ -12,6 +12,8 @@
 # WIN can be downloaded at http://wwweic.eri.u-tokyo.ac.jp/WIN/pub/win/. #
 # ====================================================================== #
 
+tar -xzvf kusiro4698.tar.gz
+
 # Loop over gauges KPG1 and KPG2
 for i in 1 2; do
 
@@ -36,7 +38,8 @@ for i in 1 2; do
 			fi
 
 			# Extract data and append to output file
-			fname="kpg1_raw/kpg1_mmh.20110311_"
+			fname="kpg$i"
+			fname+="_mmh.20110311_"
 			fname+=$h
 			fname+=$m
 			fname+=00
@@ -44,7 +47,13 @@ for i in 1 2; do
 				echo "$fname does not exist! Aborting now."
 				exit
 			fi
-			dewin -acen CD4B $fname >> $out
+			echo $fname
+			if [ $i -eq 1 ]; then
+				dewin -acen CD4B $fname >> $out
+			else
+				dewin -acen CD4D $fname >> $out
+			fi
+			rm $fname
 		done
 	done
 done
