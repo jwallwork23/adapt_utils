@@ -53,7 +53,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'use_wetting_and_drying': op.wetting_and_drying,
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
             # 'check_volume_conservation_2d': True,  # TODO
-            'norm_smoother': Constant(0.0),  # TODO: Allow modification
+            'norm_smoother': op.norm_smoother,
             'sipg_parameter': None,
         }
         for i, swo in enumerate(self.shallow_water_options):
@@ -69,10 +69,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         static_options = {
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
             # 'check_tracer_conservation': True,  # TODO
-            'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs',  # TODO
+            'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs',
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
             'sipg_parameter': None,
-            'tracer_advective_velocity_factor': Constant(1.0),  # TODO: allow custom
+            'tracer_advective_velocity_factor': op.tracer_advective_velocity_factor,
             'use_tracer_conservative_form': False,
         }
         self.tracer_limiters = [None for i in range(op.num_meshes)]
@@ -230,7 +230,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         elif self.stabilisation == 'lax_friedrichs':
             assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
             self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
-            raise NotImplementedError  # TODO
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
