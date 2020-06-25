@@ -1,11 +1,14 @@
 from thetis import *
+# from firedrake_adjoint import *
 
 import os
 import numpy as np
 import argparse
+import matplotlib.pyplot as plt
 
 from adapt_utils.test_cases.solid_body_rotation.options import LeVequeOptions
 from adapt_utils.adapt.solver import AdaptiveProblem
+# from adapt_utils.adapt.solver_discrete import AdaptiveDiscreteAdjointProblem
 
 
 def write(text, out):
@@ -18,6 +21,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh refinement level")
 parser.add_argument("-geometry", help="Choose from 'circle' or 'square'")
 parser.add_argument("-conservative", help="Toggle conservative tracer equation")
+# parser.add_argument("-compute_gradient", help="Toggle gradient computation")
 args = parser.parse_args()
 
 i = int(args.level or 0)
@@ -27,6 +31,7 @@ geometry = args.geometry or 'circle'
 # Create parameter class
 kwargs = {
     'approach': 'fixed_mesh',
+    # 'num_meshes': 4,
 
     # Geometry
     'geometry': geometry,
@@ -48,7 +53,9 @@ kwargs = {
 op = LeVequeOptions(**kwargs)
 print_output("Element count: {:d}".format(op.default_mesh.num_cells()))
 
+# class TracerProblem(AdaptiveDiscreteAdjointProblem):
 class TracerProblem(AdaptiveProblem):
+
     def quantity_of_interest(self):
         kernel = self.op.set_qoi_kernel(self.P0[-1])
         sol = self.fwd_solutions_tracer[-1]
@@ -79,3 +86,12 @@ geometry = "'" + geometry.capitalize() + "'"
 tail = 19*' ' + "{:14s}  {:14s}  {:14s}  {:7.4f}"
 write(tail.format('Geometry', geometry, 'Timestep', op.dt), f)
 f.close()  # TODO: Print model parameters, too
+
+# # Compute gradient w.r.t. velocity
+# if bool(args.compute_gradient or False):
+#     print_output("Computing gradient...")
+#     u = Control(tp.fwd_solutions[0])       # fluid velocity - elevation tuple
+#     g = tp.compute_gradient(u).split()[0]  # gradient w.r.t. velocity
+#     tricontourf(g)
+#     plt.title("Gradient of QoI w.r.t. fluid speed")
+#     plt.show()

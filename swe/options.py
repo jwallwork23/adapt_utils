@@ -137,6 +137,10 @@ class ShallowWaterOptions(Options):
         """Should be implemented in derived class."""
         return
 
+    def set_tracer_source(self, fs):
+        """Should be implemented in derived class."""
+        return
+
     def set_quadratic_drag_coefficient(self, fs):
         """Should be implemented in derived class."""
         return
