@@ -179,6 +179,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'coriolis_frequency': self.op.set_coriolis(P1),
                 'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
+                'tracer_source_2d': self.op.set_tracer_source(P1)
             })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
         self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
@@ -339,8 +340,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     def _create_adjoint_tracer_equation(self, i):
-        # NOTE: adjoint of non-conservative tracer eq is conservative and vice versa
-        raise NotImplementedError  # TODO
+        op = self.tracer_options[i]
+        model = TracerEquation2D if op.use_tracer_conservative_form else ConservativeTracerEquation2D
+        self.equations[i].adjoint_tracer = model(
+            self.Q[i],
+            self.depth[i],
+            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
+            sipg_parameter=self.tracer_options[i].sipg_parameter_tracer,
+        )
+        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+            self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
+        self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     # --- Error estimators
 
@@ -407,8 +417,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'elev_2d': eta,
             'uv_2d': u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
-            'source': None,
-            # 'source': self.fields[i].tracer_source_2d,  # TODO
+            'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.tracer_options[i].tracer_advective_velocity_factor,
         }
         if self.stabilisation == 'lax_friedrichs':
@@ -463,7 +472,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
-            # 'error_estimator': self.error_estimators[i]['shallow_water'],  # TODO
             'solver_parameters': self.op.adjoint_solver_parameters['shallow_water'],
         }
         if self.op.timestepper == 'CrankNicolson':
@@ -476,6 +484,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def _create_adjoint_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
 
+        # Reverse the flow because we are going backwards in time
+        fields.uv_2d *= -1
+
         # Account for dJdc
         raise NotImplementedError  # TODO
         # self.get_qoi_kernel_tracer(i)
@@ -487,14 +498,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         args = (self.equations[i].adjoint_tracer, self.fwd_solutions_tracer[i], fields, dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
-            # 'error_estimator': self.error_estimators[i]['tracer'],  # TODO
             'solver_parameters': self.op.adjoint_solver_parameters['tracer'],
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
         self.timesteppers[i].adjoint_tracer = integrator(*args, **kwargs)
-        raise NotImplementedError  # TODO
 
     # --- Solvers
 
