@@ -7,7 +7,7 @@ from adapt_utils.swe.utils import heaviside_approx
 import os
 import numpy as np
 import matplotlib
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 
 matplotlib.rc('text', usetex=True)
@@ -107,16 +107,16 @@ class BalzanoOptions(ShallowWaterOptions):
         expr = b1
         if self.bathymetry_type == 2:
             expr = conditional(le(abs(ξ(x) - 4000.0), 1000.0),
-                        conditional(ge(ξ(x), 4000.0),
-                                    (3000.0 + 2*(ξ(x) - 4000.0))/L*max_depth,
-                                    3000.0/L*max_depth),
-                        b1)
+                               conditional(ge(ξ(x), 4000.0),
+                                           (3000.0 + 2*(ξ(x) - 4000.0))/L*max_depth,
+                                           3000.0/L*max_depth),
+                               b1)
         elif self.bathymetry_type == 3:
             expr = conditional(le(abs(ξ(x) - 4000.0), 1000.0),
-                        conditional(ge(ξ(x), 4000.0),
-                                    (2000.0 + 3*(ξ(x) - 4000.0))/L*max_depth,
-                                    (3000.0 - (ξ(x) - 3000.0))/L*max_depth),
-                        b1)
+                               conditional(ge(ξ(x), 4000.0),
+                                           (2000.0 + 3*(ξ(x) - 4000.0))/L*max_depth,
+                                           (3000.0 - (ξ(x) - 3000.0))/L*max_depth),
+                               b1)
         return interpolate(expr, fs)
 
     def set_boundary_conditions(self, prob, i):

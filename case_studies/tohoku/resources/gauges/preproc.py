@@ -33,6 +33,7 @@ if pressure_gauge:
         bath_interp = si.RectBivariateSpline(lat, lon, b)
         b = float(-bath_interp(gauge_lat, gauge_lon))
 
+
 def readfile(filename, reverse=False):
     """Read a file in reverse order line by line"""
     with open(filename, 'r') as read_obj:
@@ -41,6 +42,7 @@ def readfile(filename, reverse=False):
         if reverse:
             lines = reversed(lines)
         return lines
+
 
 start_time = 0
 counter = 0

@@ -83,3 +83,4 @@ class RippleOptions(ShallowWaterOptions):
                 6: {},
             },
         }
+        return boundary_conditions

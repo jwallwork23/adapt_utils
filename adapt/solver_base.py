@@ -24,7 +24,7 @@ class AdaptiveProblemBase(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-    def __init__(self, op, meshes=None, discrete_adjoint=True, nonlinear=True):
+    def __init__(self, op, meshes=None, discrete_adjoint=True, nonlinear=True, monitor=None):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -33,6 +33,7 @@ class AdaptiveProblemBase(object):
         self.discrete_adjoint = discrete_adjoint
         self.approach = op.approach
         self.nonlinear = nonlinear
+        self.monitor = monitor
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
