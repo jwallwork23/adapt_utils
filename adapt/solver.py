@@ -49,8 +49,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'use_grad_div_viscosity_term': op.grad_div_viscosity,
             'use_grad_depth_viscosity_term': op.grad_depth_viscosity,
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
-            # 'use_lax_friedrichs_velocity': op.stabilisation == 'lax_friedrichs'  # TODO
-            'use_lax_friedrichs_velocity': False,
+            'use_lax_friedrichs_velocity': op.stabilisation == 'lax_friedrichs',
             'use_wetting_and_drying': op.wetting_and_drying,
             'wetting_and_drying_alpha': op.wetting_and_drying_alpha,
             # 'check_volume_conservation_2d': True,  # TODO
@@ -72,7 +71,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # 'check_tracer_conservation': True,  # TODO
             'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs',  # TODO
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
-            'sipg_parameter_tracer': None,
+            'sipg_parameter': None,
             'tracer_advective_velocity_factor': Constant(1.0),  # TODO: allow custom
             'use_tracer_conservative_form': False,
         }
@@ -333,7 +332,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.Q[i],
             self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter_tracer,
+            sipg_parameter=self.tracer_options[i].sipg_parameter,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -346,7 +345,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.Q[i],
             self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter_tracer,
+            sipg_parameter=self.tracer_options[i].sipg_parameter,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -367,15 +366,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.shallow_water_options[i],
         )
 
-    # TODO: Conservative case
     def _create_tracer_error_estimator(self, i):
-        self.error_estimators[i].tracer = TracerGOErrorEstimator(
+        if self.tracer_options[i].use_tracer_conservative_form:
+            raise NotImplementedError("Error estimators for conservative tracer not yet implemented.")  # TODO
+        else:
+            estimator = TracerGOErrorEstimator
+        self.error_estimators[i].tracer = estimator(
             self.Q[i],
             self.depth[i],
-            use_lax_friedrichs=self.op.stabilisation == 'lax_friedrichs',
-            sipg_parameter=self.op.sipg_parameter_tracer,  # TODO: This is not the right one!
+            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
+            sipg_parameter=self.tracer_options[i].sipg_parameter,
         )
-        raise NotImplementedError  # TODO
 
     # --- Timestepping
 
@@ -424,7 +425,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
 
-    # TODO: Reduce duplication (1)
     def _create_forward_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
         dt = self.op.dt
@@ -441,7 +441,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.timesteppers[i].shallow_water = integrator(*args, **kwargs)
         # self.lhs = self.timesteppers[i].shallow_water.F
 
-    # TODO: Reduce duplication (2)
     def _create_forward_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
         dt = self.op.dt
@@ -457,17 +456,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
             kwargs['error_estimator'] = self.error_estimators[i].tracer
         self.timesteppers[i].tracer = integrator(*args, **kwargs)
 
-    # TODO: Reduce duplication (3)
     def _create_adjoint_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
 
         # Account for dJdq
-        self.get_qoi_kernels(i)
+        self.kernels[i] = self.op.set_qoi_kernel(self.V[i])
         dJdu, dJdeta = self.kernels[i].split()
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         fields['momentum_source'] = self.time_kernel*dJdu
         fields['volume_source'] = self.time_kernel*dJdeta
 
+        # Construct time integrator
         dt = self.op.dt
         args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, dt, )
         kwargs = {
@@ -480,7 +479,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.timesteppers[i].adjoint_shallow_water = integrator(*args, **kwargs)
         # self.lhs = self.timesteppers[i].shallow_water.F
 
-    # TODO: Reduce duplication (4)
     def _create_adjoint_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
 
@@ -488,14 +486,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         fields.uv_2d *= -1
 
         # Account for dJdc
-        raise NotImplementedError  # TODO
-        # self.get_qoi_kernel_tracer(i)
-        # dJdc = self.kernel_tracer[i]
+        dJdc = self.op.set_qoi_kernel_tracer(self.Q[i])
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         fields['source'] = self.time_kernel*dJdc
 
+        # Construct time integrator
         dt = self.op.dt
-        args = (self.equations[i].adjoint_tracer, self.fwd_solutions_tracer[i], fields, dt, )
+        args = (self.equations[i].adjoint_tracer, self.adj_solutions_tracer[i], fields, dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
             'solver_parameters': self.op.adjoint_solver_parameters['tracer'],
@@ -699,7 +696,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if op.solve_tracer:
                 ts.adjoint_tracer.advance(self.simulation_time, update_forcings)
                 if self.tracer_options[i].use_limiter_for_tracers:
-                    self.tracer_limiters[i].apply(self.adj_solutions_tracer[i])  # TODO: TESTME
+                    self.tracer_limiters[i].apply(self.adj_solutions_tracer[i])
             iteration += 1
             self.simulation_time -= op.dt
             self.callbacks[i].evaluate(mode='timestep')
@@ -728,12 +725,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         for i, sol in enumerate(solutions):
             fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
             self.metrics.append(get_hessian_metric(sol, fields=fields, **kwargs))
-
-    # --- Goal-oriented
-
-    # TODO: What about tracer?
-    def get_qoi_kernels(self, i):
-        self.kernels[i] = self.op.set_qoi_kernel(self.V[i])
 
     # --- Run scripts
 

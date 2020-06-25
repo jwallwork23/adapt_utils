@@ -177,6 +177,9 @@ class Options(FrozenConfigurable):
     def set_qoi_kernel(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
+    def set_qoi_kernel_tracer(self, fs):
+        raise NotImplementedError("Should be implemented in derived class.")
+
     def exact_solution(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
