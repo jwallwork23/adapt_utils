@@ -26,8 +26,8 @@ class TohokuOptions(TsunamiOptions):
           Institute (PARI).
       * Timeseries for gauges KPG1 and KPG2 obtained from the Japanese Agency for Marine-Earth
           Science and Technology (JAMSTEC) via http://www.jamstec.go.jp/scdc/top_e.html.
-      * Timeseries for gauge 21418 obtained from the US National Oceanic and Atmospheric
-        Administration (NOAA) via https://www.ndbc.noaa.gov/station_page.php?station=21418.
+      * Timeseries for gauges 21401, 21413, 21418 and 21419 obtained from the US National Oceanic
+        and Atmospheric Administration (NOAA) via https://www.ndbc.noaa.gov.
 
     [Saito et al.] T. Saito, Y. Ito, D. Inazu, R. Hino, "Tsunami source of the 2011 Tohoku‐Oki
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
@@ -83,7 +83,10 @@ class TohokuOptions(TsunamiOptions):
             "MPG2": {"lonlat": (134.3712, 32.6431), "depth": 1507.0, "operator": "JAMSTEC"},
             # TODO: VCM1 (NEID)
             # TODO: VCM3 (NEID)
+            "21401": {"lonlat": (152.583, 42.617), "operator": "NOAA"},
+            "21413": {"lonlat": (152.132, 30.533), "depth": 5880.0, "operator": "NOAA"},
             "21418": {"lonlat": (148.655, 38.735), "depth": 5777.0, "operator": "NOAA"},
+            "21419": {"lonlat": (155.717, 44.435), "depth": 5282.0, "operator": "NOAA"},
         }
         self.pressure_gauges = ("P02", "P06", "KPG1", "KPG2", "MPG1", "MPG2", "21418")
         # self.pressure_gauges += ("VCM1", "VCM3")
