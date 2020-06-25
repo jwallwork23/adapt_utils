@@ -1,5 +1,6 @@
 from thetis import *
 from thetis.conservative_tracer_eq_2d import ConservativeTracerEquation2D
+from thetis.limiter import VertexBasedP1DGLimiter
 
 import os
 import numpy as np
@@ -28,11 +29,11 @@ __all__ = ["AdaptiveProblem"]
 #    - Should work, just needs testing.
 #  * Turbines
 #    - Check 2-turbine works
+#  * Sediment
+#  * Exner
 
 # TODO LATER:
 #  * Multiple tracers
-#  * Conservative tracer
-#  * Tracer limiters
 
 class AdaptiveProblem(AdaptiveProblemBase):
     """Default model: 2D coupled shallow water + tracer transport."""
@@ -70,11 +71,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
             # 'check_tracer_conservation': True,  # TODO
             'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs',  # TODO
-            # 'use_limiter_for_tracers': True,  # TODO
+            'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
             'sipg_parameter_tracer': None,
             'tracer_advective_velocity_factor': Constant(1.0),  # TODO: allow custom
             'use_tracer_conservative_form': False,
         }
+        self.tracer_limiters = [None for i in range(op.num_meshes)]
         for i, to in enumerate(self.tracer_options):
             to.update(static_options)
             if hasattr(op, 'sipg_parameter_tracer') and op.sipg_parameter_tracer is not None:
@@ -194,7 +196,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def set_stabilisation_step(self, i):
         """ Set stabilisation mode and corresponding parameter on the ith mesh."""
         self.minimum_angles = [None for mesh in self.meshes]
-        if self.op.use_automatic_sipg_parameter:
+        if self.op.use_automatic_sipg_parameter and self.stabilisation == 'sipg':
             for i, mesh in enumerate(self.meshes):
                 self.minimum_angles[i] = get_minimum_angles_2d(mesh)
         if self.op.solve_swe:
@@ -209,7 +211,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         sipg = None
         if hasattr(op, 'sipg_parameter'):
             sipg = op.sipg_parameter
-        if self.shallow_water_options[i].use_automatic_sipg_parameter:
+        if self.shallow_water_options[i].use_automatic_sipg_parameter and self.stabilisation == 'sipg':
             for i, mesh in enumerate(self.meshes):
                 cot_theta = 1.0/tan(self.minimum_angles[i])
 
@@ -240,7 +242,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         sipg = None
         if hasattr(op, 'sipg_parameter_tracer'):
             sipg = op.sipg_parameter_tracer
-        if self.tracer_options[i].use_automatic_sipg_parameter:
+        if self.tracer_options[i].use_automatic_sipg_parameter and self.stabilisation == 'sipg':
             for i, mesh in enumerate(self.meshes):
                 cot_theta = 1.0/tan(self.minimum_angles[i])
 
@@ -324,15 +326,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
     def _create_forward_tracer_equation(self, i):
-        conservative = self.tracer_options[i].use_tracer_conservative_form
-        model = ConservativeTracerEquation2D if conservative else TracerEquation2D
+        op = self.tracer_options[i]
+        model = ConservativeTracerEquation2D if op.use_tracer_conservative_form else TracerEquation2D
         self.equations[i].tracer = model(
             self.Q[i],
             self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
             sipg_parameter=self.tracer_options[i].sipg_parameter_tracer,
         )
-        # TODO: limiters
+        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+            self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     def _create_adjoint_tracer_equation(self, i):
@@ -583,7 +586,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 ts.shallow_water.advance(self.simulation_time, update_forcings)
             if op.solve_tracer:
                 ts.tracer.advance(self.simulation_time, update_forcings)
-                # TODO: limiters
+                if self.tracer_options[i].use_limiter_for_tracers:
+                    self.tracer_limiters[i].apply(self.fwd_solutions_tracer[i])
             iteration += 1
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')
@@ -685,7 +689,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 ts.adjoint_shallow_water.advance(self.simulation_time, update_forcings)
             if op.solve_tracer:
                 ts.adjoint_tracer.advance(self.simulation_time, update_forcings)
-                # TODO: limiters
+                if self.tracer_options[i].use_limiter_for_tracers:
+                    self.tracer_limiters[i].apply(self.adj_solutions_tracer[i])  # TODO: TESTME
             iteration += 1
             self.simulation_time -= op.dt
             self.callbacks[i].evaluate(mode='timestep')
