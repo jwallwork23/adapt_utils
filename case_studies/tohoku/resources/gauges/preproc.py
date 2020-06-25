@@ -44,7 +44,7 @@ def readfile(filename, reverse=False):
 
 start_time = 0
 counter = 0
-lines = readfile('.'.join([fname, 'txt']), reverse=fname == '21418')
+lines = readfile('.'.join([fname, 'txt']), reverse=fname[0] == '2')
 time = 0
 with open('.'.join([fname, 'dat']), 'w') as outfile:
     for line in lines:
@@ -52,13 +52,13 @@ with open('.'.join([fname, 'dat']), 'w') as outfile:
 
         # --- Convert time to seconds
 
-        if fname not in ('KPG1', 'KPG2'):
+        if 'PG' not in fname:
             if pressure_gauge:
                 hms = ''.join([words[3], words[4], words[5]])
                 day = int(words[2])
                 if day != 11:
                     continue
-                if fname == '21418' and int(words[6]) == 1:
+                if fname[0] == '2' and int(words[6]) == 1:
                     continue
             else:
                 hms = words[0][-7:-1]
@@ -79,11 +79,12 @@ with open('.'.join([fname, 'dat']), 'w') as outfile:
             elev = np.nan
 
         # Pressure gauges whose data have already been converted to water depth
-        elif fname in ('21418', 'KPG1', 'KPG2'):
+        elif fname[0] == '2' or 'PG' in fname:
             elev = float(meas)
-            if 'KPG' in fname:
+            if 'PG' in fname:
                 elev = elev/100  # Convert to metres
-            elev -= b
+            if 'MPG' not in fname:
+                elev -= b
 
         # Convert other pressure gauge data under hydrostatic assumptions
         elif pressure_gauge:
@@ -95,7 +96,7 @@ with open('.'.join([fname, 'dat']), 'w') as outfile:
 
         # GPS gauge data are given in centimetres
         else:
-            assert fname[:2] == '80'
+            assert fname[0] == '8'
             elev = float(meas)/100  # Convert to metres
 
         # Write to output
