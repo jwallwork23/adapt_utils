@@ -114,7 +114,7 @@ class LeVequeOptions(ShallowWaterOptions):
 
         prob.fwd_solutions_tracer[0].interpolate(self.bg + bell + cone + slot_cyl)
 
-    def set_qoi_kernel(self, fs):
+    def set_qoi_kernel_tracer(self, fs):
         b = self.ball(fs.mesh(), source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
