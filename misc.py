@@ -21,6 +21,7 @@ def abs(u):
     """Hack due to the fact `abs` seems to be broken in conditional statements."""
     return conditional(u < 0, -u, u)
 
+
 def prod(arr):
     """Helper function for taking the product of an array (similar to `sum`)."""
     n = len(arr)
@@ -218,7 +219,7 @@ def gaussian(locs, mesh, scale=1.0, rotation=None):
 
     # Combine to get indicator
     q_sq = [sum((X[j][i]/r[j][i])**2 for i in dims) for j in L]  # Quotient of squares
-    return sum(scale*conditional(lt(q_sq[j], 1), exp(-q_sq[j]), 0) for j in L)   
+    return sum(scale*conditional(lt(q_sq[j], 1), exp(-q_sq[j]), 0) for j in L)
 
 
 def copy_mesh(mesh):

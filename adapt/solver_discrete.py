@@ -2,8 +2,6 @@ from thetis import *
 from firedrake_adjoint import *
 from firedrake.adjoint.blocks import GenericSolveBlock
 
-import numpy as np
-
 from adapt_utils.adapt.solver import AdaptiveProblem
 
 

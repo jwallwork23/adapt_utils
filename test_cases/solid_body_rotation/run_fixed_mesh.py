@@ -4,7 +4,7 @@ from thetis import *
 import os
 import numpy as np
 import argparse
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from adapt_utils.test_cases.solid_body_rotation.options import LeVequeOptions
 from adapt_utils.adapt.solver import AdaptiveProblem
@@ -53,6 +53,7 @@ kwargs = {
 op = LeVequeOptions(**kwargs)
 print_output("Element count: {:d}".format(op.default_mesh.num_cells()))
 
+
 # class TracerProblem(AdaptiveDiscreteAdjointProblem):
 class TracerProblem(AdaptiveProblem):
 
@@ -60,6 +61,7 @@ class TracerProblem(AdaptiveProblem):
         kernel = self.op.set_qoi_kernel(self.P0[-1])
         sol = self.fwd_solutions_tracer[-1]
         return assemble(kernel*sol*dx)
+
 
 # Run model
 tp = TracerProblem(op)
