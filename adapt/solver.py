@@ -1,4 +1,5 @@
 from thetis import *
+from thetis.conservative_tracer_eq_2d import ConservativeTracerEquation2D
 
 import os
 import numpy as np
@@ -72,6 +73,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # 'use_limiter_for_tracers': True,  # TODO
             'sipg_parameter_tracer': None,
             'tracer_advective_velocity_factor': Constant(1.0),  # TODO: allow custom
+            'use_tracer_conservative_form': False,
         }
         for i, to in enumerate(self.tracer_options):
             to.update(static_options)
@@ -321,8 +323,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
-    def _create_forward_tracer_equation(self, i):  # TODO: Conservative form
-        self.equations[i].tracer = TracerEquation2D(
+    def _create_forward_tracer_equation(self, i):
+        conservative = self.tracer_options[i].use_tracer_conservative_form
+        model = ConservativeTracerEquation2D if conservative else TracerEquation2D
+        self.equations[i].tracer = model(
             self.Q[i],
             self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
