@@ -28,7 +28,7 @@ class LeVequeOptions(ShallowWaterOptions):
     The QoI considered in this test case may be viewed as an extension of the QoI considered in the
     [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
-    def __init__(self, shape=0, mesh_type='circle', n=0, background_concentration=0.0, **kwargs):
+    def __init__(self, shape=0, geometry='circle', n=0, background_concentration=0.0, **kwargs):
         self.solve_swe = False
         self.solve_tracer = True
         self.shape = shape
@@ -42,7 +42,7 @@ class LeVequeOptions(ShallowWaterOptions):
         self.bg = background_concentration
 
         # Domain
-        if mesh_type == 'circle':
+        if geometry == 'circle':
             mesh_file = os.path.join(os.path.dirname(__file__), 'circle.msh')
             if os.path.exists(mesh_file):
                 self.default_mesh = Mesh(mesh_file)
@@ -50,10 +50,10 @@ class LeVequeOptions(ShallowWaterOptions):
                 raise IOError("Mesh file {:s} does not exist.".format(mesh_file))
             if n > 0:
                 self.default_mesh = MeshHierarchy(self.default_mesh, n)[-1]
-        elif mesh_type == 'square':
+        elif geometry == 'square':
             self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
         else:
-            raise ValueError("Mesh type {:s} not recognised.".format(mesh_type))
+            raise ValueError("Geometry {:s} not recognised.".format(geometry))
 
         # Source / receiver
         self.source_loc = [(0.25, 0.5, 0.15),     # Bell     (shape 0)

@@ -1,4 +1,4 @@
-from thetis import print_output
+from thetis import *
 
 import os
 import numpy as np
@@ -15,60 +15,51 @@ def write(text, out):
 
 # Initialise
 parser = argparse.ArgumentParser()
-parser.add_argument("-approach", help="Choose adaptive approach")
-parser.add_argument("-init_res", help="Initial mesh refinement level")
-# parser.add_argument("-num_adapt", help="Number of adapt/solve iterations in adaptation loop")
-# parser.add_argument("-desired_error", help="Desired error level in metric normalisation")
-parser.add_argument("-mesh_type", help="Choose from 'circle' or 'square'")
-parser.add_argument("-shape", help="""
-Shape defining QoI, chosen from:
-  0: Gaussian bell
-  1: Cone
-  2: Slotted cylinder
-""")
+parser.add_argument("-level", help="Mesh refinement level")
+parser.add_argument("-geometry", help="Choose from 'circle' or 'square'")
+parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 args = parser.parse_args()
 
-approach = args.approach or 'fixed_mesh'
-i = int(args.init_res or 0)
+i = int(args.level or 0)
 n = 2**i
-# desired_error = float(args.desired_error or 0.1)
-mesh_type = args.mesh_type or 'circle'
+geometry = args.geometry or 'circle'
 
 # Create parameter class
 kwargs = {
-    'mesh_type': mesh_type,
+    'approach': 'fixed_mesh',
 
-    # QoI  (default slotted cylinder)
-    'shape': int(args.shape or 2),
+    # Geometry
+    'geometry': geometry,
 
     # Spatial discretisation
     'refinement_level': i,
     'tracer_family': 'dg',
-    'stabilisation': 'no',
+    # 'stabilisation': 'no',
+    'stabilisation': 'sipg',
+    'use_automatic_sipg_parameter': False,
+    'use_limiter_for_tracers': True,
+    'use_tracer_conservative_form': bool(args.conservative or False),
 
     # Temporal discretisation
     'dt': np.pi/(100*n),
     # 'dt': np.pi/(300*n),
     'dt_per_export': 10*n,
-    'dt_per_remesh': 10*n,
-
-    # Adaptation parameters
-    'approach': 'fixed_mesh',
-    # 'normalisation': 'error',
-    # 'num_adapt': int(args.num_adapt or 3),
-    # 'norm_order': 1,
-    # 'desired_error': desired_error,
-    # 'target': 1.0/desired_error,
 }
 op = LeVequeOptions(**kwargs)
 print_output("Element count: {:d}".format(op.default_mesh.num_cells()))
 
+class TracerProblem(AdaptiveProblem):
+    def quantity_of_interest(self):
+        kernel = self.op.set_qoi_kernel(self.P0[-1])
+        sol = self.fwd_solutions_tracer[-1]
+        return assemble(kernel*sol*dx)
+
 # Run model
-tp = AdaptiveProblem(op)
+tp = TracerProblem(op)
 tp.solve()
 
 # Print outputs
-f = open(os.path.join(tp.di, "{:s}_{:d}.log".format(mesh_type, n)), 'w+')
+f = open(os.path.join(tp.di, "{:s}_{:d}.log".format(geometry, n)), 'w+')
 head = "\n  Shape            Analytic QoI    Quadrature QoI  Calculated QoI  Error"
 rule = 74*'='
 write(head, f)
@@ -83,8 +74,8 @@ for shape, name in zip(range(3), ('Gaussian', 'Cone', 'Slotted cylinder')):
 write(rule, f)
 approach = "'" + tp.approach.replace('_', ' ').capitalize() + "'"
 tail = 19*' ' + "{:14s}  {:14s}  {:14s}  {:7d}"
-write(tail.format('Approach', approach, 'Element count', tp.num_cells[-1]), f)
-mesh_type = "'" + mesh_type.capitalize() + "'"
+write(tail.format('Approach', approach, 'Element count', tp.num_cells[-1][-1]), f)
+geometry = "'" + geometry.capitalize() + "'"
 tail = 19*' ' + "{:14s}  {:14s}  {:14s}  {:7.4f}"
-write(tail.format('Mesh type', mesh_type, 'Timestep', op.dt), f)
-f.close()
+write(tail.format('Geometry', geometry, 'Timestep', op.dt), f)
+f.close()  # TODO: Print model parameters, too
