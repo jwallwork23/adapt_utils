@@ -478,7 +478,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
         self.timesteppers[i].adjoint_shallow_water = integrator(*args, **kwargs)
-        # self.lhs = self.timesteppers[i].shallow_water.F
 
     def _create_adjoint_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)

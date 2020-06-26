@@ -6,7 +6,7 @@ import weakref
 import numpy as np
 import matplotlib.pyplot as plt
 
-from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.unsteady.options import CoupledOptions
 
 
 __all__ = ["BoydOptions"]
@@ -18,7 +18,7 @@ plt.rc('font', family='serif')
 
 # TODO: Update
 # TODO: Use paralellised version
-class BoydOptions(ShallowWaterOptions):
+class BoydOptions(CoupledOptions):
     """
     Parameters for test case in [Boyd et al. 1996].
     """

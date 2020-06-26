@@ -1,12 +1,12 @@
 from firedrake import *
 
-from adapt_utils.tracer.options import TracerOptions
+from adapt_utils.unsteady.options import CoupledOptions
 
 
 __all__ = ["ALEAdvectionOptions"]
 
 
-class ALEAdvectionOptions(TracerOptions):
+class ALEAdvectionOptions(CoupledOptions):
     def __init__(self, n=40, approach='ale', *args, **kwargs):
         super(ALEAdvectionOptions, self).__init__(*args, approach=approach, **kwargs)
         self.solve_swe = False
@@ -35,9 +35,11 @@ class ALEAdvectionOptions(TracerOptions):
         return self.source
 
     def set_boundary_conditions(self, prob, i):
-        boundary_conditions['tracer'] = {
-            1: {'diff_flux': Constant(0.0)},
-            2: {'diff_flux': Constant(0.0)},
+        boundary_conditions = {
+            'tracer': {
+                1: {'diff_flux': Constant(0.0)},
+                2: {'diff_flux': Constant(0.0)},
+            }
         }
         return boundary_conditions
 

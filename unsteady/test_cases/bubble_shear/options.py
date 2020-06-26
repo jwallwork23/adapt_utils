@@ -1,14 +1,14 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.unsteady.options import CoupledOptions
 
 
 __all__ = ["BubbleOptions"]
 
 
 # TODO: 3d version
-class BubbleOptions(ShallowWaterOptions):
+class BubbleOptions(CoupledOptions):
     # TODO: doc
     def __init__(self, n=1, **kwargs):
         super(BubbleOptions, self).__init__(**kwargs)
@@ -70,6 +70,3 @@ class BubbleOptions(ShallowWaterOptions):
             self.update_velocity(prob, i, t)
 
         return update_forcings
-
-    def set_bathymetry(self, fs):
-        return Function(fs).assign(1.0)

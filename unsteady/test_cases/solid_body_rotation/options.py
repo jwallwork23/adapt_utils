@@ -4,14 +4,14 @@ from thetis.configuration import *
 import math
 import os
 
-from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.unsteady.options import CoupledOptions
 
 
 __all__ = ["LeVequeOptions"]
 
 
 # NOTE: Could set three different tracers in Thetis implementation
-class LeVequeOptions(ShallowWaterOptions):
+class LeVequeOptions(CoupledOptions):
     r"""
     Parameters for test case in [LeVeque 1996]. The analytical final time solution is the initial
     condition, since there is no diffusivity.
@@ -96,9 +96,6 @@ class LeVequeOptions(ShallowWaterOptions):
         u, eta = prob.fwd_solutions[0].split()
         u.interpolate(as_vector((0.5 - y, x - 0.5)))
 
-    def set_bathymetry(self, fs):
-        return Constant(1.0)
-
     def set_initial_condition_tracer(self, prob):
         x, y = SpatialCoordinate(prob.meshes[0])
         bell_x0, bell_y0, bell_r0 = self.source_loc[0]
@@ -114,8 +111,8 @@ class LeVequeOptions(ShallowWaterOptions):
 
         prob.fwd_solutions_tracer[0].interpolate(self.bg + bell + cone + slot_cyl)
 
-    def set_qoi_kernel_tracer(self, fs):
-        b = self.ball(fs.mesh(), source=False)
+    def set_qoi_kernel_tracer(self, prob, i):
+        b = self.ball(prob.Q[i].mesh(), source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
@@ -152,8 +149,8 @@ class LeVequeOptions(ShallowWaterOptions):
             r = self.source_loc[2][2]                          # Cylinder radius
             return h*(pi*r*r - 2*t*l - r*r*math.asin(l/r) - l*sqrt(r*r - l*l))
 
-    def quadrature_qoi(self, fs):
-        x, y = SpatialCoordinate(fs.mesh())
+    def quadrature_qoi(self, prob, i):
+        x, y = SpatialCoordinate(prob.meshes[i])
         bell_x, bell_y, bell_r = self.source_loc[0]
         cone_x, cone_y, cone_r = self.source_loc[1]
         cyl_x, cyl_y, cyl_r = self.source_loc[2]
@@ -166,5 +163,5 @@ class LeVequeOptions(ShallowWaterOptions):
                                            0.0, 1.0), 0.0)
 
         sol = self.bg + bell + cone + slot_cyl
-        kernel = self.set_qoi_kernel(fs)
+        kernel = self.set_qoi_kernel_tracer(prob, i)
         return assemble(kernel*sol*dx(degree=12))

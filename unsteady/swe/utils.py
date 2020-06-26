@@ -4,7 +4,7 @@ from firedrake import *
 
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.recovery import DoubleL2ProjectorHessian
-from .options import ShallowWaterOptions
+from ..options import CoupledOptions
 from adapt_utils.misc import get_component, get_component_space
 
 
@@ -29,9 +29,9 @@ class ShallowWaterHessianRecoverer():
     :arg function_space: :class:`MixedFunctionSpace` instance for prognostic tuple.
     :kwarg constant_fields: dictionary of fields whose Hessian can be computed once per mesh
         iteration
-    :kwarg op: :class:`ShallowWaterOptions` parameters class
+    :kwarg op: :class:`CoupledOptions` parameters class
     """
-    def __init__(self, function_space, constant_fields={}, op=ShallowWaterOptions(), **kwargs):
+    def __init__(self, function_space, constant_fields={}, op=CoupledOptions(), **kwargs):
         kwargs.setdefault('normalise', True)
         self.op = op
 

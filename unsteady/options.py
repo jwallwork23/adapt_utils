@@ -4,11 +4,11 @@ from thetis.configuration import *
 from adapt_utils.options import Options
 
 
-__all__ = ["ShallowWaterOptions"]
+__all__ = ["CoupledOptions"]
 
 
 # TODO: Improve doc
-class ShallowWaterOptions(Options):
+class CoupledOptions(Options):
     """Parameters for coupled shallow water - tracer transport model."""
 
     # Physics
@@ -108,14 +108,15 @@ class ShallowWaterOptions(Options):
             }
         }
         self.adjoint_solver_parameters.update(self.solver_parameters)
-        super(ShallowWaterOptions, self).__init__(**kwargs)
+        super(CoupledOptions, self).__init__(**kwargs)
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
         u.interpolate(as_vector(self.base_velocity))
 
     def set_bathymetry(self, fs):
-        raise NotImplementedError("Should be implemented in derived class.")
+        """Should be implemented in derived class."""
+        return Function(fs).assign(1.0)
 
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""

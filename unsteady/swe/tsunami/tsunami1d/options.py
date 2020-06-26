@@ -3,13 +3,13 @@ from firedrake import *
 import numpy as np
 import warnings
 
-from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.unsteady.options import CoupledOptions
 
 
 __all__ = ["Tsunami1dOptions"]
 
 
-class Tsunami1dOptions(ShallowWaterOptions):
+class Tsunami1dOptions(CoupledOptions):
     """
     Parameter class for the one dimensional idealised tsunami described in [1], solved using
     space-time FEM.
