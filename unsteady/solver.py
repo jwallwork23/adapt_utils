@@ -584,12 +584,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
+
+            # TODO: Get mesh velocity; subtract in equations
+
+            # Solve equations
             if op.solve_swe:
                 ts.shallow_water.advance(self.simulation_time, update_forcings)
             if op.solve_tracer:
                 ts.tracer.advance(self.simulation_time, update_forcings)
                 if self.tracer_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_tracer[i])
+
+            # Move mesh
+            self.move_mesh(i)
+
+            # Outputs
             iteration += 1
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')

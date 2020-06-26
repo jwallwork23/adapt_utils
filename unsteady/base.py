@@ -7,6 +7,7 @@ from firedrake.petsc import PETSc
 import os
 import numpy as np
 
+from adapt_utils.adapt.r import MeshMover
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
@@ -26,7 +27,7 @@ class AdaptiveProblemBase(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-    def __init__(self, op, meshes=None, discrete_adjoint=True, nonlinear=True, monitor=None):
+    def __init__(self, op, meshes=None, discrete_adjoint=True, nonlinear=True):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -35,7 +36,6 @@ class AdaptiveProblemBase(object):
         self.discrete_adjoint = discrete_adjoint
         self.approach = op.approach
         self.nonlinear = nonlinear
-        self.monitor = monitor
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -63,6 +63,9 @@ class AdaptiveProblemBase(object):
         self.integrator = implemented_steppers[self.op.timestepper]
         if op.timestepper == 'SteadyState':
             assert op.end_time < op.dt
+
+        # Mesh movement
+        self.mesh_movers = [None for i in range(self.num_meshes)]
 
         # Outputs
         self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
@@ -297,3 +300,26 @@ class AdaptiveProblemBase(object):
 
     def get_qoi_kernels(self, i):
         self.op.set_qoi_kernel(self, i)
+
+    # --- Mesh movement
+
+    def set_monitor_functions(self, monitors):
+        assert self.approach in ('monge_ampere', 'laplacian_smoothing', 'ale')
+        assert monitors is not None
+        if callable(monitors):
+            monitors = [monitors, ]
+        assert len(monitors) == self.num_meshes
+        kwargs = {
+            'method': self.approach,
+            'mesh_velocity': None,  # TODO
+            'bc': None,  # TODO
+            'bbc': None,  # TODO
+            'op': self.op,
+        }
+        for i in range(self.num_meshes):
+            assert monitors[i] is not None
+            self.mesh_movers[i] = MeshMover(self.meshes[i], monitors[i], **kwargs)
+
+    def move_mesh(self, i):
+        if self.mesh_movers[i] is not None:
+            self.mesh_movers[i].adapt()

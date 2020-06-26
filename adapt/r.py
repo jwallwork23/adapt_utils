@@ -38,10 +38,6 @@ class MeshMover():
             assert self.dim == 2
         except AssertionError:
             raise NotImplementedError("r-adaptation only currently considered in 2D.")
-        try:
-            assert op.num_adapt == 1
-        except AssertionError:
-            raise ValueError
         self.monitor_function = monitor_function
         self.mesh_velocity_function = mesh_velocity
         assert method in ('monge_ampere', 'laplacian_smoothing', 'ale')
