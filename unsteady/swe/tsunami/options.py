@@ -133,7 +133,7 @@ class TsunamiOptions(CoupledOptions):
         kernel_eta.rename("QoI kernel (elev component)")
         kernel_eta.interpolate(rescaling*b)
 
-    def set_final_condition(self, prob):
+    def set_terminal_condition(self, prob):
         prob.adj_solutions[-1].assign(self.set_qoi_kernel(prob.V[-1]))
 
     def get_gauge_data(self, gauge, **kwargs):

@@ -117,7 +117,6 @@ class Options(FrozenConfigurable):
         self.default_mesh = mesh
         self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)
-        self.end_time -= 0.25*self.dt
         if self.debug:
             # set_log_level(DEBUG)
             set_log_level(INFO)
@@ -156,12 +155,12 @@ class Options(FrozenConfigurable):
         return misc.gaussian(locs, mesh, **kwargs)
 
     def set_start_condition(self, fs, adjoint=False):
-        return self.set_final_condition(fs) if adjoint else self.set_initial_condition(fs)
+        return self.set_terminal_condition(fs) if adjoint else self.set_initial_condition(fs)
 
     def set_initial_condition(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def set_final_condition(self, fs):
+    def set_terminal_condition(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_boundary_conditions(self, fs):
