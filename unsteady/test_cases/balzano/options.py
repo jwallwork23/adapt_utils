@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.options import ShallowWaterOptions
+from adapt_utils.options import CoupledOptions
 from adapt_utils.swe.utils import heaviside_approx
 
 import os
@@ -17,7 +17,7 @@ matplotlib.rc('font', family='serif')
 __all__ = ["BalzanoOptions"]
 
 
-class BalzanoOptions(ShallowWaterOptions):
+class BalzanoOptions(CoupledOptions):
     """
     Parameters for test case described in [1].
 

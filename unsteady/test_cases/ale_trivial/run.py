@@ -4,43 +4,56 @@ from thetis import print_output
 import numpy as np
 import argparse
 
-from adapt_utils.test_cases.ale_trivial.options import ALEAdvectionOptions
-from adapt_utils.tracer.solver2d import UnsteadyTracerProblem2d
-from adapt_utils.tracer.solver2d_thetis import UnsteadyTracerProblem2d_Thetis
+from adapt_utils.unsteady.test_cases.ale_trivial.options import ALEAdvectionOptions
+from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
 # Collect user specified arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("interpretation", help="Choose from {'eulerian', 'lagrangian'}.")
-parser.add_argument("-family", help="Choose from {'cg', 'dg'}.")
-parser.add_argument("-thetis", help="Choose Thetis or hand-coded solver backend")
+parser.add_argument("-conservative", help="Toggle conservative tracer equation")
+parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
+parser.add_argument("-stabilisation", help="Stabilisation method")
+parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-debug", help="Toggle debugging mode")
 args = parser.parse_args()
 
 approach = 'fixed_mesh' if args.interpretation == 'eulerian' else 'ale'
-family = args.family or 'cg'
-debug = bool(args.debug or False)
 
 # Setup
-op = ALEAdvectionOptions(approach=approach, prescribed_velocity='fluid', family=family, debug=debug)
-solver = UnsteadyTracerProblem2d_Thetis if bool(args.thetis or False) else UnsteadyTracerProblem2d
-tp = solver(op)
+kwargs = {
+    'approach': approach,
+
+    # Discretisation
+    'tracer_family': args.family or 'dg',
+    'stabilisation': args.stabilisation or 'no',
+    'use_automatic_sipg_parameter': False,
+    'use_limiter_for_tracers': bool(args.limiters or True),
+    'use_tracer_conservative_form': bool(args.conservative or False),
+
+    # Mesh movement
+    'prescribed_velocity': 'fluid',
+
+    # Misc
+    'debug': bool(args.debug or False),
+}
+op = ALEAdvectionOptions(**kwargs)
+tp = AdaptiveProblem(op)
+tp.set_initial_condition()
 
 # Get initial solution and coordinates
-init_sol = tp.solution.copy(deepcopy=True)
+init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
 init_norm = norm(init_sol)
-init_coords = tp.mesh.coordinates.dat.data.copy()
+init_coords = tp.meshes[0].coordinates.dat.data.copy()
 
 # Solve PDE
 if approach == 'fixed_mesh':
-    tp.solve()
-elif approach == 'ale':
-    tp.solve_ale()
+    tp.solve_forward()
 else:
-    raise NotImplementedError
-final_sol = tp.solution
+    raise NotImplementedError  # TODO
+final_sol = tp.fwd_solutions_tracer[-1]
 final_norm = norm(final_sol)
-final_coords = tp.mesh.coordinates.dat.data
+final_coords = tp.meshes[-1].coordinates.dat.data
 
 # Check final coords match initial coords
 if approach == 'ale':
