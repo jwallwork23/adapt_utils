@@ -3,7 +3,7 @@ import os
 import h5py
 
 from adapt_utils.callback import *
-from adapt_utils.swe.adapt_solver import AdaptiveShallowWaterProblem
+from adapt_utils.swe.solver import AdaptiveShallowWaterProblem
 
 
 __all__ = ["AdaptiveTsunamiProblem"]
