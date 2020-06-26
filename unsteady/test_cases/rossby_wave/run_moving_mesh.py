@@ -1,8 +1,8 @@
 from thetis import *
 
-from adapt_utils.test_cases.rossby_wave.options import BoydOptions
-from adapt_utils.test_cases.rossby_wave.monitors import *
-from adapt_utils.swe.solver import UnsteadyShallowWaterProblem
+from adapt_utils.unsteady.test_cases.rossby_wave.options import BoydOptions
+from adapt_utils.unsteady.test_cases.rossby_wave.monitors import *
+from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.adapt.recovery import construct_hessian
 from adapt_utils.adapt.metric import metric_intersection
 from adapt_utils.norms import *
@@ -22,8 +22,8 @@ op.dt = 0.04/n_coarse
 op.plot_pvd = n_coarse < 5
 op.dt_per_export = 10*n_coarse
 op.dt_per_remesh = 10*n_coarse
-swp = UnsteadyShallowWaterProblem(op, levels=0)
-swp.setup_solver()
+swp = AdaptiveProblem(op)
+# swp.setup_solver()
 
 
 # FIXME: Doesn't there need to be some interpolation?

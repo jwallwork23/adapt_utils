@@ -5,8 +5,8 @@ import pandas as pd
 import numpy as np
 import time
 
-from adapt_utils.test_cases.trench.options import TrenchOptions
-from adapt_utils.adapt.solver import AdaptiveProblem
+from adapt_utils.unsteady.test_cases.trench.options import TrenchOptions
+from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
 from adapt_utils.norms import local_frobenius_norm
 

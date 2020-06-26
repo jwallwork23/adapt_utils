@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.morphological_options import MorphOptions
+from adapt_utils.unsteady.options import CoupledOptions
 
 import os
 from matplotlib import rc
@@ -12,7 +12,8 @@ rc('text', usetex=True)
 __all__ = ["TrenchHydroOptions"]
 
 
-class TrenchHydroOptions(MorphOptions):
+# TODO: NEEDS UPDATING
+class TrenchHydroOptions(CoupledOptions):
     """
     Parameters for test case described in [1].
 

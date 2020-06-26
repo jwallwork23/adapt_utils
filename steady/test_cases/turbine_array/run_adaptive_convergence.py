@@ -1,7 +1,7 @@
 import argparse
 import h5py
 
-from adapt_utils.test_cases.steady_turbine.options import *
+from adapt_utils.steady.test_cases.turbine_array.options import *
 from adapt_utils.steady.swe.turbine.solver import SteadyTurbineProblem
 
 parser = argparse.ArgumentParser()
@@ -34,7 +34,7 @@ outstrs = {0: [], 1: []}
 for offset in (0, 1):
 
     # Run adaptation loop
-    op = Steady2TurbineOptions(offset=offset, **kwargs)
+    op = TurbineArrayOptions(offset=offset, **kwargs)
     op.set_all_rtols(op.element_rtol)
     tp = SteadyTurbineProblem(op, discrete_adjoint=True, levels=1)
     tp.outer_adaptation_loop()

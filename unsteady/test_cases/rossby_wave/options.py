@@ -62,8 +62,8 @@ class BoydOptions(CoupledOptions):
 
         # Time integration
         self.dt = 0.05
-        # self.end_time = 120.0
-        self.end_time = 30.0  # TODO: Temporary until periodicity is fixed in exact solution
+        self.end_time = 120.0
+        # self.end_time = 30.0
         self.dt_per_export = 50
         self.dt_per_remesh = 50
         self.timestepper = 'CrankNicolson'
@@ -166,11 +166,11 @@ class BoydOptions(CoupledOptions):
         """
         dirichlet = {'uv': Constant(as_vector([0., 0.]))}
         boundary_conditions = {'shallow_water': {}}
-        for tag in fs.mesh().exterior_facets.unique_markers:
+        for tag in prob.meshes[i].exterior_facets.unique_markers:
             boundary_conditions['shallow_water'][tag] = dirichlet
         return boundary_conditions
 
-    def get_exact_solution(self, fs, t):
+    def get_exact_solution(self, prob, i, t):
         """
         Evaluate asymptotic solution of chosen order.
 
@@ -178,7 +178,7 @@ class BoydOptions(CoupledOptions):
         :kwarg t: current time.
         """
         msg = "Computing order {:d} asymptotic solution at time {:.2f}s on mesh with {:d} local elements..."
-        self.print_debug(msg.format(self.order, t, fs.mesh().num_cells()))
+        self.print_debug(msg.format(self.order, t, prob.meshes[i].num_cells()))
         self.t.assign(t)
         x, y = SpatialCoordinate(self.default_mesh)
         B = self.soliton_amplitude
@@ -199,7 +199,7 @@ class BoydOptions(CoupledOptions):
             self.terms['eta'] += C*self.φ*0.5625*(-5 + 2*y*y)*self.Ψ
             self.terms['eta'] += self.φ*self.φ*self.hermite_sum['eta']
 
-        solution = Function(fs, name="Order {:d} asymptotic solution".format(self.order))
+        solution = Function(prob.V[i], name="Order {:d} asymptotic solution".format(self.order))
         u, eta = solution.split()
         u.interpolate(as_vector([self.terms['u'], self.terms['v']]))
         eta.interpolate(self.terms['eta'])
@@ -210,10 +210,8 @@ class BoydOptions(CoupledOptions):
     def set_initial_condition(self, prob):
         """
         Set initial elevation and velocity using asymptotic solution.
-
-        :arg fs: `FunctionSpace` in which the initial condition should live.
         """
-        prob.fwd_solutions[0].assign(self.get_exact_solution(fs, t=0.0))
+        prob.fwd_solutions[0].assign(self.get_exact_solution(prob, 0, t=0.0))
 
     def get_reference_mesh(self, n=50):
         """
@@ -314,18 +312,18 @@ class BoydOptions(CoupledOptions):
         self.rms = sqrt(np.mean(sol_proj.vector().gather()))
         self.print_debug("Done!")
 
-    def get_export_func(self, solver_obj):  # TODO: Could just write as a callback
+    def get_export_func(self, prob, i):
         def export_func():
             if self.debug:
                 t = solver_obj.simulation_time
 
                 # Get exact solution and plot
-                exact = self.get_exact_solution(solver_obj.function_spaces.V_2d, t=t)
+                exact = self.get_exact_solution(prob, i, t=t)
                 exact_u, exact_eta = exact.split()
                 self.exact_solution_file.write(exact_u, exact_eta)
 
                 # Compute relative error
-                approx = solver_obj.fields.solution_2d
+                approx = prob.fwd_solutions[i]
                 u, eta = approx.split()
                 l1_error = errornorm(approx, exact, norm_type='l1')/norm(exact, norm_type='l1')
                 l2_error = errornorm(approx, exact, norm_type='l2')/norm(exact, norm_type='l2')
@@ -339,11 +337,6 @@ class BoydOptions(CoupledOptions):
                 # TODO: Compute exact solution and error on fine reference mesh
             return
         return export_func
-
-    # def get_update_forcings(self, solver_obj):
-    #     def update_forcings(t):
-    #         return
-    #     return update_forcings
 
     def write_to_hdf5(self, filename=None):
         """Write relative error timeseries to HDF5."""

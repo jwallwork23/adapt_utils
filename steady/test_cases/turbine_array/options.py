@@ -3,13 +3,13 @@ from thetis.configuration import *
 
 import os
 
-from adapt_utils.swe.turbine.options import SteadyTurbineOptions
+from adapt_utils.steady.swe.turbine.options import TurbineOptions
 
 
-__all__ = ["Steady2TurbineOptions"]
+__all__ = ["TurbineArrayOptions"]
 
 
-class Steady2TurbineOptions(SteadyTurbineOptions):
+class TurbineArrayOptions(TurbineOptions):
     """Parameters for the steady 2 turbine problem"""
 
     def __init__(self, offset=0, separation=8, **kwargs):
@@ -22,7 +22,7 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
         self.base_bathymetry = 40.0        # Typical depth in Pentland Firth
         self.base_viscosity = 0.5          # Chosen to give a moderately advection-dominated problem
 
-        super(Steady2TurbineOptions, self).__init__(**kwargs)
+        super(TurbineArrayOptions, self).__init__(**kwargs)
 
         # Domain
         self.domain_length = 1200.0
@@ -56,6 +56,9 @@ class Steady2TurbineOptions(SteadyTurbineOptions):
 
     def set_default_mesh(self):
         self.default_mesh = Mesh(self.mesh_path)
+
+    def set_inflow(self, fs):
+        return interpolate(as_vector(self.inflow_velocity), fs)
 
     def set_boundary_conditions(self, prob, i):
         left_tag = 1
