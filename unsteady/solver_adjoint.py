@@ -32,7 +32,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         blocks = self.tape.get_blocks()
         if len(blocks) == 0:
             raise ValueError("Tape is empty!")
-        self.solve_blocks = [block for block in blocks if isinstance(block, GenericSolveBlock) and block is not None]
+        self.solve_blocks = [block for block in blocks if isinstance(block, GenericSolveBlock) and block.adj_sol is not None]
 
     def extract_adjoint_solution(self, solve_step):
         """
@@ -68,7 +68,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         proj_u, proj_eta = proj.split()
         proj_u.rename("Projected adjoint velocity")
         proj_eta.rename("Projected adjoint elevation")
-        for j in range(len(self.solve_blocks)-1, -1, -1):
+        for j in range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export):
             self.extract_adjoint_solution(j)
             proj.project(self.adj_solutions[i])
             self.adjoint_solution_file.write(proj_u, proj_eta)
@@ -76,7 +76,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
     def _save_adjoint_trajectory_tracer(self):
         i = 0  # TODO: Allow multiple meshes
         proj = Function(self.P1[i], name="Projected adjoint tracer")
-        for j in range(len(self.solve_blocks)-1, -1, -1):
+        for j in range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export):
             self.extract_adjoint_solution(j)
             proj.project(self.adj_solutions_tracer[i])
             self.adjoint_tracer_file.write(proj)
