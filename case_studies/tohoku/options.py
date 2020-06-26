@@ -1,12 +1,13 @@
 from thetis import *
 from thetis.configuration import *
+from firedrake.petsc import PETSc
 
 import os
 import netCDF4
 import matplotlib.pyplot as plt
 
-from adapt_utils.swe.tsunami.options import TsunamiOptions
-from adapt_utils.swe.tsunami.conversion import from_latlon
+from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
+from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
 
 
 __all__ = ["TohokuOptions"]

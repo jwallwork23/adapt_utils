@@ -4,7 +4,6 @@ from adapt_utils.misc import *  # NOQA
 
 # Base classes
 from adapt_utils.options import *  # NOQA
-from adapt_utils.solver import *  # NOQA
 
 # Mesh adaptation
 from adapt_utils.adapt.adaptation import *  # NOQA
