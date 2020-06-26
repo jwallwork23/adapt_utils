@@ -1,8 +1,8 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.options import CoupledOptions
-from adapt_utils.swe.utils import heaviside_approx
+from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.unsteady.swe.utils import heaviside_approx
 
 import os
 import numpy as np

@@ -198,7 +198,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def set_stabilisation_step(self, i):
         """ Set stabilisation mode and corresponding parameter on the ith mesh."""
         self.minimum_angles = [None for mesh in self.meshes]
-        if self.op.use_automatic_sipg_parameter and self.stabilisation == 'sipg':
+        if self.op.use_automatic_sipg_parameter:
             for i, mesh in enumerate(self.meshes):
                 self.minimum_angles[i] = get_minimum_angles_2d(mesh)
         if self.op.solve_swe:
@@ -213,7 +213,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         sipg = None
         if hasattr(op, 'sipg_parameter'):
             sipg = op.sipg_parameter
-        if self.shallow_water_options[i].use_automatic_sipg_parameter and self.stabilisation == 'sipg':
+        if self.shallow_water_options[i].use_automatic_sipg_parameter:
             for i, mesh in enumerate(self.meshes):
                 cot_theta = 1.0/tan(self.minimum_angles[i])
 
@@ -243,7 +243,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         sipg = None
         if hasattr(op, 'sipg_parameter_tracer'):
             sipg = op.sipg_parameter_tracer
-        if self.tracer_options[i].use_automatic_sipg_parameter and self.stabilisation == 'sipg':
+        if self.tracer_options[i].use_automatic_sipg_parameter:
             for i, mesh in enumerate(self.meshes):
                 cot_theta = 1.0/tan(self.minimum_angles[i])
 
