@@ -13,7 +13,7 @@ __all__ = ["LeVequeOptions"]
 # NOTE: Could set three different tracers in Thetis implementation
 class LeVequeOptions(CoupledOptions):
     r"""
-    Parameters for test case in [LeVeque 1996]. The analytical final time solution is the initial
+    Parameters for test case in [LeVeque 1996]. The analytical terminal time solution is the initial
     condition, since there is no diffusivity.
 
     We consider a quantity of interest (QoI) :math:`J` of the form
@@ -21,7 +21,7 @@ class LeVequeOptions(CoupledOptions):
 ..  math:: J(\phi) = \int_A \phi(T) \;\mathrm{d}x,
 
     where :math:`A` is a circular region surrounding the slotted cylinder. That is, we seek to
-    accurately resolve the slotted cylinder at the final time.
+    accurately resolve the slotted cylinder at the terminal time.
 
     The discontinuity of both source and QoI motivates utilising DG methods.
 
@@ -35,6 +35,7 @@ class LeVequeOptions(CoupledOptions):
 
         # Temporal discretisation
         self.dt = pi/300.0
+        self.start_time = self.end_time
         self.end_time = 2*pi
         self.dt_per_export = 10
 
@@ -113,18 +114,18 @@ class LeVequeOptions(CoupledOptions):
         prob.fwd_solutions_tracer[0].interpolate(self.bg + bell + cone + slot_cyl)
 
     def set_qoi_kernel_tracer(self, prob, i):
-        b = self.ball(prob.Q[i].mesh(), source=False)
+        b = self.ball(prob.meshes[i], source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
         return rescaling*b
 
-    def set_final_condition_tracer(self, prob):
-        b = self.ball(fs.mesh(), source=False)
+    def set_terminal_condition_tracer(self, prob):
+        b = self.ball(prob.meshes[-1], source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
         rescaling = area_exact/area if area != 0. else 1
-        prob.adj_solutions[-1].interpolate(rescaling*b)
+        prob.adj_solutions_tracer[-1].interpolate(rescaling*b)
 
     def exact_solution(self, fs):
         raise NotImplementedError  # TODO

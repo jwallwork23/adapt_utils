@@ -22,6 +22,8 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
     def clear_tape(self):
         self.tape.clear_tape()
 
+    # TODO: just call `solve_adjoint` (once merged)
+
     def compute_gradient(self, controls):
         """Compute the gradient of the quantity of interest with respect to a list of controls."""
         J = self.quantity_of_interest()
@@ -66,17 +68,23 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         i = 0  # TODO: Allow multiple meshes
         proj = Function(self.P1_vec[i]*self.P1[i])
         proj_u, proj_eta = proj.split()
-        proj_u.rename("Projected adjoint velocity")
-        proj_eta.rename("Projected adjoint elevation")
-        for j in range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export):
+        proj_u.rename("Projected discrete adjoint velocity")
+        proj_eta.rename("Projected discrete adjoint elevation")
+        iterator = list(range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export))
+        if 0 not in iterator:
+            iterator.extend([0, ])
+        for j in iterator:
             self.extract_adjoint_solution(j)
             proj.project(self.adj_solutions[i])
             self.adjoint_solution_file.write(proj_u, proj_eta)
 
     def _save_adjoint_trajectory_tracer(self):
         i = 0  # TODO: Allow multiple meshes
-        proj = Function(self.P1[i], name="Projected adjoint tracer")
-        for j in range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export):
+        proj = Function(self.P1[i], name="Projected discrete adjoint tracer")
+        iterator = list(range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export))
+        if 0 not in iterator:
+            iterator.extend([0, ])
+        for j in iterator:
             self.extract_adjoint_solution(j)
             proj.project(self.adj_solutions_tracer[i])
             self.adjoint_tracer_file.write(proj)

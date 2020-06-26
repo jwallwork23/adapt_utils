@@ -1,10 +1,12 @@
 from thetis import *
 from firedrake_adjoint import *
 
+import os
 import numpy as np
 import argparse
 
 from adapt_utils.unsteady.test_cases.solid_body_rotation.options import LeVequeOptions
+from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
 
@@ -48,10 +50,11 @@ kwargs = {
     'dt_per_export': 10*n,
 }
 op = LeVequeOptions(**kwargs)
+di = op.di
 print_output("Element count: {:d}".format(op.default_mesh.num_cells()))
 
 
-class TracerProblem(AdaptiveDiscreteAdjointProblem):
+class AnnotatedTracerProblem(AdaptiveDiscreteAdjointProblem):
 
     def quantity_of_interest(self):
         kernel = self.op.set_qoi_kernel_tracer(self, -1)
@@ -60,9 +63,29 @@ class TracerProblem(AdaptiveDiscreteAdjointProblem):
 
 
 # Run model
-tp = TracerProblem(op)
-tp.solve_forward()
+op.di = create_directory(os.path.join(di, 'discrete'))
+tp_discrete = AnnotatedTracerProblem(op)
+print_output("Running forward model...")
+tp_discrete.solve_forward()
 
 # Compute gradient w.r.t. fluid speed and extract adjoint solution
-tp.compute_gradient(Control(tp.fwd_solutions[0]))
-tp.save_adjoint_trajectory()
+print_output("Running discrete adjoint model...")
+q = tp_discrete.fwd_solutions[0]  # An arbitrary control
+tp_discrete.compute_gradient(Control(q))  # TODO: just use solve_adjoint once merged
+tp_discrete.save_adjoint_trajectory()
+stop_annotating()
+
+class UnannotatedTracerProblem(AdaptiveProblem):
+
+    def quantity_of_interest(self):
+        kernel = self.op.set_qoi_kernel_tracer(self, -1)
+        sol = self.fwd_solutions_tracer[-1]
+        return assemble(kernel*sol*dx)
+
+# Solve
+op.di = create_directory(os.path.join(di, 'continuous'))
+tp_continuous = UnannotatedTracerProblem(op)
+tp_continuous.set_initial_condition()  # Adjoint propagation is driven by reverse flow
+print_output("Running continuous adjoint model...")
+tp_continuous.solve_adjoint()
+print_output("Done!")

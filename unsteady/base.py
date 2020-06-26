@@ -155,8 +155,8 @@ class AdaptiveProblemBase(object):
     def set_initial_condition(self):
         self.op.set_initial_condition(self)
 
-    def set_final_condition(self):
-        self.op.set_final_condition(self)
+    def set_terminal_condition(self):
+        self.op.set_terminal_condition(self)
 
     def create_equations(self, i, adjoint=False):
         if adjoint:
@@ -221,7 +221,7 @@ class AdaptiveProblemBase(object):
 
     def transfer_adjoint_solution(self, i):
         if i == self.num_meshes - 1:
-            self.set_final_condition()
+            self.set_terminal_condition()
         else:
             self.project_adjoint_solution(i+1, i)
 
@@ -247,7 +247,7 @@ class AdaptiveProblemBase(object):
         full sequence of meshes.
 
         NOTE: The implementation contains a very simple checkpointing scheme, in the sense that
-            the final solution computed on mesh `i` is stored in `self.fwd_solutions[i]` or
+            the terminal solution computed on mesh `i` is stored in `self.fwd_solutions[i]` or
             `self.adj_solutions[i]`, as appropriate.
         """
         if adjoint:

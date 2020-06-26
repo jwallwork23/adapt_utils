@@ -114,6 +114,17 @@ class CoupledOptions(Options):
         u, eta = prob.fwd_solutions[0].split()
         u.interpolate(as_vector(self.base_velocity))
 
+    def set_initial_condition_tracer(self, prob):
+        prob.fwd_solutions_tracer[0].assign(0.0)
+
+    def set_terminal_condition(self, prob):
+        z, zeta = prob.adj_solutions[-1].split()
+        z.assign(0.0)
+        zeta.assign(0.0)
+
+    def set_terminal_condition_tracer(self, prob):
+        prob.adj_solutions_tracer[0].assign(0.0)
+
     def set_bathymetry(self, fs):
         """Should be implemented in derived class."""
         return Function(fs).assign(1.0)

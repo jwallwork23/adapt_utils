@@ -24,8 +24,6 @@ __all__ = ["AdaptiveProblem"]
 # TODO SOON:
 #  * Mesh movement
 #    - ALE formulation
-#    - Monge-Ampere
-#  * Discrete adjoint
 #  * Sediment
 #  * Exner
 
@@ -274,11 +272,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_tracer:
             self.op.set_initial_condition_tracer(self)
 
-    def set_final_condition(self):
-        """Apply final time condition(s) for adjoint solution(s) on final mesh."""
-        self.op.set_final_condition(self)
+    def set_terminal_condition(self):
+        """Apply terminal condition(s) for adjoint solution(s) on terminal mesh."""
+        self.op.set_terminal_condition(self)
         if self.op.solve_tracer:
-            self.op.set_final_condition_tracer(self)
+            self.op.set_terminal_condition_tracer(self)
 
     def project_forward_solution(self, i, j):
         """Project forward solution(s) from mesh `i` to mesh `j`."""
@@ -394,7 +392,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self._create_adjoint_tracer_timestepper(i, self.integrator)
 
     def _get_fields_for_shallow_water_timestepper(self, i):
-        fields = {
+        fields = AttrDict({
             'linear_drag_coefficient': None,
             'quadratic_drag_coefficient': self.fields[i].quadratic_drag_coefficient,
             'manning_drag_coefficient': self.fields[i].manning_drag_coefficient,
@@ -404,20 +402,20 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'atmospheric_pressure': None,
             'momentum_source': None,
             'volume_source': None,
-        }
+        })
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_velocity_scaling_factor'] = self.shallow_water_options[i].lax_friedrichs_velocity_scaling_factor
         return fields
 
     def _get_fields_for_tracer_timestepper(self, i):
         u, eta = self.fwd_solutions[i].split()
-        fields = {
+        fields = AttrDict({
             'elev_2d': eta,
             'uv_2d': u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.tracer_options[i].tracer_advective_velocity_factor,
-        }
+        })
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
@@ -436,7 +434,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if 'shallow_water' in self.error_estimators[i]:
             kwargs['error_estimator'] = self.error_estimators[i].shallow_water
         self.timesteppers[i].shallow_water = integrator(*args, **kwargs)
-        # self.lhs = self.timesteppers[i].shallow_water.F
 
     def _create_forward_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
@@ -482,7 +479,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         fields.uv_2d *= -1
 
         # Account for dJdc
-        dJdc = self.op.set_qoi_kernel_tracer(self.Q[i])
+        dJdc = self.op.set_qoi_kernel_tracer(self, i)
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         fields['source'] = self.time_kernel*dJdc
 
@@ -625,10 +622,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.create_adjoint_equations(i)
         op.print_debug(op.indent + "SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
         self.create_adjoint_timesteppers(i)
-        ts = self.timesteppers[i]['adjoint_shallow_water']
-        dbcs = []
         bcs = self.boundary_conditions[i]
         if op.solve_swe:
+            dbcs = []
+            ts = self.timesteppers[i]['adjoint_shallow_water']
             if op.family == 'cg-cg':
                 op.print_debug(op.indent + "SETUP: Applying adjoint DirichletBCs on mesh {:d}...".format(i))
                 for j in bcs['shallow_water']:
@@ -666,8 +663,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
-            proj_z = Function(self.P1_vec[i], name="Projected adjoint velocity")
-            proj_zeta = Function(self.P1[i], name="Projected adjoint elevation")
+            proj_z = Function(self.P1_vec[i], name="Projected continuous adjoint velocity")
+            proj_zeta = Function(self.P1[i], name="Projected continuous adjoint elevation")
             self.adjoint_solution_file._topology = None
             if i == self.num_meshes-1:
                 z, zeta = self.adj_solutions[i].split()
@@ -675,7 +672,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 proj_zeta.project(zeta)
                 self.adjoint_solution_file.write(proj_z, proj_zeta)
         if op.solve_tracer and plot_pvd:
-            proj_tracer = Function(self.P1[i], name="Projected adjoint tracer")
+            proj_tracer = Function(self.P1[i], name="Projected continuous adjoint tracer")
             self.adjoint_tracer_file._topology = None
             if i == self.num_meshes-1:
                 proj_tracer.project(self.adj_solutions_tracer[i])
@@ -688,7 +685,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         try:
             assert np.allclose(self.simulation_time, start_time)
         except AssertionError:
-            msg = "Mismatching start time: {:.2f} vs {:.2f}"
+            msg = "Mismatching start time: {:f} vs {:f}"
             raise ValueError(msg.format(self.simulation_time, start_time))
         update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
