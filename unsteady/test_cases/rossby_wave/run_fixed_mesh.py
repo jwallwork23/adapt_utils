@@ -2,9 +2,9 @@ from thetis import *
 
 import argparse
 
-from adapt_utils.test_cases.rossby_wave.options import BoydOptions
-from adapt_utils.test_cases.rossby_wave.monitors import *
-from adapt_utils.adapt.solver import AdaptiveProblem
+from adapt_utils.unsteady.test_cases.rossby_wave.options import BoydOptions
+from adapt_utils.unsteady.test_cases.rossby_wave.monitors import *
+from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
 parser = argparse.ArgumentParser()
@@ -40,20 +40,21 @@ kwargs = {
 }
 
 op = BoydOptions(**kwargs)
-swp = AdaptiveProblem(op, levels=0)
-swp.setup_solver_forward(0)
+swp = AdaptiveProblem(op)
+# swp.setup_solver_forward(0)
 
 if initial_monitor is not None:
+    raise NotImplementedError  # TODO
     swp.approach = 'monge_ampere'
     swp.monitor_function = initial_monitor
     swp.adapt_mesh()
     # op.approach = 'fixed_mesh'  # TODO: check if needed
-    swp.__init__(op, mesh=swp.mesh, levels=swp.levels)
+    swp.__init__(op, mesh=swp.meshes[0], levels=swp.levels)
 
 fname = '{:s}_{:d}'.format("uniform" if initial_monitor is None else "refined_equator", n_coarse)
 if not read_only:
     swp.solve_forward()
-    swp.op.write_to_hdf5(fname)
+    # swp.op.write_to_hdf5(fname)
 swp.op.plot_errors()
 
 if bool(args.calculate_metrics or False):

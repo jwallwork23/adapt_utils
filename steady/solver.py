@@ -53,7 +53,7 @@ class SteadyProblem():
         op.print_debug(op.indent + "Setting boundary conditions...")
         self.dbcs = []  # TODO: Populate from op
         self.dbcs_adjoint = []  # TODO: Populate from op
-        self.boundary_conditions = op.set_boundary_conditions(self.V)
+        self.boundary_conditions = op.set_boundary_conditions(self, 0)
 
         # Outputs
         self.di = create_directory(self.op.di)
@@ -192,8 +192,8 @@ class SteadyProblem():
         self.setup_solver_forward()
         if self.nonlinear:
             self.rhs = 0
-        self.op.print_debug("Solver parameters for forward: {:}".format(self.op.params))
-        solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.params)
+        self.op.print_debug("Solver parameters for forward: {:}".format(self.op.solver_parameters))
+        solve(self.lhs == self.rhs, self.solution, bcs=self.dbcs, solver_parameters=self.op.solver_parameters)
         self.plot_solution(adjoint=False)
 
     def solve_adjoint(self):
@@ -228,7 +228,7 @@ class SteadyProblem():
             assert hasattr(self, 'lhs_adjoint') and hasattr(self, 'rhs_adjoint')
         except AssertionError:
             raise ValueError("Cannot solve continuous adjoint since LHS and/or RHS unknown.")
-        solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
+        solve(self.lhs_adjoint == self.rhs_adjoint, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_solver_parameters)
 
     def solve_discrete_adjoint(self):
         try:
@@ -244,7 +244,7 @@ class SteadyProblem():
         dFdu = derivative(F, self.solution, TrialFunction(self.V))
         dFdu_form = adjoint(dFdu)
         dJdu = derivative(self.quantity_of_interest_form(), self.solution, TestFunction(self.V))
-        solve(dFdu_form == dJdu, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_params)
+        solve(dFdu_form == dJdu, self.adjoint_solution, bcs=self.dbcs_adjoint, solver_parameters=self.op.adjoint_solver_parameters)
 
     def solve_high_order(self, adjoint=True, solve_forward=False):
         """

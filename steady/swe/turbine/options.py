@@ -1,10 +1,10 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.steady.options import CoupledOptions
+from adapt_utils.unsteady.options import CoupledOptions  # TODO: Don't refer to unsteady
 
 
-__all__ = ["SteadyTurbineOptions", "UnsteadyTurbineOptions"]
+__all__ = ["TurbineOptions"]
 
 
 # Default: Newton with line search; solve linear system exactly with LU factorisation
@@ -30,7 +30,7 @@ default_adjoint_params = {}
 default_adjoint_params.update(default_params)
 
 
-class SteadyTurbineOptions(ShallowWaterOptions):
+class TurbineOptions(CoupledOptions):
     """
     Base class holding parameters for steady state tidal turbine problems.
     """
@@ -42,12 +42,13 @@ class SteadyTurbineOptions(ShallowWaterOptions):
     def __init__(self, num_iterations=1, bathymetry_space=None, timestepper='SteadyState', **kwargs):
         self.base_bathymetry = 40.0
         self.set_bathymetry(bathymetry_space)
-        super(SteadyTurbineOptions, self).__init__(**kwargs)
+        super(TurbineOptions, self).__init__(**kwargs)
         self.solve_swe = True
         self.solve_tracer = False
         self.timestepper = timestepper
         self.dt = 20.0
         self.end_time = num_iterations*self.dt - 0.2
+        self.lax_friedrichs_velocity_scaling_factor = Constant(1.0)
 
         # Solver parameters
         self.solver_parameters = default_params
@@ -57,7 +58,7 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         self.h_min = 1e-5
         self.h_max = 500.0
 
-    def get_max_depth(self):
+    def max_depth(self):
         if hasattr(self, 'bathymetry'):
             if isinstance(self.bathymetry, Constant):
                 return self.bathymetry.values()[0]
@@ -81,9 +82,8 @@ class SteadyTurbineOptions(ShallowWaterOptions):
         velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
         Piggott 2016, eq. (15))
         """
-        self.get_max_depth()
         D = self.turbine_diameter
         A_T = pi*(D/2)**2
-        correction = 4/(1+sqrt(1-A_T/(self.max_depth*D)))**2
+        correction = 4/(1+sqrt(1-A_T/(self.max_depth()*D)))**2
         self.thrust_coefficient *= correction
         # NOTE: We're not yet correcting power output here, so that will be overestimated

@@ -1,7 +1,7 @@
 from thetis import *
 
-from adapt_utils.test_cases.balzano.options import BalzanoOptions
-from adapt_utils.adapt.solver import AdaptiveProblem
+from adapt_utils.unsteady.test_cases.balzano.options import BalzanoOptions
+from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
 op = BalzanoOptions(approach='monge_ampere',

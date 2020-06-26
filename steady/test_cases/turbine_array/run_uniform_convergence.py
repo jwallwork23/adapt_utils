@@ -1,8 +1,8 @@
 import h5py
 import argparse
 
-from adapt_utils.test_cases.steady_turbine.options import *
-from adapt_utils.steady.swe.turbine.solver import *
+from adapt_utils.steady.test_cases.turbine_array.options import TurbineArrayOptions
+from adapt_utils.steady.swe.turbine.solver import SteadyTurbineProblem
 
 
 parser = argparse.ArgumentParser()
@@ -17,7 +17,7 @@ kwargs = {
 }
 
 # Setup
-op = Steady2TurbineOptions(**kwargs)
+op = TurbineArrayOptions(**kwargs)
 tp = SteadyTurbineProblem(op, levels=op.outer_iterations-1)
 qois, num_cells, dofs = [], [], []
 

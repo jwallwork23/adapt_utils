@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.swe.morphological_options import MorphOptions  # TODO: Will change
+from adapt_utils.unsteady.options import CoupledOptions
 
 import os
 import time
@@ -15,8 +15,8 @@ rc('text', usetex=True)
 __all__ = ["TrenchOptions"]
 
 
-# TODO: Hookup with AdaptiveMorphologicalProblem
-class TrenchOptions(MorphOptions):
+# TODO: NEEDS UPDATING
+class TrenchOptions(CoupledOptions):
     """
     Parameters for test case described in [1].
 

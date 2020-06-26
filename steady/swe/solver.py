@@ -2,7 +2,7 @@ from thetis import *
 from thetis.physical_constants import *
 
 from adapt_utils.steady.solver import SteadyProblem
-from adapt_utils.swe.utils import *
+from adapt_utils.unsteady.swe.utils import *  # TODO: Don't refer to unsteady
 
 
 __all__ = ["SteadyShallowWaterProblem"]
@@ -54,7 +54,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
     def set_stabilisation(self):
         self.stabilisation = self.stabilisation or 'no'
         if self.stabilisation in ('no', 'lax_friedrichs'):
-            self.stabilisation_parameter = self.op.stabilisation_parameter
+            self.stabilisation_parameter = self.op.lax_friedrichs_velocity_scaling_factor
         else:
             raise ValueError("Stabilisation method {:s} for {:s} not recognised".format(self.stabilisation, self.__class__.__name__))
 
@@ -73,11 +73,11 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.simulation_export_time = op.dt
         options.simulation_end_time = op.end_time
         options.timestepper_type = op.timestepper
-        if op.params != {}:
+        if op.solver_parameters != {}:
             if op.timestepper == 'PressureProjectionPicard':
-                options.timestepper_options.solver_parameters_momentum = op.params  # LU by default
+                options.timestepper_options.solver_parameters_momentum = op.solver_parameters  # LU by default
             else:
-                options.timestepper_options.solver_parameters = op.params
+                options.timestepper_options.solver_parameters = op.solver_parameters
         op.print_debug(options.timestepper_options.solver_parameters)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta

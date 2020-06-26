@@ -2,13 +2,13 @@ from thetis import *
 from thetis.configuration import *
 import os
 
-from adapt_utils.swe.turbine.options import UnsteadyTurbineOptions
+from adapt_utils.unsteady.swe.turbine.options import TurbineOptions
 
 
-__all__ = ["Unsteady15TurbineOptions"]
+__all__ = ["TurbineArrayOptions"]
 
 
-class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
+class TurbineArrayOptions(TurbineOptions):
     """Parameters for the unsteady 15 turbine array test case"""
 
     # Turbine parameters
@@ -20,7 +20,7 @@ class Unsteady15TurbineOptions(UnsteadyTurbineOptions):
     meshfile = os.path.join(os.path.dirname(__file__), 'channel.msh')
 
     def __init__(self, **kwargs):
-        super(Unsteady15TurbineOptions, self).__init__(**kwargs)
+        super(TurbineArrayOptions, self).__init__(**kwargs)
         self.domain_length = 3000.0
         self.domain_width = 1000.0
         try:

@@ -6,7 +6,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import matplotlib.patches as ptch
 
-from adapt_utils.test_cases.steady_turbine.options import *
+from adapt_utils.steady.test_cases.turbine_array.options import *
 from adapt_utils.steady.swe.turbine.solver import *
 from adapt_utils.plotting import *
 
@@ -48,7 +48,7 @@ kwargs = {
 
 }
 level = int(args.level or 4)
-op = Steady2TurbineOptions(**kwargs)
+op = TurbineArrayOptions(**kwargs)
 op.set_all_rtols(op.element_rtol)
 if op.approach != 'fixed_mesh':
     level = 1
@@ -66,8 +66,7 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
     # Plot initial mesh
     fig = plt.figure(figsize=(12, 5))
     ax = fig.add_subplot(111)
-    meshplot(tp.mesh, axes=ax)
-    # plot(tp.mesh, axes=ax)
+    triplot(tp.mesh, axes=ax)
     ax.set_xlim([0.0, op.domain_length])
     ax.set_ylim([0.0, op.domain_width])
     ax.add_patch(ptch.Rectangle(centre_t1, D, D, **patch_kwargs))
@@ -82,7 +81,7 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
     for i in range(level):
         tp = tp.tp_enriched
     tp.solve()
-    tp.op.print_debug("QoI: {:.4e}kW".format(tp.quantity_of_interest()/1000))
+    tp.op.print_debug("QoI: {:.4e}kW".format(tp.quantity_of_interest()/1000))  # TODO: MegaWatts?
 
     # Plot fluid speed
     u = tp.solution.split()[0]
@@ -109,7 +108,7 @@ else:
 
     # Plot mesh and annotate with turbine footprint
     for ax in (ax_main, ax_zoom):
-        meshplot(tp.mesh, axes=ax)
+        triplot(tp.mesh, axes=ax)
         ax.add_patch(ptch.Rectangle(centre_t1, D, D, **patch_kwargs))
         ax.add_patch(ptch.Rectangle(centre_t2, D, D, **patch_kwargs))
 
