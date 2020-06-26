@@ -2,7 +2,7 @@ from firedrake import *
 
 import warnings
 
-from adapt_utils.solver import SteadyProblem
+from adapt_utils.steady.solver import SteadyProblem
 from adapt_utils.adapt.metric import isotropic_metric, steady_metric
 
 
