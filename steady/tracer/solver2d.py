@@ -1,7 +1,4 @@
 from firedrake import *
-from thetis import print_output
-
-import numpy as np
 
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale

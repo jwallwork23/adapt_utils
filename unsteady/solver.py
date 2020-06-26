@@ -26,16 +26,12 @@ __all__ = ["AdaptiveProblem"]
 #    - ALE formulation
 #    - Monge-Ampere
 #  * Discrete adjoint
-#    - For steady state problems we can just take the adjoint of the form as in SNAS paper
-#  * Steady state
-#    - Should work, just needs testing.
-#  * Turbines
-#    - Check 2-turbine works
 #  * Sediment
 #  * Exner
 
 # TODO LATER:
 #  * Multiple tracers
+#  * Turbines
 
 class AdaptiveProblem(AdaptiveProblemBase):
     """Default model: 2D coupled shallow water + tracer transport."""
@@ -90,7 +86,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
         if self.op.solve_tracer:
             self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
-            self.adjoint_tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
+            self.adjoint_tracer_file = File(os.path.join(self.di, 'adjoint_tracer.pvd'))
 
     def set_finite_elements(self):
         """
