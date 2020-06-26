@@ -93,7 +93,8 @@ class LeVequeOptions(CoupledOptions):
 
     def set_initial_condition(self, prob):
         x, y = SpatialCoordinate(prob.meshes[0])
-        u, eta = prob.fwd_solutions[0].split()
+        q = prob.fwd_solutions[0]
+        u, eta = q.split()
         u.interpolate(as_vector((0.5 - y, x - 0.5)))
 
     def set_initial_condition_tracer(self, prob):
