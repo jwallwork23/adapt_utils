@@ -2,7 +2,7 @@ from firedrake import project, MeshHierarchy
 
 import argparse
 
-from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
+from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
 
 
