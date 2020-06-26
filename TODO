@@ -1,16 +1,7 @@
-Time-dependent goal-oriented adaptation
-=======================================
-
-  * Framework for solving and storing adjoint solution. Perhaps do this on an iso-P2 refined mesh?
-  * Framework for loading adjoint solutions.
-  * Cross fingers and hope it works!
-
-
 Consistency of test cases / avoid duplicate code
 ================================================
 
   * Extend `AnisotropicMetricDriver` to vertex-based case and include common metrics as methods.
-  * Use Thetis for advection-diffusion solver.
   * Run scripts / tests for all test cases. e.g. Check convergence of TELEMAC-2D test case under
     uniform refinement.
 
