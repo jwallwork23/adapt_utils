@@ -7,7 +7,7 @@ __all__ = ["ALEAdvectionOptions"]
 
 
 class ALEAdvectionOptions(CoupledOptions):
-    def __init__(self, n=40, approach='ale', *args, **kwargs):
+    def __init__(self, n=40, *args, **kwargs):
         super(ALEAdvectionOptions, self).__init__(*args, approach=approach, **kwargs)
         self.solve_swe = False
         self.solve_tracer = True

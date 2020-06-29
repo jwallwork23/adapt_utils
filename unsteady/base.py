@@ -6,6 +6,7 @@ from firedrake.petsc import PETSc
 
 import os
 import numpy as np
+import warnings
 
 from adapt_utils.adapt.r import MeshMover
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
@@ -92,6 +93,7 @@ class AdaptiveProblemBase(object):
         op.print_debug(op.indent + "SETUP: Creating function spaces...")
         self.set_finite_elements()
         self.create_function_spaces()
+        self.jacobian_signs = [interpolate(sign(JacobianDeterminant(mesh)), P0) for mesh, P0 in zip(self.meshes, self.P0)]
         op.print_debug(op.indent + "SETUP: Creating solutions...")
         self.create_solutions()
         op.print_debug(op.indent + "SETUP: Creating fields...")
@@ -312,7 +314,7 @@ class AdaptiveProblemBase(object):
     # --- Mesh movement
 
     def set_monitor_functions(self, monitors):
-        assert self.approach in ('monge_ampere', 'laplacian_smoothing', 'ale')
+        assert self.approach in ('monge_ampere', 'laplacian_smoothing')
         assert monitors is not None
         if callable(monitors):
             monitors = [monitors, ]
@@ -329,13 +331,13 @@ class AdaptiveProblemBase(object):
             assert monitors[i] is not None
             self.mesh_movers[i] = MeshMover(self.base_meshes[i], monitors[i], **kwargs)
         self.mesh_velocity_file = File(os.path.join(self.op.di, 'mesh_velocity.pvd'))
-        self.tmp_file = File(os.path.join(self.op.di, 'tmp.pvd'))
 
     def move_mesh(self, i):
         if self.op.approach == 'lagrangian':  # TODO: Make more robust (apply BCs etc.)
+            mesh = self.meshes[i]
             t = self.simulation_time
             dt = self.op.dt
-            coords = self.meshes[i].coordinates
+            coords = mesh.coordinates
 
             # Crank-Nicolson  # TODO: Assemble once
             if hasattr(self.op, 'get_velocity'):
@@ -362,6 +364,13 @@ class AdaptiveProblemBase(object):
             # Forward Euler
             else:
                 coords.interpolate(coords + dt*self.mesh_velocities[i])
+
+            # Check for inverted elements
+            orig_signs = self.jacobian_signs[i]
+            r = interpolate(JacobianDeterminant(mesh)/orig_signs, self.P0[i]).vector().gather()
+            num_inverted = len(r[r < 0])
+            if num_inverted > 0:
+                warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
 
         elif self.mesh_movers[i] is not None:  # TODO: Account for tracers
 

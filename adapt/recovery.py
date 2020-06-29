@@ -93,6 +93,7 @@ class L2ProjectorGradient(L2Projector):
     def setup(self):
         P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
         g, φ = TrialFunction(P1_vec), TestFunction(P1_vec)
+        n = FacetNormal(self.mesh)
 
         a = inner(φ, g)*dx
         # L = inner(φ, grad(self.field))*dx
