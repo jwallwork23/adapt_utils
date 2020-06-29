@@ -332,7 +332,9 @@ class AdaptiveProblemBase(object):
         self.tmp_file = File(os.path.join(self.op.di, 'tmp.pvd'))
 
     def move_mesh(self, i):
-        if self.mesh_movers[i] is not None:
+        if self.op.approach == 'lagrangian':  # TODO: Make more robust (apply BCs etc.)
+            self.meshes[i].coordinates.interpolate(self.meshes[i].coordinates + self.op.dt*self.mesh_velocities[i])
+        elif self.mesh_movers[i] is not None:
 
             # Compute new physical mesh coordinates
             self.mesh_movers[i].adapt()
@@ -347,7 +349,6 @@ class AdaptiveProblemBase(object):
             # Update physical mesh and current solution defined on it
             self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
             for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-                # sol_i.project(tmp_i)
                 sol_i.dat.data[:] = tmp_i.dat.data
             del tmp
 

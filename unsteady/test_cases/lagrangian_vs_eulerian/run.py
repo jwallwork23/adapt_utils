@@ -18,7 +18,7 @@ parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-debug", help="Toggle debugging mode")
 args = parser.parse_args()
 
-approach = 'fixed_mesh' if args.interpretation == 'eulerian' else 'ale'
+approach = 'fixed_mesh' if args.interpretation == 'eulerian' else 'lagrangian'
 
 # Setup
 kwargs = {
@@ -30,9 +30,6 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or True),
     'use_tracer_conservative_form': bool(args.conservative or False),
-
-    # Mesh movement
-    'prescribed_velocity': 'fluid',
 
     # Misc
     'debug': bool(args.debug or False),
@@ -47,16 +44,13 @@ init_norm = norm(init_sol)
 init_coords = tp.meshes[0].coordinates.dat.data.copy()
 
 # Solve PDE
-if approach == 'fixed_mesh':
-    tp.solve_forward()
-else:
-    raise NotImplementedError  # TODO
+tp.solve_forward()
 final_sol = tp.fwd_solutions_tracer[-1]
 final_norm = norm(final_sol)
 final_coords = tp.meshes[-1].coordinates.dat.data
 
 # Check final coords match initial coords
-if approach == 'ale':
+if approach == 'lagrangian':
     final_coords[:] -= [10.0, 0.0]  # TODO: Implement periodicity
 try:
     assert np.allclose(init_coords, final_coords)
@@ -66,5 +60,4 @@ except AssertionError:
 # Compute relative errors
 print_output("Initial norm:        {:.4e}".format(init_norm))
 print_output("Final norm:          {:.4e}".format(final_norm))
-print_output("Relative difference: {:.2f}%".format(100*abs(1.0 - final_norm/init_norm)))
 print_output("Relative error:      {:.2f}%".format(100*abs(errornorm(init_sol, final_sol)/init_norm)))

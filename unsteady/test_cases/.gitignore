@@ -1,14 +1,11 @@
-ale_advection/outputs/
-ale_advection/screenshots/
-ale_advection/__pycache__/
-ale_trivial/outputs/
-ale_trivial/screenshots/
-ale_trivial/__pycache__/
 balzano/outputs/
 balzano/screenshots/
 balzano/__pycache__/
 balzano/videos/
 balzano/strip.geo
+lagrangian_vs_eulerian/outputs/
+lagrangian_vs_eulerian/screenshots/
+lagrangian_vs_eulerian/__pycache__/
 rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/__pycache__/

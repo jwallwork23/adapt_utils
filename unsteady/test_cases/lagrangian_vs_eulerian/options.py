@@ -12,27 +12,20 @@ class ALEAdvectionOptions(CoupledOptions):
         self.solve_swe = False
         self.solve_tracer = True
         if self.tracer_family == 'cg':
-            self.stabilisation = 'SUPG'
+            self.stabilisation = 'supg'
         elif self.tracer_family == 'dg':
-            self.stabilisation = None
-        self.num_adapt = 1
-        self.nonlinear_method = 'relaxation'
+            self.stabilisation = 'lax_friedrichs'
 
         lx, ly = 10, 10
         self.default_mesh = PeriodicRectangleMesh(n, n, lx, ly, direction='x')
         self.periodic = True
         self.dt = 0.2
         self.dt_per_export = 1
-        self.dt_per_remesh = 1
         self.end_time = 10.0
 
         # self.base_diffusivity = 1.0e-8
         self.base_diffusivity = 0.0
         self.base_velocity = [1.0, 0.0]
-
-    def set_source(self, fs):  # TODO
-        self.source = Function(fs, name="Tracer source")
-        return self.source
 
     def set_boundary_conditions(self, prob, i):
         boundary_conditions = {
@@ -47,3 +40,12 @@ class ALEAdvectionOptions(CoupledOptions):
         x, y = SpatialCoordinate(prob.meshes[0])
         x0, y0 = 5.0, 5.0
         prob.fwd_solutions_tracer[0].interpolate(exp(-((x-x0)**2 + (y-y0)**2)))
+
+    def get_update_forcings(self, prob, i):
+        x, y = SpatialCoordinate(prob.meshes[i])
+        u, eta = prob.fwd_solutions[i].split()
+
+        def update_forcings(t):
+            u.interpolate(as_vector([1.0, cos(2*pi*t/self.end_time)]))
+
+        return update_forcings

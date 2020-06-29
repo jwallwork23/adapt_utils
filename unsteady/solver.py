@@ -415,7 +415,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.tracer_options[i].tracer_advective_velocity_factor,
+            'lax_friedrichs_tracer_scaling_factor': self.tracer_options[i].lax_friedrichs_tracer_scaling_factor,
+            'mesh_velocity': None,
         })
+        if self.mesh_velocities[i] is not None:
+            fields['mesh_velocity'] = self.mesh_velocities[i]
+        if self.op.approach == 'lagrangian':
+            self.mesh_velocities[i] = u
+            fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
