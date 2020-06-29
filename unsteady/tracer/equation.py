@@ -4,8 +4,61 @@ from thetis.utility import *
 from thetis.tracer_eq_2d import *
 
 
-# TODO: Extend Thetis tracer_2d model to consider CG case
+# TODO: Extend to consider CG case
 # TODO: Conservative form
+
+class HorizontalAdvectionTerm(TracerTerm):
+    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        if fields_old.get('uv_2d') is None:
+            return 0
+        elev = fields_old['elev_2d']
+        self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
+
+        uv = self.corr_factor * fields_old['uv_2d']
+        # FIXME is this an option?
+        lax_friedrichs_factor = fields_old.get('lax_friedrichs_tracer_scaling_factor')
+
+        f = 0
+        f += -(Dx(uv[0] * self.test, 0) * solution
+               + Dx(uv[1] * self.test, 1) * solution) * self.dx
+
+        mesh_velocity = fields_old.get('mesh_velocity')  # TODO: Make more robust
+        if mesh_velocity is not None:
+            f += (Dx(mesh_velocity[0] * self.test, 0) * solution
+                  + Dx(mesh_velocity[1] * self.test, 1) * solution) * self.dx
+
+        if self.horizontal_dg:
+            # add interface term
+            uv_av = avg(uv)
+            un_av = (uv_av[0]*self.normal('-')[0]
+                     + uv_av[1]*self.normal('-')[1])
+            s = 0.5*(sign(un_av) + 1.0)
+            c_up = solution('-')*s + solution('+')*(1-s)
+
+            f += c_up*(jump(self.test, uv[0] * self.normal[0])
+                       + jump(self.test, uv[1] * self.normal[1])) * self.dS
+            # Lax-Friedrichs stabilization
+            if self.use_lax_friedrichs:
+                gamma = 0.5*abs(un_av)*lax_friedrichs_factor
+                f += gamma*dot(jump(self.test), jump(solution))*self.dS
+            if bnd_conditions is not None:
+                for bnd_marker in self.boundary_markers:
+                    funcs = bnd_conditions.get(bnd_marker)
+                    ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                    c_in = solution
+                    if funcs is not None and 'value' in funcs:
+                        c_ext, uv_ext, eta_ext = self.get_bnd_functions(c_in, uv, elev, bnd_marker, bnd_conditions)
+                        uv_av = 0.5*(uv + uv_ext)
+                        un_av = self.normal[0]*uv_av[0] + self.normal[1]*uv_av[1]
+                        s = 0.5*(sign(un_av) + 1.0)
+                        c_up = c_in*s + c_ext*(1-s)
+                        f += c_up*(uv_av[0]*self.normal[0]
+                                   + uv_av[1]*self.normal[1])*self.test*ds_bnd
+                    else:
+                        f += c_in * (uv[0]*self.normal[0]
+                                     + uv[1]*self.normal[1])*self.test*ds_bnd
+
+        return -f
 
 
 class TracerEquation2D(Equation):

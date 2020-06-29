@@ -75,12 +75,14 @@ tp_discrete.compute_gradient(Control(q))  # TODO: just use solve_adjoint once me
 tp_discrete.save_adjoint_trajectory()
 stop_annotating()
 
+
 class UnannotatedTracerProblem(AdaptiveProblem):
 
     def quantity_of_interest(self):
         kernel = self.op.set_qoi_kernel_tracer(self, -1)
         sol = self.fwd_solutions_tracer[-1]
         return assemble(kernel*sol*dx)
+
 
 # Solve
 op.di = create_directory(os.path.join(di, 'continuous'))
