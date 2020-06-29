@@ -1,28 +1,55 @@
+from __future__ import absolute_import
 from thetis import *
 from thetis.configuration import *
-
 import os
+from . import misc
 
 
 __all__ = ["Options"]
 
 
+# TODO: Improve doc
 class Options(FrozenConfigurable):
     name = 'Common parameters for mesh adaptive simulations'
 
-    # Spatial discretisation  # TODO: use a notation which is more general
-    family = Unicode('dg-dg', help="Mixed finite element family, from {'dg-dg', 'dg-cg'}.").tag(config=True)
-    degree_increase = NonNegativeInteger(1, help="Polynomial degree increase in enriched space").tag(config=True)
-    degree = NonNegativeInteger(1, help="Order of function space").tag(config=True)
+    # Spatial discretisation
+    family = Unicode('dg-dg', help="""
+    Mixed finite element pair to use for the shallow water system. Choose from:
+      'cg-cg': Taylor-Hood                    (P2-P1);
+      'dg-dg': Equal order DG                 (PpDG-PpDG);
+      'dg-cg': Mixed continuous-discontinuous (P1DG-P2),
+    where p is the polynomial order specified by :attr:`degree`.
+    """).tag(config=True)
+    tracer_family = Unicode('dg', help="""
+    Finite element pair to use for the tracer transport model. Choose from:
+      'cg': Continuous Galerkin    (Pp);
+      'dg': Discontinuous Galerkin (PpDG),
+    where p is the polynomial order specified by :attr:`degree_tracer`.
+    """).tag(config=True)
+    degree = NonNegativeInteger(1, help="""
+    Polynomial order for shallow water finite element pair :attr:`family'.
+    """).tag(config=True)
+    degree_tracer = NonNegativeInteger(1, help="""
+    Polynomial order for tracer finite element pair :attr:`tracer_family'.
+    """).tag(config=True)
+    degree_increase = NonNegativeInteger(0, help="""
+    When defining an enriched shallow water finite element space, how much should the
+    polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+    """).tag(config=True)
+    degree_increase_tracer = NonNegativeInteger(1, help="""
+    When defining an enriched tracer finite element space, how much should the
+    polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+    """).tag(config=True)
 
     # Time discretisation
     timestepper = Unicode('CrankNicolson', help="Time integration scheme used.").tag(config=True)
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
     start_time = NonNegativeFloat(0., help="Start of time window of interest.").tag(config=True)
     end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
+    num_meshes = PositiveInteger(1, help="Number of meshes in :class:`AdaptiveProblem` solver").tag(config=True)
     dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
-    dt_per_remesh = PositiveFloat(20, help="Number of timesteps per mesh adaptation.").tag(config=True)
-    use_automatic_timestep = Bool(False).tag(config=True)
+    use_semi_implicit_linearisation = Bool(False).tag(config=True)  # TODO: doc
+    implicitness_theta = NonNegativeFloat(0.5).tag(config=True)  # TODO: doc
 
     # Boundary conditions
     boundary_conditions = PETScSolverParameters({}, help="Boundary conditions expressed as a dictionary.").tag(config=True)
@@ -30,12 +57,11 @@ class Options(FrozenConfigurable):
 
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.").tag(config=True)
-    stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0), help="Scalar stabilisation parameter.").tag(config=True)
-    sipg_parameter = FiredrakeScalarExpression(None, allow_none=True, help="Value for parameter used in symmetric interior penalty method. Chosen automatically if set to None.").tag(config=True)
+    use_automatic_sipg_parameter = Bool(True, help="Toggle automatic generation of symmetric interior penalty method.").tag(config=True)
 
     # Solver parameters
-    params = PETScSolverParameters({}).tag(config=True)
-    adjoint_params = PETScSolverParameters({}).tag(config=True)
+    solver_parameters = PETScSolverParameters({}, help="Solver parameters for the forward model, separated by equation set.").tag(config=True)
+    adjoint_solver_parameters = PETScSolverParameters({}, help="Solver parameters for the adjoint models, separated by equation set.").tag(config=True)
 
     # Outputs
     debug = Bool(False, help="Toggle debugging mode for more verbose screen output.").tag(config=True)
@@ -60,7 +86,7 @@ class Options(FrozenConfigurable):
     max_anisotropy = PositiveFloat(1000., help="Maximum tolerated anisotropy.").tag(config=True)
     normalisation = Unicode('complexity', help="Metric normalisation approach, from {'complexity', 'error'}.").tag(config=True)
     target = PositiveFloat(1.0e+2, help="Target complexity / inverse desired error for normalisation, as appropriate.").tag(config=True)
-    norm_order = NonNegativeInteger(None, allow_none=True, help="Degree p of Lp norm used in 'error' normalisation approach. Use 'None' to specify infinity norm.").tag(config=True)
+    norm_order = NonNegativeFloat(None, allow_none=True, help="Degree p of Lp norm used in spatial normalisation. Use 'None' to specify infinity norm.").tag(config=True)
     intersect_boundary = Bool(False, help="Intersect with initial boundary metric.").tag(config=True)
 
     # Hessian
@@ -69,9 +95,12 @@ class Options(FrozenConfigurable):
                                                        'ksp_rtol': 1e-5,
                                                        'ksp_gmres_restart': 20,
                                                        'pc_type': 'sor'}).tag(config=True)
+    hessian_time_combination = Unicode('integrate', help="Method used to combine Hessians over timesteps, from {'integrate', 'intersect'}.").tag(config=True)
+    hessian_timestep_lag = PositiveFloat(1, help="Allow lagged Hessian computation by setting greater than one.").tag(config=True)
 
     # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="Spatial region related to quantity of interest").tag(config=True)
+    estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)
 
     # Adaptation loop
     element_rtol = PositiveFloat(0.005, help="Relative tolerance for convergence in mesh element count").tag(config=True)
@@ -88,7 +117,6 @@ class Options(FrozenConfigurable):
         self.default_mesh = mesh
         self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)
-        self.end_time -= 0.5*self.dt
         if self.debug:
             # set_log_level(DEBUG)
             set_log_level(INFO)
@@ -104,149 +132,35 @@ class Options(FrozenConfigurable):
         self.qoi_rtol = tol
         self.estimator_rtol = tol
 
-    def ball(self, fs, scale=1., source=False):
-        """
-        Ball indicator function associated with region(s) of interest
+    # TODO: Collapse indicators to one function and include type in RoI and source specifications
 
-        :arg fs: Desired `FunctionSpace`.
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        mesh = fs.mesh()
-        dim = mesh.topological_dimension()
-        assert dim in (2, 3)
-        if dim == 2:
-            x, y = SpatialCoordinate(fs)
-        else:
-            x, y, z = SpatialCoordinate(fs)
+    def box(self, mesh, source=False, **kwargs):
         locs = self.source_loc if source else self.region_of_interest
-        eps = 1e-10
-        for j in range(len(locs)):
-            x0 = locs[j][0]
-            y0 = locs[j][1]
-            r = locs[j][2] if dim == 2 else locs[j][3]
-            if dim == 3:
-                z0 = locs[j][2]
-                expr = lt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0), r*r + eps)
-            else:
-                expr = lt((x-x0)*(x-x0) + (y-y0)*(y-y0), r*r + eps)
-            b = expr if j == 0 else Or(b, expr)
-        expr = conditional(b, scale, 0.)
-        # return interpolate(expr, fs)
-        return expr
+        return misc.box(locs, mesh, **kwargs)
 
-    def bump(self, fs, scale=1., source=False):
-        """
-        Rectangular bump function associated with region(s) of interest
-
-        :arg fs: Desired `FunctionSpace`.
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        mesh = fs.mesh()
-        dim = mesh.topological_dimension()
-        assert dim in (2, 3)
-        if dim == 2:
-            x, y = SpatialCoordinate(fs)
-        else:
-            x, y, z = SpatialCoordinate(fs)
+    def ball(self, mesh, source=False, **kwargs):  # TODO: ellipse
         locs = self.source_loc if source else self.region_of_interest
-        i = 0
-        for j in range(len(locs)):
-            x0 = locs[j][0]
-            y0 = locs[j][1]
-            r0 = locs[j][2] if dim == 2 else locs[j][3]
-            if dim == 2 and len(locs) == 4:
-                r1 = locs[j][3]
-            elif dim == 3 and len(locs) > 4:
-                r1 = locs[j][4]
-            else:
-                r1 = r0
-            expr1 = (x-x0)*(x-x0) + (y-y0)*(y-y0)
-            expr2 = scale*exp(1 - 1/(1 - (x-x0)*(x-x0)/r0**2))*exp(1 - 1/(1 - (y-y0)*(y-y0)/r1**2))
-            vol = r0*r1
-            if dim == 3:
-                z0 = locs[j][2]
-                r2 = r0 if len(locs) < 6 else locs[j][5]
-                expr1 += (z-z0)*(z-z0)
-                expr2 *= exp(1 - 1/(1 - (z-z0)*(z-z0)/r2**2))
-                vol *= r2
-            i += conditional(lt(expr1, vol), expr2, 0)
-        # return interpolate(i, fs)
-        return i
+        return misc.ellipse(locs, mesh, **kwargs)
 
-    def gaussian(self, fs, scale=1., source=False):
-        """
-        Gaussian function associated with region(s) of interest
-
-        :arg fs: Desired `FunctionSpace`.
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        mesh = fs.mesh()
-        dim = mesh.topological_dimension()
-        assert dim in (2, 3)
-        if dim == 2:
-            x, y = SpatialCoordinate(fs)
-        else:
-            x, y, z = SpatialCoordinate(fs)
+    def bump(self, mesh, source=False, **kwargs):
         locs = self.source_loc if source else self.region_of_interest
-        i = 0
-        for j in range(len(locs)):
-            x0 = locs[j][0]
-            y0 = locs[j][1]
-            r = locs[j][2] if dim == 2 else locs[j][3]
-            expr = (x-x0)*(x-x0) + (y-y0)*(y-y0)
-            if dim == 3:
-                z0 = locs[j][2]
-                expr += (z-z0)*(z-z0)
-            i += conditional(lt(expr, r*r), scale*exp(1 - 1/(1 - expr/r**2)), 0)
-        # return interpolate(i, fs)
-        return i
+        return misc.bump(locs, mesh, **kwargs)
 
-    def box(self, fs, scale=1., source=False):
-        """
-        Rectangular indicator function associated with region(s) of interest
-
-        :arg fs: Desired `FunctionSpace`.
-        :kwarg scale: Scale factor for indicator.
-        :kwarg source: Toggle source term or region of interest location.
-        """
-        mesh = fs.mesh()
-        dim = mesh.topological_dimension()
-        assert dim in (2, 3)
-        if dim == 2:
-            x, y = SpatialCoordinate(fs)
-        else:
-            x, y, z = SpatialCoordinate(fs)
+    def circular_bump(self, mesh, source=False, **kwargs):
         locs = self.source_loc if source else self.region_of_interest
-        for j in range(len(locs)):
-            x0 = locs[j][0]
-            y0 = locs[j][1]
-            r0 = locs[j][2] if dim == 2 else locs[j][3]
-            if dim == 2 and len(locs) == 4:
-                r1 = locs[j][3]
-            elif dim == 3 and len(locs) > 4:
-                r1 = locs[j][4]
-            else:
-                r1 = r0
-            expr = And(And(gt(x, x0-r0), lt(x, x0+r0)), And(gt(y, y0-r1), lt(y, y0+r1)))
-            if dim == 3:
-                r2 = r0 if len(locs) < 6 else locs[j][5]
-                z0 = locs[j][2]
-                expr = And(expr, And(gt(z, z0-r2), lt(z, z0+r2)))
-            b = expr if j == 0 else Or(b, expr)
-        expr = conditional(b, scale, 0.)
-        # return interpolate(expr, fs)
-        return expr
+        return misc.circular_bump(locs, mesh, **kwargs)
+
+    def gaussian(self, mesh, source=False, **kwargs):
+        locs = self.source_loc if source else self.region_of_interest
+        return misc.gaussian(locs, mesh, **kwargs)
 
     def set_start_condition(self, fs, adjoint=False):
-        return self.set_final_condition(fs) if adjoint else self.set_initial_condition(fs)
+        return self.set_terminal_condition(fs) if adjoint else self.set_initial_condition(fs)
 
     def set_initial_condition(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def set_final_condition(self, fs):
+    def set_terminal_condition(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_boundary_conditions(self, fs):
@@ -262,19 +176,22 @@ class Options(FrozenConfigurable):
     def set_qoi_kernel(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
+    def set_qoi_kernel_tracer(self, fs):
+        raise NotImplementedError("Should be implemented in derived class.")
+
     def exact_solution(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def exact_qoi(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def get_update_forcings(self, solver_obj):
+    def get_update_forcings(self, prob, i):
         """Should be implemented in derived class."""
         def update_forcings(t):
             return
         return update_forcings
 
-    def get_export_func(self, solver_obj):
+    def get_export_func(self, prob, i):
         """Should be implemented in derived class."""
         def export_func():
             return
@@ -284,6 +201,7 @@ class Options(FrozenConfigurable):
         if self.debug:
             print_output(msg)
 
+    # TODO: USEME
     def get_mesh_velocity(self):
         """
         Prescribed a mesh velocity.

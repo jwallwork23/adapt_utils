@@ -1,144 +1,144 @@
 from thetis import *
 
-from adapt_utils.case_studies.tohoku.options import TohokuOptions
-from adapt_utils.swe.tsunami.solver import TsunamiProblem
-from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.recovery import DoubleL2ProjectorHessian
-
 import argparse
+import datetime
+
+from adapt_utils.case_studies.tohoku.options import TohokuOptions
+from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
 parser = argparse.ArgumentParser(prog="run_hessian_based")
-parser.add_argument("-end_time", help="End time of simulation")
-parser.add_argument("-level", help="(Integer) mesh resolution")
-parser.add_argument("-norm_order", help="p for Lp normalisaton")
+
+# Space-time domain
+parser.add_argument("-end_time", help="End time of simulation (default 24 minutes)")
+parser.add_argument("-level", help="(Integer) mesh resolution (default 0)")
+parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
+
+# Solver
+parser.add_argument("-family", help="Element family for mixed FE space (default cg-cg)")
+
+# Mesh adaptation
+parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
+parser.add_argument("-normalisation", help="Normalisation method (default 'complexity')")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t")
-parser.add_argument("-target", help="Target space-time complexity")
+parser.add_argument("-time_combine", help="Method for time-combining Hessians (default integrate)")
+parser.add_argument("-hessian_lag", help="Compute Hessian every n timesteps (default 6)")
+parser.add_argument("-target", help="Target space-time complexity (default 1.0e+03)")
+parser.add_argument("-h_min", help="Minimum tolerated element size (default 100m)")
+parser.add_argument("-h_max", help="Maximum tolerated element size (default 1000km)")
+
+# QoI
+parser.add_argument("-start_time", help="""
+Start time of period of interest in seconds (default 1200s i.e. 20min)""")
+parser.add_argument("-locations", help="""
+Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
+'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
+""")
+parser.add_argument("-radii", help="Radii of interest, separated by commas (default 100km)")
+
+# Outer loop
+parser.add_argument("-num_adapt", help="Maximum number of adaptation loop iterations (default 35)")
+parser.add_argument("-element_rtol", help="Relative tolerance for element count (default 0.005)")
+parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
+
+# Misc
+parser.add_argument("-save_plex", help="Save final set of mesh DMPlexes to disk")
 parser.add_argument("-debug", help="Print all debugging statements")
-args = parser.parse_args()
+args, unknown = parser.parse_known_args()
+p = args.norm_order
 
-
-# --- Setup
-
-# Set parameters for fixed mesh run
-op = TohokuOptions(
-    level=int(args.level or 0),
-    approach='fixed_mesh',
-    adapt_field=args.adapt_field or 'elevation',
-    plot_pvd=True,
-    debug=bool(args.debug or False),
-    norm_order=int(args.norm_order or 1),  # TODO: L-inf normalisation
-    target=float(args.target or 1.0e+03),  # Desired average instantaneous spatial complexity
-)
-op.end_time = float(args.end_time or op.end_time)
-
-# Setup solver
-swp = TsunamiProblem(op, levels=0)
-swp.setup_solver_forward()
-
-average_hessian = Function(swp.P1_ten, name="Average Hessian")
-average_hessians = []
-timestep_integrals = []
-hessian_file = File(os.path.join(swp.di, 'hessian.pvd'))
-
-
-
-# --- Callbacks
-
-# Setup L2 projector
-if op.adapt_field == 'elevation':
-    fs = swp.solver_obj.function_spaces.H_2d
-elif op.adapt_field == 'speed':
-    fs = swp.P1DG
+# Collect locations and radii
+if args.locations is None:
+    locations = ['Fukushima Daiichi', ]
 else:
-    raise NotImplementedError  # TODO
-projector = DoubleL2ProjectorHessian(fs, op=op)
+    locations = args.locations.split(',')
+if args.radii is None:
+    radii = [100.0e+03 for l in locations]
+else:
+    radii = [float(r) for r in args.radii.split(',')]
+if len(locations) != len(radii):
+    msg = "Number of locations ({:d}) and radii ({:d}) do not match."
+    raise ValueError(msg.format(len(locations), len(radii)))
 
+kwargs = {
 
-def hessian(sol):
+    # Space-time domain
+    'level': int(args.level or 0),
+    'end_time': float(args.end_time or 1440.0),
+    'num_meshes': int(args.num_meshes or 12),
 
-    # TODO: Re-implement version of below which currently exists in swe/solver
+    # Physics
+    'bathymetry_cap': 30.0,  # FIXME
 
-    uv, elev = sol.split()
-    if op.adapt_field == 'elevation':
-        f = elev
-    elif op.adapt_field == 'speed':
-        # TODO: Use a par_loop instead of interpolate
-        f = interpolate(sqrt(inner(uv, uv)), swp.P1DG)
-    return steady_metric(f, projector=projector, noscale=True, op=op)
+    # Solver
+    'family': args.family or 'cg-cg',
+    'stabilisation': None,  # TODO: Lax-Friedrichs
 
+    # Mesh adaptation
+    'adapt_field': args.adapt_field or 'elevation',
+    'hessian_time_combination': args.time_combine or 'integrate',
+    'hessian_timestep_lag': float(args.hessian_lag or 6),
+    'normalisation': args.normalisation or 'complexity',
+    'norm_order': 1 if p is None else None if p == 'inf' else float(p),
+    'target': float(args.target or 5.0e+03),
+    'h_min': float(args.h_min or 1.0e+02),
+    'h_max': float(args.h_max or 1.0e+06),
 
-timestep = lambda sol: 1.0/op.dt
+    # QoI
+    'start_time': float(args.start_time or 1200.0),
+    'radii': radii,
+    'locations': locations,
 
+    # Outer loop
+    'element_rtol': float(args.element_rtol or 0.005),
+    'qoi_rtol': float(args.qoi_rtol or 0.005),
+    'num_adapt': int(args.num_adapt or 35),
 
-def extra_setup():
+    # Misc
+    'debug': bool(args.debug or False),
+    'plot_pvd': True,
+}
+save_plex = bool(args.save_plex or False)
+logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
+for key in kwargs:
+    logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
+print_output(logstr + 80*'*' + '\n')
 
-    # TODO: LaggedTimeIntegralCallback to reduce cost of Hessian computation
+# Create parameter class and problem object
+op = TohokuOptions(approach='hessian')
+op.update(kwargs)
+swp = AdaptiveTsunamiProblem(op)  # TODO: Option to load plexes
+swp.run_hessian_based()
 
-    # Number of timesteps per export (trivial for constant dt)
-    swp.callbacks["timestep"] = callback.TimeIntegralCallback(
-        timestep, swp.solver_obj, swp.solver_obj.timestepper, name="timestep", append_to_log=False)
-    swp.solver_obj.add_callback(swp.callbacks["timestep"], 'timestep')
-
-    # Time integrated Hessian over each window
-    swp.callbacks["average_hessian"] = callback.TimeIntegralCallback(
-        hessian, swp.solver_obj, swp.solver_obj.timestepper, name="average_hessian", append_to_log=False)
-    swp.solver_obj.add_callback(swp.callbacks["average_hessian"], 'timestep')
-
-
-swp.extra_setup = extra_setup
-
-
-# --- Exports
-
-
-def get_export_func(solver_obj):
-
-    def export_func():
-        if solver_obj.iteration == 0:
-            return
-
-        # Extract time averaged Hessian and reset to zero for next window
-        average_hessian.interpolate(swp.callbacks["average_hessian"].get_value())
-        hessian_file.write(average_hessian)
-        average_hessians.append(average_hessian.copy(deepcopy=True))
-        swp.callbacks["average_hessian"].integrant = 0
-
-        # Extract timesteps per export and reset to zero for next window
-        timestep_integrals.append(swp.callbacks["timestep"].get_value())
-        swp.callbacks["timestep"].integrant = 0.0
-
-    return export_func
-
-
-op.get_export_func = get_export_func
-
-
-# --- Run fixed mesh
-swp.solve()
-print_output("Quantity of interest: {:.4e}".format(swp.callbacks["qoi"].get_value()))
-
-
-# --- Time normalise metrics
-
-time_normalise(average_hessians, timestep_integrals, op=op)
-metric_file = File(os.path.join(swp.di, 'metric.pvd'))
-complexities = []
-for i, H in enumerate(average_hessians):
-    metric_file.write(H)
-    complexities.append(metric_complexity(H))
-
-
-# --- Adapt meshes
-meshes = []
-for i, M in enumerate(average_hessians):
-    mesh = adapt(swp.mesh, M)
-    meshes.append(mesh)
-# mesh_file = File(os.path.join(swp.di, 'mesh.pvd'))  # FIXME
-for i, mesh in enumerate(meshes):
-    msg = "{:2d}: complexity {:7.1f} vertices {:6d} elements {:6d}"
-    print_output(msg.format(i, complexities[i], mesh.num_vertices(), mesh.num_cells()))
-    mesh_file = File(os.path.join(swp.di, 'mesh_{:d}.pvd'.format(i)))  # FIXME
-    mesh_file.write(mesh.coordinates)
-
-# --- TODO: Run Hessian based
+# Print summary / logging
+with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
+    for line in gitlog:
+        words = line.split()
+    logstr += "    {:34s}: {:}\n".format('adapt_utils git commit', words[1])
+for i in range(len(unknown)//2):
+    logstr += "    {:34s}: {:}\n".format(unknown[2*i][1:], unknown[2*i+1])
+logstr += 80*'*' + '\n' + 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
+logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
+msg = "Mesh iteration {:2d}: qoi {:.4e} space-time complexity {:.4e}\n"
+for n in range(1, len(swp.qois)):
+    logstr += msg.format(n+1, swp.qois[n], swp.st_complexities[n])
+logstr += 80*'*' + '\n' + 30*' ' + 'FINAL ELEMENT COUNTS\n' + 80*'*' + '\n'
+l = op.end_time/op.num_meshes
+for i, num_cells in enumerate(swp.num_cells[-1]):
+    logstr += "Time window ({:7.1f},{:7.1f}]: {:7d}\n".format(i*l, (i+1)*l, num_cells)
+logstr += 80*'*' + '\n'
+print_output(logstr)
+date = datetime.date.today()
+date = '{:d}-{:d}-{:d}'.format(date.year, date.month, date.day)
+j = 0
+while True:
+    di = os.path.join(op.di, '{:s}-run-{:d}'.format(date, j))
+    if not os.path.exists(di):
+        create_directory(di)
+        break
+    j += 1
+with open(os.path.join(di, 'log'), 'w') as logfile:
+    logfile.write(logstr)
+if save_plex:
+    swp.store_plexes(di=di)
+print_output(di)

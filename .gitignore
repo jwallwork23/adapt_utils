@@ -3,7 +3,6 @@ __pycache__/
 
 # Specific files
 FIXME
-adjoint.py
 .DS_Store
 
 # File types
@@ -13,7 +12,15 @@ adjoint.py
 *.vtu
 *.h5
 *.txt
+*.pdf
 *.ipynb_checkpoints
 *.hdf5
 *.patch
 *.png
+*.fld
+*.dbf
+*.prj
+*.cpg
+*.qpj
+*.xyz
+*.tar.gz

@@ -134,9 +134,7 @@ class DoubleL2ProjectorHessian(L2Projector):
 
             a = inner(τ, H)*dx
             L = -inner(div(τ), grad(self.field))*dx
-            for i in range(self.dim):
-                for j in range(self.dim):
-                    L += τ[i, j]*self.n[j]*self.field.dx(i)*ds
+            L += dot(grad(self.field), dot(τ, self.n))*ds
 
         # Double L2 projection, using a mixed formulation for the gradient and Hessian
         elif self.hessian_recovery == 'dL2':
@@ -149,9 +147,7 @@ class DoubleL2ProjectorHessian(L2Projector):
             a = inner(τ, H)*dx
             a += inner(φ, g)*dx
             a += inner(div(τ), g)*dx
-            for i in range(self.dim):
-                for j in range(self.dim):
-                    a += -g[i]*τ[i, j]*self.n[j]*ds
+            a += -dot(g, dot(τ, self.n))*ds
 
             # L = inner(grad(self.field), φ)*dx
             L = self.field*dot(φ, self.n)*ds - self.field*div(φ)*dx  # Enables field to be P0
@@ -161,20 +157,22 @@ class DoubleL2ProjectorHessian(L2Projector):
         prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)
         self.projector = LinearVariationalSolver(prob, **self.kwargs)
 
+    # TODO: Couple with the above instead of setting arbitrary interior value
     def _setup_boundary_projector(self):
         P1 = FunctionSpace(mesh, "CG", degree)
-        h, v = TrialFunction(P1), TestFunction(P1)
+        Hs, v = TrialFunction(P1), TestFunction(P1)
         self.l2_projection = Function(P1, name="Recovered boundary Hessian")
 
         # Arbitrary value in domain interior
-        a = v*h*dx
+        a = v*Hs*dx
         L = v*Constant(pow(self.h_max, -2))*dx
 
         # Hessian on boundary
         if self.bcs is None:
-            a_bc = v*h*ds
+            a_bc = v*Hs*ds
             s = perp(self.n)  # Tangent vector
-            L_bc = -(s[0]*v.dx(0)*self.f.dx(0) + s[1]*v.dx(1)*self.f.dx(1))*ds
+            L_bc = -dot(s, grad(v))*dot(s, grad(self.field))*ds
+            # TODO: Account for nullspace
             self.bcs = EquationBC(a_bc == L_bc, self.l2_projection, 'on_boundary')
 
         prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)

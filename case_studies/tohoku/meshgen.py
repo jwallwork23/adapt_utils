@@ -1,41 +1,52 @@
-import numpy as np
+"""
+Generate a hierarchy of meshes for the Tohoku tsunami problem.
+"""
 import os
+import qmesh
 
 
 class MeshSetup:
+    """
+    Generate mesh `level` in the hierarchy.
+
+    Whilst we do not have a nested hierarchy, the gradation parameters are chosen such that
+    the mesh on level n+1 has approximately four times as many elements as the mesh on level n.
+    """
     def __init__(self, level):
         self.level = level
         self.di = os.path.join(os.path.dirname(__file__), 'resources')
-        try:
-            assert isinstance(level, int) and 0 <= level < 11
-        except AssertionError:
-            raise ValueError('Invalid input. Refinement level should be an integer from 0-10.')
+        if not (isinstance(level, int) and level >= 0):
+            raise ValueError('Invalid input. Refinement level should be a non-negative integer')
         self.name = 'Tohoku{:d}'.format(level)
-        self.log = os.path.join(self.di, 'log')
+        self.log = os.path.join(self.di, 'meshes', 'log')
 
-        # Define gradations (in metres)
-        inner_gradation_1 = np.linspace(7500.0, 1000.0, 11)[level]
-        outer_gradation_1 = np.linspace(25000.0, 2000.0, 11)[level]
-        inner_gradation_2 = np.linspace(10000.0, 2000.0, 11)[level]
-        outer_gradation_2 = np.linspace(25000.0, 4000.0, 11)[level]
+        # Gradation parameters for section of coast near Fukushima
+        self.gradation_args_fukushima = (
+            7.5e+03*0.5**level,   # inner gradation (m)
+            30.0e+03*0.5**level,  # outer gradation (m)
+            1.0,                  # gradation distance (degrees)
+            0.05,                 # TODO: What is this parameter?
+        )
 
-        # Define gradation distances (in degrees)
-        gradation_distance_1 = np.linspace(0.5, 1.0, 11)[level]
-        gradation_distance_2 = np.linspace(0.5, 1.0, 11)[level]
+        # Gradation parameters for the rest of the coast
+        self.gradation_args_else = (
+            10.0e+03*0.5**level,  # inner gradation (m)
+            30.0e+03*0.5**level,  # outer gradation (m)
+            0.5,                  # gradation distance (degrees)
+        )
 
-        # Parameters
-        self.gradation_args_1 = (inner_gradation_1, outer_gradation_1, gradation_distance_1, 0.05)
-        self.gradation_args_2 = (inner_gradation_2, outer_gradation_2, gradation_distance_2)
         self.loop_kwargs = {
             'isGlobal': False,
             'defaultPhysID': 1000,
             'fixOpenLoops': True,
         }
+
         self.polygon_kwargs = {
             'smallestNotMeshedArea': 5.0e+06,
             'smallestMeshedArea': 2.0e+08,
             'meshedAreaPhysID': 1,
         }
+
         self.mesh_kwargs = {}
         for ext in ('geo', 'fld', 'msh'):
             fname = '{:s}Filename'.format(ext)
@@ -61,7 +72,7 @@ class MeshSetup:
         gradation_raster_fukushima.setShapes(fukushima_coast)
         gradation_raster_fukushima.setRasterBounds(135.0, 149.0, 30.0, 45.0)
         gradation_raster_fukushima.setRasterResolution(300, 300)
-        gradation_raster_fukushima.setGradationParameters(*self.gradation_args_1)
+        gradation_raster_fukushima.setGradationParameters(*self.gradation_args_fukushima)
         gradation_raster_fukushima.calculateLinearGradation()
         gradation_raster_fukushima.writeNetCDF(os.path.join(self.di, 'meshes', 'gradation_fukushima.nc'))
 
@@ -72,7 +83,7 @@ class MeshSetup:
         gradation_raster_gebco.setShapes(gebco_coast)
         gradation_raster_gebco.setRasterBounds(135.0, 149.0, 30.0, 45.0)
         gradation_raster_gebco.setRasterResolution(300, 300)
-        gradation_raster_gebco.setGradationParameters(*self.gradation_args_2)
+        gradation_raster_gebco.setGradationParameters(*self.gradation_args_else)
         gradation_raster_gebco.calculateLinearGradation()
         gradation_raster_gebco.writeNetCDF(os.path.join(self.di, 'meshes', 'gradation_gebco.nc'))
 
@@ -101,15 +112,9 @@ class MeshSetup:
         TohokuMesh.writeShapefile(os.path.join(self.di, 'meshes', self.name + '.shp'))
 
 
-import qmesh
-import argparse
-
-parser = argparse.ArgumentParser()
-parser.add_argument("level", help="Integer refinement level of mesh")
-args = parser.parse_args()
-
-ms = MeshSetup(int(args.level))
-qmesh.setLogOutputFile(ms.log)  # Store QMESH log for later reference
-qmesh.initialise()              # Initialise QGIS API
-ms.generate_mesh()              # Generate the mesh using QMESH
-ms.convert_mesh()               # Convert to shapefile (for visualisation with QGIS)
+for i in range(5):
+    ms = MeshSetup(i)
+    qmesh.setLogOutputFile(ms.log)  # Store QMESH log for later reference
+    qmesh.initialise()              # Initialise QGIS API
+    ms.generate_mesh()              # Generate the mesh using QMESH
+    ms.convert_mesh()               # Convert to shapefile (for visualisation with QGIS)

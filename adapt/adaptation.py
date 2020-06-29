@@ -7,9 +7,19 @@ import warnings
 
 from adapt_utils.adapt.kernels import *
 from adapt_utils.options import Options
+from adapt_utils.misc import suppress_output
 
 
-__all__ = ["AdaptiveMesh"]
+__all__ = ["pragmatic_adapt", "AdaptiveMesh"]
+
+
+def pragmatic_adapt(mesh, M, op=Options):
+    if not op.debug:
+        with suppress_output():
+            out = adapt(mesh, M)
+    else:
+        out = adapt(mesh, M)
+    return out
 
 
 class AdaptiveMesh():
@@ -119,7 +129,7 @@ class AdaptiveMesh():
         """
         Save mesh in DMPlex format.
         """
-        viewer = PETSc.Viewer().createHDF5(filename, 'r')
+        viewer = PETSc.Viewer().createHDF5(filename, 'w')
         viewer(self.mesh._plex)
 
     def load_plex(self, filename):
