@@ -258,7 +258,10 @@ class MeshMover():
             # L += (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
             L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
             prob = LinearVariationalProblem(a, L, self.σ_new)
-            self.equidistribution = LinearVariationalSolver(prob, solver_parameters={'ksp_type': 'cg'})
+            params = {
+                'ksp_type': 'cg',
+            }
+            self.equidistribution = LinearVariationalSolver(prob, solver_parameters=params)
         else:
             φ, σ = TrialFunctions(self.W)
             ψ, τ = TestFunctions(self.W)
@@ -454,7 +457,8 @@ class MeshMover():
             minmax, equi, residual_l2_norm = self.get_diagnostics()
             if i == 0:
                 initial_norm = residual_l2_norm  # Store to check for divergence
-            if i % 10 == 0 and self.op.debug:
+            # if i % 10 == 0 and self.op.debug:
+            if i % 1 == 0 and self.op.debug:
                 print_output(self.msg.format(i, minmax, residual_l2_norm, equi))
             if residual_l2_norm < self.op.r_adapt_rtol:
                 print_output("r-adaptation converged in {:d} iterations.".format(i+1))

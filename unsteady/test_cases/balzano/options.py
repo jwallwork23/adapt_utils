@@ -66,8 +66,8 @@ class BalzanoOptions(CoupledOptions):
         # Time integration
         self.dt = 600.0
         self.end_time = self.num_hours*3600.0
-        self.dt_per_export = 6
-        self.dt_per_remesh = 6
+        # self.dt_per_export = 6
+        self.dt_per_export = 1
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 0.5
 

@@ -12,20 +12,20 @@ kwargs = {
     # 'nonlinear_method': 'quasi_newton',  # FIXME
     'n': 2,
     'r_adapt_rtol': 1.0e-3,
+    # 'r_adapt_maxit': 5,
 }
 
 op = BalzanoOptions(**kwargs)
 swp = AdaptiveProblem(op)
 
+alpha = 2.0  # size of the dense region surrounding the coast
+beta = 1.0   # level of refinement at coast
 
-def wet_dry_interface_monitor(mesh, alpha=1.0, beta=1.0):  # FIXME: all this projection is expensive!
+def wet_dry_interface_monitor(mesh):  # FIXME: all this projection is expensive!
     """
     Monitor function focused around the wet-dry interface.
 
     NOTE: Defined on the *computational* mesh.
-
-    :kwarg alpha: controls the size of the dense region surrounding the coast.
-    :kwarg beta: controls the level of refinement in this region.
     """
     P1 = FunctionSpace(mesh, "CG", 1)
     eta = swp.fwd_solutions[0].split()[1]

@@ -316,10 +316,16 @@ class AdaptiveProblemBase(object):
             'bbc': None,  # TODO
             'op': self.op,
         }
+        # self.monitors = monitors
+        # self.mesh_movement_kwargs = kwargs
         for i in range(self.num_meshes):
             assert monitors[i] is not None
-            self.mesh_movers[i] = MeshMover(self.meshes[i], monitors[i], **kwargs)
+            base_mesh = Mesh(self.meshes[i].coordinates.copy(deepcopy=True))
+            # self.mesh_movers[i] = MeshMover(self.meshes[i], monitors[i], **kwargs)
+            self.mesh_movers[i] = MeshMover(base_mesh, monitors[i], **kwargs)
 
     def move_mesh(self, i):
         if self.mesh_movers[i] is not None:
             self.mesh_movers[i].adapt()
+            self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
+            # self.mesh_movers[i] = MeshMover(self.meshes[i], self.monitors[i], **self.mesh_movement_kwargs)
