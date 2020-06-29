@@ -333,7 +333,29 @@ class AdaptiveProblemBase(object):
 
     def move_mesh(self, i):
         if self.op.approach == 'lagrangian':  # TODO: Make more robust (apply BCs etc.)
-            self.meshes[i].coordinates.interpolate(self.meshes[i].coordinates + self.op.dt*self.mesh_velocities[i])
+            dt = self.op.dt
+            coords = self.meshes[i].coordinates
+
+            # Crank-Nicolson  # TODO: Assemble once
+            if hasattr(self.op, 'get_velocity'):
+                coord_space = coords.function_space()
+                trial = TrialFunction(coord_space)
+                test = TestFunction(coord_space)
+
+                a = inner(test, trial)*dx
+                L = inner(test, coords)*dx
+                v_old = self.op.get_velocity(coords)
+                v_new = self.op.get_velocity(trial)
+                a -= lhs(0.5*dt*inner(test, v_new)*dx)
+                L += rhs(0.5*dt*inner(test, v_new)*dx)
+                L += 0.5*dt*inner(test, v_old)*dx
+
+                solve(a == L, coords, solver_parameters={'ksp_type': 'cg'})
+            
+            # Forward Euler
+            else:
+                coords.interpolate(coords + dt*self.mesh_velocities[i])
+
         elif self.mesh_movers[i] is not None:
 
             # Compute new physical mesh coordinates

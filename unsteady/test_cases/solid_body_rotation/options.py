@@ -55,12 +55,13 @@ class LeVequeOptions(CoupledOptions):
             self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
         else:
             raise ValueError("Geometry {:s} not recognised.".format(geometry))
+        self.default_mesh.coordinates.dat.data[:] -= 0.5
 
         # Source / receiver
-        self.source_loc = [(0.25, 0.5, 0.15),     # Bell     (shape 0)
-                           (0.5, 0.25, 0.15),     # Cone     (shape 1)
-                           (0.5, 0.75, 0.15),     # Cylinder \ (shape 2)
-                           (0.475, 0.525, 0.85)]  # Slot     /
+        self.source_loc = [(-0.25, 0, 0.15),       # Bell     (shape 0)
+                           (0, -0.25, 0.15),       # Cone     (shape 1)
+                           (0, 0.25, 0.15),        # Cylinder \ (shape 2)
+                           (-0.025, 0.025, 0.35)]  # Slot     /
         self.set_region_of_interest(shape=shape)
 
         # Physics
@@ -92,11 +93,13 @@ class LeVequeOptions(CoupledOptions):
             boundary_conditions['tracer'][i] = {i: {'value': Constant(self.bg)}}
         return boundary_conditions
 
-    def set_initial_condition(self, prob):
-        x, y = SpatialCoordinate(prob.meshes[0])
-        q = prob.fwd_solutions[0]
+    def get_velocity(self, coords):
+        return as_vector([0.5 - coords[1], coords[0] - 0.5])
+
+    def set_initial_condition(self, prob, i=0):
+        q = prob.fwd_solutions[i]
         u, eta = q.split()
-        u.interpolate(as_vector((0.5 - y, x - 0.5)))
+        u.interpolate(self.get_velocity(prob.meshes[i].coordinates))
 
     def set_initial_condition_tracer(self, prob):
         x, y = SpatialCoordinate(prob.meshes[0])
@@ -117,14 +120,14 @@ class LeVequeOptions(CoupledOptions):
         b = self.ball(prob.meshes[i], source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
-        rescaling = area_exact/area if area != 0. else 1
+        rescaling = area_exact/area if np.allclose(area, 0.0) else 1
         return rescaling*b
 
     def set_terminal_condition_tracer(self, prob):
         b = self.ball(prob.meshes[-1], source=False)
         area = assemble(b*dx)
         area_exact = pi*self.region_of_interest[0][2]**2
-        rescaling = area_exact/area if area != 0. else 1
+        rescaling = area_exact/area if np.allclose(area, 0.0) else 1
         prob.adj_solutions_tracer[-1].interpolate(rescaling*b)
 
     def exact_solution(self, fs):
@@ -167,3 +170,10 @@ class LeVequeOptions(CoupledOptions):
         sol = self.bg + bell + cone + slot_cyl
         kernel = self.set_qoi_kernel_tracer(prob, i)
         return assemble(kernel*sol*dx(degree=12))
+
+    def get_update_forcings(self, prob, i):
+
+        def update_forcings(t):
+            self.set_initial_condition(prob, i=i)
+
+        return update_forcings
