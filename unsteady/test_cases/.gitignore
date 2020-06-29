@@ -4,6 +4,7 @@ balzano/__pycache__/
 balzano/videos/
 balzano/strip.geo
 lagrangian_vs_eulerian/outputs/
+lagrangian_vs_eulerian/videos/
 lagrangian_vs_eulerian/screenshots/
 lagrangian_vs_eulerian/__pycache__/
 rossby_wave/outputs/
