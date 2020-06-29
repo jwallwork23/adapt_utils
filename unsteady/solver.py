@@ -69,8 +69,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
             'sipg_parameter': None,
             'tracer_advective_velocity_factor': op.tracer_advective_velocity_factor,
-            'use_tracer_conservative_form': False,
+            'use_tracer_conservative_form': op.use_tracer_conservative_form,
         }
+        if op.use_tracer_conservative_form and op.approach == 'lagrangian':
+            raise NotImplementedError  # TODO
         self.tracer_limiters = [None for i in range(op.num_meshes)]
         for i, to in enumerate(self.tracer_options):
             to.update(static_options)

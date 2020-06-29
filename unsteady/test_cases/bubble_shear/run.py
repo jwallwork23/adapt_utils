@@ -42,9 +42,15 @@ op = BubbleOptions(approach=approach, n=int(args.n or 1))
 op.update(kwargs)
 tp = AdaptiveProblem(op)
 
-if approach == 'lagrangian':
-    alpha = 10.0
-    eps = 1.0e-03
+# --- Initialise the mesh
+
+# Note:
+#  * We use Monge-Ampere with a monitor function indicating the initial condition
+
+if approach != 'fixed_mesh':
+
+    alpha = 10.0   # Parameter controlling significance of refined region
+    eps = 1.0e-03  # Parameter controlling width of refined region
 
     def monitor(mesh):
         x, y = SpatialCoordinate(mesh)
@@ -53,15 +59,22 @@ if approach == 'lagrangian':
 
     mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
     mesh_mover.adapt()
-
     tp.__init__(op, meshes=[Mesh(mesh_mover.x), ])
+
+# --- Solve the tracer transport problem
+
+# Note:
+#  * Pure Lagrangian leads to tangled elements after only a few iterations
+#  * This motivates applying monitor based methods throughout the simulation  # TODO
 
 tp.set_initial_condition()
 init_norm = norm(tp.fwd_solutions_tracer[0])
 init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
 tp.solve_forward()
+
+# Compare initial and final tracer concentrations
 final_norm = norm(tp.fwd_solutions_tracer[0])
 final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
 print_output("Initial norm:   {:.4e}".format(init_norm))
 print_output("Final norm:     {:.4e}".format(final_norm))
-print_output("Relative error: {:.2f}%".format(100*abs(1.0 - errornorm(init_sol, final_sol)/init_norm)))
+print_output("Relative error: {:.2f}%".format(100*abs(1.0-errornorm(init_sol, final_sol)/init_norm)))
