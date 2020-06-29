@@ -2,6 +2,7 @@ from thetis import *
 
 import argparse
 
+from adapt_utils.adapt.r import MeshMover
 from adapt_utils.unsteady.test_cases.rossby_wave.options import BoydOptions
 from adapt_utils.unsteady.test_cases.rossby_wave.monitors import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -22,7 +23,7 @@ args = parser.parse_args()
 n_coarse = int(args.n_coarse or 1)  # NOTE: [Huang et al 2008] considers n = 4, 8, 20
 n_fine = int(args.n_fine or 50)
 refine_equator = bool(args.refine_equator or False)
-initial_monitor = equator_monitor if refine_equator else None  # TODO: Other options
+monitor = equator_monitor if refine_equator else None  # TODO: Other options
 read_only = bool(args.read_only or False)
 
 kwargs = {
@@ -41,17 +42,15 @@ kwargs = {
 
 op = BoydOptions(**kwargs)
 swp = AdaptiveProblem(op)
-# swp.setup_solver_forward(0)
 
-if initial_monitor is not None:
-    raise NotImplementedError  # TODO
-    swp.approach = 'monge_ampere'
-    swp.monitor_function = initial_monitor
-    swp.adapt_mesh()
-    # op.approach = 'fixed_mesh'  # TODO: check if needed
-    swp.__init__(op, mesh=swp.meshes[0], levels=swp.levels)
+if monitor is not None:
+    mesh_mover = MeshMover(swp.meshes[0], monitor, method='monge_ampere', op=op)
+    mesh_mover.adapt()
+    mesh = Mesh(mesh_mover.x)
+    op.__init__(mesh=mesh, **kwargs)
+    swp.__init__(op, meshes=[mesh, ])
 
-fname = '{:s}_{:d}'.format("uniform" if initial_monitor is None else "refined_equator", n_coarse)
+fname = '{:s}_{:d}'.format("uniform" if monitor is None else "refined_equator", n_coarse)
 if not read_only:
     swp.solve_forward()
     # swp.op.write_to_hdf5(fname)

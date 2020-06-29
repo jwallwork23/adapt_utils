@@ -35,6 +35,7 @@ class CoupledOptions(Options):
     # Tracer transport model
     solve_tracer = Bool(False).tag(config=True)
     use_limiter_for_tracers = Bool(True).tag(config=True)
+    use_tracer_conservative_form = Bool(False).tag(config=True)
     tracer_family = Enum(['dg', 'cg'], default_value='dg').tag(config=True)
     lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
     sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)

@@ -315,7 +315,7 @@ class BoydOptions(CoupledOptions):
     def get_export_func(self, prob, i):
         def export_func():
             if self.debug:
-                t = solver_obj.simulation_time
+                t = prob.simulation_time
 
                 # Get exact solution and plot
                 exact = self.get_exact_solution(prob, i, t=t)

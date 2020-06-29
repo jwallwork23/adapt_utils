@@ -10,7 +10,6 @@ lagrangian_vs_eulerian/__pycache__/
 rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/__pycache__/
-rossby_wave/run_ale.py
 solid_body_rotation/videos/
 solid_body_rotation/outputs/
 solid_body_rotation/screenshots/
