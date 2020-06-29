@@ -13,12 +13,14 @@ stabilisation = args.stabilisation or 'lax_friedrichs'
 
 kwargs = {
     'approach': 'fixed_mesh',
+    'n': 2,
+    'plot_pvd': True,
 
     # Geometry
     'bathymetry_type': int(args.bathymetry_type or 1),
 
     # Spatial discretisation
-    'family': args.family or 'dg-dg',
+    'family': args.family or 'dg-cg',
     'stabilisation': stabilisation,
     'use_automatic_sipg_parameter': True,
 }

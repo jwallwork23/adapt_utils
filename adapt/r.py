@@ -204,8 +204,7 @@ class MeshMover():
     def setup_residuals(self):
         ψ = TestFunction(self.V)
         self.θ_form = self.monitor*det(self.I + self.σ_old)*dx
-        residual_form = self.monitor*det(self.I + self.σ_old) - self.θ
-        self.residual_l2_form = ψ*residual_form*dx
+        self.residual_l2_form = ψ*(self.monitor*det(self.I + self.σ_old) - self.θ)*dx
         self.norm_l2_form = ψ*self.θ*dx
 
     def apply_map(self):
@@ -234,7 +233,7 @@ class MeshMover():
         equi = std/mean
         residual_l2 = assemble(self.residual_l2_form).dat.norm
         norm_l2 = assemble(self.norm_l2_form).dat.norm
-        residual_l2_norm = residual_l2 / norm_l2
+        residual_l2_norm = residual_l2/norm_l2
         return minmax, equi, residual_l2_norm
 
     def setup_equidistribution(self):  # TODO: Other options, e.g. MMPDE
@@ -435,6 +434,8 @@ class MeshMover():
         assert self.op.nonlinear_method == 'relaxation'
         maxit = self.op.r_adapt_maxit
         for i in range(maxit):
+            # print("{:2d}: sigma = {:.4e}".format(i, norm(self.σ_old)))
+            # print("{:2d}:   phi = {:.4e}".format(i, norm(self.φ_old)))
 
             # Perform L2 projection and generate coordinates appropriately
             self.l2_projector.solve()
@@ -461,7 +462,7 @@ class MeshMover():
             if i % 1 == 0 and self.op.debug:
                 print_output(self.msg.format(i, minmax, residual_l2_norm, equi))
             if residual_l2_norm < self.op.r_adapt_rtol:
-                print_output("r-adaptation converged in {:d} iterations.".format(i+1))
+                print_output("r-adaptation converged in {:2d} iterations.".format(i+1))
                 break
             if residual_l2_norm > 2.0*initial_norm:
                 raise ConvergenceError("r-adaptation failed to converge in {:d} iterations.".format(i+1))
