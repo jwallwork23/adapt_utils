@@ -93,7 +93,7 @@ class LeVequeOptions(CoupledOptions):
             boundary_conditions['tracer'][i] = {i: {'value': Constant(self.bg)}}
         return boundary_conditions
 
-    def get_velocity(self, coords):
+    def get_velocity(self, coords, t):
         return as_vector([0.5 - coords[1], coords[0] - 0.5])
 
     def set_initial_condition(self, prob, i=0):

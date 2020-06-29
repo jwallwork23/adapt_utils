@@ -333,30 +333,37 @@ class AdaptiveProblemBase(object):
 
     def move_mesh(self, i):
         if self.op.approach == 'lagrangian':  # TODO: Make more robust (apply BCs etc.)
+            t = self.simulation_time
             dt = self.op.dt
             coords = self.meshes[i].coordinates
 
             # Crank-Nicolson  # TODO: Assemble once
             if hasattr(self.op, 'get_velocity'):
                 coord_space = coords.function_space()
-                trial = TrialFunction(coord_space)
+                coords_old = Function(coord_space).assign(coords)
                 test = TestFunction(coord_space)
 
-                a = inner(test, trial)*dx
-                L = inner(test, coords)*dx
-                v_old = self.op.get_velocity(coords)
-                v_new = self.op.get_velocity(trial)
-                a -= lhs(0.5*dt*inner(test, v_new)*dx)
-                L += rhs(0.5*dt*inner(test, v_new)*dx)
-                L += 0.5*dt*inner(test, v_old)*dx
+                F = inner(test, coords)*dx - inner(test, coords_old)*dx
+                F -= 0.5*dt*inner(test, self.op.get_velocity(coords_old, t))*dx
+                F -= 0.5*dt*inner(test, self.op.get_velocity(coords, t))*dx
 
-                solve(a == L, coords, solver_parameters={'ksp_type': 'cg'})
+                params = {
+                    'mat_type': 'aij',
+                    'snes_type': 'newtonls',
+                    'snes_rtol': 1.0e-03,
+                    # 'ksp_type': 'gmres',
+                    'ksp_type': 'preonly',
+                    # 'pc_type': 'sor',
+                    'pc_type': 'lu',
+                    'pc_type_factor_mat_solver_type': 'mumps',
+                }
+                solve(F == 0, coords, solver_parameters=params)
             
             # Forward Euler
             else:
                 coords.interpolate(coords + dt*self.mesh_velocities[i])
 
-        elif self.mesh_movers[i] is not None:
+        elif self.mesh_movers[i] is not None:  # TODO: Account for tracers
 
             # Compute new physical mesh coordinates
             self.mesh_movers[i].adapt()

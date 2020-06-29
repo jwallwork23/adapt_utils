@@ -16,17 +16,14 @@ class BubbleOptions(CoupledOptions):
         self.solve_tracer = True
         self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
         if self.tracer_family == 'cg':
-            self.stabilisation = 'SUPG'
+            self.stabilisation = 'supg'
         elif self.tracer_family == 'dg':
-            self.stabilisation = None
+            self.stabilisation = 'lax_friedrichs'
         else:
             raise NotImplementedError
-        self.num_adapt = 1
-        self.nonlinear_method = 'relaxation'
 
         # Source / receiver
         self.source_loc = [(0.5, 0.85, 0.1)]
-        # self.region_of_interest = []
         self.base_diffusivity = 0.0
 
         # Time integration
@@ -34,9 +31,8 @@ class BubbleOptions(CoupledOptions):
         self.dt = 0.015
         # self.end_time = self.period/4
         self.end_time = self.period/2
-        self.dt_per_export = 10
-        # self.dt_per_export = 1
-        self.dt_per_remesh = 10
+        # self.dt_per_export = 10
+        self.dt_per_export = 1
 
     def set_boundary_conditions(self, prob, i):
         boundary_conditions = {
@@ -49,14 +45,16 @@ class BubbleOptions(CoupledOptions):
         }
         return boundary_conditions
 
-    def update_velocity(self, prob, i, t):
-        x, y = SpatialCoordinate(prob.meshes[i])
-        expr = as_vector([
+    def get_velocity(self, coords, t):
+        x, y = coords
+        return as_vector([
             2*sin(pi*x)*sin(pi*x)*sin(2*pi*y)*cos(2*pi*t/self.period),
             -2*sin(2*pi*x)*sin(pi*y)*sin(pi*y)*cos(2*pi*t/self.period),
         ])
+
+    def update_velocity(self, prob, i, t):
         u, eta = prob.fwd_solutions[i].split()
-        u.interpolate(expr)
+        u.interpolate(self.get_velocity(prob.meshes[i].coordinates, t))
 
     def set_initial_condition(self, prob):
         self.update_velocity(prob, 0, 0.0)
