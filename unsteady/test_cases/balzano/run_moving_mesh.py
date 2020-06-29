@@ -21,16 +21,13 @@ kwargs = {
 }
 
 op = BalzanoOptions(**kwargs)
-# op.solver_parameters['shallow_water'].update({
-#     'ksp_monitor': None,
-# })
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
 alpha = 1.0  # size of the dense region surrounding the coast
-beta = 1.0   # level of refinement at coast
+beta = 10.0  # level of refinement at coast
 
 
 def wet_dry_interface_monitor(mesh):

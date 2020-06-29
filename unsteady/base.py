@@ -329,6 +329,7 @@ class AdaptiveProblemBase(object):
             assert monitors[i] is not None
             self.mesh_movers[i] = MeshMover(self.base_meshes[i], monitors[i], **kwargs)
         self.mesh_velocity_file = File(os.path.join(self.op.di, 'mesh_velocity.pvd'))
+        self.tmp_file = File(os.path.join(self.op.di, 'tmp.pvd'))
 
     def move_mesh(self, i):
         if self.mesh_movers[i] is not None:
@@ -346,10 +347,9 @@ class AdaptiveProblemBase(object):
             # Update physical mesh and current solution defined on it
             self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
             for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-                sol_i.project(tmp_i)
+                # sol_i.project(tmp_i)
+                sol_i.dat.data[:] = tmp_i.dat.data
             del tmp
-
-            # TODO: Not sure the projection actually works
 
             # Update fields
             self.set_fields()
