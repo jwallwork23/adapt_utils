@@ -580,9 +580,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
         msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
+        coords = self.meshes[i].coordinates
         while self.simulation_time <= end_time - t_epsilon:
 
-            # TODO: Get mesh velocity; subtract in equations
+            # Get mesh velocity
+            if self.mesh_movers[i] is not None:  # TODO: generalise
+                self.mesh_movers[i].adapt()
+                self.mesh_velocities[i].assign((self.mesh_movers[i].x - coords)/op.dt)
+                if iteration % op.dt_per_export == 0:
+                    self.mesh_velocity_file.write(self.mesh_velocities[i])
 
             # Solve equations
             if op.solve_swe:
@@ -594,6 +600,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Move mesh
             self.move_mesh(i)
+            # if self.mesh_movers[i] is not None:  # TODO: generalise
+            #     self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
 
             # Outputs
             iteration += 1

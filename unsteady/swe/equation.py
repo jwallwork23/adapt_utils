@@ -59,7 +59,15 @@ class HUDivTerm(ShallowWaterContinuityTerm):
     def residual(self, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions=None):
         total_h = self.depth.get_total_depth(eta_old)
 
-        f = -inner(grad(self.eta_test), total_h*uv)*self.dx
+        f = 0
+
+        mesh_velocity = self.options.get('mesh_velocity')  # TODO
+        if mesh_velocity is not None:
+            # f += -self.eta_test*inner(mesh_velocity, grad(eta))*dx
+            f += inner(grad(self.eta_test), eta*mesh_velocity)*dx
+            # f += inner(grad(self.eta_test), total_h*mesh_velocity)*dx
+
+        f += -inner(grad(self.eta_test), total_h*uv)*self.dx
         if self.eta_is_dg:
             h = avg(total_h)
             uv_rie = avg(uv) + sqrt(g_grav/h)*jump(eta, self.normal)
@@ -94,9 +102,19 @@ class HorizontalAdvectionTerm(ShallowWaterMomentumTerm):
 
         horiz_advection_by_parts = True
 
+        f = 0
+
+        mesh_velocity = self.options.get('mesh_velocity')  # TODO
+        if mesh_velocity is not None:
+        #     f += -inner(self.u_test, dot(mesh_velocity, nabla_grad(uv)))*dx
+            f += (Dx(mesh_velocity[0]*self.u_test[0], 0)*uv[0]
+                  + Dx(mesh_velocity[0]*self.u_test[1], 0)*uv[1]
+                  + Dx(mesh_velocity[1]*self.u_test[0], 1)*uv[0]
+                  + Dx(mesh_velocity[1]*self.u_test[1], 1)*uv[1])*self.dx
+
         if horiz_advection_by_parts:
-            # f = -inner(nabla_div(outer(uv, self.u_test)), uv)
-            f = -(Dx(uv_old[0]*self.u_test[0], 0)*uv[0]
+            # f += -inner(nabla_div(outer(uv, self.u_test)), uv)
+            f += -(Dx(uv_old[0]*self.u_test[0], 0)*uv[0]
                   + Dx(uv_old[0]*self.u_test[1], 0)*uv[1]
                   + Dx(uv_old[1]*self.u_test[0], 1)*uv[0]
                   + Dx(uv_old[1]*self.u_test[1], 1)*uv[1])*self.dx

@@ -161,9 +161,10 @@ class BalzanoOptions(CoupledOptions):
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
         self.eta_tilde_file._topology = None
-        u, eta = prob.fwd_solutions[i].split()
-        b = prob.bathymetry[i]
-        wd = Function(prob.P1DG[i], name="Heaviside approximation")
+        if self.plot_timeseries:
+            u, eta = prob.fwd_solutions[i].split()
+            b = prob.bathymetry[i]
+            wd = Function(prob.P1DG[i], name="Heaviside approximation")
 
         def export_func():
             eta_tilde.project(self.get_eta_tilde(prob, i))

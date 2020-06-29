@@ -27,13 +27,12 @@ class AdaptiveProblemBase(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-    def __init__(self, op, meshes=None, discrete_adjoint=True, nonlinear=True):
+    def __init__(self, op, meshes=None, nonlinear=True):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
         self.op = op
         self.stabilisation = op.stabilisation
-        self.discrete_adjoint = discrete_adjoint
         self.approach = op.approach
         self.nonlinear = nonlinear
 
@@ -120,11 +119,15 @@ class AdaptiveProblemBase(object):
               enriched meshes are build from a single mesh hierarchy.
         """
         self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
+        self.mesh_velocities = [None for i in range(self.num_meshes)]
         msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
         for i, mesh in enumerate(self.meshes):
             bnd_len = compute_boundary_length(mesh)
             mesh.boundary_len = bnd_len
             self.op.print_debug(msg.format(i, mesh.num_cells()))
+            if self.op.approach == 'monge_ampere':  # TODO: Generalise
+                coords = mesh.coordinates
+                self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
 
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")
@@ -206,6 +209,11 @@ class AdaptiveProblemBase(object):
     def project_adjoint_solution(self, i, j):
         """Project adjoint solution from mesh `i` to mesh `j`."""
         self.project(self.adj_solutions, i, j)
+
+    def project_fields(self, fields, i):
+        for f in fields:
+            if isinstance(fields[f], Function):
+                self.fields[i].project(fields[f])
 
     def transfer_solution(self, i, adjoint=False):
         if adjoint:
@@ -316,16 +324,32 @@ class AdaptiveProblemBase(object):
             'bbc': None,  # TODO
             'op': self.op,
         }
-        # self.monitors = monitors
-        # self.mesh_movement_kwargs = kwargs
+        self.base_meshes = [Mesh(mesh.coordinates.copy(deepcopy=True)) for mesh in self.meshes]
         for i in range(self.num_meshes):
             assert monitors[i] is not None
-            base_mesh = Mesh(self.meshes[i].coordinates.copy(deepcopy=True))
-            # self.mesh_movers[i] = MeshMover(self.meshes[i], monitors[i], **kwargs)
-            self.mesh_movers[i] = MeshMover(base_mesh, monitors[i], **kwargs)
+            self.mesh_movers[i] = MeshMover(self.base_meshes[i], monitors[i], **kwargs)
+        self.mesh_velocity_file = File(os.path.join(self.op.di, 'mesh_velocity.pvd'))
 
     def move_mesh(self, i):
         if self.mesh_movers[i] is not None:
+
+            # Compute new physical mesh coordinates
             self.mesh_movers[i].adapt()
+
+            # Project a copy of the current solution onto mesh defined on new coordinates
+            mesh = Mesh(self.mesh_movers[i].x)
+            V = FunctionSpace(mesh, self.V[i].ufl_element())
+            tmp = Function(V)
+            for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+                tmp_i.project(sol_i)
+
+            # Update physical mesh and current solution defined on it
             self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
-            # self.mesh_movers[i] = MeshMover(self.meshes[i], self.monitors[i], **self.mesh_movement_kwargs)
+            for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+                sol_i.project(tmp_i)
+            del tmp
+
+            # TODO: Not sure the projection actually works
+
+            # Update fields
+            self.set_fields()
