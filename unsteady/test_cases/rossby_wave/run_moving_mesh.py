@@ -2,12 +2,13 @@ from thetis import *
 
 import argparse
 
+from adapt_utils.adapt.metric import metric_intersection
+from adapt_utils.adapt.r import MeshMover
+from adapt_utils.adapt.recovery import construct_hessian
+from adapt_utils.norms import *
 from adapt_utils.unsteady.test_cases.rossby_wave.options import BoydOptions
 from adapt_utils.unsteady.test_cases.rossby_wave.monitors import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.adapt.recovery import construct_hessian
-from adapt_utils.adapt.metric import metric_intersection
-from adapt_utils.norms import *
 
 
 parser = argparse.ArgumentParser()
@@ -16,6 +17,9 @@ parser.add_argument("-n_fine", help="Resolution of fine mesh.")
 parser.add_argument("-end_time", help="Simulation end time.")
 parser.add_argument("-refine_equator", help="""
 Apply Monge-Ampere based r-adaptation to refine equatorial region.""")
+parser.add_argument("-refine_soliton", help="""
+Apply Monge-Ampere based r-adaptation to refine around initial soliton.""")
+parser.add_argument("-monitor", help="Choose monitor from 'uv', 'elev', 'both'.")
 parser.add_argument("-calculate_metrics", help="Compute metrics using the fine mesh.")
 parser.add_argument("-debug", help="Toggle debugging mode.")
 args = parser.parse_args()
@@ -23,12 +27,25 @@ args = parser.parse_args()
 
 n_coarse = int(args.n_coarse or 1)  # NOTE: [Huang et al 2008] considers n = 4, 8, 20
 n_fine = int(args.n_fine or 50)
+
+# Monitor function for initial mesh
 refine_equator = bool(args.refine_equator or False)
-monitor = equator_monitor if refine_equator else None  # TODO: Other options
+refine_soliton = bool(args.refine_soliton or False)
+monitor_type = args.monitor or 'elev'
+initial_monitor = None
+initial_monitor_type = None
+if refine_equator:
+    if refine_soliton:
+        initial_monitor = lambda mesh: equator_monitor(mesh) + soliton_monitor(mesh)
+        initial_monitor_type = 'equator_and_soliton'
+    else:
+        initial_monitor = equator_monitor
+        initial_monitor_type = 'equator'
+elif refine_soliton:
+    initial_monitor = soliton_monitor
+    initial_monitor_type = 'soliton'
 
 kwargs = {
-    'approach': 'monge_ampere',
-    'num_meshes': 1,
 
     # Asymptotic expansion
     # 'order': 0,
@@ -48,21 +65,21 @@ kwargs = {
 
     # Mesh movement
     'r_adapt_rtol': 1.0e-3,
+    'nonlinear_method': 'relaxation',
+    # 'nonlinear_method': 'quasi_newton',
 
     # Misc
     'debug': bool(args.debug or False),
 }
-
-
-# initial_monitor = None
-# initial_monitor = equator_monitor
-initial_monitor = soliton_monitor
-
-op = BoydOptions(n=n_coarse)
-op.update(**kwargs)
+fpath = 'resolution_{:d}'.format(n_coarse)
+if initial_monitor_type is not None:
+    fpath = os.path.join(fpath, initial_monitor_type)
+fpath = os.path.join(fpath, monitor_type)
+op = BoydOptions(approach='monge_ampere', n=n_coarse, fpath=fpath, order=kwargs['order'])
+op.update(kwargs)
 swp = AdaptiveProblem(op)
 
-# Refine around equator
+# Refine around equator and/or soliton
 if initial_monitor is not None:
     mesh_mover = MeshMover(swp.meshes[0], initial_monitor, method='monge_ampere', op=op)
     mesh_mover.adapt()
@@ -93,7 +110,7 @@ def velocity_norm_monitor(mesh, alpha=40.0, norm_type='HDiv'):
     :kwarg alpha: controls the amplitude of the monitor function.
     """
     P1DG_vec = VectorFunctionSpace(mesh, "DG", 1)
-    u = project(swp.solution.split()[0], P1DG_vec)
+    u = project(swp.fwd_solutions[0].split()[0], P1DG_vec)
     if norm_type == 'hessian_frobenius':
         H1 = construct_hessian(u[0], op=op)
         H2 = construct_hessian(u[1], op=op)
@@ -106,9 +123,13 @@ def mixed_monitor(mesh):
     return 0.5*(velocity_norm_monitor(mesh, norm_type='HDiv') + elevation_norm_monitor(mesh, norm_type='H1'))
 
 
-# monitor = elevation_norm_monitor
-# monitor = velocity_norm_monitor
-monitor = mixed_monitor
+# Set monitor function to use during simulation
+if monitor_type == 'elev':
+    monitor = elevation_norm_monitor
+elif monitor_type == 'uv':
+    monitor = velocity_norm_monitor
+else:
+    monitor = mixed_monitor
 swp.set_monitor_functions(monitor)
 swp.solve_forward()
 
