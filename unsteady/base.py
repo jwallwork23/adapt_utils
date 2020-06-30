@@ -127,9 +127,9 @@ class AdaptiveProblemBase(object):
             bnd_len = compute_boundary_length(mesh)
             mesh.boundary_len = bnd_len
             self.op.print_debug(msg.format(i, mesh.num_cells()))
-            if self.op.approach == 'monge_ampere':  # TODO: Generalise
-                coords = mesh.coordinates
-                self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
+            # if self.op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO
+            #     coords = mesh.coordinates
+            #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
 
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")
@@ -321,7 +321,6 @@ class AdaptiveProblemBase(object):
         assert len(monitors) == self.num_meshes
         kwargs = {
             'method': self.approach,
-            'mesh_velocity': None,  # TODO
             'bc': None,  # TODO
             'bbc': None,  # TODO
             'op': self.op,
@@ -330,7 +329,6 @@ class AdaptiveProblemBase(object):
         for i in range(self.num_meshes):
             assert monitors[i] is not None
             self.mesh_movers[i] = MeshMover(self.base_meshes[i], monitors[i], **kwargs)
-        self.mesh_velocity_file = File(os.path.join(self.op.di, 'mesh_velocity.pvd'))
 
     def move_mesh(self, i):
         if self.op.approach in ('lagrangian', 'ale'):  # TODO: Make more robust (apply BCs etc.)

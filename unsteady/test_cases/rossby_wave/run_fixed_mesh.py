@@ -71,7 +71,7 @@ op = BoydOptions(approach='ale' if ale else 'fixed_mesh', fpath=fpath, n=n_coars
 op.update(kwargs)
 swp = AdaptiveProblem(op)
 
-# Refine around equator
+# Refine around equator and/or soliton
 if monitor is not None:
     mesh_mover = MeshMover(swp.meshes[0], monitor, method='monge_ampere', op=op)
     mesh_mover.adapt()
@@ -79,7 +79,7 @@ if monitor is not None:
     op.__init__(mesh=mesh, **kwargs)
     swp.__init__(op, meshes=[mesh, ])
 
-# Apply constant mesh velocity
+# Apply constant mesh velocity  # FIXME
 if ale:
     swp.mesh_velocities[0] = Constant(as_vector([-op.lx/op.end_time, 0.0]))
 swp.solve_forward()
