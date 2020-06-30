@@ -6,7 +6,7 @@ import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 
-from adapt_utils.unsteady.swe.options import CoupledOptions
+from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import *
 from adapt_utils.norms import timeseries_error
 
