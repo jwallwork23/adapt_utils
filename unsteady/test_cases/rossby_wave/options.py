@@ -41,6 +41,11 @@ class BoydOptions(CoupledOptions):
         # Physics
         self.g.assign(1.0)
         self.base_viscosity = 0.0
+        self.modon_propagation_speed = -1.0/3.0
+        if self.order != 0:
+            self.modon_propagation_speed -= 0.395*self.soliton_amplitude**2
+        else:
+            raise ValueError("Only zeroth and first order asymptotic expansions supported.")
 
         # Initial mesh
         self.lx = 48
@@ -65,7 +70,6 @@ class BoydOptions(CoupledOptions):
         self.end_time = 120.0
         # self.end_time = 30.0
         self.dt_per_export = 50
-        self.dt_per_remesh = 50
         self.timestepper = 'CrankNicolson'
         self.family = 'dg-dg'
         # self.family = 'dg-cg'
@@ -75,12 +79,32 @@ class BoydOptions(CoupledOptions):
         self.h_max = 10.0
 
         # Read in user-specified kwargs
-        self.update(kwargs)
+        self.update(kwargs)  # TODO: Redundant?
 
-        # Unnormalised Hermite series coefficients
+        # Plotting
+        self.relative_errors = {'l1': [], 'l2': [], 'linf': []}
+        self.exact_solution_file = File(os.path.join(self.di, 'exact.pvd'))
+
+    def asymptotic_expansion_uv(self, U_2d, time=0.0):
+        x, y = SpatialCoordinate(U_2d.mesh())
+
+        t = Constant(time)
+        B = Constant(self.soliton_amplitude)
+        c = Constant(self.modon_propagation_speed)
+        xi = x - c*t
+        psi = exp(-0.5*y*y)
+        phi = 0.771*(B/cosh(B*xi))**2
+        dphidx = -2*B*phi*tanh(B*xi)
+        C = -0.395*B*B
+
+        # Zeroth order terms
+        u_terms = phi*0.25*(-9 + 6*y*y)*psi
+        v_terms = 2*y*dphidx*psi
+        if self.order == 0:
+            return interpolate(as_vector([u_terms, v_terms]), U_2d)
+
+        # Unnormalised Hermite series coefficients for u
         u = np.zeros(28)
-        v = np.zeros(28)
-        eta = np.zeros(28)
         u[0] = 1.7892760e+00
         u[2] = 0.1164146e+00
         u[4] = -0.3266961e-03
@@ -95,6 +119,9 @@ class BoydOptions(CoupledOptions):
         u[22] = -0.2994113e-17
         u[24] = 0.2291658e-19
         u[26] = -0.1178252e-21
+
+        # Unnormalised Hermite series coefficients for v
+        v = np.zeros(28)
         v[3] = -0.6697824e-01
         v[5] = -0.2266569e-02
         v[7] = 0.9228703e-04
@@ -107,6 +134,38 @@ class BoydOptions(CoupledOptions):
         v[21] = 0.6302640e-18
         v[23] = -0.1289167e-19
         v[25] = 0.1471189e-21
+
+        # Hermite polynomials
+        polynomials = [Constant(1.0), 2*y]
+        for i in range(2, 28):
+            polynomials.append(2*y*polynomials[i-1] - 2*(i-1)*polynomials[i-2])
+
+        # First order terms
+        u_terms += C*phi*0.5625*(3 + 2*y*y)*psi
+        u_terms += phi*phi*psi*sum(u[i]*polynomials[i] for i in range(28))
+        v_terms += dphidx*phi*psi*sum(v[i]*polynomials[i] for i in range(28))
+
+        return interpolate(as_vector([u_terms, v_terms]), U_2d)  # TODO: account for periodicity
+
+    def asymptotic_expansion_eta(self, H_2d, time=0.0):
+        x, y = SpatialCoordinate(H_2d.mesh())
+
+        # Variables for asymptotic expansion
+        t = Constant(time)
+        B = Constant(self.soliton_amplitude)
+        c = Constant(self.modon_propagation_speed)
+        xi = x - c*t
+        psi = exp(-0.5*y*y)
+        phi = 0.771*(B/cosh(B*xi))**2
+        C = -0.395*B*B
+
+        # Zeroth order terms
+        eta_terms = phi*0.25*(3 + 6*y*y)*psi
+        if self.order == 0:
+            return interpolate(eta_terms, H_2d)
+
+        # Unnormalised Hermite series coefficients
+        eta = np.zeros(28)
         eta[0] = -3.0714300e+00
         eta[2] = -0.3508384e-01
         eta[4] = -0.1861060e-01
@@ -121,33 +180,17 @@ class BoydOptions(CoupledOptions):
         eta[22] = -0.1382304e-17
         eta[24] = 0.1066277e-19
         eta[26] = -0.1178252e-21
-        hermite_coeffs = {'u': u, 'v': v, 'eta': eta}
 
         # Hermite polynomials
-        x, y = SpatialCoordinate(self.default_mesh)
         polynomials = [Constant(1.0), 2*y]
         for i in range(2, 28):
             polynomials.append(2*y*polynomials[i-1] - 2*(i-1)*polynomials[i-2])
-        self.Ψ = exp(-0.5*y*y)
-        self.hermite_sum = {}
-        for f in ('u', 'v', 'eta'):
-            self.hermite_sum[f] = self.Ψ*sum(hermite_coeffs[f][i]*polynomials[i] for i in range(28))
 
-        # Variables for asymptotic expansion
-        self.t = Constant(0.0)
-        B = self.soliton_amplitude
-        modon_propagation_speed = -1.0/3.0
-        if self.order == 1:
-            modon_propagation_speed -= 0.395*B*B
-        c = Constant(modon_propagation_speed)
-        ξ = x - c*self.t
-        self.φ = 0.771*(B/cosh(B*ξ))**2
-        self.dφdx = -2*B*self.φ*tanh(B*ξ)
-        # TODO: account for periodicity
+        # First order terms
+        eta_terms += C*phi*0.5625*(-5 + 2*y*y)*psi
+        eta_terms += phi*phi*psi*sum(eta[i]*polynomials[i] for i in range(28))
 
-        # Plotting
-        self.relative_errors = {'l1': [], 'l2': [], 'linf': []}
-        self.exact_solution_file = File(os.path.join(self.di, 'exact.pvd'))
+        return interpolate(eta_terms, H_2d)  # TODO: account for periodicity
 
     def set_bathymetry(self, fs):
         return Constant(1.0)
@@ -170,55 +213,31 @@ class BoydOptions(CoupledOptions):
             boundary_conditions['shallow_water'][tag] = dirichlet
         return boundary_conditions
 
-    def get_exact_solution(self, prob, i, t):
+    def get_exact_solution(self, prob, i, t=0.0):
         """
         Evaluate asymptotic solution of chosen order.
 
-        :arg fs: `FunctionSpace` in which the solution should live.
+        :arg prob: :class:`AdaptiveProblem` object
+        :arg i: index of mesh on `prob`
         :kwarg t: current time.
         """
         msg = "Computing order {:d} asymptotic solution at time {:.2f}s on mesh with {:d} local elements..."
         self.print_debug(msg.format(self.order, t, prob.meshes[i].num_cells()))
-        self.t.assign(t)
-        x, y = SpatialCoordinate(self.default_mesh)
-        B = self.soliton_amplitude
-        C = -0.395*B*B
-
-        # Zero order terms
-        self.terms = {}
-        self.terms['u'] = self.φ*0.25*(-9 + 6*y*y)*self.Ψ
-        self.terms['v'] = 2*y*self.dφdx*self.Ψ
-        self.terms['eta'] = self.φ*0.25*(3 + 6*y*y)*self.Ψ
-
-        # First order terms
-        if self.order > 0:
-            assert self.order == 1
-            self.terms['u'] += C*self.φ*0.5625*(3 + 2*y*y)*self.Ψ
-            self.terms['u'] += self.φ*self.φ*self.hermite_sum['u']
-            self.terms['v'] += self.dφdx*self.φ*self.hermite_sum['v']
-            self.terms['eta'] += C*self.φ*0.5625*(-5 + 2*y*y)*self.Ψ
-            self.terms['eta'] += self.φ*self.φ*self.hermite_sum['eta']
-
-        solution = Function(prob.V[i], name="Order {:d} asymptotic solution".format(self.order))
-        u, eta = solution.split()
-        u.interpolate(as_vector([self.terms['u'], self.terms['v']]))
-        eta.interpolate(self.terms['eta'])
+        q = Function(prob.V[i], name="Order {:d} asymptotic solution".format(self.order))
+        u, eta = q.split()
+        u.assign(self.asymptotic_expansion_uv(prob.V[i].sub(0), t))
+        eta.assign(self.asymptotic_expansion_eta(prob.V[i].sub(1), t))
         u.rename('Asymptotic velocity')
         eta.rename('Asymptotic elevation')
-        return solution
+        return q
 
     def set_initial_condition(self, prob):
-        """
-        Set initial elevation and velocity using asymptotic solution.
-        """
+        """Set initial elevation and velocity using asymptotic solution."""
         prob.fwd_solutions[0].assign(self.get_exact_solution(prob, 0, t=0.0))
 
     def get_reference_mesh(self, n=50):
-        """
-        Set up a non-periodic, very fine mesh on the PDE domain.
-        """
-        nx = int(self.lx*n)
-        ny = int(self.ly*n)
+        """Set up a non-periodic, very fine mesh on the PDE domain."""
+        nx, ny = self.lx*n, self.ly*n
         self.print_debug("Generating reference mesh with {:d} local elements...".format(2*nx*ny))
         reference_mesh = RectangleMesh(nx, ny, self.lx, self.ly,
                                        distribution_parameters=self.distribution_parameters)
@@ -227,9 +246,7 @@ class BoydOptions(CoupledOptions):
         return reference_mesh
 
     def remove_periodicity(self, sol):
-        """
-        :arg sol: Function to remove periodicity of.
-        """
+        """Project a field `sol` from a periodic space into an equivalent non-periodic space."""
 
         # Generate an identical non-periodic mesh
         nx = int(self.lx*n)
@@ -248,7 +265,8 @@ class BoydOptions(CoupledOptions):
 
     def get_peaks(self, sol_periodic, reference_mesh_resolution=50):
         """
-        Given a numerical solution of the test case, compute the metrics as given in [Huang et al 2008]:
+        Given a numerical solution of the test case, compute the metrics as given in
+        [Huang et al 2008]:
           * h± : relative peak height for Northern / Southern soliton
           * C± : relative mean phase speed for Northern / Southern soliton
           * RMS: root mean square error
@@ -257,60 +275,54 @@ class BoydOptions(CoupledOptions):
         :arg sol_periodic: Numerical solution of PDE.
         """
         self.print_debug("Generating non-periodic counterpart of periodic function...")
-        sol = self.remove_periodicity(sol_periodic)
-
-        # Split Northern and Southern halves of domain
-        self.print_debug("Splitting Northern and Southern halves of domain...")
-        mesh = sol.function_space().mesh()
-        y = SpatialCoordinate(mesh)[1]
-        upper = Function(sol.function_space())
-        upper.interpolate(0.5*(sign(y)+1))
-        lower = Function(sol.function_space())
-        lower.interpolate(0.5*(-sign(y)+1))
-        sol_upper = Function(sol.function_space()).assign(sol)
-        sol_lower = Function(sol.function_space()).assign(sol)
-        sol_upper *= upper
-        sol_lower *= lower
+        sol = self.remove_periodicity(sol_periodic)  # TODO: Needed?
 
         # Project solution into a reference space on a fine mesh
         reference_mesh = self.get_reference_mesh(n=reference_mesh_resolution)
         self.print_debug("Projecting solution onto fine mesh...")
-        fs = FunctionSpace(reference_mesh, sol.ufl_element())
+        P1_ref = FunctionSpace(reference_mesh, "CG", 1)
         reference_mesh._parallel_compatible = {weakref.ref(mesh)}  # Mark meshes as compatible
-        sol_proj = Function(fs)
-        sol_proj.project(sol)
-        sol_upper_proj = Function(fs)
-        sol_upper_proj.project(sol_upper)
-        sol_lower_proj = Function(fs)
-        sol_lower_proj.project(sol_lower)
-        xcoords = Function(sol_proj.function_space())
-        xcoords.interpolate(reference_mesh.coordinates[0])
-
-        # Get relative mean peak height
-        self.print_debug("Extracting relative mean peak height...")
-        with sol_upper_proj.dat.vec_ro as vu:
-            i_upper, self.h_upper = vu.max()
-        with sol_lower_proj.dat.vec_ro as vl:
-            i_lower, self.h_lower = vl.max()
-        self.h_upper /= 0.1567020
-        self.h_lower /= 0.1567020
-
-        # Get relative mean phase speed
-        if self.debug:
-            print_output("Extracting relative mean phase speed...")
-        xdat = xcoords.vector().gather()
-        self.c_upper = (48 - xdat[i_upper])/47.18
-        self.c_lower = (48 - xdat[i_lower])/47.18
+        sol_ref = project(sol, P1_ref)
+        xcoords = project(reference_mesh.coordinates[0], P1_ref)
 
         # Calculate RMS error
         self.print_debug("Calculating root mean square error...")
-        init = self.remove_periodicity(self.initial_value.split()[1])
-        init_proj = Function(fs)
-        init_proj.project(init)
-        sol_proj -= init_proj
-        sol_proj *= sol_proj
-        self.rms = sqrt(np.mean(sol_proj.vector().gather()))
-        self.print_debug("Done!")
+        sol_diff = sol_ref.vector().gather()
+        sol_diff -= sol.vector().gather()
+        sol_diff *= sol_diff
+        rms = sqrt(sol_diff.sum()/sol_diff.size)
+
+        # Get relative mean peak heights
+        self.print_debug("Extracting relative mean peak height...")
+        sol_ref.interpolate(sign(y)*sol_ref)  # Flip sign in sourthern hemisphere
+        with sol_ref.dat.vec_ro as v:
+            i_n, h_n = v.max()
+            i_s, h_s = v.min()
+
+            # Find ranks which own peaks
+            ownership_range = v.getOwnershipRanges()
+            for j in range(sol.function_space().mesh().comm.size):
+                if i_n >= ownership_range[j] and i_n < ownership_range[j+1]:
+                    rank_with_n_peak = j
+                if i_s >= ownership_range[j] and i_s < ownership_range[j+1]:
+                    rank_with_s_peak = j
+
+        # Get mean phase speeds
+        x_n, x_s = None, None
+        with xcoords.dat.vec_ro as xdat:
+            if mesh2d.comm.rank == rank_with_n_peak:
+                x_n = xdat[i_n]
+            if mesh2d.comm.rank == rank_with_s_peak:
+                x_s = xdat[i_s]
+        x_n = mesh2d.comm.bcast(x_n, root=rank_with_n_peak)
+        x_s = mesh2d.comm.bcast(x_s, root=rank_with_s_peak)
+
+        # Get relative versions of metrics using high resolution FVCOM data
+        h_n /= 0.1567020
+        h_s /= -0.1567020  # Flip sign back
+        c_n = (48.0 - x_n)/47.18
+        c_s = (48.0 - x_s)/47.18
+        return h_n, h_s, c_n, c_s, rms
 
     def get_export_func(self, prob, i):
         def export_func():

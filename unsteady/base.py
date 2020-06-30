@@ -333,7 +333,7 @@ class AdaptiveProblemBase(object):
         self.mesh_velocity_file = File(os.path.join(self.op.di, 'mesh_velocity.pvd'))
 
     def move_mesh(self, i):
-        if self.op.approach == 'lagrangian':  # TODO: Make more robust (apply BCs etc.)
+        if self.op.approach in ('lagrangian', 'ale'):  # TODO: Make more robust (apply BCs etc.)
             mesh = self.meshes[i]
             t = self.simulation_time
             dt = self.op.dt

@@ -51,6 +51,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # 'check_volume_conservation_2d': True,  # TODO
             'norm_smoother': op.norm_smoother,
             'sipg_parameter': None,
+            'mesh_velocity': None,
         }
         for i, swo in enumerate(self.shallow_water_options):
             swo.update(static_options)
@@ -307,6 +308,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self._create_adjoint_tracer_equation(i)
 
     def _create_forward_shallow_water_equations(self, i):
+        if self.mesh_velocities[i] is not None:
+            self.shallow_water_options[i]['mesh_velocity'] = self.mesh_velocities[i]
         self.equations[i].shallow_water = ShallowWaterEquations(
             self.V[i],
             self.depth[i],
@@ -405,6 +408,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'momentum_source': None,
             'volume_source': None,
         })
+        if self.op.approach == 'lagrangian':
+            raise NotImplementedError  # TODO
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_velocity_scaling_factor'] = self.shallow_water_options[i].lax_friedrichs_velocity_scaling_factor
         return fields
