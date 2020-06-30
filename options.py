@@ -113,10 +113,13 @@ class Options(FrozenConfigurable):
     # Mesh
     periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
 
-    def __init__(self, mesh=None, **kwargs):
+    def __init__(self, mesh=None, fpath=None, **kwargs):
         self.default_mesh = mesh
         self.update(kwargs)
         self.di = os.path.join('outputs', self.approach)
+        if fpath is not None:
+            self.di = os.path.join(self.di, fpath)
+        self.di = create_directory(self.di)
         if self.debug:
             # set_log_level(DEBUG)
             set_log_level(INFO)
