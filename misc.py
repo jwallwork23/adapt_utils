@@ -219,7 +219,8 @@ def gaussian(locs, mesh, scale=1.0, rotation=None):
 
     # Combine to get indicator
     q_sq = [sum((X[j][i]/r[j][i])**2 for i in dims) for j in L]  # Quotient of squares
-    return sum(scale*conditional(lt(q_sq[j], 1), exp(-q_sq[j]), 0) for j in L)
+    # return sum(scale*conditional(lt(q_sq[j], 1), exp(-q_sq[j]), 0) for j in L)
+    return sum(scale*exp(-q_sq[j]) for j in L)
 
 
 def copy_mesh(mesh):
