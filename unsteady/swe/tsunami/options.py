@@ -50,19 +50,16 @@ class TsunamiOptions(CoupledOptions):
         x, y = SpatialCoordinate(self.lonlat_mesh)
         self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
 
-    def set_bathymetry(self, fs=None, dat=None):
+    def set_bathymetry(self, fs=None, dat=None, northern=True, force_longitude=True, **kwargs):
         if self.bathymetry_cap is not None:
             assert self.bathymetry_cap >= 0.0
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
         bathymetry = Function(fs, name="Bathymetry")
 
         # Interpolate bathymetry data *in lonlat space*
-        lon, lat, elev = dat or self.read_bathymetry_file()
-        self.print_debug("Transforming bathymetry to UTM coordinates...")
-        x, y = lonlat_to_utm(lon, lat, self.force_zone_number)
-        self.print_debug("Done!")
+        lon, lat, elev = dat or self.read_bathymetry_file(**kwargs)
         self.print_debug("Creating bathymetry interpolator...")
-        bath_interp = si.RectBivariateSpline(y, x, elev)
+        bath_interp = si.RectBivariateSpline(lat, lon, elev)
         self.print_debug("Done!")
 
         # Insert interpolated data onto nodes of *problem domain space*
@@ -71,28 +68,29 @@ class TsunamiOptions(CoupledOptions):
         depth = bathymetry.dat.data
         # initial_surface = self.set_initial_surface(fs)  # DUPLICATED
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
+            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, northern=northern, force_longitude=force_longitude)
             # depth[i] -= initial_surface.dat.data[i]  # TODO?
-            depth[i] -= bath_interp(xy[1], xy[0])
+            depth[i] -= bath_interp(lat, lon)
             # self.print_debug(msg.format(xy[0], xy[1], depth[i]/1000))
         if self.bathymetry_cap is not None:
             bathymetry.interpolate(max_value(self.bathymetry_cap, bathymetry))
         self.print_debug("Done!")
         return bathymetry
 
-    def set_initial_surface(self, fs=None):
+    def set_initial_surface(self, fs=None, northern=True, force_longitude=True, **kwargs):
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
         initial_surface = Function(fs, name="Initial free surface")
 
         # Interpolate bathymetry data *in lonlat space*
-        lon, lat, elev = self.read_surface_file()
-        x, y = lonlat_to_utm(lon, lat, self.force_zone_number)
-        surf_interp = si.RectBivariateSpline(y, x, elev)
+        lon, lat, elev = self.read_surface_file(**kwargs)
+        surf_interp = si.RectBivariateSpline(lat, lon, elev)
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("Interpolating initial surface...")
         # msg = "Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
-            initial_surface.dat.data[i] = surf_interp(xy[1], xy[0])
+            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, northern=northern, force_longitude=force_longitude)
+            initial_surface.dat.data[i] = surf_interp(lat, lon)
             # self.print_debug(msg.format(xy[0], xy[1], initial_surface.dat.data[i]))
         self.print_debug("Done!")
         return initial_surface

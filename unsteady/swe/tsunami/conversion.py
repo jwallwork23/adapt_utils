@@ -74,7 +74,7 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
 
     if not force_longitude:
         if not 100000 <= easting < 1000000:
-            raise OutOfRangeError('easting out of range (must be between 100,000 m and 999,999 m)')
+            raise OutOfRangeError('easting {:f} out of range (must be between 100,000 m and 999,999 m)'.format(easting))
 
     msg = 'northing out of range (must be between 0 m and 10,000,000 m)'
     if isinstance(northing, ufl.indexed.Indexed):

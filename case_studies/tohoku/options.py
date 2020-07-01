@@ -118,12 +118,20 @@ class TohokuOptions(TsunamiOptions):
         loi = self.locations_of_interest
         self.region_of_interest = [loi[loc]["coords"] + (radii[loc], ) for loc in loi]
 
-    def read_bathymetry_file(self):
+    def read_bathymetry_file(self, source='gebco'):
         self.print_debug("Reading bathymetry file...")
-        nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'bathymetry.nc'), 'r')
-        lon = nc.variables['lon'][:]
-        lat = nc.variables['lat'][:-1]
-        elev = nc.variables['elevation'][:-1, :]
+        if source == 'gebco':
+            nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'gebco.nc'), 'r')
+            lon = nc.variables['lon'][:]
+            lat = nc.variables['lat'][:-1]
+            elev = nc.variables['elevation'][:-1,:]
+        elif source == 'etopo1':
+            nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'etopo1.nc'), 'r')
+            lon = nc.variables['lon'][:]
+            lat = nc.variables['lat'][:]
+            elev = nc.variables['Band1'][:,:]
+        else:
+            raise ValueError("Bathymetry data source {:s} not recognised.".format(source))
         nc.close()
         self.print_debug("Done!")
         return lon, lat, elev
