@@ -16,6 +16,7 @@ def get_mesh(dim, n=4):
     else:
         raise ValueError("Expected dimension 1, 2 or 3 but got {:d}".format(dim))
 
+
 def get_function_spaces(mesh, shape):
     if shape == 'scalar':
         constructor = FunctionSpace
@@ -60,7 +61,7 @@ def test_is_spd(dim):
     P1_ten, _ = get_function_spaces(mesh, 'tensor')
     M = interpolate(Identity(dim), P1_ten)
     assert is_spd(M)
-    M.dat.data[0][0,0] *= -1
+    M.dat.data[0][0, 0] *= -1
     assert not is_spd(M)
 
 

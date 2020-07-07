@@ -358,7 +358,7 @@ class AdaptiveProblemBase(object):
                     'pc_type_factor_mat_solver_type': 'mumps',
                 }
                 solve(F == 0, coords, solver_parameters=params)
-            
+
             # Forward Euler
             else:
                 coords.interpolate(coords + dt*self.mesh_velocities[i])

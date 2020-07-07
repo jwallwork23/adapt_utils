@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-import h5py
+# import h5py
 import weakref
 import numpy as np
 import matplotlib.pyplot as plt
