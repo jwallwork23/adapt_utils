@@ -320,7 +320,7 @@ def check_spd(M):
 
     # Check symmetric
     try:
-        assert assemble((M - transpose(M))*dx) < 1e-8
+        assert assemble(det(M - transpose(M))*dx) < 1e-8
     except AssertionError:
         raise ValueError("FAIL: Matrix is not symmetric")
     print_output("PASS: Matrix is indeed symmetric")
