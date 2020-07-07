@@ -12,6 +12,7 @@ from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
 __all__ = ["prod", "combine", "box", "ellipse", "bump", "circular_bump", "gaussian",
+           "rotation_matrix", "rotate",
            "copy_mesh", "get_finite_element", "get_component_space", "get_component", "cg2dg",
            "is_spd", "check_spd", "get_boundary_nodes", "index_string",
            "find", "suppress_output", "knownargs2dict", "unknownargs2dict"]

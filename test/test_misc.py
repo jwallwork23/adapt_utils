@@ -70,3 +70,8 @@ def test_check_spd(dim):
     P1_ten, _ = get_function_spaces(mesh, 'tensor')
     M = interpolate(Identity(dim), P1_ten)
     check_spd(M)
+
+def test_rotation():
+    v = np.array([1.0, 0.0])
+    Rv = np.dot(rotation_matrix(pi/2), v)
+    assert np.allclose(np.dot(v, Rv), 0.0)
