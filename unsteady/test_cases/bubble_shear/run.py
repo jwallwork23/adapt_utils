@@ -3,7 +3,6 @@ from thetis import *
 import argparse
 
 from adapt_utils.adapt.r import MeshMover
-from adapt_utils.adapt.recovery import construct_gradient
 from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 

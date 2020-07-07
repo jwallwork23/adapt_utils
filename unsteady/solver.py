@@ -807,7 +807,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
-        coords = self.meshes[i].coordinates
         while self.simulation_time <= end_time - t_epsilon:
             if iteration % op.dt_per_mesh_movement == 0:
                 # Get mesh velocity

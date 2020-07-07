@@ -124,12 +124,12 @@ class TohokuOptions(TsunamiOptions):
             nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'gebco.nc'), 'r')
             lon = nc.variables['lon'][:]
             lat = nc.variables['lat'][:-1]
-            elev = nc.variables['elevation'][:-1,:]
+            elev = nc.variables['elevation'][:-1, :]
         elif source == 'etopo1':
             nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'etopo1.nc'), 'r')
             lon = nc.variables['lon'][:]
             lat = nc.variables['lat'][:]
-            elev = nc.variables['Band1'][:,:]
+            elev = nc.variables['Band1'][:, :]
         else:
             raise ValueError("Bathymetry data source {:s} not recognised.".format(source))
         nc.close()
