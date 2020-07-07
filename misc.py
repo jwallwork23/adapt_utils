@@ -13,7 +13,7 @@ from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 __all__ = ["prod", "combine", "box", "ellipse", "bump", "circular_bump", "gaussian",
            "copy_mesh", "get_finite_element", "get_component_space", "get_component", "cg2dg",
-           "check_spd", "get_boundary_nodes", "index_string",
+           "is_spd", "check_spd", "get_boundary_nodes", "index_string",
            "find", "suppress_output", "knownargs2dict", "unknownargs2dict"]
 
 
@@ -308,30 +308,41 @@ def _cg2dg_tensor(f_cg, f_dg):
     par_loop((index, kernel), dx, {'cg': (f_cg, READ), 'dg': (f_dg, WRITE)}, is_loopy_kernel=True)
 
 
-def check_spd(M):
-    """
-    Verify that a tensor field `M` is symmetric positive-definite (SPD) and hence a Riemannian
-    metric.
-    """
-    print_output("TEST: Checking matrix is SPD...")
+def is_symmetric(M, tol=1.0e-08):
+    """Determine whether or not a tensor field `M` is symmetric"""
+    return assemble(abs(det(M - transpose(M)))*dx) < tol
+
+
+def is_pos_def(M):
+    """Determine whether or not a tensor field `M` is positive-definite"""
     fs = M.function_space()
     fs_vec = VectorFunctionSpace(fs.mesh(), get_finite_element(fs))
-    dim = fs.mesh().topological_dimension()
+    V = Function(fs, name="Eigenvectors")
+    Λ = Function(fs_vec, name="Eigenvalues")
+    kernel = eigen_kernel(get_eigendecomposition, fs.mesh().topological_dimension())
+    op2.par_loop(kernel, fs.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
+    return Λ.vector().gather().min() > 0.0
+
+
+def is_spd(M):
+    """Determine whether or not a tensor field `M` is symmetric positive-definite"""
+    return is_symmetric(M) and is_pos_def(M)
+
+
+def check_spd(M):
+    """Verify that a tensor field `M` is symmetric positive-definite."""
+    print_output("TEST: Checking matrix is SPD...")
 
     # Check symmetric
     try:
-        assert assemble(det(M - transpose(M))*dx) < 1e-8
+        assert is_symmetric(M)
     except AssertionError:
         raise ValueError("FAIL: Matrix is not symmetric")
     print_output("PASS: Matrix is indeed symmetric")
 
     # Check positive definite
-    V = Function(fs, name="Eigenvectors")
-    Λ = Function(fs_vec, name="Eigenvalues")
-    kernel = eigen_kernel(get_eigendecomposition, dim)
-    op2.par_loop(kernel, fs.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
     try:
-        assert Λ.vector().gather().min() > 0.0
+        assert is_pos_def(M)
     except AssertionError:
         raise ValueError("FAIL: Matrix is not positive-definite")
     print_output("PASS: Matrix is indeed positive-definite")
