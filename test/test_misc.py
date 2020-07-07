@@ -53,3 +53,9 @@ def test_cg2dg(dim, shape):
     dg = Function(P1DG)
     cg2dg(cg, dg)
     assert np.allclose(cg.dat.data, project(dg, P1).dat.data)
+
+def test_check_spd(dim):
+    mesh = get_mesh(dim)
+    P1_ten, _ = get_function_spaces(mesh, 'tensor')
+    M = interpolate(Identity(dim), P1_ten)
+    check_spd(M)
