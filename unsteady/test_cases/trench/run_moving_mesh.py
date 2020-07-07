@@ -27,7 +27,7 @@ op = TrenchOptions(approach='monge_ampere',
                    r_adapt_rtol=1.0e-3)
 
 swp = AdaptiveProblem(op)
-swp.setup_solver()
+swp.shallow_water_options[0]['mesh_velocity'] = None
 
 
 def gradient_interface_monitor(mesh, alpha=400.0, gamma=0.0):
@@ -72,9 +72,9 @@ def gradient_interface_monitor(mesh, alpha=400.0, gamma=0.0):
 
     return H
 
+swp.set_monitor_functions(gradient_interface_monitor)
+swp.solve_forward()
 
-swp.monitor = gradient_interface_monitor
-swp.run_moving_mesh()
 
 t2 = time.time()
 
