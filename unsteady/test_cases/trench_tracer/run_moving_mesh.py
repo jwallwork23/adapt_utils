@@ -11,7 +11,7 @@ kwargs = {
     'approach': 'monge_ampere',
     'nx': 1,
     'ny': 1,
-    input_dir = 'hydrodynamics_trench'
+    'input_dir': 'hydrodynamics_trench',
     'plot_pvd': True,
     'debug': True,
 

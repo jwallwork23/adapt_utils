@@ -44,11 +44,18 @@ class TrenchTracerOptions(CoupledOptions):
         self.stabilisation = 'lax_friedrichs'
 
         # Initial
-        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
+        self.elev_init, self.uv_init = self.initialise_fields(mesh, input_dir, self.di)
+
+        #self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)
+        #self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
+
+        #self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+
+        #self.eta_d = Function(self.P1DG).project(self.elev_init)
 
         # Time integration
         self.dt = 0.25
-        self.end_time = 500 #self.num_hours*3600.0
+        self.end_time = self.num_hours*3600.0
         # self.dt_per_export = 6
         self.dt_per_export = 100
         self.timestepper = 'CrankNicolson'
@@ -103,17 +110,24 @@ class TrenchTracerOptions(CoupledOptions):
             'shallow_water': {
                 inflow_tag: {'flux': Constant(-0.22)},
                 outflow_tag: {'elev': Constant(0.397)},
-            }
+            },
+	   #'tracer': {
+       #inflow_tag: {'value': self.sediment_model.sediment_rate}
+       #}
         }
         return boundary_conditions
 
     def set_initial_condition(self, prob):
-        u, eta = prob.fwd_solutions[0].split()
+        fs = prob.fwd_solutions[0].function_space()      
+        self.initial_value = Function(fs, name="Initial condition")
+        u, eta = self.initial_value.split()
         u.project(self.uv_init)
         eta.project(self.elev_init)
+        return self.initial_value
 
     def get_update_forcings(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()
+        bathymetry_displacement = prob.equations[i].shallow_water.depth.wd_bathymetry_displacement
         depth = prob.depth[i]
 
         #def update_forcings(t):
@@ -147,7 +161,7 @@ class TrenchTracerOptions(CoupledOptions):
 
         return export_func
     
-    def initialise_fields(self, inputdir, outputdir):
+    def initialise_fields(self, mesh2d, inputdir, outputdir):
         """
         Initialise simulation with results from a previous simulation
         """
