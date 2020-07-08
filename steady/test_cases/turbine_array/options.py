@@ -65,11 +65,9 @@ class TurbineArrayOptions(TurbineOptions):
         right_tag = 2
         wall_tag = 3
         boundary_conditions = {
-            'shallow_water': {
-                left_tag: {'uv': Constant(as_vector(self.inflow_velocity))},
-                right_tag: {'elev': Constant(0.0)},
-                wall_tag: {'un': Constant(0.0)},
-            }
+            left_tag: {'uv': Constant(as_vector(self.inflow_velocity))},
+            right_tag: {'elev': Constant(0.0)},
+            wall_tag: {'un': Constant(0.0)},
         }
         return boundary_conditions
 
