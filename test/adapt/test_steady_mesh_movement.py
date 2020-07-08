@@ -64,6 +64,7 @@ def method(request):
 def test_mesh_movement(monitor_type, method, plot_mesh=False):
     monitor = monitors[monitor_type]
     fname = '_'.join([monitor_type, method])
+    fname = os.path.join(os.path.dirname(__file__), fname)
 
     op = Options(r_adapt_rtol=1.0e-03, nonlinear_method=method)
 
