@@ -78,8 +78,7 @@ class TrenchOptions(CoupledOptions):
 
         self.slope_eff = True
         self.angle_correction = True
-        self.set_up_suspended(self.default_mesh)  # TODO: Update
-        self.set_up_bedload(self.default_mesh)  # TODO: Update
+
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
