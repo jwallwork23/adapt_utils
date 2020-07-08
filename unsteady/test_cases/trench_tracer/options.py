@@ -19,7 +19,7 @@ __all__ = ["TrenchTracerOptions"]
 
 class TrenchTracerOptions(CoupledOptions):
 
-    def __init__(self, friction='nikuradse', plot_timeseries=False, nx=1, ny=1, **kwargs):
+    def __init__(self, friction='nikuradse', plot_timeseries=False, nx=1, ny=1, input_dir = input_dir, **kwargs):
         super(TrenchTracerOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
