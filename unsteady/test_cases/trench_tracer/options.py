@@ -14,13 +14,13 @@ matplotlib.rc('text', usetex=True)
 matplotlib.rc('font', family='serif')
 
 
-__all__ = ["TrenchHydroOptions"]
+__all__ = ["TrenchTracerOptions"]
 
 
-class TrenchHydroOptions(CoupledOptions):
+class TrenchTracerOptions(CoupledOptions):
 
     def __init__(self, friction='nikuradse', plot_timeseries=False, nx=1, ny=1, **kwargs):
-        super(TrenchHydroOptions, self).__init__(**kwargs)
+        super(TrenchTracerOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
@@ -42,10 +42,17 @@ class TrenchHydroOptions(CoupledOptions):
         self.ksp = None
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
+        
+        # Initial
+        self.elev_init, self.uv_init = self.initialise_fields(mesh, input_dir, self.di)
+
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+
+        self.eta_d = Function(self.P1DG).project(self.elev_init)        
 
         # Time integration
         self.dt = 0.25
-        self.end_time = 500 #self.num_hours*3600.0
+        self.end_time = self.num_hours*3600.0
         # self.dt_per_export = 6
         self.dt_per_export = 100
         self.timestepper = 'CrankNicolson'
@@ -100,14 +107,20 @@ class TrenchHydroOptions(CoupledOptions):
             'shallow_water': {
                 inflow_tag: {'flux': Constant(-0.22)},
                 outflow_tag: {'elev': Constant(0.397)},
-            }
+            },
+	   #'tracer': {
+       #inflow_tag: {'value': self.sediment_model.sediment_rate}
+       #}
         }
         return boundary_conditions
 
     def set_initial_condition(self, prob):
-        u, eta = prob.fwd_solutions[0].split()
-        u.interpolate(as_vector([0.51, 0.0]))
-        eta.assign(0.397)
+        fs = prob.fwd_solutions[0].function_space()      
+        self.initial_value = Function(fs, name="Initial condition")
+        u, eta = self.initial_value.split()
+        u.project(self.uv_init)
+        eta.project(self.elev_init)
+        return self.initial_value
 
     def get_update_forcings(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()
@@ -144,4 +157,38 @@ class TrenchHydroOptions(CoupledOptions):
             #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
+    
+    def initialise_fields(self, mesh2d, inputdir, outputdir):
+        """
+        Initialise simulation with results from a previous simulation
+        """
+        from firedrake.petsc import PETSc
+        try:
+            import firedrake.cython.dmplex as dmplex
+        except:
+            import firedrake.dmplex as dmplex  # Older version
+        # mesh
+        with timed_stage('mesh'):
+            # Load
+            newplex = PETSc.DMPlex().create()
+            newplex.createFromFile(inputdir + '/myplex.h5')
+            mesh = Mesh(newplex)
+
+        DG_2d = FunctionSpace(mesh, "DG", 1)
+        # elevation
+        with timed_stage('initialising elevation'):
+            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
+            elev_init = Function(DG_2d, name="elevation")
+            chk.load(elev_init)
+            File(outputdir + "/elevation_imported.pvd").write(elev_init)
+            chk.close()
+        # velocity
+        with timed_stage('initialising velocity'):
+            chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_READ)
+            V = VectorFunctionSpace(mesh, "DG", 1)
+            uv_init = Function(V, name="velocity")
+            chk.load(uv_init)
+            File(outputdir + "/velocity_imported.pvd").write(uv_init)
+            chk.close()
+        return elev_init, uv_init,
 

@@ -2,9 +2,10 @@ from thetis import *
 
 import numpy as np
 
-from adapt_utils.unsteady.test_cases.trench_hydro.options import TrenchHydroOptions
+from adapt_utils.unsteady.test_cases.trench_tracer.options import TrenchTracerOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
-
+from adapt_utils.adapt import recovery
+from adapt_utils.norms import local_frobenius_norm
 
 kwargs = {
     'approach': 'monge_ampere',
@@ -27,31 +28,37 @@ swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-alpha = 1.0  # size of the dense region surrounding the coast
-beta = 10.0  # level of refinement at coast
 
+def gradient_interface_monitor(mesh, alpha=100.0):
 
-def wet_dry_interface_monitor(mesh):
     """
-    Monitor function focused around the wet-dry interface.
+    Monitor function focused around the steep_gradient (budd acta numerica)
 
-    NOTES:
-      * The monitor function is defined on the *computational* mesh.
-      * For the first mesh movement iteration, the mesh coordinates coincide.
+    NOTE: Defined on the *computational* mesh.
+
     """
-    eta_old = swp.fwd_solutions[0].split()[1]
-    b_old = swp.bathymetry[0]
-    eta = Function(FunctionSpace(mesh, eta_old.ufl_element()))
-    b = Function(FunctionSpace(mesh, b_old.ufl_element()))
-    same_mesh = np.allclose(mesh.coordinates.dat.data, swp.meshes[0].coordinates.dat.data)
-    if same_mesh:
-        eta.dat.data[:] = eta_old.dat.data
-        b.dat.data[:] = b_old.dat.data
-    else:
-        eta.project(eta_old)
-        b.project(b_old)
-    return 1.0 + alpha*pow(cosh(beta*(eta + b)), -2)
+    P1 = FunctionSpace(mesh, "CG", 1)
+
+    # eta = swp.solution.split()[1]
+    b = swp.bathymetry[0]
+    bath_hess = recovery.construct_hessian(b, op = swp.op)
+    frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
+
+    norm_two_proj = project(frob_bath_hess, P1)
+
+    H = Function(P1)
+    tau = TestFunction(P1)
+    n = FacetNormal(mesh)
+
+    mon_init = project(sqrt(1.0 + alpha * norm_two_proj), P1)
+
+    K = 10*(0.4**2)/4
+    a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
+    a -= inner(tau, mon_init)*dx
+    solve(a == 0, H)
+
+    return H
 
 
-swp.set_monitor_functions(wet_dry_interface_monitor)
+swp.set_monitor_functions(gradient_interface_monitor)
 swp.solve_forward()
