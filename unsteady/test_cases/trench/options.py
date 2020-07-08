@@ -26,7 +26,7 @@ class TrenchOptions(CoupledOptions):
     EarthArXiv, 9 Jan. 2020. Web.
     """
 
-    def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, **kwargs):
+    def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
         super(TrenchOptions, self).__init__(**kwargs)
         self.slope_eff = False
         self.angle_correction = False
@@ -42,8 +42,21 @@ class TrenchOptions(CoupledOptions):
         self.solve_swe = True
         self.solve_tracer = True
         self.plot_timeseries = plot_timeseries
-        self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
+        #self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
+
+        if mesh is None:
+            self.t_old = Constant(0.0)
+            self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
+            self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)
+            self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
+            self.P1_vec = VectorFunctionSpace(self.default_mesh, "CG", 1)
+            self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
+        else:
+            self.P1DG = FunctionSpace(mesh, "DG", 1)
+            self.P1 = FunctionSpace(mesh, "CG", 1)
+            self.P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+            self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)   
 
         # Physics
         self.base_viscosity = 1e-6
@@ -78,8 +91,6 @@ class TrenchOptions(CoupledOptions):
 
         self.slope_eff = True
         self.angle_correction = True
-        self.set_up_suspended(self.default_mesh)  # TODO: Update
-        self.set_up_bedload(self.default_mesh)  # TODO: Update
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
@@ -123,8 +134,7 @@ class TrenchOptions(CoupledOptions):
     def set_up_morph_model(self, input_dir, mesh = None):
 
         # Outputs
-        if self.export_intermediate:
-            self.bath_file = File(os.path.join(self.di, 'bath_export.pvd'))     
+        self.bath_file = File(os.path.join(self.di, 'bath_export.pvd'))     
 
         # Physical
         self.base_viscosity = 1e-6        
@@ -171,26 +181,30 @@ class TrenchOptions(CoupledOptions):
         self.bathymetry.interpolate(-trench)
         return self.bathymetry
 
-    def set_boundary_conditions(self, fs):
+    def set_boundary_conditions(self, prob, i):
         inflow_tag = 1
         outflow_tag = 2
-        boundary_conditions = {}
-        boundary_conditions[inflow_tag] = {'flux': Constant(-0.22)}
-        boundary_conditions[outflow_tag] = {'elev': Constant(0.397)}
+        bottom_wall_tag = 3
+        top_wall_tag = 4
+        boundary_conditions = {
+            'shallow_water': {
+                inflow_tag: {'flux': Constant(-0.22)},
+                outflow_tag: {'elev': Constant(0.397)},
+            },
+	   'tracer': {
+                inflow_tag: {'value': prob.sed_model.sediment_rate}
+            }
+        }
         return boundary_conditions
 
-    def set_boundary_conditions_tracer(self, sed_model):
-        boundary_conditions = {}
-        inflow_tag = 1
-        boundary_conditions[inflow_tag] = {'value': sed_model.sediment_rate}        
-        return boundary_conditions
 
-    def set_initial_condition(self, fs):
+    def set_initial_condition(self, prob):
         """
         Set initial elevation and velocity using asymptotic solution.
 
         :arg fs: `FunctionSpace` in which the initial condition should live.
         """
+        fs = prob.fwd_solutions[0].function_space()      
         self.initial_value = Function(fs, name="Initial condition")
         u, eta = self.initial_value.split()
         u.project(self.uv_init)
@@ -205,20 +219,20 @@ class TrenchOptions(CoupledOptions):
     def initialise_fields(self, mesh2d, inputdir, outputdir):
         """
         Initialise simulation with results from a previous simulation
-        """     
+        """
         from firedrake.petsc import PETSc
         try:
             import firedrake.cython.dmplex as dmplex
         except:
-            import firedrake.dmplex as dmplex  # Older version        
+            import firedrake.dmplex as dmplex  # Older version
         # mesh
         with timed_stage('mesh'):
             # Load
             newplex = PETSc.DMPlex().create()
             newplex.createFromFile(inputdir + '/myplex.h5')
             mesh = Mesh(newplex)
-    
-        DG_2d = get_functionspace(mesh2d, "DG", 1)
+
+        DG_2d = FunctionSpace(mesh, "DG", 1)
         # elevation
         with timed_stage('initialising elevation'):
             chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
@@ -229,7 +243,7 @@ class TrenchOptions(CoupledOptions):
         # velocity
         with timed_stage('initialising velocity'):
             chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_READ)
-            V = VectorFunctionSpace(mesh2d, "DG", 1)
+            V = VectorFunctionSpace(mesh, "DG", 1)
             uv_init = Function(V, name="velocity")
             chk.load(uv_init)
             File(outputdir + "/velocity_imported.pvd").write(uv_init)
