@@ -383,7 +383,8 @@ class AdaptiveProblemBase(object):
                 tmp_i.project(sol_i)
 
             # Update physical mesh and current solution defined on it
-            self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
+            #self.meshes[i].coordinates.project(self.mesh_movers[i].x)
+            self.meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
             for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
                 sol_i.dat.data[:] = tmp_i.dat.data
             del tmp
