@@ -3,6 +3,8 @@ from thetis.configuration import *
 
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.utils import heaviside_approx
+from thetis.options import ModelOptions2d
+from thetis.sediments_adjoint import SedimentModel
 
 import os
 import numpy as np
@@ -32,6 +34,8 @@ class TrenchTracerOptions(CoupledOptions):
         self.base_viscosity = 1e-6
         self.base_diffusivity = 0.15
         self.wetting_and_drying = False
+        self.solve_tracer = True
+
         try:
             assert friction in ('nikuradse', 'manning', 'nik_solver')
         except AssertionError:
@@ -45,6 +49,8 @@ class TrenchTracerOptions(CoupledOptions):
 
         # Initial
         self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
+
+        self.set_up_morph_model(input_dir, self.default_mesh)        
 
         # Time integration
         self.dt = 0.25
@@ -66,7 +72,40 @@ class TrenchTracerOptions(CoupledOptions):
         self.xrange = np.linspace(tol, 16-tol, 20)
 
         self.uv_file = File(os.path.join(self.di, 'uv.pvd'))
+        self.tracer_file = File(os.path.join(self.di, 'tracer2d.pvd'))
 
+    def set_up_morph_model(self, input_dir, mesh = None):
+
+        # Physical
+        self.base_viscosity = 1e-6        
+        self.base_diffusivity = 0.18161630470135287
+
+        self.porosity = Constant(0.4)
+        self.ks = Constant(0.025)
+        self.average_size = 160*(10**(-6))  # Average sediment size        
+
+        self.wetting_and_drying = False
+        self.conservative = False
+        self.implicit_source = False
+        self.slope_eff = True
+        self.angle_correction = True
+        self.solve_tracer = False
+        self.suspended = True
+        self.convectivevel_flag = True
+        self.bedload = True
+
+        if not hasattr(self, 'bathymetry') or self.bathymetry is None:
+            self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
+            self.bathymetry = self.set_bathymetry(self.P1)
+
+        if self.suspended:
+            self.tracer_init = None
+            
+        self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
+                            bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
+                            mesh2d=mesh, bathymetry_2d=self.bathymetry,
+                            uv_init = self.uv_init, elev_init = self.elev_init, ks=self.ks, average_size=self.average_size, 
+                            cons_tracer = self.conservative, wetting_and_drying = self.wetting_and_drying)
 
     def set_quadratic_drag_coefficient(self, fs):
         self.depth = Function(fs).interpolate(self.set_bathymetry(fs) + Constant(0.397))
@@ -103,6 +142,9 @@ class TrenchTracerOptions(CoupledOptions):
             'shallow_water': {
                 inflow_tag: {'flux': Constant(-0.22)},
                 outflow_tag: {'elev': Constant(0.397)},
+            },
+	   'tracer': {
+                inflow_tag: {'value': self.sediment_model.sediment_rate}
             }
         }
         return boundary_conditions
@@ -111,6 +153,9 @@ class TrenchTracerOptions(CoupledOptions):
         u, eta = prob.fwd_solutions[0].split()
         u.project(self.uv_init)
         eta.project(self.elev_init)
+
+    def set_initial_condition_tracer(self, prob):
+        prob.fwd_solutions_tracer[0].assign(self.sediment_model.equiltracer)
 
     def get_update_forcings(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()
@@ -139,6 +184,7 @@ class TrenchTracerOptions(CoupledOptions):
             #self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
             self.uv_file.write(u)
+            self.tracer_file.write(prob.tracer_2d)
             #if self.plot_timeseries:
 
                 # Store modified bathymetry timeseries
