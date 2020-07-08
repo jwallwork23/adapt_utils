@@ -61,7 +61,10 @@ class TracerProblem(AdaptiveProblem):
 
 # Run model
 tp = TracerProblem(op)
+init_coords = tp.meshes[0].coordinates.dat.data.copy()
 tp.solve_forward()
+final_coords = tp.meshes[0].coordinates.dat.data
+assert np.allclose(init_coords, final_coords, atol=1.0e-02), "Non-matching initial and final mesh coords"
 
 # Print outputs
 f = open(os.path.join(tp.di, "{:s}_{:d}.log".format(geometry, n)), 'w+')

@@ -94,12 +94,12 @@ class LeVequeOptions(CoupledOptions):
         return boundary_conditions
 
     def get_velocity(self, coords, t):
-        return as_vector([0.5 - coords[1], coords[0] - 0.5])
+        return as_vector([-coords[1], coords[0]])
 
     def set_initial_condition(self, prob, i=0):
         q = prob.fwd_solutions[i]
         u, eta = q.split()
-        u.interpolate(self.get_velocity(prob.meshes[i].coordinates))
+        u.interpolate(self.get_velocity(prob.meshes[i].coordinates, 0.0))
 
     def set_initial_condition_tracer(self, prob):
         x, y = SpatialCoordinate(prob.meshes[0])

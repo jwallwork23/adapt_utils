@@ -3,12 +3,12 @@ from firedrake import *
 from adapt_utils.unsteady.options import CoupledOptions
 
 
-__all__ = ["ALEAdvectionOptions"]
+__all__ = ["CosinePrescribedVelocityOptions"]
 
 
-class ALEAdvectionOptions(CoupledOptions):
+class CosinePrescribedVelocityOptions(CoupledOptions):
     def __init__(self, n=40, *args, **kwargs):
-        super(ALEAdvectionOptions, self).__init__(*args, approach=approach, **kwargs)
+        super(CosinePrescribedVelocityOptions, self).__init__(*args, **kwargs)
         self.solve_swe = False
         self.solve_tracer = True
         if self.tracer_family == 'cg':
