@@ -3,7 +3,7 @@ from thetis.configuration import *
 
 from adapt_utils.unsteady.options import CoupledOptions
 from thetis.options import ModelOptions2d
-
+from thetis.sediments_adjoint import SedimentModel
 
 import os
 import time
@@ -39,8 +39,8 @@ class TrenchOptions(CoupledOptions):
         self.implicit_source = False
         self.fixed_tracer = None        
         
-        self.solve_swe = True
-        self.solve_tracer = True
+        #self.solve_swe = True
+        self.solve_tracer = False
         self.plot_timeseries = plot_timeseries
         #self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
@@ -70,6 +70,7 @@ class TrenchOptions(CoupledOptions):
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
         self.average_size = 160e-6  # Average sediment size
+        self.ksp = 3*self.average_size
         self.morfac = 100
 
         # Model
@@ -93,16 +94,15 @@ class TrenchOptions(CoupledOptions):
         self.angle_correction = True
 
         # Stabilisation
-        self.stabilisation = 'lax_friedrichs'
+        self.stabilisation = None #'lax_friedrichs'
 
         self.num_hours = 15
 
         self.t_old = Constant(0.0)
-        # Stabilisation
-        self.stabilisation = 'lax_friedrichs'
-        
+
         self.morfac = Constant(100)
         self.norm_smoother_constant = Constant(0.1)
+
 
         if mesh is None:
             self.set_up_morph_model(self.input_dir, self.default_mesh)
@@ -149,7 +149,7 @@ class TrenchOptions(CoupledOptions):
         self.implicit_source = False
         self.slope_eff = True
         self.angle_correction = True
-        self.solve_tracer = True
+        self.solve_tracer = False
         self.suspended = True
         self.convectivevel_flag = True
         self.bedload = True
@@ -157,9 +157,9 @@ class TrenchOptions(CoupledOptions):
         # Initial
         self.elev_init, self.uv_init = self.initialise_fields(mesh, input_dir, self.di)
 
-        #self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
 
-        #self.eta_d = Function(self.P1DG).project(self.elev_init)
+        self.eta_d = Function(self.P1DG).project(self.elev_init)
 
         if not hasattr(self, 'bathymetry') or self.bathymetry is None:
             self.bathymetry = self.set_bathymetry(self.P1)
@@ -168,10 +168,10 @@ class TrenchOptions(CoupledOptions):
         if self.suspended:
             self.tracer_init = None
             
-        self.sediment_model = SedimentModel(ModelOptions2D, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
+        self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
                             bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
                             mesh2d=mesh, bathymetry_2d=self.bathymetry,
-                            uv_init = self.uv_init, elev_init = self.elev_init, ks=self.ks, average_size=self.average_size, 
+                            uv_init = self.uv_d, elev_init = self.eta_d, ks=self.ks, average_size=self.average_size, 
                             cons_tracer = self.conservative, wetting_and_drying = self.wetting_and_drying, wetting_alpha = self.wetting_and_drying_alpha)            
 
     def set_bathymetry(self, fs, **kwargs):
@@ -198,7 +198,7 @@ class TrenchOptions(CoupledOptions):
                 outflow_tag: {'elev': Constant(0.397)},
             },
 	   'tracer': {
-                inflow_tag: {'value': self.sed_model.sediment_rate}
+                inflow_tag: {'value': self.sediment_model.sediment_rate}
             }
         }
         return boundary_conditions
@@ -218,7 +218,7 @@ class TrenchOptions(CoupledOptions):
         return self.initial_value
     
 
-    def get_update_forcings(self, solver_obj):
+    def get_update_forcings(self, prob, i):
         return None
 
 
@@ -257,8 +257,8 @@ class TrenchOptions(CoupledOptions):
         return elev_init, uv_init,
 
 
-    def get_export_func(self, solver_obj):
-        self.bath_export = solver_obj.fields.bathymetry_2d
+    def get_export_func(self, prob, i):
+        self.bath_export = prob.bathymetry[0]
 
         def export_func():
             self.bath_file.write(self.bath_export)

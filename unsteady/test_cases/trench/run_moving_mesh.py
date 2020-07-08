@@ -42,7 +42,6 @@ def gradient_interface_monitor(mesh, alpha=400.0, gamma=0.0):
 
     # eta = swp.solution.split()[1]
     b = swp.bathymetry[0]
-    import ipdb; ipdb.set_trace()
     bath_hess = recovery.construct_hessian(b, op = swp.op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 
