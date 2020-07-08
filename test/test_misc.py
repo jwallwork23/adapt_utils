@@ -71,6 +71,7 @@ def test_check_spd(dim):
     M = interpolate(Identity(dim), P1_ten)
     check_spd(M)
 
+
 def test_rotation():
     v = np.array([1.0, 0.0])
     Rv = np.dot(rotation_matrix(pi/2), v)

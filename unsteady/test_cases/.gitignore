@@ -7,10 +7,10 @@ bubble_shear/outputs/
 bubble_shear/screenshots/
 bubble_shear/videos/
 bubble_shear/__pycache__/
-lagrangian_vs_eulerian/outputs/
-lagrangian_vs_eulerian/screenshots/
-lagrangian_vs_eulerian/videos/
-lagrangian_vs_eulerian/__pycache__/
+cosine_prescribed_velocity/outputs/
+cosine_prescribed_velocity/screenshots/
+cosine_prescribed_velocity/videos/
+cosine_prescribed_velocity/__pycache__/
 rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/videos/

@@ -1,4 +1,4 @@
-"""
+r"""
 Test mesh movement in the steady state case for analytically defined monitor functions.
 
 The monitor functions are modified from those found in
