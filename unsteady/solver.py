@@ -175,6 +175,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'horizontal_viscosity': self.op.set_viscosity(P1),
                 'horizontal_diffusivity': self.op.set_diffusivity(P1),
                 'coriolis_frequency': self.op.set_coriolis(P1),
+                'nikuradse_bed_roughness': self.op.ksp,
                 'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
                 'tracer_source_2d': self.op.set_tracer_source(P1)
@@ -401,6 +402,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'linear_drag_coefficient': None,
             'quadratic_drag_coefficient': self.fields[i].quadratic_drag_coefficient,
             'manning_drag_coefficient': self.fields[i].manning_drag_coefficient,
+            'nikuradse_bed_roughness': self.fields[i].nikuradse_bed_roughness,
             'viscosity_h': self.fields[i].horizontal_viscosity,
             'coriolis': self.fields[i].coriolis_frequency,
             'wind_stress': None,
@@ -589,7 +591,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         except AssertionError:
             msg = "Mismatching start time: {:.2f} vs {:.2f}"
             raise ValueError(msg.format(self.simulation_time, start_time))
-        update_forcings(self.simulation_time)
+        if update_forcings is not None:
+            update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
