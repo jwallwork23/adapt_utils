@@ -1,7 +1,7 @@
 """
-Runs the unsteady test case scripts found in `unsteady/test_cases/`. In some cases these examples include
+Runs the steady test case scripts found in `steady/test_cases/`. In some cases these examples include
 assertions which verify desired behaviour, but in most cases it is just verified that the solve does not
-crash and reaches the end of the required time period.
+crash.
 
 The code used in this script was largely copied from `thetis/test/examples.py`.
 """
@@ -14,22 +14,18 @@ import shutil
 
 
 examples = [
-    'cosine_prescribed_velocity/run.py',
-    'solid_body_rotation/run_fixed_mesh.py',
-    'solid_body_rotation/run_lagrangian.py',
-    'solid_body_rotation/run_adjoint.py',
-    # 'bubble_shear/run.py',  # TODO: Currently requires an 'interpretation' input parameter
-    'rossby_wave/run_fixed_mesh.py',
-    # 'rossby_wave/run_moving_mesh.py',  # TODO: Currently takes too long to run
-    'balzano/run_fixed_mesh.py',
-    'balzano/run_moving_mesh.py',
-    # 'trench/run_fixed_mesh.py',  # TODO
-    # 'trench/run_moving_mesh.py',  # TODO
-    # 'turbine_array/run.py',  # TODO
+    # TODO: 'box_discharge2d/run.py',
+    # TODO: 'point_discharge2d/run.py',
+    # TODO: 'point_discharge2d/run_uniform_convergence.py',
+    # TODO: 'point_discharge3d/run.py',
+    # TODO: 'space_time_ripple/run_fixed_mesh.py',
+    'turbine_array/run.py',
+    # TODO: 'turbine_array/run_uniform_convergence.py',
+    # TODO: 'turbine_array/run_adaptive_convergence.py',
 ]
 
 cwd = os.path.abspath(os.path.dirname(__file__))
-unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'unsteady', 'test_cases'))
+unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'steady', 'test_cases'))
 
 examples = [os.path.join(unsteady_dir, f) for f in examples]
 

@@ -11,13 +11,13 @@ from adapt_utils.steady.swe.turbine.solver import *
 from adapt_utils.plotting import *
 
 
-plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
-plt.rc('text', usetex=True)
+# plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
+# plt.rc('text', usetex=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-approach', help="Mesh adaptation approach (default fixed_mesh)")
 parser.add_argument('-target', help="Target complexity for adaptive approaches (default 3200)")
-parser.add_argument('-level', help="Number of uniform refinements to apply to the initial mesh (default 4)")
+parser.add_argument('-level', help="Number of uniform refinements to apply to the initial mesh (default 0)")
 parser.add_argument('-adapt_field', help="Field(s) for adaptation (default all_int)")
 parser.add_argument('-offset', help="""
     Number of turbine diameters by which to offset turbines in y-direction.
@@ -47,7 +47,7 @@ kwargs = {
     'num_adapt': 35,
 
 }
-level = int(args.level or 4)
+level = int(args.level or 0)
 op = TurbineArrayOptions(**kwargs)
 op.set_all_rtols(op.element_rtol)
 if op.approach != 'fixed_mesh':
@@ -88,7 +88,7 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
     spd = interpolate(sqrt(dot(u, u)), tp.P1)
     fig = plt.figure(figsize=(12, 5))
     ax = fig.add_subplot(111)
-    plot(spd, axes=ax, colorbar={'orientation': 'horizontal'}, vmin=3.5, vmax=5.2, shading='gouraud')
+    fig.colorbar(tricontourf(spd, axes=ax, cmap='coolwarm', vmin=3.5, vmax=5.2), ax=ax)
     ax.set_xlim([0.0, op.domain_length])
     ax.set_ylim([0.0, op.domain_width])
     plt.savefig('screenshots/fluid_speed_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()), bbox_inches='tight')

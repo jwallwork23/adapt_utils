@@ -24,7 +24,7 @@ lu_params = {
     'pc_factor_mat_solver_type': 'mumps',
 }
 # TODO: 'Physics based' fieldsplit approach
-default_params = {'shallow_water': lu_params}
+default_params = lu_params
 keys = {key for key in default_params if 'snes' not in key}
 default_adjoint_params = {}
 default_adjoint_params.update(default_params)

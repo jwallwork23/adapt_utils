@@ -73,12 +73,10 @@ class TelemacOptions(TracerOptions):
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)
         boundary_conditions = {
-            'tracer': {
-                1: {'value': zero},
-                2: {},
-                3: {'diff_flux': zero},
-                4: {'diff_flux': zero},
-            }
+            1: {'value': zero},
+            2: {},
+            3: {'diff_flux': zero},
+            4: {'diff_flux': zero},
         }
         return boundary_conditions
 
