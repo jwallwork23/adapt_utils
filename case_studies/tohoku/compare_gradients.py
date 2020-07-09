@@ -6,6 +6,7 @@ from firedrake.adjoint.blocks import GenericSolveBlock
 
 import argparse
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -93,6 +94,8 @@ tape = get_working_tape()
 solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
 g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)
 print("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
-print("Relative error: {:.4f}%".format(100*abs((g_discrete - g_by_hand_discrete)/g_discrete)))
+relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
+print("Relative error: {:.4f}%".format(100*relative_error))
+assert np.allclose(relative_error, 0.0)
 
 # TODO: Continuous adjoint (in nonlinear case with Manning friction)
