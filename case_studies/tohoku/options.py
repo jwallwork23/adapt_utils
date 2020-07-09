@@ -8,6 +8,8 @@ import matplotlib.pyplot as plt
 
 from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
+from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
+from adapt_utils.misc import ellipse
 
 
 __all__ = ["TohokuOptions"]
@@ -47,7 +49,8 @@ class TohokuOptions(TsunamiOptions):
         # Mesh
         self.print_debug("Loading mesh...")
         self.resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
-        self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(level))
+        self.level = level
+        self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(self.level))
         if mesh is None:
             if postproc:
                 newplex = PETSc.DMPlex().create()
@@ -59,11 +62,13 @@ class TohokuOptions(TsunamiOptions):
             self.default_mesh = mesh
         self.print_debug("Done!")
 
+        # Fields
+        self.friction = 'manning'
+        self.friction_coeff = 0.025
+
         # Timestepping: export once per minute for 24 minutes
         self.timestepper = 'CrankNicolson'
-        # self.timestepper = 'SSPRK33'
         self.dt = 5.0
-        # self.dt = 0.01
         self.dt_per_export = int(60.0/self.dt)
         self.start_time = 15*60.0
         self.end_time = 24*60.0
@@ -148,6 +153,58 @@ class TohokuOptions(TsunamiOptions):
         nc.close()
         self.print_debug("Done!")
         return lon, lat, elev
+
+    def get_update_forcings(self, prob, i):
+        """Should be implemented in derived class."""
+        self.J = 0
+        weight = Constant(1.0)
+        eta_obs = Constant(0.0)
+        eta = prob.fwd_solutions[i].split()[1]
+        mesh = eta.function_space().mesh()
+        self.times = []
+        radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
+        for gauge in self.gauges:
+            self.gauges[gauge]["data"] = []
+            self.gauges[gauge]["timeseries"] = []
+            self.gauges[gauge]["timeseries_smooth"] = []
+            self.gauges[gauge]["diff"] = []
+            self.gauges[gauge]["diff_smooth"] = []
+            self.gauges[gauge]["init"] = eta.at(self.gauges[gauge]["coords"])
+            sample = 1 if gauge[0] == '8' else 60
+            self.gauges[gauge]["interpolator"] = sample_timeseries(gauge, sample=sample)
+            loc = self.gauges[gauge]["coords"]
+            self.gauges[gauge]["indicator"] = interpolate(ellipse([loc + (radius,), ], mesh), prob.P0[i])
+            self.gauges[gauge]["area"] = assemble(self.gauges[gauge]["indicator"]*dx, annotate=False)
+
+        def update_forcings(t):
+            weight.assign(0.5 if t < 0.5*self.dt or t >= self.end_time - 0.5*self.dt else 1.0)
+            self.times.append(t)
+            dtc = Constant(self.dt)
+            for gauge in self.gauges:
+
+                # Point evaluation at gauges
+                eta_discrete = eta.at(self.gauges[gauge]["coords"]) - self.gauges[gauge]["init"]
+                self.gauges[gauge]["timeseries"].append(eta_discrete)
+
+                # Interpolate observations
+                obs = float(self.gauges[gauge]["interpolator"](t))
+                eta_obs.assign(obs)
+                self.gauges[gauge]["data"].append(obs)
+
+                # Discrete form of error
+                diff = 0.5*(eta_discrete - eta_obs.dat.data[0])**2
+                self.gauges[gauge]["diff"].append(diff)
+
+                # Continuous form of error
+                I = self.gauges[gauge]["indicator"]
+                A = self.gauges[gauge]["area"]
+                diff = 0.5*I*(eta - eta_obs)**2
+                self.J += assemble(weight*dtc*diff*dx)
+                self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False)/A)
+                self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False)/A)
+            return
+
+        return update_forcings
 
     def set_boundary_conditions(self, prob, i):
         ocean_tag = 100

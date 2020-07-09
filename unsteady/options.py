@@ -29,8 +29,7 @@ class CoupledOptions(Options):
     grad_depth_viscosity = Bool(False).tag(config=True)
     wetting_and_drying = Bool(False).tag(config=True)
     wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(4.3)).tag(config=True)
-    lax_friedrichs_velocity_scaling_factor = FiredrakeConstantTraitlet(
-        Constant(1.0), help="Scaling factor for Lax Friedrichs stabilisation term in horizontal momentum advection.").tag(config=True)
+    lax_friedrichs_velocity_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
     sipg_parameter = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
 
     # Tracer transport model
