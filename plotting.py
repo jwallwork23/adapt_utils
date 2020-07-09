@@ -4,22 +4,15 @@ from matplotlib.transforms import Bbox, TransformedBbox, blended_transform_facto
 from mpl_toolkits.axes_grid1.inset_locator import BboxPatch, BboxConnector, BboxConnectorPatch
 
 
-__all__ = ["meshplot", "zoom_effect01", "zoom_effect02"]
-
-
-def meshplot(mesh, **kwargs):
-    P1 = firedrake.FunctionSpace(mesh, "CG", 1)
-    cmap = matplotlib.cm.binary
-    kwargs.update({'linewidth': 0.001, 'edgecolors': 'dimgray', 'cmap': cmap})
-    firedrake.plot(firedrake.Function(P1), colorbar=False, **kwargs)
-
-
-# NOTE: All functions below copied from https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html
+__all__ = ["zoom_effect01", "zoom_effect02"]
 
 
 def connect_bbox(bbox1, bbox2,
                  loc1a, loc2a, loc1b, loc2b,
                  prop_lines, prop_patches=None):
+    """
+    Copied from https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html
+    """
     if prop_patches is None:
         prop_patches = {
             **prop_lines,
@@ -48,6 +41,8 @@ def zoom_effect01(ax1, ax2, xmin, xmax, **kwargs):
     Connect *ax1* and *ax2*. The *xmin*-to-*xmax* range in both axes will
     be marked.
 
+    Copied from https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html
+
     Parameters
     ----------
     ax1
@@ -59,7 +54,6 @@ def zoom_effect01(ax1, ax2, xmin, xmax, **kwargs):
     **kwargs
         Arguments passed to the patch constructor.
     """
-
     trans1 = blended_transform_factory(ax1.transData, ax1.transAxes)
     trans2 = blended_transform_factory(ax2.transData, ax2.transAxes)
 
@@ -91,8 +85,9 @@ def zoom_effect02(ax1, ax2, **kwargs):
 
     Similar to zoom_effect01.  The xmin & xmax will be taken from the
     ax1.viewLim.
-    """
 
+    Copied from https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html
+    """
     tt = ax1.transScale + (ax1.transLimits + ax2.transAxes)
     trans = blended_transform_factory(ax2.transData, tt)
 
