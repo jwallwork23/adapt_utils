@@ -1,6 +1,7 @@
 # Directories
 __pycache__/
 test/adapt/old/
+unsteady/swe/tsunami/utils/
 
 # Specific files
 FIXME

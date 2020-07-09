@@ -9,10 +9,10 @@ import matplotlib.pyplot as plt
 from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
 from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
-from adapt_utils.misc import ellipse
+from adapt_utils.misc import gaussian, ellipse
 
 
-__all__ = ["TohokuOptions"]
+__all__ = ["TohokuOptions", "TohokuGaussianBasisOptions"]
 
 
 class TohokuOptions(TsunamiOptions):
@@ -36,9 +36,10 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, mesh=None, postproc=True, level=0, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
+    def __init__(self, mesh=None, level=0, postproc=True, save_timeseries=False, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
+        self.save_timeseries = save_timeseries
 
         # Stabilisation
         self.use_automatic_sipg_parameter = False
@@ -164,12 +165,13 @@ class TohokuOptions(TsunamiOptions):
         self.times = []
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
         for gauge in self.gauges:
-            self.gauges[gauge]["data"] = []
-            self.gauges[gauge]["timeseries"] = []
-            self.gauges[gauge]["timeseries_smooth"] = []
-            self.gauges[gauge]["diff"] = []
-            self.gauges[gauge]["diff_smooth"] = []
-            self.gauges[gauge]["init"] = eta.at(self.gauges[gauge]["coords"])
+            if self.save_timeseries:
+                self.gauges[gauge]["data"] = []
+                self.gauges[gauge]["timeseries"] = []
+                self.gauges[gauge]["timeseries_smooth"] = []
+                self.gauges[gauge]["diff"] = []
+                self.gauges[gauge]["diff_smooth"] = []
+                self.gauges[gauge]["init"] = eta.at(self.gauges[gauge]["coords"])
             sample = 1 if gauge[0] == '8' else 60
             self.gauges[gauge]["interpolator"] = sample_timeseries(gauge, sample=sample)
             loc = self.gauges[gauge]["coords"]
@@ -182,18 +184,20 @@ class TohokuOptions(TsunamiOptions):
             dtc = Constant(self.dt)
             for gauge in self.gauges:
 
-                # Point evaluation at gauges
-                eta_discrete = eta.at(self.gauges[gauge]["coords"]) - self.gauges[gauge]["init"]
-                self.gauges[gauge]["timeseries"].append(eta_discrete)
-
                 # Interpolate observations
                 obs = float(self.gauges[gauge]["interpolator"](t))
                 eta_obs.assign(obs)
-                self.gauges[gauge]["data"].append(obs)
 
-                # Discrete form of error
-                diff = 0.5*(eta_discrete - eta_obs.dat.data[0])**2
-                self.gauges[gauge]["diff"].append(diff)
+                if self.save_timeseries:
+                    self.gauges[gauge]["data"].append(obs)
+
+                    # Point evaluation at gauges
+                    eta_discrete = eta.at(self.gauges[gauge]["coords"]) - self.gauges[gauge]["init"]
+                    self.gauges[gauge]["timeseries"].append(eta_discrete)
+
+                    # Discrete form of error
+                    diff = 0.5*(eta_discrete - eta_obs.dat.data[0])**2
+                    self.gauges[gauge]["diff"].append(diff)
 
                 # Continuous form of error
                 I = self.gauges[gauge]["indicator"]
@@ -258,31 +262,26 @@ class TohokuOptions(TsunamiOptions):
             circle = plt.Circle((x, y), 0.1, color=color)
             axes.add_patch(circle)
 
-    def get_gauge_data(self, gauge, sample=1):
-        """Read gauge data for `gauge` from file, averaging over every `sample` points."""
-        if gauge[0] == '8' and sample > 1:
-            assert sample % 5 == 0
-            sample //= 5
-        time_prev = 0.0
-        di = os.path.join(os.path.dirname(__file__), 'resources', 'gauges')
-        fname = os.path.join(di, '{:s}.dat'.format(gauge))
-        num_lines = sum(1 for line in open(fname, 'r'))
-        self.gauges[gauge]['data'] = []
-        self.gauges[gauge]['time'] = []
-        with open(fname, 'r') as f:
-            running = 0.0
-            for i in range(num_lines):
-                time, dat = f.readline().split()
-                time = float(time)
-                dat = float(dat)
-                running += dat  # TODO: How to deal with NaNs?
-                if sample == 1:
-                    self.gauges[gauge]['time'].append(time)
-                    self.gauges[gauge]['data'].append(dat)
-                elif i % sample == 0 and i > 0:
-                    if time < time_prev:
-                        break  # FIXME
-                    self.gauges[gauge]['time'].append(0.5*(time + time_prev))
-                    self.gauges[gauge]['data'].append(running/sample)
-                    running = 0.0
-                    time_prev = time
+
+class TohokuGaussianBasisOptions(TohokuOptions):
+    """
+    Initialise the free surface with initial condition consisting of a single Gaussian basis function
+    scaled by a control parameter.
+
+    This is useful for inversion experiments because the control parameter space is one dimensional,
+    meaning it can be easily plotted.
+    """
+    def __init__(self, control_parameter=10.0, **kwargs):
+        super(TohokuGaussianBasisOptions, self).__init__(**kwargs)
+        R = FunctionSpace(self.default_mesh, "R", 0)
+        self.control_parameter = Function(R, name="Control parameter")
+        self.control_parameter.assign(control_parameter)
+
+    def set_initial_condition(self, prob):
+        basis_function = Function(prob.V[0])
+        psi, self.phi = basis_function.split()
+        loc = (0.7e+06, 4.2e+06)
+        radii = (48e+03, 96e+03)
+        angle = pi/12
+        self.phi.interpolate(gaussian([loc + radii, ], prob.meshes[0], rotation=angle))
+        prob.fwd_solutions[0].project(self.control_parameter*basis_function)

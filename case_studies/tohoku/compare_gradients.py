@@ -1,5 +1,3 @@
-from __future__ import absolute_import
-
 from thetis import *
 from firedrake_adjoint import *
 from firedrake.adjoint.blocks import GenericSolveBlock
@@ -10,41 +8,19 @@ import numpy as np
 import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.case_studies.tohoku.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options import *
 from adapt_utils.norms import total_variation
-from adapt_utils.misc import gaussian, ellipse
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
 args = parser.parse_args()
 
-
-class TohokuGaussianBasisOptions(TohokuOptions):
-    """
-    Initialise the free surface with initial condition consisting of a single Gaussian basis function
-    scaled by a control parameter.
-    """
-    def __init__(self, control_parameter=10.0, **kwargs):
-        super(TohokuGaussianBasisOptions, self).__init__(**kwargs)
-        R = FunctionSpace(self.default_mesh, "R", 0)
-        self.control_parameter = Function(R, name="Control parameter")
-        self.control_parameter.assign(control_parameter)
-
-    def set_initial_condition(self, prob):
-        basis_function = Function(prob.V[0])
-        psi, self.phi = basis_function.split()
-        loc = (0.7e+06, 4.2e+06)
-        radii = (48e+03, 96e+03)
-        angle = pi/12
-        self.phi.interpolate(gaussian([loc + radii, ], prob.meshes[0], rotation=angle))
-
-        prob.fwd_solutions[0].project(self.control_parameter*basis_function)
-
 # Set parameters
 level = int(args.level or 0)
 kwargs = {
     'level': level,
+    'save_timeseries': True,
 
     # Spatial discretisation
     'family': 'dg-cg',
@@ -69,18 +45,27 @@ gauges = list(op.gauges.keys())
 # Solve the forward problem
 swp = AdaptiveProblem(op)
 swp.solve_forward()
-print("Quantity of interest = {:.4e}".format(op.J))
+J = assemble(op.J/len(op.times))
+print("Mean square error QoI = {:.4e}".format(J))
 
 # Plot timeseries
-fig, axes = plt.subplots(nrows=3, ncols=3, figsize=(14, 12))
+N = int(np.ceil(np.sqrt(len(gauges))))
+fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
+plotting_kwargs = {
+    'markevery': 5,
+}
+T = np.array(op.times)/60
 for i, gauge in enumerate(gauges):
-    ax = axes[i//3, i%3]
-    ax.plot(np.array(op.times)/60, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' simulated')
-    ax.plot(np.array(op.times)/60, op.gauges[gauge]['data'], '--x', label=gauge + ' data')
-    ax.legend(loc='upper right')
+    ax = axes[i//N, i%N]
+    ax.plot(T, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' simulated', **plotting_kwargs)
+    ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
+    ax.legend(loc='upper left')
     ax.set_xlabel('Time (min)')
     ax.set_ylabel('Elevation (m)')
+for i in range(len(gauges)%N):
+    axes[N-1, N-i-1].axes('off')
 di = create_directory(os.path.join(op.di, 'plots'))
+plt.tight_layout()
 plt.savefig(os.path.join(di, 'single_bf_timeseries_level{:d}.pdf'.format(level)))
 
 # TODO: Compare discrete vs continuous form of error using plot
@@ -89,13 +74,17 @@ plt.savefig(os.path.join(di, 'single_bf_timeseries_level{:d}.pdf'.format(level))
 # Compute gradient
 g_discrete = compute_gradient(op.J, Control(op.control_parameter)).dat.data[0]
 
+# TODO: Taylor test discrete gradient
+
 # Check consistency of by-hand gradient formula
 tape = get_working_tape()
 solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
-g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)
+# g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)
+g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)/len(op.times)
 print("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
 relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
 print("Relative error: {:.4f}%".format(100*relative_error))
 assert np.allclose(relative_error, 0.0)
 
 # TODO: Continuous adjoint (in nonlinear case with Manning friction)
+# TODO: Taylor test continuous gradient
