@@ -2,7 +2,7 @@ from thetis import *
 
 import numpy as np
 
-from adapt_utils.unsteady.test_cases.trench_tracer.options import TrenchTracerOptions
+from adapt_utils.unsteady.test_cases.trench_sediment.options import TrenchSedimentOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
 from adapt_utils.norms import local_frobenius_norm
@@ -23,7 +23,7 @@ kwargs = {
     'use_automatic_sipg_parameter': True,
 }
 
-op = TrenchTracerOptions(**kwargs)
+op = TrenchSedimentOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
@@ -43,7 +43,7 @@ def gradient_interface_monitor(mesh, alpha=100000.0):
 
     # eta = swp.solution.split()[1]
     #b = swp.bathymetry[0]
-    b = swp.fwd_solutions_tracer[0]
+    b = swp.fwd_solutions_sediment[0]
     bath_hess = recovery.construct_hessian(b, op = swp.op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 

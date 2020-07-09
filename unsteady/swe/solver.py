@@ -13,3 +13,7 @@ class AdaptiveShallowWaterProblem(AdaptiveProblem):
             assert not self.op.solve_tracer
         except AssertionError:
             raise ValueError("This class is for problems with no tracer component.")
+        try:
+            assert not self.op.solve_sediment
+        except AssertionError:
+            raise ValueError("This class is for problems with no sediment component.")

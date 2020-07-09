@@ -71,8 +71,7 @@ class TrenchTracerOptions(CoupledOptions):
         tol = 1e-8  # FIXME: Point evaluation hack
         self.xrange = np.linspace(tol, 16-tol, 20)
 
-        self.uv_file = File(os.path.join(self.di, 'uv.pvd'))
-        self.tracer_file = File(os.path.join(self.di, 'tracer2d.pvd'))
+        #self.uv_file = File(os.path.join(self.di, 'uv.pvd'))
 
     def set_up_morph_model(self, input_dir, mesh = None):
 
@@ -89,9 +88,8 @@ class TrenchTracerOptions(CoupledOptions):
         self.implicit_source = False
         self.slope_eff = True
         self.angle_correction = True
-        self.solve_tracer = False
         self.suspended = True
-        self.convectivevel_flag = True
+        self.convective_vel_flag = True
         self.bedload = True
 
         if not hasattr(self, 'bathymetry') or self.bathymetry is None:
@@ -100,11 +98,19 @@ class TrenchTracerOptions(CoupledOptions):
 
         if self.suspended:
             self.tracer_init = None
-            
+
+        self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)
+        self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
+        self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
+
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+
+        self.eta_d = Function(self.P1DG).project(self.elev_init)
+
         self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
                             bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
                             mesh2d=mesh, bathymetry_2d=self.bathymetry,
-                            uv_init = self.uv_init, elev_init = self.elev_init, ks=self.ks, average_size=self.average_size, 
+                            uv_init = self.uv_d, elev_init = self.eta_d, ks=self.ks, average_size=self.average_size, 
                             cons_tracer = self.conservative, wetting_and_drying = self.wetting_and_drying)
 
     def set_quadratic_drag_coefficient(self, fs):
@@ -155,7 +161,7 @@ class TrenchTracerOptions(CoupledOptions):
         eta.project(self.elev_init)
 
     def set_initial_condition_tracer(self, prob):
-        prob.fwd_solutions_tracer[0].assign(self.sediment_model.equiltracer)
+        prob.fwd_solutions_tracer[0].interpolate(self.sediment_model.equiltracer)
 
     def get_update_forcings(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()
@@ -183,8 +189,6 @@ class TrenchTracerOptions(CoupledOptions):
             eta_tilde.project(self.get_eta_tilde(prob, i))
             #self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
-            self.uv_file.write(u)
-            self.tracer_file.write(prob.tracer_2d)
             #if self.plot_timeseries:
 
                 # Store modified bathymetry timeseries
@@ -192,7 +196,7 @@ class TrenchTracerOptions(CoupledOptions):
             #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
-    
+
     def initialise_fields(self, inputdir, outputdir):
         """
         Initialise simulation with results from a previous simulation
