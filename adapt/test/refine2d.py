@@ -3,6 +3,9 @@ from adapt_utils import *
 import numpy as np
 import matplotlib.pyplot as plt
 
+
+# TODO: move over to test/adapt/test_steady_metric_based
+
 op = Options()
 
 # Simple mesh of two right angled triangles

@@ -23,6 +23,7 @@ def get_mesh(dim, n):
 def dim(request):
     return request.param
 
+
 def test_interior(dim):
     mesh = get_mesh(dim, 3)
     P1_ten = TensorFunctionSpace(mesh, "CG", 1)
@@ -37,6 +38,7 @@ def test_interior(dim):
     M2.interpolate(4*Identity(dim))
     M = metric_intersection(M1, M2)
     assert np.allclose(M.dat.data, M2.dat.data)
+
 
 def test_boundary(dim):
     mesh = get_mesh(dim, 3)
