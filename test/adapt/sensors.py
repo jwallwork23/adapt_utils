@@ -1,5 +1,7 @@
-"""
-Sensor functions considered in [Olivier 2011].
+r"""
+Sensor functions defined in
+
+Olivier, Géraldine. Anisotropic metric-based mesh adaptation for unsteady CFD simulations involving moving geometries. Diss. 2011.
 """
 from firedrake import *
 

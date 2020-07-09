@@ -197,9 +197,9 @@ class Options(FrozenConfigurable):
         self.di = create_directory(self.di)
         if self.debug:
             if self.debug_mode == 'basic':
-                set_log_level(DEBUG)
-            else:
                 set_log_level(INFO)
+            else:
+                set_log_level(DEBUG)
 
     def set_all_rtols(self, tol):
         """Set all relative tolerances to a single value, `tol`."""

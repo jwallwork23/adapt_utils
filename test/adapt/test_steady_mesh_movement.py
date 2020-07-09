@@ -18,7 +18,7 @@ from adapt_utils.adapt.r import MeshMover
 from adapt_utils.options import Options
 
 
-def ring_monitor(mesh):
+def ring(mesh):
     """
     An analytically defined monitor function which concentrates mesh density in
     a narrow ring within the unit square domain.
@@ -30,7 +30,7 @@ def ring_monitor(mesh):
     return 1.0 + alpha*pow(cosh(beta*((x-0.5)*(x-0.5) + (y-0.5)*(y-0.5) - gamma)), -2)
 
 
-def bell_monitor(mesh):
+def bell(mesh):
     """
     An analytically defined monitor function which concentrates mesh density in
     a bell region within the unit square domain.
@@ -41,18 +41,12 @@ def bell_monitor(mesh):
     return 1.0 + alpha*pow(cosh(beta*((x-0.5)*(x-0.5) + (y-0.5)*(y-0.5))), -2)
 
 
-monitors = {
-    'ring': ring_monitor,
-    'bell': bell_monitor,
-}
-
-
 # ---------------------------
 # standard tests for pytest
 # ---------------------------
 
-@pytest.fixture(params=['ring', 'bell'])
-def monitor_type(request):
+@pytest.fixture(params=[ring, bell])
+def monitor(request):
     return request.param
 
 
@@ -61,12 +55,11 @@ def method(request):
     return request.param
 
 
-def test_mesh_movement(monitor_type, method, plot_mesh=False):
-    monitor = monitors[monitor_type]
-    fname = '_'.join([monitor_type, method])
-    fname = os.path.join(os.path.dirname(__file__), fname)
+def test_mesh_movement(monitor, method, plot_mesh=False):
+    fname = '_'.join([monitor.__name__, method])
+    fpath = os.path.dirname(__file__)
 
-    op = Options(r_adapt_rtol=1.0e-03, nonlinear_method=method)
+    op = Options(approach='monge_ampere', r_adapt_rtol=1.0e-03, nonlinear_method=method, debug=plot_mesh)
 
     mesh = UnitSquareMesh(20, 20)
     orig_vol = assemble(Constant(1.0)*dx(domain=mesh))
@@ -75,22 +68,27 @@ def test_mesh_movement(monitor_type, method, plot_mesh=False):
 
     mesh.coordinates.assign(mm.x)
     vol = assemble(Constant(1.0)*dx(domain=mesh))
-    assert np.allclose(orig_vol, vol)
+    assert np.allclose(orig_vol, vol), "Volume is not conserved!"
 
     if plot_mesh:
         fig, axes = plt.subplots()
         triplot(mesh, axes=axes)
         axes.axis('off')
         plt.tight_layout()
-        plt.savefig(fname + '.png')
+        plt.savefig(os.path.join(fpath, 'outputs', fname + '.png'))
 
-    if not os.path.exists(fname + '.npy'):
-        np.save(fname, mm.x.dat.data)
-        pytest.xfail("Needed to set up the test. Please try again.")
-    loaded = np.load(fname + '.npy')
-    assert np.allclose(mm.x.dat.data, loaded)
+    if not os.path.exists(os.path.join(fpath, 'data', fname + '.npy')):
+        np.save(os.path.join(fpath, 'data', fname), mm.x.dat.data)
+        if not plot_mesh:
+            pytest.xfail("Needed to set up the test. Please try again.")
+    loaded = np.load(os.path.join(fpath, 'data', fname + '.npy'))
+    assert np.allclose(mm.x.dat.data, loaded), "Mesh does not match data"
 
+
+# ---------------------------
+# mesh plotting
+# ---------------------------
 
 if __name__ == '__main__':
-    for monitor in monitors:
-        test_mesh_movement(monitor, 'quasi_newton', plot_mesh=True)
+    for m in [ring, bell]:
+        test_mesh_movement(m, 'quasi_newton', plot_mesh=True)

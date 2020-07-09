@@ -61,7 +61,7 @@ class MeshMover():
             self.setup_pseudotimestepper()
 
         # Outputs
-        if self.op.debug:
+        if self.op.debug and self.op.debug_mode == 'full':
             self.monitor_file = File(os.path.join(op.di, 'monitor_debug.pvd'))
             self.monitor_file.write(self.monitor)
             self.volume_file = File(os.path.join(op.di, 'volume_debug.pvd'))
@@ -260,7 +260,7 @@ class MeshMover():
                 self.mesh.coordinates.assign(self.x)
                 assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
                 self.volume /= self.original_volume
-                if self.op.debug:
+                if self.op.debug and self.op.debug_mode == 'full':
                     self.monitor_file.write(self.monitor)
                     self.volume_file.write(self.volume)
                 self.mesh.coordinates.assign(self.ξ)
@@ -360,7 +360,7 @@ class MeshMover():
             self.update()
             assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
             self.volume /= self.original_volume
-            if self.op.debug:
+            if self.op.debug and self.op.debug_mode == 'full':
                 self.monitor_file.write(self.monitor)
                 self.volume_file.write(self.volume)
             self.mesh.coordinates.assign(self.ξ)

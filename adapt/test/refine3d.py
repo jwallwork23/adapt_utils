@@ -2,6 +2,9 @@ from firedrake import *
 from adapt_utils import *
 import numpy as np
 
+
+# TODO: move over to test/adapt/test_steady_metric_based
+
 op = Options()
 
 # simple mesh of two right angled triangles
