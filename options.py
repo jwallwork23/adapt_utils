@@ -47,7 +47,7 @@ class Options(FrozenConfigurable):
 
     # Time discretisation
     timestepper = Enum(
-        ['CrankNicolson', ]  # TODO: Consider more timesteppers
+        ['CrankNicolson', ],  # TODO: Consider more timesteppers
         default_value='CrankNicolson',
         help="Time integration scheme used.").tag(config=True)
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
