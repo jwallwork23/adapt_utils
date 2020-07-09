@@ -35,6 +35,7 @@ class CoupledOptions(Options):
 
     # Tracer transport model
     solve_tracer = Bool(False).tag(config=True)
+    solve_sediment = Bool(False).tag(config=True)
     use_limiter_for_tracers = Bool(True).tag(config=True)
     use_tracer_conservative_form = Bool(False).tag(config=True)
     tracer_family = Enum(['dg', 'cg'], default_value='dg').tag(config=True)
@@ -107,6 +108,12 @@ class CoupledOptions(Options):
                 "pc_type": "sor",
                 # "ksp_monitor": None,
                 # "ksp_converged_reason": None,
+            },
+            "sediment": {
+                "ksp_type": "gmres",
+                "pc_type": "sor",
+                # "ksp_monitor": None,
+                # "ksp_converged_reason": None,
             }
         }
         self.adjoint_solver_parameters.update(self.solver_parameters)
@@ -134,12 +141,6 @@ class CoupledOptions(Options):
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
         return None if np.allclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
-
-    def set_source_tracer(self, fs):
-        """Should be implemented in derived class."""
-        ero = None
-        depo = None
-        return ero, depo
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""

@@ -26,11 +26,20 @@ class Options(FrozenConfigurable):
       'dg': Discontinuous Galerkin (PpDG),
     where p is the polynomial order specified by :attr:`degree_tracer`.
     """).tag(config=True)
+    sediment_family = Unicode('dg', help="""
+    Finite element pair to use for the sediment transport model. Choose from:
+      'cg': Continuous Galerkin    (Pp);
+      'dg': Discontinuous Galerkin (PpDG),
+    where p is the polynomial order specified by :attr:`degree_sediment`.
+    """).tag(config=True)
     degree = NonNegativeInteger(1, help="""
     Polynomial order for shallow water finite element pair :attr:`family'.
     """).tag(config=True)
     degree_tracer = NonNegativeInteger(1, help="""
     Polynomial order for tracer finite element pair :attr:`tracer_family'.
+    """).tag(config=True)
+    degree_sediment = NonNegativeInteger(1, help="""
+    Polynomial order for sediment finite element pair :attr:`sediment_family'.
     """).tag(config=True)
     degree_increase = NonNegativeInteger(0, help="""
     When defining an enriched shallow water finite element space, how much should the
@@ -38,6 +47,10 @@ class Options(FrozenConfigurable):
     """).tag(config=True)
     degree_increase_tracer = NonNegativeInteger(1, help="""
     When defining an enriched tracer finite element space, how much should the
+    polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+    """).tag(config=True)
+    degree_increase_sediment = NonNegativeInteger(1, help="""
+    When defining an enriched sediment finite element space, how much should the
     polynomial order of the finite element space by incremented? (NOTE: zero is an option)
     """).tag(config=True)
 
@@ -48,6 +61,7 @@ class Options(FrozenConfigurable):
     end_time = PositiveFloat(60., help="End of time window of interest.").tag(config=True)
     num_meshes = PositiveInteger(1, help="Number of meshes in :class:`AdaptiveProblem` solver").tag(config=True)
     dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
+    dt_per_mesh_movement = PositiveFloat(1, help="Number of timesteps per mesh movement.").tag(config=True)
     use_semi_implicit_linearisation = Bool(False).tag(config=True)  # TODO: doc
     implicitness_theta = NonNegativeFloat(0.5).tag(config=True)  # TODO: doc
 

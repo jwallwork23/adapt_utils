@@ -2,7 +2,7 @@ from __future__ import absolute_import
 from thetis.equation import *
 from thetis.utility import *
 from thetis.conservative_tracer_eq_2d import *
-
+from thetis.tracer_eq_2d import TracerTerm
 
 # TODO: Extend to consider CG case
 

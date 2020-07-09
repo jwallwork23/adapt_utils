@@ -3,6 +3,8 @@ from thetis.configuration import *
 
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.utils import heaviside_approx
+from thetis.options import ModelOptions2d
+from thetis.sediments_adjoint import SedimentModel
 
 import os
 import numpy as np
@@ -14,13 +16,13 @@ matplotlib.rc('text', usetex=True)
 matplotlib.rc('font', family='serif')
 
 
-__all__ = ["TrenchTracerOptions"]
+__all__ = ["TrenchSedimentOptions"]
 
 
-class TrenchTracerOptions(CoupledOptions):
+class TrenchSedimentOptions(CoupledOptions):
 
     def __init__(self, friction='nikuradse', plot_timeseries=False, nx=1, ny=1, input_dir = None, **kwargs):
-        super(TrenchTracerOptions, self).__init__(**kwargs)
+        super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
@@ -32,6 +34,8 @@ class TrenchTracerOptions(CoupledOptions):
         self.base_viscosity = 1e-6
         self.base_diffusivity = 0.15
         self.wetting_and_drying = False
+        self.solve_sediment = True
+
         try:
             assert friction in ('nikuradse', 'manning', 'nik_solver')
         except AssertionError:
@@ -44,19 +48,14 @@ class TrenchTracerOptions(CoupledOptions):
         self.stabilisation = 'lax_friedrichs'
 
         # Initial
-        self.elev_init, self.uv_init = self.initialise_fields(mesh, input_dir, self.di)
+        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
 
-        #self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)
-        #self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
-
-        #self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
-
-        #self.eta_d = Function(self.P1DG).project(self.elev_init)
+        self.set_up_morph_model(input_dir, self.default_mesh)        
 
         # Time integration
         self.dt = 0.25
-        self.end_time = self.num_hours*3600.0
-        # self.dt_per_export = 6
+        self.end_time = 500 #self.num_hours*3600.0
+        self.dt_per_mesh_movement = 100
         self.dt_per_export = 100
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
@@ -72,8 +71,47 @@ class TrenchTracerOptions(CoupledOptions):
         tol = 1e-8  # FIXME: Point evaluation hack
         self.xrange = np.linspace(tol, 16-tol, 20)
 
-        self.uv_file = File(os.path.join(self.di, 'uv.pvd'))
+        #self.uv_file = File(os.path.join(self.di, 'uv.pvd'))
 
+    def set_up_morph_model(self, input_dir, mesh = None):
+
+        # Physical
+        self.base_viscosity = 1e-6        
+        self.base_diffusivity = 0.18161630470135287
+
+        self.porosity = Constant(0.4)
+        self.ks = Constant(0.025)
+        self.average_size = 160*(10**(-6))  # Average sediment size        
+
+        self.wetting_and_drying = False
+        self.conservative = False
+        self.implicit_source = False
+        self.slope_eff = True
+        self.angle_correction = True
+        self.suspended = True
+        self.convective_vel_flag = True
+        self.bedload = True
+
+        if not hasattr(self, 'bathymetry') or self.bathymetry is None:
+            self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
+            self.bathymetry = self.set_bathymetry(self.P1)
+
+        if self.suspended:
+            self.tracer_init = None
+
+        self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)
+        self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
+        self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
+
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+
+        self.eta_d = Function(self.P1DG).project(self.elev_init)
+
+        self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
+                            bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
+                            mesh2d=mesh, bathymetry_2d=self.bathymetry,
+                            uv_init = self.uv_d, elev_init = self.eta_d, ks=self.ks, average_size=self.average_size, 
+                            cons_tracer = self.conservative, wetting_and_drying = self.wetting_and_drying)
 
     def set_quadratic_drag_coefficient(self, fs):
         self.depth = Function(fs).interpolate(self.set_bathymetry(fs) + Constant(0.397))
@@ -111,23 +149,28 @@ class TrenchTracerOptions(CoupledOptions):
                 inflow_tag: {'flux': Constant(-0.22)},
                 outflow_tag: {'elev': Constant(0.397)},
             },
-	   #'tracer': {
-       #inflow_tag: {'value': self.sediment_model.sediment_rate}
-       #}
+	   'sediment': {
+                inflow_tag: {'value': self.sediment_model.sediment_rate}
+            }
         }
         return boundary_conditions
 
     def set_initial_condition(self, prob):
-        fs = prob.fwd_solutions[0].function_space()      
-        self.initial_value = Function(fs, name="Initial condition")
-        u, eta = self.initial_value.split()
+        u, eta = prob.fwd_solutions[0].split()
         u.project(self.uv_init)
         eta.project(self.elev_init)
-        return self.initial_value
+
+    def set_sediment_source(self, fs):
+        return self.sediment_model.ero_term
+
+    def set_sediment_sink(self, fs):
+        return self.sediment_model.depo_term
+
+    def set_initial_condition_sediment(self, prob):
+        prob.fwd_solutions_sediment[0].interpolate(self.sediment_model.equiltracer)
 
     def get_update_forcings(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()
-        bathymetry_displacement = prob.equations[i].shallow_water.depth.wd_bathymetry_displacement
         depth = prob.depth[i]
 
         #def update_forcings(t):
@@ -152,7 +195,6 @@ class TrenchTracerOptions(CoupledOptions):
             eta_tilde.project(self.get_eta_tilde(prob, i))
             #self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
-            self.uv_file.write(u)
             #if self.plot_timeseries:
 
                 # Store modified bathymetry timeseries
@@ -160,8 +202,8 @@ class TrenchTracerOptions(CoupledOptions):
             #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
-    
-    def initialise_fields(self, mesh2d, inputdir, outputdir):
+
+    def initialise_fields(self, inputdir, outputdir):
         """
         Initialise simulation with results from a previous simulation
         """
