@@ -4,6 +4,7 @@ __pycache__/
 # Specific files
 FIXME
 .DS_Store
+condition.py
 
 # File types
 *.swp
