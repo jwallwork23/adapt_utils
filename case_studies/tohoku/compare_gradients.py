@@ -9,7 +9,7 @@ import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.case_studies.tohoku.options import *
-from adapt_utils.norms import total_variation
+# from adapt_utils.norms import total_variation
 
 
 parser = argparse.ArgumentParser()
@@ -56,13 +56,13 @@ plotting_kwargs = {
 }
 T = np.array(op.times)/60
 for i, gauge in enumerate(gauges):
-    ax = axes[i//N, i%N]
+    ax = axes[i//N, i % N]
     ax.plot(T, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' simulated', **plotting_kwargs)
     ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
     ax.legend(loc='upper left')
     ax.set_xlabel('Time (min)')
     ax.set_ylabel('Elevation (m)')
-for i in range(len(gauges)%N):
+for i in range(len(gauges) % N):
     axes[N-1, N-i-1].axes('off')
 di = create_directory(os.path.join(op.di, 'plots'))
 plt.tight_layout()
