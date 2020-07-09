@@ -9,6 +9,8 @@ from adapt_utils.options import Options
 __all__ = ["MeshMover"]
 
 
+# TODO: Test Laplacian smoothing
+# TODO: Other options, e.g. MMPDE
 class MeshMover():
     r"""
     A class dedicated to performing mesh r-adaptation. Given a source mesh and a monitor function
@@ -160,7 +162,7 @@ class MeshMover():
         residual_l2_norm = residual_l2/norm_l2
         return minmax, equi, residual_l2_norm
 
-    def setup_equidistribution(self):  # TODO: Other options, e.g. MMPDE
+    def setup_equidistribution(self):
         """
         Setup solvers for nonlinear iteration. Two approaches are considered, as specified by
         `self.nonlinear_method` - either a relaxation using pseudo-timestepping ('relaxation'), or a
