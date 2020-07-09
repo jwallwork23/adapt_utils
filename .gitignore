@@ -1,5 +1,6 @@
 # Directories
 __pycache__/
+test/adapt/old/
 
 # Specific files
 FIXME
