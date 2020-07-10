@@ -586,7 +586,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'depth_integrated_source': self.fields[i].sediment_depth_integ_source,
             'sink': self.fields[i].sediment_sink_2d,
             'depth_integrated_sink': self.fields[i].sediment_depth_integ_sink,
-            'sediment': self.fwd_solutions_sediment[i]
+            'sediment': self.fwd_solutions_sediment[i],
             'morfac': self.op.morphological_acceleration_factor,
             'porosity': self.op.porosity,
         })
