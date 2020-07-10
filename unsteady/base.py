@@ -98,7 +98,6 @@ class AdaptiveProblemBase(object):
         self.create_solutions()
         if op.solve_sediment or op.solve_exner:
             op.print_debug(op.indent + "SETUP: Creating sediment model...")
-        import ipdb; ipdb.set_trace()
         self.create_sediment_model()
         op.print_debug(op.indent + "SETUP: Creating fields...")
         self.set_fields()
