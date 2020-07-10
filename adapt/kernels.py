@@ -396,9 +396,7 @@ def intersect(d):
 
 def anisotropic_refinement(d, direction):
     """Refine a metric in a single coordinate direction."""
-    assert d in (2, 3)
-    scale = 4 if d == 2 else 8
-    return anisotropic_refinement_str % (d*d, d, d, d, d, d, d, d, d, direction, scale)
+    return anisotropic_refinement_str % (d*d, d, d, d, d, d, d, d, d, direction, 4)
 
 
 def metric_from_hessian(d):

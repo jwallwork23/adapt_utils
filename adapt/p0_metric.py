@@ -17,7 +17,7 @@ class AnisotropicMetricDriver():
         self.mesh = self.am.mesh
         self.dim = self.mesh.topological_dimension()
         try:
-            assert self.dim == 2
+            assert self.dim in (2, 3)
         except AssertionError:
             raise NotImplementedError
         self.H = hessian
@@ -54,6 +54,10 @@ class AnisotropicMetricDriver():
         """
         Extract eigenpairs related to elementwise metric associated with current mesh.
         """
+        try:
+            assert self.dim == 2
+        except AssertionError:
+            raise NotImplementedError
         JJt = Function(self.P0_ten)
         JJt.interpolate(self.J*self.J.T)
         kernel = eigen_kernel(get_eigendecomposition, self.dim)
@@ -64,6 +68,10 @@ class AnisotropicMetricDriver():
         """
         Extract eigenpairs related to provided Hessian.
         """
+        try:
+            assert self.dim == 2
+        except AssertionError:
+            raise NotImplementedError
         assert self.p0hessian is not None
         kernel = eigen_kernel(get_reordered_eigendecomposition, self.dim)
         op2.par_loop(kernel, self.P0_ten.node_set, self.evec.dat(op2.RW), self.eval.dat(op2.RW), self.p0hessian.dat(op2.READ))
@@ -82,6 +90,10 @@ class AnisotropicMetricDriver():
         interpolation error for a given metric complexity or minimise metric complexity for
         a given interpolation error.
         """
+        try:
+            assert self.dim == 2
+        except AssertionError:
+            raise NotImplementedError
         assert self.eta is not None
         alpha = self.op.convergence_rate
         self.K_opt.interpolate(pow(self.eta, 1/(alpha+1)))
@@ -160,6 +172,10 @@ class AnisotropicMetricDriver():
         """
         Compute elementwise interpolation error as stated in [Carpio et al. 2013].
         """
+        try:
+            assert self.dim == 2
+        except AssertionError:
+            raise NotImplementedError
         l = self.eval[0]*self.eval[0]*self.Lij(0, 0)
         l += self.eval[0]*self.eval[1]*self.Lij(0, 1)
         l += self.eval[1]*self.eval[0]*self.Lij(1, 0)
@@ -170,6 +186,10 @@ class AnisotropicMetricDriver():
         """
         Compute gradient-based interpolation error as stated in [Carpio et al. 2013].
         """
+        try:
+            assert self.dim == 2
+        except AssertionError:
+            raise NotImplementedError
         self.cell_interpolation_error()
         coeff = pow(min_value(self.eval[0], self.eval[1]), -0.5)
         self.estimator.interpolate(coeff*self.estimator)
@@ -178,6 +198,10 @@ class AnisotropicMetricDriver():
         """
         Compute edge-based interpolation error as stated in [Carpio et al. 2013].
         """
+        try:
+            assert self.dim == 2
+        except AssertionError:
+            raise NotImplementedError
         self.cell_interpolation_error()
         coeff = sqrt((self.eval[0]+self.eval[1])*pow(min_value(self.eval[0], self.eval[1]), 1.5))
         self.estimator.interpolate(coeff*self.estimator)
@@ -188,11 +212,10 @@ class AnisotropicMetricDriver():
         element size in each canonical direction (x- or y-), by scaling the corresponding eigenvalue.
         """
         self.check_p1metric_exists()
-        dim = self.mesh.topological_dimension()
         self.component_stretch_metrics = []
         fs = self.p1metric.function_space()
-        for direction in range(dim):
+        for direction in range(self.dim):
             M = Function(self.p1metric)
-            kernel = eigen_kernel(anisotropic_refinement, dim, direction)
+            kernel = eigen_kernel(anisotropic_refinement, self.dim, direction)
             op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
             self.component_stretch_metrics.append(M)
