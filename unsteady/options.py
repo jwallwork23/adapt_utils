@@ -43,7 +43,13 @@ class CoupledOptions(Options):
     sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     norm_smoother = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
     tracer_advective_velocity_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
-
+    
+    # Exner transport model
+    solve_exner = Bool(False).tag(config=True)
+    bathymetry_family = Enum(['dg', 'cg'], default_value='cg').tag(config=True)
+    morphological_acceleration_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
+    porosity = FiredrakeScalarExpression(Constant(0.4)).tag(config=True)
+    
     # Adaptation
     adapt_field = Unicode('all_avg', help="Adaptation field of interest.").tag(config=True)
     region_of_interest = List(default_value=[]).tag(config=True)
@@ -114,7 +120,13 @@ class CoupledOptions(Options):
                 "pc_type": "sor",
                 # "ksp_monitor": None,
                 # "ksp_converged_reason": None,
-            }
+            },
+            "exner": {
+                "ksp_type": "gmres",
+                "pc_type": "sor",
+                # "ksp_monitor": None,
+                # "ksp_converged_reason": None,
+            }            
         }
         self.adjoint_solver_parameters.update(self.solver_parameters)
         super(CoupledOptions, self).__init__(**kwargs)
@@ -158,6 +170,22 @@ class CoupledOptions(Options):
         """Should be implemented in derived class."""
         return
 
+    def set_sediment_source(self, fs):
+        """Should be implemented in derived class."""
+        return
+    
+    def set_sediment_sink(self, fs):
+        """Should be implemented in derived class."""
+        return
+    
+    def set_sediment_depth_integ_source(self, fs):
+        """Should be implemented in derived class."""
+        return
+
+    def set_sediment_depth_integ_sink(self, fs):
+        """Should be implemented in derived class."""
+        return
+    
     def set_quadratic_drag_coefficient(self, fs):
         """Should be implemented in derived class."""
         return

@@ -35,6 +35,9 @@ class Options(FrozenConfigurable):
     degree = NonNegativeInteger(1, help="""
     Polynomial order for shallow water finite element pair :attr:`family'.
     """).tag(config=True)
+    degree_bathymetry = NonNegativeInteger(1, help="""
+    Polynomial order for tracer finite element pair :attr:`tracer_family'.
+    """).tag(config=True)
     degree_tracer = NonNegativeInteger(1, help="""
     Polynomial order for tracer finite element pair :attr:`tracer_family'.
     """).tag(config=True)
