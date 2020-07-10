@@ -161,10 +161,10 @@ class TrenchSedimentOptions(CoupledOptions):
         eta.project(self.elev_init)
 
     def set_sediment_source(self, fs):
-        return self.sediment_model.ero_term
+        return Function(fs).project(self.sediment_model.ero_term)
 
     def set_sediment_sink(self, fs):
-        return self.sediment_model.depo_term
+        return Function(fs).project(self.sediment_model.depo_term)
 
     def set_initial_condition_sediment(self, prob):
         prob.fwd_solutions_sediment[0].interpolate(self.sediment_model.equiltracer)
