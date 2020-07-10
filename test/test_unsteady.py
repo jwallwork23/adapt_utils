@@ -17,7 +17,6 @@ examples = [
     'cosine_prescribed_velocity/run.py',
     'solid_body_rotation/run_fixed_mesh.py',
     'solid_body_rotation/run_lagrangian.py',
-    'solid_body_rotation/run_adjoint.py',
     # 'bubble_shear/run.py',  # TODO: Currently requires an 'interpretation' input parameter
     'rossby_wave/run_fixed_mesh.py',
     # 'rossby_wave/run_moving_mesh.py',  # TODO: Currently takes too long to run
@@ -30,7 +29,6 @@ examples = [
 
 cwd = os.path.abspath(os.path.dirname(__file__))
 unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'unsteady', 'test_cases'))
-
 examples = [os.path.join(unsteady_dir, f) for f in examples]
 
 

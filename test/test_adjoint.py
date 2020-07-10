@@ -1,7 +1,8 @@
 """
-Runs the steady test case scripts found in `steady/test_cases/`. In some cases these examples include
-assertions which verify desired behaviour, but in most cases it is just verified that the solve does not
-crash.
+Runs all discrete and continuous adjoint test case scripts found in `steady/test_cases`,
+`unsteady/test_cases/` and `case_studies/`. In some cases these examples include assertions which verify
+desired behaviour, but in most cases it is just verified that the solve does not crash and reaches the
+end of the required time period.
 
 The code used in this script was largely copied from `thetis/test/examples.py`.
 """
@@ -14,19 +15,14 @@ import shutil
 
 
 examples = [
-    # TODO: 'box_discharge2d/run.py',
-    # TODO: 'point_discharge2d/run.py',
-    # TODO: 'point_discharge2d/run_uniform_convergence.py',
-    # TODO: 'point_discharge3d/run.py',
-    # TODO: 'space_time_ripple/run_fixed_mesh.py',
-    'turbine_array/run.py',
-    # TODO: 'turbine_array/run_uniform_convergence.py',
-    # TODO: 'turbine_array/run_adaptive_convergence.py',
+    'unsteady/test_cases/solid_body_rotation/run_adjoint.py',
+    'case_studies/tohoku/compare_gradients.py',
+    # 'case_studies/tohoku/run_continuous_adjoint.py',  # TODO: update
 ]
 
 cwd = os.path.abspath(os.path.dirname(__file__))
-unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'steady', 'test_cases'))
-examples = [os.path.join(unsteady_dir, f) for f in examples]
+home_dir = os.path.abspath(os.path.join(cwd, '..'))
+examples = [os.path.join(home_dir, f) for f in examples]
 
 
 @pytest.fixture(params=examples, ids=lambda x: os.path.basename(x))
