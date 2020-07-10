@@ -1,9 +1,4 @@
-"""
-Solve for an initial condition defined over a Gaussian radial basis with a single basis function.
-If we have N_g gauges and N_T timesteps then we have N_g*N_T data points we would like to fit. We
-consider a least squares fit. If N_g = 9 and N_T = 288 (as below) then we have 2592 data points.
-Compared with the single control parameter, this implies a massively overconstrained problem!
-"""
+# TODO: doc
 from thetis import *
 from firedrake_adjoint import *
 
@@ -21,6 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimised_value", help="Optimised control parameter (e.g. from previous run)")
+parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
 args = parser.parse_args()
 
 # Set parameters
@@ -28,7 +24,8 @@ level = int(args.level or 0)
 optimised_value = None if args.optimised_value is None else float(args.optimised_value)
 kwargs = {
     'level': level,
-    'save_timeseries': False,
+    'save_timeseries': True,
+    'artificial': True,
 
     # Spatial discretisation
     'family': 'dg-cg',
@@ -53,10 +50,19 @@ for gauge in gauges:
         op.gauges.pop(gauge)  # Some gauges aren't within the domain
 gauges = list(op.gauges.keys())
 
+# Artifical run
+with stop_annotating():
+    op.control_parameter.assign(float(args.optimal_control or 5.0))
+    swp = AdaptiveProblem(op)
+    swp.solve_forward()
+    for gauge in op.gauges:
+        op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
+
 # Explore parameter space
 n = 9
 control_values = np.linspace(2.0, 10.0, n)
-fname = os.path.join(op.di, 'parameter_space_{:d}.npy'.format(level))
+fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
+op.save_timeseries = False
 with stop_annotating():
     swp = AdaptiveProblem(op)
     if os.path.exists(fname):
@@ -79,7 +85,7 @@ axes.plot(control_values, func_values, '--x')
 axes.set_xlabel("Coefficient for Gaussian basis function")
 axes.set_ylabel("Mean square error quantity of interest")
 plt.tight_layout()
-plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_{:d}.pdf'.format(level)))
+plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{:d}.pdf'.format(level)))
 
 # --- Optimisation
 
@@ -108,7 +114,7 @@ for i in range(len(gauges) % N):
     axes[N-1, N-i-1].axes('off')
 di = create_directory(os.path.join(op.di, 'plots'))
 plt.tight_layout()
-plt.savefig(os.path.join(di, 'single_bf_timeseries_{:d}.pdf'.format(level)))
+plt.savefig(os.path.join(di, 'single_bf_timeseries_artificial_{:d}.pdf'.format(level)))
 
 if optimised_value is None:
 
@@ -138,13 +144,13 @@ if optimised_value is None:
     func_values_opt = np.array(func_values_opt)
     gradient_values_opt = np.array(gradient_values_opt)
     optimised_value = m_opt.dat.data[0]
-    np.save(os.path.join(op.di, 'opt_progress_dis_ctrl_{:d}.npy'.format(level)), control_values_opt)
-    np.save(os.path.join(op.di, 'opt_progress_dis_func_{:d}.npy'.format(level)), func_values_opt)
-    np.save(os.path.join(op.di, 'opt_progress_dis_grad_{:d}.npy'.format(level)), gradient_values_opt)
+    np.save(os.path.join(op.di, 'opt_progress_dis_ctrl_artificial_{:d}.npy'.format(level)), control_values_opt)
+    np.save(os.path.join(op.di, 'opt_progress_dis_func_artificial_{:d}.npy'.format(level)), func_values_opt)
+    np.save(os.path.join(op.di, 'opt_progress_dis_grad_artificial_{:d}.npy'.format(level)), gradient_values_opt)
 else:
-    control_values_opt = np.load(os.path.join(op.di, 'opt_progress_dis_ctrl_{:d}.npy'.format(level)))
-    func_values_opt = np.load(os.path.join(op.di, 'opt_progress_dis_func_{:d}.npy'.format(level)))
-    gradient_values_opt = np.load(os.path.join(op.di, 'opt_progress_dis_grad_{:d}.npy'.format(level)))
+    control_values_opt = np.load(os.path.join(op.di, 'opt_progress_dis_ctrl_artificial_{:d}.npy'.format(level)))
+    func_values_opt = np.load(os.path.join(op.di, 'opt_progress_dis_func_artificial_{:d}.npy'.format(level)))
+    gradient_values_opt = np.load(os.path.join(op.di, 'opt_progress_dis_grad_artificial_{:d}.npy'.format(level)))
 
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
@@ -157,10 +163,9 @@ for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
 axes.set_xlabel("Coefficient for Gaussian basis function")
 axes.set_ylabel("Mean square error quantity of interest")
 plt.tight_layout()
-plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_{:d}.pdf'.format(level)))
+plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
 
 # Run forward again so that we can compare timeseries
-kwargs['save_timeseries'] = True
 kwargs['control_parameter'] = optimised_value
 op_opt = TohokuGaussianBasisOptions(**kwargs)
 
@@ -173,6 +178,8 @@ for gauge in gauges:
         op_opt.print_debug("NOTE: Gauge {:5s} is not in the domain and so was removed".format(gauge))
         op_opt.gauges.pop(gauge)  # Some gauges aren't within the domain
 gauges = list(op_opt.gauges.keys())
+for gauge in gauges:
+    op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
 swp = AdaptiveProblem(op_opt)
 swp.solve_forward()
 J = op.J/len(op.times)
@@ -192,7 +199,7 @@ for i, gauge in enumerate(gauges):
 for i in range(len(gauges) % N):
     axes[N-1, N-i-1].axes('off')
 plt.tight_layout()
-plt.savefig(os.path.join(di, 'single_bf_timeseries_optimised_discrete_{:d}.pdf'.format(level)))
+plt.savefig(os.path.join(di, 'single_bf_timeseries_optimised_discrete_artificial_{:d}.pdf'.format(level)))
 
 # Compare total variation
 msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"

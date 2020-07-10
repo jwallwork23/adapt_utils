@@ -36,10 +36,11 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, mesh=None, level=0, postproc=True, save_timeseries=False, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
+    def __init__(self, mesh=None, level=0, postproc=True, save_timeseries=False, artificial=False, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
         self.save_timeseries = save_timeseries
+        self.artificial = artificial
 
         # Stabilisation
         self.use_automatic_sipg_parameter = False
@@ -166,7 +167,8 @@ class TohokuOptions(TsunamiOptions):
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
         for gauge in self.gauges:
             if self.save_timeseries:
-                self.gauges[gauge]["data"] = []
+                if not self.artificial or "data" not in self.gauges[gauge]:
+                    self.gauges[gauge]["data"] = []
                 self.gauges[gauge]["timeseries"] = []
                 self.gauges[gauge]["timeseries_smooth"] = []
                 self.gauges[gauge]["diff"] = []
@@ -180,32 +182,39 @@ class TohokuOptions(TsunamiOptions):
 
         def update_forcings(t):
             weight.assign(0.5 if t < 0.5*self.dt or t >= self.end_time - 0.5*self.dt else 1.0)
-            self.times.append(t)
             dtc = Constant(self.dt)
+            iteration = len(self.times)
             for gauge in self.gauges:
 
-                # Interpolate observations
-                obs = float(self.gauges[gauge]["interpolator"](t))
-                eta_obs.assign(obs)
-
+                # Point evaluation at gauges
                 if self.save_timeseries:
-                    self.gauges[gauge]["data"].append(obs)
-
-                    # Point evaluation at gauges
                     eta_discrete = eta.at(self.gauges[gauge]["coords"]) - self.gauges[gauge]["init"]
                     self.gauges[gauge]["timeseries"].append(eta_discrete)
 
-                    # Discrete form of error
-                    diff = 0.5*(eta_discrete - eta_obs.dat.data[0])**2
-                    self.gauges[gauge]["diff"].append(diff)
+                # Interpolate observations
+                if self.gauges[gauge]["data"] != []:
+                    if self.artificial:
+                        obs = self.gauges[gauge]["data"][iteration]
+                    else:
+                        obs = float(self.gauges[gauge]["interpolator"](t))
+                    eta_obs.assign(obs)
 
-                # Continuous form of error
-                I = self.gauges[gauge]["indicator"]
-                A = self.gauges[gauge]["area"]
-                diff = 0.5*I*(eta - eta_obs)**2
-                self.J += assemble(weight*dtc*diff*dx)
-                self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False)/A)
-                self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False)/A)
+                    if self.save_timeseries:
+                        if not self.artificial:
+                            self.gauges[gauge]["data"].append(obs)
+
+                        # Discrete form of error
+                        diff = 0.5*(eta_discrete - eta_obs.dat.data[0])**2
+                        self.gauges[gauge]["diff"].append(diff)
+
+                    # Continuous form of error
+                    I = self.gauges[gauge]["indicator"]
+                    A = self.gauges[gauge]["area"]
+                    diff = 0.5*I*(eta - eta_obs)**2
+                    self.J += assemble(weight*dtc*diff*dx)
+                    self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False)/A)
+                    self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False)/A)
+            self.times.append(t)
             return
 
         return update_forcings
