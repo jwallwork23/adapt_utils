@@ -217,18 +217,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'nikuradse_bed_roughness': self.op.ksp,
                 'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
-                'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
+                'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(self.sediment_model)
             })
         for i, P1DG in enumerate(self.P1DG):
             self.fields[i].update({
-                'tracer_source_2d': self.op.set_tracer_source(P1DG),
-                'sediment_source_2d': self.op.set_sediment_source(P1DG),
-                'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
-                'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
-                'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
+                'tracer_source_2d': self.op.set_tracer_source(self.sediment_model),
+                'sediment_source_2d': self.op.set_sediment_source(self.sediment_model),
+                'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(self.sediment_model),
+                'sediment_sink_2d': self.op.set_sediment_sink(self.sediment_model),
+                'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(self.sediment_model)
             })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
-        if not op.solve_exner:
+        if not self.op.solve_exner:
             self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
             self.depth = [None for bathymetry in self.bathymetry]
             for i, bathymetry in enumerate(self.bathymetry):
@@ -454,7 +454,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Sediment model
     def create_sediment_model(self):
-        import ipdb; ipdb.set_trace()
         for i, Q in enumerate(self.Q):
             if self.op.solve_exner:
                 bath = self.fwd_solutions_bathymetry[i]
@@ -552,7 +551,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'uv_2d': u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             'source': self.fields[i].tracer_source_2d,
-            'tracer_advective_velocity_factor': self.tracer_options[i].tracer_advective_velocity_factor,
+            'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
             'lax_friedrichs_tracer_scaling_factor': self.tracer_options[i].lax_friedrichs_tracer_scaling_factor,
             'mesh_velocity': None,
         })
@@ -573,7 +572,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             'source': self.fields[i].sediment_source_2d,
             'sink': self.fields[i].sediment_sink_2d,
-            'tracer_advective_velocity_factor': self.sediment_options[i].tracer_advective_velocity_factor,
+            'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
             'lax_friedrichs_tracer_scaling_factor': self.sediment_options[i].lax_friedrichs_tracer_scaling_factor,
             'mesh_velocity': None,
         })
@@ -721,7 +720,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.create_timesteppers(i)
         bcs = self.boundary_conditions[i]
         if op.solve_exner or op.solve_sediment:
-            self.create_sediment_model(i)
+            self.create_sediment_model()
             op.print_debug(op.indent + "SETUP: Creating sediment model on mesh {:d}...".format(i))
         if op.solve_swe:
             ts = self.timesteppers[i]['shallow_water']

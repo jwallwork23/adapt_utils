@@ -90,8 +90,8 @@ class TrenchSedimentOptions(CoupledOptions):
         self.slope_eff = True
         self.angle_correction = True
         self.suspended = True
-        self.convective_vel_flag = True
-        self.bedload = True
+        self.convective_vel_flag = False
+        self.bedload = False
 
         if not hasattr(self, 'bathymetry') or self.bathymetry is None:
             self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
@@ -137,7 +137,7 @@ class TrenchSedimentOptions(CoupledOptions):
                 outflow_tag: {'elev': Constant(0.397)},
             },
 	   'sediment': {
-                inflow_tag: {'value': self.sediment_model.sediment_rate}
+                inflow_tag: {'value': prob.sediment_model.sediment_rate}
             }
         }
         return boundary_conditions
@@ -147,17 +147,20 @@ class TrenchSedimentOptions(CoupledOptions):
         u.project(self.uv_init)
         eta.project(self.elev_init)
 
-    def set_sediment_source(self, fs):
-        return self.sediment_model.ero_term
+    def set_sediment_source(self, sediment_model):
+        return sediment_model.ero_term
 
-    def set_sediment_sink(self, fs):
-        return self.sediment_model.depo_term
+    def set_sediment_sink(self, sediment_model):
+        return sediment_model.depo_term
 
-    def set_advective_velocity_factor(self, fs):
-        return self.sediment_model.corr_vel_factor
+    def set_advective_velocity_factor(self, sediment_model):
+        if self.convective_vel_flag:
+            return sediment_model.corr_factor_model.corr_vel_factor
+        else:
+            return Constant(1.0)
 
     def set_initial_condition_sediment(self, prob):
-        prob.fwd_solutions_sediment[0].interpolate(self.sediment_model.equiltracer)
+        prob.fwd_solutions_sediment[0].interpolate(prob.sediment_model.equiltracer)
 
     def get_update_forcings(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()
