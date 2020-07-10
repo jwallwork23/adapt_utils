@@ -400,7 +400,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
             self.V[i],
             self.depth[i],
-            self.shallow_water_options[i],
+            self.shallow_water_options[i],  # TODO: Need plug in uv_2d, elev_2d for nonlinear case
         )
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
@@ -889,6 +889,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
 
+    # TODO: In nonlinear case, uv_2d and elev_2d will need to be loaded / recomputed
     def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.

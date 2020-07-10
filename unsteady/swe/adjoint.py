@@ -147,24 +147,47 @@ class WindStressTerm(AdjointShallowWaterMomentumTerm):
 
 class AtmosphericPressureTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        atmospheric_pressure = fields_old.get('atmospheric_pressure')
-        f = 0
-        if atmospheric_pressure is not None:
-            raise NotImplementedError  # TODO
-        return -f
+        return 0
 
 
-class QuadraticDragTerm(AdjointShallowWaterMomentumTerm):
+class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        # total_h = self.depth.get_total_depth(zeta_old)
+        total_h = self.depth.get_total_depth(zeta_old)
         manning_drag_coefficient = fields_old.get('manning_drag_coefficient')
         C_D = fields_old.get('quadratic_drag_coefficient')
         f = 0
         if manning_drag_coefficient is not None:
-            raise NotImplementedError  # TODO
+            if C_D is not None:
+                raise Exception('Cannot set both dimensionless and Manning drag parameter')
+            C_D = g_grav*manning_drag_coefficient**2/total_h**(1./3.)
 
+        uv = fields.get('uv_2d')  # TODO
+        if uv is None:
+            raise Exception('Adjoint equation does not have access to forward solution velocity')
         if C_D is not None:
-            raise NotImplementedError  # TODO
+            unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
+            f += C_D*unorm*inner(self.z_test, z)*self.dx
+            f += C_D*inner(self.z_test, uv)*inner(z, uv)/unorm*self.dx
+        return -f
+
+
+class QuadraticDragTermContinuity(AdjointShallowWaterMomentumTerm):
+    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        total_h = self.depth.get_total_depth(zeta_old)
+        manning_drag_coefficient = fields_old.get('manning_drag_coefficient')
+        C_D = fields_old.get('quadratic_drag_coefficient')
+        f = 0
+        if manning_drag_coefficient is not None:
+            if C_D is not None:
+                raise Exception('Cannot set both dimensionless and Manning drag parameter')
+            C_D = 4/3*g_grav*manning_drag_coefficient**2/total_h**(1./3.)
+
+        uv = fields.get('uv_2d')  # TODO
+        if uv is None:
+            raise Exception('Adjoint equation does not have access to forward solution velocity')
+        if C_D is not None:
+            unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
+            f += -C_D*unorm*inner(z, uv)*self.zeta_test/total_h**2*self.dx
         return -f
 
 
@@ -243,7 +266,7 @@ class BaseAdjointShallowWaterEquation(Equation):
         self.add_term(CoriolisTerm(*args), 'explicit')
         self.add_term(WindStressTerm(*args), 'source')
         self.add_term(AtmosphericPressureTerm(*args), 'source')
-        self.add_term(QuadraticDragTerm(*args), 'explicit')
+        self.add_term(QuadraticDragTermMomentum(*args), 'explicit')
         self.add_term(LinearDragTerm(*args), 'explicit')
         self.add_term(BottomDrag3DTerm(*args), 'source')
         self.add_term(TurbineDragTerm(*args), 'implicit')
@@ -252,6 +275,7 @@ class BaseAdjointShallowWaterEquation(Equation):
     def add_continuity_terms(self, *args):
         self.add_term(ExternalPressureGradientTerm(*args), 'implicit')
         self.add_term(ContinuitySourceTerm(*args), 'source')
+        self.add_term(QuadraticDragTermContinuity(*args), 'explicit')
 
     def residual_z_zeta(self, label, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions):
         f = 0
