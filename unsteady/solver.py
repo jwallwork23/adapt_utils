@@ -73,7 +73,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs',
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
             'sipg_parameter': None,
-            'tracer_advective_velocity_factor': self.sediment_model.tracer_advective_velocity_factor,
             'use_tracer_conservative_form': op.use_tracer_conservative_form,
         }
         if op.use_tracer_conservative_form and op.approach == 'lagrangian':
@@ -216,6 +215,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'nikuradse_bed_roughness': self.op.ksp,
                 'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
+                'tracer_advective_velocity_factor': self.sediment_model.corr_vel_factor               
             })
         for i, P1DG in enumerate(self.P1DG):
             self.fields[i].update({
