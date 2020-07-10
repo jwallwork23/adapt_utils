@@ -35,7 +35,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.base_diffusivity = 0.15
         self.wetting_and_drying = False
         self.solve_sediment = True
-        self.solve_exner = True
+        self.solve_exner = False
 
         try:
             assert friction in ('nikuradse', 'manning', 'nik_solver')
@@ -148,10 +148,13 @@ class TrenchSedimentOptions(CoupledOptions):
         eta.project(self.elev_init)
 
     def set_sediment_source(self, fs):
-        return Function(fs).project(self.sediment_model.ero_term)
+        return self.sediment_model.ero_term
 
     def set_sediment_sink(self, fs):
-        return Function(fs).project(self.sediment_model.depo_term)
+        return self.sediment_model.depo_term
+
+    def set_advective_velocity_factor(self, fs):
+        return self.sediment_model.corr_vel_factor
 
     def set_initial_condition_sediment(self, prob):
         prob.fwd_solutions_sediment[0].interpolate(self.sediment_model.equiltracer)

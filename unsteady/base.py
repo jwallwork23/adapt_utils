@@ -96,6 +96,10 @@ class AdaptiveProblemBase(object):
         self.jacobian_signs = [interpolate(sign(JacobianDeterminant(mesh)), P0) for mesh, P0 in zip(self.meshes, self.P0)]
         op.print_debug(op.indent + "SETUP: Creating solutions...")
         self.create_solutions()
+        if op.solve_sediment or op.solve_exner:
+            op.print_debug(op.indent + "SETUP: Creating sediment model...")
+        import ipdb; ipdb.set_trace()
+        self.create_sediment_model()
         op.print_debug(op.indent + "SETUP: Creating fields...")
         self.set_fields()
         op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")

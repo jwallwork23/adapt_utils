@@ -16,6 +16,8 @@ from .tracer.equation import TracerEquation2D
 from .tracer.cons_equation import ConservativeTracerEquation2D
 from .sediment.equation import SedimentEquation2D
 from thetis.exner_eq import ExnerEquation
+from thetis.options import ModelOptions2d
+from thetis.sediments_adjoint import SedimentModel
 from .tracer.error_estimation import TracerGOErrorEstimator
 from .base import AdaptiveProblemBase
 
@@ -148,7 +150,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             p = self.op.degree_bathymetry
             family = self.op.bathymetry_family
             if family == 'cg':
-                self.finite_element_sediment = FiniteElement("CG", triangle, p)
+                self.finite_element_bathymetry = FiniteElement("CG", triangle, p)
             else:
                 raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))                
 
@@ -215,7 +217,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'nikuradse_bed_roughness': self.op.ksp,
                 'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
-                'tracer_advective_velocity_factor': self.sediment_model.corr_vel_factor               
+                'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
             })
         for i, P1DG in enumerate(self.P1DG):
             self.fields[i].update({
@@ -224,7 +226,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
                 'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
                 'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
-            })            
+            })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
         if not op.solve_exner:
             self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
@@ -433,9 +435,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].exner = model(
             self.W[i],
             self.depth[i],
-            conservative=self.options.use_tracer_conservative_form, 
+            conservative=self.options.use_tracer_conservative_form,
             sed_model=self.sediment_model,
-        )      
+        )
 
     def _create_adjoint_tracer_equation(self, i):
         op = self.tracer_options[i]
@@ -451,14 +453,20 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     # --- Sediment model
-    def create_sediment_model(self, i):
-        u, eta = self.fwd_solutions[i].split()
-        self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.op.suspended, convectivevel=self.op.convective_vel_flag,
-        bedload=self.op.bedload, angle_correction=self.op.angle_correction, slope_eff=self.op.slope_eff, seccurrent=False,
-        mesh2d=self.meshes[i], bathymetry_2d=self.fwd_solutions_bathymetry[i],
-                            uv_init = u, elev_init = eta, ks=self.ks, average_size=self.op.average_size, 
+    def create_sediment_model(self):
+        import ipdb; ipdb.set_trace()
+        for i, Q in enumerate(self.Q):
+            if self.op.solve_exner:
+                bath = self.fwd_solutions_bathymetry[i]
+            else:
+                bath = self.op.set_bathymetry(self.P1[i])
+            u, eta = self.fwd_solutions[i].split()
+            self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.op.suspended, convectivevel=self.op.convective_vel_flag,
+            bedload=self.op.bedload, angle_correction=self.op.angle_correction, slope_eff=self.op.slope_eff, seccurrent=False,
+            mesh2d=self.meshes[i], bathymetry_2d=bath,
+                            uv_init = u, elev_init = eta, ks=self.op.ks, average_size=self.op.average_size,
                             cons_tracer = self.op.conservative, wetting_and_drying = self.op.wetting_and_drying)
-        
+
     # --- Error estimators
 
     def create_error_estimators(self, i):
