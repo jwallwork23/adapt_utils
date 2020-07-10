@@ -192,7 +192,7 @@ class AnisotropicMetricDriver():
         self.component_stretch_metrics = []
         fs = self.p1metric.function_space()
         for direction in range(dim):
-            M = Function(self.p1metric)  # FIXME: Copy doesn't seem to work for tensor fields
+            M = Function(self.p1metric)
             kernel = eigen_kernel(anisotropic_refinement, dim, direction)
             op2.par_loop(kernel, fs.node_set, M.dat(op2.RW))
             self.component_stretch_metrics.append(M)
