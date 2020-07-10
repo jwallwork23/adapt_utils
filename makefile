@@ -24,3 +24,8 @@ test_unsteady:
 	@echo "Running tests for unsteady examples..."
 	@pytest test/test_unsteady.py
 	@echo "PASS"
+
+test_adjoint:
+	@echo "Running tests for adjoint examples..."
+	@pytest test/test_adjoint.py
+	@echo "PASS"
