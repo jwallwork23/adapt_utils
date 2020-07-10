@@ -17,7 +17,7 @@ from .tracer.cons_equation import ConservativeTracerEquation2D
 from .sediment.equation import SedimentEquation2D
 from thetis.exner_eq import ExnerEquation
 from thetis.options import ModelOptions2d
-from thetis.sediments_adjoint import SedimentModel
+from .sediment.sediments_model import SedimentModel
 from .tracer.error_estimation import TracerGOErrorEstimator
 from .base import AdaptiveProblemBase
 
@@ -838,7 +838,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.tracer_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_tracer[i])
             if op.solve_sediment:
-                self.sediment_model.update(iteration*op.dt, ts)
+                self.sediment_model.update(self.fwd_solutions[i], self.depth[i])
                 ts.sediment.advance(self.simulation_time, update_forcings)
                 if self.sediment_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_sediment[i])
