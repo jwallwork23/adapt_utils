@@ -173,11 +173,11 @@ class CoupledOptions(Options):
     def set_sediment_source(self, fs):
         """Should be implemented in derived class."""
         return
-    
-    def set_sediment_sink(self, fs):
+
+    def set_sediment_sink(self, sediment_model, fs):
         """Should be implemented in derived class."""
         return
-    
+
     def set_sediment_depth_integ_source(self, fs):
         """Should be implemented in derived class."""
         return
@@ -185,7 +185,7 @@ class CoupledOptions(Options):
     def set_sediment_depth_integ_sink(self, fs):
         """Should be implemented in derived class."""
         return
-    
+
     def set_quadratic_drag_coefficient(self, fs):
         """Should be implemented in derived class."""
         return
