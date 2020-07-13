@@ -211,7 +211,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """Set velocity field, viscosity, etc *on each mesh*."""
         self.fields = [AttrDict() for P1 in self.P1]
         for i, P1 in enumerate(self.P1):
-            self.op.create_sediment_model(self.fwd_solutions_bathymetry[i])
+            self.op.create_sediment_model(self.P1.mesh())
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
                 'horizontal_diffusivity': self.op.set_diffusivity(P1),
@@ -825,7 +825,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.tracer_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_tracer[i])
             if op.solve_sediment:
-                self.op.sediment_model.update(ts.shallow_water.solution, self.depth[i])
+                self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i], self.depth[i])
                 ts.sediment.advance(self.simulation_time, update_forcings)
                 if self.sediment_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_sediment[i])
