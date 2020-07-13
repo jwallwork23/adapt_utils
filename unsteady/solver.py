@@ -668,6 +668,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             'solver_parameters': self.op.adjoint_solver_parameters['shallow_water'],
+            'adjoint': True,
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
@@ -677,11 +678,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def _create_adjoint_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
 
-        # Reverse the flow because we are going backwards in time
-        fields.uv_2d *= -1
-
         # Account for dJdc
-        dJdc = self.op.set_qoi_kernel_tracer(self, i)
+        dJdc = self.op.set_qoi_kernel_tracer(self, i)  # TODO: Store this kernel somewhere
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         fields['source'] = self.time_kernel*dJdc
 
@@ -691,6 +689,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
             'solver_parameters': self.op.adjoint_solver_parameters['tracer'],
+            'adjoint': True,
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation

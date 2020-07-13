@@ -23,6 +23,7 @@ parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
+parser.add_argument("-debug", help="Toggle debugging")
 args = parser.parse_args()
 
 i = int(args.level or 0)
@@ -48,6 +49,9 @@ kwargs = {
     'dt': np.pi/(100*n),
     # 'dt': np.pi/(300*n),
     'dt_per_export': 10*n,
+
+    # Misc
+    'debug': bool(args.debug or False),
 }
 op = LeVequeOptions(**kwargs)
 di = op.di
