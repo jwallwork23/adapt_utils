@@ -3,6 +3,8 @@ from thetis.equation import *
 from thetis.shallowwater_eq import ShallowWaterTerm
 from thetis.utility import *
 
+import warnings
+
 
 __all__ = ["AdjointShallowWaterEquations"]
 
@@ -25,12 +27,15 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
             zeta_ext = zeta_in  # assume symmetry
             z_ext = z_in  # assume symmetry
+            warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         elif 'elev' not in funcs:  # ∂Ω \ Γ₂
             zeta_ext = zeta_in  # assume symmetry
             z_ext = Constant(0.0)*self.normal
+            warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         elif 'un' not in funcs:  # ∂Ω \ Γ₁
             zeta_ext = Constant(0.0)
             z_ext = z_in  # assume symmetry
+            warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         else:
             raise Exception('Unsupported bnd type: {:}'.format(funcs.keys()))
         return zeta_ext, z_ext
@@ -84,6 +89,7 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
         if z_by_parts:
             f = -g_grav*inner(z, grad(self.zeta_test))*self.dx
             if self.z_continuity in ['dg', 'hdiv']:
+                # f += g_grav * self.zeta_test * inner(z, self.normal) * self.dS  # TODO
                 raise NotImplementedError
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
@@ -123,7 +129,9 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
 
         f = 0
         if self.zeta_is_dg:
-            raise NotImplementedError  # TODO
+            f += -inner(zeta, div(total_h*self.z_test))*self.dx
+            # f += total_h * zeta * inner(self.z_test, self.normal) * self.dS  # TODO
+            raise NotImplementedError
         else:
             f += inner(self.z_test, total_h*grad(zeta))*self.dx
         return -f
@@ -138,11 +146,16 @@ class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
         \mathbf u \cdot \nabla \eta^*
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-
+        f = 0
+        if not self.options.use_nonlinear_equations:
+            return f
         uv = fields.get('uv_2d')  # TODO
-        f = -inner(self.zeta_test*uv, grad(zeta))*self.dx
         if self.zeta_is_dg:
-            raise NotImplementedError  # TODO
+            f += -inner(div(self.zeta_test*uv), zeta)*self.dx
+            # f += zeta * self.zeta_test * inner(uv, self.normal) * self.dS  # TODO
+            raise NotImplementedError
+        else:
+            f += inner(self.zeta_test*uv, grad(zeta))*self.dx
         return -f
 
 
@@ -155,9 +168,9 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
         + \mathbf u \cdot \nabla \mathbf u^*
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-
+        f = 0
         if not self.options.use_nonlinear_equations:
-            return 0
+            return f
 
         raise NotImplementedError  # TODO
 
@@ -191,7 +204,7 @@ class CoriolisTerm(AdjointShallowWaterMomentumTerm):
         coriolis = fields_old.get('coriolis')
         f = 0
         if coriolis is not None:
-            f += -coriolis*(-z[1]*self.z_test[0] + z[0]*self.z_test[1])*self.dx
+            f += coriolis*(-z[1]*self.z_test[0] + z[0]*self.z_test[1])*self.dx
         return -f
 
 
@@ -220,8 +233,8 @@ class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
             raise Exception('Adjoint equation does not have access to forward solution velocity')
         if C_D is not None:
             unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
-            f += C_D*unorm*inner(self.z_test, z)*self.dx
-            f += C_D*inner(self.z_test, uv)*inner(z, uv)/unorm*self.dx
+            f += -C_D*unorm*inner(self.z_test, z)*self.dx
+            f += -C_D*inner(self.z_test, uv)*inner(z, uv)/unorm*self.dx
         return -f
 
 
@@ -250,7 +263,7 @@ class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
             raise Exception('Adjoint equation does not have access to forward solution velocity')
         if C_D is not None:
             unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
-            f += -C_D*unorm*inner(z, uv)*self.zeta_test/total_h**2*self.dx
+            f += C_D*unorm*inner(z, uv)*self.zeta_test/total_h**2*self.dx
         return -f
 
 
