@@ -96,11 +96,25 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
         return -f
 
 
-class HUDivTerm(AdjointShallowWaterMomentumTerm):
+class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        total_h = self.depth.get_total_depth(zeta_old)
+        if self.options.use_nonlinear_equations:
+            eta = fields.get('elev_2d')  # TODO
+            total_h = self.depth.get_total_depth(eta)
+        else:
+            total_h = self.depth.get_total_depth(zeta_old)
 
         f = -inner(self.z_test, grad(total_h*zeta))*self.dx
+        if self.zeta_is_dg:
+            raise NotImplementedError  # TODO
+        return -f
+
+
+class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
+    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+
+        uv = fields.get('uv_2d')  # TODO
+        f = -inner(self.zeta_test*uv, grad(zeta))*self.dx
         if self.zeta_is_dg:
             raise NotImplementedError  # TODO
         return -f
@@ -171,7 +185,7 @@ class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
         return -f
 
 
-class QuadraticDragTermContinuity(AdjointShallowWaterMomentumTerm):
+class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         total_h = self.depth.get_total_depth(zeta_old)
         manning_drag_coefficient = fields_old.get('manning_drag_coefficient')
@@ -260,7 +274,7 @@ class BaseAdjointShallowWaterEquation(Equation):
         self.options = options
 
     def add_momentum_terms(self, *args):
-        self.add_term(HUDivTerm(*args), 'implicit')
+        self.add_term(HUDivTermMomentum(*args), 'implicit')
         self.add_term(HorizontalAdvectionTerm(*args), 'explicit')
         self.add_term(HorizontalViscosityTerm(*args), 'explicit')
         self.add_term(CoriolisTerm(*args), 'explicit')
@@ -273,6 +287,7 @@ class BaseAdjointShallowWaterEquation(Equation):
         self.add_term(MomentumSourceTerm(*args), 'source')
 
     def add_continuity_terms(self, *args):
+        self.add_term(HUDivTermContinuity(*args), 'implicit')
         self.add_term(ExternalPressureGradientTerm(*args), 'implicit')
         self.add_term(ContinuitySourceTerm(*args), 'source')
         self.add_term(QuadraticDragTermContinuity(*args), 'explicit')
