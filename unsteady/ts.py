@@ -33,7 +33,7 @@ class CrankNicolson(thetis_ts.CrankNicolson):
 
     See `thetis/timeintegrator.py` for original version.
     """
-    def __init__(self, equation, solution, fields, dt, bnd_conditions=None, solver_parameters={}, theta=0.5, semi_implicit=False, error_estimator=None, adjoint=False):
+    def __init__(self, equation, solution, fields, dt, solver_parameters={}, bnd_conditions=None, theta=0.5, semi_implicit=False, error_estimator=None, adjoint=False):
         """
         :arg equation: the equation to solve
         :type equation: :class:`Equation` object
@@ -49,6 +49,7 @@ class CrankNicolson(thetis_ts.CrankNicolson):
         super(thetis_ts.CrankNicolson, self).__init__(equation, solution, fields, dt, solver_parameters)
         self.semi_implicit = semi_implicit
         self.theta = theta
+        self.adjoint = adjoint
 
         self.solver_parameters.setdefault('snes_type', 'ksponly' if semi_implicit else 'newtonls')
         self.solution_old = Function(self.equation.function_space, name='solution_old')
@@ -72,9 +73,10 @@ class CrankNicolson(thetis_ts.CrankNicolson):
 
         # Crank-Nicolson
         theta_const = Constant(theta)
-        self.F = self.equation.mass_term(u) - self.equation.mass_term(u_old)
-        if adjoint:
-            self.F = -self.F  # Account for reversed time direction in adjoint
+        if adjoint:  # Account for reversed time direction in adjoint
+            self.F = self.equation.mass_term(u_old) - self.equation.mass_term(u)
+        else:
+            self.F = self.equation.mass_term(u) - self.equation.mass_term(u_old)
         self.F += -self.dt_const*theta_const*self.equation.residual('all', u, u_nl, f, f, bnd)
         self.F += -self.dt_const*(1-theta_const)*self.equation.residual('all', u_old, u_old, f_old, f_old, bnd)
         self.update_solver()
@@ -82,6 +84,19 @@ class CrankNicolson(thetis_ts.CrankNicolson):
         # Setup error estimator
         self.error_estimator = error_estimator
         print_output("#### TODO: Setup strong residual for Crank-Nicolson")  # TODO
+
+    def advance(self, t, update_forcings=None):
+        """Advances equations for one time step."""
+        if update_forcings is not None:
+            if self.adjoint:
+                update_forcings(t - self.dt)
+            else:
+                update_forcings(t + self.dt)
+        self.solution_old.assign(self.solution)
+        self.solver.solve()
+        # shift time
+        for k in sorted(self.fields_old):
+            self.fields_old[k].assign(self.fields[k])
 
     def setup_error_estimator(self, solution, solution_old, adjoint, bnd_conditions):
         ee = self.error_estimator
