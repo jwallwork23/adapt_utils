@@ -97,7 +97,7 @@ class AdaptiveProblemBase(object):
         op.print_debug(op.indent + "SETUP: Creating solutions...")
         self.create_solutions()
         op.print_debug(op.indent + "SETUP: Creating fields...")
-        self.set_fields()
+        self.set_fields(init = True)
         op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")

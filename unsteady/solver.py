@@ -206,11 +206,23 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.fwd_solutions_bathymetry = [Function(W, name="Forward bathymetry solution") for W in self.W]            
 
-    def set_fields(self):
+    def set_fields(self, init = False):
         """Set velocity field, viscosity, etc *on each mesh*."""
         self.fields = [AttrDict() for P1 in self.P1]
+        if self.op.solve_exner:
+            if init:
+                import ipdb; ipdb.set_trace()
+                self.fwd_solutions_bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
+            self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
+            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+                self.depth[i] = DepthExpression(
+                    bathymetry,
+                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+                    )
+                self.op.create_sediment_model(self.P1[i].mesh(), self.fwd_solutions_bathymetry[i])
         for i, P1 in enumerate(self.P1):
-            self.op.create_sediment_model(self.P1.mesh())
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
                 'horizontal_diffusivity': self.op.set_diffusivity(P1),
@@ -239,15 +251,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
                     wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
                     )
-        else:
-            self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
-            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                    )
+
 
     # --- Stabilisation
 
@@ -573,7 +577,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
-    
+
     def _get_fields_for_exner_timestepper(self, i):
         u, eta = self.fwd_solutions[i].split()
         fields = AttrDict({
@@ -787,10 +791,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.sediment_file.write(proj_sediment)
         if op.solve_exner and plot_pvd:
             proj_bath = Function(self.P1[i], name="Projected bathymetry")
-            self.bathymetry_file._topology = None
+            self.exner_file._topology = None
             if i == 0:
                 proj_bath.project(self.fwd_solutions_bathymetry[i])
-                self.bathymetry_file.write(proj_bath)
+                self.exner_file.write(proj_bath)
 
         t_epsilon = 1.0e-05
         iteration = 0
@@ -856,7 +860,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.sediment_file.write(proj_sediment)
                 if op.solve_exner and plot_pvd:
                     proj_bath.project(self.fwd_solutions_bathymetry[i])
-                    self.bathymetry_file.write(proj_bath)
+                    self.exner_file.write(proj_bath)
                 if export_func is not None:
                     export_func()
                 self.callbacks[i].evaluate(mode='export')

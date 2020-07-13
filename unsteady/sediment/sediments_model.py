@@ -222,7 +222,6 @@ class SedimentModel(object):
                 self.options.tracer_advective_velocity_factor = self.corr_factor_model.corr_vel_factor
         else:
             self.options.solve_tracer = False
-
         if self.bedload:
             # calculate angle of flow
             self.calfa = Function(self.V).project(self.horizontal_velocity/sqrt(self.unorm))
@@ -316,13 +315,11 @@ class SedimentModel(object):
         # extract new elevation and velocity and project onto CG space
         self.uv1, self.elev1 = fwd_solution.split()
         self.uv_cg.project(self.uv1)
-
         if self.wetting_and_drying:
             self.wetting_alpha_fn.interpolate(abs(self.dzdx))
             self.depth.project(self.elev1 + depth_expr.wd_bathymetry_displacement(self.elev1) + self.old_bathymetry_2d)
         else:
             self.depth.project(self.elev1 + self.old_bathymetry_2d)
-
         if self.suspendedload:
             # source term
 
@@ -346,3 +343,4 @@ class SedimentModel(object):
             else:
                 self.sediment_rate.assign(self.ceq.at([0, 0])/(self.coeff.at([0, 0])))
                 self.equiltracer.project(self.ceq/self.coeff)
+
