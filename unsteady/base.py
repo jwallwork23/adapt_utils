@@ -55,11 +55,14 @@ class AdaptiveProblemBase(object):
 
         # Setup problem
         self.setup_all(meshes)
-        implemented_steppers = {  # TODO: Other timesteppers
+        implemented_steppers = {
             'CrankNicolson': CrankNicolson,
             'SteadyState': SteadyState,
         }
-        assert op.timestepper in implemented_steppers
+        try:
+            assert op.timestepper in implemented_steppers
+        except AssertionError:
+            raise NotImplementedError("Time integrator {:s} not implemented".format(op.timestepper))
         self.integrator = implemented_steppers[self.op.timestepper]
         if op.timestepper == 'SteadyState':
             assert op.end_time < op.dt
