@@ -87,7 +87,7 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
         z_by_parts = True  # So we can enforce free-slip conditions
 
         if z_by_parts:
-            f = -g_grav*inner(z, grad(self.zeta_test))*self.dx
+            f = -g_grav*inner(grad(self.zeta_test), z)*self.dx
             if self.z_continuity in ['dg', 'hdiv']:
                 # f += g_grav * self.zeta_test * inner(z, self.normal) * self.dS  # TODO
                 raise NotImplementedError
@@ -101,7 +101,7 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
                 else:
                     raise NotImplementedError
         else:
-            f = g_grav*inner(div(z), self.zeta_test)*self.dx
+            f = g_grav*self.zeta_test*nabla_div(z)*self.dx
 
         return -f
 
@@ -151,11 +151,11 @@ class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
             return f
         uv = fields.get('uv_2d')  # TODO
         if self.zeta_is_dg:
-            f += -inner(div(self.zeta_test*uv), zeta)*self.dx
+            f += -div(self.zeta_test*uv)*zeta*self.dx
             # f += zeta * self.zeta_test * inner(uv, self.normal) * self.dS  # TODO
             raise NotImplementedError
         else:
-            f += inner(self.zeta_test*uv, grad(zeta))*self.dx
+            f += inner(grad(zeta), self.zeta_test*uv)*self.dx
         return -f
 
 
