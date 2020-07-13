@@ -66,17 +66,17 @@ class AnnotatedTracerProblem(AdaptiveDiscreteAdjointProblem):
         return assemble(kernel*sol*dx)
 
 
-# Run model
-op.di = create_directory(os.path.join(di, 'discrete'))
-tp_discrete = AnnotatedTracerProblem(op)
-print_output("Running forward model...")
-tp_discrete.solve_forward()
-
-# Compute gradient w.r.t. fluid speed and extract adjoint solution
-print_output("Running discrete adjoint model...")
-q = tp_discrete.fwd_solutions[0]  # An arbitrary control
-tp_discrete.compute_gradient(Control(q))  # TODO: just use solve_adjoint once merged
-tp_discrete.save_adjoint_trajectory()
+# # Run model
+# op.di = create_directory(os.path.join(di, 'discrete'))
+# tp_discrete = AnnotatedTracerProblem(op)
+# print_output("Running forward model...")
+# tp_discrete.solve_forward()
+#
+# # Compute gradient w.r.t. fluid speed and extract adjoint solution
+# print_output("Running discrete adjoint model...")
+# q = tp_discrete.fwd_solutions[0]  # An arbitrary control
+# tp_discrete.compute_gradient(Control(q))  # TODO: just use solve_adjoint once merged
+# tp_discrete.save_adjoint_trajectory()
 stop_annotating()
 
 
