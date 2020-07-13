@@ -93,7 +93,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.angle_correction = True
         self.suspended = True
         self.convective_vel_flag = False
-        self.bedload = True
+        self.bedload = False
 
         if not hasattr(self, 'bathymetry') or self.bathymetry is None:
             self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
