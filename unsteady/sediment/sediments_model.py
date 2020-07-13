@@ -309,9 +309,9 @@ class SedimentModel(object):
 
         return self.qbx, self.qby
 
-    def update(self, fwd_solution, depth_expr):
+    def update(self, fwd_solution, fwd_solution_bathymetry, depth_expr):
         # update bathymetry
-        self.old_bathymetry_2d.project(self.bathymetry_2d)
+        self.old_bathymetry_2d.project(fwd_solution_bathymetry)
 
         # extract new elevation and velocity and project onto CG space
         self.uv1, self.elev1 = fwd_solution.split()

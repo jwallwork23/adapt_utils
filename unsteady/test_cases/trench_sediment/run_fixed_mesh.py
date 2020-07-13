@@ -1,4 +1,4 @@
-from adapt_utils.unsteady.test_cases.trench_hydro.options import BalzanoOptions
+from adapt_utils.unsteady.test_cases.trench_sediment.options import TrenchSedimentOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 #import argparse
@@ -16,16 +16,16 @@ kwargs = {
     'nx': 1,
     'ny': 1,
     'plot_pvd': True,
-
+    'input_dir': 'hydrodynamics_trench',
     # Geometry
     #'bathymetry_type': int(args.bathymetry_type or 1),
 
     # Spatial discretisation
-    'family': 'dg-cg',
+    'family': 'dg-dg',
     'stabilisation': None,
     'use_automatic_sipg_parameter': True,
 }
 
-op = BalzanoOptions(**kwargs)
+op = TrenchSedimentOptions(**kwargs)
 swp = AdaptiveProblem(op)
 swp.solve_forward()

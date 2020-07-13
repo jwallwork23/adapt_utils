@@ -50,4 +50,4 @@ class SedimentEquation2D(Equation):
             self.add_term(HorizontalAdvectionTerm(*args), 'explicit')
             self.add_term(HorizontalDiffusionTerm(*args), 'explicit')
         self.add_term(SedimentSourceTerm(*args_sediment), 'source')
-        self.add_term(SedimentSinkTerm(*args_sediment), 'source')
+        self.add_term(SedimentSinkTerm(*args_sediment), 'implicit')

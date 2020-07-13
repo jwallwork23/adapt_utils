@@ -53,11 +53,11 @@ class TrenchSedimentOptions(CoupledOptions):
 
         self.set_up_morph_model(input_dir, self.default_mesh)        
 
-        self.morfac = 100
+        self.morphological_acceleration_factor = Constant(100)
 
         # Time integration
         self.dt = 0.25
-        self.end_time = self.num_hours*3600.0/self.morfac
+        self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 48
         self.dt_per_export = 48
         self.timestepper = 'CrankNicolson'
@@ -92,7 +92,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.slope_eff = True
         self.angle_correction = True
         self.suspended = True
-        self.convective_vel_flag = True
+        self.convective_vel_flag = False
         self.bedload = True
 
         if not hasattr(self, 'bathymetry') or self.bathymetry is None:
@@ -111,12 +111,20 @@ class TrenchSedimentOptions(CoupledOptions):
 
         #self.eta_d = Function(self.P1DG).project(self.elev_init)
 
-    def create_sediment_model(self, solution, bathymetry):
-         uv_d, eta_d = solution.split()
-         self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
+    def create_sediment_model(self, mesh):
+        self.P1 = FunctionSpace(mesh, "CG", 1)
+        self.P1DG = FunctionSpace(mesh, "DG", 1)
+        self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
+        
+        bathymetry = self.set_bathymetry(P1)
+
+        self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
+
+        self.eta_d = Function(self.P1DG).project(self.elev_init)
+        self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
             bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
-            mesh2d=uv_d.function_space().mesh(), bathymetry_2d=bathymetry,
-                            uv_init = uv_d, elev_init = eta_d, ks=self.ks, average_size=self.average_size,
+            mesh2d=mesh, bathymetry_2d=bathymetry,
+                            uv_init = self.uv_d, elev_init = self.eta_d, ks=self.ks, average_size=self.average_size,
                             cons_tracer = self.conservative, wetting_and_drying = self.wetting_and_drying)
 
     def set_quadratic_drag_coefficient(self, fs):
@@ -167,14 +175,20 @@ class TrenchSedimentOptions(CoupledOptions):
         eta.project(self.elev_init)
 
     def set_sediment_source(self, fs):
-        return self.sediment_model.ero_term
+        if self.suspended:
+            return self.sediment_model.ero_term
+        else:
+            return None
 
     def set_sediment_sink(self, fs):
-        return self.sediment_model.depo_term
+        if self.suspended:
+            return self.sediment_model.depo_term
+        else:
+            return None
 
     def set_advective_velocity_factor(self, fs):
         if self.convective_vel_flag:
-            return Function(fs).project(self.sediment_model.corr_factor_model.corr_vel_factor)
+            return self.sediment_model.corr_factor_model.corr_vel_factor
         else:
             return Constant(1.0)
 

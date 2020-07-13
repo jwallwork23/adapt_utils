@@ -192,7 +192,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         for i, V in enumerate(self.V):
             self.fwd_solutions[i] = Function(V, name='Forward solution')
             u, eta = self.fwd_solutions[i].split()
-            u.interpolate(as_vector((10**(-7), 0.0)))
             u.rename("Fluid velocity")
             eta.rename("Elevation")
             self.adj_solutions[i] = Function(V, name='Adjoint solution')
@@ -211,7 +210,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """Set velocity field, viscosity, etc *on each mesh*."""
         self.fields = [AttrDict() for P1 in self.P1]
         for i, P1 in enumerate(self.P1):
-            self.op.create_sediment_model(self.fwd_solutions[i], self.fwd_solutions_bathymetry[i])
+            self.op.create_sediment_model(self.P1.mesh())
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
                 'horizontal_diffusivity': self.op.set_diffusivity(P1),
@@ -225,9 +224,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.fields[i].update({
                 'tracer_source_2d': self.op.set_tracer_source(P1DG),
                 'sediment_source_2d': self.op.set_sediment_source(P1DG),
-                'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
+                #'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
                 'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
-                'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
+                #'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
             })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
         if not self.op.solve_exner:
@@ -356,7 +355,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_sediment:
             self.project(self.fwd_solutions_sediment, i, j)
         if self.op.solve_exner:
-            self.project(self.fwd_solutions_bathymetry, i, j)            
+            self.project(self.fwd_solutions_bathymetry, i, j)
 
     def project_adjoint_solution(self, i, j):
         """Project adjoint solution(s) from mesh `i` to mesh `j`."""
@@ -455,20 +454,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
-
-    # --- Sediment model
-    #def create_sediment_model(self, fwd_solutions):
-    #    for i, Q in enumerate(self.Q):
-    #        if self.op.solve_exner:
-    #            bath = self.fwd_solutions_bathymetry[i]
-    #        else:
-    #            bath = self.op.set_bathymetry(self.P1[i])
-    #        u, eta = fwd_solutions[i].split()
-    #        self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.op.suspended, convectivevel=self.op.convective_vel_flag,
-    #        bedload=self.op.bedload, angle_correction=self.op.angle_correction, slope_eff=self.op.slope_eff, seccurrent=False,
-    #        mesh2d=self.meshes[i], bathymetry_2d=bath,
-    #                        uv_init = u, elev_init = eta, ks=self.op.ks, average_size=self.op.average_size,
-    #                        cons_tracer = self.op.conservative, wetting_and_drying = self.op.wetting_and_drying)
 
     # --- Error estimators
 
@@ -594,9 +579,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         fields = AttrDict({
             'elev_2d': eta,
             'source': self.fields[i].sediment_source_2d,
-            'depth_integrated_source': self.fields[i].sediment_depth_integ_source,
+            #'depth_integrated_source': self.fields[i].sediment_depth_integ_source,
             'sink': self.fields[i].sediment_sink_2d,
-            'depth_integrated_sink': self.fields[i].sediment_depth_integ_sink,
+            #'depth_integrated_sink': self.fields[i].sediment_depth_integ_sink,
             'sediment': self.fwd_solutions_sediment[i],
             'morfac': self.op.morphological_acceleration_factor,
             'porosity': self.op.porosity,
@@ -723,9 +708,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug(op.indent + "SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
         self.create_timesteppers(i)
         bcs = self.boundary_conditions[i]
-        #if op.solve_exner or op.solve_sediment:
-        #    self.create_sediment_model(self.fwd_solutions)
-        #    op.print_debug(op.indent + "SETUP: Creating sediment model on mesh {:d}...".format(i))
         if op.solve_swe:
             ts = self.timesteppers[i]['shallow_water']
             dbcs = []
@@ -808,7 +790,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.bathymetry_file._topology = None
             if i == 0:
                 proj_bath.project(self.fwd_solutions_bathymetry[i])
-                self.bathymetry_file.write(proj_bath)                
+                self.bathymetry_file.write(proj_bath)
 
         t_epsilon = 1.0e-05
         iteration = 0
@@ -842,7 +824,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.tracer_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_tracer[i])
             if op.solve_sediment:
-                self.op.sediment_model.update(self.fwd_solutions[i], self.depth[i])
+                self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i], self.depth[i])
                 ts.sediment.advance(self.simulation_time, update_forcings)
                 if self.sediment_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_sediment[i])
@@ -874,7 +856,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.sediment_file.write(proj_sediment)
                 if op.solve_exner and plot_pvd:
                     proj_bath.project(self.fwd_solutions_bathymetry[i])
-                    self.bathymetry_file.write(proj_bath)                    
+                    self.bathymetry_file.write(proj_bath)
                 if export_func is not None:
                     export_func()
                 self.callbacks[i].evaluate(mode='export')
