@@ -151,17 +151,15 @@ class CoriolisTerm(AdjointShallowWaterMomentumTerm):
 
 class WindStressTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        wind_stress = fields_old.get('wind_stress')
-        # total_h = self.depth.get_total_depth(zeta_old)
         f = 0
+        if not self.options.use_nonlinear_equations:
+            return f
+        wind_stress = fields_old.get('wind_stress')
+        elev = fields_old.get('elev_2d')  # TODO
+        total_h = self.depth.get_total_depth(elev)
         if wind_stress is not None:
-            raise NotImplementedError  # TODO
+            f += -dot(wind_stress, self.z_test)/total_h**2/rho_0*self.dx
         return f
-
-
-class AtmosphericPressureTerm(AdjointShallowWaterMomentumTerm):
-    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        return 0
 
 
 class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
@@ -235,6 +233,7 @@ class TurbineDragTerm(AdjointShallowWaterMomentumTerm):
         return -f
 
 
+# NOTE: Used for adjoint RHS
 class MomentumSourceTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         f = 0
@@ -242,9 +241,10 @@ class MomentumSourceTerm(AdjointShallowWaterMomentumTerm):
 
         if momentum_source is not None:
             f += inner(momentum_source, self.z_test)*self.dx
-        return f
+        return 0
 
 
+# NOTE: Used for adjoint RHS
 class ContinuitySourceTerm(AdjointShallowWaterContinuityTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         f = 0
@@ -279,7 +279,6 @@ class BaseAdjointShallowWaterEquation(Equation):
         self.add_term(HorizontalViscosityTerm(*args), 'explicit')
         self.add_term(CoriolisTerm(*args), 'explicit')
         self.add_term(WindStressTerm(*args), 'source')
-        self.add_term(AtmosphericPressureTerm(*args), 'source')
         self.add_term(QuadraticDragTermMomentum(*args), 'explicit')
         self.add_term(LinearDragTerm(*args), 'explicit')
         self.add_term(BottomDrag3DTerm(*args), 'source')
