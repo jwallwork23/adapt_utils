@@ -79,13 +79,14 @@ class LeVequeOptions(CoupledOptions):
             'tracer': {
                 'ksp_type': 'gmres',
                 'pc_type': 'sor',
+                # 'ksp_converged_reason': None,
             }
         }
         self.adjoint_solver_parameters = {
             'tracer': {
                 'ksp_type': 'gmres',
                 'pc_type': 'sor',
-                'ksp_converged_reason': None,
+                # 'ksp_converged_reason': None,
             }
         }
 
@@ -131,7 +132,7 @@ class LeVequeOptions(CoupledOptions):
         return rescaling*b
 
     def set_terminal_condition_tracer(self, prob):
-        prob.adj_solutions_tracer[-1].interpolate(self.set_qoi_kernel_tracer(prob, -1)
+        prob.adj_solutions_tracer[-1].interpolate(self.set_qoi_kernel_tracer(prob, -1))
 
     def exact_solution(self, fs):
         raise NotImplementedError  # TODO
@@ -174,7 +175,7 @@ class LeVequeOptions(CoupledOptions):
         kernel = self.set_qoi_kernel_tracer(prob, i)
         return assemble(kernel*sol*dx(degree=12))
 
-    def get_update_forcings(self, prob, i):
+    def get_update_forcings(self, prob, i, adjoint=False):
 
         def update_forcings(t):
             self.set_initial_condition(prob, i=i)

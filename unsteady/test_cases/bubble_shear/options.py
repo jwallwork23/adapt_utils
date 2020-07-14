@@ -62,7 +62,7 @@ class BubbleOptions(CoupledOptions):
     def set_initial_condition_tracer(self, prob):
         prob.fwd_solutions_tracer[0].interpolate(self.ball(prob.meshes[0], source=True))
 
-    def get_update_forcings(self, prob, i):
+    def get_update_forcings(self, prob, i, adjoint=False):
 
         def update_forcings(t):
             self.update_velocity(prob, i, t)
