@@ -211,6 +211,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.fields = [AttrDict() for P1 in self.P1]
         if self.op.solve_exner:
             if init:
+                import ipdb; ipdb.set_trace()
                 self.fwd_solutions_bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
             self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
             for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
@@ -220,7 +221,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
                     wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
                     )
-                import ipdb; ipdb.set_trace()
                 self.op.create_sediment_model(self.P1[i].mesh(), self.fwd_solutions_bathymetry[i])
         for i, P1 in enumerate(self.P1):
             self.fields[i].update({

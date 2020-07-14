@@ -28,7 +28,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.plot_pvd = True
         self.num_hours = 15
 
-        self.di = os.path.join(self.di, 'bathymetry_equitracer')
+        self.di = os.path.join(self.di, 'bathymetry')
 
         # Physical
         self.base_viscosity = 1e-6
@@ -57,10 +57,10 @@ class TrenchSedimentOptions(CoupledOptions):
         self.morphological_acceleration_factor = Constant(100)
 
         # Time integration
-        self.dt = 0.1
+        self.dt = 0.25
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 100
-        self.dt_per_export = 100
+        self.dt_per_mesh_movement = 45
+        self.dt_per_export = 45
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
