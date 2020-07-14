@@ -24,10 +24,10 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
 
     # TODO: just call `solve_adjoint` (once merged)
 
-    def compute_gradient(self, controls):
+    def compute_gradient(self, controls, scaling=1.0):
         """Compute the gradient of the quantity of interest with respect to a list of controls."""
         J = self.quantity_of_interest()
-        return compute_gradient(J, controls)
+        return compute_gradient(J, controls, adj_value=scaling)
 
     def get_solve_blocks(self):
         """Extract all tape blocks which are subclasses of :class:`GenericSolveBlock`."""
