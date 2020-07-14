@@ -192,7 +192,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         for i, V in enumerate(self.V):
             self.fwd_solutions[i] = Function(V, name='Forward solution')
             u, eta = self.fwd_solutions[i].split()
-            u.interpolate(as_vector((10**(-7), 0.0)))
             u.rename("Fluid velocity")
             eta.rename("Elevation")
             self.adj_solutions[i] = Function(V, name='Adjoint solution')
