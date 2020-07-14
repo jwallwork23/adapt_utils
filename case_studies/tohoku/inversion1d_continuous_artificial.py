@@ -18,6 +18,7 @@ parser.add_argument("-initial_guess", help="Initial guess for control parameter"
 parser.add_argument("-optimised_value", help="Optimised control parameter (e.g. from previous run)")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
 parser.add_argument("-recompute", help="Recompute parameter space etc.")
+parser.add_argument("-debug", help="Toggle debugging")
 args = parser.parse_args()
 
 # Set parameters
@@ -40,7 +41,7 @@ kwargs = {
     'artificial': True,
 
     # Misc
-    'debug': True,
+    'debug': bool(args.debug or False),
 }
 nonlinear = False  # TODO
 scaling = 1.0e-10
@@ -92,11 +93,11 @@ def reduced_functional(m):
 
     Note that this involves checkpointing state.
     """
-    op.control_parameter.assign(m)
+    op.control_parameter.assign(m[0])
     swp.solve_forward()
     # J = op.J*scaling
     J = op.J
-    print_output("QoI = {:.8e}".format(J))
+    print_output("control = {:.8e}  functional = {:.8e}".format(m[0], J))
     return J
 
 def gradient(m):
@@ -107,15 +108,18 @@ def gradient(m):
     if len(swp.checkpoint) == 0:
         J = reduced_functional(m)
     swp.solve_adjoint()
-    g = np.array(assemble(inner(op.basis_function, swp.adj_solutions[0])*dx))
-    print_output("gradient = {:.8e}".format(g[0]))
+    g = np.array([assemble(inner(op.basis_function, swp.adj_solutions[0])*dx), ])
+    print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g[0]))
     return g
 
 # Solve the forward problem with some initial guess
+swp.checkpointing = False
 op.save_timeseries = True
-J = reduced_functional(float(args.initial_guess or 10.0))
+m_init = np.array([float(args.initial_guess or 10.0), ])
+J = reduced_functional(m_init)
 print_output("Mean square error QoI = {:.4e}".format(J))
 op.save_timeseries = False
+swp.checkpointing = True
 
 # Plot timeseries
 gauges = list(op.gauges.keys())
@@ -147,19 +151,16 @@ if optimised_value is None or recompute:
     gradient_values_opt = []
 
     def reduced_functional_hat(m):
+        control_values_opt.append(m)
         J = reduced_functional(m)
-        control_values_opt.append(m.dat.data[0])
         func_values_opt.append(J)
         return J
 
     def gradient_hat(m):
         if len(swp.checkpoint) == 0:
             J = scaled_reduced_functional_hat(m)
-        else:
-            J = func_values_opt[-1]
         g = gradient(m)
-        gradient_values_opt.append(g.dat.data[0])
-        print_output("control {:.8e}  functional {:.8e}  gradient {:.8e}".format(m.dat.data[0], J, g.dat.data[0]))
+        gradient_values_opt.append(g[0])
         return g
 
     def opt_cb(m):
@@ -172,7 +173,8 @@ if optimised_value is None or recompute:
         'callback': opt_cb,
         'fprime': gradient_hat,
     }
-    m_opt = scipy.optimize.fmin_bfgs(reduced_functional_hat, op.control_parameter, **opt_kwargs)
+    m_init = op.control_parameter.dat.data
+    m_opt = scipy.optimize.fmin_bfgs(reduced_functional_hat, m_init, **opt_kwargs)
 
     # Store trajectory
     control_values_opt = np.array(control_values_opt)
