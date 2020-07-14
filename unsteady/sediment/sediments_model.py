@@ -222,7 +222,7 @@ class SedimentModel(object):
                 self.options.tracer_advective_velocity_factor = self.corr_factor_model.corr_vel_factor
         else:
             self.options.solve_tracer = False
-
+        import ipdb; ipdb.set_trace()
         if self.bedload:
             # calculate angle of flow
             self.calfa = Function(self.V).project(self.horizontal_velocity/sqrt(self.unorm))
@@ -321,7 +321,7 @@ class SedimentModel(object):
             self.depth.project(self.elev1 + depth_expr.wd_bathymetry_displacement(self.elev1) + self.old_bathymetry_2d)
         else:
             self.depth.project(self.elev1 + self.old_bathymetry_2d)
-
+        import ipdb; ipdb.set_trace()
         if self.suspendedload:
             # source term
 
