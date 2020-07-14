@@ -230,18 +230,22 @@ class TohokuOptions(TsunamiOptions):
         return update_forcings
 
     def _get_update_forcings_adjoint(self, prob, i):
+        eta_obs = Constant(0.0)
 
         def update_forcings(t):
 
             # Get gauge data (loaded from checkpoint)
-            eta_saved = prob.fwd_solutions[i].split()[1]
+            u_saved, eta_saved = prob.fwd_solutions[i].split()
 
             # Sum differences between checkpoint and data
             expr = 0
-            print("#### DEBUG: iteration {:d}/{:d}".format(prob.iteration, len(self.gauges['P02']['data'])))  # TODO: temporary
             for gauge in self.gauges:
-                I = self.gauges[gauge]['indicator']
-                expr += I*(eta_saved - self.gauges[gauge]['data'][prob.iteration-1])
+                if self.artificial:
+                    obs = self.gauges[gauge]["data"][prob.iteration-1]
+                else:
+                    obs = float(self.gauges[gauge]["interpolator"](t))
+                eta_obs.assign(obs)
+                expr += self.gauges[gauge]["indicator"]*(eta_saved - eta_obs)
 
             # Interpolate onto RHS
             k_u, k_eta = prob.kernels[i].split()
@@ -325,10 +329,10 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         self.control_parameter.assign(control_parameter)
 
     def set_initial_condition(self, prob):
-        basis_function = Function(prob.V[0])
-        psi, self.phi = basis_function.split()
+        self.basis_function = Function(prob.V[0])
+        psi, phi = self.basis_function.split()
         loc = (0.7e+06, 4.2e+06)
         radii = (48e+03, 96e+03)
         angle = pi/12
-        self.phi.interpolate(gaussian([loc + radii, ], prob.meshes[0], rotation=angle))
-        prob.fwd_solutions[0].project(self.control_parameter*basis_function)
+        phi.interpolate(gaussian([loc + radii, ], prob.meshes[0], rotation=angle))
+        prob.fwd_solutions[0].project(self.control_parameter*self.basis_function)

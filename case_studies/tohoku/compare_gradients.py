@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.case_studies.tohoku.options import *
 # from adapt_utils.norms import total_variation
 
@@ -33,7 +33,7 @@ kwargs = {
     'debug': True,
     'artificial': True,
 }
-op = TohokuGaussianBasisOptions(**kwargs)
+op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
 
 # Only consider gauges which lie within the spatial domain
 gauges = list(op.gauges.keys())
@@ -47,13 +47,13 @@ gauges = list(op.gauges.keys())
 
 # Solve the forward problem to get data
 with stop_annotating():
-    swp = AdaptiveProblem(op, nonlinear=False)
+    swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=False)
     swp.solve_forward()
     for gauge in op.gauges:
         op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
 # Solve the forward problem
-swp = AdaptiveProblem(op, nonlinear=False)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=False)
 swp.solve_forward()
 scaling = 1.0e+10
 # J = assemble(op.J/scaling)
@@ -85,14 +85,19 @@ plt.savefig(os.path.join(di, 'single_bf_timeseries_level{:d}.pdf'.format(level))
 
 # Compute gradient
 g_discrete = compute_gradient(J, Control(op.control_parameter)).dat.data[0]
+# TODO: g_discrete = swp.compute_gradient(Control(op.control_parameter)).dat.data[0]
 
 # TODO: Taylor test discrete gradient
 
 # Check consistency of by-hand gradient formula
+swp.get_solve_blocks()
+swp.save_adjoint_trajectory()
 tape = get_working_tape()
 solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
-g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)
-# g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)/scaling
+# g_by_hand_discrete = assemble(inner(op.basis_function, solve_blocks[0])*dx)
+# # g_by_hand_discrete = assemble(inner(op.basis_function, solve_blocks[0])*dx)/scaling
+g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
+# g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)/scaling
 print("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
 relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
 print("Relative error: {:.4f}%".format(100*relative_error))
