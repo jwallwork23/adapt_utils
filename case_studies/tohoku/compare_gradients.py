@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.case_studies.tohoku.options import *
 # from adapt_utils.norms import total_variation
@@ -47,13 +48,19 @@ gauges = list(op.gauges.keys())
 
 # Solve the forward problem to get data
 with stop_annotating():
-    swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=False)
+    swp = AdaptiveProblem(op, nonlinear=False)
     swp.solve_forward()
     for gauge in op.gauges:
         op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
+
+class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
+    def quantity_of_interest(self):
+        return self.op.J  # TODO: scaling
+
+
 # Solve the forward problem
-swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=False)
+swp = DiscreteAdjointTsunamiProblem(op, nonlinear=False)
 swp.solve_forward()
 scaling = 1.0e+10
 # J = assemble(op.J/scaling)
@@ -84,8 +91,8 @@ plt.savefig(os.path.join(di, 'single_bf_timeseries_level{:d}.pdf'.format(level))
 # TODO: Compare discrete vs continuous form of error using norms / TV
 
 # Compute gradient
-g_discrete = compute_gradient(J, Control(op.control_parameter)).dat.data[0]
-# TODO: g_discrete = swp.compute_gradient(Control(op.control_parameter)).dat.data[0]
+# g_discrete = compute_gradient(J, Control(op.control_parameter)).dat.data[0]
+g_discrete = swp.compute_gradient(Control(op.control_parameter)).dat.data[0]
 
 # TODO: Taylor test discrete gradient
 
@@ -94,8 +101,6 @@ swp.get_solve_blocks()
 swp.save_adjoint_trajectory()
 tape = get_working_tape()
 solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
-# g_by_hand_discrete = assemble(inner(op.basis_function, solve_blocks[0])*dx)
-# # g_by_hand_discrete = assemble(inner(op.basis_function, solve_blocks[0])*dx)/scaling
 g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
 # g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)/scaling
 print("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
@@ -103,5 +108,5 @@ relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
 print("Relative error: {:.4f}%".format(100*relative_error))
 assert np.allclose(relative_error, 0.0)
 
-# TODO: Continuous adjoint (in nonlinear case with Manning friction)
+# TODO: Continuous adjoint
 # TODO: Taylor test continuous gradient
