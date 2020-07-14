@@ -12,8 +12,8 @@ outputdir = 'outputs' + st
 
 kwargs = {
     'approach': 'fixed_mesh',
-    'nx': 4,
-    'ny': 2,
+    'nx': 1,
+    'ny': 1,
     'plot_pvd': True,
     'input_dir': 'hydrodynamics_trench_4',
     'output_dir': outputdir,
