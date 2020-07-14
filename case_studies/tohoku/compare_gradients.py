@@ -117,5 +117,10 @@ g_continuous = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
 print_output("Gradient computed by hand (continuous): {:.4e}".format(g_continuous))
 relative_error = abs((g_discrete - g_continuous)/g_discrete)
 print_output("Relative error (discrete vs. continuous): {:.4f}%".format(100*relative_error))
+with open('outputs/fixed_mesh/gradient_{:d}.log'.format(level), 'w') as logfile:
+    logfile.write("elements: {:d}".format(swp.meshes[0].num_cells()))
+    # TODO: finite difference gradient
+    logfile.write("discrete gradient: {:.4e}".format(g_discrete))
+    logfile.write("continuous gradient: {:.4e}".format(g_continuous))
 
 # TODO: Taylor test continuous gradient
