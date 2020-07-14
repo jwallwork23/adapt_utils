@@ -132,19 +132,27 @@ if optimised_value is None or recompute:
         gradient_values_opt.append(gradient)
         print_output("control {:.8e}  functional  {:.8e}  gradient {:.8e}".format(control, j, gradient))
 
+        # Stagnation termination condition
+        if len(func_values_opt) > 1:
+            if abs(func_values_opt[-1] - func_values_opt[-2]) < 1.0e-06*abs(func_values_opt[-2]):
+                raise ConvergenceError
+
     # Run BFGS optimisation
     opt_kwargs = {  # TODO: Tighter tolerances
         'maxiter': 10,
         'gtol': 1.0e-02,
     }
     Jhat = ReducedFunctional(J, Control(op.control_parameter), derivative_cb_post=derivative_cb_post)
-    m_opt = minimize(Jhat, method='BFGS', options=opt_kwargs)
+    try:
+        optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs).dat.data[0]
+    except ConvergenceError:
+        optimised_value = control_values_opt[-1]
+        print_output("ConvergenceError: Stagnation of objective functional")
 
     # Store trajectory
     control_values_opt = np.array(control_values_opt)
     func_values_opt = np.array(func_values_opt)
     gradient_values_opt = np.array(gradient_values_opt)
-    optimised_value = m_opt.dat.data[0]
     np.save(os.path.join(op.di, fname.format('ctrl', level)), control_values_opt)
     np.save(os.path.join(op.di, fname.format('func', level)), func_values_opt)
     np.save(os.path.join(op.di, fname.format('grad', level)), gradient_values_opt)
