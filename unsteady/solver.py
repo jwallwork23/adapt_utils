@@ -221,7 +221,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
                     )
                 import ipdb; ipdb.set_trace()
-                self.op.create_sediment_model(self.P1[i].mesh())
+                self.op.create_sediment_model(self.P1[i].mesh(), self.fwd_solutions_bathymetry[i])
         for i, P1 in enumerate(self.P1):
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),

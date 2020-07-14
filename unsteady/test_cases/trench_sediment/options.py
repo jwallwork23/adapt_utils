@@ -99,12 +99,9 @@ class TrenchSedimentOptions(CoupledOptions):
         #    self.bathymetry = self.set_bathymetry(self.P1)
 
 
-    def create_sediment_model(self, mesh):
-        self.P1 = FunctionSpace(mesh, "CG", 1)
+    def create_sediment_model(self, mesh, bathymetry):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
-
-        bathymetry = self.set_bathymetry(self.P1)
 
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
 
