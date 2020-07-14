@@ -210,7 +210,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """Set velocity field, viscosity, etc *on each mesh*."""
         self.fields = [AttrDict() for P1 in self.P1]
         for i, P1 in enumerate(self.P1):
-            self.op.create_sediment_model(self.P1.mesh())
+            self.op.create_sediment_model(P1.mesh())
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
                 'horizontal_diffusivity': self.op.set_diffusivity(P1),
@@ -573,7 +573,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
-    
+
     def _get_fields_for_exner_timestepper(self, i):
         u, eta = self.fwd_solutions[i].split()
         fields = AttrDict({
@@ -787,10 +787,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.sediment_file.write(proj_sediment)
         if op.solve_exner and plot_pvd:
             proj_bath = Function(self.P1[i], name="Projected bathymetry")
-            self.bathymetry_file._topology = None
+            self.exner_file._topology = None
             if i == 0:
                 proj_bath.project(self.fwd_solutions_bathymetry[i])
-                self.bathymetry_file.write(proj_bath)
+                self.exner_file.write(proj_bath)
 
         t_epsilon = 1.0e-05
         iteration = 0
@@ -856,7 +856,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.sediment_file.write(proj_sediment)
                 if op.solve_exner and plot_pvd:
                     proj_bath.project(self.fwd_solutions_bathymetry[i])
-                    self.bathymetry_file.write(proj_bath)
+                    self.exner_file.write(proj_bath)
                 if export_func is not None:
                     export_func()
                 self.callbacks[i].evaluate(mode='export')

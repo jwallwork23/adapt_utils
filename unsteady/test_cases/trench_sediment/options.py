@@ -21,18 +21,17 @@ __all__ = ["TrenchSedimentOptions"]
 
 class TrenchSedimentOptions(CoupledOptions):
 
-    def __init__(self, friction='nikuradse', plot_timeseries=False, nx=1, ny=1, input_dir = None, **kwargs):
+    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, **kwargs):
         super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
         self.num_hours = 15
 
-        self.di = os.path.join(self.di, 'bathymetry')
+        self.di = os.path.join(self.di, 'bathymetry_equitracer')
 
         # Physical
         self.base_viscosity = 1e-6
-        self.base_diffusivity = 0.15
         self.wetting_and_drying = False
         self.solve_sediment = True
         self.solve_exner = True
@@ -44,7 +43,9 @@ class TrenchSedimentOptions(CoupledOptions):
         self.friction = friction
         self.average_size = 160e-6  # Average sediment size
         self.friction_coeff = 0.025
-        self.ksp = None
+        self.ksp = Constant(3*self.average_size)
+        self.norm_smoother = Constant(0.1)
+
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
 
@@ -56,10 +57,10 @@ class TrenchSedimentOptions(CoupledOptions):
         self.morphological_acceleration_factor = Constant(100)
 
         # Time integration
-        self.dt = 0.25
+        self.dt = 0.1
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 48
-        self.dt_per_export = 48
+        self.dt_per_mesh_movement = 100
+        self.dt_per_export = 100
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
@@ -79,7 +80,6 @@ class TrenchSedimentOptions(CoupledOptions):
     def set_up_morph_model(self, input_dir, mesh = None):
 
         # Physical
-        self.base_viscosity = 1e-6        
         self.base_diffusivity = 0.18161630470135287
 
         self.porosity = Constant(0.4)
@@ -88,35 +88,23 @@ class TrenchSedimentOptions(CoupledOptions):
 
         self.wetting_and_drying = False
         self.conservative = False
-        self.implicit_source = False
         self.slope_eff = True
         self.angle_correction = True
         self.suspended = True
-        self.convective_vel_flag = False
+        self.convective_vel_flag = True
         self.bedload = True
 
-        if not hasattr(self, 'bathymetry') or self.bathymetry is None:
-            self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
-            self.bathymetry = self.set_bathymetry(self.P1)
+        #if not hasattr(self, 'bathymetry') or self.bathymetry is None:
+        #    self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
+        #    self.bathymetry = self.set_bathymetry(self.P1)
 
-
-        if self.suspended:
-            self.tracer_init = None
-
-        #self.P1DG = FunctionSpace(self.default_mesh, "DG", 1)
-        #self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
-        #self.P1_vec_dg = VectorFunctionSpace(self.default_mesh, "DG", 1)
-
-        #self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
-
-        #self.eta_d = Function(self.P1DG).project(self.elev_init)
 
     def create_sediment_model(self, mesh):
         self.P1 = FunctionSpace(mesh, "CG", 1)
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
-        
-        bathymetry = self.set_bathymetry(P1)
+
+        bathymetry = self.set_bathymetry(self.P1)
 
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
 
@@ -153,6 +141,11 @@ class TrenchSedimentOptions(CoupledOptions):
                              conditional(le(x, 9.5), depth_trench, conditional(le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
         return interpolate(-trench, fs)
 
+    def set_viscosity(self, fs):
+        self.viscosity = Function(fs)
+        self.viscosity.assign(self.base_viscosity)
+        return self.viscosity
+
     def set_boundary_conditions(self, prob, i):
         inflow_tag = 1
         outflow_tag = 2
@@ -164,7 +157,7 @@ class TrenchSedimentOptions(CoupledOptions):
                 outflow_tag: {'elev': Constant(0.397)},
             },
 	   'sediment': {
-                inflow_tag: {'value': self.sediment_model.sediment_rate}
+                inflow_tag: {'value': self.sediment_model.equiltracer}
             }
         }
         return boundary_conditions
@@ -193,10 +186,10 @@ class TrenchSedimentOptions(CoupledOptions):
             return Constant(1.0)
 
     def set_initial_condition_sediment(self, prob):
-        prob.fwd_solutions_sediment[0].interpolate(self.sediment_model.equiltracer)
+        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0)) #self.sediment_model.equiltracer)
 
     def set_initial_condition_bathymetry(self, prob):
-       prob.fwd_solutions_bathymetry[0] = self.bathymetry
+       prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
 
     def get_update_forcings(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()
