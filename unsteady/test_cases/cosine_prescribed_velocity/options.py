@@ -41,7 +41,7 @@ class CosinePrescribedVelocityOptions(CoupledOptions):
         x0, y0 = 5.0, 5.0
         prob.fwd_solutions_tracer[0].interpolate(exp(-((x-x0)**2 + (y-y0)**2)))
 
-    def get_update_forcings(self, prob, i):
+    def get_update_forcings(self, prob, i, adjoint=False):
         x, y = SpatialCoordinate(prob.meshes[i])
         u, eta = prob.fwd_solutions[i].split()
 
