@@ -105,12 +105,13 @@ class TsunamiOptions(CoupledOptions):
         eta.interpolate(self.set_initial_surface(prob.P1[0]))
 
     def set_coriolis(self, fs):
-        x, y = SpatialCoordinate(fs.mesh())
-        lat, lon = to_latlon(
-            x, y, self.force_zone_number,
-            northern=True, coords=fs.mesh().coordinates, force_longitude=True
-        )
-        return interpolate(2*self.Omega*sin(radians(lat)), fs)
+        # x, y = SpatialCoordinate(fs.mesh())
+        # lat, lon = to_latlon(
+        #     x, y, self.force_zone_number,
+        #     northern=True, coords=fs.mesh().coordinates, force_longitude=True
+        # )
+        # return interpolate(2*self.Omega*sin(radians(lat)), fs)
+        return
 
     def set_qoi_kernel(self, prob, i):
         fs = prob.V[i]
@@ -131,19 +132,20 @@ class TsunamiOptions(CoupledOptions):
         kernel_eta.rename("QoI kernel (elev component)")
         kernel_eta.interpolate(rescaling*b)
 
-    def set_terminal_condition(self, prob):
-        # b = self.ball(prob.meshes[-1], source=False)
-        # b = self.circular_bump(prob.meshes[-1], source=False)
-        b = self.gaussian(prob.meshes[-1], source=False)
+    def set_terminal_condition(self, prob):  # TODO: For hazard case
+        # # b = self.ball(prob.meshes[-1], source=False)
+        # # b = self.circular_bump(prob.meshes[-1], source=False)
+        # b = self.gaussian(prob.meshes[-1], source=False)
 
-        # TODO: Normalise by area computed on fine reference mesh
-        # area = assemble(b*dx)
-        # area_fine_mesh = ...
-        # rescaling = 1.0 if np.allclose(area, 0.0) else area_fine_mesh/area
-        rescaling = 1.0
+        # # TODO: Normalise by area computed on fine reference mesh
+        # # area = assemble(b*dx)
+        # # area_fine_mesh = ...
+        # # rescaling = 1.0 if np.allclose(area, 0.0) else area_fine_mesh/area
+        # rescaling = 1.0
 
-        z, zeta = prob.adj_solutions[-1].split()
-        zeta.interpolate(rescaling*b)
+        # z, zeta = prob.adj_solutions[-1].split()
+        # zeta.interpolate(rescaling*b)
+        return
 
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")

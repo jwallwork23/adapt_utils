@@ -290,13 +290,16 @@ class AdaptiveProblemBase(object):
         """Functional of interest which takes the PDE solution as input."""
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def save_to_checkpoint(self, f):
+    def save_to_checkpoint(self, f):  # TODO: Disk option
         """Extremely simple checkpointing scheme with a simple stack of copied fields."""
         self.checkpoint.append(f.copy(deepcopy=True))
+        self.op.print_debug("CHECKPOINTING: {:3d} currently stored".format(len(self.checkpoint)))
 
-    def collect_from_checkpoint(self):  # TODO: Checkpoint to disk; recompute
+    def collect_from_checkpoint(self):
         """Extremely simple checkpointing scheme which pops off the top of a stack of copied fields."""
-        return self.checkpoint.pop(-1)
+        chk = self.checkpoint.pop(-1)  # TODO: TEMP
+        self.op.print_debug("CHECKPOINTING: {:3d} currently stored".format(len(self.checkpoint)))
+        return chk  # TODO: TEMP
 
     def run(self, **kwargs):
         """
