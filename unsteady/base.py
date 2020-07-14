@@ -28,7 +28,7 @@ class AdaptiveProblemBase(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-    def __init__(self, op, meshes=None, nonlinear=True):
+    def __init__(self, op, meshes=None, nonlinear=True, checkpointing=False):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -36,6 +36,7 @@ class AdaptiveProblemBase(object):
         self.stabilisation = op.stabilisation
         self.approach = op.approach
         self.nonlinear = nonlinear
+        self.checkpointing = checkpointing
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -74,6 +75,7 @@ class AdaptiveProblemBase(object):
         self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         self.kernel_file = File(os.path.join(self.di, 'kernel.pvd'))
+        self.checkpoint = []
 
         # Storage for diagnostics over mesh adaptation loop
         self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
@@ -287,6 +289,14 @@ class AdaptiveProblemBase(object):
     def quantity_of_interest(self):
         """Functional of interest which takes the PDE solution as input."""
         raise NotImplementedError("Should be implemented in derived class.")
+
+    def save_to_checkpoint(self, f):
+        """Extremely simple checkpointing scheme with a simple stack of copied fields."""
+        self.checkpoint.append(f.copy(deepcopy=True))
+
+    def collect_from_checkpoint(self):  # TODO: Checkpoint to disk; recompute
+        """Extremely simple checkpointing scheme which pops off the top of a stack of copied fields."""
+        return self.checkpoint.pop(-1)
 
     def run(self, **kwargs):
         """
