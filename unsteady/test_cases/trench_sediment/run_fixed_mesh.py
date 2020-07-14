@@ -37,6 +37,16 @@ bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bath
 
 data = pd.read_csv('~/Documents/adapt_utils/test_cases/trench_sed_model/experimental_data.csv', header=None)
 
+datathetis = []
+bathymetrythetis1 = []
+diff_thetis = []
+for i in np.linspace(0, 15.9, 160):
+    datathetis.append(i)
+    bathymetrythetis1.append(-bath.at([i, 0.55]))
+
+df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
+
+df.to_csv('fixed_output/bed_trench_output_uni_' + str(nx) + '.csv')
 
 
 datathetis = []
@@ -47,7 +57,13 @@ for i in range(len(data[0].dropna())):
     bathymetrythetis1.append(-bath.at([np.round(data[0].dropna()[i], 3), 0.55]))
     diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
 
-df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns = ['bath'])], axis = 1)
+df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
+
+df.to_csv('fixed_output/bed_trench_output' + str(nx) + '.csv')
 
 print("L2 norm: ")
 print(np.sqrt(sum(diff_thetis)))
+print(nx)
+print("total time: ")
+print(t2-t1)
+
