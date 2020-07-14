@@ -73,7 +73,7 @@ with stop_annotating():
             op.control_parameter.assign(m)
             swp.set_initial_condition()
             swp.solve_forward()
-            func_values[i] = op.J/len(op.times)
+            func_values[i] = op.J/scaling
     np.save(fname, func_values)
     op.control_parameter.assign(float(args.initial_guess or 10.0))
 for i, m in enumerate(control_values):
@@ -93,7 +93,8 @@ plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{
 op.save_timeseries = True
 swp = AdaptiveProblem(op)
 swp.solve_forward()
-J = op.J/len(op.times)
+scaling = 1.0e+10
+J = op.J/scaling
 print_output("Mean square error QoI = {:.4e}".format(J))
 
 # Plot timeseries
@@ -182,7 +183,7 @@ for gauge in gauges:
     op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
 swp = AdaptiveProblem(op_opt)
 swp.solve_forward()
-J = op.J/len(op.times)
+J = op.J/scaling
 print_output("Mean square error QoI after optimisation = {:.4e}".format(J))
 
 # Plot timeseries for both initial guess and optimised control

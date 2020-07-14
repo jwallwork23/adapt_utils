@@ -87,9 +87,9 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
         z_by_parts = True  # So we can enforce free-slip conditions
 
         if z_by_parts:
-            f = -g_grav*inner(grad(self.zeta_test), z)*self.dx
+            f = g_grav*inner(grad(self.zeta_test), z)*self.dx
             if self.z_continuity in ['dg', 'hdiv']:
-                # f += g_grav * self.zeta_test * inner(z, self.normal) * self.dS  # TODO
+                # f += -g_grav * self.zeta_test * inner(z, self.normal) * self.dS  # TODO
                 raise NotImplementedError
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
@@ -97,11 +97,11 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
                 if funcs is not None:
                     # TODO: Riemann solutions
                     zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
-                    f += g_grav*self.zeta_test*inner(z_ext, self.normal)*ds_bnd
+                    f += -g_grav*self.zeta_test*inner(z_ext, self.normal)*ds_bnd
                 else:
                     raise NotImplementedError
         else:
-            f = g_grav*self.zeta_test*nabla_div(z)*self.dx
+            f = -g_grav*self.zeta_test*nabla_div(z)*self.dx
 
         return -f
 
@@ -129,11 +129,11 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
 
         f = 0
         if self.zeta_is_dg:
-            f += -inner(zeta, div(total_h*self.z_test))*self.dx
-            # f += total_h * zeta * inner(self.z_test, self.normal) * self.dS  # TODO
+            f += inner(zeta, div(total_h*self.z_test))*self.dx
+            # f += -total_h * zeta * inner(self.z_test, self.normal) * self.dS  # TODO
             raise NotImplementedError
         else:
-            f += inner(self.z_test, total_h*grad(zeta))*self.dx
+            f += -inner(self.z_test, total_h*grad(zeta))*self.dx
         return -f
 
 
@@ -170,7 +170,7 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         f = 0
         if not self.options.use_nonlinear_equations:
-            return f
+            return 0
 
         raise NotImplementedError  # TODO
 
@@ -204,7 +204,7 @@ class CoriolisTerm(AdjointShallowWaterMomentumTerm):
         coriolis = fields_old.get('coriolis')
         f = 0
         if coriolis is not None:
-            f += coriolis*(-z[1]*self.z_test[0] + z[0]*self.z_test[1])*self.dx
+            f += -coriolis*(-z[1]*self.z_test[0] + z[0]*self.z_test[1])*self.dx
         return -f
 
 
@@ -227,14 +227,16 @@ class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
             if C_D is not None:
                 raise Exception('Cannot set both dimensionless and Manning drag parameter')
             C_D = g_grav*manning_drag_coefficient**2/total_h**(1./3.)
+        if C_D is None:
+            return -f
 
         uv = fields.get('uv_2d')  # TODO
         if uv is None:
             raise Exception('Adjoint equation does not have access to forward solution velocity')
         if C_D is not None:
             unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
-            f += -C_D*unorm*inner(self.z_test, z)*self.dx
-            f += -C_D*inner(self.z_test, uv)*inner(z, uv)/unorm*self.dx
+            f += C_D*unorm*inner(self.z_test, z)*self.dx
+            f += C_D*inner(self.z_test, uv)*inner(z, uv)/unorm*self.dx
         return -f
 
 
@@ -257,13 +259,15 @@ class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
             if C_D is not None:
                 raise Exception('Cannot set both dimensionless and Manning drag parameter')
             C_D = 4/3*g_grav*manning_drag_coefficient**2/total_h**(1./3.)
+        if C_D is None:
+            return -f
 
         uv = fields.get('uv_2d')  # TODO
         if uv is None:
             raise Exception('Adjoint equation does not have access to forward solution velocity')
         if C_D is not None:
             unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
-            f += C_D*unorm*inner(z, uv)*self.zeta_test/total_h**2*self.dx
+            f += -C_D*unorm*inner(z, uv)*self.zeta_test/total_h**2*self.dx
         return -f
 
 
@@ -279,7 +283,7 @@ class LinearDragTerm(AdjointShallowWaterMomentumTerm):
         f = 0
         if linear_drag_coefficient is not None:
             bottom_fri = linear_drag_coefficient*inner(self.z_test, z)*self.dx
-            f += bottom_fri
+            f += -bottom_fri
         return -f
 
 
@@ -311,7 +315,7 @@ class MomentumSourceTerm(AdjointShallowWaterMomentumTerm):
 
         if momentum_source is not None:
             f += inner(momentum_source, self.z_test)*self.dx
-        return 0
+        return f
 
 
 # NOTE: Used for adjoint RHS

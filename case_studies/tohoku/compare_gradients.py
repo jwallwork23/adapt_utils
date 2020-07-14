@@ -23,12 +23,15 @@ kwargs = {
     'save_timeseries': True,
 
     # Spatial discretisation
-    'family': 'dg-cg',
-    'stabilisation': 'lax_friedrichs',
+    # 'family': 'dg-cg',
+    'family': 'cg-cg',
+    # 'stabilisation': 'lax_friedrichs',
+    'stabilisation': None,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Misc
     'debug': True,
+    'artificial': True,
 }
 op = TohokuGaussianBasisOptions(**kwargs)
 
@@ -42,10 +45,19 @@ for gauge in gauges:
         op.gauges.pop(gauge)  # Some gauges aren't within the domain
 gauges = list(op.gauges.keys())
 
+# Solve the forward problem to get data
+with stop_annotating():
+    swp = AdaptiveProblem(op, nonlinear=False)
+    swp.solve_forward()
+    for gauge in op.gauges:
+        op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
+
 # Solve the forward problem
-swp = AdaptiveProblem(op)
+swp = AdaptiveProblem(op, nonlinear=False)
 swp.solve_forward()
-J = assemble(op.J/len(op.times))
+scaling = 1.0e+10
+# J = assemble(op.J/scaling)
+J = op.J
 print("Mean square error QoI = {:.4e}".format(J))
 
 # Plot timeseries
@@ -72,15 +84,15 @@ plt.savefig(os.path.join(di, 'single_bf_timeseries_level{:d}.pdf'.format(level))
 # TODO: Compare discrete vs continuous form of error using norms / TV
 
 # Compute gradient
-g_discrete = compute_gradient(op.J, Control(op.control_parameter)).dat.data[0]
+g_discrete = compute_gradient(J, Control(op.control_parameter)).dat.data[0]
 
 # TODO: Taylor test discrete gradient
 
 # Check consistency of by-hand gradient formula
 tape = get_working_tape()
 solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
-# g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)
-g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)/len(op.times)
+g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)
+# g_by_hand_discrete = assemble(op.phi*solve_blocks[0].adj_sol.split()[1]*dx)/scaling
 print("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
 relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
 print("Relative error: {:.4f}%".format(100*relative_error))
