@@ -3,6 +3,12 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 from thetis import *
 
 import pandas as pd
+import time
+import datetime
+
+ts = time.time()
+st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+outputdir = 'outputs' + st
 
 kwargs = {
     'approach': 'fixed_mesh',
@@ -10,9 +16,7 @@ kwargs = {
     'ny': 2,
     'plot_pvd': True,
     'input_dir': 'hydrodynamics_trench_4',
-    # Geometry
-    #'bathymetry_type': int(args.bathymetry_type or 1),
-
+    'output_dir': outputdir,
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,

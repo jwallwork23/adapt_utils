@@ -21,14 +21,15 @@ __all__ = ["TrenchSedimentOptions"]
 
 class TrenchSedimentOptions(CoupledOptions):
 
-    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, **kwargs):
+    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, output_dir = None, **kwargs):
         super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
         self.num_hours = 15
 
-        self.di = os.path.join(self.di, 'bathymetry_equitracer')
+        if output_dir is not None:
+            self.di = output_dir
 
         # Physical
         self.base_viscosity = 1e-6
