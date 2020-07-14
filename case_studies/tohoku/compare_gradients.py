@@ -1,6 +1,5 @@
 from thetis import *
 from firedrake_adjoint import *
-from firedrake.adjoint.blocks import GenericSolveBlock
 
 import argparse
 import matplotlib.pyplot as plt

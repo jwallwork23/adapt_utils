@@ -86,6 +86,7 @@ plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{
 
 swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True)
 
+
 def reduced_functional(m):
     """
     The QoI, reinterpreted as a function of the control parameter `m` only. We apply PDE constrained
@@ -100,17 +101,19 @@ def reduced_functional(m):
     print_output("control = {:.8e}  functional = {:.8e}".format(m[0], J))
     return J
 
+
 def gradient(m):
     """
     Compute the gradient of the reduced functional with respect to the control parameter using data
     stored to the checkpoints.
     """
     if len(swp.checkpoint) == 0:
-        J = reduced_functional(m)
+        reduced_functional(m)
     swp.solve_adjoint()
     g = np.array([assemble(inner(op.basis_function, swp.adj_solutions[0])*dx), ])
     print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g[0]))
     return g
+
 
 # Solve the forward problem with some initial guess
 swp.checkpointing = False
@@ -151,36 +154,44 @@ if optimised_value is None or recompute:
     gradient_values_opt = []
 
     def reduced_functional_hat(m):
-        control_values_opt.append(m)
+        """Modified reduced functional which stores progress and checks for stagnation."""
+        control_values_opt.append(m[0])
         J = reduced_functional(m)
         func_values_opt.append(J)
+
+        # Stagnation termination condition
+        if len(func_values_opt) > 1:
+            if abs(func_values_opt[-1] - func_values_opt[-2]) < 1.0e-06*abs(func_values_opt[-2]):
+                raise ConvergenceError
         return J
 
     def gradient_hat(m):
+        """Modified gradient functional which stores progress"""
         if len(swp.checkpoint) == 0:
-            J = scaled_reduced_functional_hat(m)
+            scaled_reduced_functional_hat(m)
         g = gradient(m)
         gradient_values_opt.append(g[0])
         return g
-
-    def opt_cb(m):
-        print_output("LINE SEARCH COMPLETE")
 
     # Run BFGS optimisation
     opt_kwargs = {  # TODO: Tighter tolerances
         'maxiter': 10,
         'gtol': 1.0e-02,
-        'callback': opt_cb,
+        'callback': lambda m: print_output("LINE SEARCH COMPLETE"),
         'fprime': gradient_hat,
     }
     m_init = op.control_parameter.dat.data
-    m_opt = scipy.optimize.fmin_bfgs(reduced_functional_hat, m_init, **opt_kwargs)
+    try:
+        m_opt = scipy.optimize.fmin_bfgs(reduced_functional_hat, m_init, **opt_kwargs)
+        optimised_value = m_opt.dat.data[0]
+    except ConvergenceError:
+        optimised_value = control_values_opt[-1]
+        print_output("ConvergenceError: Stagnation of objective functional")
 
     # Store trajectory
     control_values_opt = np.array(control_values_opt)
     func_values_opt = np.array(func_values_opt)
     gradient_values_opt = np.array(gradient_values_opt)
-    optimised_value = m_opt.dat.data[0]
     np.save(os.path.join(op.di, fname.format('ctrl', level)), control_values_opt)
     np.save(os.path.join(op.di, fname.format('func', level)), func_values_opt)
     np.save(os.path.join(op.di, fname.format('grad', level)), gradient_values_opt)
