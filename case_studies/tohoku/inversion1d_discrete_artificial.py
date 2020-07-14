@@ -17,33 +17,40 @@ parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimised_value", help="Optimised control parameter (e.g. from previous run)")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
+parser.add_argument("-recompute", help="Recompute parameter space etc.")
 args = parser.parse_args()
 
 # Set parameters
 level = int(args.level or 0)
 optimised_value = None if args.optimised_value is None else float(args.optimised_value)
+recompute = bool(args.recompute or False)
 kwargs = {
     'level': level,
     'save_timeseries': True,
-    'artificial': True,
 
     # Spatial discretisation
-    'family': 'dg-cg',
-    'stabilisation': 'lax_friedrichs',
+    # 'family': 'dg-cg',
+    'family': 'cg-cg',
+    # 'stabilisation': 'lax_friedrichs',
+    'stabilisation': None,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
     'control_parameter': float(args.initial_guess or 10.0),
+    'artificial': True,
 
     # Misc
     'debug': True,
 }
+nonlinear = False  # TODO
+# scaling = 1.0e-10
+scaling = 1.0
 op = TohokuGaussianBasisOptions(**kwargs)
 
 # Artifical run
 with stop_annotating():
     op.control_parameter.assign(float(args.optimal_control or 5.0))
-    swp = AdaptiveProblem(op)
+    swp = AdaptiveProblem(op, nonlinear=nonlinear)
     swp.solve_forward()
     for gauge in op.gauges:
         op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
@@ -54,8 +61,8 @@ control_values = np.linspace(2.0, 10.0, n)
 fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
 op.save_timeseries = False
 with stop_annotating():
-    swp = AdaptiveProblem(op)
-    if os.path.exists(fname):
+    swp = AdaptiveProblem(op, nonlinear=nonlinear)
+    if os.path.exists(fname) and not recompute:
         func_values = np.load(fname)
     else:
         func_values = np.zeros(n)
@@ -63,7 +70,8 @@ with stop_annotating():
             op.control_parameter.assign(m)
             swp.set_initial_condition()
             swp.solve_forward()
-            func_values[i] = op.J/scaling
+            # func_values[i] = op.J*scaling
+            func_values[i] = op.J
     np.save(fname, func_values)
     op.control_parameter.assign(float(args.initial_guess or 10.0))
 for i, m in enumerate(control_values):
@@ -81,13 +89,14 @@ plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{
 
 # Solve the forward problem with some initial guess
 op.save_timeseries = True
-swp = AdaptiveProblem(op)
+swp = AdaptiveProblem(op, nonlinear=nonlinear)
 swp.solve_forward()
-scaling = 1.0e+10
-J = op.J/scaling
+# J = op.J*scaling
+J = op.J
 print_output("Mean square error QoI = {:.4e}".format(J))
 
 # Plot timeseries
+gauges = list(op.gauges.keys())
 N = int(np.ceil(np.sqrt(len(gauges))))
 fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
 plotting_kwargs = {
@@ -107,7 +116,8 @@ di = create_directory(os.path.join(op.di, 'plots'))
 plt.tight_layout()
 plt.savefig(os.path.join(di, 'single_bf_timeseries_artificial_{:d}.pdf'.format(level)))
 
-if optimised_value is None:
+fname = 'opt_progress_cts_{:s}_artificial_{:d}.npy'
+if optimised_value is None or recompute:
 
     # Arrays to log progress
     control_values_opt = []
@@ -135,13 +145,14 @@ if optimised_value is None:
     func_values_opt = np.array(func_values_opt)
     gradient_values_opt = np.array(gradient_values_opt)
     optimised_value = m_opt.dat.data[0]
-    np.save(os.path.join(op.di, 'opt_progress_dis_ctrl_artificial_{:d}.npy'.format(level)), control_values_opt)
-    np.save(os.path.join(op.di, 'opt_progress_dis_func_artificial_{:d}.npy'.format(level)), func_values_opt)
-    np.save(os.path.join(op.di, 'opt_progress_dis_grad_artificial_{:d}.npy'.format(level)), gradient_values_opt)
+    np.save(os.path.join(op.di, fname.format('ctrl', level)), control_values_opt)
+    np.save(os.path.join(op.di, fname.format('func', level)), func_values_opt)
+    np.save(os.path.join(op.di, fname.format('grad', level)), gradient_values_opt)
 else:
-    control_values_opt = np.load(os.path.join(op.di, 'opt_progress_dis_ctrl_artificial_{:d}.npy'.format(level)))
-    func_values_opt = np.load(os.path.join(op.di, 'opt_progress_dis_func_artificial_{:d}.npy'.format(level)))
-    gradient_values_opt = np.load(os.path.join(op.di, 'opt_progress_dis_grad_artificial_{:d}.npy'.format(level)))
+    # Load trajectory
+    control_values_opt = np.load(os.path.join(op.di, fname.format('ctrl', level)))
+    func_values_opt = np.load(os.path.join(op.di, fname.format('func', level)))
+    gradient_values_opt = np.load(os.path.join(op.di, fname.format('grad', level)))
 
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
@@ -159,21 +170,13 @@ plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pd
 # Run forward again so that we can compare timeseries
 kwargs['control_parameter'] = optimised_value
 op_opt = TohokuGaussianBasisOptions(**kwargs)
-
-# Only consider gauges which lie within the spatial domain
-gauges = list(op_opt.gauges.keys())
-for gauge in gauges:
-    try:
-        op_opt.default_mesh.coordinates.at(op_opt.gauges[gauge]['coords'])
-    except PointNotInDomainError:
-        op_opt.print_debug("NOTE: Gauge {:5s} is not in the domain and so was removed".format(gauge))
-        op_opt.gauges.pop(gauge)  # Some gauges aren't within the domain
 gauges = list(op_opt.gauges.keys())
 for gauge in gauges:
     op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
-swp = AdaptiveProblem(op_opt)
+swp = AdaptiveProblem(op_opt, nonlinear=nonlinear)
 swp.solve_forward()
-J = op.J/scaling
+# J = op.J*scaling
+J = op.J
 print_output("Mean square error QoI after optimisation = {:.4e}".format(J))
 
 # Plot timeseries for both initial guess and optimised control
