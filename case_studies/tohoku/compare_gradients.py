@@ -136,13 +136,14 @@ rtol = 1.0e-03
 g_fd_ = None
 while not converged:
     op.control_parameter.assign(kwargs['control_parameter'] + epsilon)
-    swp.solve_forward()
-    # J_step = op.J*scaling
-    J_step = op.J
-    print_output("J(m=10) = {:.8e}  J(m=10+{:.1e}) = {:.8e}".format(J, epsilon, J_step))
+    swp.solve_forward(plot_pvd=False)
+    # J_step = J*scaling
+    J_step = J
     g_fd = (J_step - J)/epsilon
+    print_output("J(epsilon=0) = {:.8e}  J(epsilon={:.1e}) = {:.8e}".format(J, epsilon, J_step))
     if g_fd_ is not None:
-        if abs(g_fd - g_fd_) < rtol:
+        print_output("gradient = {:.8e}  difference = {:.8e}".format(g_fd, abs(g_fd - g_fd_)))
+        if abs(g_fd - g_fd_) < rtol*J:
             converged = True
         elif epsilon < 1.0e-10:
             raise ConvergenceError
@@ -151,7 +152,7 @@ while not converged:
 
 # Logging
 logstr = "elements: {:d}\n".format(swp.meshes[0].num_cells())
-logstr += "finite difference gradient: {:.4e}\n".format(g_fd)
+logstr += "finite difference gradient (rtol={:.1e}): {:.4e}\n".format(rtol, g_fd)
 logstr += "discrete gradient: {:.4e}\n".format(g_discrete)
 logstr += "continuous gradient: {:.4e}\n".format(g_continuous)
 print_output(logstr)
