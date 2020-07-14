@@ -10,12 +10,16 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
+nx = 1
+
+inputdir = 'hydrodynamics_trench_' + str(nx)
+
 kwargs = {
     'approach': 'fixed_mesh',
-    'nx': 1,
+    'nx': nx,
     'ny': 1,
     'plot_pvd': True,
-    'input_dir': 'hydrodynamics_trench_4',
+    'input_dir': inputdir,
     'output_dir': outputdir,
     # Spatial discretisation
     'family': 'dg-dg',
