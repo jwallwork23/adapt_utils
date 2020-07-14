@@ -81,6 +81,13 @@ class LeVequeOptions(CoupledOptions):
                 'pc_type': 'sor',
             }
         }
+        self.adjoint_solver_parameters = {
+            'tracer': {
+                'ksp_type': 'gmres',
+                'pc_type': 'sor',
+                'ksp_converged_reason': None,
+            }
+        }
 
     def set_region_of_interest(self, shape=0):
         assert shape in (0, 1, 2)
@@ -124,11 +131,7 @@ class LeVequeOptions(CoupledOptions):
         return rescaling*b
 
     def set_terminal_condition_tracer(self, prob):
-        b = self.ball(prob.meshes[-1], source=False)
-        area = assemble(b*dx)
-        area_exact = pi*self.region_of_interest[0][2]**2
-        rescaling = area_exact/area if np.allclose(area, 0.0) else 1
-        prob.adj_solutions_tracer[-1].interpolate(rescaling*b)
+        prob.adj_solutions_tracer[-1].interpolate(self.set_qoi_kernel_tracer(prob, -1)
 
     def exact_solution(self, fs):
         raise NotImplementedError  # TODO

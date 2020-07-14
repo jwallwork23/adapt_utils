@@ -595,8 +595,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _create_forward_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
-        dt = self.op.dt
-        args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, dt, )
+        args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, self.op.dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             'solver_parameters': self.op.solver_parameters['shallow_water'],
@@ -610,8 +609,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _create_forward_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
-        dt = self.op.dt
-        args = (self.equations[i].tracer, self.fwd_solutions_tracer[i], fields, dt, )
+        args = (self.equations[i].tracer, self.fwd_solutions_tracer[i], fields, self.op.dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
             'solver_parameters': self.op.solver_parameters['tracer'],
@@ -663,8 +661,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         fields['volume_source'] = self.time_kernel*dJdeta
 
         # Construct time integrator
-        dt = self.op.dt
-        args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, dt, )
+        args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, self.op.dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             'solver_parameters': self.op.adjoint_solver_parameters['shallow_water'],
@@ -678,7 +675,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def _create_adjoint_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
 
-        # fields.uv_2d *= -1
+        # fields.uv_2d = - fields.uv_2d
 
         # Account for dJdc
         dJdc = self.op.set_qoi_kernel_tracer(self, i)  # TODO: Store this kernel somewhere
@@ -686,12 +683,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         fields['source'] = self.time_kernel*dJdc
 
         # Construct time integrator
-        dt = self.op.dt
-        args = (self.equations[i].adjoint_tracer, self.adj_solutions_tracer[i], fields, dt, )
+        args = (self.equations[i].adjoint_tracer, self.adj_solutions_tracer[i], fields, self.op.dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
             'solver_parameters': self.op.adjoint_solver_parameters['tracer'],
-            'adjoint': True,  # FIXME
+            # 'adjoint': True,  # FIXME
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
