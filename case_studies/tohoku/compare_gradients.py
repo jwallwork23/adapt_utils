@@ -17,6 +17,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
 args = parser.parse_args()
 
+# --- Setup
+
 # Set parameters
 level = int(args.level or 0)
 kwargs = {
@@ -32,6 +34,7 @@ kwargs = {
 
     # Adjoint
     'control_parameter': 10.0,
+    'optimal_value': 5.0,
     'artificial': True,
 
     # Misc
@@ -44,12 +47,14 @@ op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
 
 # Solve the forward problem to get data with 'optimal' control parameter m = 5
 with stop_annotating():
-    op.control_parameter.assign(5.0)
+    op.control_parameter.assign(kwargs['optimal_value'])
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     swp.solve_forward()
     for gauge in op.gauges:
         op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
+
+# --- Discrete adjoint
 
 class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
     """The subclass exists to pass the QoI as required."""
@@ -58,8 +63,8 @@ class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
 
 
 # Solve the forward problem with 'suboptimal' control parameter m = 10
-op.control_parameter.assign(10.0, annotate=False)
-swp = DiscreteAdjointTsunamiProblem(op, nonlinear=False, checkpointing=False)
+op.control_parameter.assign(kwargs['control_parameter'], annotate=False)
+swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, checkpointing=False)
 swp.solve_forward()
 J = op.J
 print_output("Mean square error QoI = {:.4e}".format(J*scaling))
@@ -74,8 +79,10 @@ plotting_kwargs = {
 T = np.array(op.times)/60
 for i, gauge in enumerate(gauges):
     ax = axes[i//N, i % N]
-    ax.plot(T, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' simulated', **plotting_kwargs)
-    ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
+    plotting_kwargs['label'] = "{:s} simulated (m = {:.1f})".format(gauge, kwargs['control_parameter'])
+    ax.plot(T, op.gauges[gauge]['timeseries'], '--x', **plotting_kwargs)
+    plotting_kwargs['label'] = "{:s} data (m = {:.1f})".format(gauge, kwargs['optimal_value'])
+    ax.plot(T, op.gauges[gauge]['data'], '--x', **plotting_kwargs)
     ax.legend(loc='upper left')
     ax.set_xlabel('Time (min)')
     ax.set_ylabel('Elevation (m)')
@@ -97,15 +104,19 @@ swp.save_adjoint_trajectory()
 g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
 print_output("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
 relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
-print_output("Relative error (discrete vs. discrete by hand): {:.4f}%".format(100*relative_error))
 assert np.allclose(relative_error, 0.0)
 swp.clear_tape()
 stop_annotating()
 
+
+# --- Continuous adjoint
+
 # Solve the forward problem with 'suboptimal' control parameter m = 10, checkpointing state
 op.di = create_directory(op.di.replace('discrete', 'continuous'))
-swp = DiscreteAdjointTsunamiProblem(op, nonlinear=False, checkpointing=True)
+swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True)
 swp.solve_forward()
+# J = op.J*scaling
+J = op.J
 
 # Solve adjoint equation in continuous form
 swp.solve_adjoint()
@@ -113,8 +124,36 @@ g_continuous = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)*scali
 print_output("Gradient computed by hand (continuous): {:.4e}".format(g_continuous))
 relative_error = abs((g_discrete - g_continuous)/g_discrete)
 print_output("Relative error (discrete vs. continuous): {:.4f}%".format(100*relative_error))
+
+
+# --- Finite differences
+
+# Establish gradient using finite differences
+swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
+epsilon = 0.1
+converged = False
+rtol = 1.0e-03
+g_fd_ = None
+while not converged:
+    op.control_parameter.assign(kwargs['control_parameter'] + epsilon)
+    swp.solve_forward()
+    # J_step = op.J*scaling
+    J_step = op.J
+    print_output("J(m=10) = {:.8e}  J(m=10+{:.1e}) = {:.8e}".format(J, epsilon, J_step))
+    g_fd = (J_step - J)/epsilon
+    if g_fd_ is not None:
+        if abs(g_fd - g_fd_) < rtol:
+            converged = True
+        elif epsilon < 1.0e-10:
+            raise ConvergenceError
+    epsilon *= 0.1
+    g_fd_ = g_fd
+
+# Logging
+logstr = "elements: {:d}\n".format(swp.meshes[0].num_cells())
+logstr += "finite difference gradient: {:.4e}\n".format(g_fd)
+logstr += "discrete gradient: {:.4e}\n".format(g_discrete)
+logstr += "continuous gradient: {:.4e}\n".format(g_continuous)
+print_output(logstr)
 with open('outputs/fixed_mesh/gradient_{:d}.log'.format(level), 'w') as logfile:
-    logfile.write("elements: {:d}".format(swp.meshes[0].num_cells()))
-    # TODO: finite difference gradient
-    logfile.write("discrete gradient: {:.4e}".format(g_discrete))
-    logfile.write("continuous gradient: {:.4e}".format(g_continuous))
+    logfile.write(logstr)
