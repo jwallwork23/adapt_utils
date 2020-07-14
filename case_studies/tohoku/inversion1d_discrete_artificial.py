@@ -40,16 +40,6 @@ kwargs = {
 }
 op = TohokuGaussianBasisOptions(**kwargs)
 
-# Only consider gauges which lie within the spatial domain
-gauges = list(op.gauges.keys())
-for gauge in gauges:
-    try:
-        op.default_mesh.coordinates.at(op.gauges[gauge]['coords'])
-    except PointNotInDomainError:
-        op.print_debug("NOTE: Gauge {:5s} is not in the domain and so was removed".format(gauge))
-        op.gauges.pop(gauge)  # Some gauges aren't within the domain
-gauges = list(op.gauges.keys())
-
 # Artifical run
 with stop_annotating():
     op.control_parameter.assign(float(args.optimal_control or 5.0))
