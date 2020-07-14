@@ -30,44 +30,42 @@ kwargs = {
     'stabilisation': None,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
+    # Adjoint
+    'control_parameter': 10.0,
+    'artificial': True,
+
     # Misc
     'debug': True,
-    'artificial': True,
 }
+nonlinear = False  # TODO
 op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
 
-# Only consider gauges which lie within the spatial domain
-gauges = list(op.gauges.keys())
-for gauge in gauges:
-    try:
-        op.default_mesh.coordinates.at(op.gauges[gauge]['coords'])
-    except PointNotInDomainError:
-        op.print_debug("NOTE: Gauge {:5s} is not in the domain and so was removed".format(gauge))
-        op.gauges.pop(gauge)  # Some gauges aren't within the domain
-gauges = list(op.gauges.keys())
-
-# Solve the forward problem to get data
+# Solve the forward problem to get data with 'optimal' control parameter m = 5
 with stop_annotating():
-    swp = AdaptiveProblem(op, nonlinear=False)
+    op.control_parameter.assign(5.0)
+    swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     swp.solve_forward()
     for gauge in op.gauges:
         op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
 
 class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
+    """The subclass exists to pass the QoI as required."""
     def quantity_of_interest(self):
         return self.op.J  # TODO: scaling
 
 
-# Solve the forward problem
-swp = DiscreteAdjointTsunamiProblem(op, nonlinear=False)
+# Solve the forward problem with 'suboptimal' control parameter m = 10
+op.control_parameter.assign(10.0, annotate=False)
+swp = DiscreteAdjointTsunamiProblem(op, nonlinear=False, checkpointing=False)
 swp.solve_forward()
-scaling = 1.0e+10
+# scaling = 1.0e+10
 # J = assemble(op.J/scaling)
 J = op.J
-print("Mean square error QoI = {:.4e}".format(J))
+print_output("Mean square error QoI = {:.4e}".format(J))
 
 # Plot timeseries
+gauges = list(op.gauges.keys())
 N = int(np.ceil(np.sqrt(len(gauges))))
 fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
 plotting_kwargs = {
@@ -91,7 +89,6 @@ plt.savefig(os.path.join(di, 'single_bf_timeseries_level{:d}.pdf'.format(level))
 # TODO: Compare discrete vs continuous form of error using norms / TV
 
 # Compute gradient
-# g_discrete = compute_gradient(J, Control(op.control_parameter)).dat.data[0]
 g_discrete = swp.compute_gradient(Control(op.control_parameter)).dat.data[0]
 
 # TODO: Taylor test discrete gradient
@@ -99,14 +96,26 @@ g_discrete = swp.compute_gradient(Control(op.control_parameter)).dat.data[0]
 # Check consistency of by-hand gradient formula
 swp.get_solve_blocks()
 swp.save_adjoint_trajectory()
-tape = get_working_tape()
-solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
 g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
 # g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)/scaling
-print("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
+print_output("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
 relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
-print("Relative error: {:.4f}%".format(100*relative_error))
+print_output("Relative error (discrete vs. discrete by hand): {:.4f}%".format(100*relative_error))
 assert np.allclose(relative_error, 0.0)
+swp.clear_tape()
+stop_annotating()
 
-# TODO: Continuous adjoint
+# Solve the forward problem with 'suboptimal' control parameter m = 10, checkpointing state
+op.di = create_directory(op.di.replace('discrete', 'continuous'))
+swp = DiscreteAdjointTsunamiProblem(op, nonlinear=False, checkpointing=True)
+swp.solve_forward()
+
+# Solve adjoint equation in continuous form
+swp.solve_adjoint()
+g_continuous = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
+# g_continuous = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)/scaling
+print_output("Gradient computed by hand (continuous): {:.4e}".format(g_continuous))
+relative_error = abs((g_discrete - g_continuous)/g_discrete)
+print_output("Relative error (discrete vs. continuous): {:.4f}%".format(100*relative_error))
+
 # TODO: Taylor test continuous gradient
