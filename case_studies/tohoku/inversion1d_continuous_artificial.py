@@ -1,11 +1,11 @@
 # TODO: doc
 from thetis import *
-from firedrake_adjoint import *
 
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import scipy
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.case_studies.tohoku.options import *
@@ -43,37 +43,33 @@ kwargs = {
     'debug': True,
 }
 nonlinear = False  # TODO
-# scaling = 1.0e-10
-scaling = 1.0
+scaling = 1.0e-10
 op = TohokuGaussianBasisOptions(**kwargs)
 
 # Artifical run
-with stop_annotating():
-    op.control_parameter.assign(float(args.optimal_control or 5.0))
-    swp = AdaptiveProblem(op, nonlinear=nonlinear)
-    swp.solve_forward()
-    for gauge in op.gauges:
-        op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
+op.control_parameter.assign(float(args.optimal_control or 5.0))
+swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
+swp.solve_forward()
+for gauge in op.gauges:
+    op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
 # Explore parameter space
 n = 9
 control_values = np.linspace(2.0, 10.0, n)
 fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
 op.save_timeseries = False
-with stop_annotating():
-    swp = AdaptiveProblem(op, nonlinear=nonlinear)
-    if os.path.exists(fname) and not recompute:
-        func_values = np.load(fname)
-    else:
-        func_values = np.zeros(n)
-        for i, m in enumerate(control_values):
-            op.control_parameter.assign(m)
-            swp.set_initial_condition()
-            swp.solve_forward()
-            # func_values[i] = op.J*scaling
-            func_values[i] = op.J
-    np.save(fname, func_values)
-    op.control_parameter.assign(float(args.initial_guess or 10.0))
+swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
+if os.path.exists(fname) and not recompute:
+    func_values = np.load(fname)
+else:
+    func_values = np.zeros(n)
+    for i, m in enumerate(control_values):
+        op.control_parameter.assign(m)
+        swp.set_initial_condition()
+        swp.solve_forward()
+        # func_values[i] = op.J*scaling
+        func_values[i] = op.J
+np.save(fname, func_values)
 for i, m in enumerate(control_values):
     print_output("{:2d}: control value {:.4e}  functional value {:.4e}".format(i, m, func_values[i]))
 
@@ -87,13 +83,39 @@ plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{
 
 # --- Optimisation
 
+swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True)
+
+def reduced_functional(m):
+    """
+    The QoI, reinterpreted as a function of the control parameter `m` only. We apply PDE constrained
+    optimisation in order to minimise this functional.
+
+    Note that this involves checkpointing state.
+    """
+    op.control_parameter.assign(m)
+    swp.solve_forward()
+    # J = op.J*scaling
+    J = op.J
+    print_output("QoI = {:.8e}".format(J))
+    return J
+
+def gradient(m):
+    """
+    Compute the gradient of the reduced functional with respect to the control parameter using data
+    stored to the checkpoints.
+    """
+    if len(swp.checkpoint) == 0:
+        J = reduced_functional(m)
+    swp.solve_adjoint()
+    g = np.array(assemble(inner(op.basis_function, swp.adj_solutions[0])*dx))
+    print_output("gradient = {:.8e}".format(g[0]))
+    return g
+
 # Solve the forward problem with some initial guess
 op.save_timeseries = True
-swp = AdaptiveProblem(op, nonlinear=nonlinear)
-swp.solve_forward()
-# J = op.J*scaling
-J = op.J
+J = reduced_functional(float(args.initial_guess or 10.0))
 print_output("Mean square error QoI = {:.4e}".format(J))
+op.save_timeseries = False
 
 # Plot timeseries
 gauges = list(op.gauges.keys())
@@ -124,21 +146,33 @@ if optimised_value is None or recompute:
     func_values_opt = []
     gradient_values_opt = []
 
-    def derivative_cb_post(j, dj, m):
-        control = m.dat.data[0]
-        control_values_opt.append(control)
-        func_values_opt.append(j)
-        gradient = dj.dat.data[0]
-        gradient_values_opt.append(gradient)
-        print_output("control {:.8e}  functional  {:.8e}  gradient {:.8e}".format(control, j, gradient))
+    def reduced_functional_hat(m):
+        J = reduced_functional(m)
+        control_values_opt.append(m.dat.data[0])
+        func_values_opt.append(J)
+        return J
+
+    def gradient_hat(m):
+        if len(swp.checkpoint) == 0:
+            J = scaled_reduced_functional_hat(m)
+        else:
+            J = func_values_opt[-1]
+        g = gradient(m)
+        gradient_values_opt.append(g.dat.data[0])
+        print_output("control {:.8e}  functional {:.8e}  gradient {:.8e}".format(m.dat.data[0], J, g.dat.data[0]))
+        return g
+
+    def opt_cb(m):
+        print_output("LINE SEARCH COMPLETE")
 
     # Run BFGS optimisation
     opt_kwargs = {  # TODO: Tighter tolerances
         'maxiter': 10,
         'gtol': 1.0e-02,
+        'callback': opt_cb,
+        'fprime': gradient_hat,
     }
-    Jhat = ReducedFunctional(J, Control(op.control_parameter), derivative_cb_post=derivative_cb_post)
-    m_opt = minimize(Jhat, method='BFGS', options=opt_kwargs)
+    m_opt = scipy.optimize.fmin_bfgs(reduced_functional_hat, op.control_parameter, **opt_kwargs)
 
     # Store trajectory
     control_values_opt = np.array(control_values_opt)
@@ -165,7 +199,7 @@ for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
 axes.set_xlabel("Coefficient for Gaussian basis function")
 axes.set_ylabel("Mean square error quantity of interest")
 plt.tight_layout()
-plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
+plt.savefig(os.path.join(di, 'single_bf_optimisation_continuous_artificial_{:d}.pdf'.format(level)))
 
 # Run forward again so that we can compare timeseries
 kwargs['control_parameter'] = optimised_value
@@ -173,7 +207,7 @@ op_opt = TohokuGaussianBasisOptions(**kwargs)
 gauges = list(op_opt.gauges.keys())
 for gauge in gauges:
     op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
-swp = AdaptiveProblem(op_opt, nonlinear=nonlinear)
+swp = AdaptiveProblem(op_opt, nonlinear=nonlinear, checkpointing=False)
 swp.solve_forward()
 # J = op.J*scaling
 J = op.J
@@ -193,7 +227,7 @@ for i, gauge in enumerate(gauges):
 for i in range(len(gauges) % N):
     axes[N-1, N-i-1].axes('off')
 plt.tight_layout()
-plt.savefig(os.path.join(di, 'single_bf_timeseries_optimised_discrete_artificial_{:d}.pdf'.format(level)))
+plt.savefig(os.path.join(di, 'single_bf_timeseries_optimised_continuous_artificial_{:d}.pdf'.format(level)))
 
 # Compare total variation
 msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"
