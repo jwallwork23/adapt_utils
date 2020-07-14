@@ -211,7 +211,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """Set velocity field, viscosity, etc *on each mesh*."""
         self.fields = [AttrDict() for P1 in self.P1]
         for i, P1 in enumerate(self.P1):
-            self.op.create_sediment_model(self.P1.mesh())
+            self.op.create_sediment_model(P1.mesh())
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
                 'horizontal_diffusivity': self.op.set_diffusivity(P1),
