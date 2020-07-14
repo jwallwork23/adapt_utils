@@ -65,8 +65,9 @@ class TohokuOptions(TsunamiOptions):
         self.print_debug("Done!")
 
         # Fields
-        self.friction = 'manning'
-        self.friction_coeff = 0.025
+        self.friction = None
+        # self.friction = 'manning'
+        # self.friction_coeff = 0.025
 
         # Timestepping: export once per minute for 24 minutes
         self.timestepper = 'CrankNicolson'
@@ -121,6 +122,15 @@ class TohokuOptions(TsunamiOptions):
                 loc[l]["utm"] = from_latlon(lat, lon, force_zone_number=54)
                 loc[l]["coords"] = loc[l]["utm"]
 
+        # Check validity of gauge coordinates
+        gauges = list(self.gauges.keys())
+        for gauge in gauges:
+            try:
+                self.default_mesh.coordinates.at(self.gauges[gauge]['coords'])
+            except PointNotInDomainError:
+                self.print_debug("NOTE: Gauge {:5s} is not in the domain; removing now".format(gauge))
+                self.gauges.pop(gauge)  # Some gauges aren't within the domain
+
         # Regions of interest
         loi = self.locations_of_interest
         self.region_of_interest = [loi[loc]["coords"] + (radii[loc], ) for loc in loi]
@@ -156,8 +166,7 @@ class TohokuOptions(TsunamiOptions):
         self.print_debug("Done!")
         return lon, lat, elev
 
-    def get_update_forcings(self, prob, i):
-        """Should be implemented in derived class."""
+    def _get_update_forcings_forward(self, prob, i):
         self.J = 0
         weight = Constant(1.0)
         eta_obs = Constant(0.0)
@@ -183,7 +192,8 @@ class TohokuOptions(TsunamiOptions):
         def update_forcings(t):
             weight.assign(0.5 if t < 0.5*self.dt or t >= self.end_time - 0.5*self.dt else 1.0)
             dtc = Constant(self.dt)
-            iteration = len(self.times)
+            # iteration = len(self.times)
+            iteration = prob.iteration
             for gauge in self.gauges:
 
                 # Point evaluation at gauges
@@ -218,6 +228,34 @@ class TohokuOptions(TsunamiOptions):
             return
 
         return update_forcings
+
+    def _get_update_forcings_adjoint(self, prob, i):
+
+        def update_forcings(t):
+
+            # Get gauge data (loaded from checkpoint)
+            eta_saved = prob.fwd_solutions[i].split()[1]
+
+            # Sum differences between checkpoint and data
+            expr = 0
+            print("#### DEBUG: iteration {:d}/{:d}".format(prob.iteration, len(self.gauges['P02']['data'])))  # TODO: temporary
+            for gauge in self.gauges:
+                I = self.gauges[gauge]['indicator']
+                expr += I*(eta_saved - self.gauges[gauge]['data'][prob.iteration-1])
+
+            # Interpolate onto RHS
+            k_u, k_eta = prob.kernels[i].split()
+            k_eta.interpolate(expr)
+
+            return
+
+        return update_forcings
+
+    def get_update_forcings(self, prob, i, adjoint=False):
+        if adjoint:
+            return self._get_update_forcings_adjoint(prob, i)
+        else:
+            return self._get_update_forcings_forward(prob, i)
 
     def set_boundary_conditions(self, prob, i):
         ocean_tag = 100

@@ -132,7 +132,18 @@ class TsunamiOptions(CoupledOptions):
         kernel_eta.interpolate(rescaling*b)
 
     def set_terminal_condition(self, prob):
-        prob.adj_solutions[-1].assign(self.set_qoi_kernel(prob.V[-1]))
+        # b = self.ball(prob.meshes[-1], source=False)
+        # b = self.circular_bump(prob.meshes[-1], source=False)
+        b = self.gaussian(prob.meshes[-1], source=False)
+
+        # TODO: Normalise by area computed on fine reference mesh
+        # area = assemble(b*dx)
+        # area_fine_mesh = ...
+        # rescaling = 1.0 if np.allclose(area, 0.0) else area_fine_mesh/area
+        rescaling = 1.0
+
+        z, zeta = prob.adj_solutions[-1].split()
+        zeta.interpolate(rescaling*b)
 
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")
