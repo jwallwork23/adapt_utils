@@ -36,11 +36,12 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, mesh=None, level=0, postproc=True, save_timeseries=False, artificial=False, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
+    def __init__(self, mesh=None, level=0, postproc=True, save_timeseries=False, artificial=False, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], qoi_scaling=1.0e-10, **kwargs):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
         self.save_timeseries = save_timeseries
         self.artificial = artificial
+        self.qoi_scaling = qoi_scaling
 
         # Stabilisation
         self.use_automatic_sipg_parameter = False
@@ -168,6 +169,7 @@ class TohokuOptions(TsunamiOptions):
 
     def _get_update_forcings_forward(self, prob, i):
         self.J = 0
+        scaling = Constant(self.qoi_scaling)
         weight = Constant(1.0)
         eta_obs = Constant(0.0)
         eta = prob.fwd_solutions[i].split()[1]
@@ -221,7 +223,7 @@ class TohokuOptions(TsunamiOptions):
                     I = self.gauges[gauge]["indicator"]
                     A = self.gauges[gauge]["area"]
                     diff = 0.5*I*(eta - eta_obs)**2
-                    self.J += assemble(weight*dtc*diff*dx)
+                    self.J += assemble(scaling*weight*dtc*diff*dx)
                     self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False)/A)
                     self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False)/A)
             self.times.append(t)
@@ -231,6 +233,7 @@ class TohokuOptions(TsunamiOptions):
 
     def _get_update_forcings_adjoint(self, prob, i):
         eta_obs = Constant(0.0)
+        scaling = Constant(self.qoi_scaling)
 
         def update_forcings(t):
 
@@ -249,7 +252,7 @@ class TohokuOptions(TsunamiOptions):
 
             # Interpolate onto RHS
             k_u, k_eta = prob.kernels[i].split()
-            k_eta.interpolate(expr)
+            k_eta.interpolate(scaling*expr)
 
             return
 
