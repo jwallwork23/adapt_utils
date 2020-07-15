@@ -240,7 +240,7 @@ params = {'linewidth': 3, 'markersize': 8, 'color': 'C2', }
 for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
     x = np.array([m - delta_m, m + delta_m])
     axes.plot(x, g*(x-m) + f, '-', **params)
-params['label'] = 'Discrete adjoint gradient'
+params['label'] = 'Continuous adjoint gradient'
 axes.plot(x, g*(x-m) + f, '-', **params)
 axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
 axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
