@@ -51,9 +51,10 @@ kwargs = {
     # Optimisation
     'control_parameter': float(args.initial_guess or 10.0),
     'artificial': True,
-    'qoi_scaling': 1.0e-10,
+    'qoi_scaling': 1.0e-12,
 
     # Misc
+    'plot_pvd': False,
     'debug': bool(args.debug or False),
 }
 nonlinear = False  # TODO
@@ -99,7 +100,7 @@ for i, m in enumerate(control_values):
 # Plot parameter space
 fig, axes = plt.subplots(figsize=(8, 8))
 axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
-axes.set_xlabel("Coefficient for Gaussian basis function", fontsize=fontsize)
+axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
 axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
@@ -132,10 +133,10 @@ if not plot_only:
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         plt.xticks(fontsize=fontsize_tick)
         plt.yticks(fontsize=fontsize_tick)
+        plt.grid()
     for i in range(len(gauges) % N):
         axes[N-1, N-i-1].axes('off')
     plt.tight_layout()
-    plt.grid()
     plt.savefig(os.path.join(di, 'single_bf_timeseries_artificial_{:d}.pdf'.format(level)))
 
 fname = os.path.join(op.di, 'opt_progress_dis_{:s}_artificial' + '_{:d}.npy'.format(level))
@@ -195,7 +196,7 @@ delta_m = 0.25
 for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
     x = np.array([m - delta_m, m + delta_m])
     axes.plot(x, g*(x-m) + f, '-', color='g', linewidth=2, markersize=8)
-axes.set_xlabel("Coefficient for Gaussian basis function", fontsize=fontsize)
+axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
 axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
@@ -231,10 +232,10 @@ if not plot_only:
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         plt.xticks(fontsize=fontsize_tick)
         plt.yticks(fontsize=fontsize_tick)
+        plt.grid()
     for i in range(len(gauges) % N):
         axes[N-1, N-i-1].axes('off')
     plt.tight_layout()
-    plt.grid()
     plt.savefig(os.path.join(di, 'single_bf_timeseries_optimised_discrete_artificial_{:d}.pdf'.format(level)))
 
     # Compare total variation

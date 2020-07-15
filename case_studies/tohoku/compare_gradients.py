@@ -14,6 +14,7 @@ from adapt_utils.case_studies.tohoku.options import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
+parser.add_argument("-debug", help="Toggle debugging")
 args = parser.parse_args()
 
 # --- Setup
@@ -35,10 +36,11 @@ kwargs = {
     'control_parameter': 10.0,
     'optimal_value': 5.0,
     'artificial': True,
-    'qoi_scaling': 1.0e-10,
+    'qoi_scaling': 1.0e-12,
 
     # Misc
-    'debug': True,
+    'plot_pvd': False,
+    'debug': bool(args.debug or False),
 }
 nonlinear = False  # TODO
 op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
@@ -50,6 +52,7 @@ with stop_annotating():
     swp.solve_forward()
     for gauge in op.gauges:
         op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
+    del swp
 
 
 # --- Discrete adjoint
@@ -104,6 +107,7 @@ print_output("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_dis
 relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
 assert np.allclose(relative_error, 0.0)
 swp.clear_tape()
+del swp
 stop_annotating()
 
 
@@ -126,15 +130,15 @@ print_output("Relative error (discrete vs. continuous): {:.4f}%".format(100*rela
 # --- Finite differences
 
 # Establish gradient using finite differences
-swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
-epsilon = 0.1
+epsilon = 1.0
 converged = False
-rtol = 1.0e-03
+rtol = 1.0e-05
 g_fd_ = None
 while not converged:
+    swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     op.control_parameter.assign(kwargs['control_parameter'] + epsilon)
     swp.solve_forward(plot_pvd=False)
-    J_step = J
+    J_step = op.J
     g_fd = (J_step - J)/epsilon
     print_output("J(epsilon=0) = {:.8e}  J(epsilon={:.1e}) = {:.8e}".format(J, epsilon, J_step))
     if g_fd_ is not None:
@@ -143,8 +147,9 @@ while not converged:
             converged = True
         elif epsilon < 1.0e-10:
             raise ConvergenceError
-    epsilon *= 0.1
+    epsilon *= 0.5
     g_fd_ = g_fd
+    del swp
 
 # Logging
 logstr = "elements: {:d}\n".format(swp.meshes[0].num_cells())
@@ -152,5 +157,6 @@ logstr += "finite difference gradient (rtol={:.1e}): {:.4e}\n".format(rtol, g_fd
 logstr += "discrete gradient: {:.4e}\n".format(g_discrete)
 logstr += "continuous gradient: {:.4e}\n".format(g_continuous)
 print_output(logstr)
-with open('outputs/fixed_mesh/gradient_{:d}.log'.format(level), 'w') as logfile:
+fname = "outputs/fixed_mesh/gradient_at_{:d}_level{:d}.log"
+with open(fname.format(int(kwargs['control_parameter']), level), 'w') as logfile:
     logfile.write(logstr)
