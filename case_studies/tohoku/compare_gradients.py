@@ -35,13 +35,12 @@ kwargs = {
     'control_parameter': 10.0,
     'optimal_value': 5.0,
     'artificial': True,
+    'qoi_scaling': 1.0e-10,
 
     # Misc
     'debug': True,
 }
 nonlinear = False  # TODO
-# scaling = 1.0e-10
-scaling = 1.0
 op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
 
 # Solve the forward problem to get data with 'optimal' control parameter m = 5
@@ -66,7 +65,7 @@ op.control_parameter.assign(kwargs['control_parameter'], annotate=False)
 swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, checkpointing=False)
 swp.solve_forward()
 J = op.J
-print_output("Mean square error QoI = {:.4e}".format(J*scaling))
+print_output("Mean square error QoI = {:.4e}".format(J))
 
 # Plot timeseries
 gauges = list(op.gauges.keys())
@@ -95,7 +94,7 @@ plt.savefig(os.path.join(di, 'single_bf_timeseries_level{:d}.pdf'.format(level))
 # TODO: Compare discrete vs continuous form of error using norms / TV
 
 # Compute gradient
-g_discrete = swp.compute_gradient(Control(op.control_parameter), scaling=scaling).dat.data[0]
+g_discrete = swp.compute_gradient(Control(op.control_parameter)).dat.data[0]
 
 # Check consistency of by-hand gradient formula
 swp.get_solve_blocks()
@@ -114,12 +113,11 @@ stop_annotating()
 op.di = create_directory(op.di.replace('discrete', 'continuous'))
 swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True)
 swp.solve_forward()
-# J = op.J*scaling
 J = op.J
 
 # Solve adjoint equation in continuous form
 swp.solve_adjoint()
-g_continuous = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)*scaling
+g_continuous = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
 print_output("Gradient computed by hand (continuous): {:.4e}".format(g_continuous))
 relative_error = abs((g_discrete - g_continuous)/g_discrete)
 print_output("Relative error (discrete vs. continuous): {:.4f}%".format(100*relative_error))
@@ -136,7 +134,6 @@ g_fd_ = None
 while not converged:
     op.control_parameter.assign(kwargs['control_parameter'] + epsilon)
     swp.solve_forward(plot_pvd=False)
-    # J_step = J*scaling
     J_step = J
     g_fd = (J_step - J)/epsilon
     print_output("J(epsilon=0) = {:.8e}  J(epsilon={:.1e}) = {:.8e}".format(J, epsilon, J_step))
