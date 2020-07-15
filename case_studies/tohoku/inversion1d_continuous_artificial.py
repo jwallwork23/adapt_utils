@@ -62,7 +62,6 @@ fontsize = 22
 fontsize_tick = 18
 plotting_kwargs = {
     'markevery': 5,
-    'fontsize': fontsize,
 }
 op = TohokuGaussianBasisOptions(**kwargs)
 di = create_directory(os.path.join(op.di, 'plots'))
@@ -80,11 +79,11 @@ n = 9
 control_values = np.linspace(2.0, 10.0, n)
 fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
 op.save_timeseries = False
-swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
 if os.path.exists(fname) and not recompute:
     func_values = np.load(fname)
 else:
     func_values = np.zeros(n)
+    swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     for i, m in enumerate(control_values):
         op.control_parameter.assign(m)
         swp.set_initial_condition()
@@ -96,7 +95,7 @@ for i, m in enumerate(control_values):
 
 # Plot parameter space
 fig, axes = plt.subplots(figsize=(8, 8))
-axes.plot(control_values, func_values, '--x')
+axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
 axes.set_xlabel("Coefficient for Gaussian basis function", fontsize=fontsize)
 axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
@@ -107,35 +106,34 @@ plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{
 
 # --- Optimisation
 
-swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True)
-
-def reduced_functional(m):
-    """
-    The QoI, reinterpreted as a function of the control parameter `m` only. We apply PDE constrained
-    optimisation in order to minimise this functional.
-
-    Note that this involves checkpointing state.
-    """
-    op.control_parameter.assign(m[0])
-    swp.solve_forward()
-    J = op.J
-    print_output("control = {:.8e}  functional = {:.8e}".format(m[0], J))
-    return J
-
-
-def gradient(m):
-    """
-    Compute the gradient of the reduced functional with respect to the control parameter using data
-    stored to the checkpoints.
-    """
-    if len(swp.checkpoint) == 0:
-        reduced_functional(m)
-    swp.solve_adjoint()
-    g = np.array([assemble(inner(op.basis_function, swp.adj_solutions[0])*dx), ])
-    print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g[0]))
-    return g
-
 if not plot_only:
+    swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True)
+
+    def reduced_functional(m):
+        """
+        The QoI, reinterpreted as a function of the control parameter `m` only. We apply PDE
+        constrained optimisation in order to minimise this functional.
+
+        Note that this involves checkpointing state.
+        """
+        op.control_parameter.assign(m[0])
+        swp.solve_forward()
+        J = op.J
+        print_output("control = {:.8e}  functional = {:.8e}".format(m[0], J))
+        return J
+
+
+    def gradient(m):
+        """
+        Compute the gradient of the reduced functional with respect to the control parameter using
+        data stored to the checkpoints.
+        """
+        if len(swp.checkpoint) == 0:
+            reduced_functional(m)
+        swp.solve_adjoint()
+        g = np.array([assemble(inner(op.basis_function, swp.adj_solutions[0])*dx), ])
+        print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g[0]))
+        return g
 
     # Solve the forward problem with some initial guess
     swp.checkpointing = False
@@ -227,16 +225,18 @@ else:
 
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
-axes.plot(control_values, func_values, '--x')
-axes.plot(control_values_opt, func_values_opt, 'o', color='r')
+axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
+axes.plot(control_values_opt, func_values_opt, 'o', color='r', linewidth=2, markersize=8)
 delta_m = 0.25
 for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
     x = np.array([m - delta_m, m + delta_m])
-    axes.plot(x, g*(x-m) + f, '-', color='g')
+    axes.plot(x, g*(x-m) + f, '-', color='g', linewidth=2, markersize=8)
 axes.set_xlabel("Coefficient for Gaussian basis function", fontsize=fontsize)
-axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
+axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
+plt.xlim([1.5, 10.5])
+plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
 plt.grid()
 plt.savefig(os.path.join(di, 'single_bf_optimisation_continuous_artificial_{:d}.pdf'.format(level)))
