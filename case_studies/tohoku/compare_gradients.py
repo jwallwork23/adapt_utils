@@ -134,6 +134,7 @@ epsilon = 1.0
 converged = False
 rtol = 1.0e-05
 g_fd_ = None
+op.save_timeseries = False
 while not converged:
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     op.control_parameter.assign(kwargs['control_parameter'] + epsilon)

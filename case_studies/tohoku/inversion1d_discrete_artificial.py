@@ -13,6 +13,7 @@ from firedrake_adjoint import *
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy
 import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -188,22 +189,36 @@ else:
     np.save(fname.format('func'), func_values_opt)
     np.save(fname.format('grad'), gradient_values_opt)
 
+# Fit a quadratic to the first three points
+quadratic = scipy.interpolate.interp1d(control_values[::4], func_values[::4], kind='quadratic', fill_value='extrapolate')
+
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
-axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
-axes.plot(control_values_opt, func_values_opt, 'o', color='r', linewidth=2, markersize=8)
+params = {'linewidth': 3, 'markersize': 8, 'color': 'C0', 'label': 'Parameter space', }
+axes.plot(control_values, func_values, 'x', **params)
+x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
+axes.plot(x, quadratic(x), '--', color='C0', linewidth=1, markersize=8, label='Fitted quadratic')
+params = {'linewidth': 3, 'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
+axes.plot(control_values_opt, func_values_opt, 'o', **params)
 delta_m = 0.25
+params = {'linewidth': 3, 'markersize': 8, 'color': 'C2', }
 for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
     x = np.array([m - delta_m, m + delta_m])
-    axes.plot(x, g*(x-m) + f, '-', color='g', linewidth=2, markersize=8)
+    axes.plot(x, g*(x-m) + f, '-', **params)
+params['label'] = 'Discrete adjoint gradient'
+axes.plot(x, g*(x-m) + f, '-', **params)
 axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
 axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
 plt.xlim([1.5, 10.5])
-plt.ylim([0.0, 1.1*func_values[-1]])
+# plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
 plt.grid()
+plt.legend(fontsize=fontsize)
+opt = control_values_opt[-1]
+axes.annotate('m = {:.2f}'.format(opt),
+    xy=(opt-0.5, func_values_opt[-1]+0.1**level), color='C1', fontsize=fontsize)
 plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
 
 if not plot_only:
