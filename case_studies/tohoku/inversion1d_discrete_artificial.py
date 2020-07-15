@@ -61,7 +61,6 @@ fontsize = 22
 fontsize_tick = 18
 plotting_kwargs = {
     'markevery': 5,
-    'fontsize': fontsize,
 }
 op = TohokuGaussianBasisOptions(**kwargs)
 di = create_directory(os.path.join(op.di, 'plots'))
@@ -82,11 +81,11 @@ control_values = np.linspace(2.0, 10.0, n)
 fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
 op.save_timeseries = False
 with stop_annotating():
-    swp = AdaptiveProblem(op, nonlinear=nonlinear)
     if os.path.exists(fname) and not recompute:
         func_values = np.load(fname)
     else:
         func_values = np.zeros(n)
+        swp = AdaptiveProblem(op, nonlinear=nonlinear)
         for i, m in enumerate(control_values):
             op.control_parameter.assign(m)
             swp.set_initial_condition()
@@ -99,7 +98,7 @@ for i, m in enumerate(control_values):
 
 # Plot parameter space
 fig, axes = plt.subplots(figsize=(8, 8))
-axes.plot(control_values, func_values, '--x')
+axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
 axes.set_xlabel("Coefficient for Gaussian basis function", fontsize=fontsize)
 axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
@@ -190,16 +189,18 @@ else:
 
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
-axes.plot(control_values, func_values, '--x')
-axes.plot(control_values_opt, func_values_opt, 'o', color='r')
+axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
+axes.plot(control_values_opt, func_values_opt, 'o', color='r', linewidth=2, markersize=8)
 delta_m = 0.25
 for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
     x = np.array([m - delta_m, m + delta_m])
-    axes.plot(x, g*(x-m) + f, '-', color='g')
+    axes.plot(x, g*(x-m) + f, '-', color='g', linewidth=2, markersize=8)
 axes.set_xlabel("Coefficient for Gaussian basis function", fontsize=fontsize)
-axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
+axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
+plt.xlim([1.5, 10.5])
+plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
 plt.grid()
 plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
