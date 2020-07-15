@@ -1,4 +1,12 @@
-# TODO: doc
+"""
+Source inversion for a 'synthetic' tsunami generated from an initial condition given by scaling a
+single Gaussian basis function. Given that the 'optimal' scaling parameter is m = 5, we seek to
+find this value through PDE constrained optimisation with an initial guess m = 10. What is 'optimal'
+is determined via an objective functional J which quantifies the misfit at timeseries with those data
+recorded under the m = 5 case.
+
+In this script, we use the discrete adjoint approach to approximate the gradient of J w.r.t. m.
+"""
 from thetis import *
 from firedrake_adjoint import *
 
@@ -15,15 +23,15 @@ from adapt_utils.norms import total_variation
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
-parser.add_argument("-optimised_value", help="Optimised control parameter (e.g. from previous run)")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
-parser.add_argument("-recompute", help="Recompute parameter space etc.")
+parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
+parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
 args = parser.parse_args()
 
 # Set parameters
 level = int(args.level or 0)
-optimised_value = None if args.optimised_value is None else float(args.optimised_value)
-recompute = bool(args.recompute or False)
+recompute = bool(args.recompute_parameter_space or False)
+optimise = bool(args.rerun_optimisation or False)
 kwargs = {
     'level': level,
     'save_timeseries': True,
@@ -116,8 +124,16 @@ di = create_directory(os.path.join(op.di, 'plots'))
 plt.tight_layout()
 plt.savefig(os.path.join(di, 'single_bf_timeseries_artificial_{:d}.pdf'.format(level)))
 
-fname = 'opt_progress_cts_{:s}_artificial_{:d}.npy'
-if optimised_value is None or recompute:
+fname = os.path.join(op.di, 'opt_progress_dis_{:s}_artificial' + '_{:d}.npy'.format(level))
+if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) or not optimise:
+
+    # Load trajectory
+    control_values_opt = np.load(fname.format('ctrl', level))
+    func_values_opt = np.load(fname.format('func', level))
+    gradient_values_opt = np.load(fname.format('grad', level))
+    optimised_value = control_values_opt[-1]
+
+else:
 
     # Arrays to log progress
     control_values_opt = []
@@ -156,11 +172,6 @@ if optimised_value is None or recompute:
     np.save(os.path.join(op.di, fname.format('ctrl', level)), control_values_opt)
     np.save(os.path.join(op.di, fname.format('func', level)), func_values_opt)
     np.save(os.path.join(op.di, fname.format('grad', level)), gradient_values_opt)
-else:
-    # Load trajectory
-    control_values_opt = np.load(os.path.join(op.di, fname.format('ctrl', level)))
-    func_values_opt = np.load(os.path.join(op.di, fname.format('func', level)))
-    gradient_values_opt = np.load(os.path.join(op.di, fname.format('grad', level)))
 
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
