@@ -150,6 +150,10 @@ class CoupledOptions(Options):
         """Should be implemented in derived class."""
         return Function(fs).assign(1.0)
 
+    def set_advective_velocity_factor(self, fs):
+        """Should be implemented in derived class."""
+        return Constant(1.0)
+
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
         return None if np.allclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
