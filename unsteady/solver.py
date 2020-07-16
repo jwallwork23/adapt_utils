@@ -813,8 +813,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
+
+            # Get mesh velocity
             if self.iteration % op.dt_per_mesh_movement == 0:
-                # Get mesh velocity
                 if self.mesh_movers[i] is not None:  # TODO: generalise
                     self.mesh_movers[i].adapt()
 
@@ -838,8 +839,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Move mesh
             if self.iteration % op.dt_per_mesh_movement == 0:
                 self.move_mesh(i)
-            # if self.mesh_movers[i] is not None:  # TODO: generalise
-            #     self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
 
             # Save to checkpoint
             if self.checkpointing:
@@ -847,6 +846,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.save_to_checkpoint(self.fwd_solutions[i])
                 if op.solve_tracer:
                     self.save_to_checkpoint(self.fwd_solutions_tracer[i])
+                if op.solve_sediment:
+                    self.save_to_checkpoint(self.fwd_solutions_sediment[i])
+                if op.solve_exner:
+                    self.save_to_checkpoint(self.fwd_solutions_bathymetry[i])
+                # TODO: Checkpoint mesh if moving
 
             # Export
             self.iteration += 1
