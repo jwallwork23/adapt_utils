@@ -204,24 +204,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_sediment:
             self.fwd_solutions_sediment = [Function(Q, name="Forward sediment solution") for Q in self.Q]
         if self.op.solve_exner:
-            self.fwd_solutions_bathymetry = [Function(W, name="Forward bathymetry solution") for W in self.W]            
+            self.fwd_solutions_bathymetry = [Function(W, name="Forward bathymetry solution") for W in self.W]
 
     def set_fields(self, init = False):
         """Set velocity field, viscosity, etc *on each mesh*."""
         self.fields = [AttrDict() for P1 in self.P1]
         if self.op.solve_exner:
             if init:
-                import ipdb; ipdb.set_trace()
-                self.fwd_solutions_bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-            self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
-            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                    )
-                self.op.create_sediment_model(self.P1[i].mesh(), self.fwd_solutions_bathymetry[i])
+                print("init")
+                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
+                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
         for i, P1 in enumerate(self.P1):
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
@@ -397,7 +390,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.shallow_water_options[i]['mesh_velocity'] = self.mesh_velocities[i]
         self.equations[i].shallow_water = ShallowWaterEquations(
             self.V[i],
-            self.depth[i],
+            #self.depth[i],
+            self.op.sediment_model.depth_expr,
             self.shallow_water_options[i],
         )
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
@@ -428,7 +422,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         model = SedimentEquation2D
         self.equations[i].sediment = model(
             self.Q[i],
-            self.depth[i],
+            self.op.sediment_model.depth_expr,
+            #self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
         )
@@ -441,7 +436,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         model = ExnerEquation
         self.equations[i].exner = model(
             self.W[i],
-            self.depth[i],
+            #self.depth[i],
+            self.op.sediment_model.depth_expr,
             conservative=self.op.use_tracer_conservative_form,
             sed_model=self.op.sediment_model,
         )
@@ -828,7 +824,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.tracer_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_tracer[i])
             if op.solve_sediment:
-                self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i], self.depth[i])
+                self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i])
                 ts.sediment.advance(self.simulation_time, update_forcings)
                 if self.sediment_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_sediment[i])
@@ -1077,6 +1073,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                                 H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
+
                 self.setup_solver_forward(i)
                 self.solve_forward_step(i, export_func=export_func, update_forcings=update_forcings, plot_pvd=op.plot_pvd)
 

@@ -10,7 +10,7 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 1
+nx = 0.1
 
 inputdir = 'hydrodynamics_trench_' + str(nx)
 
@@ -29,7 +29,10 @@ kwargs = {
 
 op = TrenchSedimentOptions(**kwargs)
 swp = AdaptiveProblem(op)
+
+t1 = time.time()
 swp.solve_forward()
+t2 = time.time()
 
 new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
 

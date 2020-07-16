@@ -126,7 +126,7 @@ class CoupledOptions(Options):
                 "pc_type": "sor",
                 # "ksp_monitor": None,
                 # "ksp_converged_reason": None,
-            }            
+            }
         }
         self.adjoint_solver_parameters.update(self.solver_parameters)
         super(CoupledOptions, self).__init__(**kwargs)

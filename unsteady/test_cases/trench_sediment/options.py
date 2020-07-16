@@ -60,8 +60,8 @@ class TrenchSedimentOptions(CoupledOptions):
         # Time integration
         self.dt = 0.25
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 45
-        self.dt_per_export = 45
+        self.dt_per_mesh_movement = 16
+        self.dt_per_export = 48
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
@@ -187,21 +187,10 @@ class TrenchSedimentOptions(CoupledOptions):
         prob.fwd_solutions_sediment[0].interpolate(Constant(0.0)) #self.sediment_model.equiltracer)
 
     def set_initial_condition_bathymetry(self, prob):
-       prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
+        prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
 
     def get_update_forcings(self, prob, i):
-        u, eta = prob.fwd_solutions[i].split()
-        depth = prob.depth[i]
-
-        #def update_forcings(t):
-
-            # Update bathymetry and friction
-            #if self.friction == 'nikuradse':
-            #    if self.wetting_and_drying:
-            #        depth.project(eta + bathymetry_displacement(eta) + prob.bathymetry[i])
-            #    prob.fields[i].quadratic_drag_coefficient.interpolate(self.get_cfactor(depth))
-
-        return None #update_forcings
+        return None
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")

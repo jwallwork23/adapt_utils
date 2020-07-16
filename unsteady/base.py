@@ -358,7 +358,7 @@ class AdaptiveProblemBase(object):
                     'pc_type_factor_mat_solver_type': 'mumps',
                 }
                 solve(F == 0, coords, solver_parameters=params)
-            
+
             # Forward Euler
             else:
                 coords.interpolate(coords + dt*self.mesh_velocities[i])
@@ -377,6 +377,7 @@ class AdaptiveProblemBase(object):
 
             # Project a copy of the current solution onto mesh defined on new coordinates
             mesh = Mesh(self.mesh_movers[i].x)
+
             V = FunctionSpace(mesh, self.V[i].ufl_element())
             tmp = Function(V)
             for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
@@ -389,5 +390,22 @@ class AdaptiveProblemBase(object):
                 sol_i.dat.data[:] = tmp_i.dat.data
             del tmp
 
+            #P1DG = FunctionSpace(mesh, self.P1DG[i].ufl_element())
+            #tmp = Function(P1DG)
+            #tmp.project(self.fwd_solutions_sediment[i])
+
+            #self.fwd_solutions_sediment[i].dat.data[:] = tmp.dat.data
+            #del tmp
+
+            #P1 = FunctionSpace(mesh, self.P1[i].ufl_element())
+            #tmp = Function(P1)
+            #tmp.project(self.fwd_solutions_bathymetry[i])
+
+            #self.fwd_solutions_bathymetry[i].dat.data[:] = tmp.dat.data
+            #del tmp
+
             # Update fields
+            #if self.simulation_time == 0.0:
+            #    self.set_fields(init=True)
+            #else:
             self.set_fields()
