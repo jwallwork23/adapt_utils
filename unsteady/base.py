@@ -403,29 +403,35 @@ class AdaptiveProblemBase(object):
                 tmp = Function(V)
                 for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
                     tmp_i.project(sol_i)
+
+                # Same for tracers etc.
                 if self.op.solve_tracer:
                     Q = FunctionSpace(mesh, self.Q[i].ufl_element())
                     tmp_tracer = Function(Q)
-                    tmp_tracer.project(self.fwd_solutions_tracer[i])
-                    del tmp_tracer
-                del tmp
+                    tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
+                if self.op.solve_sediment:
+                    Q = FunctionSpace(mesh, self.Q[i].ufl_element())
+                    tmp_sediment = Function(Q)
+                    tmp_sediment = project(self.fwd_solutions_sediment[i], Q)
+                if self.op.solve_exner:
+                    W = FunctionSpace(mesh, self.W[i].ufl_element())
+                    tmp_bathymetry = Function(W)
+                    tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
 
-            #P1DG = FunctionSpace(mesh, self.P1DG[i].ufl_element())
-            #tmp = Function(P1DG)
-            #tmp.project(self.fwd_solutions_sediment[i])
+            # Update physical mesh and solution fields defined on it
+            self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
+            for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+                sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
+            del tmp
+            if self.op.solve_tracer:  # FIXME: Need annotation
+                self.fwd_solutions_tracer[i].dat.data[:] = tmp_tracer.dat.data
+                del tmp_tracer
+            if self.op.solve_sediment:  # FIXME: Need annotation
+                self.fwd_solutions_sediment[i].dat.data[:] = tmp_sediment.dat.data
+                del tmp_sediment
+            if self.op.solve_exner:  # FIXME: Need annotation
+                self.fwd_solutions_bathymetry[i].dat.data[:] = tmp_bathymetry.dat.data
+                del tmp_bathymetry
 
-            #self.fwd_solutions_sediment[i].dat.data[:] = tmp.dat.data
-            #del tmp
-
-            #P1 = FunctionSpace(mesh, self.P1[i].ufl_element())
-            #tmp = Function(P1)
-            #tmp.project(self.fwd_solutions_bathymetry[i])
-
-            #self.fwd_solutions_bathymetry[i].dat.data[:] = tmp.dat.data
-            #del tmp
-
-            # Update fields
-            #if self.simulation_time == 0.0:
-            #    self.set_fields(init=True)
-            #else:
+            # Re-interpolate fields
             self.set_fields()
