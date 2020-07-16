@@ -410,11 +410,9 @@ class AdaptiveProblemBase(object):
                     tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
                 if self.op.solve_sediment:
                     Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-                    tmp_sediment = Function(Q)
                     tmp_sediment = project(self.fwd_solutions_sediment[i], Q)
                 if self.op.solve_exner:
                     W = FunctionSpace(mesh, self.W[i].ufl_element())
-                    tmp_bathymetry = Function(W)
                     tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
 
             # Update physical mesh and solution fields defined on it
