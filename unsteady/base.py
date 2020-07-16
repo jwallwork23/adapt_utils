@@ -348,87 +348,71 @@ class AdaptiveProblemBase(object):
 
     def move_mesh(self, i):
         if self.op.approach in ('lagrangian', 'ale'):  # TODO: Make more robust (apply BCs etc.)
-            mesh = self.meshes[i]
-            t = self.simulation_time
-            dt = self.op.dt
-            coords = mesh.coordinates
-
-            # Crank-Nicolson  # TODO: Assemble once
-            if hasattr(self.op, 'get_velocity'):
-                coord_space = coords.function_space()
-                coords_old = Function(coord_space).assign(coords)
-                test = TestFunction(coord_space)
-
-                F = inner(test, coords)*dx - inner(test, coords_old)*dx
-                F -= 0.5*dt*inner(test, self.op.get_velocity(coords_old, t))*dx
-                F -= 0.5*dt*inner(test, self.op.get_velocity(coords, t))*dx
-
-                params = {
-                    'mat_type': 'aij',
-                    'snes_type': 'newtonls',
-                    'snes_rtol': 1.0e-03,
-                    # 'ksp_type': 'gmres',
-                    'ksp_type': 'preonly',
-                    # 'pc_type': 'sor',
-                    'pc_type': 'lu',
-                    'pc_type_factor_mat_solver_type': 'mumps',
-                }
-                solve(F == 0, coords, solver_parameters=params)
-
-            # Forward Euler
-            else:
-                coords.interpolate(coords + dt*self.mesh_velocities[i])
-
-            # Check for inverted elements
-            orig_signs = self.jacobian_signs[i]
-            r = interpolate(JacobianDeterminant(mesh)/orig_signs, self.P0[i]).vector().gather()
-            num_inverted = len(r[r < 0])
-            if num_inverted > 0:
-                warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
-
+            self.move_mesh_ale()
         elif self.mesh_movers[i] is not None:
+            self.move_mesh_monge_ampere()
 
-            # NOTE: If we want to take the adjoint through mesh movement then there is no need to
-            #       know how the coordinate transform was derived, only what the result was. In any
-            #       case, the current implementation involves a supermesh projection which is not
-            #       yet annotated in pyadjoint.
-            with stop_annotating():
+    def move_mesh_ale(self):
+        mesh = self.meshes[i]
+        t = self.simulation_time
+        dt = self.op.dt
+        coords = mesh.coordinates
 
-                # Compute new physical mesh coordinates
-                self.mesh_movers[i].adapt()
+        # Crank-Nicolson  # TODO: Assemble once
+        if hasattr(self.op, 'get_velocity'):
+            coord_space = coords.function_space()
+            coords_old = Function(coord_space).assign(coords)
+            test = TestFunction(coord_space)
 
-                # Project a copy of the current solution onto mesh defined on new coordinates
-                mesh = Mesh(self.mesh_movers[i].x)
-                V = FunctionSpace(mesh, self.V[i].ufl_element())
-                tmp = Function(V)
-                for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-                    tmp_i.project(sol_i)
+            F = inner(test, coords)*dx - inner(test, coords_old)*dx
+            F -= 0.5*dt*inner(test, self.op.get_velocity(coords_old, t))*dx
+            F -= 0.5*dt*inner(test, self.op.get_velocity(coords, t))*dx
 
-                # Same for tracers etc.
-                if self.op.solve_tracer:
-                    Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-                    tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
-                if self.op.solve_sediment:
-                    Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-                    tmp_sediment = project(self.fwd_solutions_sediment[i], Q)
-                if self.op.solve_exner:
-                    W = FunctionSpace(mesh, self.W[i].ufl_element())
-                    tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
+            params = {
+                'mat_type': 'aij',
+                'snes_type': 'newtonls',
+                'snes_rtol': 1.0e-03,
+                # 'ksp_type': 'gmres',
+                'ksp_type': 'preonly',
+                # 'pc_type': 'sor',
+                'pc_type': 'lu',
+                'pc_type_factor_mat_solver_type': 'mumps',
+            }
+            solve(F == 0, coords, solver_parameters=params)
 
-            # Update physical mesh and solution fields defined on it
-            self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
+        # Forward Euler
+        else:
+            coords.interpolate(coords + dt*self.mesh_velocities[i])
+
+        # Check for inverted elements
+        orig_signs = self.jacobian_signs[i]
+        r = interpolate(JacobianDeterminant(mesh)/orig_signs, self.P0[i]).vector().gather()
+        num_inverted = len(r[r < 0])
+        if num_inverted > 0:
+            warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
+
+    def move_mesh_monge_ampere(self):
+        # NOTE: If we want to take the adjoint through mesh movement then there is no need to
+        #       know how the coordinate transform was derived, only what the result was. In any
+        #       case, the current implementation involves a supermesh projection which is not
+        #       yet annotated in pyadjoint.
+        with stop_annotating():
+
+            # Compute new physical mesh coordinates
+            self.mesh_movers[i].adapt()
+
+            # Project a copy of the current solution onto mesh defined on new coordinates
+            mesh = Mesh(self.mesh_movers[i].x)
+            V = FunctionSpace(mesh, self.V[i].ufl_element())
+            tmp = Function(V)
             for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-                sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
-            del tmp
-            if self.op.solve_tracer:  # FIXME: Need annotation
-                self.fwd_solutions_tracer[i].dat.data[:] = tmp_tracer.dat.data
-                del tmp_tracer
-            if self.op.solve_sediment:  # FIXME: Need annotation
-                self.fwd_solutions_sediment[i].dat.data[:] = tmp_sediment.dat.data
-                del tmp_sediment
-            if self.op.solve_exner:  # FIXME: Need annotation
-                self.fwd_solutions_bathymetry[i].dat.data[:] = tmp_bathymetry.dat.data
-                del tmp_bathymetry
+                tmp_i.project(sol_i)
 
-            # Re-interpolate fields
-            self.set_fields()
+        # Update physical mesh and solution fields defined on it
+        self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
+        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+            sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
+        del tmp
+
+        # Re-interpolate fields
+        self.set_fields()
