@@ -28,6 +28,7 @@ parser.add_argument("-optimal_control", help="Artificially choose an optimum to 
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
 parser.add_argument("-plot_only", help="Just plot parameter space and optimisation progress")
+parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-debug", help="Toggle debugging")
 args = parser.parse_args()
 
@@ -38,6 +39,7 @@ optimise = bool(args.rerun_optimisation or False)
 plot_only = bool(args.plot_only or False)
 if recompute:
     assert not plot_only
+plot_pvd = bool(args.plot_pvd or False)
 kwargs = {
     'level': level,
     'save_timeseries': True,
@@ -234,6 +236,7 @@ if not plot_only:
 
     # Run forward again so that we can compare timeseries
     kwargs['control_parameter'] = optimised_value
+    kwargs['plot_pvd'] plot_pvd
     op_opt = TohokuGaussianBasisOptions(**kwargs)
     gauges = list(op_opt.gauges.keys())
     for gauge in gauges:
