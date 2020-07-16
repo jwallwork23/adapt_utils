@@ -814,7 +814,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
 
-            # Get mesh velocity
+            # Obtain the mesh movement transformation
             if self.iteration % op.dt_per_mesh_movement == 0:
                 if self.mesh_movers[i] is not None:  # TODO: generalise
                     self.mesh_movers[i].adapt()
@@ -836,7 +836,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if op.solve_exner:
                 ts.exner.advance(self.simulation_time, update_forcings)
 
-            # Move mesh
+            # Move *mesh i*
             if self.iteration % op.dt_per_mesh_movement == 0:
                 self.move_mesh(i)
 
@@ -1547,33 +1547,32 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 print_output("Converged number of mesh elements!")
                 break
 
-    def move_mesh_monge_ampere(self):
-        # NOTE: If we want to take the adjoint through mesh movement then there is no need to
-        #       know how the coordinate transform was derived, only what the result was. In any
-        #       case, the current implementation involves a supermesh projection which is not
-        #       yet annotated in pyadjoint.
-        with stop_annotating():
+    def move_mesh_monge_ampere(self, i):
+        # NOTES:
+        #    * Assumes we have already computed new physical mesh coordinates.
+        #
+        #    * If we want to take the adjoint through mesh movement then there is no need to
+        #      know how the coordinate transform was derived, only what the result was. In any
+        #      case, the current implementation involves a supermesh projection which is not
+        #      yet annotated in pyadjoint.  # TODO
 
-            # Compute new physical mesh coordinates
-            self.mesh_movers[i].adapt()
+        # Project a copy of the current solution onto mesh defined on new coordinates
+        mesh = Mesh(self.mesh_movers[i].x)
+        V = FunctionSpace(mesh, self.V[i].ufl_element())
+        tmp = Function(V)
+        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+            tmp_i.project(sol_i)
 
-            # Project a copy of the current solution onto mesh defined on new coordinates
-            mesh = Mesh(self.mesh_movers[i].x)
-            V = FunctionSpace(mesh, self.V[i].ufl_element())
-            tmp = Function(V)
-            for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-                tmp_i.project(sol_i)
-
-            # Same for tracers etc.
-            if self.op.solve_tracer:
-                Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-                tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
-            if self.op.solve_sediment:
-                Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-                tmp_sediment = project(self.fwd_solutions_sediment[i], Q)
-            if self.op.solve_exner:
-                W = FunctionSpace(mesh, self.W[i].ufl_element())
-                tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
+        # Same for tracers etc.
+        if self.op.solve_tracer:
+            Q = FunctionSpace(mesh, self.Q[i].ufl_element())
+            tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
+        if self.op.solve_sediment:
+            Q = FunctionSpace(mesh, self.Q[i].ufl_element())
+            tmp_sediment = project(self.fwd_solutions_sediment[i], Q)
+        if self.op.solve_exner:
+            W = FunctionSpace(mesh, self.W[i].ufl_element())
+            tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
 
         # Update physical mesh and solution fields defined on it
         self.meshes[i].coordinates.assign(self.mesh_movers[i].x)

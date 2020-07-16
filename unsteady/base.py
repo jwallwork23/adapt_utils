@@ -348,11 +348,11 @@ class AdaptiveProblemBase(object):
 
     def move_mesh(self, i):
         if self.op.approach in ('lagrangian', 'ale'):  # TODO: Make more robust (apply BCs etc.)
-            self.move_mesh_ale()
+            self.move_mesh_ale(i)
         elif self.mesh_movers[i] is not None:
-            self.move_mesh_monge_ampere()
+            self.move_mesh_monge_ampere(i)
 
-    def move_mesh_ale(self):
+    def move_mesh_ale(self, i):
         mesh = self.meshes[i]
         t = self.simulation_time
         dt = self.op.dt
@@ -391,7 +391,7 @@ class AdaptiveProblemBase(object):
         if num_inverted > 0:
             warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
 
-    def move_mesh_monge_ampere(self):
+    def move_mesh_monge_ampere(self, i):
         # NOTE: If we want to take the adjoint through mesh movement then there is no need to
         #       know how the coordinate transform was derived, only what the result was. In any
         #       case, the current implementation involves a supermesh projection which is not
