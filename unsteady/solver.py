@@ -16,11 +16,9 @@ from .tracer.equation import TracerEquation2D
 from .tracer.cons_equation import ConservativeTracerEquation2D
 from .sediment.equation import SedimentEquation2D
 from thetis.exner_eq import ExnerEquation
-from thetis.options import ModelOptions2d
 from .sediment.sediments_model import SedimentModel
 from .tracer.error_estimation import TracerGOErrorEstimator
 from .base import AdaptiveProblemBase
-
 
 __all__ = ["AdaptiveProblem"]
 
@@ -806,7 +804,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
-            if iteration % op.dt_per_mesh_movement == 0:
+            if self.iteration % op.dt_per_mesh_movement == 0:
                 # Get mesh velocity
                 if self.mesh_movers[i] is not None:  # TODO: generalise
                     self.mesh_movers[i].adapt()
@@ -829,7 +827,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 ts.exner.advance(self.simulation_time, update_forcings)
 
             # Move mesh
-            if iteration % op.dt_per_mesh_movement == 0:
+            if self.iteration % op.dt_per_mesh_movement == 0:
                 self.move_mesh(i)
             # if self.mesh_movers[i] is not None:  # TODO: generalise
             #     self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
@@ -1536,36 +1534,36 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 print_output("Converged number of mesh elements!")
                 break
 
-    def move_mesh_monge_ampere(self):
+    def move_mesh_monge_ampere(self, i):
         # NOTE: If we want to take the adjoint through mesh movement then there is no need to
         #       know how the coordinate transform was derived, only what the result was. In any
         #       case, the current implementation involves a supermesh projection which is not
         #       yet annotated in pyadjoint.
-        with stop_annotating():
+        #with stop_annotating():
 
-            # Compute new physical mesh coordinates
-            self.mesh_movers[i].adapt()
+        # Compute new physical mesh coordinates
+        self.mesh_movers[i].adapt()
 
-            # Project a copy of the current solution onto mesh defined on new coordinates
-            mesh = Mesh(self.mesh_movers[i].x)
-            V = FunctionSpace(mesh, self.V[i].ufl_element())
-            tmp = Function(V)
-            for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+        # Project a copy of the current solution onto mesh defined on new coordinates
+        mesh = Mesh(self.mesh_movers[i].x)
+        V = FunctionSpace(mesh, self.V[i].ufl_element())
+        tmp = Function(V)
+        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
                 tmp_i.project(sol_i)
 
-            # Same for tracers etc.
-            if self.op.solve_tracer:
+        # Same for tracers etc.
+        if self.op.solve_tracer:
                 Q = FunctionSpace(mesh, self.Q[i].ufl_element())
                 tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
-            if self.op.solve_sediment:
+        if self.op.solve_sediment:
                 Q = FunctionSpace(mesh, self.Q[i].ufl_element())
                 tmp_sediment = project(self.fwd_solutions_sediment[i], Q)
-            if self.op.solve_exner:
+        if self.op.solve_exner:
                 W = FunctionSpace(mesh, self.W[i].ufl_element())
                 tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
 
         # Update physical mesh and solution fields defined on it
-        self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
+        self.meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
         for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
             sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
         del tmp

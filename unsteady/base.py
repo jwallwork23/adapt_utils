@@ -350,7 +350,7 @@ class AdaptiveProblemBase(object):
         if self.op.approach in ('lagrangian', 'ale'):  # TODO: Make more robust (apply BCs etc.)
             self.move_mesh_ale()
         elif self.mesh_movers[i] is not None:
-            self.move_mesh_monge_ampere()
+            self.move_mesh_monge_ampere(i)
 
     def move_mesh_ale(self):
         mesh = self.meshes[i]
