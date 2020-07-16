@@ -189,23 +189,32 @@ else:
     np.save(fname.format('func'), func_values_opt)
     np.save(fname.format('grad'), gradient_values_opt)
 
-# Fit a quadratic to the first three points
-quadratic = scipy.interpolate.interp1d(control_values[::4], func_values[::4], kind='quadratic', fill_value='extrapolate')
+# Fit a quadratic to the first three points and find its root
+assert len(control_values[::4]) == 3
+q = scipy.interpolate.lagrange(control_values[::4], func_values[::4])
+dq = q.deriv()
+q_min = -dq.coefficients[1]/dq.coefficients[0]
+assert dq.deriv().coefficients[0] > 0
+print_output("Minimiser of quadratic: {:.4f}".format(q_min))
+assert np.isclose(dq(q_min), 0.0)
 
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
 params = {'linewidth': 3, 'markersize': 8, 'color': 'C0', 'label': 'Parameter space', }
 axes.plot(control_values, func_values, 'x', **params)
 x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
-axes.plot(x, quadratic(x), '--', color='C0', linewidth=1, markersize=8, label='Fitted quadratic')
-params = {'linewidth': 3, 'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
+params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'label': 'Fitted quadratic', }
+axes.plot(x, q(x), '--', **params)
+params = {'markersize': 14, 'color': 'C0', 'label': 'Minimum of quadratic', }
+axes.plot(q_min, q(q_min), '*', **params)
+params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
 axes.plot(control_values_opt, func_values_opt, 'o', **params)
 delta_m = 0.25
 params = {'linewidth': 3, 'markersize': 8, 'color': 'C2', }
 for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
     x = np.array([m - delta_m, m + delta_m])
     axes.plot(x, g*(x-m) + f, '-', **params)
-params['label'] = 'Discrete adjoint gradient'
+params['label'] = 'Computed gradient'
 axes.plot(x, g*(x-m) + f, '-', **params)
 axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
 axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
