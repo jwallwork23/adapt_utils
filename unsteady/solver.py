@@ -209,12 +209,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def set_fields(self, init = False):
         """Set velocity field, viscosity, etc *on each mesh*."""
         self.fields = [AttrDict() for P1 in self.P1]
-        if self.op.solve_exner:
-            if init:
-                print("init")
-                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
-                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
         for i, P1 in enumerate(self.P1):
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
@@ -225,16 +219,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
                 'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
             })
-        for i, P1DG in enumerate(self.P1DG):
-            self.fields[i].update({
-                'tracer_source_2d': self.op.set_tracer_source(P1DG),
-                'sediment_source_2d': self.op.set_sediment_source(P1DG),
-                #'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
-                'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
-                #'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
-            })
-        self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
-        if not self.op.solve_exner:
+        if self.op.solve_tracer:
+            for i, P1DG in enumerate(self.P1DG):
+                self.fields[i].update({
+                    'tracer_source_2d': self.op.set_tracer_source(P1DG),
+                })
+        if self.op.solve_sediment:
+            for i, P1DG in enumerate(self.P1DG):
+                self.fields[i].update({
+                    'sediment_source_2d': self.op.set_sediment_source(P1DG),
+                    #'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
+                    'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
+                    #'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
+                })
+        if self.op.solve_exner:
+            if init:
+                print("init")
+                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
+                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
+        else:
             self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
             self.depth = [None for bathymetry in self.bathymetry]
             for i, bathymetry in enumerate(self.bathymetry):
@@ -243,7 +247,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
                     use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
                     wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                    )
+                )
+        self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
 
     # --- Stabilisation
@@ -388,10 +393,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def _create_forward_shallow_water_equations(self, i):
         if self.mesh_velocities[i] is not None:
             self.shallow_water_options[i]['mesh_velocity'] = self.mesh_velocities[i]
+        if self.op.solve_sediment:
+            depth = self.op.sediment_model.depth_expr
+        else:
+            depth = self.depth[i]
         self.equations[i].shallow_water = ShallowWaterEquations(
             self.V[i],
-            #self.depth[i],
-            self.op.sediment_model.depth_expr,
+            depth,
             self.shallow_water_options[i],
         )
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
@@ -805,7 +813,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
-            if iteration % op.dt_per_mesh_movement == 0:
+            if self.iteration % op.dt_per_mesh_movement == 0:
                 # Get mesh velocity
                 if self.mesh_movers[i] is not None:  # TODO: generalise
                     self.mesh_movers[i].adapt()
@@ -828,7 +836,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 ts.exner.advance(self.simulation_time, update_forcings)
 
             # Move mesh
-            if iteration % op.dt_per_mesh_movement == 0:
+            if self.iteration % op.dt_per_mesh_movement == 0:
                 self.move_mesh(i)
             # if self.mesh_movers[i] is not None:  # TODO: generalise
             #     self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
