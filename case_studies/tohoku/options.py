@@ -280,41 +280,46 @@ class TohokuOptions(TsunamiOptions):
         #          different PhysID.
         return boundary_conditions
 
-    def annotate_plot(self, axes, coords="utm", gauges=False):
+    def annotate_plot(self, axes, coords="utm", gauges=False, fontsize=12):
         """
-        Annotate a plot on axes `axes` in coordinate system `coords` with all gauges or locations of
-        interest, as determined by the Boolean kwarg `gauges`.
+        Annotate `axes` in coordinate system `coords` with all gauges or locations of interest, as
+        determined by the Boolean kwarg `gauges`.
         """
         try:
             assert coords in ("lonlat", "utm")
         except AssertionError:
             raise ValueError("Coordinate system {:s} not recognised.".format(coords))
         dat = self.gauges if gauges else self.locations_of_interest
+        offset = 40.0e+03  # Offset by an extra 40 km
         for loc in dat:
             x, y = dat[loc][coords]
-            xytext = (x + 0.3, y)
+            xytext = (x + offset, y)
             color = "indigo"
-            if loc == "P02":
-                color = "navy"
-                xytext = (x + 0.5, y - 0.4)
-            elif loc == "P06":
-                color = "navy"
-                xytext = (x + 0.5, y + 0.2)
-            elif "80" in loc:
-                color = "darkgreen"
-                xytext = (x - 0.8, y)
-            elif "PG" in loc or loc[0] == "2":
-                color = "navy"
-            elif loc == "Fukushima Daini":
+            ha = "right"
+            va = "center"
+            if loc == "Fukushima Daini":
                 continue
             elif loc == "Fukushima Daiichi":
                 loc = "Fukushima"
-            elif loc in ("Tokyo", "Hamaoka"):
-                xytext = (x + 0.3, y-0.6)
-            ha = "center" if gauges else "left"
-            axes.annotate(loc, xy=(x, y), xytext=xytext, fontsize=12, color=color, ha=ha)
-            circle = plt.Circle((x, y), 0.1, color=color)
-            axes.add_patch(circle)
+            elif "80" in loc:
+                color = "C3"
+                xytext = (x - offset, y)
+                ha = "right"
+            elif gauges:
+                color = "navy"
+                xytext = (x + offset, y)
+                ha = "left"
+                if loc == "P02":
+                    xytext = (x + offset, y - offset)
+                    va = "bottom"
+                elif loc == "P06":
+                    xytext = (x + offset, y + offset)
+                    va = "top"
+            axes.plot(x, y, 'x', color=color)
+            axes.annotate(
+                loc, xy=(x, y), xycoords='data', xytext=xytext,
+                fontsize=fontsize, color=color, ha=ha, va=va
+            )
 
 
 class TohokuGaussianBasisOptions(TohokuOptions):
