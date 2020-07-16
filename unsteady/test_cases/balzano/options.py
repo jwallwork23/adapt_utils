@@ -142,7 +142,7 @@ class BalzanoOptions(CoupledOptions):
         u.interpolate(as_vector([1.0e-7, 0.0]))
         eta.assign(0.0)
 
-    def get_update_forcings(self, prob, i):
+    def get_update_forcings(self, prob, i, adjoint=False):
         u, eta = prob.fwd_solutions[i].split()
         bathymetry_displacement = prob.equations[i].shallow_water.depth.wd_bathymetry_displacement
         depth = prob.depth[i]

@@ -5,17 +5,18 @@ import sys
 import math
 import fnmatch
 import numpy as np
-import scipy.sparse as sp
-import scipy.sparse.linalg as sla
 
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["prod", "combine", "box", "ellipse", "bump", "circular_bump", "gaussian",
-           "copy_mesh", "get_finite_element", "get_component_space", "get_component", "cg2dg",
-           "check_spd", "get_boundary_nodes", "index_string",
-           "find", "suppress_output", "knownargs2dict", "unknownargs2dict"]
+__all__ = ["prod", "combine", "rotation_matrix", "rotate",
+           "box", "ellipse", "bump", "circular_bump", "gaussian", "cg2dg",
+           "copy_mesh", "get_finite_element", "get_component_space", "get_component", "get_boundary_nodes",
+           "is_symmetric", "is_pos_def", "is_spd", "check_spd",
+           "find", "suppress_output", "knownargs2dict", "unknownargs2dict", "index_string"]
 
+
+# --- UFL
 
 def abs(u):
     """Hack due to the fact `abs` seems to be broken in conditional statements."""
@@ -44,6 +45,8 @@ def combine(operator, *args):
         return operator(args[0], combine(operator, *args[1:]))
 
 
+# --- Rotation
+
 def rotation_matrix(theta):
     """NumPy array 2D rotation matrix associated with angle `theta`."""
     return np.array([[math.cos(theta), -math.sin(theta)],
@@ -57,6 +60,8 @@ def rotate(vectors, angle):
         assert len(vectors[i]) == 2
         vectors[i] = np.dot(R, vectors[i])
 
+
+# --- Utility functions
 
 def box(locs, mesh, scale=1.0, rotation=None):
     r"""
@@ -223,6 +228,8 @@ def gaussian(locs, mesh, scale=1.0, rotation=None):
     return sum(scale*exp(-q_sq[j]) for j in L)
 
 
+# --- Extraction from Firedrake objects
+
 def copy_mesh(mesh):
     """Deepcopy a mesh."""
     return Mesh(Function(mesh.coordinates))
@@ -267,6 +274,16 @@ def get_component(f, index, component_space=None):
     return fi
 
 
+def get_boundary_nodes(fs, segment='on_boundary'):
+    """
+    :arg fs: function space to get boundary nodes for.
+    :kwarg segment: segment of boundary to get nodes of (default 'on_boundary').
+    """
+    return fs.boundary_nodes(segment, 'topological')
+
+
+# --- Continuous to discontinuous transfer
+
 def cg2dg(f_cg, f_dg=None):
     """
     Transfer data from a the degrees of freedom of a Pp field directly to those of the
@@ -308,43 +325,50 @@ def _cg2dg_tensor(f_cg, f_dg):
     par_loop((index, kernel), dx, {'cg': (f_cg, READ), 'dg': (f_dg, WRITE)}, is_loopy_kernel=True)
 
 
-def check_spd(M):
-    """
-    Verify that a tensor field `M` is symmetric positive-definite (SPD) and hence a Riemannian
-    metric.
-    """
-    print_output("TEST: Checking matrix is SPD...")
+# --- Matrix properties
+
+def is_symmetric(M, tol=1.0e-08):
+    """Determine whether or not a tensor field `M` is symmetric"""
+    return assemble(abs(det(M - transpose(M)))*dx) < tol
+
+
+def is_pos_def(M):
+    """Determine whether or not a tensor field `M` is positive-definite"""
     fs = M.function_space()
     fs_vec = VectorFunctionSpace(fs.mesh(), get_finite_element(fs))
-    dim = fs.mesh().topological_dimension()
+    V = Function(fs, name="Eigenvectors")
+    Λ = Function(fs_vec, name="Eigenvalues")
+    kernel = eigen_kernel(get_eigendecomposition, fs.mesh().topological_dimension())
+    op2.par_loop(kernel, fs.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
+    return Λ.vector().gather().min() > 0.0
+
+
+def is_spd(M):
+    """Determine whether or not a tensor field `M` is symmetric positive-definite"""
+    return is_symmetric(M) and is_pos_def(M)
+
+
+def check_spd(M):
+    """Verify that a tensor field `M` is symmetric positive-definite."""
+    print_output("TEST: Checking matrix is SPD...")
 
     # Check symmetric
     try:
-        assert assemble((M - transpose(M))*dx) < 1e-8
+        assert is_symmetric(M)
     except AssertionError:
         raise ValueError("FAIL: Matrix is not symmetric")
     print_output("PASS: Matrix is indeed symmetric")
 
     # Check positive definite
-    V = Function(fs, name="Eigenvectors")
-    Λ = Function(fs_vec, name="Eigenvalues")
-    kernel = eigen_kernel(get_eigendecomposition, dim)
-    op2.par_loop(kernel, fs.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
     try:
-        assert Λ.vector().gather().min() > 0.0
+        assert is_pos_def(M)
     except AssertionError:
         raise ValueError("FAIL: Matrix is not positive-definite")
     print_output("PASS: Matrix is indeed positive-definite")
     print_output("TEST: Done!")
 
 
-def get_boundary_nodes(fs, segment='on_boundary'):
-    """
-    :arg fs: function space to get boundary nodes for.
-    :kwarg segment: segment of boundary to get nodes of (default 'on_boundary').
-    """
-    return fs.boundary_nodes(segment, 'topological')
-
+# --- Non-Firedrake specific
 
 def index_string(index):
     """
@@ -352,9 +376,6 @@ def index_string(index):
     :return: five-digit string form of index.
     """
     return (5 - len(str(index)))*'0' + str(index)
-
-
-# --- Non-Firedrake specific
 
 
 def find(pattern, path):
@@ -419,107 +440,3 @@ class suppress_output(object):
         """Stop fiverting stream data to pipe."""
         os.close(self.pipe_in)
         os.close(self.pipe_out)
-
-
-# --- Unused
-
-
-class BaseConditionCheck():
-
-    def __init__(self, bilinear_form, mass_term=None):
-        self.a = bilinear_form
-        self.A = assemble(bilinear_form).M.handle
-        if mass_term is not None:
-            self.M = assemble(mass_term).M.handle
-
-    def _get_wrk(self, *args):
-        pass
-
-    def _get_csr(self):
-        indptr, indices, data = self.wrk.getValuesCSR()
-        self.csr = sp.csr_matrix((data, indices, indptr), shape=self.wrk.getSize())
-
-    def condition_number(self, *args, eps=1e-10):
-        self._get_wrk(*args)
-        try:
-            from slepc4py import SLEPc
-        except ImportError:
-            # If SLEPc is not available, use SciPy
-            self._get_csr()
-            eigval = sla.eigs(self.csr)[0]
-            eigmin = np.min(eigval)
-            if eigmin > 0.0:
-                print_output("Mass matrix is positive-definite")
-            else:
-                print_output("Mass matrix is not positive-definite. Minimal eigenvalue: {:.4e}".format(eigmin))
-            eigval = np.abs(eigval)
-            return np.max(eigval)/max(np.min(eigval), eps)
-
-        if hasattr(self, 'M'):
-            raise NotImplementedError  # TODO
-        else:
-            from firedrake.petsc import PETSc
-
-            # Solve eigenvalue problem
-            n = self.wrk.getSize()[0]
-            es = SLEPc.EPS().create(comm=COMM_WORLD)
-            es.setDimensions(n)
-            es.setOperators(self.wrk)
-            opts = PETSc.Options()
-            opts.setValue('eps_type', 'krylovschur')
-            opts.setValue('eps_monitor', None)
-            # opts.setValue('eps_pc_type', 'lu')
-            # opts.setValue('eps_pc_factor_mat_solver_type', 'mumps')
-            es.setFromOptions()
-            print_output("Solving eigenvalue problem using SLEPc...")
-            es.solve()
-
-            # Check convergence
-            nconv = es.getConverged()
-            if nconv == 0:
-                import sys
-                warning("Did not converge any eigenvalues")
-                sys.exit(0)
-
-            # Compute condition number
-            vr, vi = self.wrk.getVecs()
-            eigmax = es.getEigenpair(0, vr, vi).real
-            eigmin = es.getEigenpair(n-1, vr, vi).real
-            eigmin = max(eigmin, eps)
-            if eigmin > 0.0:
-                print_output("Mass matrix is positive-definite")
-            else:
-                print_output("Mass matrix is not positive-definite. Minimal eigenvalue: {:.4e}".format(eigmin))
-            return np.abs(eigmax/eigmin)
-
-
-class UnnestedConditionCheck(BaseConditionCheck):
-
-    def __init__(self, bilinear_form):
-        super(UnnestedConditionCheck, self).__init__(bilinear_form)
-        try:
-            assert self.A.getType() != 'nest'
-        except AssertionError:
-            raise ValueError("Matrix type 'nest' not supported. Use `NestedConditionCheck` instead.")
-
-    def _get_wrk(self):
-        self.wrk = self.A
-
-
-class NestedConditionCheck(BaseConditionCheck):
-
-    def __init__(self, bilinear_form):
-        super(NestedConditionCheck, self).__init__(bilinear_form)
-        try:
-            assert self.A.getType() == 'nest'
-        except AssertionError:
-            raise ValueError("Matrix type {:} not supported.".format(self.A.getType()))
-        m, n = self.A.getNestSize()
-        self.submatrices = {}
-        for i in range(m):
-            self.submatrices[i] = {}
-            for j in range(n):
-                self.submatrices[i][j] = self.A.getNestSubMatrix(i, j)
-
-    def _get_wrk(self, i, j):
-        self.wrk = self.submatrices[i][j]

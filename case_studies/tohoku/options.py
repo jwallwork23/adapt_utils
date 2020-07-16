@@ -8,9 +8,11 @@ import matplotlib.pyplot as plt
 
 from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
+from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
+from adapt_utils.misc import gaussian, ellipse
 
 
-__all__ = ["TohokuOptions"]
+__all__ = ["TohokuOptions", "TohokuGaussianBasisOptions"]
 
 
 class TohokuOptions(TsunamiOptions):
@@ -34,9 +36,12 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, mesh=None, postproc=True, level=0, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], **kwargs):
+    def __init__(self, mesh=None, level=0, postproc=True, save_timeseries=False, artificial=False, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], qoi_scaling=1.0e-10, **kwargs):
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
+        self.save_timeseries = save_timeseries
+        self.artificial = artificial
+        self.qoi_scaling = qoi_scaling
 
         # Stabilisation
         self.use_automatic_sipg_parameter = False
@@ -47,7 +52,8 @@ class TohokuOptions(TsunamiOptions):
         # Mesh
         self.print_debug("Loading mesh...")
         self.resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
-        self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(level))
+        self.level = level
+        self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(self.level))
         if mesh is None:
             if postproc:
                 newplex = PETSc.DMPlex().create()
@@ -59,11 +65,14 @@ class TohokuOptions(TsunamiOptions):
             self.default_mesh = mesh
         self.print_debug("Done!")
 
+        # Fields
+        self.friction = None
+        # self.friction = 'manning'
+        # self.friction_coeff = 0.025
+
         # Timestepping: export once per minute for 24 minutes
         self.timestepper = 'CrankNicolson'
-        # self.timestepper = 'SSPRK33'
         self.dt = 5.0
-        # self.dt = 0.01
         self.dt_per_export = int(60.0/self.dt)
         self.start_time = 15*60.0
         self.end_time = 24*60.0
@@ -114,6 +123,15 @@ class TohokuOptions(TsunamiOptions):
                 loc[l]["utm"] = from_latlon(lat, lon, force_zone_number=54)
                 loc[l]["coords"] = loc[l]["utm"]
 
+        # Check validity of gauge coordinates
+        gauges = list(self.gauges.keys())
+        for gauge in gauges:
+            try:
+                self.default_mesh.coordinates.at(self.gauges[gauge]['coords'])
+            except PointNotInDomainError:
+                self.print_debug("NOTE: Gauge {:5s} is not in the domain; removing now".format(gauge))
+                self.gauges.pop(gauge)  # Some gauges aren't within the domain
+
         # Regions of interest
         loi = self.locations_of_interest
         self.region_of_interest = [loi[loc]["coords"] + (radii[loc], ) for loc in loi]
@@ -124,12 +142,12 @@ class TohokuOptions(TsunamiOptions):
             nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'gebco.nc'), 'r')
             lon = nc.variables['lon'][:]
             lat = nc.variables['lat'][:-1]
-            elev = nc.variables['elevation'][:-1,:]
+            elev = nc.variables['elevation'][:-1, :]
         elif source == 'etopo1':
             nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'etopo1.nc'), 'r')
             lon = nc.variables['lon'][:]
             lat = nc.variables['lat'][:]
-            elev = nc.variables['Band1'][:,:]
+            elev = nc.variables['Band1'][:, :]
         else:
             raise ValueError("Bathymetry data source {:s} not recognised.".format(source))
         nc.close()
@@ -149,6 +167,103 @@ class TohokuOptions(TsunamiOptions):
         self.print_debug("Done!")
         return lon, lat, elev
 
+    def _get_update_forcings_forward(self, prob, i):
+        self.J = 0
+        scaling = Constant(self.qoi_scaling)
+        weight = Constant(1.0)
+        eta_obs = Constant(0.0)
+        eta = prob.fwd_solutions[i].split()[1]
+        mesh = eta.function_space().mesh()
+        self.times = []
+        radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
+        for gauge in self.gauges:
+            if self.save_timeseries:
+                if not self.artificial or "data" not in self.gauges[gauge]:
+                    self.gauges[gauge]["data"] = []
+                self.gauges[gauge]["timeseries"] = []
+                self.gauges[gauge]["timeseries_smooth"] = []
+                self.gauges[gauge]["diff"] = []
+                self.gauges[gauge]["diff_smooth"] = []
+                self.gauges[gauge]["init"] = eta.at(self.gauges[gauge]["coords"])
+            sample = 1 if gauge[0] == '8' else 60
+            self.gauges[gauge]["interpolator"] = sample_timeseries(gauge, sample=sample)
+            loc = self.gauges[gauge]["coords"]
+            self.gauges[gauge]["indicator"] = interpolate(ellipse([loc + (radius,), ], mesh), prob.P0[i])
+            self.gauges[gauge]["area"] = assemble(self.gauges[gauge]["indicator"]*dx, annotate=False)
+
+        def update_forcings(t):
+            weight.assign(0.5 if t < 0.5*self.dt or t >= self.end_time - 0.5*self.dt else 1.0)
+            dtc = Constant(self.dt)
+            # iteration = len(self.times)
+            iteration = prob.iteration
+            for gauge in self.gauges:
+
+                # Point evaluation at gauges
+                if self.save_timeseries:
+                    eta_discrete = eta.at(self.gauges[gauge]["coords"]) - self.gauges[gauge]["init"]
+                    self.gauges[gauge]["timeseries"].append(eta_discrete)
+
+                # Interpolate observations
+                if self.gauges[gauge]["data"] != []:
+                    if self.artificial:
+                        obs = self.gauges[gauge]["data"][iteration]
+                    else:
+                        obs = float(self.gauges[gauge]["interpolator"](t))
+                    eta_obs.assign(obs)
+
+                    if self.save_timeseries:
+                        if not self.artificial:
+                            self.gauges[gauge]["data"].append(obs)
+
+                        # Discrete form of error
+                        diff = 0.5*(eta_discrete - eta_obs.dat.data[0])**2
+                        self.gauges[gauge]["diff"].append(diff)
+
+                    # Continuous form of error
+                    I = self.gauges[gauge]["indicator"]
+                    A = self.gauges[gauge]["area"]
+                    diff = 0.5*I*(eta - eta_obs)**2
+                    self.J += assemble(scaling*weight*dtc*diff*dx)
+                    self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False)/A)
+                    self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False)/A)
+            self.times.append(t)
+            return
+
+        return update_forcings
+
+    def _get_update_forcings_adjoint(self, prob, i):
+        eta_obs = Constant(0.0)
+        scaling = Constant(self.qoi_scaling)
+
+        def update_forcings(t):
+
+            # Get gauge data (loaded from checkpoint)
+            u_saved, eta_saved = prob.fwd_solutions[i].split()
+
+            # Sum differences between checkpoint and data
+            expr = 0
+            for gauge in self.gauges:
+                if self.artificial:
+                    obs = self.gauges[gauge]["data"][prob.iteration-1]
+                else:
+                    obs = float(self.gauges[gauge]["interpolator"](t))
+                eta_obs.assign(obs)
+                expr += self.gauges[gauge]["indicator"]*(eta_saved - eta_obs)
+
+            # Interpolate onto RHS
+            k_u, k_eta = prob.kernels[i].split()
+            k_eta.interpolate(scaling*expr)
+
+            return
+
+        return update_forcings
+
+    def get_update_forcings(self, prob, i, adjoint=False):
+        if adjoint:
+            return self._get_update_forcings_adjoint(prob, i)
+        else:
+            return self._get_update_forcings_forward(prob, i)
+
     def set_boundary_conditions(self, prob, i):
         ocean_tag = 100
         coast_tag = 200
@@ -165,67 +280,67 @@ class TohokuOptions(TsunamiOptions):
         #          different PhysID.
         return boundary_conditions
 
-    def annotate_plot(self, axes, coords="utm", gauges=False):
+    def annotate_plot(self, axes, coords="utm", gauges=False, fontsize=12):
         """
-        Annotate a plot on axes `axes` in coordinate system `coords` with all gauges or locations of
-        interest, as determined by the Boolean kwarg `gauges`.
+        Annotate `axes` in coordinate system `coords` with all gauges or locations of interest, as
+        determined by the Boolean kwarg `gauges`.
         """
         try:
             assert coords in ("lonlat", "utm")
         except AssertionError:
             raise ValueError("Coordinate system {:s} not recognised.".format(coords))
         dat = self.gauges if gauges else self.locations_of_interest
+        offset = 40.0e+03  # Offset by an extra 40 km
         for loc in dat:
             x, y = dat[loc][coords]
-            xytext = (x + 0.3, y)
+            xytext = (x + offset, y)
             color = "indigo"
-            if loc == "P02":
-                color = "navy"
-                xytext = (x + 0.5, y - 0.4)
-            elif loc == "P06":
-                color = "navy"
-                xytext = (x + 0.5, y + 0.2)
-            elif "80" in loc:
-                color = "darkgreen"
-                xytext = (x - 0.8, y)
-            elif "PG" in loc or loc[0] == "2":
-                color = "navy"
-            elif loc == "Fukushima Daini":
+            ha = "right"
+            va = "center"
+            if loc == "Fukushima Daini":
                 continue
             elif loc == "Fukushima Daiichi":
                 loc = "Fukushima"
-            elif loc in ("Tokyo", "Hamaoka"):
-                xytext = (x + 0.3, y-0.6)
-            ha = "center" if gauges else "left"
-            axes.annotate(loc, xy=(x, y), xytext=xytext, fontsize=12, color=color, ha=ha)
-            circle = plt.Circle((x, y), 0.1, color=color)
-            axes.add_patch(circle)
+            elif "80" in loc:
+                color = "C3"
+                xytext = (x - offset, y)
+                ha = "right"
+            elif gauges:
+                color = "navy"
+                xytext = (x + offset, y)
+                ha = "left"
+                if loc == "P02":
+                    xytext = (x + offset, y - offset)
+                    va = "bottom"
+                elif loc == "P06":
+                    xytext = (x + offset, y + offset)
+                    va = "top"
+            axes.plot(x, y, 'x', color=color)
+            axes.annotate(
+                loc, xy=(x, y), xycoords='data', xytext=xytext,
+                fontsize=fontsize, color=color, ha=ha, va=va
+            )
 
-    def get_gauge_data(self, gauge, sample=1):
-        """Read gauge data for `gauge` from file, averaging over every `sample` points."""
-        if gauge[0] == '8' and sample > 1:
-            assert sample % 5 == 0
-            sample //= 5
-        time_prev = 0.0
-        di = os.path.join(os.path.dirname(__file__), 'resources', 'gauges')
-        fname = os.path.join(di, '{:s}.dat'.format(gauge))
-        num_lines = sum(1 for line in open(fname, 'r'))
-        self.gauges[gauge]['data'] = []
-        self.gauges[gauge]['time'] = []
-        with open(fname, 'r') as f:
-            running = 0.0
-            for i in range(num_lines):
-                time, dat = f.readline().split()
-                time = float(time)
-                dat = float(dat)
-                running += dat  # TODO: How to deal with NaNs?
-                if sample == 1:
-                    self.gauges[gauge]['time'].append(time)
-                    self.gauges[gauge]['data'].append(dat)
-                elif i % sample == 0 and i > 0:
-                    if time < time_prev:
-                        break  # FIXME
-                    self.gauges[gauge]['time'].append(0.5*(time + time_prev))
-                    self.gauges[gauge]['data'].append(running/sample)
-                    running = 0.0
-                    time_prev = time
+
+class TohokuGaussianBasisOptions(TohokuOptions):
+    """
+    Initialise the free surface with initial condition consisting of a single Gaussian basis function
+    scaled by a control parameter.
+
+    This is useful for inversion experiments because the control parameter space is one dimensional,
+    meaning it can be easily plotted.
+    """
+    def __init__(self, control_parameter=10.0, **kwargs):
+        super(TohokuGaussianBasisOptions, self).__init__(**kwargs)
+        R = FunctionSpace(self.default_mesh, "R", 0)
+        self.control_parameter = Function(R, name="Control parameter")
+        self.control_parameter.assign(control_parameter)
+
+    def set_initial_condition(self, prob):
+        self.basis_function = Function(prob.V[0])
+        psi, phi = self.basis_function.split()
+        loc = (0.7e+06, 4.2e+06)
+        radii = (48e+03, 96e+03)
+        angle = pi/12
+        phi.interpolate(gaussian([loc + radii, ], prob.meshes[0], rotation=angle))
+        prob.fwd_solutions[0].project(self.control_parameter*self.basis_function)

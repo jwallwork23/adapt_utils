@@ -79,6 +79,14 @@ class LeVequeOptions(CoupledOptions):
             'tracer': {
                 'ksp_type': 'gmres',
                 'pc_type': 'sor',
+                # 'ksp_converged_reason': None,
+            }
+        }
+        self.adjoint_solver_parameters = {
+            'tracer': {
+                'ksp_type': 'gmres',
+                'pc_type': 'sor',
+                # 'ksp_converged_reason': None,
             }
         }
 
@@ -94,12 +102,12 @@ class LeVequeOptions(CoupledOptions):
         return boundary_conditions
 
     def get_velocity(self, coords, t):
-        return as_vector([0.5 - coords[1], coords[0] - 0.5])
+        return as_vector([-coords[1], coords[0]])
 
     def set_initial_condition(self, prob, i=0):
         q = prob.fwd_solutions[i]
         u, eta = q.split()
-        u.interpolate(self.get_velocity(prob.meshes[i].coordinates, 0))
+        u.interpolate(self.get_velocity(prob.meshes[i].coordinates, 0.0))
 
     def set_initial_condition_tracer(self, prob):
         x, y = SpatialCoordinate(prob.meshes[0])
@@ -124,11 +132,7 @@ class LeVequeOptions(CoupledOptions):
         return rescaling*b
 
     def set_terminal_condition_tracer(self, prob):
-        b = self.ball(prob.meshes[-1], source=False)
-        area = assemble(b*dx)
-        area_exact = pi*self.region_of_interest[0][2]**2
-        rescaling = area_exact/area if np.allclose(area, 0.0) else 1
-        prob.adj_solutions_tracer[-1].interpolate(rescaling*b)
+        prob.adj_solutions_tracer[-1].interpolate(self.set_qoi_kernel_tracer(prob, -1))
 
     def exact_solution(self, fs):
         raise NotImplementedError  # TODO
@@ -171,7 +175,7 @@ class LeVequeOptions(CoupledOptions):
         kernel = self.set_qoi_kernel_tracer(prob, i)
         return assemble(kernel*sol*dx(degree=12))
 
-    def get_update_forcings(self, prob, i):
+    def get_update_forcings(self, prob, i, adjoint=False):
 
         def update_forcings(t):
             self.set_initial_condition(prob, i=i)

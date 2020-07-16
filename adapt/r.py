@@ -9,6 +9,8 @@ from adapt_utils.options import Options
 __all__ = ["MeshMover"]
 
 
+# TODO: Test Laplacian smoothing
+# TODO: Other options, e.g. MMPDE
 class MeshMover():
     r"""
     A class dedicated to performing mesh r-adaptation. Given a source mesh and a monitor function
@@ -61,7 +63,7 @@ class MeshMover():
             self.setup_pseudotimestepper()
 
         # Outputs
-        if self.op.debug:
+        if self.op.debug and self.op.debug_mode == 'full':
             self.monitor_file = File(os.path.join(op.di, 'monitor_debug.pvd'))
             self.monitor_file.write(self.monitor)
             self.volume_file = File(os.path.join(op.di, 'volume_debug.pvd'))
@@ -160,7 +162,7 @@ class MeshMover():
         residual_l2_norm = residual_l2/norm_l2
         return minmax, equi, residual_l2_norm
 
-    def setup_equidistribution(self):  # TODO: Other options, e.g. MMPDE
+    def setup_equidistribution(self):
         """
         Setup solvers for nonlinear iteration. Two approaches are considered, as specified by
         `self.nonlinear_method` - either a relaxation using pseudo-timestepping ('relaxation'), or a
@@ -260,7 +262,7 @@ class MeshMover():
                 self.mesh.coordinates.assign(self.x)
                 assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
                 self.volume /= self.original_volume
-                if self.op.debug:
+                if self.op.debug and self.op.debug_mode == 'full':
                     self.monitor_file.write(self.monitor)
                     self.volume_file.write(self.volume)
                 self.mesh.coordinates.assign(self.ξ)
@@ -360,7 +362,7 @@ class MeshMover():
             self.update()
             assemble(self.L_p0, tensor=self.volume)  # For equidistribution measure
             self.volume /= self.original_volume
-            if self.op.debug:
+            if self.op.debug and self.op.debug_mode == 'full':
                 self.monitor_file.write(self.monitor)
                 self.volume_file.write(self.volume)
             self.mesh.coordinates.assign(self.ξ)

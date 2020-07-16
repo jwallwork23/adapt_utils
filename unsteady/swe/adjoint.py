@@ -3,12 +3,13 @@ from thetis.equation import *
 from thetis.shallowwater_eq import ShallowWaterTerm
 from thetis.utility import *
 
+import warnings
+
 
 __all__ = ["AdjointShallowWaterEquations"]
 
 
 g_grav = physical_constants['g_grav']
-rho_0 = physical_constants['rho0']
 
 
 class AdjointShallowWaterTerm(ShallowWaterTerm):
@@ -26,12 +27,15 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
             zeta_ext = zeta_in  # assume symmetry
             z_ext = z_in  # assume symmetry
+            warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         elif 'elev' not in funcs:  # ∂Ω \ Γ₂
             zeta_ext = zeta_in  # assume symmetry
             z_ext = Constant(0.0)*self.normal
+            warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         elif 'un' not in funcs:  # ∂Ω \ Γ₁
             zeta_ext = Constant(0.0)
             z_ext = z_in  # assume symmetry
+            warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         else:
             raise Exception('Unsupported bnd type: {:}'.format(funcs.keys()))
         return zeta_ext, z_ext
@@ -74,12 +78,18 @@ class AdjointShallowWaterContinuityTerm(AdjointShallowWaterTerm):
 
 
 class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
+    r"""
+  ..math::
+
+        g \nabla \cdot \mathbf u^*
+    """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         z_by_parts = True  # So we can enforce free-slip conditions
 
         if z_by_parts:
-            f = g_grav*inner(z, grad(self.zeta_test))*self.dx
+            f = g_grav*inner(grad(self.zeta_test), z)*self.dx
             if self.z_continuity in ['dg', 'hdiv']:
+                # f += -g_grav * self.zeta_test * inner(z, self.normal) * self.dS  # TODO
                 raise NotImplementedError
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
@@ -91,24 +101,74 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
                 else:
                     raise NotImplementedError
         else:
-            f = -g_grav*inner(div(z), self.zeta_test)*self.dx
+            f = -g_grav*self.zeta_test*nabla_div(z)*self.dx
 
         return -f
 
 
-class HUDivTerm(AdjointShallowWaterMomentumTerm):
-    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        total_h = self.depth.get_total_depth(zeta_old)
+class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
+    r"""
+    In the nonlinear case,
 
-        f = -inner(self.z_test, grad(total_h*zeta))*self.dx
+  ..math::
+
+        H \nabla \eta^*.
+
+    In the linear case,
+
+  ..math::
+
+        b \nabla \eta^*.
+    """
+    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        if self.options.use_nonlinear_equations:
+            eta = fields.get('elev_2d')  # TODO
+            total_h = self.depth.get_total_depth(eta)
+        else:
+            total_h = self.depth.get_total_depth(zeta_old)
+
+        f = 0
         if self.zeta_is_dg:
-            raise NotImplementedError  # TODO
+            f += inner(zeta, div(total_h*self.z_test))*self.dx
+            # f += -total_h * zeta * inner(self.z_test, self.normal) * self.dS  # TODO
+            raise NotImplementedError
+        else:
+            f += -inner(self.z_test, total_h*grad(zeta))*self.dx
+        return -f
+
+
+class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
+    r"""
+    This term only arises in the nonlinear case.
+
+  ..math::
+
+        \mathbf u \cdot \nabla \eta^*
+    """
+    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        f = 0
+        if not self.options.use_nonlinear_equations:
+            return f
+        uv = fields.get('uv_2d')  # TODO
+        if self.zeta_is_dg:
+            f += -div(self.zeta_test*uv)*zeta*self.dx
+            # f += zeta * self.zeta_test * inner(uv, self.normal) * self.dS  # TODO
+            raise NotImplementedError
+        else:
+            f += inner(grad(zeta), self.zeta_test*uv)*self.dx
         return -f
 
 
 class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
-    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+    r"""
+  ..math::
 
+        - (\nabla\mathbf u)^T \mathbf u^*
+        + (\nabla \cdot \mathbf u) \mathbf u^*
+        + \mathbf u \cdot \nabla \mathbf u^*
+    """
+    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        f = 0
         if not self.options.use_nonlinear_equations:
             return 0
 
@@ -116,8 +176,15 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
 
 
 class HorizontalViscosityTerm(AdjointShallowWaterMomentumTerm):
+    r"""
+
+  ..math::
+
+        \nabla \cdot (\nu \nabla \mathbf u^*)
+    """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        # total_h = self.depth.get_total_depth(zeta_old)
+        # eta = fields.get('elev_2d')
+        # total_h = self.depth.get_total_depth(eta)
 
         nu = fields_old.get('viscosity_h')
         if nu is None:
@@ -127,6 +194,12 @@ class HorizontalViscosityTerm(AdjointShallowWaterMomentumTerm):
 
 
 class CoriolisTerm(AdjointShallowWaterMomentumTerm):
+    r"""
+
+  ..math::
+
+        f \widehat{\mathbf z} \times \mathbf u^*
+    """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         coriolis = fields_old.get('coriolis')
         f = 0
@@ -135,69 +208,106 @@ class CoriolisTerm(AdjointShallowWaterMomentumTerm):
         return -f
 
 
-class WindStressTerm(AdjointShallowWaterMomentumTerm):
+class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
+    r"""
+
+  ..math::
+
+        -\frac{C_d}H \left(
+            \|\mathbf u\| \mathbf u
+            + \frac{\mathbf u^* \cdot \mathbf u}{\|\mathbf u\|}\mathbf u
+        \right)
+    """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        wind_stress = fields_old.get('wind_stress')
-        # total_h = self.depth.get_total_depth(zeta_old)
-        f = 0
-        if wind_stress is not None:
-            raise NotImplementedError  # TODO
-        return f
-
-
-class AtmosphericPressureTerm(AdjointShallowWaterMomentumTerm):
-    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        atmospheric_pressure = fields_old.get('atmospheric_pressure')
-        f = 0
-        if atmospheric_pressure is not None:
-            raise NotImplementedError  # TODO
-        return -f
-
-
-class QuadraticDragTerm(AdjointShallowWaterMomentumTerm):
-    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        # total_h = self.depth.get_total_depth(zeta_old)
+        total_h = self.depth.get_total_depth(zeta_old)
         manning_drag_coefficient = fields_old.get('manning_drag_coefficient')
         C_D = fields_old.get('quadratic_drag_coefficient')
         f = 0
         if manning_drag_coefficient is not None:
-            raise NotImplementedError  # TODO
+            if C_D is not None:
+                raise Exception('Cannot set both dimensionless and Manning drag parameter')
+            C_D = g_grav*manning_drag_coefficient**2/total_h**(1./3.)
+        if C_D is None:
+            return -f
 
+        uv = fields.get('uv_2d')  # TODO
+        if uv is None:
+            raise Exception('Adjoint equation does not have access to forward solution velocity')
         if C_D is not None:
-            raise NotImplementedError  # TODO
+            unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
+            f += C_D*unorm*inner(self.z_test, z)*self.dx
+            f += C_D*inner(self.z_test, uv)*inner(z, uv)/unorm*self.dx
+        return -f
+
+
+class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
+    r"""
+
+  ..math::
+
+        \frac{\widetilde{C_d}}{H^2} \|\mathbf u\| \mathbf u \cdot \mathbf u^*,
+
+    where :math:`\widetilde{C_d}` is given by :math:`\frac43 C_d` in the case of Manning friction
+    and :math:`C_d` otherwise.
+    """
+    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        total_h = self.depth.get_total_depth(zeta_old)
+        manning_drag_coefficient = fields_old.get('manning_drag_coefficient')
+        C_D = fields_old.get('quadratic_drag_coefficient')
+        f = 0
+        if manning_drag_coefficient is not None:
+            if C_D is not None:
+                raise Exception('Cannot set both dimensionless and Manning drag parameter')
+            C_D = 4/3*g_grav*manning_drag_coefficient**2/total_h**(1./3.)
+        if C_D is None:
+            return -f
+
+        uv = fields.get('uv_2d')  # TODO
+        if uv is None:
+            raise Exception('Adjoint equation does not have access to forward solution velocity')
+        if C_D is not None:
+            unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
+            f += -C_D*unorm*inner(z, uv)*self.zeta_test/total_h**2*self.dx
         return -f
 
 
 class LinearDragTerm(AdjointShallowWaterMomentumTerm):
+    r"""
+
+  ..math::
+
+        C_d \mathbf u^*
+    """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         linear_drag_coefficient = fields_old.get('linear_drag_coefficient')
         f = 0
         if linear_drag_coefficient is not None:
             bottom_fri = linear_drag_coefficient*inner(self.z_test, z)*self.dx
-            f += bottom_fri
+            f += -bottom_fri
         return -f
 
 
-class BottomDrag3DTerm(AdjointShallowWaterMomentumTerm):
+class TurbineDragTermMomentum(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        # total_h = self.depth.get_total_depth(zeta_old)
-        bottom_drag = fields_old.get('bottom_drag')
-        z_bottom = fields_old.get('z_bottom')
-        f = 0
-        if bottom_drag is not None and z_bottom is not None:
-            raise NotImplementedError  # TODO
-        return -f
-
-
-class TurbineDragTerm(AdjointShallowWaterMomentumTerm):
-    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        # total_h = self.depth.get_total_depth(zeta_old)
+        # eta = fields.get('elev_2d')  # TODO
+        # total_h = self.depth.get_total_depth(eta)
         f = 0
         for subdomain_id, farm_options in self.options.tidal_turbine_farms.items():
             raise NotImplementedError  # TODO
         return -f
 
 
+class TurbineDragTermContinuity(AdjointShallowWaterContinuityTerm):
+    def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        # eta = fields.get('elev_2d')  # TODO
+        # total_h = self.depth.get_total_depth(eta)
+        f = 0
+        for subdomain_id, farm_options in self.options.tidal_turbine_farms.items():
+            raise NotImplementedError  # TODO
+        return -f
+
+
+# NOTE: Used for adjoint RHS
 class MomentumSourceTerm(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         f = 0
@@ -208,6 +318,7 @@ class MomentumSourceTerm(AdjointShallowWaterMomentumTerm):
         return f
 
 
+# NOTE: Used for adjoint RHS
 class ContinuitySourceTerm(AdjointShallowWaterContinuityTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         f = 0
@@ -237,21 +348,23 @@ class BaseAdjointShallowWaterEquation(Equation):
         self.options = options
 
     def add_momentum_terms(self, *args):
-        self.add_term(HUDivTerm(*args), 'implicit')
+        self.add_term(HUDivTermMomentum(*args), 'implicit')
         self.add_term(HorizontalAdvectionTerm(*args), 'explicit')
         self.add_term(HorizontalViscosityTerm(*args), 'explicit')
         self.add_term(CoriolisTerm(*args), 'explicit')
-        self.add_term(WindStressTerm(*args), 'source')
-        self.add_term(AtmosphericPressureTerm(*args), 'source')
-        self.add_term(QuadraticDragTerm(*args), 'explicit')
+        # self.add_term(WindStressTerm(*args), 'source')
+        self.add_term(QuadraticDragTermMomentum(*args), 'explicit')
         self.add_term(LinearDragTerm(*args), 'explicit')
-        self.add_term(BottomDrag3DTerm(*args), 'source')
-        self.add_term(TurbineDragTerm(*args), 'implicit')
+        # self.add_term(BottomDrag3DTerm(*args), 'source')
+        self.add_term(TurbineDragTermMomentum(*args), 'implicit')
         self.add_term(MomentumSourceTerm(*args), 'source')
 
     def add_continuity_terms(self, *args):
+        self.add_term(HUDivTermContinuity(*args), 'implicit')
         self.add_term(ExternalPressureGradientTerm(*args), 'implicit')
         self.add_term(ContinuitySourceTerm(*args), 'source')
+        self.add_term(QuadraticDragTermContinuity(*args), 'explicit')
+        self.add_term(TurbineDragTermContinuity(*args), 'implicit')
 
     def residual_z_zeta(self, label, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions):
         f = 0

@@ -28,7 +28,7 @@ class AdaptiveProblemBase(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-    def __init__(self, op, meshes=None, nonlinear=True):
+    def __init__(self, op, meshes=None, nonlinear=True, checkpointing=False):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -36,6 +36,7 @@ class AdaptiveProblemBase(object):
         self.stabilisation = op.stabilisation
         self.approach = op.approach
         self.nonlinear = nonlinear
+        self.checkpointing = checkpointing
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -55,11 +56,14 @@ class AdaptiveProblemBase(object):
 
         # Setup problem
         self.setup_all(meshes)
-        implemented_steppers = {  # TODO: Other timesteppers
+        implemented_steppers = {
             'CrankNicolson': CrankNicolson,
             'SteadyState': SteadyState,
         }
-        assert op.timestepper in implemented_steppers
+        try:
+            assert op.timestepper in implemented_steppers
+        except AssertionError:
+            raise NotImplementedError("Time integrator {:s} not implemented".format(op.timestepper))
         self.integrator = implemented_steppers[self.op.timestepper]
         if op.timestepper == 'SteadyState':
             assert op.end_time < op.dt
@@ -71,6 +75,7 @@ class AdaptiveProblemBase(object):
         self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
         self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         self.kernel_file = File(os.path.join(self.di, 'kernel.pvd'))
+        self.checkpoint = []
 
         # Storage for diagnostics over mesh adaptation loop
         self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
@@ -285,6 +290,17 @@ class AdaptiveProblemBase(object):
         """Functional of interest which takes the PDE solution as input."""
         raise NotImplementedError("Should be implemented in derived class.")
 
+    def save_to_checkpoint(self, f):  # TODO: Disk option
+        """Extremely simple checkpointing scheme with a simple stack of copied fields."""
+        self.checkpoint.append(f.copy(deepcopy=True))
+        self.op.print_debug("CHECKPOINTING: {:3d} currently stored".format(len(self.checkpoint)))
+
+    def collect_from_checkpoint(self):
+        """Extremely simple checkpointing scheme which pops off the top of a stack of copied fields."""
+        chk = self.checkpoint.pop(-1)  # TODO: TEMP
+        self.op.print_debug("CHECKPOINTING: {:3d} currently stored".format(len(self.checkpoint)))
+        return chk  # TODO: TEMP
+
     def run(self, **kwargs):
         """
         Run simulation using mesh adaptation approach specified by `self.approach`.
@@ -370,25 +386,29 @@ class AdaptiveProblemBase(object):
             if num_inverted > 0:
                 warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
 
-        elif self.mesh_movers[i] is not None:  # TODO: Account for tracers
+        elif self.mesh_movers[i] is not None:
 
-            # Compute new physical mesh coordinates
-            self.mesh_movers[i].adapt()
+            # NOTE: If we want to take the adjoint through mesh movement then there is no need to
+            #       know how the coordinate transform was derived, only what the result was. In any
+            #       case, the current implementation involves a supermesh projection which is not
+            #       yet annotated in pyadjoint.
+            with stop_annotating():
 
-            # Project a copy of the current solution onto mesh defined on new coordinates
-            mesh = Mesh(self.mesh_movers[i].x)
+                # Compute new physical mesh coordinates
+                self.mesh_movers[i].adapt()
 
-            V = FunctionSpace(mesh, self.V[i].ufl_element())
-            tmp = Function(V)
-            for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-                tmp_i.project(sol_i)
-
-            # Update physical mesh and current solution defined on it
-            #self.meshes[i].coordinates.project(self.mesh_movers[i].x)
-            self.meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
-            for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-                sol_i.dat.data[:] = tmp_i.dat.data
-            del tmp
+                # Project a copy of the current solution onto mesh defined on new coordinates
+                mesh = Mesh(self.mesh_movers[i].x)
+                V = FunctionSpace(mesh, self.V[i].ufl_element())
+                tmp = Function(V)
+                for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+                    tmp_i.project(sol_i)
+                if self.op.solve_tracer:
+                    Q = FunctionSpace(mesh, self.Q[i].ufl_element())
+                    tmp_tracer = Function(Q)
+                    tmp_tracer.project(self.fwd_solutions_tracer[i])
+                    del tmp_tracer
+                del tmp
 
             #P1DG = FunctionSpace(mesh, self.P1DG[i].ufl_element())
             #tmp = Function(P1DG)

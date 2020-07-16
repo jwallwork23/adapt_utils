@@ -36,17 +36,15 @@ class RippleOptions(ShallowWaterOptions):
 
         # Solver parameters
         self.solver_parameters = {
-            'shallow_water': {
-                # 'mat_type': 'matfree',
-                'mat_type': 'aij',
-                'ksp_type': 'preonly',
-                # 'pc_type': 'python',
-                # 'pc_python_type': 'firedrake.AssembledPC',
-                # 'assembled_pc_type': 'lu'
-                'pc_type': 'lu',
-                'pc_factor_mat_solver_type': 'mumps',
-                'ksp_monitor': None,
-            }
+            # 'mat_type': 'matfree',
+            'mat_type': 'aij',
+            'ksp_type': 'preonly',
+            # 'pc_type': 'python',
+            # 'pc_python_type': 'firedrake.AssembledPC',
+            # 'assembled_pc_type': 'lu'
+            'pc_type': 'lu',
+            'pc_factor_mat_solver_type': 'mumps',
+            'ksp_monitor': None,
         }
         self.adjoint_solver_parameters.update(self.solver_parameters)
 
@@ -74,13 +72,11 @@ class RippleOptions(ShallowWaterOptions):
         u, eta = args[:2]
         # udiv = args[2]
         boundary_conditions = {
-            'shallow_water': {
-                1: {'un': Constant(0.0)},
-                2: {'un': Constant(0.0)},
-                3: {'un': Constant(0.0)},
-                4: {'un': Constant(0.0)},
-                5: {'uv': u, 'elev': eta},
-                6: {},
-            },
+            1: {'un': Constant(0.0)},
+            2: {'un': Constant(0.0)},
+            3: {'un': Constant(0.0)},
+            4: {'un': Constant(0.0)},
+            5: {'uv': u, 'elev': eta},
+            6: {},
         }
         return boundary_conditions

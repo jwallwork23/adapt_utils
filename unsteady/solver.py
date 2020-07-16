@@ -400,7 +400,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
             self.V[i],
             self.depth[i],
-            self.shallow_water_options[i],
+            self.shallow_water_options[i],  # TODO: Need plug in uv_2d, elev_2d for nonlinear case
         )
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
@@ -595,8 +595,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _create_forward_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
-        dt = self.op.dt
-        args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, dt, )
+        args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, self.op.dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             'solver_parameters': self.op.solver_parameters['shallow_water'],
@@ -610,8 +609,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _create_forward_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
-        dt = self.op.dt
-        args = (self.equations[i].tracer, self.fwd_solutions_tracer[i], fields, dt, )
+        args = (self.equations[i].tracer, self.fwd_solutions_tracer[i], fields, self.op.dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
             'solver_parameters': self.op.solver_parameters['tracer'],
@@ -656,18 +654,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
         fields = self._get_fields_for_shallow_water_timestepper(i)
 
         # Account for dJdq
-        self.kernels[i] = self.op.set_qoi_kernel(self.V[i])
+        self.op.set_qoi_kernel(self, i)
         dJdu, dJdeta = self.kernels[i].split()
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         fields['momentum_source'] = self.time_kernel*dJdu
         fields['volume_source'] = self.time_kernel*dJdeta
 
         # Construct time integrator
-        dt = self.op.dt
-        args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, dt, )
+        args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, self.op.dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             'solver_parameters': self.op.adjoint_solver_parameters['shallow_water'],
+            # 'adjoint': True,  # FIXME
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
@@ -677,20 +675,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def _create_adjoint_tracer_timestepper(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
 
-        # Reverse the flow because we are going backwards in time
-        fields.uv_2d *= -1
+        # fields.uv_2d = - fields.uv_2d
 
         # Account for dJdc
-        dJdc = self.op.set_qoi_kernel_tracer(self, i)
+        dJdc = self.op.set_qoi_kernel_tracer(self, i)  # TODO: Store this kernel somewhere
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         fields['source'] = self.time_kernel*dJdc
 
         # Construct time integrator
-        dt = self.op.dt
-        args = (self.equations[i].adjoint_tracer, self.adj_solutions_tracer[i], fields, dt, )
+        args = (self.equations[i].adjoint_tracer, self.adj_solutions_tracer[i], fields, self.op.dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
             'solver_parameters': self.op.adjoint_solver_parameters['tracer'],
+            'adjoint': True,  # FIXME
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
@@ -755,7 +752,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         plot_pvd &= op.plot_pvd
 
         # Callbacks
-        update_forcings = update_forcings or self.op.get_update_forcings(self, i)
+        update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
         export_func = export_func or self.op.get_export_func(self, i)
         print_output(80*'=')
         # if i == 0:
@@ -792,8 +789,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 proj_bath.project(self.fwd_solutions_bathymetry[i])
                 self.exner_file.write(proj_bath)
 
+        # Initialise counters
         t_epsilon = 1.0e-05
-        iteration = 0
+        self.iteration = 0
         start_time = i*op.dt*self.dt_per_mesh
         end_time = (i+1)*op.dt*self.dt_per_mesh
         try:
@@ -801,13 +799,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         except AssertionError:
             msg = "Mismatching start time: {:.2f} vs {:.2f}"
             raise ValueError(msg.format(self.simulation_time, start_time))
-        if update_forcings is not None:
-            update_forcings(self.simulation_time)
+        # update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
-        coords = self.meshes[i].coordinates
         while self.simulation_time <= end_time - t_epsilon:
             if iteration % op.dt_per_mesh_movement == 0:
                 # Get mesh velocity
@@ -816,7 +812,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # TODO: Update mesh velocity
 
-            # Solve equations
+            # Solve PDE(s)
             if op.solve_swe:
                 ts.shallow_water.advance(self.simulation_time, update_forcings)
             if op.solve_tracer:
@@ -837,11 +833,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # if self.mesh_movers[i] is not None:  # TODO: generalise
             #     self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
 
-            # Outputs
-            iteration += 1
+            # Save to checkpoint
+            if self.checkpointing:
+                if op.solve_swe:
+                    self.save_to_checkpoint(self.fwd_solutions[i])
+                if op.solve_tracer:
+                    self.save_to_checkpoint(self.fwd_solutions_tracer[i])
+
+            # Export
+            self.iteration += 1
             self.simulation_time += op.dt
             self.callbacks[i].evaluate(mode='timestep')
-            if iteration % op.dt_per_export == 0:
+            if self.iteration % op.dt_per_export == 0:
                 print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
                 if op.solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
@@ -890,6 +893,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
 
+    # TODO: In nonlinear case, uv_2d and elev_2d will need to be loaded / recomputed
     def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.
@@ -902,7 +906,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         plot_pvd &= op.plot_pvd
 
         # Callbacks
-        update_forcings = update_forcings or self.op.get_update_forcings(self, i)
+        update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
         export_func = export_func or self.op.get_export_func(self, i)
         print_output(80*'=')
         # if i == self.num_meshes-1:
@@ -926,8 +930,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 proj_tracer.project(self.adj_solutions_tracer[i])
                 self.adjoint_tracer_file.write(proj_tracer)
 
+        # Initialise counters
         t_epsilon = 1.0e-05
-        iteration = 0
+        self.iteration = (i+1)*self.dt_per_mesh
         start_time = (i+1)*op.dt*self.dt_per_mesh
         end_time = i*op.dt*self.dt_per_mesh
         try:
@@ -935,22 +940,39 @@ class AdaptiveProblem(AdaptiveProblemBase):
         except AssertionError:
             msg = "Mismatching start time: {:f} vs {:f}"
             raise ValueError(msg.format(self.simulation_time, start_time))
-        update_forcings(self.simulation_time)
+        # update_forcings(self.simulation_time)
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time >= end_time + t_epsilon:
+
+            # Collect forward solution from checkpoint and free associated memory
+            #   NOTE: We need collect the checkpoints from the stack in reverse order
+            if self.checkpointing:
+                if op.solve_tracer:
+                    self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint())
+                if op.solve_swe:
+                    # chk = self.collect_from_checkpoint()
+                    # self.fwd_solutions[i].assign(chk)
+                    # del chk
+                    self.fwd_solutions[i].assign(self.collect_from_checkpoint())
+
+            # Solve adjoint PDE(s)
             if op.solve_swe:
                 ts.adjoint_shallow_water.advance(self.simulation_time, update_forcings)
             if op.solve_tracer:
                 ts.adjoint_tracer.advance(self.simulation_time, update_forcings)
                 if self.tracer_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.adj_solutions_tracer[i])
-            iteration += 1
+
+            # Increment counters
+            self.iteration -= 1
             self.simulation_time -= op.dt
             self.callbacks[i].evaluate(mode='timestep')
-            if iteration % op.dt_per_export == 0:
+
+            # Export
+            if self.iteration % op.dt_per_export == 0:
                 print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
                 if op.solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
