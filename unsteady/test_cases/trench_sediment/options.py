@@ -60,7 +60,7 @@ class TrenchSedimentOptions(CoupledOptions):
         # Time integration
         self.dt = 0.25
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 16
+        self.dt_per_mesh_movement = 48
         self.dt_per_export = 48
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
@@ -189,7 +189,7 @@ class TrenchSedimentOptions(CoupledOptions):
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
 
-    def get_update_forcings(self, prob, i):
+    def get_update_forcings(self, prob, i, adjoint):
         return None
 
     def get_export_func(self, prob, i):
