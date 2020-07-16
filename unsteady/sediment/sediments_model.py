@@ -146,20 +146,16 @@ class SedimentModel(object):
             self.settling_velocity = Constant(1.1*sqrt(self.g*self.average_size*self.R))
 
         self.uv_cg = Function(self.vector_cg).project(self.uv_init)
-        
-        # define bed gradient
-        self.old_bathymetry_2d = Function(self.V).project(self.bathymetry_2d)        
-        self.dzdx = self.old_bathymetry_2d.dx(0)
-        self.dzdy = self.old_bathymetry_2d.dx(1)        
 
-        if self.wetting_and_drying:
-            self.options.use_wetting_and_drying = self.wetting_and_drying
-            self.wetting_alpha_fn = Function(self.V).interpolate(abs(self.dzdx))
-            self.options.wetting_and_drying_alpha = self.wetting_alpha_fn
-            H = self.elev_init + self.bathymetry_2d
-            self.depth = Function(self.V).project(H + (Constant(0.5) * (sqrt(H ** 2 + self.options.wetting_and_drying_alpha ** 2) - H)))
-        else:
-            self.depth = Function(self.V).project(self.elev_init + self.bathymetry_2d)
+        # define bed gradient
+        self.old_bathymetry_2d = Function(self.V).project(self.bathymetry_2d)
+        self.dzdx = self.old_bathymetry_2d.dx(0)
+        self.dzdy = self.old_bathymetry_2d.dx(1)
+
+
+        self.depth_expr = DepthExpression(self.bathymetry_2d, use_wetting_and_drying=self.wetting_and_drying, wetting_and_drying_alpha=self.wetting_alpha)
+        self.depth = Function(self.V).project(self.depth_expr.get_total_depth(self.elev_init))
+
 
         self.horizontal_velocity = self.uv_cg[0]
         self.vertical_velocity = self.uv_cg[1]
@@ -308,18 +304,16 @@ class SedimentModel(object):
 
         return self.qbx, self.qby
 
-    def update(self, fwd_solution, fwd_solution_bathymetry, depth_expr):
+    def update(self, fwd_solution, fwd_solution_bathymetry):
         # update bathymetry
         self.old_bathymetry_2d.project(fwd_solution_bathymetry)
-
         # extract new elevation and velocity and project onto CG space
         self.uv1, self.elev1 = fwd_solution.split()
         self.uv_cg.project(self.uv1)
-        if self.wetting_and_drying:
-            self.wetting_alpha_fn.interpolate(abs(self.dzdx))
-            self.depth.project(self.elev1 + depth_expr.wd_bathymetry_displacement(self.elev1) + self.old_bathymetry_2d)
-        else:
-            self.depth.project(self.elev1 + self.old_bathymetry_2d)
+
+        self.depth_expr = DepthExpression(self.old_bathymetry_2d, use_wetting_and_drying=self.wetting_and_drying, wetting_and_drying_alpha=self.wetting_alpha)
+        self.depth.project(self.depth_expr.get_total_depth(self.elev1))
+
         if self.suspendedload:
             # source term
 
@@ -335,7 +329,6 @@ class SedimentModel(object):
 
             if self.convectivevel:
                 self.corr_factor_model.update()
-
             # update sediment rate to ensure equilibrium at inflow
             if self.cons_tracer:
                 self.sediment_rate.assign(self.depth.at([0, 0])*self.ceq.at([0, 0])/(self.coeff.at([0, 0])))
