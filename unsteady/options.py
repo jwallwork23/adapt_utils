@@ -18,6 +18,7 @@ class CoupledOptions(Options):
     g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
     friction = Unicode(None, allow_none=True).tag(config=True)
     friction_coeff = NonNegativeFloat(None, allow_none=True).tag(config=True)
+    ksp = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
 
     # Common model
     implicitness_theta = NonNegativeFloat(0.5).tag(config=True)
