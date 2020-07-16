@@ -16,7 +16,7 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
 nx = 0.125
-alpha = 5
+alpha = 0
 
 inputdir = 'hydrodynamics_trench_' + str(nx)
 
@@ -65,7 +65,6 @@ def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
     n = FacetNormal(mesh)
 
     mon_init = project(sqrt(Constant(1.0) + alpha * norm_two_proj), P1)
-    import ipdb; ipdb.set_trace()
     #K = 10*(0.2**2)/4
     #a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
     #a -= inner(tau, mon_init)*dx

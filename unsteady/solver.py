@@ -16,11 +16,9 @@ from .tracer.equation import TracerEquation2D
 from .tracer.cons_equation import ConservativeTracerEquation2D
 from .sediment.equation import SedimentEquation2D
 from thetis.exner_eq import ExnerEquation
-from thetis.options import ModelOptions2d
 from .sediment.sediments_model import SedimentModel
 from .tracer.error_estimation import TracerGOErrorEstimator
 from .base import AdaptiveProblemBase
-
 
 __all__ = ["AdaptiveProblem"]
 
@@ -813,7 +811,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
-
             # Obtain the mesh movement transformation
             if self.iteration % op.dt_per_mesh_movement == 0:
                 if self.mesh_movers[i] is not None:  # TODO: generalise
@@ -1561,9 +1558,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         V = FunctionSpace(mesh, self.V[i].ufl_element())
         tmp = Function(V)
         for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-            tmp_i.project(sol_i)
 
         # Same for tracers etc.
+            tmp_i.project(sol_i)
         if self.op.solve_tracer:
             Q = FunctionSpace(mesh, self.Q[i].ufl_element())
             tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
@@ -1575,7 +1572,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
 
         # Update physical mesh and solution fields defined on it
-        self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
+        self.meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
         for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
             sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
         del tmp
