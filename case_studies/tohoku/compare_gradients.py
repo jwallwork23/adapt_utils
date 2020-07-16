@@ -125,6 +125,8 @@ g_continuous = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
 print_output("Gradient computed by hand (continuous): {:.4e}".format(g_continuous))
 relative_error = abs((g_discrete - g_continuous)/g_discrete)
 print_output("Relative error (discrete vs. continuous): {:.4f}%".format(100*relative_error))
+elements = swp.meshes[0].num_cells()
+del swp
 
 
 # --- Finite differences
@@ -153,7 +155,7 @@ while not converged:
     del swp
 
 # Logging
-logstr = "elements: {:d}\n".format(swp.meshes[0].num_cells())
+logstr = "elements: {:d}\n".format(elements)
 logstr += "finite difference gradient (rtol={:.1e}): {:.4e}\n".format(rtol, g_fd)
 logstr += "discrete gradient: {:.4e}\n".format(g_discrete)
 logstr += "continuous gradient: {:.4e}\n".format(g_continuous)
