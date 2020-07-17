@@ -284,12 +284,12 @@ class TohokuOptions(TsunamiOptions):
 
         # Compute regularisation term
         R = assemble(0.5*alpha*inner(deta0dx, deta0dx)*dx)
-        print_output("Regularisation term = {:.8f}".format(R))
+        print_output("Regularisation term = {:.4e}".format(R))
         self.regularisation_term = R
 
         # Compute gradient of regularisation term
         dRdm = assemble(alpha*inner(dphidx, deta0dx)*dx)
-        print_output("Gradient of regularisation term = {:.8f}".format(dRdm))
+        print_output("Gradient of regularisation term = {:.4e}".format(dRdm))
         self.regularisation_term_gradient = dRdm
 
         return R

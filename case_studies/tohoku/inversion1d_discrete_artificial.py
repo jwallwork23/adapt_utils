@@ -83,7 +83,7 @@ if not plot_only:
         for gauge in op.gauges:
             op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
-# Explore parameter space
+# Explore parameter space  # TODO: Separate regularised version
 n = 9
 control_values = np.linspace(2.0, 10.0, n)
 fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
@@ -104,7 +104,7 @@ with stop_annotating():
 for i, m in enumerate(control_values):
     print_output("{:2d}: control value {:.4e}  functional value {:.4e}".format(i, m, func_values[i]))
 
-# Plot parameter space
+# Plot parameter space  # TODO: Separate regularised version
 fig, axes = plt.subplots(figsize=(8, 8))
 axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
 axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
@@ -164,11 +164,16 @@ else:
 
     def derivative_cb_post(j, dj, m):
         control = m.dat.data[0]
+        gradient = dj.dat.data[0]
+        print_output("control {:.8e}  J {:.8e}  gradient {:.8e}".format(control, j, gradient))
+
+        # Save progress to NumPy arrays on-the-fly
         control_values_opt.append(control)
         func_values_opt.append(j)
-        gradient = dj.dat.data[0]
         gradient_values_opt.append(gradient)
-        print_output("control {:.8e}  functional  {:.8e}  gradient {:.8e}".format(control, j, gradient))
+        np.save(fname.format('ctrl'), np.array(control_values_opt))
+        np.save(fname.format('func'), np.array(func_values_opt))
+        np.save(fname.format('grad'), np.array(gradient_values_opt))
 
         # Stagnation termination condition
         if len(func_values_opt) > 1:
@@ -186,14 +191,6 @@ else:
     except StagnationError:
         optimised_value = control_values_opt[-1]
         print_output("StagnationError: Stagnation of objective functional")
-
-    # Store trajectory
-    control_values_opt = np.array(control_values_opt)
-    func_values_opt = np.array(func_values_opt)
-    gradient_values_opt = np.array(gradient_values_opt)
-    np.save(fname.format('ctrl'), control_values_opt)
-    np.save(fname.format('func'), func_values_opt)
-    np.save(fname.format('grad'), gradient_values_opt)
 
 # Fit a quadratic to the first three points and find its root
 assert len(control_values[::4]) == 3
