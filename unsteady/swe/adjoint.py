@@ -22,20 +22,21 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         velocity on the complement of Γ₂ and Dirichlet conditions for the elevation on the
         complement of Γ₁.
         """
+        warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         # bnd_len = self.boundary_len[bnd_id]
         funcs = bnd_conditions.get(bnd_id)
         if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
             zeta_ext = zeta_in  # assume symmetry
             z_ext = z_in  # assume symmetry
-            warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         elif 'elev' not in funcs:  # ∂Ω \ Γ₂
             zeta_ext = zeta_in  # assume symmetry
             z_ext = Constant(0.0)*self.normal
-            warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         elif 'un' not in funcs:  # ∂Ω \ Γ₁
             zeta_ext = Constant(0.0)
             z_ext = z_in  # assume symmetry
-            warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
+        elif funcs is None:  # ∂Ω \ (Γ₁ ∪ Γ₂)
+            zeta_ext = Constant(0.0)
+            z_ext = Constant(0.0)*self.normal
         else:
             raise Exception('Unsupported bnd type: {:}'.format(funcs.keys()))
         return zeta_ext, z_ext
@@ -94,12 +95,9 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-                if funcs is not None:
-                    # TODO: Riemann solutions
-                    zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
-                    f += -g_grav*self.zeta_test*inner(z_ext, self.normal)*ds_bnd
-                else:
-                    raise NotImplementedError
+                # TODO: Riemann solutions
+                zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
+                f += -g_grav*self.zeta_test*inner(z_ext, self.normal)*ds_bnd
         else:
             f = -g_grav*self.zeta_test*nabla_div(z)*self.dx
 
