@@ -4,12 +4,9 @@ from firedrake.petsc import PETSc
 
 import os
 import netCDF4
-import matplotlib.pyplot as plt
 
 from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
-from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
-from adapt_utils.misc import gaussian, ellipse
 
 
 __all__ = ["TohokuOptions", "TohokuGaussianBasisOptions"]
@@ -168,7 +165,10 @@ class TohokuOptions(TsunamiOptions):
         return lon, lat, elev
 
     def _get_update_forcings_forward(self, prob, i):
-        self.J = 0
+        from adapt_utils.misc import ellipse
+        from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
+
+        self.J = self.get_regularisation_term(prob)
         scaling = Constant(self.qoi_scaling)
         weight = Constant(1.0)
         eta_obs = Constant(0.0)
@@ -264,6 +264,36 @@ class TohokuOptions(TsunamiOptions):
         else:
             return self._get_update_forcings_forward(prob, i)
 
+    def get_regularisation_term(self, prob):
+        """
+        Tikhonov regularisation term that enforces spatial smoothness in the initial surface.
+
+        NOTE: Assumes the forward model has been initialised but not taken any iterations.
+        """
+        from adapt_utils.adapt.recovery import construct_gradient
+
+        # Set regularisation parameter
+        if np.isclose(self.regularisation, 0.0):
+            return 0
+        alpha = Constant(self.regularisation)
+
+        # Recover gradient of initial surface and a basis function using L2 projection
+        u0, eta0 = prob.fwd_solutions[0].split()
+        deta0dx = construct_gradient(eta0, op=self)
+        dphidx = construct_gradient(self.basis_function.split()[1], op=self)
+
+        # Compute regularisation term
+        R = assemble(0.5*alpha*inner(deta0dx, deta0dx)*dx)
+        print_output("Regularisation term = {:.8f}".format(R))
+        self.regularisation_term = R
+
+        # Compute gradient of regularisation term
+        dRdm = assemble(alpha*inner(dphidx, deta0dx)*dx)
+        print_output("Gradient of regularisation term = {:.8f}".format(dRdm))
+        self.regularisation_term_gradient = dRdm
+
+        return R
+
     def set_boundary_conditions(self, prob, i):
         ocean_tag = 100
         coast_tag = 200
@@ -337,6 +367,8 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         self.control_parameter.assign(control_parameter)
 
     def set_initial_condition(self, prob):
+        from adapt_utils.misc import gaussian
+
         self.basis_function = Function(prob.V[0])
         psi, phi = self.basis_function.split()
         loc = (0.7e+06, 4.2e+06)

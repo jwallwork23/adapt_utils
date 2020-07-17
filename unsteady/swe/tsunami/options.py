@@ -21,11 +21,12 @@ class TsunamiOptions(CoupledOptions):
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
     bathymetry_cap = NonNegativeFloat(30.0, allow_none=True, help="Minimum depth").tag(config=True)
 
-    def __init__(self, **kwargs):
+    def __init__(self, regularisation=0.0, **kwargs):
         super(TsunamiOptions, self).__init__(**kwargs)
         self.solve_swe = True
         self.solve_tracer = False
         self.rotational = True
+        self.regularisation = regularisation
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False
         self.gauges = {}

@@ -28,6 +28,7 @@ parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-family", help="Finite element pair")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
+parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
 parser.add_argument("-plot_only", help="Just plot parameter space and optimisation progress")
@@ -57,6 +58,7 @@ kwargs = {
     'control_parameter': float(args.initial_guess or 10.0),
     'artificial': True,
     'qoi_scaling': 1.0e-12,
+    'regularisation': float(args.regularisation or 0.0),
 
     # Misc
     'plot_pvd': False,

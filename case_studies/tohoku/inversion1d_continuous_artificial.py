@@ -27,6 +27,7 @@ parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-family", help="Finite element pair")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
+parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
 parser.add_argument("-plot_only", help="Just plot parameter space and optimisation progress")
@@ -56,6 +57,7 @@ kwargs = {
     'control_parameter': float(args.initial_guess or 10.0),
     'artificial': True,
     'qoi_scaling': 1.0e-12,
+    'regularisation': float(args.regularisation or 0.0),
 
     # Misc
     'plot_pvd': False,
@@ -135,9 +137,10 @@ if not plot_only:
         if len(swp.checkpoint) == 0:
             reduced_functional(m)
         swp.solve_adjoint()
-        g = np.array([assemble(inner(op.basis_function, swp.adj_solutions[0])*dx), ])
-        print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g[0]))
-        return g
+        g = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
+        g += op.regularisation_term_gradient
+        print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g))
+        return np.array([g, ])
 
     # Solve the forward problem with some initial guess
     swp.checkpointing = False
