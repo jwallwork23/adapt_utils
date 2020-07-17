@@ -9,12 +9,15 @@ import numpy as np
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["prod", "combine", "rotation_matrix", "rotate",
+__all__ = ["StagnationError", "prod", "combine", "rotation_matrix", "rotate",
            "box", "ellipse", "bump", "circular_bump", "gaussian", "cg2dg",
            "copy_mesh", "get_finite_element", "get_component_space", "get_component", "get_boundary_nodes",
            "is_symmetric", "is_pos_def", "is_spd", "check_spd",
            "find", "suppress_output", "knownargs2dict", "unknownargs2dict", "index_string"]
 
+
+class StagnationError(Exception):
+    """Error raised when an optimisation routine stagnates."""
 
 # --- UFL
 
