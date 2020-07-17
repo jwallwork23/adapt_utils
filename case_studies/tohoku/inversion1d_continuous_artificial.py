@@ -250,6 +250,20 @@ params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'label': 'Fitted quadr
 axes.plot(x, q(x), '--', **params)
 params = {'markersize': 14, 'color': 'C0', 'label': 'Minimum of quadratic', }
 axes.plot(q_min, q(q_min), '*', **params)
+
+# Fit quadratic to regularised functional values TODO: TEMPORARY - really we need a separate figure
+q_reg = scipy.interpolate.lagrange(control_values_opt[:3], func_values_opt[:3])
+dq_reg = q_reg.deriv()
+q_reg_min = -dq_reg.coefficients[1]/dq_reg.coefficients[0]
+assert dq_reg.deriv().coefficients[0] > 0
+print_output("Minimiser of quadratic (regularised): {:.4f}".format(q_reg_min))
+assert np.isclose(dq_reg(q_reg_min), 0.0)
+params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': 'Fitted quadratic (reg)', }
+x = np.linspace(control_values_opt[0], control_values_opt[-1], 10*len(control_values))
+axes.plot(x, q_reg(x), '--', **params)
+params = {'markersize': 14, 'color': 'C6', 'label': 'Minimum of quadratic (reg)', }
+axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
+
 params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
 axes.plot(control_values_opt, func_values_opt, 'o', **params)
 delta_m = 0.25
@@ -263,7 +277,7 @@ axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
 axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
-plt.xlim([1.5, 10.5])
+# plt.xlim([1.5, 10.5])
 # plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
 plt.grid()
