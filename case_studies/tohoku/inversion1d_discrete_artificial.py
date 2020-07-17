@@ -19,6 +19,7 @@ import os
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.case_studies.tohoku.options import *
+from adapt_utils.misc import StagnationError
 from adapt_utils.norms import total_variation
 
 
@@ -47,7 +48,6 @@ kwargs = {
     'save_timeseries': True,
 
     # Spatial discretisation
-    # 'family': 'dg-cg',
     'family': args.family or 'cg-cg',
     # 'stabilisation': 'lax_friedrichs',
     'stabilisation': None,
@@ -171,7 +171,7 @@ else:
         # Stagnation termination condition
         if len(func_values_opt) > 1:
             if abs(func_values_opt[-1] - func_values_opt[-2]) < 1.0e-06*abs(func_values_opt[-2]):
-                raise ConvergenceError
+                raise StagnationError
 
     # Run BFGS optimisation
     opt_kwargs = {
@@ -181,9 +181,9 @@ else:
     Jhat = ReducedFunctional(J, Control(op.control_parameter), derivative_cb_post=derivative_cb_post)
     try:
         optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs).dat.data[0]
-    except ConvergenceError:
+    except StagnationError:
         optimised_value = control_values_opt[-1]
-        print_output("ConvergenceError: Stagnation of objective functional")
+        print_output("StagnationError: Stagnation of objective functional")
 
     # Store trajectory
     control_values_opt = np.array(control_values_opt)
@@ -291,5 +291,4 @@ if not plot_only:
     if plot_pvd:
         swp.compute_gradient(Control(op_opt.control_parameter))
         swp.get_solve_blocks()
-        print(len(swp.solve_blocks))
         swp.save_adjoint_trajectory()

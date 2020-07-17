@@ -18,6 +18,7 @@ import scipy
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.case_studies.tohoku.options import *
+from adapt_utils.misc import StagnationError
 from adapt_utils.norms import total_variation
 
 
@@ -46,7 +47,6 @@ kwargs = {
     'save_timeseries': True,
 
     # Spatial discretisation
-    # 'family': 'dg-cg',
     'family': args.family or 'cg-cg',
     # 'stabilisation': 'lax_friedrichs',
     'stabilisation': None,
@@ -193,7 +193,7 @@ else:
         # Stagnation termination condition
         if len(func_values_opt) > 1:
             if abs(func_values_opt[-1] - func_values_opt[-2]) < 1.0e-06*abs(func_values_opt[-2]):
-                raise ConvergenceError
+                raise StagnationError
         return J
 
     def gradient_hat(m):
@@ -215,9 +215,9 @@ else:
     try:
         m_opt = scipy.optimize.fmin_bfgs(reduced_functional_hat, m_init, **opt_kwargs)
         optimised_value = m_opt.dat.data[0]
-    except ConvergenceError:
+    except StagnationError:
         optimised_value = control_values_opt[-1]
-        print_output("ConvergenceError: Stagnation of objective functional")
+        print_output("StagnationError: Stagnation of objective functional")
 
     # Store trajectory
     control_values_opt = np.array(control_values_opt)
@@ -226,6 +226,13 @@ else:
     np.save(fname.format('ctrl'), control_values_opt)
     np.save(fname.format('func'), func_values_opt)
     np.save(fname.format('grad'), gradient_values_opt)
+
+try:
+    assert len(control_values_opt) == len(gradient_values_opt) + 1
+    assert len(func_values_opt) == len(gradient_values_opt) + 1
+except AssertionError:
+    lengths = (len(func_values_opt), len(gradient_values_opt), len(control_values_opt))
+    raise ValueError("Inconsistent stored data: {:d} vs {:d} vs {:d}".format(*lengths))
 
 # Fit a quadratic to the first three points and find its root
 assert len(control_values[::4]) == 3
@@ -277,7 +284,7 @@ if not plot_only:
     gauges = list(op_opt.gauges.keys())
     for gauge in gauges:
         op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
-    swp = AdaptiveProblem(op_opt, nonlinear=nonlinear, checkpointing=not plot_pvd)
+    swp = AdaptiveProblem(op_opt, nonlinear=nonlinear, checkpointing=plot_pvd)
     swp.solve_forward()
     J = op.J
     print_output("Mean square error QoI after optimisation = {:.4e}".format(J))
