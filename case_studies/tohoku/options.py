@@ -136,7 +136,7 @@ class TohokuOptions(TsunamiOptions):
         loi = self.locations_of_interest
         self.region_of_interest = [loi[loc]["coords"] + (radii[loc], ) for loc in loi]
 
-    def read_bathymetry_file(self, source='gebco'):
+    def read_bathymetry_file(self, source='etopo1'):
         self.print_debug("Reading bathymetry file...")
         if source == 'gebco':
             nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'gebco.nc'), 'r')
