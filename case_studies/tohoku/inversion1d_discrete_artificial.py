@@ -17,12 +17,14 @@ import scipy
 import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.case_studies.tohoku.options import *
 from adapt_utils.norms import total_variation
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
+parser.add_argument("-family", help="Finite element pair")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
@@ -46,7 +48,7 @@ kwargs = {
 
     # Spatial discretisation
     # 'family': 'dg-cg',
-    'family': 'cg-cg',
+    'family': args.family or 'cg-cg',
     # 'stabilisation': 'lax_friedrichs',
     'stabilisation': None,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
@@ -233,17 +235,25 @@ axes.annotate('m = {:.2f}'.format(opt),
 plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
 
 if not plot_only:
+    tape = get_working_tape()
+    tape.clear_tape()
+
+    class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
+        """The subclass exists to pass the QoI as required."""
+        def quantity_of_interest(self):
+            return self.op.J
+
 
     # Run forward again so that we can compare timeseries
     kwargs['control_parameter'] = optimised_value
-    kwargs['plot_pvd'] plot_pvd
+    kwargs['plot_pvd'] = plot_pvd
     op_opt = TohokuGaussianBasisOptions(**kwargs)
     gauges = list(op_opt.gauges.keys())
     for gauge in gauges:
         op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
-    swp = AdaptiveProblem(op_opt, nonlinear=nonlinear)
+    swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear)
     swp.solve_forward()
-    J = op.J
+    J = swp.quantity_of_interest()
     print_output("Mean square error QoI after optimisation = {:.4e}".format(J))
 
     # Plot timeseries for both initial guess and optimised control
@@ -277,3 +287,9 @@ if not plot_only:
         tv = total_variation(op.gauges[gauge]['diff'])
         tv_opt = total_variation(op_opt.gauges[gauge]['diff'])
         print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
+
+    if plot_pvd:
+        swp.compute_gradient(Control(op_opt.control_parameter))
+        swp.get_solve_blocks()
+        print(len(swp.solve_blocks))
+        swp.save_adjoint_trajectory()

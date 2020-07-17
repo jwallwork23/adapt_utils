@@ -23,6 +23,7 @@ from adapt_utils.norms import total_variation
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
+parser.add_argument("-family", help="Finite element pair")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
@@ -46,7 +47,7 @@ kwargs = {
 
     # Spatial discretisation
     # 'family': 'dg-cg',
-    'family': 'cg-cg',
+    'family': args.family or 'cg-cg',
     # 'stabilisation': 'lax_friedrichs',
     'stabilisation': None,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
