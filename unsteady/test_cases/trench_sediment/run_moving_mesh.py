@@ -15,8 +15,8 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.125
-alpha = 0
+nx = 0.8
+alpha = 3
 
 inputdir = 'hydrodynamics_trench_' + str(nx)
 
@@ -110,7 +110,7 @@ df_exp.to_csv('adapt_output/bed_trench_output_' + str(nx) + '_' + str(alpha) + '
 
 print(nx)
 print(alpha)
-
+print('dt-0.2')
 print("Total error: ")
 print(np.sqrt(sum(diff_thetis)))
 

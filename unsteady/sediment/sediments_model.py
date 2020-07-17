@@ -193,10 +193,8 @@ class SedimentModel(object):
                 self.corr_factor_model = Corrective_Velocity_Factor(self.depth, self.ksp, self.ks, self.settling_velocity, self.ustar)
             # update sediment rate to ensure equilibrium at inflow
             if self.cons_tracer:
-                self.sediment_rate = Constant(self.depth.at([0, 0])*self.ceq.at([0, 0])/(self.coeff.at([0, 0])))
                 self.equiltracer = Function(self.P1_2d).project(self.depth*self.ceq/self.coeff)
             else:
-                self.sediment_rate = Constant(self.ceq.at([0, 0])/(self.coeff.at([0, 0])))
                 self.equiltracer = Function(self.P1_2d).project(self.ceq/self.coeff)
 
             # get individual terms
@@ -331,9 +329,7 @@ class SedimentModel(object):
                 self.corr_factor_model.update()
             # update sediment rate to ensure equilibrium at inflow
             if self.cons_tracer:
-                self.sediment_rate.assign(self.depth.at([0, 0])*self.ceq.at([0, 0])/(self.coeff.at([0, 0])))
                 self.equiltracer.project(self.depth*self.ceq/self.coeff)
             else:
-                self.sediment_rate.assign(self.ceq.at([0, 0])/(self.coeff.at([0, 0])))
                 self.equiltracer.project(self.ceq/self.coeff)
 

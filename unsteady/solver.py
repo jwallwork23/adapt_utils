@@ -207,6 +207,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def set_fields(self, init = False):
         """Set velocity field, viscosity, etc *on each mesh*."""
         self.fields = [AttrDict() for P1 in self.P1]
+        if self.op.solve_exner:
+            if init:
+                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
+                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
+        else:
+            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
+            self.depth = [None for bathymetry in self.bathymetry]
+            for i, bathymetry in enumerate(self.bathymetry):
+                self.depth[i] = DepthExpression(
+                    bathymetry,
+                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+                )
         for i, P1 in enumerate(self.P1):
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
@@ -230,22 +245,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
                     #'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
                 })
-        if self.op.solve_exner:
-            if init:
-                print("init")
-                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
-                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-        else:
-            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-            self.depth = [None for bathymetry in self.bathymetry]
-            for i, bathymetry in enumerate(self.bathymetry):
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                )
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
 
@@ -1561,7 +1560,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         tmp = Function(V)
         for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
             tmp_i.project(sol_i)
-
         # Same for tracers etc.
         if self.op.solve_tracer:
             Q = FunctionSpace(mesh, self.Q[i].ufl_element())
