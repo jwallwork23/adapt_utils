@@ -80,7 +80,7 @@ if not plot_only:
     for gauge in op.gauges:
         op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
-# Explore parameter space
+# Explore parameter space  # TODO: Separate regularised version
 n = 9
 control_values = np.linspace(2.0, 10.0, n)
 fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
@@ -99,7 +99,7 @@ np.save(fname, func_values)
 for i, m in enumerate(control_values):
     print_output("{:2d}: control value {:.4e}  functional value {:.4e}".format(i, m, func_values[i]))
 
-# Plot parameter space
+# Plot parameter space  # TODO: Separate regularised version
 fig, axes = plt.subplots(figsize=(8, 8))
 axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
 axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
@@ -190,8 +190,10 @@ else:
     def reduced_functional_hat(m):
         """Modified reduced functional which stores progress and checks for stagnation."""
         control_values_opt.append(m[0])
+        np.save(fname.format('ctrl'), np.array(control_values_opt))
         J = reduced_functional(m)
         func_values_opt.append(J)
+        np.save(fname.format('func'), np.array(func_values_opt))
 
         # Stagnation termination condition
         if len(func_values_opt) > 1:
@@ -205,6 +207,7 @@ else:
             scaled_reduced_functional_hat(m)
         g = gradient(m)
         gradient_values_opt.append(g[0])
+        np.save(fname.format('grad'), np.array(gradient_values_opt))
         return g
 
     # Run BFGS optimisation
@@ -222,20 +225,12 @@ else:
         optimised_value = control_values_opt[-1]
         print_output("StagnationError: Stagnation of objective functional")
 
-    # Store trajectory
-    control_values_opt = np.array(control_values_opt)
-    func_values_opt = np.array(func_values_opt)
-    gradient_values_opt = np.array(gradient_values_opt)
-    np.save(fname.format('ctrl'), control_values_opt)
-    np.save(fname.format('func'), func_values_opt)
-    np.save(fname.format('grad'), gradient_values_opt)
-
-try:
-    assert len(control_values_opt) == len(gradient_values_opt) + 1
-    assert len(func_values_opt) == len(gradient_values_opt) + 1
-except AssertionError:
-    lengths = (len(func_values_opt), len(gradient_values_opt), len(control_values_opt))
-    raise ValueError("Inconsistent stored data: {:d} vs {:d} vs {:d}".format(*lengths))
+# try:
+#     assert len(control_values_opt) == len(gradient_values_opt) + 1
+#     assert len(func_values_opt) == len(gradient_values_opt) + 1
+# except AssertionError:
+#     lengths = (len(func_values_opt), len(gradient_values_opt), len(control_values_opt))
+#     raise ValueError("Inconsistent stored data: {:d} vs {:d} vs {:d}".format(*lengths))
 
 # Fit a quadratic to the first three points and find its root
 assert len(control_values[::4]) == 3
