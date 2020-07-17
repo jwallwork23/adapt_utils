@@ -25,6 +25,18 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         # bnd_len = self.boundary_len[bnd_id]
         funcs = bnd_conditions.get(bnd_id)
+        # if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
+        #     zeta_ext = Constant(0.0)
+        #     z_ext = Constant(0.0)*self.normal
+        # elif 'elev' in funcs:  # Γ₁
+        #     zeta_ext = Constant(0.0)
+        #     z_ext = z_in  # assume symmetry
+        # elif 'un' in funcs:  # Γ₂
+        #     zeta_ext = zeta_in  # assume symmetry
+        #     z_ext = Constant(0.0)*self.normal
+        # elif funcs is None:  # ∂Ω \ (Γ₁ ∪ Γ₂)
+        #     zeta_ext = zeta_in  # assume symmetry
+        #     z_ext = z_in  # assume symmetry
         if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
             zeta_ext = zeta_in  # assume symmetry
             z_ext = z_in  # assume symmetry
@@ -85,7 +97,8 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
         g \nabla \cdot \mathbf u^*
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        z_by_parts = self.z_continuity in ['dg', 'hdiv']:
+
+        z_by_parts = self.z_continuity in ['dg', 'hdiv']
 
         if z_by_parts:
             f = g_grav*inner(grad(self.zeta_test), z)*self.dx
