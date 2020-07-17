@@ -25,6 +25,7 @@ class TsunamiOptions(CoupledOptions):
         super(TsunamiOptions, self).__init__(**kwargs)
         self.solve_swe = True
         self.solve_tracer = False
+        self.rotational = True
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False
         self.gauges = {}
@@ -105,13 +106,14 @@ class TsunamiOptions(CoupledOptions):
         eta.interpolate(self.set_initial_surface(prob.P1[0]))
 
     def set_coriolis(self, fs):
-        # x, y = SpatialCoordinate(fs.mesh())
-        # lat, lon = to_latlon(
-        #     x, y, self.force_zone_number,
-        #     northern=True, coords=fs.mesh().coordinates, force_longitude=True
-        # )
-        # return interpolate(2*self.Omega*sin(radians(lat)), fs)
-        return
+        if not self.rotational:
+            return
+        x, y = SpatialCoordinate(fs.mesh())
+        lat, lon = to_latlon(
+            x, y, self.force_zone_number,
+            northern=True, coords=fs.mesh().coordinates, force_longitude=True
+        )
+        return interpolate(2*self.Omega*sin(radians(lat)), fs)
 
     def set_qoi_kernel(self, prob, i):
         fs = prob.V[i]
