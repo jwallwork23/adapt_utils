@@ -85,21 +85,26 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
         g \nabla \cdot \mathbf u^*
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        z_by_parts = True  # So we can enforce free-slip conditions
+        z_by_parts = self.z_continuity in ['dg', 'hdiv']:
 
         if z_by_parts:
             f = g_grav*inner(grad(self.zeta_test), z)*self.dx
-            if self.z_continuity in ['dg', 'hdiv']:
-                # f += -g_grav * self.zeta_test * inner(z, self.normal) * self.dS  # TODO
-                raise NotImplementedError
+            # TODO: TESTME
+            # f += -g_grav*self.zeta_test*inner(z, self.normal)*self.dS
+            f += -g_grav*avg(self.zeta_test)*jump(z, self.normal)*self.dS
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-                # TODO: Riemann solutions
                 zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
+                # TODO: Riemann solutions?
                 f += -g_grav*self.zeta_test*inner(z_ext, self.normal)*ds_bnd
         else:
             f = -g_grav*self.zeta_test*nabla_div(z)*self.dx
+            for bnd_marker in self.boundary_markers:
+                funcs = bnd_conditions.get(bnd_marker)
+                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                if funcs is not None and 'elev' not in funcs:
+                    f += g_grav*dot(z, self.normal)*self.zeta_test*ds_bnd
 
         return -f
 
@@ -126,12 +131,34 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
             total_h = self.depth.get_total_depth(zeta_old)
 
         f = 0
-        if self.zeta_is_dg:
+        if self.zeta_is_dg:  # TODO: TESTME
             f += inner(zeta, div(total_h*self.z_test))*self.dx
-            # f += -total_h * zeta * inner(self.z_test, self.normal) * self.dS  # TODO
-            raise NotImplementedError
+            # f += -total_h*zeta*inner(self.z_test, self.normal)*self.dS
+            if z is not None:
+                zeta_star = avg(zeta) + sqrt(avg(total_h)/g_grav)*jump(z, self.normal)
+            else:
+                zeta_star = avg(zeta)
+            f += -total_h*zeta_star*jump(self.z_test, self.normal)*self.dS
+            for bnd_marker in self.boundary_markers:
+                funcs = bnd_conditions.get(bnd_marker)
+                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
+                # Compute linear riemann solution with zeta, zeta_ext, z, z_ext
+                zn_jump = inner(z - z_ext, self.normal)
+                zeta_rie = 0.5*(zeta + zeta_ext) + sqrt(total_h/g_grav)*zn_jump
+                f += -total_h*zeta_rie*dot(self.z_test, self.normal)*ds_bnd
         else:
-            f += -inner(self.z_test, total_h*grad(zeta))*self.dx
+            f += -total_h*inner(grad(zeta), self.z_test)*self.dx
+            for bnd_marker in self.boundary_markers:
+                funcs = bnd_conditions.get(bnd_marker)
+                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                if funcs is not None and self.options.get('element_family') != 'cg-cg':
+                    # TODO: TESTME
+                    zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
+                    # Compute linear riemann solution with zeta, zeta_ext, z, z_ext
+                    zn_jump = inner(z - z_ext, self.normal)
+                    zeta_rie = 0.5*(zeta + zeta_ext) + sqrt(total_h/g_grav)*zn_jump
+                    f += -total_h*(zeta_rie-zeta)*dot(self.z_test, self.normal)*ds_bnd
         return -f
 
 

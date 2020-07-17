@@ -59,6 +59,8 @@ class HUDivTerm(ShallowWaterContinuityTerm):
     def residual(self, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions=None):
         total_h = self.depth.get_total_depth(eta_old)
 
+        hu_by_parts = self.u_continuity in ['dg', 'hdiv']
+
         f = 0
 
         mesh_velocity = self.options.get('mesh_velocity')  # TODO
@@ -67,27 +69,35 @@ class HUDivTerm(ShallowWaterContinuityTerm):
             f += inner(grad(self.eta_test), eta*mesh_velocity)*dx
             # f += inner(grad(self.eta_test), total_h*mesh_velocity)*dx
 
-        f += -inner(grad(self.eta_test), total_h*uv)*self.dx
-        if self.eta_is_dg:
-            h = avg(total_h)
-            uv_rie = avg(uv) + sqrt(g_grav/h)*jump(eta, self.normal)
-            hu_star = h*uv_rie
-            f += inner(jump(self.eta_test, self.normal), hu_star)*self.dS
-        for bnd_marker in self.boundary_markers:
-            funcs = bnd_conditions.get(bnd_marker)
-            ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-            if funcs is not None and self.options.get('element_family') != 'cg-cg':
-                eta_ext, uv_ext = self.get_bnd_functions(eta, uv, bnd_marker, bnd_conditions)
-                eta_ext_old, uv_ext_old = self.get_bnd_functions(eta_old, uv_old, bnd_marker, bnd_conditions)
-                # Compute linear riemann solution with eta, eta_ext, uv, uv_ext
-                total_h_ext = self.depth.get_total_depth(eta_ext_old)
-                h_av = 0.5*(total_h + total_h_ext)
-                eta_jump = eta - eta_ext
-                un_rie = 0.5*inner(uv + uv_ext, self.normal) + sqrt(g_grav/h_av)*eta_jump
-                un_jump = inner(uv_old - uv_ext_old, self.normal)
-                eta_rie = 0.5*(eta_old + eta_ext_old) + sqrt(h_av/g_grav)*un_jump
-                h_rie = self.depth.get_total_depth(eta_rie)
-                f += h_rie*un_rie*self.eta_test*ds_bnd
+        if hu_by_parts:
+            f += -inner(grad(self.eta_test), total_h*uv)*self.dx
+            if self.eta_is_dg:
+                h = avg(total_h)
+                uv_rie = avg(uv) + sqrt(g_grav/h)*jump(eta, self.normal)
+                hu_star = h*uv_rie
+                f += inner(jump(self.eta_test, self.normal), hu_star)*self.dS
+            for bnd_marker in self.boundary_markers:
+                funcs = bnd_conditions.get(bnd_marker)
+                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                if funcs is not None:
+                    eta_ext, uv_ext = self.get_bnd_functions(eta, uv, bnd_marker, bnd_conditions)
+                    eta_ext_old, uv_ext_old = self.get_bnd_functions(eta_old, uv_old, bnd_marker, bnd_conditions)
+                    # Compute linear riemann solution with eta, eta_ext, uv, uv_ext
+                    total_h_ext = self.depth.get_total_depth(eta_ext_old)
+                    h_av = 0.5*(total_h + total_h_ext)
+                    eta_jump = eta - eta_ext
+                    un_rie = 0.5*inner(uv + uv_ext, self.normal) + sqrt(g_grav/h_av)*eta_jump
+                    un_jump = inner(uv_old - uv_ext_old, self.normal)
+                    eta_rie = 0.5*(eta_old + eta_ext_old) + sqrt(h_av/g_grav)*un_jump
+                    h_rie = self.depth.get_total_depth(eta_rie)
+                    f += h_rie*un_rie*self.eta_test*ds_bnd
+        else:
+            f = div(total_h*uv)*self.eta_test*self.dx
+            for bnd_marker in self.boundary_markers:
+                funcs = bnd_conditions.get(bnd_marker)
+                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                if funcs is None or 'un' in funcs:
+                    f += -total_h*dot(uv, self.normal)*self.eta_test*ds_bnd
         return -f
 
 
