@@ -1,6 +1,8 @@
 from thetis import *
 from thetis.configuration import *
 
+from firedrake.petsc import PETSc
+
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.utils import heaviside_approx
 from thetis.options import ModelOptions2d
@@ -216,11 +218,7 @@ class TrenchSlantOptions(CoupledOptions):
         """
         Initialise simulation with results from a previous simulation
         """
-        from firedrake.petsc import PETSc
-        try:
-            import firedrake.cython.dmplex as dmplex
-        except:
-            import firedrake.dmplex as dmplex  # Older version
+
         # mesh
         with timed_stage('mesh'):
             # Load
