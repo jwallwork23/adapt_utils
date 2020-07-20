@@ -41,7 +41,7 @@ level = int(args.level or 0)
 recompute = bool(args.recompute_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
 plot_only = bool(args.plot_only or False)
-if recompute:
+if optimise or recompute:
     assert not plot_only
 plot_pvd = bool(args.plot_pvd or False)
 kwargs = {
@@ -85,13 +85,12 @@ if not plot_only:
 
 # Explore parameter space  # TODO: Separate regularised version
 n = 9
+op.save_timeseries = False
 control_values = np.linspace(2.0, 10.0, n)
 fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
-op.save_timeseries = False
+recompute |= not os.path.exists(fname)
 with stop_annotating():
-    if os.path.exists(fname) and not recompute:
-        func_values = np.load(fname)
-    else:
+    if recompute:
         func_values = np.zeros(n)
         swp = AdaptiveProblem(op, nonlinear=nonlinear)
         for i, m in enumerate(control_values):
@@ -99,21 +98,24 @@ with stop_annotating():
             swp.set_initial_condition()
             swp.solve_forward()
             func_values[i] = op.J
+    else:
+        func_values = np.load(fname)
     np.save(fname, func_values)
     op.control_parameter.assign(float(args.initial_guess or 10.0))
 for i, m in enumerate(control_values):
     print_output("{:2d}: control value {:.4e}  functional value {:.4e}".format(i, m, func_values[i]))
 
-# Plot parameter space  # TODO: Separate regularised version
-fig, axes = plt.subplots(figsize=(8, 8))
-axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
-axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
-axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
-plt.xticks(fontsize=fontsize_tick)
-plt.yticks(fontsize=fontsize_tick)
-plt.tight_layout()
-plt.grid()
-plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{:d}.pdf'.format(level)))
+# Plot parameter space
+if recompute:
+    fig, axes = plt.subplots(figsize=(8, 8))
+    axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
+    axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
+    axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
+    plt.xticks(fontsize=fontsize_tick)
+    plt.yticks(fontsize=fontsize_tick)
+    plt.tight_layout()
+    plt.grid()
+    plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{:d}.pdf'.format(level)))
 
 # --- Optimisation
 
