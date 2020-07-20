@@ -63,9 +63,9 @@ class TohokuOptions(TsunamiOptions):
         self.print_debug("Done!")
 
         # Fields
-        self.friction = None
-        # self.friction = 'manning'
-        # self.friction_coeff = 0.025
+        self.friction = 'manning'
+        self.friction_coeff = 0.025
+        # self.friction = None
 
         # Timestepping
         # ============
