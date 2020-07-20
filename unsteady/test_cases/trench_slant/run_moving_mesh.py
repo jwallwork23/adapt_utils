@@ -17,11 +17,11 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.1
-ny = 0.1
-alpha = 0.5
-beta = 0
-gamma = 1
+nx = 0.4
+ny = 0.4
+alpha = 4
+beta = 1
+gamma = 0
 
 inputdir = 'hydrodynamics_trench_slant_' + str(nx)
 
@@ -47,7 +47,7 @@ swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
+def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
@@ -120,7 +120,7 @@ def export_final_state(inputdir, bathymetry_2d):
     viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
     viewer(plex)        
 
-export_final_state("adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx), bath)
+#export_final_state("adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx), bath)
 
 bath_real = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 

@@ -60,10 +60,10 @@ class TrenchSlantOptions(CoupledOptions):
         self.morphological_acceleration_factor = Constant(100)
 
         # Time integration
-        self.dt = 0.2
+        self.dt = 0.25
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 36
-        self.dt_per_export = 36
+        self.dt_per_mesh_movement = 48
+        self.dt_per_export = 48
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
