@@ -232,6 +232,50 @@ class HorizontalViscosityTerm(ShallowWaterMomentumTerm):
         return -f
 
 
+class QuadraticDragTerm(ShallowWaterMomentumTerm):
+    def residual(self, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions=None):
+        if not self.options.use_nonlinear_equations:
+            return 0
+        total_h = self.depth.get_total_depth(eta_old)
+        manning_drag_coefficient = fields_old.get('manning_drag_coefficient')
+        nikuradse_bed_roughness = fields_old.get('nikuradse_bed_roughness')
+        C_D = fields_old.get('quadratic_drag_coefficient')
+        f = 0
+        if manning_drag_coefficient is not None:
+            if C_D is not None:
+                raise Exception('Cannot set both dimensionless and Manning drag parameter')
+            C_D = g_grav * manning_drag_coefficient**2 / total_h**(1./3.)
+
+        if nikuradse_bed_roughness is not None:
+            if manning_drag_coefficient is not None:
+                raise Exception('Cannot set both Nikuradse drag and Manning drag parameter')
+            if C_D is not None:
+                raise Exception('Cannot set both dimensionless and Nikuradse drag parameter')
+
+            kappa = physical_constants['von_karman']
+            C_D = conditional(total_h > nikuradse_bed_roughness, 2*(kappa**2)/(ln(11.036*total_h/nikuradse_bed_roughness)**2), Constant(0.0))
+
+        if C_D is not None:
+            f += C_D * sqrt(dot(uv_old, uv_old) + self.options.norm_smoother**2) * inner(self.u_test, uv) / total_h * self.dx
+        return -f
+
+
+class TurbineDragTerm(ShallowWaterMomentumTerm):
+    def residual(self, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions=None):
+        if not self.options.use_nonlinear_equations:
+            return 0
+        total_h = self.depth.get_total_depth(eta_old)
+        f = 0
+        for subdomain_id, farm_options in self.options.tidal_turbine_farms.items():
+            density = farm_options.turbine_density
+            C_T = farm_options.turbine_options.thrust_coefficient
+            A_T = pi * (farm_options.turbine_options.diameter/2.)**2
+            C_D = (C_T * A_T * density)/2.
+            unorm = sqrt(dot(uv_old, uv_old))
+            f += C_D * unorm * inner(self.u_test, uv) / total_h * self.dx(subdomain_id)
+        return -f
+
+
 class BaseShallowWaterEquation(Equation):
     """Copied here to hook up modified terms."""
     def __init__(self, function_space,
