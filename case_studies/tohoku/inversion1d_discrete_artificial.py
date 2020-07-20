@@ -57,7 +57,8 @@ kwargs = {
     # Optimisation
     'control_parameter': float(args.initial_guess or 10.0),
     'artificial': True,
-    'qoi_scaling': 1.0e-12,
+    # 'qoi_scaling': 1.0e-12,
+    'qoi_scaling': 1.0,
     'regularisation': float(args.regularisation or 0.0),
 
     # Misc
@@ -177,10 +178,10 @@ else:
         np.save(fname.format('func'), np.array(func_values_opt))
         np.save(fname.format('grad'), np.array(gradient_values_opt))
 
-        # # Stagnation termination condition
-        # if len(func_values_opt) > 1:
-        #     if abs(func_values_opt[-1] - func_values_opt[-2]) < 1.0e-06*abs(func_values_opt[-2]):
-        #         raise StagnationError
+        # Stagnation termination condition
+        if len(func_values_opt) > 1:
+            if abs(func_values_opt[-1] - func_values_opt[-2]) < 1.0e-06*abs(func_values_opt[-2]):
+                raise StagnationError
 
     # Run BFGS optimisation
     opt_kwargs = {

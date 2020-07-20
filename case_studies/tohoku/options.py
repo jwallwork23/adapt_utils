@@ -210,12 +210,11 @@ class TohokuOptions(TsunamiOptions):
             loc = self.gauges[gauge]["coords"]
             self.gauges[gauge]["indicator"] = interpolate(ellipse([loc + (radius,), ], mesh), prob.P0[i])
             self.gauges[gauge]["area"] = assemble(self.gauges[gauge]["indicator"]*dx, annotate=False)
+            self.gauges[gauge]["indicator"] /= self.gauges[gauge]["area"]
 
         def update_forcings(t):
             weight.assign(0.5 if t < 0.5*self.dt or t >= self.end_time - 0.5*self.dt else 1.0)
             dtc = Constant(self.dt)
-            # iteration = len(self.times)
-            iteration = prob.iteration
             for gauge in self.gauges:
 
                 # Point evaluation at gauges
@@ -226,7 +225,7 @@ class TohokuOptions(TsunamiOptions):
                 # Interpolate observations
                 if self.gauges[gauge]["data"] != []:
                     if self.artificial:
-                        obs = self.gauges[gauge]["data"][iteration]
+                        obs = self.gauges[gauge]["data"][prob.iteration]
                     else:
                         obs = float(self.gauges[gauge]["interpolator"](t))
                     eta_obs.assign(obs)
@@ -241,43 +240,43 @@ class TohokuOptions(TsunamiOptions):
 
                     # Continuous form of error
                     I = self.gauges[gauge]["indicator"]
-                    A = self.gauges[gauge]["area"]
                     diff = 0.5*I*(eta - eta_obs)**2
                     self.J += assemble(scaling*weight*dtc*diff*dx)
-                    self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False)/A)
-                    self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False)/A)
+                    # self.J += assemble(scaling*weight*diff*dx)
+                    self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False))
+                    self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False))
             self.times.append(t)
             return
 
         return update_forcings
 
     def _get_update_forcings_adjoint(self, prob, i):
-        eta_obs = Constant(0.0)
-        scaling = Constant(self.qoi_scaling)
+        expr = 0
+        u_saved, eta_saved = prob.fwd_solutions[i].split()  # Gauge data (to be loaded from checkpoint)
+        for gauge in self.gauges:
+            self.gauges[gauge]['obs'] = Constant(0.0)
+            expr += self.gauges[gauge]["indicator"]*(eta_saved - self.gauges[gauge]['obs'])
+        expr = Constant(self.qoi_scaling)*expr
+        msg = "CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e} (iteration {:d})"
 
         def update_forcings(t):
-
-            # Get gauge data (loaded from checkpoint)
-            u_saved, eta_saved = prob.fwd_solutions[i].split()
             if self.debug:
-                print_output("CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e}".format(norm(u_saved), norm(eta_saved)))
+                print_output(msg.format(norm(u_saved), norm(eta_saved), prob.iteration))
 
             # Sum differences between checkpoint and data
-            expr = 0
-            self.print_debug("ITERATION: {:d}".format(prob.iteration))
             for gauge in self.gauges:
                 if self.artificial:
                     obs = self.gauges[gauge]["data"][prob.iteration-1]
                 else:
                     obs = float(self.gauges[gauge]["interpolator"](t))
-                eta_obs.assign(obs)
-                expr += self.gauges[gauge]["indicator"]*(eta_saved - eta_obs)
+                # self.gauges[gauge]['obs'].assign(obs/self.end_time)  # Time average
+                self.gauges[gauge]['obs'].assign(obs)
 
             # Interpolate onto RHS
             k_u, k_eta = prob.kernels[i].split()
-            k_eta.interpolate(scaling*expr)
-
-            return
+            k_eta.interpolate(expr)
+            if self.debug and prob.iteration % self.dt_per_export == 0:
+                prob.kernel_file.write(k_eta)
 
         return update_forcings
 

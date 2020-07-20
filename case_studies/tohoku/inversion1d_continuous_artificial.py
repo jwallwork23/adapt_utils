@@ -58,7 +58,8 @@ kwargs = {
     # Optimisation
     'control_parameter': float(args.initial_guess or 10.0),
     'artificial': True,
-    'qoi_scaling': 1.0e-12,
+    # 'qoi_scaling': 1.0e-12,
+    'qoi_scaling': 1.0,
     'regularisation': float(args.regularisation or 0.0),
 
     # Misc
