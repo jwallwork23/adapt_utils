@@ -67,7 +67,13 @@ class TohokuOptions(TsunamiOptions):
         # self.friction = 'manning'
         # self.friction_coeff = 0.025
 
-        # Timestepping: export once per minute for 24 minutes
+        # Timestepping
+        # ============
+        #
+        # NOTES:
+        #  * Export once per minute for 24 minutes.
+        #  * There is a trade-off between having an unneccesarily small timestep and being able to
+        #    represent the gauge timeseries profiles.
         self.timestepper = 'CrankNicolson'
         # self.dt = 5.0
         self.dt = 60.0*0.5**level
@@ -258,6 +264,7 @@ class TohokuOptions(TsunamiOptions):
 
             # Sum differences between checkpoint and data
             expr = 0
+            self.print_debug("ITERATION: {:d}".format(prob.iteration))
             for gauge in self.gauges:
                 if self.artificial:
                     obs = self.gauges[gauge]["data"][prob.iteration-1]
