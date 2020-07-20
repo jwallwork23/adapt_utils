@@ -40,7 +40,7 @@ level = int(args.level or 0)
 recompute = bool(args.recompute_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
 plot_only = bool(args.plot_only or False)
-if recompute:
+if optimise or recompute:
     assert not plot_only
 plot_pvd = bool(args.plot_pvd or False)
 kwargs = {
@@ -63,6 +63,7 @@ kwargs = {
     'plot_pvd': False,
     'debug': bool(args.debug or False),
 }
+use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 nonlinear = False  # TODO
 fontsize = 22
 fontsize_tick = 18
@@ -80,14 +81,13 @@ if not plot_only:
     for gauge in op.gauges:
         op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
-# Explore parameter space  # TODO: Separate regularised version
+# Explore parameter space
 n = 9
+op.save_timeseries = False
 control_values = np.linspace(2.0, 10.0, n)
 fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
-op.save_timeseries = False
-if os.path.exists(fname) and not recompute:
-    func_values = np.load(fname)
-else:
+recompute |= not os.path.exists(fname)
+if recompute:
     func_values = np.zeros(n)
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     for i, m in enumerate(control_values):
@@ -95,20 +95,44 @@ else:
         swp.set_initial_condition()
         swp.solve_forward()
         func_values[i] = op.J
+else:
+    func_values = np.load(fname)
 np.save(fname, func_values)
+msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
 for i, m in enumerate(control_values):
-    print_output("{:2d}: control value {:.4e}  functional value {:.4e}".format(i, m, func_values[i]))
+    print_output(msg.format(i, m, func_values[i]))
 
-# Plot parameter space  # TODO: Separate regularised version
-fig, axes = plt.subplots(figsize=(8, 8))
-axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
-axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
-axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
-plt.xticks(fontsize=fontsize_tick)
-plt.yticks(fontsize=fontsize_tick)
-plt.tight_layout()
-plt.grid()
-plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{:d}.pdf'.format(level)))
+# Explore regularised parameter space
+if use_regularisation:
+    fname = os.path.join(op.di, 'parameter_space_artificial_reg_{:d}.npy'.format(level))
+    recompute &= not os.path.exists(fname)
+    if recompute:
+        func_values_reg = np.zeros(n)
+        swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
+        for i, m in enumerate(control_values):
+            op.control_parameter.assign(m)
+            swp.set_initial_condition()
+            swp.solve_forward()
+            func_values_reg[i] = op.J
+    else:
+        func_values_reg = np.load(fname)
+    np.save(fname, func_values_reg)
+    for i, m in enumerate(control_values):
+        print_output(msg.format(i, m, func_values_reg[i]))
+
+# Plot parameter space
+if recompute:
+    fig, axes = plt.subplots(figsize=(8, 8))
+    axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
+    if use_regularisation:
+        axes.plot(control_values, func_values_reg, '--x', linewidth=2, markersize=8)
+    axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
+    axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
+    plt.xticks(fontsize=fontsize_tick)
+    plt.yticks(fontsize=fontsize_tick)
+    plt.tight_layout()
+    plt.grid()
+    plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{:d}.pdf'.format(level)))
 
 # --- Optimisation
 
@@ -138,7 +162,8 @@ if not plot_only:
             reduced_functional(m)
         swp.solve_adjoint()
         g = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
-        g += op.regularisation_term_gradient
+        if use_regularisation:
+            g += op.regularisation_term_gradient
         print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g))
         return np.array([g, ])
 
@@ -171,7 +196,12 @@ if not plot_only:
     plt.tight_layout()
     plt.savefig(os.path.join(di, 'single_bf_timeseries_artificial_{:d}.pdf'.format(level)))
 
-fname = os.path.join(op.di, 'opt_progress_cts_{:s}_artificial' + '_{:d}.npy'.format(level))
+# Get filename for tracking progress
+fname = os.path.join(op.di, 'opt_progress_cts_{:s}_artificial')
+if use_regularisation:
+    fname = '_'.join([fname, 'reg'])
+fname = '_'.join([fname, '_{:d}.npy'.format(level)])
+
 if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) and not optimise:
 
     # Load trajectory
@@ -241,6 +271,20 @@ assert dq.deriv().coefficients[0] > 0
 print_output("Minimiser of quadratic: {:.4f}".format(q_min))
 assert np.isclose(dq(q_min), 0.0)
 
+# Fit quadratic to regularised functional values
+if use_regularisation:
+    q_reg = scipy.interpolate.lagrange(control_values[::4], func_values_reg[::4])
+    dq_reg = q_reg.deriv()
+    q_reg_min = -dq_reg.coefficients[1]/dq_reg.coefficients[0]
+    assert dq_reg.deriv().coefficients[0] > 0
+    print_output("Minimiser of quadratic (regularised): {:.4f}".format(q_reg_min))
+    assert np.isclose(dq_reg(q_reg_min), 0.0)
+    params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': 'Fitted quadratic (reg)', }
+    x = np.linspace(control_values_opt[0], control_values_opt[-1], 10*len(control_values))
+    axes.plot(x, q_reg(x), '--', **params)
+    params = {'markersize': 14, 'color': 'C6', 'label': 'Minimum of quadratic (reg)', }
+    axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
+
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
 params = {'linewidth': 3, 'markersize': 8, 'color': 'C0', 'label': 'Parameter space', }
@@ -250,20 +294,6 @@ params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'label': 'Fitted quadr
 axes.plot(x, q(x), '--', **params)
 params = {'markersize': 14, 'color': 'C0', 'label': 'Minimum of quadratic', }
 axes.plot(q_min, q(q_min), '*', **params)
-
-# Fit quadratic to regularised functional values TODO: TEMPORARY - really we need a separate figure
-q_reg = scipy.interpolate.lagrange(control_values_opt[:3], func_values_opt[:3])
-dq_reg = q_reg.deriv()
-q_reg_min = -dq_reg.coefficients[1]/dq_reg.coefficients[0]
-assert dq_reg.deriv().coefficients[0] > 0
-print_output("Minimiser of quadratic (regularised): {:.4f}".format(q_reg_min))
-assert np.isclose(dq_reg(q_reg_min), 0.0)
-params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': 'Fitted quadratic (reg)', }
-x = np.linspace(control_values_opt[0], control_values_opt[-1], 10*len(control_values))
-axes.plot(x, q_reg(x), '--', **params)
-params = {'markersize': 14, 'color': 'C6', 'label': 'Minimum of quadratic (reg)', }
-axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
-
 params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
 axes.plot(control_values_opt, func_values_opt, 'o', **params)
 delta_m = 0.25
@@ -277,7 +307,7 @@ axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
 axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
-# plt.xlim([1.5, 10.5])
+plt.xlim([1.5, 10.5])
 # plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
 plt.grid()
