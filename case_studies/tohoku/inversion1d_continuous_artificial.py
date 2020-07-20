@@ -29,6 +29,7 @@ parser.add_argument("-initial_guess", help="Initial guess for control parameter"
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
 parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
+parser.add_argument("-recompute_reg_parameter_space", help="Recompute regularised parameter space")
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
 parser.add_argument("-plot_only", help="Just plot parameter space and optimisation progress")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
@@ -38,6 +39,7 @@ args = parser.parse_args()
 # Set parameters
 level = int(args.level or 0)
 recompute = bool(args.recompute_parameter_space or False)
+recompute_reg = bool(args.recompute_reg_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
 plot_only = bool(args.plot_only or False)
 if optimise or recompute:
@@ -105,8 +107,8 @@ for i, m in enumerate(control_values):
 # Explore regularised parameter space
 if use_regularisation:
     fname = os.path.join(op.di, 'parameter_space_artificial_reg_{:d}.npy'.format(level))
-    recompute &= not os.path.exists(fname)
-    if recompute:
+    recompute_reg |= not os.path.exists(fname)
+    if recompute_reg:
         func_values_reg = np.zeros(n)
         swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
         for i, m in enumerate(control_values):
@@ -279,11 +281,6 @@ if use_regularisation:
     assert dq_reg.deriv().coefficients[0] > 0
     print_output("Minimiser of quadratic (regularised): {:.4f}".format(q_reg_min))
     assert np.isclose(dq_reg(q_reg_min), 0.0)
-    params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': 'Fitted quadratic (reg)', }
-    x = np.linspace(control_values_opt[0], control_values_opt[-1], 10*len(control_values))
-    axes.plot(x, q_reg(x), '--', **params)
-    params = {'markersize': 14, 'color': 'C6', 'label': 'Minimum of quadratic (reg)', }
-    axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
 
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
@@ -294,6 +291,11 @@ params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'label': 'Fitted quadr
 axes.plot(x, q(x), '--', **params)
 params = {'markersize': 14, 'color': 'C0', 'label': 'Minimum of quadratic', }
 axes.plot(q_min, q(q_min), '*', **params)
+if use_regularisation:
+    params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': 'Fitted quadratic (reg)', }
+    axes.plot(x, q_reg(x), '--', **params)
+    params = {'markersize': 14, 'color': 'C6', 'label': 'Minimum of quadratic (reg)', }
+    axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
 params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
 axes.plot(control_values_opt, func_values_opt, 'o', **params)
 delta_m = 0.25
