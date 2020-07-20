@@ -177,10 +177,10 @@ else:
         np.save(fname.format('func'), np.array(func_values_opt))
         np.save(fname.format('grad'), np.array(gradient_values_opt))
 
-        # Stagnation termination condition
-        if len(func_values_opt) > 1:
-            if abs(func_values_opt[-1] - func_values_opt[-2]) < 1.0e-06*abs(func_values_opt[-2]):
-                raise StagnationError
+        # # Stagnation termination condition
+        # if len(func_values_opt) > 1:
+        #     if abs(func_values_opt[-1] - func_values_opt[-2]) < 1.0e-06*abs(func_values_opt[-2]):
+        #         raise StagnationError
 
     # Run BFGS optimisation
     opt_kwargs = {
