@@ -69,11 +69,25 @@ class TohokuOptions(TsunamiOptions):
 
         # Timestepping: export once per minute for 24 minutes
         self.timestepper = 'CrankNicolson'
-        self.dt = 5.0
+        # self.dt = 5.0
+        self.dt = 60.0*0.5**level
         self.dt_per_export = int(60.0/self.dt)
         self.start_time = 15*60.0
         self.end_time = 24*60.0
         # self.end_time = 60*60.0
+
+        # Compute CFL number
+        if self.debug:
+            P0 = FunctionSpace(self.default_mesh, "DG", 0)
+            P1 = FunctionSpace(self.default_mesh, "CG", 1)
+            b = self.set_bathymetry(P1).vector().gather().max()
+            g = self.g.values()[0]
+            celerity = sqrt(g*b)
+            dx = interpolate(CellDiameter(self.default_mesh), P0).vector().gather().max()
+            cfl = celerity*self.dt/dx
+            msg = "dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
+            print_output(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
+
 
         # Gauges where we have timeseries
         self.gauges = {
