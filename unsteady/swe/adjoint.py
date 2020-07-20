@@ -228,13 +228,24 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
 
         horiz_advection_by_parts = True
         uv = fields.get('uv_2d')
+        n = self.normal
 
         f = 0
         if horiz_advection_by_parts:
             f += inner(dot(self.z_test, nabla_grad(uv)), z)*dx
             f += inner(dot(uv, nabla_grad(self.z_test)), z)*dx
 
-            raise NotImplementedError("Need to account for flux terms")  # TODO
+            # TODO: TESTME
+            f += -dot(uv('+'), n('-'))*inner(jump(self.z_test), z('+'))*self.dS
+            f += -dot(uv('-'), n('-'))*inner(jump(self.z_test), z('-'))*self.dS
+
+            # TODO: TESTME
+            f += -inner(grad(dot(uv('+'), n('-'))), self.z_test('+'))*inner(jump(uv), z('+'))*self.dS
+            f += -inner(grad(dot(uv('-'), n('-'))), self.z_test('-'))*inner(jump(uv), z('-'))*self.dS
+
+            # TODO: Boundary conditions?
+
+        return -f
 
 
 class HorizontalViscosityTerm(AdjointShallowWaterMomentumTerm):
