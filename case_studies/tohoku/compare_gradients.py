@@ -36,7 +36,8 @@ kwargs = {
     'control_parameter': 10.0,
     'optimal_value': 5.0,
     'artificial': True,
-    'qoi_scaling': 1.0e-12,
+    # 'qoi_scaling': 1.0e-12,
+    'qoi_scaling': 1.0,
 
     # Misc
     'plot_pvd': False,

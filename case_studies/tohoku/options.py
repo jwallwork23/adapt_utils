@@ -189,10 +189,12 @@ class TohokuOptions(TsunamiOptions):
         from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
 
         self.J = self.get_regularisation_term(prob)
+        # N_T = int(self.end_time/self.dt)+1  # Number of observations
+        # scaling = Constant(self.qoi_scaling/N_T)
         scaling = Constant(self.qoi_scaling)
         weight = Constant(1.0)
         eta_obs = Constant(0.0)
-        eta = prob.fwd_solutions[i].split()[1]
+        u, eta = prob.fwd_solutions[i].split()
         mesh = eta.function_space().mesh()
         self.times = []
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
@@ -246,7 +248,6 @@ class TohokuOptions(TsunamiOptions):
                     self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False))
                     self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False))
             self.times.append(t)
-            return
 
         return update_forcings
 
@@ -256,6 +257,8 @@ class TohokuOptions(TsunamiOptions):
         for gauge in self.gauges:
             self.gauges[gauge]['obs'] = Constant(0.0)
             expr += self.gauges[gauge]["indicator"]*(eta_saved - self.gauges[gauge]['obs'])
+        # expr = Constant(self.qoi_scaling/self.end_time)*expr  # Time average
+        # expr = Constant(self.qoi_scaling/self.dt)*expr  # Time average
         expr = Constant(self.qoi_scaling)*expr
         msg = "CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e} (iteration {:d})"
 
@@ -269,7 +272,6 @@ class TohokuOptions(TsunamiOptions):
                     obs = self.gauges[gauge]["data"][prob.iteration-1]
                 else:
                     obs = float(self.gauges[gauge]["interpolator"](t))
-                # self.gauges[gauge]['obs'].assign(obs/self.end_time)  # Time average
                 self.gauges[gauge]['obs'].assign(obs)
 
             # Interpolate onto RHS
