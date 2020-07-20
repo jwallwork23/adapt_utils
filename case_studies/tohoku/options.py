@@ -253,6 +253,8 @@ class TohokuOptions(TsunamiOptions):
 
             # Get gauge data (loaded from checkpoint)
             u_saved, eta_saved = prob.fwd_solutions[i].split()
+            if self.debug:
+                print_output("CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e}".format(norm(u_saved), norm(eta_saved)))
 
             # Sum differences between checkpoint and data
             expr = 0
