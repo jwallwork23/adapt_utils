@@ -292,6 +292,8 @@ class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
         \right)
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        if not self.options.use_nonlinear_equations:
+            return 0
         total_h = self.depth.get_total_depth(zeta_old)
         manning_drag_coefficient = fields_old.get('manning_drag_coefficient')
         C_D = fields_old.get('quadratic_drag_coefficient')
@@ -324,6 +326,8 @@ class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
     and :math:`C_d` otherwise.
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        if not self.options.use_nonlinear_equations:
+            return 0
         total_h = self.depth.get_total_depth(zeta_old)
         manning_drag_coefficient = fields_old.get('manning_drag_coefficient')
         C_D = fields_old.get('quadratic_drag_coefficient')
@@ -362,6 +366,8 @@ class LinearDragTerm(AdjointShallowWaterMomentumTerm):
 
 class TurbineDragTermMomentum(AdjointShallowWaterMomentumTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        if not self.options.use_nonlinear_equations:
+            return 0
         eta = fields.get('elev_2d')
         # total_h = self.depth.get_total_depth(eta)
         f = 0
@@ -372,6 +378,8 @@ class TurbineDragTermMomentum(AdjointShallowWaterMomentumTerm):
 
 class TurbineDragTermContinuity(AdjointShallowWaterContinuityTerm):
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
+        if not self.options.use_nonlinear_equations:
+            return 0
         eta = fields.get('elev_2d')
         # total_h = self.depth.get_total_depth(eta)
         f = 0
