@@ -677,6 +677,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _create_adjoint_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
+        fields['uv_2d'], fields['elev_2d'] = self.fwd_solutions[i].split()
 
         # Account for dJdq
         self.op.set_qoi_kernel(self, i)
@@ -915,7 +916,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if op.solve_swe:
             dbcs = []
             ts = self.timesteppers[i]['adjoint_shallow_water']
-            if op.family == 'cg-cg':
+            if op.family in ('cg-cg', 'dg-cg'):  # NOTE: This is inconsistent with forward
                 op.print_debug(op.indent + "SETUP: Applying adjoint DirichletBCs on mesh {:d}...".format(i))
                 for j in bcs['shallow_water']:
                     if 'un' not in bcs['shallow_water'][j]:

@@ -1,3 +1,8 @@
+"""
+Discretisation for continuous adjoint shallow water equations.
+
+P1DG-P2 discretisaton similar to that used in [Funke et al. 2017].
+"""  # TODO: Equations etc
 from __future__ import absolute_import
 from thetis.equation import *
 from thetis.shallowwater_eq import ShallowWaterTerm
@@ -95,6 +100,8 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
   ..math::
 
         g \nabla \cdot \mathbf u^*
+
+    Unlike in the discretisation of the forward equations, we do not include fluxes for this term.
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
 
@@ -102,9 +109,6 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
 
         if z_by_parts:
             f = g_grav*inner(grad(self.zeta_test), z)*self.dx
-            # TODO: TESTME
-            # f += -g_grav*self.zeta_test*inner(z, self.normal)*self.dS
-            f += -g_grav*avg(self.zeta_test)*jump(z, self.normal)*self.dS
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
@@ -143,8 +147,10 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
         else:
             total_h = self.depth.get_total_depth(zeta_old)
 
+        zeta_by_parts = self.zeta_is_dg
+
         f = 0
-        if self.zeta_is_dg:  # TODO: TESTME
+        if zeta_by_parts:  # TODO: TESTME
             f += inner(zeta, div(total_h*self.z_test))*self.dx
             # f += -total_h*zeta*inner(self.z_test, self.normal)*self.dS
             if z is not None:
@@ -165,7 +171,7 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-                if funcs is not None and self.options.get('element_family') != 'cg-cg':
+                if funcs is not None and self.options.get('element_family') == 'dg-dg':
                     # TODO: TESTME
                     zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
                     # Compute linear riemann solution with zeta, zeta_ext, z, z_ext
@@ -187,8 +193,11 @@ class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
         f = 0
         if not self.options.use_nonlinear_equations:
             return f
+
+        zeta_by_parts = self.zeta_is_dg
+
         uv = fields.get('uv_2d')  # TODO
-        if self.zeta_is_dg:
+        if zeta_by_parts:
             f += -div(self.zeta_test*uv)*zeta*self.dx
             # f += zeta * self.zeta_test * inner(uv, self.normal) * self.dS  # TODO
             raise NotImplementedError
