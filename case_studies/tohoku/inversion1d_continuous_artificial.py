@@ -11,6 +11,7 @@ We observe the phenomenon of inconsistent gradients for the continuous adjoint a
 from thetis import *
 
 import argparse
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -22,6 +23,16 @@ from adapt_utils.misc import StagnationError
 from adapt_utils.norms import total_variation
 
 
+# Set fonts
+matplotlib.rc('text', usetex=True)
+matplotlib.rcParams['mathtext.fontset'] = 'custom'
+matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
+matplotlib.rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
+matplotlib.rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
+matplotlib.rcParams['mathtext.fontset'] = 'stix'
+matplotlib.rcParams['font.family'] = 'STIXGeneral'
+
+# Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-family", help="Finite element pair")
@@ -129,8 +140,8 @@ if recompute:
     axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
     if use_regularisation:
         axes.plot(control_values, func_values_reg, '--x', linewidth=2, markersize=8)
-    axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
-    axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
+    axes.set_xlabel(r"Basis function coefficient", fontsize=fontsize)
+    axes.set_ylabel(r"Mean square error quantity of interest", fontsize=fontsize)
     plt.xticks(fontsize=fontsize_tick)
     plt.yticks(fontsize=fontsize_tick)
     plt.tight_layout()
@@ -285,17 +296,23 @@ if use_regularisation:
 
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
-params = {'linewidth': 3, 'markersize': 8, 'color': 'C0', 'label': 'Parameter space', }
-axes.plot(control_values, func_values, 'x', **params)
+params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'markevery': 10, }
+if use_regularisation:
+    params['label'] = r'$\alpha=0.00$'
+else:
+    params['label'] = r'Parameter space'
 x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
-params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'label': 'Fitted quadratic', }
-axes.plot(x, q(x), '--', **params)
-params = {'markersize': 14, 'color': 'C0', 'label': 'Minimum of quadratic', }
+axes.plot(x, q(x), '--x', **params)
+params = {'markersize': 14, 'color': 'C0', }
+if use_regularisation:
+    params['label'] = r'$m^\star|_{{\alpha=0.00}} = {:.2f}$'.format(q_min)
+else:
+    params['label'] = r'$m^\star = {:.2f}$'.format(q_min)
 axes.plot(q_min, q(q_min), '*', **params)
 if use_regularisation:
-    params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': 'Fitted quadratic (reg)', }
-    axes.plot(x, q_reg(x), '--', **params)
-    params = {'markersize': 14, 'color': 'C6', 'label': 'Minimum of quadratic (reg)', }
+    params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': r'$\alpha = {:.2f}$'.format(op.regularisation), 'markevery': 10, }
+    axes.plot(x, q_reg(x), '--x', **params)
+    params = {'markersize': 14, 'color': 'C6', 'label': r'$m^\star|_{{\alpha={:.2f}}} = {:.2f}$'.format(op.regularisation, q_reg_min), }
     axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
 params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
 axes.plot(control_values_opt, func_values_opt, 'o', **params)
@@ -306,8 +323,8 @@ for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
     axes.plot(x, g*(x-m) + f, '-', **params)
 params['label'] = 'Computed gradient'
 axes.plot(x, g*(x-m) + f, '-', **params)
-axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
-axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
+axes.set_xlabel(r"Basis function coefficient, $m$", fontsize=fontsize)
+axes.set_ylabel(r"Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
 plt.xlim([1.5, 10.5])
@@ -316,8 +333,8 @@ plt.tight_layout()
 plt.grid()
 plt.legend(fontsize=fontsize)
 opt = control_values_opt[-1]
-axes.annotate('m = {:.2f}'.format(opt),
-    xy=(opt-0.5, func_values_opt[-1]+0.1**level), color='C1', fontsize=fontsize)
+axes.annotate(r'$m = {:.2f}$'.format(opt),
+    xy=(opt-0.5*2**level, func_values_opt[-1]+500*0.5**level), color='C1', fontsize=fontsize)
 plt.savefig(os.path.join(di, 'single_bf_optimisation_continuous_artificial_{:d}.pdf'.format(level)))
 
 if not plot_only:
