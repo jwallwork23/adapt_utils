@@ -40,7 +40,6 @@ to that presented in [1]. A :math:`\mathbb P2-\mathbb P1` Taylor-Hood element pa
 [1] Funke, S. W., P. E. Farrell, and M. D. Piggott. "Reconstructing wave profiles from inundation data."
     Computer Methods in Applied Mechanics and Engineering 322 (2017): 167-186.
 """
-from __future__ import absolute_import
 from thetis.equation import *
 from thetis.shallowwater_eq import ShallowWaterTerm
 from thetis.utility import *
@@ -449,6 +448,7 @@ class ContinuitySourceTerm(AdjointShallowWaterContinuityTerm):
 
 
 class BaseAdjointShallowWaterEquation(Equation):
+    # TODO: doc
     def __init__(self, function_space,
                  depth, options):
         super(BaseAdjointShallowWaterEquation, self).__init__(function_space)
@@ -482,6 +482,7 @@ class BaseAdjointShallowWaterEquation(Equation):
 
 
 class AdjointShallowWaterEquations(BaseAdjointShallowWaterEquation):
+    # TODO: doc
     def __init__(self, function_space, depth, options):
         """
         :arg function_space: Mixed function space where the solution belongs
