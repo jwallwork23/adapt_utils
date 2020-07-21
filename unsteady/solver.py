@@ -422,7 +422,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
             self.V[i],
             self.depth[i],
-            self.shallow_water_options[i],  # TODO: Need plug in uv_2d, elev_2d for nonlinear case
+            self.shallow_water_options[i],
         )
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
@@ -683,15 +683,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.op.set_qoi_kernel(self, i)
         dJdu, dJdeta = self.kernels[i].split()
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
-        fields['momentum_source'] = self.time_kernel*dJdu
-        fields['volume_source'] = self.time_kernel*dJdeta
+        fields['dJdu'] = self.time_kernel*dJdu
+        fields['dJdeta'] = self.time_kernel*dJdeta
 
         # Construct time integrator
         args = (self.equations[i].adjoint_shallow_water, self.adj_solutions[i], fields, self.op.dt, )
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             'solver_parameters': self.op.adjoint_solver_parameters['shallow_water'],
-            # 'adjoint': True,  # FIXME
+            # 'adjoint': True,  # FIXME: Need to write out negate some terms in adjoint equations
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
