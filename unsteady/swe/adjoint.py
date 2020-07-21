@@ -45,8 +45,6 @@ from thetis.equation import *
 from thetis.shallowwater_eq import ShallowWaterTerm
 from thetis.utility import *
 
-import warnings
-
 
 __all__ = ["AdjointShallowWaterEquations"]
 
@@ -218,15 +216,20 @@ class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
         eta_star_by_parts = self.eta_star_is_dg
         assert not eta_star_by_parts
 
+        # Account for wetting and drying
+        test = self.eta_star_test
+        if self.options.get('use_wetting_and_drying'):
+            test = test*self.depth.heaviside_approx(self.options.get('elev_2d'))
+
         f = 0
         uv = fields.get('uv_2d')
         if not eta_star_by_parts:
-            f += -inner(grad(eta_star), self.eta_star_test*uv)*self.dx
+            f += -inner(grad(eta_star), test*uv)*self.dx
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
                 if funcs is not None and 'elev' not in funcs:
-                    f += eta_star*dot(uv, self.normal)*self.eta_star_test*ds_bnd
+                    f += eta_star*dot(uv, self.normal)*test*ds_bnd
         return -f
 
 
@@ -335,10 +338,10 @@ class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
         uv = fields.get('uv_2d')
         if uv is None:
             raise Exception('Adjoint equation does not have access to forward solution velocity')
-        if C_D is not None:
-            unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
-            f += C_D*unorm*inner(self.u_star_test, u_star)*self.dx
-            f += C_D*inner(self.u_star_test, uv)*inner(u_star, uv)/unorm*self.dx
+
+        unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
+        f += C_D*unorm*inner(self.u_star_test, u_star)*self.dx
+        f += C_D*inner(self.u_star_test, uv)*inner(u_star, uv)/unorm*self.dx
         return -f
 
 
@@ -369,13 +372,16 @@ class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
             C_D = 4/3*g_grav*manning_drag_coefficient**2/total_h**(1./3.)
         if C_D is None:
             return -f
-
         uv = fields.get('uv_2d')
         if uv is None:
             raise Exception('Adjoint equation does not have access to forward solution velocity')
-        if C_D is not None:
-            unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
-            f += -C_D*unorm*inner(u_star, uv)*self.eta_star_test/total_h**2*self.dx
+
+        # Account for wetting and drying
+        if self.options.get('use_wetting_and_drying'):
+            C_D = C_D*self.depth.heaviside_approx(self.options.get('elev_2d'))
+
+        unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
+        f += -C_D*unorm*inner(u_star, uv)*self.eta_star_test/total_h**2*self.dx
         return -f
 
 
@@ -442,17 +448,6 @@ class ContinuitySourceTerm(AdjointShallowWaterContinuityTerm):
         return f
 
 
-# TODO: See [Funke et al. 2017] to see how bathymetry displacement terms crop up elsewhere, too
-class BathymetryDisplacementMassTerm(AdjointShallowWaterContinuityTerm):
-    def residual(self, solution):
-        if isinstance(solution, list):
-            u_star, eta_star = solution
-        else:
-            u_star, eta_star = split(solution)
-        f = inner(self.depth.wd_bathymetry_displacement(eta_star), self.eta_star_test)*self.dx
-        return -f
-
-
 class BaseAdjointShallowWaterEquation(Equation):
     def __init__(self, function_space,
                  depth, options):
@@ -494,12 +489,6 @@ class AdjointShallowWaterEquations(BaseAdjointShallowWaterEquation):
         :arg options: :class:`.AttrDict` object containing all circulation model options
         """
         super(AdjointShallowWaterEquations, self).__init__(function_space, depth, options)
-
-        # TODO: Model options intending to develop support for
-        if options.get('use_wetting_and_drying'):
-            raise NotImplementedError
-
-        # No plan to support these model options
         if options.get('family') == 'dg-dg':
             raise NotImplementedError("Equal order DG finite element not supported.")
         if options.get('wind_stress') is not None:
@@ -513,18 +502,18 @@ class AdjointShallowWaterEquations(BaseAdjointShallowWaterEquation):
         self.add_momentum_terms(u_star_test, u_star_space, eta_star_space, depth, options)
 
         self.add_continuity_terms(eta_star_test, eta_star_space, u_star_space, depth, options)
-        # self.bathymetry_displacement_mass_term = BathymetryDisplacementMassTerm(
-        #     eta_star_test, eta_star_space, u_star_space, depth, options)  # TODO
 
     def mass_term(self, solution):
-        f = super(AdjointShallowWaterEquations, self).mass_term(solution)
-        # f += -self.bathymetry_displacement_mass_term.residual(solution)  # TODO
+        if options.get('use_wetting_and_drying'):
+            raise NotImplementedError  # TODO: Need old elevation
+            # u_star, eta_star = solution if isinstance(solution, list) else split(solution)
+            # f = inner(u_star, self.u_star_test)*dx
+            # f += inner(eta_star, self.depth.heaviside_approx(eta)*self.eta_star_test)*dx
+        else:
+            f = super(AdjointShallowWaterEquations, self).mass_term(solution)
         return f
 
     def residual(self, label, solution, solution_old, fields, fields_old, bnd_conditions):
         # NOTE: `solution_old` doesn't do anything since the equation is linear
-        if isinstance(solution, list):
-            u_star, eta_star = solution
-        else:
-            u_star, eta_star = split(solution)
+        u_star, eta_star = solution if isinstance(solution, list) else split(solution)
         return self.residual_u_star_eta_star(label, u_star, eta_star, fields, fields_old, bnd_conditions)
