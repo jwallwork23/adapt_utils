@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 
 from thetis import *
-from thetis.conservative_tracer_eq_2d import ConservativeTracerEquation2D
 from thetis.limiter import VertexBasedP1DGLimiter
 
 import os
@@ -13,7 +12,7 @@ from .swe.equation import ShallowWaterEquations
 from .swe.adjoint import AdjointShallowWaterEquations
 from .swe.error_estimation import ShallowWaterGOErrorEstimator
 from .swe.utils import *
-from .tracer.equation import TracerEquation2D
+from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
 from .tracer.error_estimation import TracerGOErrorEstimator
 from .base import AdaptiveProblemBase
 

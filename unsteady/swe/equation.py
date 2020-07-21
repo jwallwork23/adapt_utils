@@ -82,8 +82,7 @@ class HorizontalAdvectionTerm(thetis_sw.HorizontalAdvectionTerm):
 
 class QuadraticDragTerm(thetis_sw.QuadraticDragTerm):
     """
-    Quadratic bottom friction term from Thetis, modified so that it isn't included in the linear
-    model.
+    Quadratic bottom friction term from Thetis, modified so that it isn't included in the linear model.
     """
     def residual(self, *args, **kwargs):
         if not self.options.use_nonlinear_equations:
@@ -92,10 +91,7 @@ class QuadraticDragTerm(thetis_sw.QuadraticDragTerm):
 
 
 class TurbineDragTerm(thetis_sw.TurbineDragTerm):
-    """
-    Turbine drag term from Thetis, modified so that it isn't included in the linear
-    model.
-    """
+    """Turbine drag term from Thetis, modified so that it isn't included in the linear model."""
     def residual(self, *args, **kwargs):
         if not self.options.use_nonlinear_equations:
             return 0
@@ -103,7 +99,7 @@ class TurbineDragTerm(thetis_sw.TurbineDragTerm):
 
 
 class BaseShallowWaterEquation(thetis_sw.BaseShallowWaterEquation):
-    """Copied here to hook up modified terms."""
+    """Copied here from `thetis/shallowwater_eq` to hook up modified terms."""
 
     def add_momentum_terms(self, *args):
         self.add_term(ExternalPressureGradientTerm(*args), 'implicit')
@@ -124,7 +120,7 @@ class BaseShallowWaterEquation(thetis_sw.BaseShallowWaterEquation):
 
 
 class ShallowWaterEquations(BaseShallowWaterEquation):
-    """Copied here to hook up modified terms."""
+    """Copied here from `thetis/shallowwater_eq` to hook up modified terms."""
 
     def __init__(self, function_space, depth, options):
         """
