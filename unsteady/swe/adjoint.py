@@ -227,23 +227,19 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
             raise NotImplementedError  # TODO
 
         horiz_advection_by_parts = True
+
+        # Downwind velocity
         uv = fields.get('uv_2d')
         n = self.normal
+        un = 0.5*(abs(dot(uv, n)) - dot(uv, n))  # u.n if u.n < 0 else 0
+        downwind = lambda x: conditional(un < 0, dot(x, n), 0)
 
         f = 0
         if horiz_advection_by_parts:
-            f += inner(dot(self.z_test, nabla_grad(uv)), z)*dx
-            f += inner(dot(uv, nabla_grad(self.z_test)), z)*dx
-
-            # TODO: TESTME
-            f += -dot(uv('+'), n('-'))*inner(jump(self.z_test), z('+'))*self.dS
-            f += -dot(uv('-'), n('-'))*inner(jump(self.z_test), z('-'))*self.dS
-
-            # TODO: TESTME
-            f += -inner(grad(dot(uv('+'), n('-'))), self.z_test('+'))*inner(jump(uv), z('+'))*self.dS
-            f += -inner(grad(dot(uv('-'), n('-'))), self.z_test('-'))*inner(jump(uv), z('-'))*self.dS
-
-            # TODO: Boundary conditions?
+            f += inner(dot(self.z_test, nabla_grad(uv)), z)*self.dx
+            f += inner(dot(uv, nabla_grad(self.z_test)), z)*self.dx
+            f += -inner(jump(self.z_test), 2*avg(un*z))*self.dS
+            f += -inner(2*avg(downwind(self.z_test)*z), jump(uv))*self.dS
 
         return -f
 
