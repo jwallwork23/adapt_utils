@@ -437,7 +437,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _create_forward_tracer_equation(self, i):
         op = self.tracer_options[i]
-        model = ConservativeTracerEquation2D if op.use_tracer_conservative_form else TracerEquation2D
+        conservative = op.use_tracer_conservative_form
+        model = ConservativeTracerEquation2D if conservative else TracerEquation2D
         self.equations[i].tracer = model(
             self.Q[i],
             self.depth[i],
@@ -476,7 +477,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _create_adjoint_tracer_equation(self, i):
         op = self.tracer_options[i]
-        model = TracerEquation2D if op.use_tracer_conservative_form else ConservativeTracerEquation2D
+        conservative = op.use_tracer_conservative_form
+        model = AdjointConservativeTracerEquation2D if conservative else AdjointTracerEquation2D
         self.equations[i].adjoint_tracer = model(
             self.Q[i],
             self.depth[i],
