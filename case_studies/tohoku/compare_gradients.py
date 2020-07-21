@@ -14,6 +14,9 @@ from adapt_utils.case_studies.tohoku.options import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
+parser.add_argument("-family", help="Finite element pair")
+parser.add_argument("-stabilisation", help="Stabilisation approach")
+parser.add_argument("-nonlinear", help="Toggle nonlinear model")
 parser.add_argument("-debug", help="Toggle debugging")
 args = parser.parse_args()
 
@@ -26,10 +29,8 @@ kwargs = {
     'save_timeseries': True,
 
     # Spatial discretisation
-    # 'family': 'dg-cg',
-    'family': 'cg-cg',
-    # 'stabilisation': 'lax_friedrichs',
-    'stabilisation': None,
+    'family': args.family or 'dg-cg',
+    'stabilisation': args.stabilisation,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Adjoint
@@ -43,7 +44,7 @@ kwargs = {
     'plot_pvd': False,
     'debug': bool(args.debug or False),
 }
-nonlinear = False  # TODO
+nonlinear = bool(args.nonlinear or True)
 op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
 
 # Solve the forward problem to get data with 'optimal' control parameter m = 5
