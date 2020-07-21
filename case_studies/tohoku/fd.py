@@ -1,9 +1,7 @@
 from thetis import *
 
 import argparse
-import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.case_studies.tohoku.options import *

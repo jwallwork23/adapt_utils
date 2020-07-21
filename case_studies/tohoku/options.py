@@ -94,7 +94,6 @@ class TohokuOptions(TsunamiOptions):
             msg = "dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
             print_output(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
 
-
         # Gauges where we have timeseries
         self.gauges = {
             "P02": {"lonlat": (142.5016, 38.5002), "operator": "Tohoku University"},  # TODO: depth

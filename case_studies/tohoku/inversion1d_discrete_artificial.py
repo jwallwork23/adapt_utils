@@ -11,6 +11,7 @@ from thetis import *
 from firedrake_adjoint import *
 
 import argparse
+import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
@@ -23,14 +24,25 @@ from adapt_utils.misc import StagnationError
 from adapt_utils.norms import total_variation
 
 
+# Set fonts
+matplotlib.rc('text', usetex=True)
+matplotlib.rcParams['mathtext.fontset'] = 'custom'
+matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
+matplotlib.rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
+matplotlib.rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
+matplotlib.rcParams['mathtext.fontset'] = 'stix'
+matplotlib.rcParams['font.family'] = 'STIXGeneral'
+
+# Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-family", help="Finite element pair")
+parser.add_argument("-stabilisation", help="Stabilisation approach")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
-parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
+parser.add_argument("-nonlinear", help="Toggle nonlinear model")
 parser.add_argument("-plot_only", help="Just plot parameter space and optimisation progress")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-debug", help="Toggle debugging")
@@ -49,9 +61,8 @@ kwargs = {
     'save_timeseries': True,
 
     # Spatial discretisation
-    'family': args.family or 'cg-cg',
-    # 'stabilisation': 'lax_friedrichs',
-    'stabilisation': None,
+    'family': args.family or 'dg-cg',
+    'stabilisation': args.stabilisation,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
@@ -59,13 +70,12 @@ kwargs = {
     'artificial': True,
     # 'qoi_scaling': 1.0e-12,
     'qoi_scaling': 1.0,
-    'regularisation': float(args.regularisation or 0.0),
 
     # Misc
     'plot_pvd': False,
     'debug': bool(args.debug or False),
 }
-nonlinear = False  # TODO
+nonlinear = bool(args.nonlinear or True)
 fontsize = 22
 fontsize_tick = 18
 plotting_kwargs = {
@@ -84,7 +94,7 @@ if not plot_only:
         for gauge in op.gauges:
             op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
-# Explore parameter space  # TODO: Separate regularised version
+# Explore parameter space
 n = 9
 op.save_timeseries = False
 control_values = np.linspace(2.0, 10.0, n)
@@ -109,7 +119,7 @@ for i, m in enumerate(control_values):
 # Plot parameter space
 if recompute:
     fig, axes = plt.subplots(figsize=(8, 8))
-    axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8)
+    axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8, markerstyle='x', markevery=10)
     axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
     axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
     plt.xticks(fontsize=fontsize_tick)
@@ -206,12 +216,10 @@ assert np.isclose(dq(q_min), 0.0)
 
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
-params = {'linewidth': 3, 'markersize': 8, 'color': 'C0', 'label': 'Parameter space', }
-axes.plot(control_values, func_values, 'x', **params)
+params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'markevery': 10, 'label': 'Parameter space', }
 x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
-params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'label': 'Fitted quadratic', }
-axes.plot(x, q(x), '--', **params)
-params = {'markersize': 14, 'color': 'C0', 'label': 'Minimum of quadratic', }
+axes.plot(x, q(x), '--x', **params)
+params = {'markersize': 14, 'color': 'C0', 'label': r'$m^\star = {:.2f}$'.format(q_min), }
 axes.plot(q_min, q(q_min), '*', **params)
 params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
 axes.plot(control_values_opt, func_values_opt, 'o', **params)
@@ -222,18 +230,19 @@ for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
     axes.plot(x, g*(x-m) + f, '-', **params)
 params['label'] = 'Computed gradient'
 axes.plot(x, g*(x-m) + f, '-', **params)
-axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
-axes.set_ylabel("Scaled mean square error", fontsize=fontsize)
+axes.set_xlabel(r"Basis function coefficient, $m$", fontsize=fontsize)
+axes.set_ylabel(r"Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
 plt.xlim([1.5, 10.5])
-# plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
 plt.grid()
 plt.legend(fontsize=fontsize)
 opt = control_values_opt[-1]
-axes.annotate('m = {:.2f}'.format(opt),
-    xy=(opt-0.5, func_values_opt[-1]+0.1**level), color='C1', fontsize=fontsize)
+axes.annotate(
+    r'$m = {:.2f}$'.format(opt), xy=(opt-0.5*2**level, func_values_opt[-1]+500*0.5**level),
+    color='C1', fontsize=fontsize
+)
 plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
 
 if not plot_only:
@@ -244,7 +253,6 @@ if not plot_only:
         """The subclass exists to pass the QoI as required."""
         def quantity_of_interest(self):
             return self.op.J
-
 
     # Run forward again so that we can compare timeseries
     kwargs['control_parameter'] = optimised_value
@@ -264,7 +272,7 @@ if not plot_only:
     for i, gauge in enumerate(gauges):
         ax = axes[i//N, i % N]
         ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-        ax.plot(T, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' initial_guess', **plotting_kwargs)
+        ax.plot(T, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' initial guess', **plotting_kwargs)
         ax.plot(T, op_opt.gauges[gauge]['timeseries'], '--x', label=gauge + ' optimised', **plotting_kwargs)
         ax.legend(loc='upper left')
         ax.set_xlabel('Time (min)', fontsize=fontsize)

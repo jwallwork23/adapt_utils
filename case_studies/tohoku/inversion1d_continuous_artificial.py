@@ -36,9 +36,11 @@ matplotlib.rcParams['font.family'] = 'STIXGeneral'
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-family", help="Finite element pair")
+parser.add_argument("-stabilisation", help="Stabilisation approach")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
 parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
+parser.add_argument("-nonlinear", help="Toggle nonlinear model")
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
 parser.add_argument("-recompute_reg_parameter_space", help="Recompute regularised parameter space")
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
@@ -61,9 +63,8 @@ kwargs = {
     'save_timeseries': True,
 
     # Spatial discretisation
-    'family': args.family or 'cg-cg',
-    # 'stabilisation': 'lax_friedrichs',
-    'stabilisation': None,
+    'family': args.family or 'dg-cg',
+    'stabilisation': args.stabilisation,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
@@ -78,7 +79,7 @@ kwargs = {
     'debug': bool(args.debug or False),
 }
 use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
-nonlinear = False  # TODO
+nonlinear = bool(args.nonlinear or True)
 fontsize = 22
 fontsize_tick = 18
 plotting_kwargs = {
@@ -165,7 +166,6 @@ if not plot_only:
         J = op.J
         print_output("control = {:.8e}  functional = {:.8e}".format(m[0], J))
         return J
-
 
     def gradient(m):
         """
@@ -269,13 +269,6 @@ else:
         optimised_value = control_values_opt[-1]
         print_output("StagnationError: Stagnation of objective functional")
 
-# try:
-#     assert len(control_values_opt) == len(gradient_values_opt) + 1
-#     assert len(func_values_opt) == len(gradient_values_opt) + 1
-# except AssertionError:
-#     lengths = (len(func_values_opt), len(gradient_values_opt), len(control_values_opt))
-#     raise ValueError("Inconsistent stored data: {:d} vs {:d} vs {:d}".format(*lengths))
-
 # Fit a quadratic to the first three points and find its root
 assert len(control_values[::4]) == 3
 q = scipy.interpolate.lagrange(control_values[::4], func_values[::4])
@@ -328,14 +321,18 @@ axes.set_ylabel(r"Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
 plt.xlim([1.5, 10.5])
-# plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
 plt.grid()
 plt.legend(fontsize=fontsize)
 opt = control_values_opt[-1]
-axes.annotate(r'$m = {:.2f}$'.format(opt),
-    xy=(opt-0.5*2**level, func_values_opt[-1]+500*0.5**level), color='C1', fontsize=fontsize)
-plt.savefig(os.path.join(di, 'single_bf_optimisation_continuous_artificial_{:d}.pdf'.format(level)))
+axes.annotate(
+    r'$m = {:.2f}$'.format(opt), xy=(opt-0.5*2**level, func_values_opt[-1]+500*0.5**level),
+    color='C1', fontsize=fontsize
+)
+fname = os.path.join(di, 'single_bf_optimisation_continuous_artificial')
+if use_regularisation:
+    fname = '_'.join([fname, 'reg'])
+plt.savefig('_'.join([fname, '_{:d}.pdf'.format(level)]))
 
 if not plot_only:
 
@@ -357,7 +354,7 @@ if not plot_only:
     for i, gauge in enumerate(gauges):
         ax = axes[i//N, i % N]
         ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-        ax.plot(T, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' initial_guess', **plotting_kwargs)
+        ax.plot(T, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' initial guess', **plotting_kwargs)
         ax.plot(T, op_opt.gauges[gauge]['timeseries'], '--x', label=gauge + ' optimised', **plotting_kwargs)
         ax.legend(loc='upper left')
         ax.set_xlabel('Time (min)', fontsize=fontsize)
