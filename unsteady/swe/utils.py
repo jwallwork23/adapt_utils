@@ -120,7 +120,7 @@ def heaviside_approx(H, alpha):
     return 0.5*(H/(sqrt(H**2 + alpha**2))) + 0.5
 
 
-def DepthExpression(thetis_utils.DepthExpression):
+class DepthExpression(thetis_utils.DepthExpression):
     """Depth expression from Thetis modified to include an approximation to the Heaviside function."""
     def heaviside_approx(self, eta):
         return heaviside_approx(self.get_total_depth(eta), self.wetting_and_drying_alpha)
