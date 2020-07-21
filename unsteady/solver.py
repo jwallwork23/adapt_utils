@@ -183,6 +183,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
         self.depth = [None for bathymetry in self.bathymetry]
         for i, bathymetry in enumerate(self.bathymetry):
+            # NOTE: DepthExpression is the modified version from `unsteady/swe/utils`.
             self.depth[i] = DepthExpression(
                 bathymetry,
                 use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
@@ -478,7 +479,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             'solver_parameters': self.op.adjoint_solver_parameters['shallow_water'],
-            # 'adjoint': True,  # FIXME: Need to write out negate some terms in adjoint equations
+            'adjoint': True,  # Makes sure fields are updated according to appropriate timesteps
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
@@ -500,7 +501,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
             'solver_parameters': self.op.adjoint_solver_parameters['tracer'],
-            'adjoint': True,  # FIXME
+            'adjoint': True,  # Makes sure fields are updated according to appropriate timesteps
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation

@@ -214,6 +214,13 @@ class TohokuOptions(TsunamiOptions):
             self.gauges[gauge]["indicator"] /= self.gauges[gauge]["area"]
 
         def update_forcings(t):
+            """
+            Evaluate free surface elevation at gauges, compute the contribution to the quantity of
+            interest from the current timestep and store data in :attr:`self.gauges`.
+
+            NOTE: `update_forcings` is called one timestep along so we shift time back.
+            """
+            t = t - self.dt
             weight.assign(0.5 if t < 0.5*self.dt or t >= self.end_time - 0.5*self.dt else 1.0)
             dtc = Constant(self.dt)
             for gauge in self.gauges:
@@ -262,6 +269,12 @@ class TohokuOptions(TsunamiOptions):
         msg = "CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e} (iteration {:d})"
 
         def update_forcings(t):
+            """
+            Evaluate RHS for adjoint equations using forward solution data retreived from checkpoint.
+
+            NOTE: `update_forcings` is called one timestep along so we shift time.
+            """
+            t = t + self.dt
             if self.debug:
                 print_output(msg.format(norm(u_saved), norm(eta_saved), prob.iteration))
 
