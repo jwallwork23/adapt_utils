@@ -1,8 +1,45 @@
-"""
-Discretisation for continuous adjoint shallow water equations.
+r"""
+Continuous adjoint shallow water equations for some quantity of interest :math:`J`. The momentum equation
+is given by
 
-P1DG-P2 discretisaton similar to that used in [Funke et al. 2017].
-"""  # TODO: Equations etc
+..math::
+
+    -\frac{\partial\mathbf u^*}{\partial t}
+      + (\nabla\mathbf u)^T \mathbf u^*
+      - (\nabla\cdot\mathbf u) \mathbf u^*
+      - \mathbf u\cdot\nabla \mathbf u^*
+      - f \widehat{\mathbf z} \times \mathbf u^*
+      + \frac{C_d}H \left(
+          \|\mathbf u\| \mathbf u^*
+          + \frac{\mathbf u \cdot \mathbf u^*}{\|\mathbf u\|} \mathbf u
+          \right)
+      = \frac{\partial J}{\partial\mathbf u}
+
+and the continuity equation is given by
+
+..math::
+
+    -\frac{\partial\eta}{\partial t}
+      - g\nabla \cdot \mathbf u^*
+      - \mathbf u \cdot \nabla \eta^*,
+      - \frac{\widetilde{C_d}}{H^2} \|\mathbf u\| \mathbf u \cdot \mathbf u^*
+      = \frac{\partial J}{\partial\eta},
+
+where :math:`(\mathbf u^*,\eta^*)` are the adjoint variables corresponding to fluid velocity and free
+surface elevation, :math:`(\mathbf u, eta)`. If Manning friction is used then
+:math:`\widetilde{C_d} = \frac43 C_d`, otherwise :math:`\widetilde{C_d} = C_d`.
+
+This implementation only accounts for Dirichlet conditions for elevation on segment :math:`\Gamma_D` and
+free-slip conditions for velocity on segment :math:`\Gamma_{\mathrm{freeslip}}`. In the adjoint model
+these become free-slip conditions for the adjoint velocity on :math:`\partial\Omega\backslash\Gamma_D`
+and Dirichlet conditions for adjoint elevation on :math:`\partial\Omega\backslash\Gamma_{\mathrm{freeslip}}`.
+
+The mixed discontinuous-continuous :math:`\mathbb P1_{DG}-\mathbb P2` discretisation used is very similar
+to that presented in [1]. A :math:`\mathbb P2-\mathbb P1` Taylor-Hood element pair is also allowed.
+
+[1] Funke, S. W., P. E. Farrell, and M. D. Piggott. "Reconstructing wave profiles from inundation data."
+    Computer Methods in Applied Mechanics and Engineering 322 (2017): 167-186.
+"""
 from __future__ import absolute_import
 from thetis.equation import *
 from thetis.shallowwater_eq import ShallowWaterTerm
