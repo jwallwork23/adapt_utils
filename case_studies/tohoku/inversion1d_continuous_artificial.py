@@ -321,13 +321,13 @@ axes.set_ylabel(r"Scaled mean square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
 plt.xlim([1.5, 10.5])
+plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
 plt.grid()
 plt.legend(fontsize=fontsize)
 opt = control_values_opt[-1]
 axes.annotate(
-    r'$m = {:.2f}$'.format(opt), xy=(opt-0.5*2**level, func_values_opt[-1]+500*0.5**level),
-    color='C1', fontsize=fontsize
+    r'$m = {:.2f}$'.format(opt), xy=(opt+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
 fname = os.path.join(di, 'single_bf_optimisation_continuous_artificial')
 if use_regularisation:

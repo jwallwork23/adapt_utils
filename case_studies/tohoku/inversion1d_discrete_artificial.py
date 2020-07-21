@@ -240,8 +240,7 @@ plt.grid()
 plt.legend(fontsize=fontsize)
 opt = control_values_opt[-1]
 axes.annotate(
-    r'$m = {:.2f}$'.format(opt), xy=(opt-0.5*2**level, func_values_opt[-1]+500*0.5**level),
-    color='C1', fontsize=fontsize
+    r'$m = {:.2f}$'.format(opt), xy=(opt+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
 plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
 

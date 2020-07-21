@@ -267,7 +267,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
                 })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
-
+        self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
+        self.depth = [None for bathymetry in self.bathymetry]
+        for i, bathymetry in enumerate(self.bathymetry):
+            # NOTE: DepthExpression is the modified version from `unsteady/swe/utils`.
+            self.depth[i] = DepthExpression(
+                bathymetry,
+                use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+            )
 
     # --- Stabilisation
 
@@ -691,7 +700,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['shallow_water'],
             'solver_parameters': self.op.adjoint_solver_parameters['shallow_water'],
-            # 'adjoint': True,  # FIXME: Need to write out negate some terms in adjoint equations
+            'adjoint': True,  # Makes sure fields are updated according to appropriate timesteps
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
@@ -713,7 +722,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         kwargs = {
             'bnd_conditions': self.boundary_conditions[i]['tracer'],
             'solver_parameters': self.op.adjoint_solver_parameters['tracer'],
-            'adjoint': True,  # FIXME
+            'adjoint': True,  # Makes sure fields are updated according to appropriate timesteps
         }
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
