@@ -119,7 +119,7 @@ for i, m in enumerate(control_values):
 # Plot parameter space
 if recompute:
     fig, axes = plt.subplots(figsize=(8, 8))
-    axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8, markerstyle='x', markevery=10)
+    axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8, markevery=10)
     axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
     axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
     plt.xticks(fontsize=fontsize_tick)
@@ -238,9 +238,9 @@ plt.xlim([1.5, 10.5])
 plt.tight_layout()
 plt.grid()
 plt.legend(fontsize=fontsize)
-opt = control_values_opt[-1]
 axes.annotate(
-    r'$m = {:.2f}$'.format(opt), xy=(opt+2, func_values_opt[-1]), color='C1', fontsize=fontsize
+    r'$m = {:.2f}$'.format(control_values_opt[-1]),
+    xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
 plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
 

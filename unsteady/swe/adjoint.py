@@ -505,7 +505,7 @@ class AdjointShallowWaterEquations(BaseAdjointShallowWaterEquation):
         self.add_continuity_terms(eta_star_test, eta_star_space, u_star_space, depth, options)
 
     def mass_term(self, solution):
-        if options.get('use_wetting_and_drying'):
+        if self.options.get('use_wetting_and_drying'):
             raise NotImplementedError  # TODO: Need old elevation
             # u_star, eta_star = solution if isinstance(solution, list) else split(solution)
             # f = inner(u_star, self.u_star_test)*dx

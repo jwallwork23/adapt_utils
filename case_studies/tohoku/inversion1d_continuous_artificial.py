@@ -325,9 +325,9 @@ plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
 plt.grid()
 plt.legend(fontsize=fontsize)
-opt = control_values_opt[-1]
 axes.annotate(
-    r'$m = {:.2f}$'.format(opt), xy=(opt+2, func_values_opt[-1]), color='C1', fontsize=fontsize
+    r'$m = {:.2f}$'.format(control_values_opt[-1]),
+    xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
 fname = os.path.join(di, 'single_bf_optimisation_continuous_artificial')
 if use_regularisation:
