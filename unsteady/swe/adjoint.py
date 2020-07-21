@@ -97,9 +97,15 @@ class AdjointShallowWaterContinuityTerm(AdjointShallowWaterTerm):
 
 class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
     r"""
+    Term resulting from differentiating the external pressure gradient term with respect to elevation.
+    Note that, where the original term appeared in the momentum equation of the forward model, this
+    term appears in the continuity equation of the adjoint model.
+
   ..math::
 
-        g \nabla \cdot \mathbf u^*
+        -\langle g \nabla \cdot \mathbf u^*, \zeta\rangle_K
+          = \langle g\nabla(\zeta), \mathbf u^*\rangle_K
+            -\langle g\zeta, \mathbf u^*\cdot\widehat{\mathbf n}\rangle_{\partial K}.
 
     Unlike in the discretisation of the forward equations, we do not include fluxes for this term.
     """
@@ -113,7 +119,6 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
                 zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
-                # TODO: Riemann solutions?
                 f += -g_grav*self.zeta_test*inner(z_ext, self.normal)*ds_bnd
         else:
             f = -g_grav*self.zeta_test*nabla_div(z)*self.dx
@@ -128,80 +133,59 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
 
 class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
     r"""
-    In the nonlinear case,
+    Term resulting from differentiating the :math:`\nabla\cdot(H\mathbf u)` term with respect to
+    velocity. Note that, where the original term appeared in the continuity equation of the forward
+    model, this term appears in the momentum equation of the adjoint model.
+
+    The term is given by
 
   ..math::
 
-        H \nabla \eta^*.
+        -\langle H \nabla \eta^*, z\rangle_K
 
-    In the linear case,
+    where :math:`H = b + \eta` in the nonlinear case and :math:`H = b` otherwise.
 
-  ..math::
-
-        b \nabla \eta^*.
+    Note that, unlike in the forward model, Dirichlet boundary conditions on the adjoint free surface
+    elevation are applied strongly.
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        if self.options.use_nonlinear_equations:
-            eta = fields.get('elev_2d')
-            total_h = self.depth.get_total_depth(eta)
-        else:
-            total_h = self.depth.get_total_depth(zeta_old)
+        eta = fields.get('elev_2d')
+        total_h = self.depth.get_total_depth(eta)
 
         zeta_by_parts = self.zeta_is_dg
+        assert not zeta_by_parts
 
         f = 0
-        if zeta_by_parts:  # TODO: TESTME
-            f += inner(zeta, div(total_h*self.z_test))*self.dx
-            # f += -total_h*zeta*inner(self.z_test, self.normal)*self.dS
-            if z is not None:
-                zeta_star = avg(zeta) + sqrt(avg(total_h)/g_grav)*jump(z, self.normal)
-            else:
-                zeta_star = avg(zeta)
-            f += -total_h*zeta_star*jump(self.z_test, self.normal)*self.dS
-            for bnd_marker in self.boundary_markers:
-                funcs = bnd_conditions.get(bnd_marker)
-                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-                zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
-                # Compute linear riemann solution with zeta, zeta_ext, z, z_ext
-                zn_jump = inner(z - z_ext, self.normal)
-                zeta_rie = 0.5*(zeta + zeta_ext) + sqrt(total_h/g_grav)*zn_jump
-                f += -total_h*zeta_rie*dot(self.z_test, self.normal)*ds_bnd
-        else:
+        if not zeta_by_parts:
             f += -total_h*inner(grad(zeta), self.z_test)*self.dx
-            for bnd_marker in self.boundary_markers:
-                funcs = bnd_conditions.get(bnd_marker)
-                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-                if funcs is not None and not self.options.get('element_family') in ('cg-cg', 'dg-cg'):
-                    # TODO: TESTME
-                    zeta_ext, z_ext = self.get_bnd_functions(zeta, z, bnd_marker, bnd_conditions)
-                    # Compute linear riemann solution with zeta, zeta_ext, z, z_ext
-                    zn_jump = inner(z - z_ext, self.normal)
-                    zeta_rie = 0.5*(zeta + zeta_ext) + sqrt(total_h/g_grav)*zn_jump
-                    f += -total_h*(zeta_rie-zeta)*dot(self.z_test, self.normal)*ds_bnd
         return -f
 
 
 class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
     r"""
-    This term only arises in the nonlinear case.
+    Term resulting from differentiating the :math:`\nabla\cdot(H\mathbf u)` term with respect to
+    elevation.
 
   ..math::
 
-        \mathbf u \cdot \nabla \eta^*
+        -\langle \zeta, \mathbf u \cdot \nabla \eta^* \rangle_\Omega
+          + \langle \zeta, \eta^*\mathbf u\cdot\widehat{\mathbf n}\rangle_\Gamma,
+
+    where the integral over :math:`\Gamma = \partial\Omega\backslash\Gamma_D` enforces the no-slip
+    condition on the adjoint velocity.
+
+    Note that this term only arises in the nonlinear case.
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
-        f = 0
         if not self.options.use_nonlinear_equations:
-            return f
+            return 0
 
         zeta_by_parts = self.zeta_is_dg
+        assert not zeta_by_parts
 
+        f = 0
         uv = fields.get('uv_2d')
-        if zeta_by_parts:
-            f += -div(self.zeta_test*uv)*zeta*self.dx
-            # f += zeta * self.zeta_test * inner(uv, self.normal) * self.dS  # TODO
-            raise NotImplementedError
-        else:
+        if not zeta_by_parts:
             f += -inner(grad(zeta), self.zeta_test*uv)*self.dx
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
@@ -213,20 +197,26 @@ class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
 
 class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
     r"""
+    Term resulting from differentiating the nonlinear advection term by velocity.
+
   ..math::
 
-        - (\nabla\mathbf u)^T \mathbf u^*
-        + (\nabla \cdot \mathbf u) \mathbf u^*
-        + \mathbf u \cdot \nabla \mathbf u^*
+        langle (\nabla\mathbf u)^T \mathbf u^*, \mathbf z \rangle_K
+        - langle (\nabla \cdot \mathbf u) \mathbf u^*, \mathbf z \rangle_K
+        - langle \mathbf u \cdot \nabla \mathbf u^*, \mathbf z \rangle_K
+          = \langle (\mathbf z \cdot \nabla)\mathbf u, \mathbf u^* \rangle_K
+            + \langle (\mathbf u \cdot \nabla)\mathbf z, \mathbf u^* \rangle_K
+            - \langle [[\mathbf z]], \mathbf u \cdot \widehat{\mathbf n} \mathbf u^*\rangle_{\Gamma^-}
+            - \langle [[\mathbf u]], \mathbf z \cdot \widehat{\mathbf n} \mathbf u^*\rangle_{\Gamma^-},
+
+    where :math:`\Gamma^-=\{\gamma\in\partial K\mid\mathbf u\cdot \widehat{\mathbf n}|_\gamma < 0\}` is
+    comprised of downwind faces of :math:`K`.
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         if not self.options.use_nonlinear_equations:
             return 0
 
-        if self.options.get('element_family') == 'cg-cg':
-            raise NotImplementedError  # TODO
-
-        horiz_advection_by_parts = True
+        horiz_advection_by_parts = self.z_continuity in ['dg', 'hdiv']
 
         # Downwind velocity
         uv = fields.get('uv_2d')
@@ -235,11 +225,13 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
         downwind = lambda x: conditional(un < 0, dot(x, n), 0)
 
         f = 0
+        f += inner(dot(self.z_test, nabla_grad(uv)), z)*self.dx
+        f += inner(dot(uv, nabla_grad(self.z_test)), z)*self.dx
         if horiz_advection_by_parts:
-            f += inner(dot(self.z_test, nabla_grad(uv)), z)*self.dx
-            f += inner(dot(uv, nabla_grad(self.z_test)), z)*self.dx
             f += -inner(jump(self.z_test), 2*avg(un*z))*self.dS
             f += -inner(2*avg(downwind(self.z_test)*z), jump(uv))*self.dS
+        else:
+            f += inner(dot(transpose(grad(uv)), z), self.z_test)*self.dx
 
         return -f
 
@@ -250,7 +242,7 @@ class HorizontalViscosityTerm(AdjointShallowWaterMomentumTerm):
   ..math::
 
         \nabla \cdot (\nu \nabla \mathbf u^*)
-    """
+    """  # TODO: doc
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         # eta = fields.get('elev_2d')
         # total_h = self.depth.get_total_depth(eta)
@@ -264,10 +256,13 @@ class HorizontalViscosityTerm(AdjointShallowWaterMomentumTerm):
 
 class CoriolisTerm(AdjointShallowWaterMomentumTerm):
     r"""
+    This term is identical to that in the forward model, except for the opposite sign:
 
   ..math::
 
-        f \widehat{\mathbf z} \times \mathbf u^*
+        -f \widehat{\mathbf z} \times \mathbf u^*,
+
+    where :math:`f` is the user-specified Coriolis parameter.
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         coriolis = fields_old.get('coriolis')
@@ -279,13 +274,16 @@ class CoriolisTerm(AdjointShallowWaterMomentumTerm):
 
 class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
     r"""
+    Term resulting from differentiating the quadratic drag term with respect to velocity.
 
   ..math::
 
-        -\frac{C_d}H \left(
-            \|\mathbf u\| \mathbf u
-            + \frac{\mathbf u^* \cdot \mathbf u}{\|\mathbf u\|}\mathbf u
-        \right)
+        \left\langle
+            \frac{\C_d}H \left(
+                \|\mathbf u\| \mathbf u
+                + \frac{\mathbf u^* \cdot \mathbf u}{\|\mathbf u\|}\mathbf u
+            \right), \mathbf z
+        \right\rangle_K
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         if not self.options.use_nonlinear_equations:
@@ -313,13 +311,14 @@ class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
 
 class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
     r"""
+    Term resulting from differentiating the quadratic drag term with respect to elevation.
 
   ..math::
 
         \frac{\widetilde{C_d}}{H^2} \|\mathbf u\| \mathbf u \cdot \mathbf u^*,
 
     where :math:`\widetilde{C_d}` is given by :math:`\frac43 C_d` in the case of Manning friction
-    and :math:`C_d` otherwise.
+    and :math:`C_d` in other cases where the drag coefficient is independent of the water depth.
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         if not self.options.use_nonlinear_equations:
@@ -346,17 +345,14 @@ class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
 
 class LinearDragTerm(AdjointShallowWaterMomentumTerm):
     r"""
-
-  ..math::
-
-        C_d \mathbf u^*
+    Identical to the linear drag term in the forward model, :math:`C \mathbf u^*`, where :math:`C` is
+    a user-defined drag coefficient.
     """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         linear_drag_coefficient = fields_old.get('linear_drag_coefficient')
         f = 0
         if linear_drag_coefficient is not None:
-            bottom_fri = linear_drag_coefficient*inner(self.z_test, z)*self.dx
-            f += -bottom_fri
+            f += linear_drag_coefficient*inner(self.z_test, z)*self.dx
         return -f
 
 
@@ -384,29 +380,35 @@ class TurbineDragTermContinuity(AdjointShallowWaterContinuityTerm):
         return -f
 
 
-# NOTE: Used for adjoint RHS
 class MomentumSourceTerm(AdjointShallowWaterMomentumTerm):
+    r"""
+    Term on the right hand side of the adjoint momentum equation corresponding to the derivative of
+    the quantity of interest :math:`J` with respect to velocity, :math:`\partial J/\partial u`.
+    """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         f = 0
-        momentum_source = fields_old.get('momentum_source')
+        momentum_source = fields_old.get('dJdu')
 
         if momentum_source is not None:
             f += inner(momentum_source, self.z_test)*self.dx
         return f
 
 
-# NOTE: Used for adjoint RHS
 class ContinuitySourceTerm(AdjointShallowWaterContinuityTerm):
+    r"""
+    Term on the right hand side of the adjoint continuity equation corresponding to the derivative of
+    the quantity of interest :math:`J` with respect to elevation, :math:`\partial J/\partial\eta`.
+    """
     def residual(self, z, zeta, z_old, zeta_old, fields, fields_old, bnd_conditions=None):
         f = 0
-        volume_source = fields_old.get('volume_source')
+        volume_source = fields_old.get('dJdeta')
 
         if volume_source is not None:
             f += inner(volume_source, self.zeta_test)*self.dx
         return f
 
 
-# TODO
+# TODO: See [Funke et al. 2017] to see how bathymetry displacement terms crop up elsewhere, too
 class BathymetryDisplacementMassTerm(AdjointShallowWaterContinuityTerm):
     def residual(self, solution):
         if isinstance(solution, list):
@@ -459,8 +461,17 @@ class AdjointShallowWaterEquations(BaseAdjointShallowWaterEquation):
         """
         super(AdjointShallowWaterEquations, self).__init__(function_space, depth, options)
 
+        # TODO: Model options intending to develop support for
         if options.get('use_wetting_and_drying'):
-            raise NotImplementedError  # TODO
+            raise NotImplementedError
+
+        # No plan to support these model options
+        if options.get('family') == 'dg-dg':
+            raise NotImplementedError("Equal order DG finite element not supported.")
+        if options.get('wind_stress') is not None:
+            raise NotImplementedError("Wind stress not supported in continuous adjoint model.")
+        if options.get('bottom_drag') is not None:
+            raise NotImplementedError("3D bottom drag not supported in continuous adjoint model.")
 
         z_test, zeta_test = TestFunctions(function_space)
         z_space, zeta_space = function_space.split()
