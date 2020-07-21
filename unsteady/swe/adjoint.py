@@ -64,7 +64,6 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         velocity on the complement of Γ₂ and Dirichlet conditions for the elevation on the
         complement of Γ₁.
         """
-        warnings.warn("#### TODO: BCs not valid for viscous or nonlinear equations")  # TODO
         # bnd_len = self.boundary_len[bnd_id]
         funcs = bnd_conditions.get(bnd_id)
         # if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂

@@ -5,13 +5,13 @@ import os
 import h5py
 
 from adapt_utils.unsteady.callback import *
-from adapt_utils.unsteady.swe.solver import AdaptiveShallowWaterProblem
+from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
 __all__ = ["AdaptiveTsunamiProblem"]
 
 
-class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
+class AdaptiveTsunamiProblem(AdaptiveProblem):
     """
     General solver object for adaptive tsunami propagation problems which exists to hook up
     callbacks appropriately. The default callbacks are:
@@ -23,6 +23,10 @@ class AdaptiveTsunamiProblem(AdaptiveShallowWaterProblem):
     def __init__(self, *args, extension=None, nonlinear=False, **kwargs):
         self.extension = extension
         super(AdaptiveTsunamiProblem, self).__init__(*args, nonlinear=nonlinear, **kwargs)
+        try:
+            assert not self.op.solve_tracer
+        except AssertionError:
+            raise ValueError("This class is for problems with no tracer component.")
 
     def add_callbacks(self, i):
         gauges = list(self.op.gauges.keys())
