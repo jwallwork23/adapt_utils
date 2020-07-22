@@ -183,7 +183,7 @@ if not plot_only:
         swp.solve_adjoint()
         g = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)  # TODO: No minus sign?
         if use_regularisation:
-            g += op.regularisation_term_gradient
+            g += op.regularisation_term_gradients[0]
         print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g))
         return np.array([g, ])
 
