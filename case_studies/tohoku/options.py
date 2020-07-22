@@ -193,6 +193,7 @@ class TohokuOptions(TsunamiOptions):
         scaling = Constant(self.qoi_scaling)
         weight = Constant(1.0)
         eta_obs = Constant(0.0)
+        dtc = Constant(self.dt)
         u, eta = prob.fwd_solutions[i].split()
         mesh = eta.function_space().mesh()
         self.times = []
@@ -222,38 +223,36 @@ class TohokuOptions(TsunamiOptions):
             """
             t = t - self.dt
             weight.assign(0.5 if t < 0.5*self.dt or t >= self.end_time - 0.5*self.dt else 1.0)
-            dtc = Constant(self.dt)
+            self.times.append(t)
             for gauge in self.gauges:
+                gauge_dat = self.gauges[gauge]
+                I = gauge_dat["indicator"]
 
                 # Point evaluation at gauges
                 if self.save_timeseries:
-                    eta_discrete = eta.at(self.gauges[gauge]["coords"]) - self.gauges[gauge]["init"]
-                    self.gauges[gauge]["timeseries"].append(eta_discrete)
+                    eta_discrete = eta.at(gauge_dat["coords"]) - gauge_dat["init"]
+                    gauge_dat["timeseries"].append(eta_discrete)
+                    gauge_dat["timeseries_smooth"].append(assemble(I*eta*dx, annotate=False))
+                if self.artificial and gauge_dat["data"] == []:
+                    continue
 
-                # Interpolate observations
-                if self.gauges[gauge]["data"] != []:
-                    if self.artificial:
-                        obs = self.gauges[gauge]["data"][prob.iteration]
-                    else:
-                        obs = float(self.gauges[gauge]["interpolator"](t))
-                    eta_obs.assign(obs)
+                # Read data
+                interpolator = gauge_dat["interpolator"]
+                obs = gauge_dat["data"][prob.iteration] if self.artificial else float(interpolator(t))
+                eta_obs.assign(obs)
+                if self.save_timeseries:
+                    if not self.artificial:
+                        gauge_dat["data"].append(obs)
 
-                    if self.save_timeseries:
-                        if not self.artificial:
-                            self.gauges[gauge]["data"].append(obs)
+                    # Discrete form of error
+                    gauge_dat["diff"].append(0.5*(eta_discrete - eta_obs.dat.data[0])**2)
 
-                        # Discrete form of error
-                        diff = 0.5*(eta_discrete - eta_obs.dat.data[0])**2
-                        self.gauges[gauge]["diff"].append(diff)
-
-                    # Continuous form of error
-                    I = self.gauges[gauge]["indicator"]
-                    diff = 0.5*I*(eta - eta_obs)**2
-                    self.J += assemble(scaling*weight*dtc*diff*dx)
-                    # self.J += assemble(scaling*weight*diff*dx)
-                    self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False))
-                    self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False))
-            self.times.append(t)
+                # Continuous form of error
+                diff = 0.5*I*(eta - eta_obs)**2
+                self.J += assemble(scaling*weight*dtc*diff*dx)
+                # self.J += assemble(scaling*weight*diff*dx)  # Time average
+                if self.save_timeseries:
+                    gauge_dat["diff_smooth"].append(assemble(diff*dx, annotate=False))
 
         return update_forcings
 

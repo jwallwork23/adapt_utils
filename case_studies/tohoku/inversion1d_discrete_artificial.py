@@ -75,7 +75,7 @@ kwargs = {
     'plot_pvd': False,
     'debug': bool(args.debug or False),
 }
-nonlinear = bool(args.nonlinear or True)
+nonlinear = bool(args.nonlinear or False)
 fontsize = 22
 fontsize_tick = 18
 plotting_kwargs = {

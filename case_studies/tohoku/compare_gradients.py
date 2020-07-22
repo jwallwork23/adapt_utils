@@ -44,7 +44,7 @@ kwargs = {
     'plot_pvd': False,
     'debug': bool(args.debug or False),
 }
-nonlinear = bool(args.nonlinear or True)
+nonlinear = bool(args.nonlinear or False)
 op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
 
 # Solve the forward problem to get data with 'optimal' control parameter m = 5
