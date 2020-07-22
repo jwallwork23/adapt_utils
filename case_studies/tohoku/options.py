@@ -8,7 +8,7 @@ from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
 
 
-__all__ = ["TohokuOptions", "TohokuGaussianBasisOptions"]
+__all__ = ["TohokuOptions", "TohokuGaussianBasisOptions", "TohokuOkadaOptions"]
 
 
 class TohokuOptions(TsunamiOptions):
@@ -511,3 +511,15 @@ class TohokuGaussianBasisOptions(TohokuOptions):
             self.regularisation_term_gradients.append(dRdm)
 
         return R
+
+
+class TohokuOkadaOptions(TohokuOptions):
+    """
+    Initialise the free surface with an initial condition generated using Okada functions.
+
+    Note that, unlike in the basis comprised of an array of Gaussians, the relationship between the
+    control parameters and the initial surface is nonlinear.
+    """
+    def __init__(self, **kwargs):
+        super(TohokuOkadaOptions, self).__init__(**kwargs)
+        raise NotImplementedError  # TODO
