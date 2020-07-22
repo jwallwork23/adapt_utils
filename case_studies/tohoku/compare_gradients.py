@@ -50,7 +50,7 @@ op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
 
 # Toggle smoothed or discrete timeseries
 timeseries_type = "timeseries"
-use_smoothed_timeseries = False
+use_smoothed_timeseries = True
 if use_smoothed_timeseries:
     timeseries_type = "_".join([timeseries_type, "smooth"])
 

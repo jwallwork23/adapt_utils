@@ -78,7 +78,8 @@ class TohokuOptions(TsunamiOptions):
         # self.dt = 5.0
         self.dt = 60.0*0.5**level
         self.dt_per_export = int(60.0/self.dt)
-        self.start_time = 15*60.0
+        # self.start_time = 15*60.0
+        self.start_time = 0.0
         self.end_time = 24*60.0
         # self.end_time = 60*60.0
 
@@ -188,9 +189,7 @@ class TohokuOptions(TsunamiOptions):
         from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
 
         self.J = self.get_regularisation_term(prob)
-        # N_T = int(self.end_time/self.dt)+1  # Number of observations
-        # scaling = Constant(self.qoi_scaling/N_T)
-        scaling = Constant(self.qoi_scaling)
+        scaling = Constant(0.5*self.qoi_scaling)
         weight = Constant(1.0)  # Quadrature weight for time integration scheme
 
         # These will be updated by the checkpointing routine
@@ -280,8 +279,11 @@ class TohokuOptions(TsunamiOptions):
                     gauge_dat["diff"].append(0.5*(eta_discrete - gauge_dat["obs"].dat.data[0])**2)
 
                 # Continuous form of error
-                #   NOTE: The initial free surface *field* is subtracted in some cases.
-                diff = 0.5*I*(eta - self.eta_init - gauge_dat["obs"])**2
+                #   NOTES:
+                #     * The initial free surface *field* is subtracted in some cases.
+                #     * Factor of half is included in `scaling`
+                #     * Quadrature weights and timestep included in `weight`
+                diff = I*(eta - self.eta_init - gauge_dat["obs"])**2
                 self.J += assemble(scaling*weight*diff*dx)
                 if self.save_timeseries:
                     gauge_dat["diff_smooth"].append(assemble(diff*dx, annotate=False))
@@ -290,6 +292,8 @@ class TohokuOptions(TsunamiOptions):
 
     def _get_update_forcings_adjoint(self, prob, i):
         expr = 0
+        # scaling = Constant(self.qoi_scaling)
+        scaling = Constant(2*self.qoi_scaling)  # TODO: TEMPORARY FACTOR OF 2
         msg = "CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e} (iteration {:d})"
 
         # Gauge data (to be loaded from checkpoint)
@@ -299,8 +303,7 @@ class TohokuOptions(TsunamiOptions):
         #   NOTE: The initial free surface *field* is subtracted in some cases.
         for gauge in self.gauges:
             gauge_dat = self.gauges[gauge]
-            expr += gauge_dat["indicator"]*(eta_saved - self.eta_init - gauge_dat["obs"])
-        expr = Constant(self.qoi_scaling)*expr
+            expr += scaling*gauge_dat["indicator"]*(eta_saved - self.eta_init - gauge_dat["obs"])
         k_u, k_eta = prob.kernels[i].split()
 
         def update_forcings(t):
