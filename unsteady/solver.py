@@ -997,6 +997,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
         ts = self.timesteppers[i]
         while self.simulation_time >= end_time + t_epsilon:
+            self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
 
             # Collect forward solution from checkpoint and free associated memory
             #   NOTE: We need collect the checkpoints from the stack in reverse order
@@ -1035,6 +1036,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.adjoint_tracer_file.write(proj_tracer)
                 if export_func is not None:
                     export_func()
+        self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         update_forcings(self.simulation_time - op.dt)  # TODO: TESTME
         op.print_debug("Done!")
         print_output(80*'=')
