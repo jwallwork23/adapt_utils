@@ -339,34 +339,8 @@ class TohokuOptions(TsunamiOptions):
             return self._get_update_forcings_forward(prob, i)
 
     def get_regularisation_term(self, prob):
-        """
-        Tikhonov regularisation term that enforces spatial smoothness in the initial surface.
-
-        NOTE: Assumes the forward model has been initialised but not taken any iterations.
-        """
-        from adapt_utils.adapt.recovery import construct_gradient
-
-        # Set regularisation parameter
-        if np.isclose(self.regularisation, 0.0):
-            return 0
-        alpha = Constant(self.regularisation)
-
-        # Recover gradient of initial surface and a basis function using L2 projection
-        u0, eta0 = prob.fwd_solutions[0].split()
-        deta0dx = construct_gradient(eta0, op=self)
-        dphidx = construct_gradient(self.basis_functions[0].split()[1], op=self)
-
-        # Compute regularisation term
-        R = assemble(0.5*alpha*inner(deta0dx, deta0dx)*dx)
-        print_output("Regularisation term = {:.4e}".format(R))
-        self.regularisation_term = R
-
-        # Compute gradient of regularisation term
-        dRdm = assemble(alpha*inner(dphidx, deta0dx)*dx)
-        print_output("Gradient of regularisation term = {:.4e}".format(dRdm))
-        self.regularisation_term_gradient = dRdm
-
-        return R
+        """Should be implemented in derived class"""
+        raise NotImplementedError
 
     def set_boundary_conditions(self, prob, i):
         ocean_tag = 100
@@ -428,7 +402,7 @@ class TohokuOptions(TsunamiOptions):
 
 class TohokuGaussianBasisOptions(TohokuOptions):
     """
-    Initialise the free surface with initial condition consisting of an array of Gaussian basis
+    Initialise the free surface with an initial condition consisting of an array of Gaussian basis
     functions, each scaled by a control parameter.
 
     The source region centre is predefined. In the 1D case the basis function is centred at the same
@@ -502,3 +476,38 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         for n in range(0, N, 100):
             expr = sum(m*g for m, g in zip(self.control_parameters[n:n+1], self.basis_functions[n:n+1]))
             prob.fwd_solutions[0].assign(prob.fwd_solutions[0] + project(expr, prob.V[0]))
+
+    def get_regularisation_term(self, prob):
+        """
+        Tikhonov regularisation term that enforces spatial smoothness in the initial surface.
+
+        NOTE: Assumes the forward model has been initialised but not taken any iterations.
+        """
+        from adapt_utils.adapt.recovery import construct_gradient
+
+        # Set regularisation parameter
+        if np.isclose(self.regularisation, 0.0):
+            return 0
+        alpha = Constant(self.regularisation)
+
+        # Recover gradient of initial surface using L2 projection
+        u0, eta0 = prob.fwd_solutions[0].split()
+        deta0dx = construct_gradient(eta0, op=self)
+
+        # Compute regularisation term
+        R = assemble(0.5*alpha*inner(deta0dx, deta0dx)*dx)
+        print_output("Regularisation term = {:.4e}".format(R))
+        self.regularisation_term = R
+
+        # Compute components of gradient of regularisation term
+        self.regularisation_term_gradients = []
+        for i in range(len(self.basis_functions)):
+            dphidx = construct_gradient(self.basis_functions[i].split()[1], op=self)
+            dRdm = assemble(alpha*inner(dphidx, deta0dx)*dx)
+            if len(self.basis_functions) == 1:
+                print_output("Gradient of regularisation term = {:.4e}".format(dRdm))
+            else:
+                print_output("(Gradient of regularisation term)[{:d}] = {:.4e}".format(i, dRdm))
+            self.regularisation_term_gradients.append(dRdm)
+
+        return R
