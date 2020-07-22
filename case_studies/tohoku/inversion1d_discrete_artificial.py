@@ -84,6 +84,12 @@ plotting_kwargs = {
 op = TohokuGaussianBasisOptions(**kwargs)
 di = create_directory(os.path.join(op.di, 'plots'))
 
+# Toggle smoothed or discrete timeseries
+timeseries_type = "timeseries"
+use_smoothed_timeseries = False
+if use_smoothed_timeseries:
+    timeseries_type = "_".join([timeseries_type, "smooth"])
+
 if not plot_only:
 
     # Artifical run
@@ -92,7 +98,7 @@ if not plot_only:
         swp = AdaptiveProblem(op, nonlinear=nonlinear)
         swp.solve_forward()
         for gauge in op.gauges:
-            op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
+            op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
 
 # Explore parameter space
 n = 9
@@ -147,7 +153,7 @@ if not plot_only:
     for i, gauge in enumerate(gauges):
         ax = axes[i//N, i % N]
         ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-        ax.plot(T, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' simulated', **plotting_kwargs)
+        ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' simulated', **plotting_kwargs)
         ax.legend(loc='upper left')
         ax.set_xlabel('Time (min)', fontsize=fontsize)
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
@@ -271,8 +277,8 @@ if not plot_only:
     for i, gauge in enumerate(gauges):
         ax = axes[i//N, i % N]
         ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-        ax.plot(T, op.gauges[gauge]['timeseries'], '--x', label=gauge + ' initial guess', **plotting_kwargs)
-        ax.plot(T, op_opt.gauges[gauge]['timeseries'], '--x', label=gauge + ' optimised', **plotting_kwargs)
+        ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' initial guess', **plotting_kwargs)
+        ax.plot(T, op_opt.gauges[gauge][timeseries_type], '--x', label=gauge + ' optimised', **plotting_kwargs)
         ax.legend(loc='upper left')
         ax.set_xlabel('Time (min)', fontsize=fontsize)
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
