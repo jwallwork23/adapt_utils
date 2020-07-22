@@ -61,34 +61,42 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         velocity on the complement of Γ₂ and Dirichlet conditions for the elevation on the
         complement of Γ₁.
         """
-        # bnd_len = self.boundary_len[bnd_id]
+        homogeneous = False
         funcs = bnd_conditions.get(bnd_id)
-        # if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
-        #     eta_star_ext = Constant(0.0)
-        #     u_star_ext = Constant(0.0)*self.normal
-        # elif 'elev' in funcs:  # Γ₁
-        #     eta_star_ext = Constant(0.0)
-        #     u_star_ext = u_star_in  # assume symmetry
-        # elif 'un' in funcs:  # Γ₂
-        #     eta_star_ext = eta_star_in  # assume symmetry
-        #     u_star_ext = Constant(0.0)*self.normal
-        # elif funcs is None:  # ∂Ω \ (Γ₁ ∪ Γ₂)
-        #     eta_star_ext = eta_star_in  # assume symmetry
-        #     u_star_ext = u_star_in  # assume symmetry
-        if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
-            eta_star_ext = eta_star_in  # assume symmetry
-            u_star_ext = u_star_in  # assume symmetry
-        elif 'elev' not in funcs:  # ∂Ω \ Γ₂
-            eta_star_ext = eta_star_in  # assume symmetry
-            u_star_ext = Constant(0.0)*self.normal
-        elif 'un' not in funcs:  # ∂Ω \ Γ₁
-            eta_star_ext = Constant(0.0)
-            u_star_ext = u_star_in  # assume symmetry
-        elif funcs is None:  # ∂Ω \ (Γ₁ ∪ Γ₂)
-            eta_star_ext = Constant(0.0)
-            u_star_ext = Constant(0.0)*self.normal
-        else:
+        if funcs is not None and 'elev' not in funcs and 'un' not in funcs:
             raise Exception('Unsupported bnd type: {:}'.format(funcs.keys()))
+
+        if homogeneous:
+
+            # Homogeneous boundary conditions as given in [1].
+            if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
+                eta_star_ext = Constant(0.0)
+                u_star_ext = Constant(0.0)*self.normal
+            elif 'elev' in funcs:  # Γ₁
+                eta_star_ext = Constant(0.0)
+                u_star_ext = u_star_in  # assume symmetry
+            elif 'un' in funcs:  # Γ₂
+                eta_star_ext = eta_star_in  # assume symmetry
+                u_star_ext = Constant(0.0)*self.normal
+            else:  # funcs is None, ∂Ω \ (Γ₁ ∪ Γ₂)
+                eta_star_ext = eta_star_in  # assume symmetry
+                u_star_ext = u_star_in  # assume symmetry
+        else:
+
+            # Inhomogeneous boundary conditions obtained via integration by parts
+            if 'elev' in funcs and 'un' in funcs:  # Γ₁ ∪ Γ₂
+                eta_star_ext = eta_star_in  # assume symmetry
+                u_star_ext = u_star_in  # assume symmetry
+            elif 'elev' not in funcs:  # ∂Ω \ Γ₂
+                eta_star_ext = eta_star_in  # assume symmetry
+                u_star_ext = Constant(0.0)*self.normal
+            elif 'un' not in funcs:  # ∂Ω \ Γ₁
+                eta_star_ext = Constant(0.0)
+                u_star_ext = u_star_in  # assume symmetry
+            else:  # funcs is None, ∂Ω \ (Γ₁ ∪ Γ₂)
+                eta_star_ext = Constant(0.0)
+                u_star_ext = Constant(0.0)*self.normal
+
         return eta_star_ext, u_star_ext
 
 
@@ -154,7 +162,7 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
                 eta_star_ext, u_star_ext = self.get_bnd_functions(eta_star, u_star, bnd_marker, bnd_conditions)
                 f += -g_grav*self.eta_star_test*inner(u_star_ext, self.normal)*ds_bnd
         else:
-            f = -g_grav*self.eta_star_test*nabla_div(u_star)*self.dx
+            f = -g_grav*self.eta_star_test*div(u_star)*self.dx
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
@@ -190,6 +198,15 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
         f = 0
         if not eta_star_by_parts:
             f += -total_h*inner(grad(eta_star), self.u_star_test)*self.dx
+            # for bnd_marker in self.boundary_markers:
+            #     funcs = bnd_conditions.get(bnd_marker)
+            #     ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+            #     if funcs is not None:
+            #         eta_star_ext, u_star_ext = self.get_bnd_functions(eta_star, u_star, bnd_marker, bnd_conditions)
+            #         # Compute linear riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
+            #         un_star_jump = inner(u_star - u_star_ext, self.normal)
+            #         eta_star_rie = 0.5*(eta_star + eta_star_ext) + sqrt(g_grav/total_h)*un_star_jump
+            #         f += -total_h*(eta_star_rie-eta_star)*dot(self.u_star_test, self.normal)*ds_bnd
         return -f
 
 

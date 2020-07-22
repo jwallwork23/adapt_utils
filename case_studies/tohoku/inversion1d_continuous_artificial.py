@@ -100,8 +100,7 @@ if not plot_only:
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     swp.solve_forward()
     for gauge in op.gauges:
-        # op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
-        op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries_smooth"]
+        op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
 
 # Explore parameter space
 n = 9
@@ -153,7 +152,7 @@ if recompute:
     plt.xticks(fontsize=fontsize_tick)
     plt.yticks(fontsize=fontsize_tick)
     plt.tight_layout()
-    plt.grid()
+    axes.grid()
     plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{:d}.pdf'.format(level)))
 
 # --- Optimisation
@@ -182,7 +181,7 @@ if not plot_only:
         if len(swp.checkpoint) == 0:
             reduced_functional(m)
         swp.solve_adjoint()
-        g = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
+        g = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradient
         print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g))
@@ -211,7 +210,7 @@ if not plot_only:
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         plt.xticks(fontsize=fontsize_tick)
         plt.yticks(fontsize=fontsize_tick)
-        plt.grid()
+        ax.grid()
     for i in range(len(gauges) % N):
         axes[N-1, N-i-1].axes('off')
     plt.tight_layout()
@@ -330,7 +329,7 @@ plt.yticks(fontsize=fontsize_tick)
 plt.xlim([1.5, 10.5])
 plt.ylim([0.0, 1.1*func_values[-1]])
 plt.tight_layout()
-plt.grid()
+axes.grid()
 plt.legend(fontsize=fontsize)
 axes.annotate(
     r'$m = {:.2f}$'.format(control_values_opt[-1]),
@@ -368,7 +367,7 @@ if not plot_only:
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         plt.xticks(fontsize=fontsize_tick)
         plt.yticks(fontsize=fontsize_tick)
-        plt.grid()
+        ax.grid()
     for i in range(len(gauges) % N):
         axes[N-1, N-i-1].axes('off')
     plt.tight_layout()
