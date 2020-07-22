@@ -193,28 +193,44 @@ class TohokuOptions(TsunamiOptions):
         scaling = Constant(self.qoi_scaling)
         weight = Constant(1.0)
         eta_obs = Constant(0.0)
-        dtc = Constant(self.dt)
+
         u, eta = prob.fwd_solutions[i].split()
-        # self.eta_init = eta.copy(deepcopy=True)
+        # self.eta_init = Function(eta.function_space()).assign(eta)
         mesh = eta.function_space().mesh()
-        self.times = []
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
+        # R = FunctionSpace(mesh, "R", 0)
+        # R_test = TestFunction(R)
+        # R_trial = TrialFunction(R)
         for gauge in self.gauges:
             gauge_dat = self.gauges[gauge]
+
+            # Setup interpolator
             sample = 1 if gauge[0] == '8' else 60
             gauge_dat["interpolator"] = sample_timeseries(gauge, sample=sample)
-            disc = ellipse([gauge_dat["coords"] + (radius,), ], mesh)
+
+            # Assemble an area-normalised indicator function
+            x, y = gauge_dat["coords"]
+            disc = ellipse([(x, y, radius,), ], mesh)
             area = assemble(disc*dx, annotate=False)
             gauge_dat["indicator"] = interpolate(disc/area, prob.P0[i])
+            I = gauge_dat["indicator"]
+
+            # Get initial pointwise and area averaged values
+            gauge_dat["init"] = eta.at(gauge_dat["coords"])
+            # gauge_dat["init_smooth"] = assemble(I*eta*dx, annotate=False)
+            gauge_dat["init_smooth"] = assemble(I*eta*dx)
+            # gauge_dat["init_smooth"] = Function(R).assign(assemble(I*eta*dx))
+            # gauge_dat["init_smooth"] = Function(R)
+            # solve(R_test*R_trial*dx == R_test*I*eta*dx, gauge_dat["init_smooth"])
+
+            # Initialise arrays for storing timeseries
             if self.save_timeseries:
-                if not self.artificial or "data" not in self.gauges[gauge]:
-                    gauge_dat["data"] = []
                 gauge_dat["timeseries"] = []
                 gauge_dat["timeseries_smooth"] = []
                 gauge_dat["diff"] = []
                 gauge_dat["diff_smooth"] = []
-                gauge_dat["init"] = eta.at(gauge_dat["coords"])
-                gauge_dat["init_smooth"] = assemble(gauge_dat["indicator"]*eta*dx, annotate=False)
+                if not self.artificial or "data" not in self.gauges[gauge]:
+                    gauge_dat["data"] = []
 
         def update_forcings(t):
             """
@@ -226,7 +242,6 @@ class TohokuOptions(TsunamiOptions):
             dt = self.dt
             t = t - dt
             weight.assign(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
-            print("#### DEBUG: time {:7.2f} weight {:3.1f}".format(t, *weight.values()))
             self.times.append(t)
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
