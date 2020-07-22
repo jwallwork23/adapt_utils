@@ -191,18 +191,34 @@ class TohokuOptions(TsunamiOptions):
         # N_T = int(self.end_time/self.dt)+1  # Number of observations
         # scaling = Constant(self.qoi_scaling/N_T)
         scaling = Constant(self.qoi_scaling)
-        weight = Constant(1.0)
-        eta_obs = Constant(0.0)
+        weight = Constant(1.0)  # Quadrature weight for time integration scheme
 
+        # These will be updated by the checkpointing routine
         u, eta = prob.fwd_solutions[i].split()
-        # self.eta_init = Function(eta.function_space()).assign(eta)
+
+        # Account for timeseries shift
+        # ============================
+        #   This can be troublesome business. With synthetic data, we can actually get away with not
+        #   shifting, provided we are solving the linearised equations. However, in the nonlinear case
+        #   and when using real data, we should make sure that the timeseries are comparable by always
+        #   shifting them by the initial elevation at each gauge. This isn't really a problem for the
+        #   continuous adjoint method. However, for discrete adjoint we need to annotate the initial
+        #   gauge evaluation. Until point evaluation is annotated in Firedrake, the best thing is to
+        #   just use the initial surface *field*. This does modify the QoI, but it shouldn't be too much
+        #   of a problem if the mesh is sufficiently fine (and hence the indicator regions are
+        #   sufficiently small.
+        if self.artificial:
+            self.eta_init = Constant(0.0)
+        else:
+            # TODO: Use point evaluation once it is annotated
+            self.eta_init = Function(eta.function_space()).assign(eta)
+
         mesh = eta.function_space().mesh()
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
-        # R = FunctionSpace(mesh, "R", 0)
-        # R_test = TestFunction(R)
-        # R_trial = TrialFunction(R)
+        self.times = []
         for gauge in self.gauges:
             gauge_dat = self.gauges[gauge]
+            gauge_dat["obs"] = Constant(0.0)  # Constant associated with free surface observations
 
             # Setup interpolator
             sample = 1 if gauge[0] == '8' else 60
@@ -217,11 +233,7 @@ class TohokuOptions(TsunamiOptions):
 
             # Get initial pointwise and area averaged values
             gauge_dat["init"] = eta.at(gauge_dat["coords"])
-            # gauge_dat["init_smooth"] = assemble(I*eta*dx, annotate=False)
-            gauge_dat["init_smooth"] = assemble(I*eta*dx)
-            # gauge_dat["init_smooth"] = Function(R).assign(assemble(I*eta*dx))
-            # gauge_dat["init_smooth"] = Function(R)
-            # solve(R_test*R_trial*dx == R_test*I*eta*dx, gauge_dat["init_smooth"])
+            gauge_dat["init_smooth"] = assemble(I*eta*dx, annotate=False)
 
             # Initialise arrays for storing timeseries
             if self.save_timeseries:
@@ -259,18 +271,17 @@ class TohokuOptions(TsunamiOptions):
                 # Read data
                 interpolator = gauge_dat["interpolator"]
                 obs = gauge_dat["data"][prob.iteration] if self.artificial else float(interpolator(t))
-                eta_obs.assign(obs)
+                gauge_dat["obs"].assign(obs)
                 if self.save_timeseries:
                     if not self.artificial:
                         gauge_dat["data"].append(obs)
 
                     # Discrete form of error
-                    gauge_dat["diff"].append(0.5*(eta_discrete - eta_obs.dat.data[0])**2)
+                    gauge_dat["diff"].append(0.5*(eta_discrete - gauge_dat["obs"].dat.data[0])**2)
 
                 # Continuous form of error
-                diff = 0.5*I*(eta - gauge_dat["init_smooth"] - eta_obs)**2
-                # diff = 0.5*I*(eta - gauge_dat["init"] - eta_obs)**2
-                # diff = 0.5*I*(eta - self.eta_init - eta_obs)**2
+                #   NOTE: The initial free surface *field* is subtracted in some cases.
+                diff = 0.5*I*(eta - self.eta_init - gauge_dat["obs"])**2
                 self.J += assemble(scaling*weight*diff*dx)
                 if self.save_timeseries:
                     gauge_dat["diff_smooth"].append(assemble(diff*dx, annotate=False))
@@ -279,15 +290,18 @@ class TohokuOptions(TsunamiOptions):
 
     def _get_update_forcings_adjoint(self, prob, i):
         expr = 0
-        u_saved, eta_saved = prob.fwd_solutions[i].split()  # Gauge data (to be loaded from checkpoint)
+        msg = "CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e} (iteration {:d})"
+
+        # Gauge data (to be loaded from checkpoint)
+        u_saved, eta_saved = prob.fwd_solutions[i].split()
+
+        # Construct an expression for the RHS of the adjoint continuity equation
+        #   NOTE: The initial free surface *field* is subtracted in some cases.
         for gauge in self.gauges:
             gauge_dat = self.gauges[gauge]
-            gauge_dat["obs"] = Constant(0.0)
-            expr += gauge_dat["indicator"]*(eta_saved - gauge_dat["init_smooth"] - gauge_dat["obs"])
-            # expr += gauge_dat["indicator"]*(eta_saved - gauge_dat["init"] - gauge_dat["obs"])
-            # expr += gauge_dat["indicator"]*(eta_saved - self.eta_init - gauge_dat["obs"])
+            expr += gauge_dat["indicator"]*(eta_saved - self.eta_init - gauge_dat["obs"])
         expr = Constant(self.qoi_scaling)*expr
-        msg = "CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e} (iteration {:d})"
+        k_u, k_eta = prob.kernels[i].split()
 
         def update_forcings(t):
             """
@@ -299,14 +313,13 @@ class TohokuOptions(TsunamiOptions):
             if self.debug:
                 print_output(msg.format(norm(u_saved), norm(eta_saved), prob.iteration))
 
-            # Sum differences between checkpoint and data
+            # Get timeseries data, implicitly modifying the expression
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
                 obs = gauge_dat["data"][prob.iteration-1] if self.artificial else float(interpolator(t))
                 gauge_dat["obs"].assign(obs)
 
-            # Interpolate onto RHS
-            k_u, k_eta = prob.kernels[i].split()
+            # Interpolate expression onto RHS
             k_eta.interpolate(expr)
             if self.debug and prob.iteration % self.dt_per_export == 0:
                 prob.kernel_file.write(k_eta)

@@ -304,9 +304,9 @@ x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
 axes.plot(x, q(x), '--x', **params)
 params = {'markersize': 14, 'color': 'C0', }
 if use_regularisation:
-    params['label'] = r'$m^\star|_{{\alpha=0.00}} = {:.2f}$'.format(q_min)
+    params['label'] = r'$m^\star|_{{\alpha=0.00}} = {:.4f}$'.format(q_min)
 else:
-    params['label'] = r'$m^\star = {:.2f}$'.format(q_min)
+    params['label'] = r'$m^\star = {:.4f}$'.format(q_min)
 axes.plot(q_min, q(q_min), '*', **params)
 if use_regularisation:
     params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': r'$\alpha = {:.2f}$'.format(op.regularisation), 'markevery': 10, }
@@ -332,7 +332,7 @@ plt.tight_layout()
 axes.grid()
 plt.legend(fontsize=fontsize)
 axes.annotate(
-    r'$m = {:.2f}$'.format(control_values_opt[-1]),
+    r'$m = {:.4f}$'.format(control_values_opt[-1]),
     xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
 fname = os.path.join(di, 'single_bf_optimisation_continuous_artificial')
