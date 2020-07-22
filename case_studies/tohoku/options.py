@@ -425,7 +425,7 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         self.nx = kwargs.get('nx', 1)
         self.ny = kwargs.get('ny', 1)
         N_b = self.nx*self.ny
-        control_parameters = kwargs.get('control_parameters', [1.0 for i in range(N_b)])
+        control_parameters = kwargs.get('control_parameters', [0.0 for i in range(N_b)])
         N_c = len(control_parameters)
         if N_c != N_b:
             raise ValueError("{:d} controls inconsistent with {:d} basis functions".format(N_c, N_b))
