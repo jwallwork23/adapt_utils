@@ -9,7 +9,6 @@ import os
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.case_studies.tohoku.options import *
-# from adapt_utils.norms import total_variation
 
 
 parser = argparse.ArgumentParser()
@@ -18,6 +17,7 @@ parser.add_argument("-family", help="Finite element pair")
 parser.add_argument("-stabilisation", help="Stabilisation approach")
 parser.add_argument("-control_parameter", help="Where to evaluate gradient")
 parser.add_argument("-nonlinear", help="Toggle nonlinear model")
+parser.add_argument("-finite_differences", help="Toggle finite difference computation")
 parser.add_argument("-debug", help="Toggle debugging")
 args = parser.parse_args()
 
@@ -38,7 +38,6 @@ kwargs = {
     'control_parameter': float(args.control_parameter or 10.0),
     'optimal_value': 5.0,
     'artificial': True,
-    # 'qoi_scaling': 1.0e-12,
     'qoi_scaling': 1.0,
 
     # Misc
@@ -46,6 +45,7 @@ kwargs = {
     'debug': bool(args.debug or False),
 }
 nonlinear = bool(args.nonlinear or False)
+fd = bool(args.finite_differences or False)
 op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
 
 # Toggle smoothed or discrete timeseries
@@ -102,9 +102,6 @@ di = create_directory(os.path.join(op.di, 'plots'))
 plt.tight_layout()
 plt.savefig(os.path.join(di, 'single_bf_timeseries_level{:d}.pdf'.format(level)))
 
-# TODO: Compare discrete vs continuous form of error using plot
-# TODO: Compare discrete vs continuous form of error using norms / TV
-
 # Compute gradient
 g_discrete = swp.compute_gradient(Control(op.control_parameter)).dat.data[0]
 
@@ -141,31 +138,33 @@ del swp
 # --- Finite differences
 
 # Establish gradient using finite differences
-epsilon = 1.0
-converged = False
-rtol = 1.0e-05
-g_fd_ = None
-op.save_timeseries = False
-while not converged:
-    swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
-    op.control_parameter.assign(kwargs['control_parameter'] + epsilon)
-    swp.solve_forward(plot_pvd=False)
-    J_step = op.J
-    g_fd = (J_step - J)/epsilon
-    print_output("J(epsilon=0) = {:.8e}  J(epsilon={:.1e}) = {:.8e}".format(J, epsilon, J_step))
-    if g_fd_ is not None:
-        print_output("gradient = {:.8e}  difference = {:.8e}".format(g_fd, abs(g_fd - g_fd_)))
-        if abs(g_fd - g_fd_) < rtol*J:
-            converged = True
-        elif epsilon < 1.0e-10:
-            raise ConvergenceError
-    epsilon *= 0.5
-    g_fd_ = g_fd
-    del swp
+if fd:
+    epsilon = 1.0
+    converged = False
+    rtol = 1.0e-05
+    g_fd_ = None
+    op.save_timeseries = False
+    while not converged:
+        swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
+        op.control_parameter.assign(kwargs['control_parameter'] + epsilon)
+        swp.solve_forward(plot_pvd=False)
+        J_step = op.J
+        g_fd = (J_step - J)/epsilon
+        print_output("J(epsilon=0) = {:.8e}  J(epsilon={:.1e}) = {:.8e}".format(J, epsilon, J_step))
+        if g_fd_ is not None:
+            print_output("gradient = {:.8e}  difference = {:.8e}".format(g_fd, abs(g_fd - g_fd_)))
+            if abs(g_fd - g_fd_) < rtol*J:
+                converged = True
+            elif epsilon < 1.0e-10:
+                raise ConvergenceError
+        epsilon *= 0.5
+        g_fd_ = g_fd
+        del swp
 
 # Logging
 logstr = "elements: {:d}\n".format(elements)
-logstr += "finite difference gradient (rtol={:.1e}): {:.4e}\n".format(rtol, g_fd)
+if fd:
+    logstr += "finite difference gradient (rtol={:.1e}): {:.4e}\n".format(rtol, g_fd)
 logstr += "discrete gradient: {:.4e}\n".format(g_discrete)
 logstr += "continuous gradient: {:.4e}\n".format(g_continuous)
 print_output(logstr)

@@ -237,7 +237,7 @@ for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
 params['label'] = 'Computed gradient'
 axes.plot(x, g*(x-m) + f, '-', **params)
 axes.set_xlabel(r"Basis function coefficient, $m$", fontsize=fontsize)
-axes.set_ylabel(r"Scaled mean square error", fontsize=fontsize)
+axes.set_ylabel(r"Square error", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
 plt.xlim([1.5, 10.5])
