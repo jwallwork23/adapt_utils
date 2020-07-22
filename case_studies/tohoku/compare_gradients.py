@@ -47,13 +47,19 @@ kwargs = {
 nonlinear = bool(args.nonlinear or False)
 op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
 
+# Toggle smoothed or discrete timeseries
+timeseries_type = "timeseries"
+use_smoothed_timeseries = False
+if use_smoothed_timeseries:
+    timeseries_type = "_".join([timeseries_type, "smooth"])
+
 # Solve the forward problem to get data with 'optimal' control parameter m = 5
 with stop_annotating():
     op.control_parameter.assign(kwargs['optimal_value'])
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     swp.solve_forward()
     for gauge in op.gauges:
-        op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
+        op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
     del swp
 
 
@@ -83,7 +89,7 @@ T = np.array(op.times)/60
 for i, gauge in enumerate(gauges):
     ax = axes[i//N, i % N]
     plotting_kwargs['label'] = "{:s} simulated (m = {:.1f})".format(gauge, kwargs['control_parameter'])
-    ax.plot(T, op.gauges[gauge]['timeseries'], '--x', **plotting_kwargs)
+    ax.plot(T, op.gauges[gauge][timeseries_type], '--x', **plotting_kwargs)
     plotting_kwargs['label'] = "{:s} data (m = {:.1f})".format(gauge, kwargs['optimal_value'])
     ax.plot(T, op.gauges[gauge]['data'], '--x', **plotting_kwargs)
     ax.legend(loc='upper left')

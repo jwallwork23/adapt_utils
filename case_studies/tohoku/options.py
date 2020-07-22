@@ -193,6 +193,7 @@ class TohokuOptions(TsunamiOptions):
         scaling = Constant(self.qoi_scaling)
         weight = Constant(1.0)
         eta_obs = Constant(0.0)
+        eta_init = Constant(0.0)
         dtc = Constant(self.dt)
         u, eta = prob.fwd_solutions[i].split()
         mesh = eta.function_space().mesh()
@@ -206,7 +207,8 @@ class TohokuOptions(TsunamiOptions):
                 self.gauges[gauge]["timeseries_smooth"] = []
                 self.gauges[gauge]["diff"] = []
                 self.gauges[gauge]["diff_smooth"] = []
-                self.gauges[gauge]["init"] = eta.at(self.gauges[gauge]["coords"])
+                self.gauges[gauge]["init"] = []
+                self.gauges[gauge]["init_smooth"] = []
             sample = 1 if gauge[0] == '8' else 60
             self.gauges[gauge]["interpolator"] = sample_timeseries(gauge, sample=sample)
             loc = self.gauges[gauge]["coords"]
@@ -228,11 +230,19 @@ class TohokuOptions(TsunamiOptions):
                 gauge_dat = self.gauges[gauge]
                 I = gauge_dat["indicator"]
 
-                # Point evaluation at gauges
+                # Point evaluation and average value at gauges
+                eta_smoothed = assemble(I*eta*dx, annotate=False)
+                # eta_smoothed = assemble(I*eta*dx, annotate=gauge_dat["init_smooth"] == [])
+                if gauge_dat["init_smooth"] == []:
+                    gauge_dat["init_smooth"] = eta_smoothed
+                    eta_init.assign(eta_smoothed)
                 if self.save_timeseries:
-                    eta_discrete = eta.at(gauge_dat["coords"]) - gauge_dat["init"]
+                    gauge_dat["timeseries_smooth"].append(eta_smoothed - gauge_dat["init_smooth"])
+                    eta_discrete = eta.at(gauge_dat["coords"])
+                    if gauge_dat["init"] == []:
+                        gauge_dat["init"] = eta_discrete
+                    eta_discrete -= gauge_dat["init"]
                     gauge_dat["timeseries"].append(eta_discrete)
-                    gauge_dat["timeseries_smooth"].append(assemble(I*eta*dx, annotate=False))
                 if self.artificial and gauge_dat["data"] == []:
                     continue
 
@@ -248,7 +258,7 @@ class TohokuOptions(TsunamiOptions):
                     gauge_dat["diff"].append(0.5*(eta_discrete - eta_obs.dat.data[0])**2)
 
                 # Continuous form of error
-                diff = 0.5*I*(eta - eta_obs)**2
+                diff = 0.5*I*(eta - eta_init - eta_obs)**2
                 self.J += assemble(scaling*weight*dtc*diff*dx)
                 # self.J += assemble(scaling*weight*diff*dx)  # Time average
                 if self.save_timeseries:
