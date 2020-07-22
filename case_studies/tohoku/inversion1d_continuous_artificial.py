@@ -79,7 +79,7 @@ kwargs = {
     'debug': bool(args.debug or False),
 }
 use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
-nonlinear = bool(args.nonlinear or True)
+nonlinear = bool(args.nonlinear or False)
 fontsize = 22
 fontsize_tick = 18
 plotting_kwargs = {
@@ -332,7 +332,7 @@ axes.annotate(
 fname = os.path.join(di, 'single_bf_optimisation_continuous_artificial')
 if use_regularisation:
     fname = '_'.join([fname, 'reg'])
-plt.savefig('_'.join([fname, '_{:d}.pdf'.format(level)]))
+plt.savefig('_'.join([fname, '{:d}.pdf'.format(level)]))
 
 if not plot_only:
 
