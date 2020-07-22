@@ -193,28 +193,28 @@ class TohokuOptions(TsunamiOptions):
         scaling = Constant(self.qoi_scaling)
         weight = Constant(1.0)
         eta_obs = Constant(0.0)
-        eta_init = Constant(0.0)
         dtc = Constant(self.dt)
         u, eta = prob.fwd_solutions[i].split()
+        # self.eta_init = eta.copy(deepcopy=True)
         mesh = eta.function_space().mesh()
         self.times = []
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
         for gauge in self.gauges:
+            gauge_dat = self.gauges[gauge]
+            sample = 1 if gauge[0] == '8' else 60
+            gauge_dat["interpolator"] = sample_timeseries(gauge, sample=sample)
+            disc = ellipse([gauge_dat["coords"] + (radius,), ], mesh)
+            area = assemble(disc*dx, annotate=False)
+            gauge_dat["indicator"] = interpolate(disc/area, prob.P0[i])
             if self.save_timeseries:
                 if not self.artificial or "data" not in self.gauges[gauge]:
-                    self.gauges[gauge]["data"] = []
-                self.gauges[gauge]["timeseries"] = []
-                self.gauges[gauge]["timeseries_smooth"] = []
-                self.gauges[gauge]["diff"] = []
-                self.gauges[gauge]["diff_smooth"] = []
-                self.gauges[gauge]["init"] = []
-                self.gauges[gauge]["init_smooth"] = []
-            sample = 1 if gauge[0] == '8' else 60
-            self.gauges[gauge]["interpolator"] = sample_timeseries(gauge, sample=sample)
-            loc = self.gauges[gauge]["coords"]
-            self.gauges[gauge]["indicator"] = interpolate(ellipse([loc + (radius,), ], mesh), prob.P0[i])
-            self.gauges[gauge]["area"] = assemble(self.gauges[gauge]["indicator"]*dx, annotate=False)
-            self.gauges[gauge]["indicator"] /= self.gauges[gauge]["area"]
+                    gauge_dat["data"] = []
+                gauge_dat["timeseries"] = []
+                gauge_dat["timeseries_smooth"] = []
+                gauge_dat["diff"] = []
+                gauge_dat["diff_smooth"] = []
+                gauge_dat["init"] = eta.at(gauge_dat["coords"])
+                gauge_dat["init_smooth"] = assemble(gauge_dat["indicator"]*eta*dx, annotate=False)
 
         def update_forcings(t):
             """
@@ -223,26 +223,21 @@ class TohokuOptions(TsunamiOptions):
 
             NOTE: `update_forcings` is called one timestep along so we shift time back.
             """
-            t = t - self.dt
-            weight.assign(0.5 if t < 0.5*self.dt or t >= self.end_time - 0.5*self.dt else 1.0)
+            dt = self.dt
+            t = t - dt
+            weight.assign(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
+            print("#### DEBUG: time {:7.2f} weight {:3.1f}".format(t, *weight.values()))
             self.times.append(t)
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
                 I = gauge_dat["indicator"]
 
                 # Point evaluation and average value at gauges
-                eta_smoothed = assemble(I*eta*dx, annotate=False)
-                # eta_smoothed = assemble(I*eta*dx, annotate=gauge_dat["init_smooth"] == [])
-                if gauge_dat["init_smooth"] == []:
-                    gauge_dat["init_smooth"] = eta_smoothed
-                    eta_init.assign(eta_smoothed)
                 if self.save_timeseries:
-                    gauge_dat["timeseries_smooth"].append(eta_smoothed - gauge_dat["init_smooth"])
-                    eta_discrete = eta.at(gauge_dat["coords"])
-                    if gauge_dat["init"] == []:
-                        gauge_dat["init"] = eta_discrete
-                    eta_discrete -= gauge_dat["init"]
+                    eta_discrete = eta.at(gauge_dat["coords"]) - gauge_dat["init"]
                     gauge_dat["timeseries"].append(eta_discrete)
+                    eta_smoothed = assemble(I*eta*dx, annotate=False) - gauge_dat["init_smooth"]
+                    gauge_dat["timeseries_smooth"].append(eta_smoothed)
                 if self.artificial and gauge_dat["data"] == []:
                     continue
 
@@ -258,9 +253,10 @@ class TohokuOptions(TsunamiOptions):
                     gauge_dat["diff"].append(0.5*(eta_discrete - eta_obs.dat.data[0])**2)
 
                 # Continuous form of error
-                diff = 0.5*I*(eta - eta_init - eta_obs)**2
-                self.J += assemble(scaling*weight*dtc*diff*dx)
-                # self.J += assemble(scaling*weight*diff*dx)  # Time average
+                diff = 0.5*I*(eta - gauge_dat["init_smooth"] - eta_obs)**2
+                # diff = 0.5*I*(eta - gauge_dat["init"] - eta_obs)**2
+                # diff = 0.5*I*(eta - self.eta_init - eta_obs)**2
+                self.J += assemble(scaling*weight*diff*dx)
                 if self.save_timeseries:
                     gauge_dat["diff_smooth"].append(assemble(diff*dx, annotate=False))
 
@@ -270,10 +266,11 @@ class TohokuOptions(TsunamiOptions):
         expr = 0
         u_saved, eta_saved = prob.fwd_solutions[i].split()  # Gauge data (to be loaded from checkpoint)
         for gauge in self.gauges:
-            self.gauges[gauge]['obs'] = Constant(0.0)
-            expr += self.gauges[gauge]["indicator"]*(eta_saved - self.gauges[gauge]['obs'])
-        # expr = Constant(self.qoi_scaling/self.end_time)*expr  # Time average
-        # expr = Constant(self.qoi_scaling/self.dt)*expr  # Time average
+            gauge_dat = self.gauges[gauge]
+            gauge_dat["obs"] = Constant(0.0)
+            expr += gauge_dat["indicator"]*(eta_saved - gauge_dat["init_smooth"] - gauge_dat["obs"])
+            # expr += gauge_dat["indicator"]*(eta_saved - gauge_dat["init"] - gauge_dat["obs"])
+            # expr += gauge_dat["indicator"]*(eta_saved - self.eta_init - gauge_dat["obs"])
         expr = Constant(self.qoi_scaling)*expr
         msg = "CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e} (iteration {:d})"
 
@@ -289,11 +286,9 @@ class TohokuOptions(TsunamiOptions):
 
             # Sum differences between checkpoint and data
             for gauge in self.gauges:
-                if self.artificial:
-                    obs = self.gauges[gauge]["data"][prob.iteration-1]
-                else:
-                    obs = float(self.gauges[gauge]["interpolator"](t))
-                self.gauges[gauge]['obs'].assign(obs)
+                gauge_dat = self.gauges[gauge]
+                obs = gauge_dat["data"][prob.iteration-1] if self.artificial else float(interpolator(t))
+                gauge_dat["obs"].assign(obs)
 
             # Interpolate onto RHS
             k_u, k_eta = prob.kernels[i].split()
