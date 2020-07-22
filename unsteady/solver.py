@@ -913,6 +913,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if export_func is not None:
                     export_func()
                 self.callbacks[i].evaluate(mode='export')
+        update_forcings(self.simulation_time + op.dt)  # TODO: TESTME
         op.print_debug("Done!")
         print_output(80*'=')
 
@@ -1034,6 +1035,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.adjoint_tracer_file.write(proj_tracer)
                 if export_func is not None:
                     export_func()
+        update_forcings(self.simulation_time - op.dt)  # TODO: TESTME
         op.print_debug("Done!")
         print_output(80*'=')
 

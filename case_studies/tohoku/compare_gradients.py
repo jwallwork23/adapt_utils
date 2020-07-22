@@ -16,6 +16,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-family", help="Finite element pair")
 parser.add_argument("-stabilisation", help="Stabilisation approach")
+parser.add_argument("-control_parameter", help="Where to evaluate gradient")
 parser.add_argument("-nonlinear", help="Toggle nonlinear model")
 parser.add_argument("-debug", help="Toggle debugging")
 args = parser.parse_args()
@@ -34,7 +35,7 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Adjoint
-    'control_parameter': 10.0,
+    'control_parameter': float(args.control_parameter or 10.0),
     'optimal_value': 5.0,
     'artificial': True,
     # 'qoi_scaling': 1.0e-12,
