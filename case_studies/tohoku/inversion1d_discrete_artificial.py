@@ -66,7 +66,7 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
-    'control_parameter': float(args.initial_guess or 10.0),
+    'control_parameters': [float(args.initial_guess or 10.0), ],
     'artificial': True,
     # 'qoi_scaling': 1.0e-12,
     'qoi_scaling': 1.0,
@@ -94,7 +94,7 @@ if not plot_only:
 
     # Artifical run
     with stop_annotating():
-        op.control_parameter.assign(float(args.optimal_control or 5.0))
+        op.control_parameters[0].assign(float(args.optimal_control or 5.0))
         swp = AdaptiveProblem(op, nonlinear=nonlinear)
         swp.solve_forward()
         for gauge in op.gauges:
@@ -111,14 +111,14 @@ with stop_annotating():
         func_values = np.zeros(n)
         swp = AdaptiveProblem(op, nonlinear=nonlinear)
         for i, m in enumerate(control_values):
-            op.control_parameter.assign(m)
+            op.control_parameters[0].assign(m)
             swp.set_initial_condition()
             swp.solve_forward()
             func_values[i] = op.J
     else:
         func_values = np.load(fname)
     np.save(fname, func_values)
-    op.control_parameter.assign(float(args.initial_guess or 10.0))
+    op.control_parameters[0].assign(float(args.initial_guess or 10.0))
 for i, m in enumerate(control_values):
     print_output("{:2d}: control value {:.4e}  functional value {:.4e}".format(i, m, func_values[i]))
 
@@ -204,7 +204,7 @@ else:
         'maxiter': 100,
         'gtol': 1.0e-08,
     }
-    Jhat = ReducedFunctional(J, Control(op.control_parameter), derivative_cb_post=derivative_cb_post)
+    Jhat = ReducedFunctional(J, Control(op.control_parameters[0]), derivative_cb_post=derivative_cb_post)
     try:
         optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs).dat.data[0]
     except StagnationError:
@@ -260,7 +260,7 @@ if not plot_only:
             return self.op.J
 
     # Run forward again so that we can compare timeseries
-    kwargs['control_parameter'] = optimised_value
+    kwargs['control_parameters'] = [optimised_value, ]
     kwargs['plot_pvd'] = plot_pvd
     op_opt = TohokuGaussianBasisOptions(**kwargs)
     gauges = list(op_opt.gauges.keys())
@@ -304,6 +304,6 @@ if not plot_only:
         print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
 
     if plot_pvd:
-        swp.compute_gradient(Control(op_opt.control_parameter))
+        swp.compute_gradient(Control(op_opt.control_parameters[0]))
         swp.get_solve_blocks()
         swp.save_adjoint_trajectory()

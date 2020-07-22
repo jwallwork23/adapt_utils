@@ -68,7 +68,7 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
-    'control_parameter': float(args.initial_guess or 10.0),
+    'control_parameters': [float(args.initial_guess or 10.0), ],
     'artificial': True,
     # 'qoi_scaling': 1.0e-12,
     'qoi_scaling': 1.0,
@@ -96,7 +96,7 @@ if use_smoothed_timeseries:
 
 # Artifical run
 if not plot_only:
-    op.control_parameter.assign(float(args.optimal_control or 5.0))
+    op.control_parameters[0].assign(float(args.optimal_control or 5.0))
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     swp.solve_forward()
     for gauge in op.gauges:
@@ -112,7 +112,7 @@ if recompute:
     func_values = np.zeros(n)
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     for i, m in enumerate(control_values):
-        op.control_parameter.assign(m)
+        op.control_parameters[0].assign(m)
         swp.set_initial_condition()
         swp.solve_forward()
         func_values[i] = op.J
@@ -131,7 +131,7 @@ if use_regularisation:
         func_values_reg = np.zeros(n)
         swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
         for i, m in enumerate(control_values):
-            op.control_parameter.assign(m)
+            op.control_parameters[0].assign(m)
             swp.set_initial_condition()
             swp.solve_forward()
             func_values_reg[i] = op.J
@@ -167,7 +167,7 @@ if not plot_only:
 
         Note that this involves checkpointing state.
         """
-        op.control_parameter.assign(m[0])
+        op.control_parameters[0].assign(m[0])
         swp.solve_forward()
         J = op.J
         print_output("control = {:.8e}  functional = {:.8e}".format(m[0], J))
@@ -181,7 +181,7 @@ if not plot_only:
         if len(swp.checkpoint) == 0:
             reduced_functional(m)
         swp.solve_adjoint()
-        g = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)  # TODO: No minus sign?
+        g = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradient
         print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g))
@@ -267,7 +267,7 @@ else:
         'callback': lambda m: print_output("LINE SEARCH COMPLETE"),
         'fprime': gradient_hat,
     }
-    m_init = op.control_parameter.dat.data
+    m_init = op.control_parameters[0].dat.data
     try:
         m_opt = scipy.optimize.fmin_bfgs(reduced_functional_hat, m_init, **opt_kwargs)
         optimised_value = m_opt.dat.data[0]
@@ -343,7 +343,7 @@ plt.savefig('_'.join([fname, '{:d}.pdf'.format(level)]))
 if not plot_only:
 
     # Run forward again so that we can compare timeseries
-    kwargs['control_parameter'] = optimised_value
+    kwargs['control_parameters'] = [optimised_value, ]
     kwargs['plot_pvd'] = plot_pvd
     op_opt = TohokuGaussianBasisOptions(**kwargs)
     gauges = list(op_opt.gauges.keys())

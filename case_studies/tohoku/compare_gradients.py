@@ -35,7 +35,7 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Adjoint
-    'control_parameter': float(args.control_parameter or 10.0),
+    'control_parameters': [float(args.control_parameter or 10.0), ],
     'optimal_value': 5.0,
     'artificial': True,
     'qoi_scaling': 1.0,
@@ -56,7 +56,7 @@ if use_smoothed_timeseries:
 
 # Solve the forward problem to get data with 'optimal' control parameter m = 5
 with stop_annotating():
-    op.control_parameter.assign(kwargs['optimal_value'])
+    op.control_parameters[0].assign(kwargs['optimal_value'])
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
     swp.solve_forward()
     for gauge in op.gauges:
@@ -73,7 +73,7 @@ class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
 
 
 # Solve the forward problem with 'suboptimal' control parameter m = 10
-op.control_parameter.assign(kwargs['control_parameter'], annotate=False)
+op.control_parameters[0].assign(kwargs['control_parameters'][0], annotate=False)
 swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, checkpointing=False)
 swp.solve_forward()
 J = op.J
@@ -89,7 +89,7 @@ plotting_kwargs = {
 T = np.array(op.times)/60
 for i, gauge in enumerate(gauges):
     ax = axes[i//N, i % N]
-    plotting_kwargs['label'] = "{:s} simulated (m = {:.1f})".format(gauge, kwargs['control_parameter'])
+    plotting_kwargs['label'] = "{:s} simulated (m = {:.1f})".format(gauge, kwargs['control_parameters'][0])
     ax.plot(T, op.gauges[gauge][timeseries_type], '--x', **plotting_kwargs)
     plotting_kwargs['label'] = "{:s} data (m = {:.1f})".format(gauge, kwargs['optimal_value'])
     ax.plot(T, op.gauges[gauge]['data'], '--x', **plotting_kwargs)
@@ -103,12 +103,12 @@ plt.tight_layout()
 plt.savefig(os.path.join(di, 'single_bf_timeseries_level{:d}.pdf'.format(level)))
 
 # Compute gradient
-g_discrete = swp.compute_gradient(Control(op.control_parameter)).dat.data[0]
+g_discrete = swp.compute_gradient(Control(op.control_parameters[0])).dat.data[0]
 
 # Check consistency of by-hand gradient formula
 swp.get_solve_blocks()
 swp.save_adjoint_trajectory()
-g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
+g_by_hand_discrete = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)
 print_output("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
 relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
 assert np.allclose(relative_error, 0.0)
@@ -127,7 +127,7 @@ J = op.J
 
 # Solve adjoint equation in continuous form
 swp.solve_adjoint()
-g_continuous = assemble(inner(op.basis_function, swp.adj_solutions[0])*dx)
+g_continuous = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)
 print_output("Gradient computed by hand (continuous): {:.4e}".format(g_continuous))
 relative_error = abs((g_discrete - g_continuous)/g_discrete)
 print_output("Relative error (discrete vs. continuous): {:.4f}%".format(100*relative_error))
@@ -146,7 +146,7 @@ if fd:
     op.save_timeseries = False
     while not converged:
         swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
-        op.control_parameter.assign(kwargs['control_parameter'] + epsilon)
+        op.control_parameters[0].assign(kwargs['control_parameters'][0] + epsilon)
         swp.solve_forward(plot_pvd=False)
         J_step = op.J
         g_fd = (J_step - J)/epsilon
@@ -169,5 +169,5 @@ logstr += "discrete gradient: {:.4e}\n".format(g_discrete)
 logstr += "continuous gradient: {:.4e}\n".format(g_continuous)
 print_output(logstr)
 fname = "outputs/fixed_mesh/gradient_at_{:d}_level{:d}.log"
-with open(fname.format(int(kwargs['control_parameter']), level), 'w') as logfile:
+with open(fname.format(int(kwargs['control_parameters'][0]), level), 'w') as logfile:
     logfile.write(logstr)
