@@ -225,7 +225,7 @@ fig, axes = plt.subplots(figsize=(8, 8))
 params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'markevery': 10, 'label': 'Parameter space', }
 x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
 axes.plot(x, q(x), '--x', **params)
-params = {'markersize': 14, 'color': 'C0', 'label': r'$m^\star = {:.2f}$'.format(q_min), }
+params = {'markersize': 14, 'color': 'C0', 'label': r'$m^\star = {:.4f}$'.format(q_min), }
 axes.plot(q_min, q(q_min), '*', **params)
 params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
 axes.plot(control_values_opt, func_values_opt, 'o', **params)
@@ -245,7 +245,7 @@ plt.tight_layout()
 axes.grid()
 plt.legend(fontsize=fontsize)
 axes.annotate(
-    r'$m = {:.2f}$'.format(control_values_opt[-1]),
+    r'$m = {:.4f}$'.format(control_values_opt[-1]),
     xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
 plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
