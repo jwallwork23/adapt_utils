@@ -37,7 +37,7 @@ kwargs = {
     # Adjoint
     'control_parameters': [float(args.control_parameter or 10.0), ],
     'optimal_value': 5.0,
-    'artificial': True,
+    'synthetic': True,
     'qoi_scaling': 1.0,
 
     # Misc

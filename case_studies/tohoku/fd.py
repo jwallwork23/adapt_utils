@@ -30,7 +30,7 @@ kwargs = {
     # Adjoint
     'control_parameters': [10.0, ],
     'optimal_value': 5.0,
-    'artificial': True,
+    'synthetic': True,
     'qoi_scaling': 1.0e-12,
 
     # Misc
