@@ -630,12 +630,12 @@ class TohokuOkadaOptions(TohokuOptions):
       * Focal depth - depth of the top of the fault plane [m].
       * Fault length - length of the fault plane [m].
       * Fault width - width of the fault plane [m].
-      * Dislocation - average displacement [m].
-      * Strike direction - angle from North of fault [radians].
+      * Slip - average displacement [m].
+      * Strike angle - angle from North of fault [radians].
       * Dip angle - angle from horizontal [radians].
-      * Slip angle - slip of one fault block compared to another [radians].
-      * Fault latitude - latitude of top-center of fault plane [degrees].
-      * Fault longitude - longitude of top-center of fault plane [degrees].
+      * Rake angle - slip of one fault block compared to another [radians].
+      * Focus x-coordinate - in UTM coordinates [m].
+      * Focus y-coordinate - in UTM coordinates [m].
     """
     def __init__(self, **kwargs):
         """
@@ -655,14 +655,20 @@ class TohokuOkadaOptions(TohokuOptions):
 
         # Extract Okada parameters
         assert len(self.control_parameters) == 9
-        self.focal_depth, self.fault_length, self.fault_width, \
-            self.dislocation, self.strike_direction, self.dip_angle, \
-            self.slip_angle, self.fault_latitude, self.fault_longitude = self.control_parameters
-        # TODO: Check validity, e.g. lon/lat in correct range. Perhaps apply modular arithmetic.
+        self.focal_depth, self.fault_length, self.fault_width, self.slip, \
+            self.strike_angle, self.dip_angle, self.rake_angle, \
+            self.centre_x, self.centre_y = self.control_parameters
+        # TODO: Check validity of controls
+
+        # Pre-compute trigonometric functions
+        self.sin_strike = np.sin(self.strike_angle)
+        self.cos_strike = np.cos(self.strike_angle)
+        self.sin_dip = np.sin(self.dip_angle)
+        self.cos_dip = np.cos(self.dip_angle)
+        self.sin_rake = np.sin(self.rake_angle)
+        self.cos_rake = np.cos(self.rake_angle)
 
         # Parametrisation of source region
-        self.centre_x = kwargs.get('centre_x', 0.7e+06)
-        self.centre_y = kwargs.get('centre_y', 4.2e+06)
         self.extent_x = kwargs.get('extent_x', 560.0e+03)
         self.extent_y = kwargs.get('extent_y', 240.0e+03)
         self.fault_type = kwargs.get('fault_type', 'average')
@@ -675,33 +681,96 @@ class TohokuOkadaOptions(TohokuOptions):
         self.nx = kwargs.get('nx', 20)
         self.ny = kwargs.get('ny', 20)
 
-    def get_fault_lenth(x, y):
+        # Other parameters
+        self.poisson_ratio = 0.25
+
+    def get_fault_length(x, y):
         """
         :arg x: distance along strike direction
         :arg y: distance perpendicular to strike direction.
         """
-        dbar = self.dislocation
         if self.fault_type == 'average':
-            return dbar
-        theta = self.fault_asymmetry*self.fault_length
-        if self.fault_type == 'sinusoidal':
-            if np.isclose(x, theta):
-                return 0.5*pi*dbar
-            elif x < theta:
-                return 0.5*pi*dbar*sin(0.5*pi*x/theta)
-            else:
-                return -0.5*pi*dbar*sin(1.5*pi + 0.5*pi*(x - theta)/(self.fault_length - theta))
+            return self.slip
         else:
-            return 0.5*pi*dbar*sin(0.5*pi*(x**2 + y**2)/theta)
+            raise NotImplementedError  # TODO
+
+    def _strike_slip(self, y1, y2, q):
+        # TODO: doc; copied from `geoclaw/src/python/geoclaw/dtopotools.py`
+        sn = self.sin_dip
+        cs = self.cos_dip
+
+        dbar = y2*sn - q*cs
+        r = np.sqrt(y1**2 + y2**2 + q**2)
+        a4 = 2.0*self.poisson_ratio/cs*(np.log(r + dbar) - sn*np.log(r + y2))
+        return -0.5*(dbar*q/(r*(r + y2)) + q*sn/(r + y2) + a4*sn)/pi
+
+    def _dip_slip(self, y1, y2, q):
+        # TODO: doc; copied from `geoclaw/src/python/geoclaw/dtopotools.py`
+        sn = self.sin_dip
+        cs = self.cos_dip
+
+        dbar = y2*sn - q*cs
+        r = np.sqrt(y1**2 + y2**2 + q**2)
+        xx = np.sqrt(y1**2 + q**2)
+        a5 = 4.0*self.poisson_ratio*np.arctan((y2*(xx + q*cs) + xx*(r + xx)*sn)/(y1*(r + xx)*cs))/cs
+        return -0.5*(dbar*q/(r*(r + y1)) + sn*np.arctan(y1*y2/(q*r)) - a5*sn*cs)/pi
 
     def set_initial_condition(self, prob):
+        # TODO: doc; copied from `geoclaw/src/python/geoclaw/dtopotools.py`
+        from scipy.interpolate import interp2d
 
-        # Get fault dislocation grid
-        Xfbar = np.linspace(0, self.fault_width, self.nx)
-        Yfbar = np.linspace(0, self.fault_length, self.ny)
-        Zfbar = [[self.get_fault_length(x, y) for y in Yfbar] for x in Xfbar]
+        # Get fault parameters
+        length = self.fault_length
+        width = self.fault_width
+        w = width/self.ny
+        depth = self.focal_depth
+        halfL = 0.5*length/self.nx
 
-        raise NotImplementedError  # TODO
+        # Get fault dislocation grid  # TODO: Currently assumed constant
+        x = np.linspace(self.centre_x - 0.5*length, self.centre_x + 0.5*length, self.nx)
+        y = np.linspace(self.centre_y - 0.5*width, self.centre_y + 0.5*width, self.ny)
+        # slip = np.array([[self.get_fault_length(xi, yj) for yj in y] for xi in x])
+        slip = self.slip
+        X, Y = np.meshgrid(x, y)
+
+        # Convert to distance along strike (x1) and dip (x2)  # TODO: use rotate function
+        x1 = X*self.sin_strike + Y*self.cos_strike
+        x2 = X*self.cos_strike - Y*self.sin_strike
+        x2 = -x2  # Account for Okada's notation (x2 is distance up fault plane, rather than down dip)
+        p = x2*self.cos_dip + self.focal_depth*self.sin_dip
+        q = x2*self.sin_dip - self.focal_depth*self.cos_dip
+
+        # Sum components for strike
+        f1 = self._strike_slip(x1 + halfL, p, q)
+        f2 = self._strike_slip(x1 + halfL, p - w, q)
+        f3 = self._strike_slip(x1 - halfL, p, q)
+        f4 = self._strike_slip(x1 - halfL, p - w, q)
+        us = (f1 - f2 - f3 + f4)*slip*self.cos_rake
+
+        # Sum components for dip
+        g1 = self._dip_slip(x1 + halfL, p, q)
+        g2 = self._dip_slip(x1 + halfL, p - w, q)
+        g3 = self._dip_slip(x1 - halfL, p, q)
+        g4 = self._dip_slip(x1 - halfL, p - w, q)
+        ud = (g1 - g2 - g3 + g4)*slip*self.sin_rake
+
+        # Interpolate  # TODO: Would be better to just evaluate all the above in UFL
+        surf_interp = interp2d(X, Y, us + ud)
+        initial_surface = Function(prob.P1[0])
+        self.print_debug("Interpolating initial surface...")
+        for i, xy in enumerate(prob.meshes[0].coordinates.dat.data):
+            initial_surface.dat.data[i] = surf_interp(xy[0], xy[1])
+        self.print_debug("Done!")
+
+        # Set initial condition
+        u, eta = prob.fwd_solutions[0].split()
+        eta.interpolate(initial_surface)
+
+        # TODO: TEMP
+        self.X = X
+        self.Y = Y
+        self.us = us
+        self.ud = ud
 
     def get_regularisation_term(self, prob):
         raise NotImplementedError  # TODO
