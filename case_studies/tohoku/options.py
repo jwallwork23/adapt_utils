@@ -695,17 +695,33 @@ class TohokuOkadaOptions(TohokuOptions):
             raise NotImplementedError  # TODO
 
     def _strike_slip(self, y1, y2, q):
-        # TODO: doc; copied from `geoclaw/src/python/geoclaw/dtopotools.py`
+        """
+        Calculate strike-slip displacements as in [Okada 85].
+
+        Modified from the code available within GeoCLAW in `geoclaw/src/python/geoclaw/dtopotools.py`.
+
+        [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
+                   half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
+                   pp.1135--1154, (1985).
+        """
         sn = self.sin_dip
         cs = self.cos_dip
 
         dbar = y2*sn - q*cs
         r = np.sqrt(y1**2 + y2**2 + q**2)
         a4 = 2.0*self.poisson_ratio/cs*(np.log(r + dbar) - sn*np.log(r + y2))
-        return -0.5*(dbar*q/(r*(r + y2)) + q*sn/(r + y2) + a4*sn)/pi
+        return -0.5*self.slip*(dbar*q/(r*(r + y2)) + q*sn/(r + y2) + a4*sn)/pi
 
     def _dip_slip(self, y1, y2, q):
-        # TODO: doc; copied from `geoclaw/src/python/geoclaw/dtopotools.py`
+        """
+        Calculate dip-slip displacements as in [Okada 85].
+
+        Modified from the code available within GeoCLAW in `geoclaw/src/python/geoclaw/dtopotools.py`.
+
+        [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
+                   half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
+                   pp.1135--1154, (1985).
+        """
         sn = self.sin_dip
         cs = self.cos_dip
 
@@ -713,10 +729,18 @@ class TohokuOkadaOptions(TohokuOptions):
         r = np.sqrt(y1**2 + y2**2 + q**2)
         xx = np.sqrt(y1**2 + q**2)
         a5 = 4.0*self.poisson_ratio*np.arctan((y2*(xx + q*cs) + xx*(r + xx)*sn)/(y1*(r + xx)*cs))/cs
-        return -0.5*(dbar*q/(r*(r + y1)) + sn*np.arctan(y1*y2/(q*r)) - a5*sn*cs)/pi
+        return -0.5*self.slip*(dbar*q/(r*(r + y1)) + sn*np.arctan(y1*y2/(q*r)) - a5*sn*cs)/pi
 
     def set_initial_condition(self, prob):
-        # TODO: doc; copied from `geoclaw/src/python/geoclaw/dtopotools.py`
+        """
+        Set initial condition using the Okada parametrisation [Okada 85].
+
+        Modified from the code available within GeoCLAW in `geoclaw/src/python/geoclaw/dtopotools.py`.
+
+        [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
+                   half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
+                   pp.1135--1154, (1985).
+        """
         from scipy.interpolate import interp2d
 
         # Get fault parameters
@@ -730,7 +754,6 @@ class TohokuOkadaOptions(TohokuOptions):
         x = np.linspace(self.centre_x - 0.5*length, self.centre_x + 0.5*length, self.nx)
         y = np.linspace(self.centre_y - 0.5*width, self.centre_y + 0.5*width, self.ny)
         # slip = np.array([[self.get_fault_length(xi, yj) for yj in y] for xi in x])
-        slip = self.slip
         X, Y = np.meshgrid(x, y)
 
         # Convert to distance along strike (x1) and dip (x2)  # TODO: use rotate function
@@ -745,14 +768,14 @@ class TohokuOkadaOptions(TohokuOptions):
         f2 = self._strike_slip(x1 + halfL, p - w, q)
         f3 = self._strike_slip(x1 - halfL, p, q)
         f4 = self._strike_slip(x1 - halfL, p - w, q)
-        us = (f1 - f2 - f3 + f4)*slip*self.cos_rake
+        us = (f1 - f2 - f3 + f4)*self.cos_rake
 
         # Sum components for dip
         g1 = self._dip_slip(x1 + halfL, p, q)
         g2 = self._dip_slip(x1 + halfL, p - w, q)
         g3 = self._dip_slip(x1 - halfL, p, q)
         g4 = self._dip_slip(x1 - halfL, p - w, q)
-        ud = (g1 - g2 - g3 + g4)*slip*self.sin_rake
+        ud = (g1 - g2 - g3 + g4)*self.sin_rake
 
         # Interpolate  # TODO: Would be better to just evaluate all the above in UFL
         surf_interp = interp2d(X, Y, us + ud)
