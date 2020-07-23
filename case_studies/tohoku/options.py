@@ -464,13 +464,13 @@ class TohokuBoxBasisOptions(TohokuOptions):
     def __init__(self, **kwargs):
         """
         :kwarg control_parameters: a list of values to use for the basis function coefficients.
-        :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates.
-        :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates.
-        :kwarg nx: number of basis functions perpendicular to the fault.
-        :kwarg ny: number of basis functions parallel to the fault.
-        :kwarg radius_x: radius of basis function in the direction perpendicular to the fault.
-        :kwarg radius_y: radius of basis function in the direction parallel to the fault.
-        :kwarg angle: angle of fault to north.
+        :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates [m].
+        :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates [m].
+        :kwarg nx: number of basis functions along strike direction (i.e. along the fault).
+        :kwarg ny: number of basis functions perpendicular to the strike direction.
+        :kwarg radius_x: radius of basis function along strike direction [m].
+        :kwarg radius_y: radius of basis function perpendicular to the strike direction [m].
+        :kwarg angle: angle of fault to north [radians].
         """
         super(TohokuBoxBasisOptions, self).__init__(**kwargs)
         self.nx = kwargs.get('nx', 1)
@@ -484,8 +484,8 @@ class TohokuBoxBasisOptions(TohokuOptions):
         # Parametrisation of source region
         self.centre_x = kwargs.get('centre_x', 0.7e+06)
         self.centre_y = kwargs.get('centre_y', 4.2e+06)
-        self.radius_x = kwargs.get('radius_x', 48e+03 if self.nx == 1 else 24.0e+03)
-        self.radius_y = kwargs.get('radius_y', 96e+03 if self.ny == 1 else 48.0e+03)
+        self.radius_x = kwargs.get('radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
+        self.radius_y = kwargs.get('radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
 
         # Parametrisation of source basis
         R = FunctionSpace(self.default_mesh, "R", 0)
@@ -493,7 +493,7 @@ class TohokuBoxBasisOptions(TohokuOptions):
         for i in range(N_c):
             self.control_parameters.append(Function(R, name="Control parameter {:d}".format(i)))
             self.control_parameters[i].assign(control_parameters[i])
-        self.angle = kwargs.get('angle', pi/12)
+        self.angle = kwargs.get('angle', 7*pi/12)
 
     def set_initial_condition(self, prob):
         from adapt_utils.misc import box, rotation_matrix
@@ -549,15 +549,15 @@ class TohokuGaussianBasisOptions(TohokuOptions):
     def __init__(self, **kwargs):
         """
         :kwarg control_parameters: a list of values to use for the basis function coefficients.
-        :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates.
-        :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates.
-        :kwarg nx: number of basis functions perpendicular to the fault.
-        :kwarg ny: number of basis functions parallel to the fault.
-        :kwarg extent_x: extent of source region in the direction perpendicular to the fault.
-        :kwarg extent_y: extent of source region in the direction parallel to the fault.
-        :kwarg radius_x: radius of basis function in the direction perpendicular to the fault.
-        :kwarg radius_y: radius of basis function in the direction parallel to the fault.
-        :kwarg angle: angle of fault to north.
+        :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates [m].
+        :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates [m].
+        :kwarg extent_x: extent of source region along the strike direction (i.e. along the fault) [m].
+        :kwarg extent_y: extent of source region perpendicular to the strike direction [m].
+        :kwarg nx: number of basis functions along strike direction.
+        :kwarg ny: number of basis functions perpendicular to the strike direction.
+        :kwarg radius_x: radius of basis function along strike direction [m].
+        :kwarg radius_y: radius of basis function perpendicular to the strike direction [m].
+        :kwarg angle: angle of fault to north [radians].
         """
         super(TohokuGaussianBasisOptions, self).__init__(**kwargs)
         self.nx = kwargs.get('nx', 1)
@@ -571,18 +571,18 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         # Parametrisation of source region
         self.centre_x = kwargs.get('centre_x', 0.7e+06)
         self.centre_y = kwargs.get('centre_y', 4.2e+06)
-        self.extent_x = kwargs.get('extent_x', 240.0e+03)
-        self.extent_y = kwargs.get('extent_y', 560.0e+03)
+        self.extent_x = kwargs.get('extent_x', 560.0e+03)
+        self.extent_y = kwargs.get('extent_y', 240.0e+03)
 
         # Parametrisation of source basis
-        self.radius_x = kwargs.get('radius_x', 48e+03 if self.nx == 1 else 24.0e+03)
-        self.radius_y = kwargs.get('radius_y', 96e+03 if self.ny == 1 else 48.0e+03)
+        self.radius_x = kwargs.get('radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
+        self.radius_y = kwargs.get('radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
         R = FunctionSpace(self.default_mesh, "R", 0)
         self.control_parameters = []
         for i in range(N_c):
             self.control_parameters.append(Function(R, name="Control parameter {:d}".format(i)))
             self.control_parameters[i].assign(control_parameters[i])
-        self.angle = kwargs.get('angle', pi/12)
+        self.angle = kwargs.get('angle', 7*pi/12)
 
     def set_initial_condition(self, prob):
         from adapt_utils.misc import gaussian, rotation_matrix
@@ -627,25 +627,28 @@ class TohokuOkadaOptions(TohokuOptions):
     required in order to set up the problem.
 
     Control parameters comprise of the following list:
-      * Focal depth - depth of the top of the fault plane, m
-      * Fault length - length of the fault plane, m
-      * Fault width - width of the fault plane, m
-      * Dislocation - average displacement, m
-      * Strike direction - angle from North of fault, degrees
-      * Dip angle - angle from horizontal, degrees
-      * Slip angle - slip of one fault block compared to another, degrees
-      * Fault latitude - latitude of top-center of fault plane, degrees
-      * Fault longitude - longitude of top-center of fault plane, degrees
+      * Focal depth - depth of the top of the fault plane [m].
+      * Fault length - length of the fault plane [m].
+      * Fault width - width of the fault plane [m].
+      * Dislocation - average displacement [m].
+      * Strike direction - angle from North of fault [radians].
+      * Dip angle - angle from horizontal [radians].
+      * Slip angle - slip of one fault block compared to another [radians].
+      * Fault latitude - latitude of top-center of fault plane [degrees].
+      * Fault longitude - longitude of top-center of fault plane [degrees].
     """
     def __init__(self, **kwargs):
         """
         :kwarg control_parameters: a list of values to use for the basis function coefficients.
         :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates.
         :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates.
-        :kwarg extent_x: extent of source region in the direction perpendicular to the fault.
-        :kwarg extent_y: extent of source region in the direction parallel to the fault.
+        :kwarg extent_x: extent of source region along the strike direction (i.e. along the fault).
+        :kwarg extent_y: extent of source region perpendicular to the strike direction.
+        :kwarg nx: number of sub-faults along strike direction.
+        :kwarg ny: number of sub-faults perpendicular to the strike direction.
         :kwarg fault_type: choose fault type from 'sinusoidal', 'average', 'circular'.
-        :kwarg fault_asymmetry: asymmetry of fault in the sinusoidal case.
+        :kwarg fault_asymmetry: asymmetry of fault in the sinusoidal case. 0.5 corresponds to symmetric,
+            whilst 0 and 1 correspond to fully asymmetric.
         """
         super(TohokuOkadaOptions, self).__init__(**kwargs)
         self.control_parameters = kwargs.get('control_parameters')
@@ -655,19 +658,28 @@ class TohokuOkadaOptions(TohokuOptions):
         self.focal_depth, self.fault_length, self.fault_width, \
             self.dislocation, self.strike_direction, self.dip_angle, \
             self.slip_angle, self.fault_latitude, self.fault_longitude = self.control_parameters
+        # TODO: Check validity, e.g. lon/lat in correct range. Perhaps apply modular arithmetic.
 
         # Parametrisation of source region
         self.centre_x = kwargs.get('centre_x', 0.7e+06)
         self.centre_y = kwargs.get('centre_y', 4.2e+06)
-        self.extent_x = kwargs.get('extent_x', 240.0e+03)
-        self.extent_y = kwargs.get('extent_y', 560.0e+03)
+        self.extent_x = kwargs.get('extent_x', 560.0e+03)
+        self.extent_y = kwargs.get('extent_y', 240.0e+03)
         self.fault_type = kwargs.get('fault_type', 'average')
         assert self.fault_type in ('average', 'sinusoidal', 'circular')
-        self.fault_asymmetry = kwargs.get('fault_asymmetry', 0.5)
+        self.fault_asymmetry = kwargs.get('fault_asymmetry', 0.35)
         if self.fault_type == 'average':
             self.fault_asymmetry = None
 
+        # Numbers of sub-faults in each direction
+        self.nx = kwargs.get('nx', 20)
+        self.ny = kwargs.get('ny', 20)
+
     def get_fault_lenth(x, y):
+        """
+        :arg x: distance along strike direction
+        :arg y: distance perpendicular to strike direction.
+        """
         dbar = self.dislocation
         if self.fault_type == 'average':
             return dbar
@@ -683,6 +695,12 @@ class TohokuOkadaOptions(TohokuOptions):
             return 0.5*pi*dbar*sin(0.5*pi*(x**2 + y**2)/theta)
 
     def set_initial_condition(self, prob):
+
+        # Get fault dislocation grid
+        Xfbar = np.linspace(0, self.fault_width, self.nx)
+        Yfbar = np.linspace(0, self.fault_length, self.ny)
+        Zfbar = [[self.get_fault_length(x, y) for y in Yfbar] for x in Xfbar]
+
         raise NotImplementedError  # TODO
 
     def get_regularisation_term(self, prob):
