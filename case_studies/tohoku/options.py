@@ -470,7 +470,7 @@ class TohokuBoxBasisOptions(TohokuOptions):
         :kwarg ny: number of basis functions perpendicular to the strike direction.
         :kwarg radius_x: radius of basis function along strike direction [m].
         :kwarg radius_y: radius of basis function perpendicular to the strike direction [m].
-        :kwarg angle: angle of fault to north [radians].
+        :kwarg strike angle: angle of fault to north [radians].
         """
         super(TohokuBoxBasisOptions, self).__init__(**kwargs)
         self.nx = kwargs.get('nx', 1)
@@ -493,7 +493,7 @@ class TohokuBoxBasisOptions(TohokuOptions):
         for i in range(N_c):
             self.control_parameters.append(Function(R, name="Control parameter {:d}".format(i)))
             self.control_parameters[i].assign(control_parameters[i])
-        self.angle = kwargs.get('angle', 7*pi/12)
+        self.strike_angle = kwargs.get('strike_angle', 7*pi/12)
 
     def set_initial_condition(self, prob):
         from adapt_utils.misc import box, rotation_matrix
@@ -503,7 +503,7 @@ class TohokuBoxBasisOptions(TohokuOptions):
         nx, ny = self.nx, self.ny              # Number of basis functions in each component direction
         N = nx*ny                              # Total number of basis functions
         rx, ry = self.radius_x, self.radius_y  # Radius of each basis function in each direction
-        angle = self.angle                     # Angle by which to rotate basis array
+        angle = self.strike_angle              # Angle by which to rotate basis array
 
         # Setup array coordinates
         X = np.linspace((1 - nx)*rx, (nx - 1)*rx, nx)
@@ -557,7 +557,7 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         :kwarg ny: number of basis functions perpendicular to the strike direction.
         :kwarg radius_x: radius of basis function along strike direction [m].
         :kwarg radius_y: radius of basis function perpendicular to the strike direction [m].
-        :kwarg angle: angle of fault to north [radians].
+        :kwarg strike_angle: angle of fault to north [radians].
         """
         super(TohokuGaussianBasisOptions, self).__init__(**kwargs)
         self.nx = kwargs.get('nx', 1)
@@ -582,7 +582,7 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         for i in range(N_c):
             self.control_parameters.append(Function(R, name="Control parameter {:d}".format(i)))
             self.control_parameters[i].assign(control_parameters[i])
-        self.angle = kwargs.get('angle', 7*pi/12)
+        self.strike_angle = kwargs.get('strike_angle', 7*pi/12)
 
     def set_initial_condition(self, prob):
         from adapt_utils.misc import gaussian, rotation_matrix
@@ -593,7 +593,7 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         N = nx*ny                              # Total number of basis functions
         rx, ry = self.radius_x, self.radius_y  # Radius of each basis function in each direction
         dx, dy = self.extent_x, self.extent_y  # Extent of basis region in each component direction
-        angle = self.angle                     # Angle by which to rotate basis array
+        angle = self.strike_angle              # Angle by which to rotate basis array
 
         # Setup array coordinates
         X = np.array([0.0, ]) if nx == 1 else np.linspace(-0.5*dx, 0.5*dx, nx)
