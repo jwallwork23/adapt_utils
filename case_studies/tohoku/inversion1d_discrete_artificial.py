@@ -67,7 +67,7 @@ kwargs = {
 
     # Optimisation
     'control_parameters': [float(args.initial_guess or 10.0), ],
-    'artificial': True,
+    'synthetic': True,
     # 'qoi_scaling': 1.0e-12,
     'qoi_scaling': 1.0,
 
@@ -104,7 +104,7 @@ if not plot_only:
 n = 9
 op.save_timeseries = False
 control_values = np.linspace(2.0, 10.0, n)
-fname = os.path.join(op.di, 'parameter_space_artificial_{:d}.npy'.format(level))
+fname = os.path.join(op.di, 'parameter_space_synthetic_{:d}.npy'.format(level))
 recompute |= not os.path.exists(fname)
 with stop_annotating():
     if recompute:
@@ -132,7 +132,7 @@ if recompute:
     plt.yticks(fontsize=fontsize_tick)
     plt.tight_layout()
     axes.grid()
-    plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_artificial_{:d}.pdf'.format(level)))
+    plt.savefig(os.path.join(op.di, 'plots', 'single_bf_parameter_space_synthetic_{:d}.pdf'.format(level)))
 
 # --- Optimisation
 
@@ -163,9 +163,9 @@ if not plot_only:
     for i in range(len(gauges) % N):
         axes[N-1, N-i-1].axes('off')
     plt.tight_layout()
-    plt.savefig(os.path.join(di, 'single_bf_timeseries_artificial_{:d}.pdf'.format(level)))
+    plt.savefig(os.path.join(di, 'single_bf_timeseries_synthetic_{:d}.pdf'.format(level)))
 
-fname = os.path.join(op.di, 'opt_progress_dis_{:s}_artificial' + '_{:d}.npy'.format(level))
+fname = os.path.join(op.di, 'opt_progress_dis_{:s}_synthetic' + '_{:d}.npy'.format(level))
 if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) and not optimise:
 
     # Load trajectory
@@ -248,7 +248,7 @@ axes.annotate(
     r'$m = {:.4f}$'.format(control_values_opt[-1]),
     xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
-plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_artificial_{:d}.pdf'.format(level)))
+plt.savefig(os.path.join(di, 'single_bf_optimisation_discrete_synthetic_{:d}.pdf'.format(level)))
 
 if not plot_only:
     tape = get_working_tape()
@@ -288,7 +288,7 @@ if not plot_only:
     for i in range(len(gauges) % N):
         axes[N-1, N-i-1].axes('off')
     plt.tight_layout()
-    plt.savefig(os.path.join(di, 'single_bf_timeseries_optimised_discrete_artificial_{:d}.pdf'.format(level)))
+    plt.savefig(os.path.join(di, 'single_bf_timeseries_optimised_discrete_synthetic_{:d}.pdf'.format(level)))
 
     # Compare total variation
     msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"
