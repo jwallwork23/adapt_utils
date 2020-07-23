@@ -573,10 +573,10 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         self.centre_y = kwargs.get('centre_y', 4.2e+06)
         self.extent_x = kwargs.get('extent_x', 240.0e+03)
         self.extent_y = kwargs.get('extent_y', 560.0e+03)
-        self.radius_x = kwargs.get('radius_x', 48e+03 if self.nx == 1 else 24.0e+03)
-        self.radius_y = kwargs.get('radius_y', 96e+03 if self.ny == 1 else 48.0e+03)
 
         # Parametrisation of source basis
+        self.radius_x = kwargs.get('radius_x', 48e+03 if self.nx == 1 else 24.0e+03)
+        self.radius_y = kwargs.get('radius_y', 96e+03 if self.ny == 1 else 48.0e+03)
         R = FunctionSpace(self.default_mesh, "R", 0)
         self.control_parameters = []
         for i in range(N_c):
@@ -625,10 +625,62 @@ class TohokuOkadaOptions(TohokuOptions):
     relationship between the control parameters and the initial surface is nonlinear. In addition,
     zero is not a feasible initial guess for the Okada parameters, meaning some physical intuition is
     required in order to set up the problem.
+
+    Control parameters comprise of the following list:
+      * Focal depth - depth of the top of the fault plane, m
+      * Fault length - length of the fault plane, m
+      * Fault width - width of the fault plane, m
+      * Dislocation - average displacement, m
+      * Strike direction - angle from North of fault, degrees
+      * Dip angle - angle from horizontal, degrees
+      * Slip angle - slip of one fault block compared to another, degrees
+      * Fault latitude - latitude of top-center of fault plane, degrees
+      * Fault longitude - longitude of top-center of fault plane, degrees
     """
     def __init__(self, **kwargs):
+        """
+        :kwarg control_parameters: a list of values to use for the basis function coefficients.
+        :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates.
+        :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates.
+        :kwarg extent_x: extent of source region in the direction perpendicular to the fault.
+        :kwarg extent_y: extent of source region in the direction parallel to the fault.
+        :kwarg fault_type: choose fault type from 'sinusoidal', 'average', 'circular'.
+        :kwarg fault_asymmetry: asymmetry of fault in the sinusoidal case.
+        """
         super(TohokuOkadaOptions, self).__init__(**kwargs)
-        raise NotImplementedError  # TODO
+        self.control_parameters = kwargs.get('control_parameters')
+
+        # Extract Okada parameters
+        assert len(self.control_parameters) == 9
+        self.focal_depth, self.fault_length, self.fault_width, \
+            self.dislocation, self.strike_direction, self.dip_angle, \
+            self.slip_angle, self.fault_latitude, self.fault_longitude = self.control_parameters
+
+        # Parametrisation of source region
+        self.centre_x = kwargs.get('centre_x', 0.7e+06)
+        self.centre_y = kwargs.get('centre_y', 4.2e+06)
+        self.extent_x = kwargs.get('extent_x', 240.0e+03)
+        self.extent_y = kwargs.get('extent_y', 560.0e+03)
+        self.fault_type = kwargs.get('fault_type', 'average')
+        assert self.fault_type in ('average', 'sinusoidal', 'circular')
+        self.fault_asymmetry = kwargs.get('fault_asymmetry', 0.5)
+        if self.fault_type == 'average':
+            self.fault_asymmetry = None
+
+    def get_fault_lenth(x, y):
+        dbar = self.dislocation
+        if self.fault_type == 'average':
+            return dbar
+        theta = self.fault_asymmetry*self.fault_length
+        if self.fault_type == 'sinusoidal':
+            if np.isclose(x, theta):
+                return 0.5*pi*dbar
+            elif x < theta:
+                return 0.5*pi*dbar*sin(0.5*pi*x/theta)
+            else:
+                return -0.5*pi*dbar*sin(1.5*pi + 0.5*pi*(x - theta)/(self.fault_length - theta))
+        else:
+            return 0.5*pi*dbar*sin(0.5*pi*(x**2 + y**2)/theta)
 
     def set_initial_condition(self, prob):
         raise NotImplementedError  # TODO
