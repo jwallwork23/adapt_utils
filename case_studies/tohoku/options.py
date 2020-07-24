@@ -104,7 +104,7 @@ class TohokuOptions(TsunamiOptions):
             P1 = FunctionSpace(self.default_mesh, "CG", 1)
             b = self.set_bathymetry(P1).vector().gather().max()
             g = self.g.values()[0]
-            celerity = sqrt(g*b)
+            celerity = np.sqrt(g*b)
             dx = interpolate(CellDiameter(self.default_mesh), P0).vector().gather().max()
             cfl = celerity*self.dt/dx
             msg = "dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
@@ -634,16 +634,14 @@ class TohokuOkadaOptions(TohokuOptions):
       * Strike angle - angle from North of fault [radians].
       * Dip angle - angle from horizontal [radians].
       * Rake angle - slip of one fault block compared to another [radians].
-      * Focus x-coordinate - in UTM coordinates [m].
-      * Focus y-coordinate - in UTM coordinates [m].
+      * Focal x-coordinate - in UTM coordinates [m].
+      * Focal y-coordinate - in UTM coordinates [m].
     """
     def __init__(self, **kwargs):
         """
         :kwarg control_parameters: a list of values to use for the basis function coefficients.
         :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates.
         :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates.
-        :kwarg extent_x: extent of source region along the strike direction (i.e. along the fault).
-        :kwarg extent_y: extent of source region perpendicular to the strike direction.
         :kwarg nx: number of sub-faults along strike direction.
         :kwarg ny: number of sub-faults perpendicular to the strike direction.
         :kwarg fault_type: choose fault type from 'sinusoidal', 'average', 'circular'.
@@ -654,23 +652,43 @@ class TohokuOkadaOptions(TohokuOptions):
         self.control_parameters = kwargs.get('control_parameters')
 
         # Extract Okada parameters
+        # ========================
+        #   The initial condition is built by projecting a UFL expression comprised of these
+        #   parameters. As such, we need to be careful to only treat them using functions
+        #   which are known to UFL.
         assert len(self.control_parameters) == 9
         self.focal_depth, self.fault_length, self.fault_width, self.slip, \
             self.strike_angle, self.dip_angle, self.rake_angle, \
             self.centre_x, self.centre_y = self.control_parameters
-        # TODO: Check validity of controls
 
-        # Pre-compute trigonometric functions
-        self.sin_strike = np.sin(self.strike_angle)
-        self.cos_strike = np.cos(self.strike_angle)
-        self.sin_dip = np.sin(self.dip_angle)
-        self.cos_dip = np.cos(self.dip_angle)
-        self.sin_rake = np.sin(self.rake_angle)
-        self.cos_rake = np.cos(self.rake_angle)
+        # Check validity of controls
+        if isinstance(self.focal_depth, Function):
+            assert len(self.focal_depth.dat.data) == 1
+            depth = self.focal_depth.dat.data[0]
+        else:
+            depth = self.focal_depth
+        if depth <= 0.0:
+            raise ValueError("Focal depth is negative.")
+        if isinstance(self.centre_x, Function) and isinstance(self.centre_y, Function):
+            assert len(self.centre_x.dat.data) == 1
+            assert len(self.centre_y.dat.data) == 1
+            x, y = self.centre_x.dat.data[0], self.centre_y.dat.data[0]
+        else:
+            x, y = self.centre_x, self.centre_y
+        try:
+            self.default_mesh.coordinates.at([x, y])
+        except PointNotInDomainError:
+            raise ValueError("Source focus is not in the domain.")
 
-        # Parametrisation of source region
-        self.extent_x = kwargs.get('extent_x', 560.0e+03)
-        self.extent_y = kwargs.get('extent_y', 240.0e+03)
+        # UFL trigonometric expressions, for ease
+        self.sin_strike = sin(self.strike_angle)
+        self.cos_strike = cos(self.strike_angle)
+        self.sin_dip = sin(self.dip_angle)
+        self.cos_dip = cos(self.dip_angle)
+        self.sin_rake = sin(self.rake_angle)
+        self.cos_rake = cos(self.rake_angle)
+
+        # Parametrisation of fault
         self.fault_type = kwargs.get('fault_type', 'average')
         assert self.fault_type in ('average', 'sinusoidal', 'circular')
         self.fault_asymmetry = kwargs.get('fault_asymmetry', 0.35)
@@ -681,7 +699,7 @@ class TohokuOkadaOptions(TohokuOptions):
         self.nx = kwargs.get('nx', 20)
         self.ny = kwargs.get('ny', 20)
 
-        # Other parameters
+        # Material parameters
         self.poisson_ratio = 0.25
 
     def get_fault_length(x, y):
