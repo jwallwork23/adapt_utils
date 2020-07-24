@@ -669,6 +669,13 @@ class TohokuOkadaOptions(TohokuOptions):
             depth = self.focal_depth
         if depth <= 0.0:
             raise ValueError("Focal depth is negative.")
+        if isinstance(self.slip, Function):
+            assert len(self.slip.dat.data) == 1
+            slip = self.slip.dat.data[0]
+        else:
+            slip = self.slip
+        if slip <= 0.0:
+            raise ValueError("Slip is negative.")
         if isinstance(self.centre_x, Function) and isinstance(self.centre_y, Function):
             assert len(self.centre_x.dat.data) == 1
             assert len(self.centre_y.dat.data) == 1
