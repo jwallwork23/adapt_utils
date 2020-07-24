@@ -726,7 +726,9 @@ class TohokuOkadaOptions(TohokuOptions):
         cs = self.cos_dip
 
         dbar = y2*sn - q*cs
+        # r = sqrt(y1**2 + y2**2 + q**2)
         r = np.sqrt(y1**2 + y2**2 + q**2)
+        # a4 = 2.0*self.poisson_ratio/cs*(ln(r + dbar) - sn*ln(r + y2))
         a4 = 2.0*self.poisson_ratio/cs*(np.log(r + dbar) - sn*np.log(r + y2))
         return -0.5*self.slip*(dbar*q/(r*(r + y2)) + q*sn/(r + y2) + a4*sn)/pi
 
@@ -744,9 +746,13 @@ class TohokuOkadaOptions(TohokuOptions):
         cs = self.cos_dip
 
         dbar = y2*sn - q*cs
+        # r = sqrt(y1**2 + y2**2 + q**2)
         r = np.sqrt(y1**2 + y2**2 + q**2)
+        # xx = sqrt(y1**2 + q**2)
         xx = np.sqrt(y1**2 + q**2)
+        # a5 = 4.0*self.poisson_ratio*atan((y2*(xx + q*cs) + xx*(r + xx)*sn)/(y1*(r + xx)*cs))/cs
         a5 = 4.0*self.poisson_ratio*np.arctan((y2*(xx + q*cs) + xx*(r + xx)*sn)/(y1*(r + xx)*cs))/cs
+        # return -0.5*self.slip*(dbar*q/(r*(r + y1)) + sn*atan(y1*y2/(q*r)) - a5*sn*cs)/pi
         return -0.5*self.slip*(dbar*q/(r*(r + y1)) + sn*np.arctan(y1*y2/(q*r)) - a5*sn*cs)/pi
 
     def set_initial_condition(self, prob):
@@ -765,14 +771,19 @@ class TohokuOkadaOptions(TohokuOptions):
         length = self.fault_length
         width = self.fault_width
         w = width/self.ny
+        # w = Constant(1.0/self.ny)*width
         depth = self.focal_depth
         halfL = 0.5*length/self.nx
+        # halfL = Constant(0.5/self.nx)*length
 
         # Get fault dislocation grid  # TODO: Currently assumed constant
         x = np.linspace(self.centre_x - 0.5*length, self.centre_x + 0.5*length, self.nx)
         y = np.linspace(self.centre_y - 0.5*width, self.centre_y + 0.5*width, self.ny)
         # slip = np.array([[self.get_fault_length(xi, yj) for yj in y] for xi in x])
         X, Y = np.meshgrid(x, y)
+
+        # TODO: Triangular version for UFL
+        # X, Y = SpatialCoordinate(self.default_mesh)
 
         # Convert to distance along strike (x1) and dip (x2)  # TODO: use rotate function
         x1 = X*self.sin_strike + Y*self.cos_strike
@@ -795,23 +806,26 @@ class TohokuOkadaOptions(TohokuOptions):
         g4 = self._dip_slip(x1 - halfL, p - w, q)
         ud = (g1 - g2 - g3 + g4)*self.sin_rake
 
-        # Interpolate  # TODO: Would be better to just evaluate all the above in UFL
-        surf_interp = interp2d(X, Y, us + ud)
+        # Interpolate
         initial_surface = Function(prob.P1[0])
         self.print_debug("Interpolating initial surface...")
+        surf_interp = interp2d(X, Y, us + ud)
         for i, xy in enumerate(prob.meshes[0].coordinates.dat.data):
             initial_surface.dat.data[i] = surf_interp(xy[0], xy[1])
         self.print_debug("Done!")
+
+        # TODO: UFL version
+        # initial_surface = us + ud
 
         # Set initial condition
         u, eta = prob.fwd_solutions[0].split()
         eta.interpolate(initial_surface)
 
-        # TODO: TEMP
-        self.X = X
-        self.Y = Y
-        self.us = us
-        self.ud = ud
+        # # TODO: TEMP
+        # self.X = X
+        # self.Y = Y
+        # self.us = us
+        # self.ud = ud
 
     def get_regularisation_term(self, prob):
         raise NotImplementedError  # TODO
