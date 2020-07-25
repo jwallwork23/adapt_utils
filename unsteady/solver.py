@@ -67,6 +67,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
         self.sediment_options = [AttrDict() for i in range(op.num_meshes)]
         self.exner_options = [AttrDict() for i in range(op.num_meshes)]
+        import ipdb; ipdb.set_trace()
         static_options = {
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
             # 'check_tracer_conservation': True,  # TODO
@@ -241,9 +242,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for i, P1DG in enumerate(self.P1DG):
                 self.fields[i].update({
                     'sediment_source_2d': self.op.set_sediment_source(P1DG),
-                    #'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
+                    'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
                     'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
-                    #'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
+                    'sediment_depth_integ_sink': self.op.set_sediment_sink(P1DG)
                 })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
@@ -584,9 +585,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         fields = AttrDict({
             'elev_2d': eta,
             'source': self.fields[i].sediment_source_2d,
-            #'depth_integrated_source': self.fields[i].sediment_depth_integ_source,
+            'depth_integrated_source': self.fields[i].sediment_depth_integ_source,
             'sink': self.fields[i].sediment_sink_2d,
-            #'depth_integrated_sink': self.fields[i].sediment_depth_integ_sink,
+            'depth_integrated_sink': self.fields[i].sediment_depth_integ_sink,
             'sediment': self.fwd_solutions_sediment[i],
             'morfac': self.op.morphological_acceleration_factor,
             'porosity': self.op.porosity,

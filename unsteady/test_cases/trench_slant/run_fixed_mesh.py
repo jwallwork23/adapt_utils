@@ -40,9 +40,7 @@ def initialise_fields(mesh2d, inputdir):
         chk.load(bath)
         chk.close()
         
-    return bath    
-
-t1 = time.time()
+    return bath
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
