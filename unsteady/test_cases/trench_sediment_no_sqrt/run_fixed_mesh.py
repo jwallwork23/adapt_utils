@@ -10,7 +10,7 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 1
+nx = 0.125
 
 inputdir = 'hydrodynamics_trench_' + str(nx)
 
@@ -49,7 +49,7 @@ for i in np.linspace(0, 15.9, 160):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv('fixed_output/bed_trench_output_uni_' + str(nx) + '.csv')
+df.to_csv('fixed_output/bed_trench_output_uni_c' + str(nx) + '.csv')
 
 
 datathetis = []
@@ -62,7 +62,7 @@ for i in range(len(data[0].dropna())):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv('fixed_output/bed_trench_output' + str(nx) + '.csv')
+df.to_csv('fixed_output/bed_trench_outputc' + str(nx) + '.csv')
 
 print("L2 norm: ")
 print(np.sqrt(sum(diff_thetis)))

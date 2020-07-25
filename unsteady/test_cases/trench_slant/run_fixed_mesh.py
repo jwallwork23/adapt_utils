@@ -9,6 +9,8 @@ import pandas as pd
 import time
 import datetime
 
+import firedrake as fire
+
 def export_final_state(inputdir, bathymetry_2d):
     """
     Export fields to be used in a subsequent simulation
@@ -46,8 +48,8 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 3
-ny = 3
+nx = 1.6
+ny = 1.6
 
 inputdir = 'hydrodynamics_trench_slant_' + str(nx)
 

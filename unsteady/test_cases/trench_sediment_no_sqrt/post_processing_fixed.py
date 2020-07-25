@@ -16,10 +16,10 @@ df_real1a = pd.read_csv('fixed_output/bed_trench_output_uni_1.csv')
 df_real2 = pd.read_csv('fixed_output/bed_trench_output_uni_0.8.csv')
 df_real2a = pd.read_csv('fixed_output/bed_trench_output_uni_0.5.csv')
 df_real3 = pd.read_csv('fixed_output/bed_trench_output_uni_0.4.csv')
-df_real3a = pd.read_csv('fixed_output/bed_trench_output_uni_0.25.csv')
+df_real3a = pd.read_csv('fixed_output/bed_trench_output_uni_c0.25.csv')
 df_real4 = pd.read_csv('fixed_output/bed_trench_output_uni_0.2.csv')
-df_real4a = pd.read_csv('fixed_output/bed_trench_output_uni_0.125.csv')
-df_real4b = pd.read_csv('fixed_output/bed_trench_output_uni_0.1.csv')
+df_real4a = pd.read_csv('fixed_output/bed_trench_output_uni_c0.125.csv')
+df_real4b = pd.read_csv('fixed_output/bed_trench_output_uni_c0.1.csv')
 #df_real5a = pd.read_csv('fixed_output/bed_trench_output_uni_0.05.csv')
 
 error_list = []

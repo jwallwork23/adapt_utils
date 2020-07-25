@@ -17,13 +17,13 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.4
-ny = 0.4
+nx = 1.6
+ny = 1.6
 alpha = 4
-beta = 1
-gamma = 0
+beta = 0.5
+gamma = 1
 
-inputdir = 'hydrodynamics_trench_slant_' + str(nx)
+inputdir = 'hydrodynamics_trench_slant_'  + str(nx)
 
 kwargs = {
     'approach': 'monge_ampere',
@@ -120,11 +120,12 @@ def export_final_state(inputdir, bathymetry_2d):
     viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
     viewer(plex)        
 
-#export_final_state("adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx), bath)
+export_final_state("adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx), bath)
 
 bath_real = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 
 print(nx)
+print(ny)
 print(alpha)
 print('L2')
 print(fire.errornorm(bath, bath_real))
