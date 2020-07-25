@@ -48,8 +48,8 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 1.6
-ny = 1.6
+nx = 2.0
+ny = 2.0
 
 inputdir = 'hydrodynamics_trench_slant_' + str(nx)
 

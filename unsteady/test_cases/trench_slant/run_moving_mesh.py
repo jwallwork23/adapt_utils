@@ -17,10 +17,10 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 1.6
-ny = 1.6
-alpha = 4
-beta = 0.5
+nx = 0.4
+ny = 0.4
+alpha = 8
+beta = 1
 gamma = 1
 
 inputdir = 'hydrodynamics_trench_slant_'  + str(nx)
