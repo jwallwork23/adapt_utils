@@ -45,7 +45,9 @@ class BeachOptions(CoupledOptions):
 
         self.plot_timeseries = plot_timeseries
 
-        self.default_mesh = RectangleMesh(np.int(220*nx), 10*ny, self.lx, self.ly)
+        self.default_mesh = RectangleMesh(np.int(220*nx), np.int(10*ny), self.lx, self.ly)
+
+        self.friction_coeff = 0.02
 
         self.set_up_morph_model(self.default_mesh)
 
@@ -70,18 +72,18 @@ class BeachOptions(CoupledOptions):
         omega = 0.5  # Ocean boundary forcing frequency
         self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(100.0))))
         self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(100.0))))
-        
+
         self.tracer_init = Constant(0.0)    
 
         # Time integration
 
         self.dt = 0.05
-        self.end_time = float(self.num_hours*3600.0/self.morfac)
+        self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
         self.dt_per_export = 40
         self.dt_per_remesh = 40
         self.timestepper = 'CrankNicolson'
-        self.implicitness_theta = 1.0       
-        
+        self.implicitness_theta = 1.0
+
         # Adaptivity
         self.h_min = 1e-8
         self.h_max = 10.
@@ -106,11 +108,10 @@ class BeachOptions(CoupledOptions):
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
         self.average_size = 0.0002  # Average sediment size
-        self.ksp = Constant(3*self.average_size)
 
         self.wetting_and_drying = True
         self.depth_integrated = True
-        self.conservative = True
+        self.use_tracer_conservative_form = True
         self.slope_eff = True
         self.angle_correction = False
         self.suspended = True
@@ -136,7 +137,7 @@ class BeachOptions(CoupledOptions):
             bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
             mesh2d=mesh, bathymetry_2d=bathymetry,
                             uv_init = self.uv_d, elev_init = self.eta_d, ks=self.ks, average_size=self.average_size,
-                            cons_tracer = self.conservative, wetting_and_drying = self.wetting_and_drying, wetting_alpha = self.wetting_and_drying_alpha)
+                            cons_tracer = self.use_tracer_conservative_form, wetting_and_drying = self.wetting_and_drying, wetting_alpha = self.wetting_and_drying_alpha)
 
 
     def set_manning_drag_coefficient(self, fs):
@@ -178,6 +179,8 @@ class BeachOptions(CoupledOptions):
             'shallow_water': {
                 inflow_tag: {'elev': self.elev_in, 'uv': self.vel_in},
             },
+	   'sediment': {
+            }
         }
         return boundary_conditions    
 
@@ -202,8 +205,14 @@ class BeachOptions(CoupledOptions):
             return self.sediment_model.depo_term
         else:
             return None
-        
-    def set_sediment_depth_integrated_source(self, fs):
+
+    def set_sediment_depth_integ_sink(self, fs):
+        if self.suspended and self.depth_integrated:
+            return self.sediment_model.depo_term
+        else:
+            return None
+
+    def set_sediment_depth_integ_source(self, fs):
         if self.suspended and self.depth_integrated:
             return self.sediment_model.ero
         else:
@@ -220,19 +229,19 @@ class BeachOptions(CoupledOptions):
 
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))    
-    
-    def get_update_forcings(self, solver_obj):
+
+    def get_update_forcings(self, prob, i, adjoint):
 
         def update_forcings(t):
 
-            self.update_boundary_conditions(solver_obj, t=t)
+            self.update_boundary_conditions(prob, t=t)
 
         return update_forcings
 
     def initialise_fields(self, inputdir, outputdir):
         """
         Initialise simulation with results from a previous simulation
-        """     
+        """
         from firedrake.petsc import PETSc
         try:
             import firedrake.cython.dmplex as dmplex
@@ -264,19 +273,25 @@ class BeachOptions(CoupledOptions):
 
         return  elev_init, uv_init, 
 
-    def get_export_func(self, solver_obj):
-        self.bath_export = solver_obj.fields.bathymetry_2d
-        bathymetry_displacement = solver_obj.depth.wd_bathymetry_displacement
-        eta = solver_obj.fields.elev_2d        
+    def get_export_func(self, prob, i):
+        eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
+        #self.eta_tilde_file._topology = None
+        if self.plot_timeseries:
+            u, eta = prob.fwd_solutions[i].split()
+            b = prob.bathymetry[i]
+            wd = Function(prob.P1DG[i], name="Heaviside approximation")
 
         def export_func():
-            self.eta_tilde.project(eta + bathymetry_displacement(eta))
-            self.eta_tilde_file.write(self.eta_tilde)
-            self.bath_file.write(self.bath_export)
-            self.bath_init = self.set_bathymetry(self.bath_export.function_space())
-            self.diff_bathy.project(self.bath_export - self.bath_init)
-            self.diff_bath_file.write(self.diff_bathy)
-        return export_func 
+            eta_tilde.project(self.get_eta_tilde(prob, i))
+            #self.eta_tilde_file.write(eta_tilde)
+            u, eta = prob.fwd_solutions[i].split()
+            #if self.plot_timeseries:
+
+                # Store modified bathymetry timeseries
+            #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
+            #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
+
+        return export_func
 
     def set_boundary_surface(self):
         """Set the initial displacement of the boundary elevation."""

@@ -11,15 +11,15 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 
 t1 = time.time()
 
-nx = 4.0
-ny = 2.0
+nx = 1.0
+ny = 1.0
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(nx*220)
-
+inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
+print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': nx,
@@ -48,6 +48,6 @@ baththetis1 = []
 
 for i in np.linspace(0, 219, 220):
     xaxisthetis1.append(i)
-    baththetis1.append(-swp.solver_obj.fields.bathymetry_2d.at([i, 5]))
+    baththetis1.append(-swp.fwd_solutions_bathymetry[0].at([i, 5]))
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
-df.to_csv("final_result_nx" + str(nx) + "_ny2.csv", index = False)
+df.to_csv("final_result_nx" + str(nx) + "_ny" + str(ny) + ".csv", index = False)
