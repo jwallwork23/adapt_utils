@@ -67,7 +67,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
         self.sediment_options = [AttrDict() for i in range(op.num_meshes)]
         self.exner_options = [AttrDict() for i in range(op.num_meshes)]
-        import ipdb; ipdb.set_trace()
         static_options = {
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
             # 'check_tracer_conservation': True,  # TODO
@@ -244,7 +243,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     'sediment_source_2d': self.op.set_sediment_source(P1DG),
                     'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
                     'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
-                    'sediment_depth_integ_sink': self.op.set_sediment_sink(P1DG)
+                    'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
                 })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
@@ -432,6 +431,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             #self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
+            conservative=self.op.use_tracer_conservative_form,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -566,7 +566,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'uv_2d': u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             'source': self.fields[i].sediment_source_2d,
+            'depth_integrated_source': self.fields[i].sediment_depth_integ_source,
             'sink': self.fields[i].sediment_sink_2d,
+            'depth_integrated_sink': self.fields[i].sediment_depth_integ_sink,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
             'lax_friedrichs_tracer_scaling_factor': self.sediment_options[i].lax_friedrichs_tracer_scaling_factor,
             'mesh_velocity': None,

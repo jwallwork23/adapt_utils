@@ -303,6 +303,7 @@ class SedimentModel(object):
         return self.qbx, self.qby
 
     def update(self, fwd_solution, fwd_solution_bathymetry):
+
         # update bathymetry
         self.old_bathymetry_2d.project(fwd_solution_bathymetry)
         # extract new elevation and velocity and project onto CG space
