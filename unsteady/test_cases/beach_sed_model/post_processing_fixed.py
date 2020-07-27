@@ -10,9 +10,9 @@ import pandas as pd
 import numpy as np
 import pylab as plt
 
-df_real = pd.read_csv('final_result_nx2.0_ny2.0.csv')
+df_real = pd.read_csv('final_result_nx4.0_ny2.0.csv')
 
-#df_test = pd.read_csv('final_result_nx2.0_ny1.csv')
+df_test = pd.read_csv('final_result_nx2.0_ny2.0.csv')
 
 df_test1 = pd.read_csv('final_result_nx1.5_ny1.0.csv')
 
@@ -23,15 +23,17 @@ df_test3 = pd.read_csv('final_result_nx0.75_ny1.0.csv')
 df_test4 = pd.read_csv('final_result_nx0.5_ny1.0.csv')
 
 df_test5 = pd.read_csv('final_result_nx0.25_ny1.0.csv')
+df_test6 = pd.read_csv('final_result_nx0.25_0_1_1.csv')
 
 error_list = []
 #error_list.append(0.0)
-#error_list.append(sum([(df_test['bath'][i] - df_real['bath'][i])**2 for i in range(1, len(df_real))]))
+error_list.append(sum([(df_test['bath'][i] - df_real['bath'][i])**2 for i in range(1, len(df_real))]))
 error_list.append(sum([(df_test1['bath'][i] - df_real['bath'][i])**2 for i in range(1, len(df_real))]))
 error_list.append(sum([(df_test2['bath'][i] - df_real['bath'][i])**2 for i in range(1, len(df_real))]))
 error_list.append(sum([(df_test3['bath'][i] - df_real['bath'][i])**2 for i in range(1, len(df_real))]))
 error_list.append(sum([(df_test4['bath'][i] - df_real['bath'][i])**2 for i in range(1, len(df_real))]))
 error_list.append(sum([(df_test5['bath'][i] - df_real['bath'][i])**2 for i in range(1, len(df_real))]))
+error_list.append(sum([(df_test6['bath'][i] - df_real['bath'][i])**2 for i in range(1, len(df_real))]))
 print(error_list)
 
 

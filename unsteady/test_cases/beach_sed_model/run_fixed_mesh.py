@@ -1,4 +1,5 @@
 from thetis import *
+import firedrake as fire
 from firedrake.petsc import PETSc
 
 import pylab as plt
@@ -80,8 +81,6 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
 export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220)), bath)
-
-
 
 xaxisthetis1 = []
 baththetis1 = []
