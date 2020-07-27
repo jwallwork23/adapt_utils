@@ -43,7 +43,7 @@ def initialise_fields(mesh2d, inputdir):
 
 t1 = time.time()
 
-nx = 1.0
+nx = 0.25
 ny = 1.0
 
 ts = time.time()
@@ -79,7 +79,7 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("hydrodynamics_beach_bath_new_"+str(nx), bath)
+export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220)), bath)
 
 
 
@@ -92,7 +92,7 @@ for i in np.linspace(0, 219, 220):
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
 df.to_csv("final_result_nx" + str(nx) + "_ny" + str(ny) + ".csv", index = False)
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_4.0')
+bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_880')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
