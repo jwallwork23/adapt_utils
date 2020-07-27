@@ -22,21 +22,21 @@ class BeachOptions(CoupledOptions):
     """
     Parameters for test case adapted from [1].
 
-    [1] Roberts, W. et al. "Investigation using simple mathematical models of 
-    the effect of tidal currents and waves on the profile shape of intertidal 
+    [1] Roberts, W. et al. "Investigation using simple mathematical models of
+    the effect of tidal currents and waves on the profile shape of intertidal
     mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
 
         super(BeachOptions, self).__init__(**kwargs)
-        
+
         try:
             assert friction in ('nikuradse', 'manning')
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction  
-        
+
         self.lx = 220
         self.ly = 10
 
@@ -63,7 +63,7 @@ class BeachOptions(CoupledOptions):
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
-        
+
         self.morphological_acceleration_factor = Constant(50)
 
         # Boundary conditions
@@ -79,8 +79,8 @@ class BeachOptions(CoupledOptions):
 
         self.dt = 0.05
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
+        self.dt_per_mesh_movement = 40
         self.dt_per_export = 40
-        self.dt_per_remesh = 40
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
