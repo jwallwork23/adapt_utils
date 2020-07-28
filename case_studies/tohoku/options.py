@@ -626,20 +626,28 @@ class TohokuOkadaOptions(TohokuOptions):
     zero is not a feasible initial guess for the Okada parameters, meaning some physical intuition is
     required in order to set up the problem.
 
-    Control parameters comprise of the following list:
-      * Focal depth - depth of the top of the fault plane [m].
-      * Fault length - length of the fault plane [m].
-      * Fault width - width of the fault plane [m].
-      * Slip - average displacement [m].
-      * Strike angle - angle from North of fault [radians].
-      * Dip angle - angle from horizontal [radians].
-      * Rake angle - slip of one fault block compared to another [radians].
-      * Focal x-coordinate - in UTM coordinates [m].
-      * Focal y-coordinate - in UTM coordinates [m].
+    Control parameters comprise of a dictionary of lists containing the following parameters. The
+    list index corresponds to the subfault within the main fault. By default, a 19 x 10 grid of
+    25km x 20km subfaults is considered, using the work of [Shao et al. 2011].
+    
+      * 'depth'     - depth of the centroid of the subfault plane [m].
+      * 'length'    - length of the subfault plane [m].
+      * 'width'     - width of the subfault plane [m].
+      * 'slip'      - average displacement [m].
+      * 'strike'    - angle from north of subfault [radians].
+      * 'dip'       - angle from horizontal [radians].
+      * 'rake'      - slip of one subfault block compared to another [radians].
+      * 'latitude'  - latitude of the centroid of the subfault [degrees].
+      * 'longitude' - longitude of the centroid of the subfault [degrees].
+
+    [Shao et al. 2011] G. Shao, X. Li, C. Ji & T. Maeda, "Focal mechanism and slip history of the
+                       2011 Mw 9.1 off the Pacific coast of Tohoku Earthquake, constrained with
+                       teleseismic body and surface waves", Earth, Planets and Space 63.7 (2011),
+                       p.559--564.
     """
     def __init__(self, **kwargs):
         """
-        :kwarg control_parameters: a list of values to use for the basis function coefficients.
+        :kwarg control_parameters: a dictionary of values to use for the basis function coefficients.
         :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates.
         :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates.
         :kwarg nx: number of sub-faults along strike direction.
@@ -649,130 +657,129 @@ class TohokuOkadaOptions(TohokuOptions):
             whilst 0 and 1 correspond to fully asymmetric.
         """
         # self.force_zone_number = 54
-        # self.get_lonlat_mesh()
         super(TohokuOkadaOptions, self).__init__(**kwargs)
         self.control_parameters = kwargs.get('control_parameters')
-
-        # Extract Okada parameters
-        # ========================
-        #   The initial condition is built by projecting a UFL expression comprised of these
-        #   parameters. As such, we need to be careful to only treat them using functions
-        #   which are known to UFL.
-        assert len(self.control_parameters) == 9
-        self.focal_depth, self.fault_length, self.fault_width, self.slip, \
-            self.strike_angle, self.dip_angle, self.rake_angle, \
-            self.centre_x, self.centre_y = self.control_parameters
-
-        # Check validity of controls
-        if isinstance(self.focal_depth, Function):
-            assert len(self.focal_depth.dat.data) == 1
-            depth = self.focal_depth.dat.data[0]
-        else:
-            depth = self.focal_depth
-        if depth <= 0.0:
-            raise ValueError("Focal depth is negative.")
-        if isinstance(self.slip, Function):
-            assert len(self.slip.dat.data) == 1
-            slip = self.slip.dat.data[0]
-        else:
-            slip = self.slip
-        if slip <= 0.0:
-            raise ValueError("Slip is negative.")
-        if isinstance(self.centre_x, Function) and isinstance(self.centre_y, Function):
-            assert len(self.centre_x.dat.data) == 1
-            assert len(self.centre_y.dat.data) == 1
-            x, y = self.centre_x.dat.data[0], self.centre_y.dat.data[0]
-        else:
-            x, y = self.centre_x, self.centre_y
-        try:
-            self.default_mesh.coordinates.at([x, y])
-        except PointNotInDomainError:
-            try:
-                self.get_lonlat_mesh()
-                self.lonlat_mesh.coordinates.at([x, y])
-            except PointNotInDomainError:
-                raise ValueError("Source focus is not in the domain.")
-
-        # UFL trigonometric expressions, for ease
-        self.sin_strike = sin(self.strike_angle)
-        self.cos_strike = cos(self.strike_angle)
-        self.sin_dip = sin(self.dip_angle)
-        self.cos_dip = cos(self.dip_angle)
-        self.sin_rake = sin(self.rake_angle)
-        self.cos_rake = cos(self.rake_angle)
-
-        # Parametrisation of fault
-        self.fault_type = kwargs.get('fault_type', 'average')
-        assert self.fault_type in ('average', 'sinusoidal', 'circular')
-        self.fault_asymmetry = kwargs.get('fault_asymmetry', 0.35)
-        if self.fault_type == 'average':
-            self.fault_asymmetry = None
+        self.coordinate_specification = kwargs.get('coordinate_specification', 'centroid')
+        self.subfaults = []
+        self.get_subfaults()
 
         # Numbers of sub-faults in each direction
-        self.nx = kwargs.get('nx', 20)
-        self.ny = kwargs.get('ny', 20)
+        self.nx = kwargs.get('nx', 19)
+        self.ny = kwargs.get('ny', 10)
+        assert self.nx*self.ny == len(self.subfaults)
 
-        # Material parameters
-        self.poisson_ratio = 0.25
+    def download_okada_parameters(self):
+        """
+        Download the Okada parameters generated by [Shao et al. 2011] from the webpage
+          `http://ji.faculty.geol.ucsb.edu/big_earthquakes/2011/03/0311_v3/result_c/static_out`.
 
-    def get_fault_length(x, y):
+        A 19 x 10 array of Okada functions was assumed, each of which with a length of 25km and a
+        width of 20km. Note that the webpage also provides initial times, rise times and end times
+        for each subfault, although we do not use these here.
         """
-        :arg x: distance along strike direction
-        :arg y: distance perpendicular to strike direction.
-        """
-        if self.fault_type == 'average':
-            return self.slip
+        import urllib.request
+
+        # Read the data if already downloaded
+        fname = os.path.join(self.resource_dir, 'surf', 'okada_parameters.txt')
+        if os.path.exists(fname):
+            data = open(fname, 'r').readlines()
+
+        # Download the data
         else:
-            raise NotImplementedError  # TODO
+            url = "http://ji.faculty.geol.ucsb.edu/big_earthquakes/2011/03/0311_v3/result_c/static_out"
+            with urllib.request.urlopen(url) as fp:
+                data_bytes = fp.read()                # read webpage as bytes
+                data_str = data_bytes.decode("utf8")  # convert to a string
+                with open(fname, 'w+') as f:
+                    f.write(data_str)                 # save for future use
+                data = data_str.split('\n')
 
-    def _strike_slip(self, y1, y2, q):
+        # Create a dictionary to contain the parameters
+        controls = ('latitude', 'longitude', 'depth', 'slip', 'rake', 'strike', 'dip')
+        self.control_parameters = {}
+        for control in controls:
+            self.control_parameters[control] = []
+        self.control_parameters['length'] = []
+        self.control_parameters['width'] = []
+
+        # Extract the data and enter it into the dictionary
+        for i, line in enumerate(data):
+            if i < 12:
+                continue
+            for word, control in zip(line.split(), controls):
+                val = float(word)
+                if control == 'slip':
+                    val /= 100  # convert from cm to m
+                if control == 'depth':
+                    val *= 1000  # convert from km to m
+                self.control_parameters[control].append(val)
+            if line not in ('', '\n'):
+                self.control_parameters['length'].append(25.0e+03)
+                self.control_parameters['width'].append(20.0e+03)
+
+    def get_subfaults(self):
         """
-        Calculate strike-slip displacements as in [Okada 85].
-
-        Modified from the code available within GeoCLAW in `geoclaw/src/python/geoclaw/dtopotools.py`.
-
-        [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
-                   half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
-                   pp.1135--1154, (1985).
+        Create GeoCLAW :class:`SubFault` objects from provided subfault parameters, as well as a
+        :class`Fault` object.
+        
+        If control parameters were not provided then data are downloaded according to the
+        `download_okada_parameters` method.
         """
-        sn = self.sin_dip
-        cs = self.cos_dip
+        from clawpack.geoclaw import dtopotools
 
-        dbar = y2*sn - q*cs
-        # r = sqrt(y1**2 + y2**2 + q**2)
-        r = np.sqrt(y1**2 + y2**2 + q**2)
-        # a4 = 2.0*self.poisson_ratio/cs*(ln(r + dbar) - sn*ln(r + y2))
-        a4 = 2.0*self.poisson_ratio/cs*(np.log(r + dbar) - sn*np.log(r + y2))
-        return -0.5*self.slip*(dbar*q/(r*(r + y2)) + q*sn/(r + y2) + a4*sn)/pi
+        # If no Okada parameters have been provided then download them from a default webpage
+        if self.control_parameters is None or self.control_parameters == {}:
+            self.download_okada_parameters()
 
-    def _dip_slip(self, y1, y2, q):
+        # Check consistency of the inputs
+        num_subfaults = len(self.control_parameters['latitude'])
+        msg = "Mismatching '{:s}' data: {:d} controls vs. {:d} subfaults"
+        for var in self.control_parameters:
+            num_ctrls = len(self.control_parameters[var])
+            assert num_ctrls == num_subfaults, msg.format(var, num_ctrls, num_subfaults)
+        for i in range(num_subfaults):
+            for var in ('depth', 'slip'):
+                value = self.control_parameters[var][i]
+                assert value > 0, "{:s} is not allowed to be negative".format(var.capitalize())
+            lon = self.control_parameters['longitude'][i]
+            lat = self.control_parameters['latitude'][i]
+            self.check_in_domain([lon, lat])
+
+        # Create subfaults
+        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        for i in range(num_subfaults):
+            subfault = dtopotools.SubFault()
+            for var in self.control_parameters:
+                value = self.control_parameters[var][i]
+                subfault.__setattr__(var, value)
+            subfault.coordinate_specification = self.coordinate_specification
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo()))
+            self.subfaults.append(subfault)
+
+        # Create fault
+        self.fault = dtopotools.Fault(subfaults=self.subfaults)
+        msg = "Fault corresponds to an earthquake with moment magnitude {:4.1e}"
+        self.print_debug(msg.format(self.fault.Mw()))
+
+    def check_in_domain(self, point):
         """
-        Calculate dip-slip displacements as in [Okada 85].
-
-        Modified from the code available within GeoCLAW in `geoclaw/src/python/geoclaw/dtopotools.py`.
-
-        [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
-                   half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
-                   pp.1135--1154, (1985).
+        Check that a `point` lies within at least one of the UTM and longitude-latitude domains.
         """
-        sn = self.sin_dip
-        cs = self.cos_dip
-
-        dbar = y2*sn - q*cs
-        # r = sqrt(y1**2 + y2**2 + q**2)
-        r = np.sqrt(y1**2 + y2**2 + q**2)
-        # xx = sqrt(y1**2 + q**2)
-        xx = np.sqrt(y1**2 + q**2)
-        # a5 = 4.0*self.poisson_ratio*atan((y2*(xx + q*cs) + xx*(r + xx)*sn)/(y1*(r + xx)*cs))/cs
-        a5 = 4.0*self.poisson_ratio*np.arctan((y2*(xx + q*cs) + xx*(r + xx)*sn)/(y1*(r + xx)*cs))/cs
-        # return -0.5*self.slip*(dbar*q/(r*(r + y1)) + sn*atan(y1*y2/(q*r)) - a5*sn*cs)/pi
-        return -0.5*self.slip*(dbar*q/(r*(r + y1)) + sn*np.arctan(y1*y2/(q*r)) - a5*sn*cs)/pi
+        try:
+            self.default_mesh.coordinates.at(point)
+        except PointNotInDomainError:
+            try:
+                if not hasattr(self, 'lonlat_mesh'):
+                    self.get_lonlat_mesh()
+                self.lonlat_mesh.coordinates.at(point)
+            except PointNotInDomainError:
+                raise ValueError("Source focus is not in the domain.")
 
     def set_initial_condition(self, prob):
         """
         Set initial condition using the Okada parametrisation [Okada 85].
 
-        Modified from the code available within GeoCLAW in `geoclaw/src/python/geoclaw/dtopotools.py`.
+        Uses code from GeoCLAW found in `geoclaw/src/python/geoclaw/dtopotools.py`.
 
         [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
                    half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
@@ -780,65 +787,26 @@ class TohokuOkadaOptions(TohokuOptions):
         """
         from scipy.interpolate import interp2d
 
-        # Get fault parameters
-        length = self.fault_length
-        width = self.fault_width
-        w = width/self.ny
-        # w = Constant(1.0/self.ny)*width
-        depth = self.focal_depth
-        halfL = 0.5*length/self.nx
-        # halfL = Constant(0.5/self.nx)*length
+        # Create a lon-lat grid upon which to represent the source
+        x = np.linspace(138, 148, 201)
+        y = np.linspace(32., 42, 201)
+        times = [1.0]
 
-        # Get fault dislocation grid  # TODO: Currently assumed constant
-        x = np.linspace(self.centre_x - 0.5*length, self.centre_x + 0.5*length, self.nx)
-        y = np.linspace(self.centre_y - 0.5*width, self.centre_y + 0.5*width, self.ny)
-        # slip = np.array([[self.get_fault_length(xi, yj) for yj in y] for xi in x])
-        X, Y = np.meshgrid(x, y)
+        # Create fault topography
+        if self.fault.dtopo is None:
+            self.fault.create_dtopography(x, y, times)
 
-        # TODO: Triangular version for UFL
-        # X, Y = SpatialCoordinate(self.default_mesh)
+        # Interpolate it using SciPy
+        surf_interp = interp2d(x, y, self.fault.dtopo.dZ)
 
-        # Convert to distance along strike (x1) and dip (x2)  # TODO: use rotate function
-        x1 = X*self.sin_strike + Y*self.cos_strike
-        x2 = X*self.cos_strike - Y*self.sin_strike
-        x2 = -x2  # Account for Okada's notation (x2 is distance up fault plane, rather than down dip)
-        p = x2*self.cos_dip + self.focal_depth*self.sin_dip
-        q = x2*self.sin_dip - self.focal_depth*self.cos_dip
+        # Evaluate the interpolant at the mesh vertices
+        surf = Function(prob.P1[0])
+        for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
+            surf.dat.data[i] = surf_interp(*xy)
 
-        # Sum components for strike
-        f1 = self._strike_slip(x1 + halfL, p, q)
-        f2 = self._strike_slip(x1 + halfL, p - w, q)
-        f3 = self._strike_slip(x1 - halfL, p, q)
-        f4 = self._strike_slip(x1 - halfL, p - w, q)
-        us = (f1 - f2 - f3 + f4)*self.cos_rake
-
-        # Sum components for dip
-        g1 = self._dip_slip(x1 + halfL, p, q)
-        g2 = self._dip_slip(x1 + halfL, p - w, q)
-        g3 = self._dip_slip(x1 - halfL, p, q)
-        g4 = self._dip_slip(x1 - halfL, p - w, q)
-        ud = (g1 - g2 - g3 + g4)*self.sin_rake
-
-        # Interpolate
-        initial_surface = Function(prob.P1[0])
-        self.print_debug("Interpolating initial surface...")
-        surf_interp = interp2d(X, Y, us + ud)
-        for i, xy in enumerate(prob.meshes[0].coordinates.dat.data):
-            initial_surface.dat.data[i] = surf_interp(xy[0], xy[1])
-        self.print_debug("Done!")
-
-        # TODO: UFL version
-        # initial_surface = us + ud
-
-        # Set initial condition
+        # Interpolate into the elevation space
         u, eta = prob.fwd_solutions[0].split()
-        eta.interpolate(initial_surface)
-
-        # # TODO: TEMP
-        # self.X = X
-        # self.Y = Y
-        # self.us = us
-        # self.ud = ud
+        eta.interpolate(surf)
 
     def get_regularisation_term(self, prob):
         raise NotImplementedError  # TODO
