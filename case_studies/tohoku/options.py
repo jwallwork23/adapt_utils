@@ -648,6 +648,8 @@ class TohokuOkadaOptions(TohokuOptions):
         :kwarg fault_asymmetry: asymmetry of fault in the sinusoidal case. 0.5 corresponds to symmetric,
             whilst 0 and 1 correspond to fully asymmetric.
         """
+        # self.force_zone_number = 54
+        # self.get_lonlat_mesh()
         super(TohokuOkadaOptions, self).__init__(**kwargs)
         self.control_parameters = kwargs.get('control_parameters')
 
@@ -685,7 +687,11 @@ class TohokuOkadaOptions(TohokuOptions):
         try:
             self.default_mesh.coordinates.at([x, y])
         except PointNotInDomainError:
-            raise ValueError("Source focus is not in the domain.")
+            try:
+                self.get_lonlat_mesh()
+                self.lonlat_mesh.coordinates.at([x, y])
+            except PointNotInDomainError:
+                raise ValueError("Source focus is not in the domain.")
 
         # UFL trigonometric expressions, for ease
         self.sin_strike = sin(self.strike_angle)
