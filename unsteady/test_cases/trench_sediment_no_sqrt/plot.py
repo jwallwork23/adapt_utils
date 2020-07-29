@@ -20,6 +20,8 @@ for i in diff_time.columns.values[2:-1]:
 
 fig, ax1 = plt.subplots()
 
+plt.gca().ticklabel_format(style='sci', scilimits=(0,1), axis='y')
+
 color = 'tab:red'
 ax1.set_xlabel('Number of timesteps per mesh movement')
 ax1.set_ylabel('Mesh error', color=color)
