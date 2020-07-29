@@ -8,7 +8,7 @@ import numpy as np
 import time
 import datetime
 
-from adapt_utils.unsteady.test_cases.beach_sed_model.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_tight_wave.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 def export_final_state(inputdir, bathymetry_2d):
@@ -39,19 +39,18 @@ def initialise_fields(mesh2d, inputdir):
         bath = Function(V, name="bathymetry")
         chk.load(bath)
         chk.close()
-        
     return bath
 
 t1 = time.time()
 
-nx = 0.25
+nx = 0.2
 ny = 0.5
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-inputdir = 'hydrodynamics_beach_l_sep_nx_55' # + str(int(nx*220))
+inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
 print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
@@ -75,7 +74,7 @@ swp.solve_forward()
 t2 = time.time()
 
 print(t2-t1)
-print(nx)
+
 new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])

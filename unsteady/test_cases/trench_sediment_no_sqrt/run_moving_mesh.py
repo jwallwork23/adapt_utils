@@ -15,8 +15,8 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.1
-alpha = 4
+nx = 0.8
+alpha = 2
 
 inputdir = 'hydrodynamics_trench_' + str(nx)
 
