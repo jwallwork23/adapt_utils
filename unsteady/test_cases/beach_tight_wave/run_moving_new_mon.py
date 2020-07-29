@@ -47,11 +47,11 @@ def initialise_fields(mesh2d, inputdir):
 nx = 0.25
 ny = 1.0
 
-alpha =5
+alpha = 5
 beta = 0
 gamma = 1
 
-kappa = 12.5
+kappa = 100 #12.5
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -82,9 +82,7 @@ swp.shallow_water_options[0]['mesh_velocity'] = None
 
 def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     P1 = FunctionSpace(mesh, "CG", 1)
-    b = swp.fwd_solutions_bathymetry[0]
-    bath_dx = Function(b.function_space()).interpolate(b.dx(0))
-    print(max(abs(bath_dx.dat.data[:])))
+
     uv, elev = swp.fwd_solutions[0].split()
     horizontal_velocity = Function(elev.function_space()).project(uv[0])
     abs_horizontal_velocity = Function(elev.function_space()).project(abs(uv[0]))
@@ -96,16 +94,16 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
         div_uv_star = Function(elev.function_space()).project(frob_uv_hess)
     else:
         div_uv_star = Function(elev.function_space()).project(frob_uv_hess/max(frob_uv_hess.dat.data[:]))
-    print(max(frob_uv_hess.dat.data[:]))
+
     if max(abs_horizontal_velocity.dat.data[:])<1e-10:
         abs_uv_star = Function(elev.function_space()).project(abs_horizontal_velocity)
     else:
         abs_uv_star = Function(elev.function_space()).project(abs_horizontal_velocity/max(abs_horizontal_velocity.dat.data[:]))
-    print(max(abs_uv_star.dat.data[:]))
-    comp = interpolate(conditional(beta*abs_uv_star > gamma*div_uv_star, beta*abs_uv_star, gamma*div_uv_star), elev.function_space())
+
+    comp = interpolate(conditional(beta*abs_uv_star > gamma*div_uv_star, beta*abs_uv_star, gamma*div_uv_star)**2, elev.function_space())
     comp_new = project(comp, P1)
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
-    mon_init = project(1.0 + alpha * comp_new2, P1)
+    mon_init = project(sqrt(1.0 + alpha * comp_new2), P1)
 
     H = Function(P1)
     tau = TestFunction(P1)
@@ -113,7 +111,7 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     a = (inner(tau, H)*dx)+(K*inner(tau.dx(1), H.dx(1))*dx) - inner(tau, mon_init)*dx
     solve(a == 0, H)
 
-    return H
+    return mon_init
 
 swp.set_monitor_functions(velocity_monitor)
 
@@ -147,3 +145,7 @@ print(fire.errornorm(bath, bath_real))
 df_real = pd.read_csv('final_result_nx4.0_ny2.0.csv')
 print("Mesh error: ")
 print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+
+print(alpha)
+print(beta)
+print(gamma)

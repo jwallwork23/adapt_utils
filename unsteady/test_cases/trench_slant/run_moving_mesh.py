@@ -17,9 +17,9 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.4
-ny = 0.4
-alpha = 8
+nx = 0.8
+ny = 0.8
+alpha = 18
 beta = 1
 gamma = 1
 
@@ -66,11 +66,11 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     current_mesh = b.function_space().mesh()
     l2_bath_grad = Function(b.function_space()).project(local_norm(bath_gradient))
     bath_dx_l2_norm = Function(b.function_space()).interpolate(l2_bath_grad/max(l2_bath_grad.dat.data[:]))
-    
-    comp = interpolate(conditional(beta*bath_dx_l2_norm > gamma*frob_bath_norm, beta*bath_dx_l2_norm, gamma*frob_bath_norm), b.function_space())  
+
+    comp = interpolate(conditional(alpha*beta*bath_dx_l2_norm > alpha*gamma*frob_bath_norm, alpha*beta*bath_dx_l2_norm, alpha*gamma*frob_bath_norm), b.function_space())
     comp_new = project(comp, P1)
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
-    mon_init = project(Constant(1.0) + alpha * comp_new2, P1)
+    mon_init = project(Constant(1.0) + comp_new2, P1)
 
     #K = 10*(0.2**2)/4
     #a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds

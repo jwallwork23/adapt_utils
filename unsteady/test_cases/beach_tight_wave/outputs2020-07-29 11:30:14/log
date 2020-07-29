@@ -1,0 +1,18 @@
+dt = 0.05
+Using time integrator: CrankNicolson
+    0     0 T=      0.00 eta norm:     0.0000 u norm:     0.0000  0.00
+volume2d rel. error  0.0000e+00
+    1    40 T=      2.00 eta norm:     3.8869 u norm:     5.9614  4.13
+volume2d rel. error  1.7946e-02
+    2    80 T=      4.00 eta norm:     3.8323 u norm:     6.2979  1.65
+volume2d rel. error  1.8938e-02
+    3   120 T=      6.00 eta norm:     5.0448 u norm:     8.5993  1.58
+volume2d rel. error  4.5451e-03
+    4   160 T=      8.00 eta norm:     6.3500 u norm:    10.7072  1.65
+volume2d rel. error -1.1305e-02
+    5   200 T=     10.00 eta norm:     6.3473 u norm:    11.1995  1.59
+volume2d rel. error -1.4552e-02
+    6   240 T=     12.00 eta norm:     7.1152 u norm:    14.2404  1.73
+volume2d rel. error  2.0200e-04
+    7   280 T=     14.00 eta norm:    10.5663 u norm:    52.9486  1.92
+volume2d rel. error  2.0175e-02
