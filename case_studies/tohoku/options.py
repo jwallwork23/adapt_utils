@@ -799,7 +799,7 @@ class TohokuOkadaOptions(TohokuOptions):
             for control in self.all_controls:
                 subfault.__setattr__(control, self.control_parameters[control][i])
             self.print_debug(msg.format(i, subfault.mu, subfault.Mo()))
-        self.fault.create_dtopography(verbose=self.debug)
+        self.fault.create_dtopography(verbose=self.debug, active=False)
 
     def _create_topography_active(self, tag=0):
         import adolc
@@ -826,11 +826,13 @@ class TohokuOkadaOptions(TohokuOptions):
 
         # Create the topography, thereby calling Okada
         self.print_debug("SETUP: Creating topography using Okada model...")
-        self.fault.create_dtopography()
+        self.fault.create_dtopography(verbose=self.debug, active=True)
         self.print_debug("SETUP: Done!")
 
         # Mark output as dependent
-        adolc.dependent(self.fault.dtopo.dZ_a)
+        for subfault in self.subfaults:
+            adolc.dependent(subfault.dtopo.dZ)
+        # adolc.dependent(self.fault.dtopo.dZ_a)
         adolc.trace_off()
 
     def set_initial_condition(self, prob, annotate_source=False, **kwargs):
@@ -866,19 +868,29 @@ class TohokuOkadaOptions(TohokuOptions):
         u, eta = prob.fwd_solutions[0].split()
         eta.interpolate(surf)
 
-    def get_active_input_vector(self):
-        # TODO: doc
+    def get_input_vector(self):
+        """
+        Get a vector of the same length as the total number of controls and populate it with passive
+        versions of each parameter. This provides a point at which we can compute derivative matrices.
+        """
         controls = self.control_parameters
         num_subfaults = len(self.subfaults)
         X = [controls[control][i] for i in range(num_subfaults) for control in self.active_controls]
-        self.active_input_vector = np.array(X)
+        self.input_vector = np.array(X)
 
-    def get_seed_matrices(self):  # TODO: Check
-        # TODO: doc
-        if not hasattr(self, 'active_input_vector'):
-            self.get_active_input_vector()
+    def get_seed_matrices(self):  # TODO: More advanced colouring approach
+        """
+        Whilst the Okada function on each subfault is a nonlinear function of the associated controls,
+        the total dislocation is just the sum over all subfaults. As such, the derivatives with respect
+        to each parameter type (e.g. slip) may be computed simultaneously. All we need to do is choose
+        an appropriate 'seed matrix' to propagate through the forward mode of AD.
+
+        In the default case we have four active controls and hence there are four seed matrices.
+        """
+        if not hasattr(self, 'input_vector'):
+            self.get_input_vector()
         n = len(self.active_controls)
-        S = [[1 if i % n == j else 0 for j in range(n)] for i in range(len(self.active_input_vector))]
+        S = [[1 if i % n == j else 0 for j in range(n)] for i in range(len(self.input_vector))]
         self.seed_matrices = np.array(S)
 
     def get_interpolation_matrix(self):
