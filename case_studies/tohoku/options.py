@@ -205,7 +205,10 @@ class TohokuOptions(TsunamiOptions):
         from adapt_utils.misc import ellipse
         from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
 
-        self.J = self.get_regularisation_term(prob)
+        if np.isclose(self.regularisation, 0.0):
+            self.J = 0
+        else:
+            self.J = self.get_regularisation_term(prob)
         scaling = Constant(0.5*self.qoi_scaling)
         weight = Constant(1.0)  # Quadrature weight for time integration scheme
 
@@ -652,21 +655,29 @@ class TohokuOkadaOptions(TohokuOptions):
         :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates.
         :kwarg nx: number of sub-faults along strike direction.
         :kwarg ny: number of sub-faults perpendicular to the strike direction.
-        :kwarg fault_type: choose fault type from 'sinusoidal', 'average', 'circular'.
-        :kwarg fault_asymmetry: asymmetry of fault in the sinusoidal case. 0.5 corresponds to symmetric,
-            whilst 0 and 1 correspond to fully asymmetric.
+        :kwarg okada_grid_resolution: integer N giving rise to an N x N grid upon which to evaluate
+            the Okada functions and hence the resulting fault surface.
         """
         # self.force_zone_number = 54
         super(TohokuOkadaOptions, self).__init__(**kwargs)
         self.control_parameters = kwargs.get('control_parameters')
         self.coordinate_specification = kwargs.get('coordinate_specification', 'centroid')
+        self.N = kwargs.get('okada_grid_resolution', 101)
         self.subfaults = []
         self.get_subfaults()
+        self.all_controls = (
+            'latitude', 'longitude', 'depth',
+            'slip', 'rake', 'strike', 'dip',
+            'length', 'width',
+        )
 
         # Numbers of sub-faults in each direction
         self.nx = kwargs.get('nx', 19)
         self.ny = kwargs.get('ny', 10)
         assert self.nx*self.ny == len(self.subfaults)
+
+        # Active controls for automatic differentation
+        self.active_controls = ('slip', 'rake', 'strike', 'dip')
 
     def download_okada_parameters(self):
         """
@@ -677,6 +688,7 @@ class TohokuOkadaOptions(TohokuOptions):
         width of 20km. Note that the webpage also provides initial times, rise times and end times
         for each subfault, although we do not use these here.
         """
+        # TODO: Use geoclaw's inbuild functionality for reading from UCSB format
         import urllib.request
 
         # Read the data if already downloaded
@@ -695,9 +707,9 @@ class TohokuOkadaOptions(TohokuOptions):
                 data = data_str.split('\n')
 
         # Create a dictionary to contain the parameters
-        controls = ('latitude', 'longitude', 'depth', 'slip', 'rake', 'strike', 'dip')
+        self.all_controls = ('latitude', 'longitude', 'depth', 'slip', 'rake', 'strike', 'dip')
         self.control_parameters = {}
-        for control in controls:
+        for control in self.all_controls:
             self.control_parameters[control] = []
         self.control_parameters['length'] = []
         self.control_parameters['width'] = []
@@ -706,7 +718,7 @@ class TohokuOkadaOptions(TohokuOptions):
         for i, line in enumerate(data):
             if i < 12:
                 continue
-            for word, control in zip(line.split(), controls):
+            for word, control in zip(line.split(), self.all_controls):
                 val = float(word)
                 if control == 'slip':
                     val /= 100  # convert from cm to m
@@ -716,8 +728,9 @@ class TohokuOkadaOptions(TohokuOptions):
             if line not in ('', '\n'):
                 self.control_parameters['length'].append(25.0e+03)
                 self.control_parameters['width'].append(20.0e+03)
+        self.all_controls += ('length', 'width', )
 
-    def get_subfaults(self):
+    def get_subfaults(self, check_validity=False):
         """
         Create GeoCLAW :class:`SubFault` objects from provided subfault parameters, as well as a
         :class`Fault` object.
@@ -725,7 +738,7 @@ class TohokuOkadaOptions(TohokuOptions):
         If control parameters were not provided then data are downloaded according to the
         `download_okada_parameters` method.
         """
-        from clawpack.geoclaw import dtopotools
+        from adapt_utils.unsteady.swe.tsunami.dtopotools import Fault, SubFault
 
         # If no Okada parameters have been provided then download them from a default webpage
         if self.control_parameters is None or self.control_parameters == {}:
@@ -737,45 +750,90 @@ class TohokuOkadaOptions(TohokuOptions):
         for var in self.control_parameters:
             num_ctrls = len(self.control_parameters[var])
             assert num_ctrls == num_subfaults, msg.format(var, num_ctrls, num_subfaults)
-        for i in range(num_subfaults):
-            for var in ('depth', 'slip'):
-                value = self.control_parameters[var][i]
-                assert value > 0, "{:s} is not allowed to be negative".format(var.capitalize())
-            lon = self.control_parameters['longitude'][i]
-            lat = self.control_parameters['latitude'][i]
-            self.check_in_domain([lon, lat])
+
+        # Check validity of the inputs
+        if check_validity:
+            for i in range(num_subfaults):
+                for var in ('depth', 'slip'):
+                    value = self.control_parameters[var][i]
+                    assert value > 0, "{:s} is not allowed to be negative".format(var.capitalize())
+                lon = self.control_parameters['longitude'][i]
+                lat = self.control_parameters['latitude'][i]
+                self.check_in_domain([lon, lat])
 
         # Create subfaults
-        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
         for i in range(num_subfaults):
-            subfault = dtopotools.SubFault()
-            for var in self.control_parameters:
-                value = self.control_parameters[var][i]
-                subfault.__setattr__(var, value)
+            subfault = SubFault()
             subfault.coordinate_specification = self.coordinate_specification
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo()))
             self.subfaults.append(subfault)
 
+        # Create a lon-lat grid upon which to represent the source
+        x = np.linspace(138, 148, self.N)
+        y = np.linspace(32, 42, self.N)
+
         # Create fault
-        self.fault = dtopotools.Fault(subfaults=self.subfaults)
+        self.fault = Fault(x, y, subfaults=self.subfaults)
+
+    def create_topography(self, annotate=False, **kwargs):
+        """
+        Compute the topography dislocation due to the earthquake using the Okada model. This
+        implementation makes use of the :class:`Fault` and :class:`SubFault` objects from GeoClaw.
+
+        If annotation is turned on, the rupture process is annotated using the Python wrapper `pyadolc`
+        to the C++ operator overloading automatic differentation tool ADOL-C.
+
+        :kwarg annotate: toggle annotation using pyadolc.
+        :kwarg tag: label for tape.
+        """
         msg = "Fault corresponds to an earthquake with moment magnitude {:4.1e}"
-        self.print_debug(msg.format(self.fault.Mw()))
+        if annotate:
+            self._create_topography_active(**kwargs)
+            self.print_debug(msg.format(self.fault.Mw().val))
+        else:
+            self._create_topography_passive()
+            self.print_debug(msg.format(self.fault.Mw()))
 
-    def check_in_domain(self, point):
-        """
-        Check that a `point` lies within at least one of the UTM and longitude-latitude domains.
-        """
-        try:
-            self.default_mesh.coordinates.at(point)
-        except PointNotInDomainError:
-            try:
-                if not hasattr(self, 'lonlat_mesh'):
-                    self.get_lonlat_mesh()
-                self.lonlat_mesh.coordinates.at(point)
-            except PointNotInDomainError:
-                raise ValueError("Source focus is not in the domain.")
+    def _create_topography_passive(self):
+        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        for i, subfault in enumerate(self.subfaults):
+            for control in self.all_controls:
+                subfault.__setattr__(control, self.control_parameters[control][i])
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo()))
+        self.fault.create_dtopography(verbose=self.debug)
 
-    def set_initial_condition(self, prob):
+    def _create_topography_active(self, tag=0):
+        import adolc
+
+        # Sanitise kwargs
+        assert isinstance(tag, int)
+        assert tag >= 0
+        for control in self.active_controls:
+            assert control in self.all_controls
+
+        # Initialise tape
+        adolc.trace_on(tag)
+
+        # Read parameters and mark active variables as independent
+        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        for i, subfault in enumerate(self.subfaults):
+            for control in self.all_controls:
+                if control in self.active_controls:
+                    subfault.__setattr__(control, adolc.adouble(self.control_parameters[control][i]))
+                    adolc.independent(subfault.__getattribute__(control))
+                else:
+                    subfault.__setattr__(control, self.control_parameters[control][i])
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val))
+
+        # Create the topography, thereby calling Okada
+        self.print_debug("SETUP: Creating topography using Okada model...")
+        self.fault.create_dtopography()
+        self.print_debug("SETUP: Done!")
+
+        # Mark output as dependent
+        adolc.dependent(self.fault.dtopo.dZ_a)
+        adolc.trace_off()
+
+    def set_initial_condition(self, prob, annotate_source=False, **kwargs):
         """
         Set initial condition using the Okada parametrisation [Okada 85].
 
@@ -784,29 +842,50 @@ class TohokuOkadaOptions(TohokuOptions):
         [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
                    half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
                    pp.1135--1154, (1985).
+
+        :arg prob: :class:`AdaptiveTsunamiProblem` solver object.
+        :kwarg annotate_source: toggle annotation of the rupture process using pyadolc.
+        :kwarg tag: non-negative integer label for tape.
         """
         from scipy.interpolate import interp2d
 
-        # Create a lon-lat grid upon which to represent the source
-        x = np.linspace(138, 148, 201)
-        y = np.linspace(32., 42, 201)
-        times = [1.0]
-
         # Create fault topography
-        if self.fault.dtopo is None:
-            self.fault.create_dtopography(x, y, times)
+        self.create_topography(annotate=annotate_source, **kwargs)
 
         # Interpolate it using SciPy
-        surf_interp = interp2d(x, y, self.fault.dtopo.dZ)
+        surf_interp = interp2d(self.fault.dtopo.x, self.fault.dtopo.y, self.fault.dtopo.dZ)
 
         # Evaluate the interpolant at the mesh vertices
         surf = Function(prob.P1[0])
+        if not hasattr(self, 'lonlat_mesh'):
+            self.get_lonlat_mesh()
         for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
             surf.dat.data[i] = surf_interp(*xy)
 
         # Interpolate into the elevation space
         u, eta = prob.fwd_solutions[0].split()
         eta.interpolate(surf)
+
+    def get_active_input_vector(self):
+        # TODO: doc
+        controls = self.control_parameters
+        num_subfaults = len(self.subfaults)
+        X = [controls[control][i] for i in range(num_subfaults) for control in self.active_controls]
+        self.active_input_vector = np.array(X)
+
+    def get_seed_matrices(self):  # TODO: Check
+        # TODO: doc
+        if not hasattr(self, 'active_input_vector'):
+            self.get_active_input_vector()
+        n = len(self.active_controls)
+        S = [[1 if i % n == j else 0 for j in range(n)] for i in range(len(self.active_input_vector))]
+        self.seed_matrices = np.array(S)
+
+    def get_interpolation_matrix(self):
+        # TODO: doc
+        raise NotImplementedError  # TODO
+
+    # TODO: differentation
 
     def get_regularisation_term(self, prob):
         raise NotImplementedError  # TODO

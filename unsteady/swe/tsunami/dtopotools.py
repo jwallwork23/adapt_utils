@@ -5,7 +5,12 @@ THIS FILE HAS LARGELY BEEN COPIED FROM GEOCLAW FOR THE PURPOSES OF AUTOMATIC DIF
 See GeoClaw dtopotools Module `$CLAW/geoclaw/src/python/geoclaw/dtopotools.py` for original version.
 ****************************************************************************************************
 """
-import adolc
+try:
+    import adolc
+    have_adolc = True
+except ImportError:
+    print("WARNING: pyadolc could not be imported")
+    have_adolc = False
 
 import numpy
 from time import clock
@@ -29,7 +34,8 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
 
     def create_dtopography(self, active=True, verbose=False):
         """Annotated version of topography method."""
-
+        if active and not have_adolc:
+            raise ValueError("Cannot annotate the rupture process without an appropriate AD tool.")
         if self.rupture_type != 'static':
             raise NotImplementedError("Only static ruptures currently considered.")
 
@@ -42,10 +48,13 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
         for k, subfault in enumerate(self.subfaults):
             subfault.okada(self.dtopo.x, self.dtopo.y)
             dz += subfault.dtopo.dZ[0, :, :]
-            if k % 10 == 0:
+            if k % 10 == 0 and verbose:
                 print(msg.format(k+1, num_subfaults, clock() - tic))
                 tic = clock()
-        self.dtopo.dZ_a = dz
-        self.dtopo.dZ = numpy.array([dzi.val for dzi in numpy.ravel(dz)]).reshape((1, ) +  dz.shape)
+        if active:
+            self.dtopo.dZ_a = dz
+            self.dtopo.dZ = numpy.array([dzi.val for dzi in numpy.ravel(dz)]).reshape((1, ) +  dz.shape)
+        else:
+            self.dtopo.dZ = dz
 
         return self.dtopo

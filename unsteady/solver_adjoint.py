@@ -78,8 +78,9 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             iterator.extend([0, ])
         for j in iterator:
             self.extract_adjoint_solution(j)
-            proj.project(self.adj_solutions[i])
-            self.adjoint_solution_file.write(proj_u, proj_eta)
+            if self.op.plot_pvd:
+                proj.project(self.adj_solutions[i])
+                self.adjoint_solution_file.write(proj_u, proj_eta)
 
     def _save_adjoint_trajectory_tracer(self):
         i = 0  # TODO: Allow multiple meshes
@@ -89,5 +90,6 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             iterator.extend([0, ])
         for j in iterator:
             self.extract_adjoint_solution(j)
-            proj.project(self.adj_solutions_tracer[i])
-            self.adjoint_tracer_file.write(proj)
+            if self.op.plot_pvd:
+                proj.project(self.adj_solutions_tracer[i])
+                self.adjoint_tracer_file.write(proj)
