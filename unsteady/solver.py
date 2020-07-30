@@ -360,9 +360,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Solution initialisation and transfer
 
-    def set_initial_condition(self):
+    def set_initial_condition(self, **kwargs):
         """Apply initial condition(s) for forward solution(s) on first mesh."""
-        self.op.set_initial_condition(self)
+        self.op.set_initial_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.op.set_initial_condition_tracer(self)
         if self.op.solve_sediment:
@@ -370,11 +370,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.op.set_initial_condition_bathymetry(self)
 
-    def set_terminal_condition(self):
+    def set_terminal_condition(self, **kwargs):
         """Apply terminal condition(s) for adjoint solution(s) on terminal mesh."""
-        self.op.set_terminal_condition(self)
+        self.op.set_terminal_condition(self, **kwargs)
         if self.op.solve_tracer:
-            self.op.set_terminal_condition_tracer(self)
+            self.op.set_terminal_condition_tracer(self, **kwargs)
 
     def project_forward_solution(self, i, j):
         """Project forward solution(s) from mesh `i` to mesh `j`."""

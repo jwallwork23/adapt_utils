@@ -153,6 +153,17 @@ class TsunamiOptions(CoupledOptions):
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")
 
+    def check_in_domain(self, point):
+        """
+        Check that a `point` lies within at least one of the UTM and longitude-latitude domains.
+        """
+        try:
+            self.default_mesh.coordinates.at(point)
+        except PointNotInDomainError:
+            if not hasattr(self, 'lonlat_mesh'):
+                self.get_lonlat_mesh()
+            self.lonlat_mesh.coordinates.at(point)
+
     # TODO: Plot multiple mesh approaches
     # TODO: UPDATE
     def plot_timeseries(self, gauge, axes=None, **kwargs):
