@@ -8,7 +8,7 @@ import numpy as np
 import time
 import datetime
 
-from adapt_utils.unsteady.test_cases.beach_sed_model.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_suspended_only.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.adapt import recovery
@@ -44,10 +44,10 @@ def initialise_fields(mesh2d, inputdir):
 
     return bath
 
-nx = 0.25
-ny = 1.0
+nx = 0.5
+ny = 0.5
 
-alpha = 5
+alpha = 2
 beta = 0
 gamma = 1
 
@@ -86,6 +86,7 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     uv, elev = swp.fwd_solutions[0].split()
     horizontal_velocity = Function(elev.function_space()).project(uv[0])
     abs_horizontal_velocity = Function(elev.function_space()).project(abs(uv[0]))
+    abs_hor_vel_norm = Function(elev.function_space()).project(conditional(abs(elev) > 10**(-5), abs(abs_horizontal_velocity - np.mean(abs_horizontal_velocity.dat.data[:])), Constant(0.0)))
 
     uv_gradient = recovery.construct_gradient(horizontal_velocity)
     frob_uv_hess = Function(elev.function_space()).project(local_norm(uv_gradient))
@@ -96,14 +97,14 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
         div_uv_star = Function(elev.function_space()).project(frob_uv_hess/max(frob_uv_hess.dat.data[:]))
 
     if max(abs_horizontal_velocity.dat.data[:])<1e-10:
-        abs_uv_star = Function(elev.function_space()).project(abs_horizontal_velocity)
+        abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm)
     else:
-        abs_uv_star = Function(elev.function_space()).project(abs_horizontal_velocity/max(abs_horizontal_velocity.dat.data[:]))
+        abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm/max(abs_hor_vel_norm.dat.data[:]))
 
-    comp = interpolate(conditional(beta*abs_uv_star > gamma*div_uv_star, beta*abs_uv_star, gamma*div_uv_star)**2, elev.function_space())
+    comp = interpolate(conditional(beta*abs_uv_star > gamma*div_uv_star, beta*abs_uv_star, gamma*div_uv_star), elev.function_space())
     comp_new = project(comp, P1)
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
-    mon_init = project(sqrt(1.0 + alpha * comp_new2), P1)
+    mon_init = project(1.0 + alpha * comp_new2, P1)
 
     H = Function(P1)
     tau = TestFunction(P1)
@@ -111,7 +112,7 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     a = (inner(tau, H)*dx)+(K*inner(tau.dx(1), H.dx(1))*dx) - inner(tau, mon_init)*dx
     solve(a == 0, H)
 
-    return mon_init
+    return H
 
 swp.set_monitor_functions(velocity_monitor)
 
@@ -137,12 +138,12 @@ for i in np.linspace(0, 219, 220):
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
 df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_880')
+bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
 
-df_real = pd.read_csv('final_result_nx4.0_ny2.0.csv')
+df_real = pd.read_csv('final_result_nx2_ny1.csv')
 print("Mesh error: ")
 print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
 

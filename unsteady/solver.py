@@ -819,7 +819,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.iteration % op.dt_per_mesh_movement == 0:
                 if self.mesh_movers[i] is not None:  # TODO: generalise
                     self.mesh_movers[i].adapt()
-
+                    if op.solve_exner:
+                        self.new_bathymetry = Function(self.fwd_solutions_bathymetry[i].function_space()).project(self.fwd_solutions_bathymetry[i])
             # TODO: Update mesh velocity
 
             # Solve PDE(s)
