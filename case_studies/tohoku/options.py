@@ -657,12 +657,20 @@ class TohokuOkadaOptions(TohokuOptions):
         :kwarg ny: number of sub-faults perpendicular to the strike direction.
         :kwarg okada_grid_resolution: integer N giving rise to an N x N grid upon which to evaluate
             the Okada functions and hence the resulting fault surface.
+        :kwarg okada_grid_length_lon: extent of the Okada grid in the longitudinal direction.
+        :kwarg okada_grid_length_lat: extent of the Okada grid in the latitudinal direction.
+        :kwarg okada_grid_lon_min: minimum longitude in the Okada grid.
+        :kwarg okada_grid_lat_min: minimum latitude in the Okada grid.
         """
         # self.force_zone_number = 54
         super(TohokuOkadaOptions, self).__init__(**kwargs)
         self.control_parameters = kwargs.get('control_parameters')
         self.coordinate_specification = kwargs.get('coordinate_specification', 'centroid')
         self.N = kwargs.get('okada_grid_resolution', 101)
+        self.lx = kwargs.get('okada_grid_length_lon', 10)
+        self.ly = kwargs.get('okada_grid_length_lat', 10)
+        self.xmin = kwargs.get('okada_grid_lon_min', 138)
+        self.ymin = kwargs.get('okada_grid_lat_min', 32)
         self.subfaults = []
         self.get_subfaults()
         self.all_controls = (
@@ -768,8 +776,8 @@ class TohokuOkadaOptions(TohokuOptions):
             self.subfaults.append(subfault)
 
         # Create a lon-lat grid upon which to represent the source
-        x = np.linspace(138, 148, self.N)
-        y = np.linspace(32, 42, self.N)
+        x = np.linspace(self.xmin, self.xmin + self.lx, self.N)
+        y = np.linspace(self.ymin, self.ymin + self.ly, self.N)
 
         # Create fault
         self.fault = Fault(x, y, subfaults=self.subfaults)
@@ -877,8 +885,9 @@ class TohokuOkadaOptions(TohokuOptions):
         num_subfaults = len(self.subfaults)
         X = [controls[control][i] for i in range(num_subfaults) for control in self.active_controls]
         self.input_vector = np.array(X)
+        return self.input_vector
 
-    def get_seed_matrices(self):  # TODO: More advanced colouring approach
+    def get_seed_matrices(self):
         """
         Whilst the Okada function on each subfault is a nonlinear function of the associated controls,
         the total dislocation is just the sum over all subfaults. As such, the derivatives with respect
@@ -892,12 +901,74 @@ class TohokuOkadaOptions(TohokuOptions):
         n = len(self.active_controls)
         S = [[1 if i % n == j else 0 for j in range(n)] for i in range(len(self.input_vector))]
         self.seed_matrices = np.array(S)
+        return self.seed_matrices
 
-    def get_interpolation_matrix(self):
-        # TODO: doc
-        raise NotImplementedError  # TODO
+    def get_interpolation_operators(self):
+        """
+        Establish the mapping between Okada grid
+        """
+        from firedrake.projection import SupermeshProjector
 
-    # TODO: differentation
+        # Create a Firedrake mesh associated with the (uniform) Okada grid.
+        self.okada_mesh = SquareMesh(self.N-1, self.N-1, self.lx, self.ly)
+        self.okada_mesh.coordinates.dat.data[:] += [self.xmin, self.ymin]
+
+        # Create function spaces associated with both the Okada and longitude-latitude meshes
+        self.P1_okada = FunctionSpace(self.okada_mesh, "CG", 1)
+        self.P1_lonlat = FunctionSpace(self.lonlat_mesh, "CG", 1)
+
+        # Establish an index mapping between the logical x- and y- directions and the vertex
+        # ordering used by Firedrake's utility mesh, :class:`SquareMesh`.
+        self.print_debug("SETUP: Establishing index mapping for Okada mesh...")
+        self._x_locations, self._y_locations = [], []
+        for i, coord in enumerate(self.okada_mesh.coordinates.dat.data):
+            self._x_locations.append(int(np.round((coord[0] - self.xmin)*(self.N-1)/self.lx)))
+            self._y_locations.append(int(np.round((coord[1] - self.ymin)*(self.N-1)/self.ly)))
+        self.print_debug("SETUP: Done!")
+
+        # Create source and target images and a libsupermesh projector between them
+        self.print_debug("SETUP: Establishing supermesh projector between Okada and lonlat meshes...")
+        self.source_okada = Function(self.P1_okada, name="Interpolation source on Okada mesh")
+        self.target_lonlat = Function(self.P1_lonlat, name="Interpolation target on lonlat mesh")
+        self._okada2lonlat = SupermeshProjector(self.source_okada, self.target_lonlat)
+        self.print_debug("SETUP: Done!")
+
+        # Target image on UTM mesh
+        P1 = FunctionSpace(self.default_mesh, "CG", 1)
+        self.target_utm = Function(P1, name="Interpolation target on UTM mesh")
+
+    def _field_from_array(self, arr):
+        """
+        Insert an array `arr` from the Okada model into the source field defined on the Firedrake
+        Okada mesh.
+        """
+        if not hasattr(self, '_source'):
+            self.get_interpolation_operators()
+        assert arr.shape == (self.N, self.N)
+        for k in range(self.N*self.N):
+            self.source_okada.dat.data[k] = arr[self._y_locations[k], self._x_locations[k]]
+
+    def interpolate_okada_array(self, arr):
+        """
+        Given an array `arr` obtained from the Okada model, interpolate it onto the Firedrake mesh
+        in UTM coordinates, i.e. :attr:`self.default_mesh`.
+
+        The return value may also be found as :attr:`target_utm`. Along the way, we also obtain the
+        representation in longitude-latitude space, which may be found as :attr:`target_lonlat`. The
+        source image on the Okada mesh may be found as :attr:`source_okada`.
+        """
+        if not hasattr(self, '_source'):
+            self.get_interpolation_operators()
+
+        # Copy data onto Firedrake Okada mesh
+        self._field_from_array(arr)
+
+        # Project from Okada mesh to longitude-latitude mesh
+        self._okada2lonlat.project()
+
+        # Transfer from longitude-latitude to UTM mesh
+        self.target_utm.dat.data[:] = self.target_lonlat.dat.data
+        return self.target_utm
 
     def get_regularisation_term(self, prob):
         raise NotImplementedError  # TODO
