@@ -59,17 +59,17 @@ class BeachOptions(CoupledOptions):
 
         self.grad_depth_viscosity = True
 
-        self.num_hours = 48
+        self.num_hours = 72
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
 
-        self.morphological_acceleration_factor = Constant(200)
+        self.morphological_acceleration_factor = Constant(1000)
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
         v_amp = 1 # Ocean boundary foring velocity
-        omega = 8 # Ocean boundary forcing frequency
+        omega = 0.5 # Ocean boundary forcing frequency
         self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(100.0))))
         self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(100.0))))
 
@@ -79,8 +79,8 @@ class BeachOptions(CoupledOptions):
 
         self.dt = 0.05
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 160
-        self.dt_per_export = 160
+        self.dt_per_mesh_movement = 162
+        self.dt_per_export = 162
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 

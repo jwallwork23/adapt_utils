@@ -1,0 +1,104 @@
+dt = 0.05
+Using time integrator: CrankNicolson
+    0     0 T=      0.00 eta norm:     0.0000 u norm:     0.0000  0.00
+volume2d rel. error  0.0000e+00
+    1    40 T=      2.00 eta norm:     4.2871 u norm:     6.6385  5.54
+volume2d rel. error  1.8891e-02
+    2    80 T=      4.00 eta norm:     4.3224 u norm:     6.9622  2.81
+volume2d rel. error  2.0018e-02
+    3   120 T=      6.00 eta norm:     5.5415 u norm:     9.2763  2.80
+volume2d rel. error  5.1459e-03
+    4   160 T=      8.00 eta norm:     6.8698 u norm:    11.6956  2.92
+volume2d rel. error -1.1602e-02
+    5   200 T=     10.00 eta norm:     6.9300 u norm:    12.2289  2.94
+volume2d rel. error -1.5152e-02
+    6   240 T=     12.00 eta norm:     7.7626 u norm:    13.8560  2.83
+volume2d rel. error  4.0767e-04
+    7   280 T=     14.00 eta norm:     9.1608 u norm:    16.2252  2.79
+volume2d rel. error  2.1739e-02
+    8   320 T=     16.00 eta norm:     9.2297 u norm:    16.9348  2.88
+volume2d rel. error  2.8562e-02
+    9   360 T=     18.00 eta norm:     9.4248 u norm:    17.8660  3.36
+volume2d rel. error  1.7012e-02
+   10   400 T=     20.00 eta norm:    10.0581 u norm:    19.3536  4.06
+volume2d rel. error -8.8565e-04
+   11   440 T=     22.00 eta norm:     9.8430 u norm:    19.8320  3.96
+volume2d rel. error -9.4541e-03
+   12   480 T=     24.00 eta norm:     9.7235 u norm:    20.0823  3.98
+volume2d rel. error  1.2316e-03
+   13   520 T=     26.00 eta norm:    10.5613 u norm:    21.2719  3.97
+volume2d rel. error  2.3468e-02
+   14   560 T=     28.00 eta norm:    10.3592 u norm:    21.5579  4.12
+volume2d rel. error  3.6184e-02
+   15   600 T=     30.00 eta norm:     9.8461 u norm:    20.4485  4.12
+volume2d rel. error  2.9537e-02
+   16   640 T=     32.00 eta norm:    10.2292 u norm:    19.5860  4.22
+volume2d rel. error  1.2229e-02
+   17   680 T=     34.00 eta norm:    10.0912 u norm:    19.7745  4.12
+volume2d rel. error -2.6321e-04
+   18   720 T=     36.00 eta norm:     9.6340 u norm:    19.6442  4.07
+volume2d rel. error  4.7458e-03
+   19   760 T=     38.00 eta norm:    10.5741 u norm:    20.0891  4.04
+volume2d rel. error  2.5302e-02
+   20   800 T=     40.00 eta norm:    10.7587 u norm:    20.8072  4.03
+volume2d rel. error  4.2136e-02
+   21   840 T=     42.00 eta norm:    10.0255 u norm:    20.4857  4.08
+volume2d rel. error  4.0488e-02
+   22   880 T=     44.00 eta norm:    10.2994 u norm:    19.2205  4.19
+volume2d rel. error  2.4768e-02
+   23   920 T=     46.00 eta norm:    10.4997 u norm:    19.4476  4.15
+volume2d rel. error  9.6403e-03
+   24   960 T=     48.00 eta norm:     9.8751 u norm:    19.4490  4.08
+volume2d rel. error  9.4574e-03
+   25  1000 T=     50.00 eta norm:    10.4565 u norm:    19.4535  4.06
+volume2d rel. error  2.7388e-02
+   26  1040 T=     52.00 eta norm:    10.9467 u norm:    20.4631  4.08
+volume2d rel. error  4.7737e-02
+   27  1080 T=     54.00 eta norm:    10.2645 u norm:    20.5618  4.03
+volume2d rel. error  5.1896e-02
+   28  1120 T=     56.00 eta norm:    10.3134 u norm:    19.2841  4.23
+volume2d rel. error  3.8918e-02
+   29  1160 T=     58.00 eta norm:    10.6797 u norm:    19.4386  4.16
+volume2d rel. error  2.1852e-02
+   30  1200 T=     60.00 eta norm:    10.0603 u norm:    19.7304  4.13
+volume2d rel. error  1.5991e-02
+   31  1240 T=     62.00 eta norm:    10.2162 u norm:    19.4578  4.17
+volume2d rel. error  2.9015e-02
+   32  1280 T=     64.00 eta norm:    11.0577 u norm:    20.2720  4.07
+volume2d rel. error  5.0188e-02
+   33  1320 T=     66.00 eta norm:    10.6488 u norm:    20.5539  4.05
+volume2d rel. error  5.9088e-02
+   34  1360 T=     68.00 eta norm:    10.3020 u norm:    19.6748  4.14
+volume2d rel. error  4.9063e-02
+   35  1400 T=     70.00 eta norm:    10.6244 u norm:    19.4962  4.32
+volume2d rel. error  3.0615e-02
+   36  1440 T=     72.00 eta norm:    10.1814 u norm:    19.9813  4.20
+volume2d rel. error  1.9316e-02
+   37  1480 T=     74.00 eta norm:     9.9081 u norm:    19.6754  4.12
+volume2d rel. error  2.6270e-02
+   38  1520 T=     76.00 eta norm:    10.9248 u norm:    20.0583  4.08
+volume2d rel. error  4.6372e-02
+   39  1560 T=     78.00 eta norm:    10.9488 u norm:    20.4972  4.06
+volume2d rel. error  5.9590e-02
+   40  1600 T=     80.00 eta norm:    10.3091 u norm:    20.1367  4.10
+volume2d rel. error  5.3682e-02
+   41  1640 T=     82.00 eta norm:    10.4881 u norm:    19.4131  4.21
+volume2d rel. error  3.5448e-02
+   42  1680 T=     84.00 eta norm:    10.2938 u norm:    19.9720  4.20
+volume2d rel. error  2.0080e-02
+   43  1720 T=     86.00 eta norm:     9.6708 u norm:    19.8859  4.14
+volume2d rel. error  2.1042e-02
+   44  1760 T=     88.00 eta norm:    10.5974 u norm:    19.7945  4.09
+volume2d rel. error  3.8754e-02
+   45  1800 T=     90.00 eta norm:    11.0832 u norm:    20.3895  4.04
+volume2d rel. error  5.5700e-02
+   46  1840 T=     92.00 eta norm:    10.3437 u norm:    20.3498  4.04
+volume2d rel. error  5.5023e-02
+   47  1880 T=     94.00 eta norm:    10.3352 u norm:    19.3329  4.21
+volume2d rel. error  3.8717e-02
+   48  1920 T=     96.00 eta norm:    10.3950 u norm:    19.7779  4.24
+volume2d rel. error  2.0850e-02
+   49  1960 T=     98.00 eta norm:     9.6707 u norm:    19.9370  4.11
+volume2d rel. error  1.6307e-02
+   50  2000 T=    100.00 eta norm:    10.2156 u norm:    19.5828  4.09
+volume2d rel. error  3.0461e-02

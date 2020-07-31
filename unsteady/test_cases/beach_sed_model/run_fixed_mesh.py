@@ -44,8 +44,8 @@ def initialise_fields(mesh2d, inputdir):
 
 t1 = time.time()
 
-nx = 0.25
-ny = 0.5
+nx = 1
+ny = 1
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')

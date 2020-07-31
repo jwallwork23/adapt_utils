@@ -1,0 +1,44 @@
+dt = 0.05
+Using time integrator: CrankNicolson
+    0     0 T=      0.00 eta norm:     0.0000 u norm:     0.0000  0.00
+volume2d rel. error  0.0000e+00
+    1    40 T=      2.00 eta norm:     4.4341 u norm:     6.8644 13.20
+volume2d rel. error  1.9521e-02
+    2    80 T=      4.00 eta norm:     4.4708 u norm:     7.1929  8.22
+volume2d rel. error  2.0717e-02
+    3   120 T=      6.00 eta norm:     5.7332 u norm:     9.5925  8.02
+volume2d rel. error  5.3439e-03
+    4   160 T=      8.00 eta norm:     7.1117 u norm:    12.1126  7.97
+volume2d rel. error -1.1997e-02
+    5   200 T=     10.00 eta norm:     7.1760 u norm:    12.6644  8.03
+volume2d rel. error -1.5687e-02
+    6   240 T=     12.00 eta norm:     8.0309 u norm:    14.3342  8.14
+volume2d rel. error  3.7088e-04
+    7   280 T=     14.00 eta norm:     9.4682 u norm:    16.7740  8.03
+volume2d rel. error  2.2408e-02
+    8   320 T=     16.00 eta norm:     9.5374 u norm:    17.5021 10.76
+volume2d rel. error  2.9494e-02
+    9   360 T=     18.00 eta norm:     9.7316 u norm:    18.4435 15.92
+volume2d rel. error  1.7573e-02
+   10   400 T=     20.00 eta norm:    10.3732 u norm:    19.9656 17.17
+volume2d rel. error -9.4654e-04
+   11   440 T=     22.00 eta norm:    10.1331 u norm:    20.4158 17.16
+volume2d rel. error -9.8212e-03
+   12   480 T=     24.00 eta norm:     9.9922 u norm:    20.6292 16.96
+volume2d rel. error  1.2111e-03
+   13   520 T=     26.00 eta norm:    10.8517 u norm:    21.8412 16.87
+volume2d rel. error  2.4177e-02
+   14   560 T=     28.00 eta norm:    10.6511 u norm:    22.1194 16.78
+volume2d rel. error  3.7343e-02
+   15   600 T=     30.00 eta norm:    10.1242 u norm:    20.9774 17.38
+volume2d rel. error  3.0502e-02
+   16   640 T=     32.00 eta norm:    10.5361 u norm:    20.1621 18.74
+volume2d rel. error  1.2596e-02
+   17   680 T=     34.00 eta norm:    10.3965 u norm:    20.3342 17.72
+volume2d rel. error -3.2848e-04
+   18   720 T=     36.00 eta norm:     9.9100 u norm:    20.1597 17.55
+volume2d rel. error  4.8618e-03
+   19   760 T=     38.00 eta norm:    10.8674 u norm:    20.6296 17.58
+volume2d rel. error  2.6139e-02
+   20   800 T=     40.00 eta norm:    11.0743 u norm:    21.3561 17.17
+volume2d rel. error  4.3615e-02

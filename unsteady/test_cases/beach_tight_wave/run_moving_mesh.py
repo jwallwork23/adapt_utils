@@ -8,7 +8,7 @@ import numpy as np
 import time
 import datetime
 
-from adapt_utils.unsteady.test_cases.beach_sed_model.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_tight_wave.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.adapt import recovery
@@ -47,9 +47,9 @@ def initialise_fields(mesh2d, inputdir):
 nx = 0.25
 ny = 0.5
 
-alpha = 10
-beta = 0
-gamma = 1
+alpha = 1
+beta = 1
+gamma = 0
 
 kappa = 12.5
 
@@ -121,11 +121,16 @@ t2 = time.time()
 
 print(t2-t1)
 
+print(nx)
+print(alpha)
+print(beta)
+print(gamma)
+
 new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output/hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
+export_final_state("adapt_output/hydrodynamics_beach_bath_new_vel"+str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
 
 
 xaxisthetis1 = []
@@ -135,13 +140,14 @@ for i in np.linspace(0, 219, 220):
     xaxisthetis1.append(i)
     baththetis1.append(-bath.at([i, 5]))
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
-df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
+df.to_csv("final_result_vel_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_880')
+df_real = pd.read_csv('final_result_nx2_ny1.csv')
+print("Mesh error: ")
+print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+
+bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
 
-df_real = pd.read_csv('final_result_nx4.0_ny2.0.csv')
-print("Mesh error: ")
-print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))

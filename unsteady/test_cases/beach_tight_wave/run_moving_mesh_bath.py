@@ -1,11 +1,13 @@
+from firedrake.petsc import PETSc
+import firedrake as fire
 from thetis import *
 
 import numpy as np
 
-from adapt_utils.unsteady.test_cases.beach_sed_model.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_tight_wave.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
-from adapt_utils.norms import local_frobenius_norm
+from adapt_utils.norms import local_frobenius_norm, local_norm
 
 import pandas as pd
 import time
@@ -49,11 +51,11 @@ outputdir = 'outputs' + st
 nx = 0.25
 ny = 0.5
 
-alpha = 10
+alpha = 2
 beta = 1
-gamma = 0
+gamma = 0.5
 
-kappa = 12.5
+kappa = 50
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -83,7 +85,7 @@ swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
+def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
@@ -98,24 +100,39 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     bath_gradient = recovery.construct_gradient(b)
     bath_hess = recovery.construct_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
-    frob_bath_norm = Function(b.function_space()).project(frob_bath_hess/max(frob_bath_hess.dat.data[:]))
-    current_mesh = b.function_space().mesh()
-    l2_bath_grad = Function(b.function_space()).project(local_norm(bath_gradient))
-    import ipdb; ipdb.set_trace()
-    
-    bath_dx_l2_norm = Function(b.function_space()).interpolate(l2_bath_grad/max(l2_bath_grad.dat.data[:]))
 
+    if max(abs(frob_bath_hess.dat.data[:]))<1e-10:
+        frob_bath_norm = Function(b.function_space()).project(frob_bath_hess)
+    else:
+        frob_bath_norm = Function(b.function_space()).project(frob_bath_hess/max(frob_bath_hess.dat.data[:]))
+
+    current_mesh = b.function_space().mesh()
+    bath_grad2 = Function(bath_gradient.function_space()).project(bath_gradient+as_vector((0.025, 0.0)))
+    l2_bath_grad = Function(b.function_space()).project(abs(local_norm(bath_gradient)))
+
+    bath_dx_l2_norm = Function(b.function_space()).interpolate(l2_bath_grad/max(l2_bath_grad.dat.data[:]))
+    #comp = interpolate(alpha*bath_dx_l2_norm, b.function_space())
     comp = interpolate(conditional(alpha*beta*bath_dx_l2_norm > alpha*gamma*frob_bath_norm, alpha*beta*bath_dx_l2_norm, alpha*gamma*frob_bath_norm), b.function_space())
     comp_new = project(comp, P1)
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
     mon_init = project(Constant(1.0) + comp_new2, P1)
 
-    #K = 10*(0.2**2)/4
-    #a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
-    #a -= inner(tau, mon_init)*dx
+    #H = Function(P1)
+    #tau = TestFunction(P1)
+
+    #a = (inner(tau, H)*dx)+(K*inner(tau.dx(1), H.dx(1))*dx) - inner(tau, mon_init)*dx
     #solve(a == 0, H)
 
-    return mon_init
+    H = Function(P1)
+    tau = TestFunction(P1)
+
+    n = FacetNormal(mesh)
+
+    a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
+    a -= inner(tau, mon_init)*dx
+    solve(a == 0, H)
+
+    return H
 
 swp.set_monitor_functions(gradient_interface_monitor)
 
@@ -124,6 +141,11 @@ swp.solve_forward()
 t2 = time.time()
 
 print(t2-t1)
+
+print(nx)
+print(alpha)
+print(beta)
+print(gamma)
 
 new_mesh = RectangleMesh(880, 20, 220, 10)
 
@@ -141,11 +163,12 @@ for i in np.linspace(0, 219, 220):
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
 df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_880')
+df_real = pd.read_csv('final_result_nx3_ny1.csv')
+print("Mesh error: ")
+print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+
+bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_660')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
-
-df_real = pd.read_csv('final_result_nx4.0_ny2.0.csv')
-print("Mesh error: ")
-print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+print(kappa)
