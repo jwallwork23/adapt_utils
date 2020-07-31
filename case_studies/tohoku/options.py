@@ -809,7 +809,7 @@ class TohokuOkadaOptions(TohokuOptions):
             self.print_debug(msg.format(i, subfault.mu, subfault.Mo()))
         self.fault.create_dtopography(verbose=self.debug, active=False)
 
-    def _create_topography_active(self, tag=0):
+    def _create_topography_active(self, tag=0, separate_faults=True):
         import adolc
 
         # Sanitise kwargs
@@ -838,9 +838,11 @@ class TohokuOkadaOptions(TohokuOptions):
         self.print_debug("SETUP: Done!")
 
         # Mark output as dependent
-        for subfault in self.subfaults:
-            adolc.dependent(subfault.dtopo.dZ)
-        # adolc.dependent(self.fault.dtopo.dZ_a)
+        if separate_faults:
+            for subfault in self.subfaults:
+                adolc.dependent(subfault.dtopo.dZ)
+        else:
+            adolc.dependent(self.fault.dtopo.dZ_a)
         adolc.trace_off()
 
     def set_initial_condition(self, prob, annotate_source=False, **kwargs):
