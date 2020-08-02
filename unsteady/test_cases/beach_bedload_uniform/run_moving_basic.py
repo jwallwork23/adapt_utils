@@ -1,4 +1,3 @@
-
 from thetis import *
 from firedrake.petsc import PETSc
 import firedrake as fire
@@ -9,7 +8,7 @@ import numpy as np
 import time
 import datetime
 
-from adapt_utils.unsteady.test_cases.beach_bedload_only.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_bedload_uniform.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.adapt import recovery
@@ -88,7 +87,7 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     if b is not None:
     	abs_hor_vel_norm = Function(b.function_space()).project(conditional(b > 0.0, Constant(1.0), Constant(0.0)))
     else:
-        abs_hor_vel_norm = Function(swp.bathymetry[0].function_space()).project(conditional(swp.bathymetry[0] > 0.0, Constant(1.0), Constant(0.0)))
+        abs_hor_vel_norm = Function(swp.bathymetry[0].function_space()).project(conditional(swp.bathymetry[0] > 0.0, Constant(2.0), Constant(0.0)))
     comp_new = project(abs_hor_vel_norm, P1)
     mon_init = project(1.0 + alpha * comp_new, P1)
     return mon_init
@@ -105,9 +104,9 @@ print(t2-t1)
 
 #bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_basic", swp.fwd_solutions_bathymetry[0])
+export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_test", swp.fwd_solutions_bathymetry[0])
 
-
+"""
 xaxisthetis1 = []
 baththetis1 = []
 
@@ -129,3 +128,4 @@ print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]
 print(alpha)
 print(beta)
 print(gamma)
+"""

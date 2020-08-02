@@ -47,7 +47,7 @@ def initialise_fields(mesh2d, inputdir):
 nx = 0.5
 ny = 0.5
 
-alpha = 2
+alpha = 0.5
 beta = 1
 gamma = 1
 
@@ -86,7 +86,7 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     uv, elev = swp.fwd_solutions[0].split()
     horizontal_velocity = Function(elev.function_space()).project(uv[0])
     abs_horizontal_velocity = Function(elev.function_space()).project(abs(uv[0]))
-    abs_hor_vel_norm = Function(elev.function_space()).project(conditional(abs(elev) > 10**(-5), abs_horizontal_velocity, Constant(0.0)))
+    abs_hor_vel_norm = Function(elev.function_space()).project(abs_horizontal_velocity)
 
     uv_gradient = recovery.construct_gradient(horizontal_velocity)
     frob_uv_hess = Function(elev.function_space()).project(local_norm(uv_gradient))

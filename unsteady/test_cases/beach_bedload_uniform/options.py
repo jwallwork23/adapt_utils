@@ -37,7 +37,7 @@ class BeachOptions(CoupledOptions):
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
         self.friction = friction
 
-        self.lx = 220
+        self.lx = 180
         self.ly = 10
 
         if output_dir is not None:
@@ -45,16 +45,29 @@ class BeachOptions(CoupledOptions):
 
         self.plot_timeseries = plot_timeseries
 
-        self.default_mesh = RectangleMesh(np.int(220*nx), np.int(10*ny), self.lx, self.ly)
+
+        from firedrake.petsc import PETSc
+        try:
+            import firedrake.cython.dmplex as dmplex
+        except:
+            import firedrake.dmplex as dmplex  # Older version        
+        # mesh
+        with timed_stage('mesh'):
+            # Load
+            newplex = PETSc.DMPlex().create()
+            newplex.createFromFile('hydrodynamics_beach_bath_new_110_test/myplex.h5')
+            mesh = Mesh(newplex)
+        import ipdb; ipdb.set_trace()
+        self.default_mesh = mesh #RectangleMesh(np.int(220*nx), np.int(10*ny), self.lx, self.ly)
 
         self.friction_coeff = 0.02
 
         self.set_up_morph_model(self.default_mesh)
 
         # Initial
-        #self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
-        self.elev_init = Constant(0.0)
-        self.uv_init = as_vector((10**(-7), 0.0))
+        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
+        #self.elev_init = Constant(0.0)
+        #self.uv_init = as_vector((10**(-7), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'

@@ -71,9 +71,9 @@ class BeachOptions(CoupledOptions):
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
         v_amp = 0.5 # Ocean boundary foring velocity
-        omega = 0.5  # Ocean boundary forcing frequency
-        self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(100.0))))
-        self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(100.0))))
+        omega = 0.1  # Ocean boundary forcing frequency
+        self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(500.0))))
+        self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(500.0))))
 
         self.tracer_init = Constant(0.0)
 
@@ -81,8 +81,8 @@ class BeachOptions(CoupledOptions):
 
         self.dt = 0.05
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 16
-        self.dt_per_export = 16
+        self.dt_per_mesh_movement = 54
+        self.dt_per_export = 54
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
@@ -115,8 +115,8 @@ class BeachOptions(CoupledOptions):
         self.use_tracer_conservative_form = True
         self.slope_eff = True
         self.angle_correction = False
-        self.suspended = False
-        self.convective_vel_flag = False
+        self.suspended = True
+        self.convective_vel_flag = True
         self.bedload = True
         self.solve_sediment = True
         self.solve_exner = True

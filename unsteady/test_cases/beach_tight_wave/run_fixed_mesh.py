@@ -50,7 +50,7 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
+inputdir = 'hydrodynamics_beach_test_' + str(int(nx*220))
 print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',

@@ -1,4 +1,3 @@
-
 from thetis import *
 from firedrake.petsc import PETSc
 import firedrake as fire
@@ -9,7 +8,7 @@ import numpy as np
 import time
 import datetime
 
-from adapt_utils.unsteady.test_cases.beach_bedload_only.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_suspended_uniform.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.adapt import recovery
@@ -48,11 +47,11 @@ def initialise_fields(mesh2d, inputdir):
 nx = 0.5
 ny = 0.5
 
-alpha = 1
+alpha = 5
 beta = 1
 gamma = 1
 
-kappa = 100 #12.5
+kappa = 40
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -83,15 +82,43 @@ swp.shallow_water_options[0]['mesh_velocity'] = None
 
 def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     P1 = FunctionSpace(mesh, "CG", 1)
-    b = swp.fwd_solutions_bathymetry[0]
 
-    if b is not None:
-    	abs_hor_vel_norm = Function(b.function_space()).project(conditional(b > 0.0, Constant(1.0), Constant(0.0)))
+    uv, elev = swp.fwd_solutions[0].split()
+    horizontal_velocity = Function(elev.function_space()).project(uv[0])
+    abs_horizontal_velocity = Function(elev.function_space()).project(abs(uv[0]))
+    abs_hor_vel_norm = Function(elev.function_space()).project(conditional(abs(elev) > 10**(-5), abs(abs_horizontal_velocity - np.mean(abs_horizontal_velocity.dat.data[:])), Constant(0.0)))
+
+    uv_gradient = recovery.construct_gradient(horizontal_velocity)
+    frob_uv_hess = Function(elev.function_space()).project(local_norm(uv_gradient))
+
+    if max(abs(frob_uv_hess.dat.data[:])) < 1e-10:
+        div_uv_star = Function(elev.function_space()).project(frob_uv_hess)
     else:
-        abs_hor_vel_norm = Function(swp.bathymetry[0].function_space()).project(conditional(swp.bathymetry[0] > 0.0, Constant(1.0), Constant(0.0)))
-    comp_new = project(abs_hor_vel_norm, P1)
-    mon_init = project(1.0 + alpha * comp_new, P1)
-    return mon_init
+        div_uv_star = Function(elev.function_space()).project(frob_uv_hess/max(frob_uv_hess.dat.data[:]))
+
+    if max(abs_horizontal_velocity.dat.data[:])<1e-10:
+        abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm)
+    else:
+        abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm/max(abs_hor_vel_norm.dat.data[:]))
+
+    comp = interpolate(conditional(beta*abs_uv_star > gamma*div_uv_star, beta*abs_uv_star, gamma*div_uv_star), elev.function_space())
+    comp_new = project(comp, P1)
+    comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
+    mon_init = project(1.0 + alpha * comp_new2, P1)
+
+    H = Function(P1)
+    tau = TestFunction(P1)
+
+    n = FacetNormal(mesh)
+
+    a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
+    a -= inner(tau, mon_init)*dx
+    solve(a == 0, H)
+
+    #a = (inner(tau, H)*dx)+(K*inner(tau.dx(1), H.dx(1))*dx) - inner(tau, mon_init)*dx
+    #solve(a == 0, H)
+
+    return H
 
 swp.set_monitor_functions(velocity_monitor)
 
@@ -101,11 +128,11 @@ t2 = time.time()
 
 print(t2-t1)
 
-#new_mesh = RectangleMesh(880, 20, 220, 10)
+new_mesh = RectangleMesh(880, 20, 220, 10)
 
-#bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
+bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_basic", swp.fwd_solutions_bathymetry[0])
+export_final_state("adapt_output/hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
 
 
 xaxisthetis1 = []

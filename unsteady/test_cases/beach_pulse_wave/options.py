@@ -54,26 +54,26 @@ class BeachOptions(CoupledOptions):
         # Initial
         #self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
         self.elev_init = Constant(0.0)
-        self.uv_init = as_vector((10**(-7), 0.0))
+        self.uv_init = as_vector((10**(-4), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'
 
         self.grad_depth_viscosity = True
 
-        self.num_hours = 72
+        self.num_hours = 288*4
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
 
-        self.morphological_acceleration_factor = Constant(1000)
+        self.morphological_acceleration_factor = Constant(2000)
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
         v_amp = 0.5 # Ocean boundary foring velocity
         omega = 0.5  # Ocean boundary forcing frequency
-        self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(100.0))))
-        self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(100.0))))
+        self.ocean_elev_func = lambda t : (h_amp * np.cos(-omega *t)) if (t%(8*np.pi) > 4*np.pi and t%(8*np.pi) < 6*np.pi) else 0
+        self.ocean_vel_func = lambda t : (v_amp * np.cos(-omega *t)) if (t%(8*np.pi) > 4*np.pi and t%(8*np.pi) < 6*np.pi) else 10**(-4)
 
         self.tracer_init = Constant(0.0)
 
@@ -117,7 +117,7 @@ class BeachOptions(CoupledOptions):
         self.angle_correction = False
         self.suspended = False
         self.convective_vel_flag = False
-        self.bedload = True
+        self.bedload =True
         self.solve_sediment = True
         self.solve_exner = True
 
@@ -158,11 +158,10 @@ class BeachOptions(CoupledOptions):
     def set_viscosity(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
         self.viscosity = Function(fs)
-        sponge_viscosity = Function(fs).interpolate(conditional(x>=100, -399 + 4*x, Constant(1.0)))
+        sponge_viscosity = Function(fs).interpolate(conditional(x>=10000, -39999 + 4*x, Constant(1.0)))
         self.viscosity.interpolate(sponge_viscosity*self.base_viscosity)
         return self.viscosity #Constant(self.base_viscosity)
 
-    
     def set_boundary_conditions(self, prob, i):
         if not hasattr(self, 'elev_in'):
             self.elev_in = Constant(0.0)

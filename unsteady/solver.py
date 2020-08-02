@@ -212,6 +212,27 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
                     bathymetry.project(self.op.set_bathymetry(self.P1[i]))
                     self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
+            self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
+            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+                self.depth[i] = DepthExpression(
+                    bathymetry,
+                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+                )
+        elif self.op.solve_sediment:
+            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
+            for i, bathymetry in enumerate(self.bathymetry):
+                if init:
+                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
+            self.depth = [None for bathymetry in self.bathymetry]
+            for i, bathymetry in enumerate(self.bathymetry):
+                self.depth[i] = DepthExpression(
+                    bathymetry,
+                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+                )
         else:
             self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
             self.depth = [None for bathymetry in self.bathymetry]
@@ -390,13 +411,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def _create_forward_shallow_water_equations(self, i):
         if self.mesh_velocities[i] is not None:
             self.shallow_water_options[i]['mesh_velocity'] = self.mesh_velocities[i]
-        if self.op.solve_sediment:
-            depth = self.op.sediment_model.depth_expr
-        else:
-            depth = self.depth[i]
         self.equations[i].shallow_water = ShallowWaterEquations(
             self.V[i],
-            depth,
+            self.depth[i],
             self.shallow_water_options[i],
         )
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
@@ -427,8 +444,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         model = SedimentEquation2D
         self.equations[i].sediment = model(
             self.Q[i],
-            self.op.sediment_model.depth_expr,
-            #self.depth[i],
+            #self.op.sediment_model.depth_expr,
+            self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
             conservative=self.op.use_tracer_conservative_form,
@@ -442,8 +459,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         model = ExnerEquation
         self.equations[i].exner = model(
             self.W[i],
-            #self.depth[i],
-            self.op.sediment_model.depth_expr,
+            self.depth[i],
+            #self.op.sediment_model.depth_expr,
             conservative=self.op.use_tracer_conservative_form,
             sed_model=self.op.sediment_model,
         )
@@ -831,7 +848,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.tracer_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_tracer[i])
             if op.solve_sediment:
-                self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i])
+                if op.solve_exner:
+                    self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i])
+                else:
+                    self.op.sediment_model.update(ts.shallow_water.solution, self.bathymetry[i])
                 ts.sediment.advance(self.simulation_time, update_forcings)
                 if self.sediment_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_sediment[i])

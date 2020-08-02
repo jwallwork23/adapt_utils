@@ -35,9 +35,9 @@ class BeachOptions(CoupledOptions):
             assert friction in ('nikuradse', 'manning')
         except AssertionError:
             raise ValueError("Friction parametrisation '{:s}' not recognised.".format(friction))
-        self.friction = friction
+        self.friction = friction  
 
-        self.lx = 220
+        self.lx = 180
         self.ly = 10
 
         if output_dir is not None:
@@ -45,16 +45,16 @@ class BeachOptions(CoupledOptions):
 
         self.plot_timeseries = plot_timeseries
 
-        self.default_mesh = RectangleMesh(np.int(220*nx), np.int(10*ny), self.lx, self.ly)
+        self.default_mesh = RectangleMesh(np.int(180*nx), np.int(10*ny), self.lx, self.ly)
 
         self.friction_coeff = 0.02
 
         self.set_up_morph_model(self.default_mesh)
 
         # Initial
-        #self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
-        self.elev_init = Constant(0.0)
-        self.uv_init = as_vector((10**(-7), 0.0))
+        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
+        #self.elev_init = Constant(0.0)
+        #self.uv_init = as_vector((10**(-7), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'
@@ -66,7 +66,7 @@ class BeachOptions(CoupledOptions):
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
 
-        self.morphological_acceleration_factor = Constant(1000)
+        self.morphological_acceleration_factor = Constant(250)
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
@@ -115,9 +115,9 @@ class BeachOptions(CoupledOptions):
         self.use_tracer_conservative_form = True
         self.slope_eff = True
         self.angle_correction = False
-        self.suspended = False
-        self.convective_vel_flag = False
-        self.bedload = True
+        self.suspended = True
+        self.convective_vel_flag = True
+        self.bedload = False
         self.solve_sediment = True
         self.solve_exner = True
 
@@ -160,7 +160,7 @@ class BeachOptions(CoupledOptions):
         self.viscosity = Function(fs)
         sponge_viscosity = Function(fs).interpolate(conditional(x>=100, -399 + 4*x, Constant(1.0)))
         self.viscosity.interpolate(sponge_viscosity*self.base_viscosity)
-        return self.viscosity #Constant(self.base_viscosity)
+        return self.viscosity
 
     
     def set_boundary_conditions(self, prob, i):
@@ -276,7 +276,6 @@ class BeachOptions(CoupledOptions):
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        #self.eta_tilde_file = File(self.di + "/eta_tilde.pvd").write(eta_tilde)
         #self.eta_tilde_file._topology = None
         if self.plot_timeseries:
             u, eta = prob.fwd_solutions[i].split()
