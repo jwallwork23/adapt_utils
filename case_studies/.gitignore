@@ -7,3 +7,5 @@ tohoku/resources/surf_zeroed_utm.nc
 tohoku/resources/log
 tohoku/run_fixed_mesh_old.py
 tohoku/notebooks/plotting.ipynb
+tohoku/notebooks/okada/*.npy
+tohoku/notebooks/okada/old/
