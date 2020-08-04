@@ -56,6 +56,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
     # --- Quantity of Interest
 
     def add_callbacks(self, i):
+        super(AdaptiveTurbineProblem, self).add_callbacks(i)
         self.get_qoi_kernels(i)
         self.callbacks[i].add(QoICallback(self, i), 'timestep')
 

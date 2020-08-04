@@ -29,6 +29,7 @@ class AdaptiveTsunamiProblem(AdaptiveProblem):
             raise ValueError("This class is for problems with no tracer component.")
 
     def add_callbacks(self, i):
+        super(AdaptiveTsunamiProblem, self).add_callbacks(i)
         gauges = list(self.op.gauges.keys())
         for gauge in gauges:
             try:

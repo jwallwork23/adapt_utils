@@ -44,7 +44,7 @@ class TimeseriesCallback(object):
 class VelocityNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the velocity field at each timestep/export."""
     def __init__(self, prob, i):
-        self.name = "velocity_norm"
+        self.name = "velocity norm"
         u, eta = prob.fwd_solutions[i].split()
         super(VelocityNormCallback, self).__init__(prob, lambda t: norm(u), i, "velocity_norm")
 
@@ -52,7 +52,7 @@ class VelocityNormCallback(TimeseriesCallback):
 class ElevationNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the elevation field at each timestep/export."""
     def __init__(self, prob, i):
-        self.name = "elevation_norm"
+        self.name = "elevation norm"
         u, eta = prob.fwd_solutions[i].split()
         super(ElevationNormCallback, self).__init__(prob, lambda t: norm(eta), i, "elevation_norm")
 
@@ -60,7 +60,7 @@ class ElevationNormCallback(TimeseriesCallback):
 class TracerNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the tracer concentration at each timestep/export."""
     def __init__(self, prob, i):
-        self.name = "tracer_norm"
+        self.name = "tracer norm"
         c = prob.fwd_solutions_tracer[i]
         super(TracerNormCallback, self).__init__(prob, lambda t: norm(c), i, "tracer_norm")
 
@@ -81,7 +81,7 @@ class QoICallback(TimeseriesCallback):
         :arg prob: :class:`AdaptiveProblem` object.
         :arg i: mesh index.
         """
-        self.name = "qoi"
+        self.name = "QoI"
         ks = prob.kernels[i]  # Kernel in space
         kt = Constant(0.0)    # Kernel in time
         sol = prob.fwd_solutions[i]
