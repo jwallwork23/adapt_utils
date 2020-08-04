@@ -26,14 +26,14 @@ def initialise_fields(mesh2d, inputdir):
     return bath
 
 new_mesh = th.RectangleMesh(880, 5*4, 220, 10)
-bath0 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_22')
-bath1 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_44')
-bath2 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_55')
-bath3 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_110')
-bath4 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_165')
-bath5 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_220')
-bath6 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_330')
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
+bath0 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_44')
+bath1 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_55')
+bath2 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_110')
+bath3 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_165')
+bath4 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_220')
+bath5 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_330')
+bath6 = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
+bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_660')
 
 errorlist = []
 errorlist.append(fire.errornorm(bath6, bath_real))
@@ -45,8 +45,6 @@ errorlist.append(fire.errornorm(bath1, bath_real))
 errorlist.append(fire.errornorm(bath0, bath_real))
 
 print(errorlist)
-
-stop
 
 plt.loglog([0.5, 2/3, 1, 4/3, 2, 4], errorlist, '-o')
 plt.ylabel('Error norm (m)')

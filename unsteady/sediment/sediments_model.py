@@ -173,8 +173,6 @@ class SedimentModel(object):
         self.unorm = (self.horizontal_velocity**2) + (self.vertical_velocity**2)
         self.TOB = Function(self.V).project(self.rhow*Constant(0.5)*self.qfc*self.unorm)
 
-
-
         options.solve_exner = True
 
         if self.suspendedload:
@@ -218,8 +216,8 @@ class SedimentModel(object):
             self.options.solve_tracer = False
         if self.bedload:
             # calculate angle of flow
-            self.calfa = Function(self.V).project(self.horizontal_velocity/sqrt(self.unorm))
-            self.salfa = Function(self.V).project(self.vertical_velocity/sqrt(self.unorm))
+            self.calfa = self.horizontal_velocity/sqrt(self.unorm)
+            self.salfa = self.vertical_velocity/sqrt(self.unorm)
             if self.angle_correction:
                 # slope effect angle correction due to gravity
                 self.stress = Function(self.V).project(self.rhow*Constant(0.5)*self.qfc*self.unorm)
@@ -309,6 +307,8 @@ class SedimentModel(object):
         # extract new elevation and velocity and project onto CG space
         self.uv1, self.elev1 = fwd_solution.split()
         self.uv_cg.project(self.uv1)
+
+        self.TOB.project(self.rhow*Constant(0.5)*self.qfc*self.unorm)
 
         self.depth_expr = DepthExpression(self.old_bathymetry_2d, use_wetting_and_drying=self.wetting_and_drying, wetting_and_drying_alpha=self.wetting_alpha)
         self.depth.project(self.depth_expr.get_total_depth(self.elev1))

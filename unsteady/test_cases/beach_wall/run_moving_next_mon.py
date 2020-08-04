@@ -8,7 +8,7 @@ import numpy as np
 import time
 import datetime
 
-from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_wall.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.adapt import recovery
@@ -47,9 +47,9 @@ def initialise_fields(mesh2d, inputdir):
 nx = 0.5
 ny = 0.5
 
-alpha = 0.2
-beta = 0
-gamma = 1
+alpha = 1
+beta = 1
+gamma = 0
 
 kappa = 100 #12.5
 
@@ -86,18 +86,17 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     uv, elev = swp.fwd_solutions[0].split()
     horizontal_velocity = Function(elev.function_space()).project(uv[0])
     abs_horizontal_velocity = Function(elev.function_space()).project(abs(uv[0]))
-    #abs_hor_vel_norm = Function(elev.function_space()).project(abs(abs_horizontal_velocity - np.mean(abs_horizontal_velocity.dat.data[:])))
-    abs_hor_vel_norm = Function(elev.function_space()).project(abs_horizontal_velocity)
+    abs_hor_vel_norm = Function(elev.function_space()).project(conditional(abs(elev) > 10**(-5), abs(abs_horizontal_velocity - np.mean(abs_horizontal_velocity.dat.data[:])), Constant(0.0)))
 
     uv_gradient = recovery.construct_gradient(horizontal_velocity)
     frob_uv_hess = Function(elev.function_space()).project(local_norm(uv_gradient))
 
-    if max(abs(frob_uv_hess.dat.data[:])) < 1e-10:
+    if max(abs(frob_uv_hess.dat.data[:])) < 1e-4:
         div_uv_star = Function(elev.function_space()).project(frob_uv_hess)
     else:
         div_uv_star = Function(elev.function_space()).project(frob_uv_hess/max(frob_uv_hess.dat.data[:]))
 
-    if max(abs_horizontal_velocity.dat.data[:])<1e-10:
+    if max(abs_horizontal_velocity.dat.data[:])<1e-4:
         abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm)
     else:
         abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm/max(abs_hor_vel_norm.dat.data[:]))
@@ -137,16 +136,16 @@ for i in np.linspace(0, 219, 220):
     xaxisthetis1.append(i)
     baththetis1.append(-bath.at([i, 5]))
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
-df.to_csv("adapt_output/final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
+df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
 
-#bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
+bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
 
-#print('L2')
-#print(fire.errornorm(bath, bath_real))
+print('L2')
+print(fire.errornorm(bath, bath_real))
 
-#df_real = pd.read_csv('final_result_nx2_ny1.csv')
-#print("Mesh error: ")
-#print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+df_real = pd.read_csv('final_result_nx2_ny1.csv')
+print("Mesh error: ")
+print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
 
 print(alpha)
 print(beta)

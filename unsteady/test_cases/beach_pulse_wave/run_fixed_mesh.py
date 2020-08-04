@@ -43,7 +43,7 @@ def initialise_fields(mesh2d, inputdir):
 
 t1 = time.time()
 
-nx = 0.5
+nx = 0.1
 ny = 0.5
 
 ts = time.time()
@@ -51,7 +51,7 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
 inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
-print(inputdir)
+
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': nx,
@@ -79,7 +79,7 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-#export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220)), bath)
+export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220)), bath)
 
 xaxisthetis1 = []
 baththetis1 = []

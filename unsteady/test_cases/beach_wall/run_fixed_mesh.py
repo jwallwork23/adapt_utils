@@ -8,7 +8,7 @@ import numpy as np
 import time
 import datetime
 
-from adapt_utils.unsteady.test_cases.beach_bedload_only.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_wall.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 def export_final_state(inputdir, bathymetry_2d):
@@ -43,8 +43,8 @@ def initialise_fields(mesh2d, inputdir):
 
 t1 = time.time()
 
-nx = 4
-ny = 2
+nx = 0.5
+ny = 0.5
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
