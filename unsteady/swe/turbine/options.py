@@ -12,6 +12,7 @@ class TurbineOptions(CoupledOptions):
 
     # Turbine parameters
     turbine_length = PositiveFloat(18.0).tag(config=False)
+    thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
 
     def __init__(self, **kwargs):
         super(TurbineOptions, self).__init__(**kwargs)
@@ -24,36 +25,44 @@ class TurbineOptions(CoupledOptions):
         self.T_tide = self.M2_tide_period
         self.dt_per_export = 10
 
+    def set_qoi_kernel(self, prob, i):
+        prob.kernels[i] = Function(prob.V[i])
+        u = prob.fwd_solutions[i].split()[0]
+        k_u = prob.kernels[i].split()[0]
+        k_u.interpolate(Constant(1/3)*prob.turbine_densities[i]*sqrt(inner(u, u))*u)
+
     def set_quadratic_drag_coefficient(self, fs):
         return Constant(self.friction_coeff)
 
     def set_manning_drag_coefficient(self, fs):
         return
 
-    def thrust_coefficient_correction(self):
+    def get_thrust_coefficient(self, correction=True):
         """
         Correction to account for the fact that the thrust coefficient is based on an upstream
         velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
         Piggott 2016, eq. (15))
         """
+        if not correction:
+            return self.thrust_coefficient
         if hasattr(self, 'turbine_diameter'):
             D = self.turbine_diameter
         else:
             D = max(self.turbine_length, self.turbine_width)
         A_T = pi*(D/2)**2
-        correction = 4/(1+sqrt(1-A_T/(self.max_depth()*D)))**2
-        self.thrust_coefficient *= correction
+        correction = 4/(1+sqrt(1-A_T/(self.max_depth*D)))**2
+        return self.thrust_coefficient*correction
         # NOTE: We're not yet correcting power output here, so that will be overestimated
 
-    def max_depth(self):
+    def get_max_depth(self, bathymetry=None):
         """Compute maximum depth from bathymetry field."""
-        if hasattr(self, 'bathymetry'):
-            if isinstance(self.bathymetry, Constant):
-                return self.bathymetry.values()[0]
-            elif isinstance(self.bathymetry, Function):
-                return self.bathymetry.vector().gather().max()
+        if bathymetry is not None:
+            if isinstance(bathymetry, Constant):
+                self.max_depth = bathymetry.values()[0]
+            elif isinstance(bathymetry, Function):
+                self.max_depth = self.bathymetry.vector().gather().max()
             else:
                 raise ValueError("Bathymetry format cannot be understood.")
         else:
             assert hasattr(self, 'base_bathymetry')
-            return self.base_bathymetry
+            self.max_depth = self.base_bathymetry

@@ -17,7 +17,6 @@ class TurbineArrayOptions(TurbineOptions):
     turbine_width = PositiveFloat(5.0).tag(config=False)
     array_length = PositiveInteger(5).tag(config=False)
     array_width = PositiveInteger(3).tag(config=False)
-    thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
 
     # Domain specification
     mesh_file = os.path.join(os.path.dirname(__file__), 'channel.msh')
@@ -36,6 +35,7 @@ class TurbineArrayOptions(TurbineOptions):
         # Physics
         self.base_viscosity = 3.0
         self.base_bathymetry = 50.0
+        self.max_depth = 50.0
 
         # Timestepping
         self.dt = 3.0
@@ -51,10 +51,11 @@ class TurbineArrayOptions(TurbineOptions):
         deltax = 10.0*D
         deltay = 7.5*D
         self.region_of_interest = []
+        self.num_turbines = self.array_length*self.array_width
         for i in range(-2, 3):
             for j in range(-1, 2):
                 self.region_of_interest.append((i*deltax, j*deltay, D, d))
-        self.num_turbines = len(self.region_of_interest)
+        assert len(self.region_of_interest) == self.num_turbines
         self.turbine_tags = list(range(2, 2+self.num_turbines))
         self.thrust_coefficient_correction()
 
@@ -95,7 +96,7 @@ class TurbineArrayOptions(TurbineOptions):
         }
         return boundary_conditions
 
-    def get_update_forcings(self, prob, i):
+    def get_update_forcings(self, prob, i, **kwargs):
         tc = Constant(0.0)
         hmax = Constant(self.max_amplitude)
 

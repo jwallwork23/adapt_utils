@@ -21,6 +21,7 @@ class SpaceshipOptions(TurbineOptions):
     mesh_file = os.path.join(os.path.dirname(__file__), 'spaceship.msh')
     narrows_width = PositiveFloat(1000.0).tag(config=False)
     maximum_upstream_width = PositiveFloat(5000.0).tag(config=False)
+    domain_length = PositiveFloat(61500.0).tag(config=False)
 
     def __init__(self, **kwargs):
         super(SpaceshipOptions, self).__init__(**kwargs)
@@ -34,8 +35,9 @@ class SpaceshipOptions(TurbineOptions):
         # Physics
         self.base_viscosity = 1.0
         self.friction_coeff = 0.0025
+        self.max_depth = 25.5
 
-        # TODO: Timestepping
+        # Timestepping
         self.dt = 3.0
         self.T_ramp = 1.0*self.T_tide
         self.end_time = self.T_ramp + 2.0*self.T_tide
@@ -51,8 +53,8 @@ class SpaceshipOptions(TurbineOptions):
         self.elev_in = [None for i in range(self.num_meshes)]
 
         # Solver parameters and discretisation
-        self.stabilisation = None
-        # self.stabilisation = 'lax_friedrichs'
+        self.stabilisation = 'lax_friedrichs'
+        # self.stabilisation = None
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
         self.family = 'dg-cg'
@@ -75,7 +77,7 @@ class SpaceshipOptions(TurbineOptions):
         }
         return boundary_conditions
 
-    def get_update_forcings(self, prob, i):
+    def get_update_forcings(self, prob, i, **kwargs):
         tc = Constant(0.0)
         hmax = Constant(self.max_amplitude)
 
