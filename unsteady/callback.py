@@ -20,9 +20,12 @@ class TimeseriesCallback(object):
         self.name = name
         self.func = func
         self.timeseries = []
+        self.msg = 4*" " + self.name + ": {:.4e}"
 
     def evaluate(self, **kwargs):
-        self.timeseries.append(self.func(self.prob.simulation_time))
+        value = self.func(self.prob.simulation_time)
+        print_output(self.msg.format(value))
+        self.timeseries.append(value)
 
     def time_integrate(self):
         N = len(self.timeseries)
@@ -52,6 +55,7 @@ class QoICallback(TimeseriesCallback):
         :arg prob: :class:`AdaptiveProblem` object.
         :arg i: mesh index.
         """
+        self.name = "qoi"
         ks = prob.kernels[i]  # Kernel in space
         kt = Constant(0.0)    # Kernel in time
         sol = prob.fwd_solutions[i]
@@ -75,6 +79,7 @@ class GaugeCallback(TimeseriesCallback):
         :arg i: mesh index.
         :arg gauge: name of gauge to be evaluated.
         """
+        self.name = gauge
         u, eta = prob.fwd_solutions[i].split()
         gauge_location = prob.op.gauges[gauge]["coords"]
 

@@ -26,7 +26,7 @@ class SteadyTurbineProblem(SteadyShallowWaterProblem):
         self.farm_options.turbine_options.diameter = op.turbine_diameter
         self.farm_options.turbine_options.thrust_coefficient = op.thrust_coefficient
 
-        A_T = pi*(op.turbine_diameter/2.0)**2
+        A_T = pi*(op.turbine_diameter/2.0)**2  # TODO: Why circular area?
         self.C_D = op.thrust_coefficient*A_T*self.turbine_density/2.0
 
         # Turbine drag is applied everywhere (where the turbine density isn't zero)
