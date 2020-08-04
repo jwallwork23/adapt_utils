@@ -27,8 +27,8 @@ class TurbineOptions(CoupledOptions):
 
     def set_qoi_kernel(self, prob, i):
         prob.kernels[i] = Function(prob.V[i])
-        u = prob.fwd_solutions[i].split()[0]
-        k_u = prob.kernels[i].split()[0]
+        u, eta = prob.fwd_solutions[i].split()
+        k_u, k_eta = prob.kernels[i].split()
         k_u.interpolate(Constant(1/3)*prob.turbine_densities[i]*sqrt(inner(u, u))*u)
 
     def set_quadratic_drag_coefficient(self, fs):
