@@ -212,8 +212,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
                     bathymetry.project(self.op.set_bathymetry(self.P1[i]))
                     self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-            self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
-            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+                self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
+            #for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
                 self.depth[i] = DepthExpression(
                     bathymetry,
                     use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
@@ -225,7 +225,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for i, bathymetry in enumerate(self.bathymetry):
                 if init:
                     self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-            self.depth = [None for bathymetry in self.bathymetry]
+                    self.depth = [None for bathymetry in self.bathymetry]
             for i, bathymetry in enumerate(self.bathymetry):
                 self.depth[i] = DepthExpression(
                     bathymetry,
@@ -258,7 +258,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.fields[i].update({
                     'tracer_source_2d': self.op.set_tracer_source(P1DG),
                 })
-        if self.op.solve_sediment:
+        if self.op.solve_sediment or self.op.solve_exner:
             for i, P1DG in enumerate(self.P1DG):
                 self.fields[i].update({
                     'sediment_source_2d': self.op.set_sediment_source(P1DG),
@@ -856,6 +856,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.sediment_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.fwd_solutions_sediment[i])
             if op.solve_exner:
+                if not op.solve_sediment:
+                    self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i])
                 ts.exner.advance(self.simulation_time, update_forcings)
 
             # Move *mesh i*
@@ -1595,6 +1597,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
             W = FunctionSpace(mesh, self.W[i].ufl_element())
             tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
 
+        tmp_depth = project(self.op.sediment_model.depth, W)
+        tmp_tob = project(self.op.sediment_model.TOB, W)
+
+        R = VectorFunctionSpace(mesh, "CG", 1)
+        tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
+
         # Update physical mesh and solution fields defined on it
         self.meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
         for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
@@ -1609,6 +1617,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:  # FIXME: Need annotation
             self.fwd_solutions_bathymetry[i].dat.data[:] = tmp_bathymetry.dat.data
             del tmp_bathymetry
+        self.op.sediment_model.depth.dat.data[:] = tmp_depth.dat.data
+        del tmp_depth
+        self.op.sediment_model.TOB.dat.data[:] = tmp_tob.dat.data
+        del tmp_tob
+        self.op.sediment_model.uv_cg.dat.data[:] = tmp_uv_cg.dat.data
+        del tmp_uv_cg
 
         # Re-interpolate fields
         self.set_fields()

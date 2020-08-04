@@ -52,28 +52,28 @@ class BeachOptions(CoupledOptions):
         self.set_up_morph_model(self.default_mesh)
 
         # Initial
-        #self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
-        self.elev_init = Constant(0.0)
-        self.uv_init = as_vector((10**(-4), 0.0))
+        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
+        #self.elev_init = Constant(0.0)
+        #self.uv_init = as_vector((10**(-7), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'
 
         self.grad_depth_viscosity = True
 
-        self.num_hours = 48 #288*4
+        self.num_hours = 72
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
 
-        self.morphological_acceleration_factor = Constant(125)
+        self.morphological_acceleration_factor = Constant(1000)
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
         v_amp = 0.5 # Ocean boundary foring velocity
         omega = 0.5  # Ocean boundary forcing frequency
-        self.ocean_elev_func = lambda t : (h_amp * np.cos(-omega *t)) if (t%(8*np.pi) > 4*np.pi and t%(8*np.pi) < 6*np.pi) else 0
-        self.ocean_vel_func = lambda t : (v_amp * np.cos(-omega *t)) if (t%(8*np.pi) > 4*np.pi and t%(8*np.pi) < 6*np.pi) else 10**(-4)
+        self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(100.0))))
+        self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(100.0))))
 
         self.tracer_init = Constant(0.0)
 
@@ -110,14 +110,14 @@ class BeachOptions(CoupledOptions):
         self.ks = Constant(0.025)
         self.average_size = 0.0002  # Average sediment size
 
-        self.wetting_and_drying = True
+        self.wetting_and_drying = False
         self.depth_integrated = True
         self.use_tracer_conservative_form = True
         self.slope_eff = True
         self.angle_correction = False
         self.suspended = False
         self.convective_vel_flag = False
-        self.bedload =True
+        self.bedload = True
         self.solve_sediment = False
         self.solve_exner = True
 
@@ -125,15 +125,17 @@ class BeachOptions(CoupledOptions):
 
         P1 = FunctionSpace(mesh, "CG", 1)
         bath = self.set_bathymetry(P1)
-        self.wetting_and_drying_alpha = Constant(1/40) #bath.dx(0)
+        self.wetting_and_drying_alpha = Constant(0.0) #1/40) #bath.dx(0)
 
     def create_sediment_model(self, mesh, bathymetry):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
 
+        #if uv_init is None:
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
-
+        #if elev_init is None:
         self.eta_d = Function(self.P1DG).project(self.elev_init)
+
         self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
             bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
             mesh2d=mesh, bathymetry_2d=bathymetry,
@@ -152,16 +154,17 @@ class BeachOptions(CoupledOptions):
     def set_bathymetry(self, fs, **kwargs):
         x, y = SpatialCoordinate(fs.mesh())
         self.bathymetry = Function(fs, name="Bathymetry")
-        self.bathymetry.interpolate(4 - x/40)
+        self.bathymetry.interpolate(Constant(4)) # - x/40)
         return self.bathymetry
 
     def set_viscosity(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
         self.viscosity = Function(fs)
-        sponge_viscosity = Function(fs).interpolate(conditional(x>=10000, -39999 + 4*x, Constant(1.0)))
+        sponge_viscosity = Function(fs).interpolate(conditional(x>=100, -399 + 4*x, Constant(1.0)))
         self.viscosity.interpolate(sponge_viscosity*self.base_viscosity)
         return self.viscosity #Constant(self.base_viscosity)
 
+    
     def set_boundary_conditions(self, prob, i):
         if not hasattr(self, 'elev_in'):
             self.elev_in = Constant(0.0)
@@ -178,6 +181,7 @@ class BeachOptions(CoupledOptions):
         boundary_conditions = {
             'shallow_water': {
                 inflow_tag: {'elev': self.elev_in, 'uv': self.vel_in},
+                outflow_tag: {'elev': Constant(0.0)},
             },
 	   'sediment': {
             }
@@ -233,7 +237,10 @@ class BeachOptions(CoupledOptions):
     def get_update_forcings(self, prob, i, adjoint):
 
         def update_forcings(t):
-
+            uv, elev = prob.fwd_solutions[0].split()
+            if np.round(t%2.7, 0) == 3:
+                print(t)
+                print(assemble(elev*dx))
             self.update_boundary_conditions(prob, t=t)
 
         return update_forcings
