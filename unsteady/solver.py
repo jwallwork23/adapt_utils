@@ -212,8 +212,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
                     bathymetry.project(self.op.set_bathymetry(self.P1[i]))
                     self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-                self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
-            #for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+            self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
+            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
                 self.depth[i] = DepthExpression(
                     bathymetry,
                     use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
@@ -836,8 +836,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.iteration % op.dt_per_mesh_movement == 0:
                 if self.mesh_movers[i] is not None:  # TODO: generalise
                     self.mesh_movers[i].adapt()
-                    if op.solve_exner:
-                        self.new_bathymetry = Function(self.fwd_solutions_bathymetry[i].function_space()).project(self.fwd_solutions_bathymetry[i])
             # TODO: Update mesh velocity
 
             # Solve PDE(s)
@@ -859,10 +857,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if not op.solve_sediment:
                     self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i])
                 ts.exner.advance(self.simulation_time, update_forcings)
-
             # Move *mesh i*
             if self.iteration % op.dt_per_mesh_movement == 0:
-                self.move_mesh(i)
+               self.move_mesh(i)
 
             # Save to checkpoint
             if self.checkpointing:
@@ -1581,6 +1578,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         #      yet annotated in pyadjoint.  # TODO
 
         # Project a copy of the current solution onto mesh defined on new coordinates
+
+
         mesh = Mesh(self.mesh_movers[i].x)
         V = FunctionSpace(mesh, self.V[i].ufl_element())
         tmp = Function(V)
@@ -1597,14 +1596,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
             W = FunctionSpace(mesh, self.W[i].ufl_element())
             tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
 
-        tmp_depth = project(self.op.sediment_model.depth, W)
-        tmp_tob = project(self.op.sediment_model.TOB, W)
+        #tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
 
-        R = VectorFunctionSpace(mesh, "CG", 1)
-        tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
+        #tmp_depth = project(self.op.sediment_model.depth, W)
+        #tmp_tob = project(self.op.sediment_model.TOB, W)
+
+        #R = VectorFunctionSpace(mesh, "CG", 1)
+        #tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
 
         # Update physical mesh and solution fields defined on it
         self.meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
+
         for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
             sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
         del tmp
@@ -1617,12 +1619,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:  # FIXME: Need annotation
             self.fwd_solutions_bathymetry[i].dat.data[:] = tmp_bathymetry.dat.data
             del tmp_bathymetry
-        self.op.sediment_model.depth.dat.data[:] = tmp_depth.dat.data
-        del tmp_depth
-        self.op.sediment_model.TOB.dat.data[:] = tmp_tob.dat.data
-        del tmp_tob
-        self.op.sediment_model.uv_cg.dat.data[:] = tmp_uv_cg.dat.data
-        del tmp_uv_cg
+        #self.op.sediment_model.old_bathymetry_2d.dat.data[:] = tmp_old_bath.dat.data[:]
+        #self.op.sediment_model.depth.dat.data[:] = tmp_depth.dat.data
+        #del tmp_depth
+        #self.op.sediment_model.TOB.dat.data[:] = tmp_tob.dat.data
+        #del tmp_tob
+        #self.op.sediment_model.uv_cg.dat.data[:] = tmp_uv_cg.dat.data
+        #del tmp_uv_cg
 
         # Re-interpolate fields
         self.set_fields()
+
+        #self.create_forward_equations(i)
+        #self.create_forward_timesteppers(i)
