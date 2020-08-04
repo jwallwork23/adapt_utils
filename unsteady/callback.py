@@ -21,7 +21,7 @@ class TimeseriesCallback(object):
         self.name = name
         self.func = func
         self.timeseries = []
-        self.msg = "    {:16s}".format(self.name) + " at time {:6.1f} = {:.4e}"
+        self.msg = "    {:16s}".format(self.name) + " at time {:6.1f} = {:11.4e}"
 
     def evaluate(self, **kwargs):
         t = self.prob.simulation_time
