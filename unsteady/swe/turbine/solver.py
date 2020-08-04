@@ -1,12 +1,12 @@
 from thetis import *
 
-from adapt_utils.swe.solver import AdaptiveShallowWaterProblem
+from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
 __all__ = ["AdaptiveTurbineProblem"]
 
 
-class AdaptiveTurbineProblem(AdaptiveShallowWaterProblem):
+class AdaptiveTurbineProblem(AdaptiveProblem):
     """General solver object for adaptive tidal turbine problems."""
 
     # --- Setup
