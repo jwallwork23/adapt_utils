@@ -1,7 +1,8 @@
 from thetis import *
 
-from adapt_utils.unsteady.callback import QoICallback
 from adapt_utils.unsteady.solver import AdaptiveProblem
+# from adapt_utils.unsteady.callback import QoICallback
+from adapt_utils.unsteady.swe.turbine.callback import PowerOutputCallback
 
 
 __all__ = ["AdaptiveTurbineProblem"]
@@ -57,8 +58,10 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
 
     def add_callbacks(self, i):
         super(AdaptiveTurbineProblem, self).add_callbacks(i)
-        self.get_qoi_kernels(i)
-        self.callbacks[i].add(QoICallback(self, i), 'timestep')
+        # self.get_qoi_kernels(i)
+        # self.callbacks[i].add(QoICallback(self, i), 'timestep')
+        for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
+            self.callbacks[i].add(PowerOutputCallback(self, i, farm_id), 'timestep')
 
     def quantity_of_interest(self):
         self.qoi = sum(c['timestep']['qoi'].time_integrate() for c in self.callbacks)

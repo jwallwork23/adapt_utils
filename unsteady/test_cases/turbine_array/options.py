@@ -104,7 +104,6 @@ class TurbineArrayOptions(TurbineOptions):
             tc.assign(t)
             self.elev_in[i].assign(hmax*cos(self.omega*(tc - self.T_ramp)))
             self.elev_out[i].assign(hmax*cos(self.omega*(tc - self.T_ramp) + pi))
-            self.print_debug("DEBUG: t = {:.0f}".format(t))
 
         return update_forcings
 
