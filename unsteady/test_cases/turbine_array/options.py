@@ -36,13 +36,14 @@ class TurbineArrayOptions(TurbineOptions):
         self.base_viscosity = 3.0
         self.base_bathymetry = 50.0
         self.max_depth = 50.0
+        self.friction_coeff = 0.0025
 
         # Timestepping
         self.dt = 3.0
         self.T_tide = 0.1*self.M2_tide_period
         self.T_ramp = 1.0*self.T_tide
         self.end_time = self.T_ramp + 2.0*self.T_tide
-        self.dt_per_export = 10
+        self.dt_per_export = 12
 
         # Tidal farm
         D = self.turbine_length
@@ -57,7 +58,6 @@ class TurbineArrayOptions(TurbineOptions):
                 self.region_of_interest.append((i*deltax, j*deltay, D, d))
         assert len(self.region_of_interest) == self.num_turbines
         self.turbine_tags = list(range(2, 2+self.num_turbines))
-        self.thrust_coefficient_correction()
 
         # Boundary forcing
         self.max_amplitude = 0.5
