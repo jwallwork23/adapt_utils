@@ -212,7 +212,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
                     bathymetry.project(self.op.set_bathymetry(self.P1[i]))
                     self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-            self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
+                self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
             for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
                 self.depth[i] = DepthExpression(
                     bathymetry,
@@ -836,6 +836,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.iteration % op.dt_per_mesh_movement == 0:
                 if self.mesh_movers[i] is not None:  # TODO: generalise
                     self.mesh_movers[i].adapt()
+
+            # Move *mesh i*
+            if self.iteration % op.dt_per_mesh_movement == 0:
+               self.move_mesh(i)
+
             # TODO: Update mesh velocity
 
             # Solve PDE(s)
@@ -858,8 +863,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i])
                 ts.exner.advance(self.simulation_time, update_forcings)
             # Move *mesh i*
-            if self.iteration % op.dt_per_mesh_movement == 0:
-               self.move_mesh(i)
+            #if self.iteration % op.dt_per_mesh_movement == 0:
+            #   self.move_mesh(i)
 
             # Save to checkpoint
             if self.checkpointing:
@@ -1596,6 +1601,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
             W = FunctionSpace(mesh, self.W[i].ufl_element())
             tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
 
+
+
+        self.a_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
+        print('here')
+        if not hasattr(self, "b_mc"):
+            self.b_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
+        print(self.a_mc - self.b_mc)
+
+        self.b_mc = assemble(tmp_bathymetry*dx)
+        print(self.b_mc-self.a_mc)
         #tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
 
         #tmp_depth = project(self.op.sediment_model.depth, W)
@@ -1626,9 +1641,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         #del tmp_tob
         #self.op.sediment_model.uv_cg.dat.data[:] = tmp_uv_cg.dat.data
         #del tmp_uv_cg
-
         # Re-interpolate fields
         self.set_fields()
-
         #self.create_forward_equations(i)
         #self.create_forward_timesteppers(i)

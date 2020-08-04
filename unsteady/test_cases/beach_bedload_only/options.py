@@ -52,9 +52,9 @@ class BeachOptions(CoupledOptions):
         self.set_up_morph_model(self.default_mesh)
 
         # Initial
-        #self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
-        self.elev_init = Constant(0.0)
-        self.uv_init = as_vector((10**(-7), 0.0))
+        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
+        #self.elev_init = Constant(0.0)
+        #self.uv_init = as_vector((10**(-7), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'
@@ -117,9 +117,9 @@ class BeachOptions(CoupledOptions):
         self.angle_correction = False
         self.suspended = False
         self.convective_vel_flag = False
-        self.bedload = False
-        self.solve_sediment = False
-        self.solve_exner = False
+        self.bedload = True
+        self.solve_sediment = True
+        self.solve_exner = True
 
         self.norm_smoother = Constant(10/25)
 
@@ -234,10 +234,10 @@ class BeachOptions(CoupledOptions):
     def get_update_forcings(self, prob, i, adjoint):
 
         def update_forcings(t):
-            uv, elev = prob.fwd_solutions[0].split()
-            if np.round(t%2.7, 0) == 3:
-                print(t)
-                print(assemble(elev*dx))
+            #uv, elev = prob.fwd_solutions[0].split()
+            #if np.round(t%2.7, 0) == 3:
+            #    print(t)
+            #    print(assemble(prob.fwd_solutions_bathymetry[0]*dx))
             self.update_boundary_conditions(prob, t=t)
 
         return update_forcings
