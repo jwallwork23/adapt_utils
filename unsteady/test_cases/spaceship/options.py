@@ -22,6 +22,7 @@ class SpaceshipOptions(TurbineOptions):
     narrows_width = PositiveFloat(1000.0).tag(config=False)
     maximum_upstream_width = PositiveFloat(5000.0).tag(config=False)
     domain_length = PositiveFloat(61500.0).tag(config=False)
+    domain_width = PositiveFloat(60000.0).tag(config=False)
 
     def __init__(self, **kwargs):
         super(SpaceshipOptions, self).__init__(**kwargs)
@@ -91,5 +92,13 @@ class SpaceshipOptions(TurbineOptions):
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
         x, y = SpatialCoordinate(prob.meshes[0])
+
+        # Small velocity to avoid zero initial condition
         u.interpolate(as_vector([1e-8, 0.0]))
-        eta.interpolate(-x/self.domain_length)
+
+        # Set initial elevation consistently with the boundary forcing
+        hmax = Constant(self.max_amplitude)
+        r = 0.5*self.domain_width
+        expr = hmax*(x**2 + y**2)/r**2
+        # eta.interpolate(conditional(x > 0, -expr, expr))
+        eta.interpolate(conditional(x > 0, 0, expr))
