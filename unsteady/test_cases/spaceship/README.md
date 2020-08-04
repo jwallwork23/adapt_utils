@@ -9,14 +9,24 @@ bathymetry. It is this latter bathymetry which is used here.
 
 Thanks to [1][Nicolas Barral] for contributing the geometry file.
 
+### Parameters:
+  * TODO
+
+### Boundary conditions:
+  * TODO
+
+### Quantity of interest
+Power output (integral over turbine footprints and time period of cubed fluid speed, scaled by
+turbine drag coefficient and divided by water depth).
+
 ### References
 
 [Walkington & Burrows] I. Walkington, R. Burrows, "Modelling tidal stream power potential", Applied
-                       ocean research, 31:239–245, (2009).
+ocean research, 31:239–245, (2009).
 
 [Kramer et al.] S. C. Kramer, M. D. Piggott, J. Hill, L. Kregting, D. Pritchard, B. Elsaesser,
-                "The modelling of tidal turbine farms using multi-scale unstructured mesh models",
-                Proceedings of the 2nd International Conference on Environmental Interactions of
-                Marine Renewable Energy Technologies (2014).
+"The modelling of tidal turbine farms using multi-scale unstructured mesh models", Proceedings of
+the 2nd International Conference on Environmental Interactions of Marine Renewable Energy
+Technologies (2014).
 
 [1]: https://nicolasbarral.fr "Nicolas Barral"
