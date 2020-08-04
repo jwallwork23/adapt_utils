@@ -19,6 +19,7 @@ from thetis.exner_eq import ExnerEquation
 from .sediment.sediments_model import SedimentModel
 from .tracer.error_estimation import TracerGOErrorEstimator
 from .base import AdaptiveProblemBase
+from .callback import *
 
 __all__ = ["AdaptiveProblem"]
 
@@ -733,7 +734,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Solvers
 
-    # TODO: Turbine setup
+    def add_callbacks(self, i):
+        if self.op.solve_swe:
+            self.callbacks[i].add(VelocityNormCallback(self, i), 'export')
+            self.callbacks[i].add(ElevationNormCallback(self, i), 'export')
+        if self.op.solve_tracer:
+            self.callbacks[i].add(TracerNormCallback(self, i), 'export')
+
     def setup_solver_forward(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
@@ -788,10 +795,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op = self.op
         plot_pvd &= op.plot_pvd
 
+        # Initialise counters
+        t_epsilon = 1.0e-05
+        self.iteration = 0
+        start_time = i*op.dt*self.dt_per_mesh
+        end_time = (i+1)*op.dt*self.dt_per_mesh
+        try:
+            assert np.allclose(self.simulation_time, start_time)
+        except AssertionError:
+            msg = "Mismatching start time: {:.2f} vs {:.2f}"
+            raise ValueError(msg.format(self.simulation_time, start_time))
+        # update_forcings(self.simulation_time)
+        print_output(80*'=')
+        op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
+        msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
+        print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
+
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
         export_func = export_func or self.op.get_export_func(self, i)
-        print_output(80*'=')
         # if i == 0:
         if export_func is not None:
             export_func()
@@ -944,7 +966,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
 
-    # TODO: In nonlinear case, uv_2d and elev_2d will need to be loaded / recomputed
     def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.
@@ -956,10 +977,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op = self.op
         plot_pvd &= op.plot_pvd
 
+        # Initialise counters
+        t_epsilon = 1.0e-05
+        self.iteration = (i+1)*self.dt_per_mesh
+        start_time = (i+1)*op.dt*self.dt_per_mesh
+        end_time = i*op.dt*self.dt_per_mesh
+        try:
+            assert np.allclose(self.simulation_time, start_time)
+        except AssertionError:
+            msg = "Mismatching start time: {:f} vs {:f}"
+            raise ValueError(msg.format(self.simulation_time, start_time))
+        # update_forcings(self.simulation_time)
+        print_output(80*'=')
+        op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
+        msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
+        print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
+
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
         export_func = export_func or self.op.get_export_func(self, i)
-        print_output(80*'=')
         # if i == self.num_meshes-1:
         if export_func is not None:
             export_func()
@@ -981,20 +1017,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 proj_tracer.project(self.adj_solutions_tracer[i])
                 self.adjoint_tracer_file.write(proj_tracer)
 
-        # Initialise counters
-        t_epsilon = 1.0e-05
-        self.iteration = (i+1)*self.dt_per_mesh
-        start_time = (i+1)*op.dt*self.dt_per_mesh
-        end_time = i*op.dt*self.dt_per_mesh
-        try:
-            assert np.allclose(self.simulation_time, start_time)
-        except AssertionError:
-            msg = "Mismatching start time: {:f} vs {:f}"
-            raise ValueError(msg.format(self.simulation_time, start_time))
-        # update_forcings(self.simulation_time)
-        op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}"
-        print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time))
+        # Time integrate
         ts = self.timesteppers[i]
         while self.simulation_time >= end_time + t_epsilon:
             self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
