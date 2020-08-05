@@ -33,14 +33,25 @@ __all__ = ["AdaptiveProblem"]
 
 # TODO LATER:
 #  * Multiple tracers
-#  * Turbines
 
 class AdaptiveProblem(AdaptiveProblemBase):
-    """Default model: 2D coupled shallow water + tracer transport."""
-    # TODO: equations and supported terms
-    def __init__(self, op, nonlinear=True, **kwargs):
+    """
+    A class describing 2D models which may involve coupling of any of:
 
-        # Problem-specific options
+        * shallow water equations (hydrodynamics);
+        * tracer transport;
+        * sediment transport;
+        * Exner equation.
+
+    Mesh adaptation is supported both using the metric-based approach of Pragmatic, as well as
+    mesh movement methods. Mesh movement can either be driven by a prescribed velocity or by a
+    monitor function.
+
+    In addition to enabling the solution of these equations, the class provides means to solve
+    the associated continuous form adjoint equations, evaluate goal-oriented error estimators and
+    indicators, as well as various other utilities.
+    """
+    def __init__(self, op, nonlinear=True, **kwargs):
         self.shallow_water_options = [AttrDict() for i in range(op.num_meshes)]
         static_options = {
             'use_nonlinear_equations': nonlinear,
@@ -56,10 +67,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'norm_smoother': op.norm_smoother,
             'sipg_parameter': None,
             'mesh_velocity': None,
+            'tidal_turbine_farms': {},  # NOTE: This is only modified in AdaptiveTurbineProblem
         }
         for i, swo in enumerate(self.shallow_water_options):
             swo.update(static_options)
-            swo.tidal_turbine_farms = {}  # TODO
             if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
                 swo['sipg_parameter'] = op.sipg_parameter
         if not nonlinear:
@@ -394,9 +405,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_tracer:
             self.project(self.adj_solutions_tracer, i, j)
         if self.op.solve_sediment:
-            raise NotImplementedError
+            self.project(self.adj_solutions_sediment, i, j)
         if self.op.solve_exner:
-            raise NotImplementedError
+            self.project(self.adj_solutions_bathymetry, i, j)
 
     # --- Equations
 
@@ -410,17 +421,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self._create_forward_exner_equation(i)
 
-    def create_adjoint_equations(self, i):
-        if self.op.solve_swe:
-            self._create_adjoint_shallow_water_equations(i)
-        if self.op.solve_tracer:
-            self._create_adjoint_tracer_equation(i)
-        if self.op.solve_sediment:
-            raise NotImplementedError
-        if self.op.solve_exner:
-            raise NotImplementedError
-
     def _create_forward_shallow_water_equations(self, i):
+        from .swe.equation import ShallowWaterEquations
+
         if self.mesh_velocities[i] is not None:
             self.shallow_water_options[i]['mesh_velocity'] = self.mesh_velocities[i]
         self.equations[i].shallow_water = ShallowWaterEquations(
@@ -430,15 +433,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
-    def _create_adjoint_shallow_water_equations(self, i):
-        self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
-            self.V[i],
-            self.depth[i],
-            self.shallow_water_options[i],
-        )
-        self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
-
     def _create_forward_tracer_equation(self, i):
+        from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
+
         op = self.tracer_options[i]
         conservative = op.use_tracer_conservative_form
         model = ConservativeTracerEquation2D if conservative else TracerEquation2D
@@ -453,6 +450,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     def _create_forward_sediment_equation(self, i):
+        from .sediment.equation import SedimentEquation2D
+
         op = self.sediment_options[i]
         model = SedimentEquation2D
         self.equations[i].sediment = model(
@@ -478,7 +477,29 @@ class AdaptiveProblem(AdaptiveProblemBase):
             sed_model=self.op.sediment_model,
         )
 
+    def create_adjoint_equations(self, i):
+        if self.op.solve_swe:
+            self._create_adjoint_shallow_water_equations(i)
+        if self.op.solve_tracer:
+            self._create_adjoint_tracer_equation(i)
+        if self.op.solve_sediment:
+            self._create_adjoint_sediment_equation(i)
+        if self.op.solve_exner:
+            self._create_adjoint_exner_equation(i)
+
+    def _create_adjoint_shallow_water_equations(self, i):
+        from .swe.adjoint import AdjointShallowWaterEquations
+
+        self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
+            self.V[i],
+            self.depth[i],
+            self.shallow_water_options[i],
+        )
+        self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
+
     def _create_adjoint_tracer_equation(self, i):
+        from .tracer.adjoint import AdjointTracerEquation2D, AdjointConservativeTracerEquation2D
+
         op = self.tracer_options[i]
         conservative = op.use_tracer_conservative_form
         model = AdjointConservativeTracerEquation2D if conservative else AdjointTracerEquation2D
@@ -491,6 +512,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
+
+    def _create_adjoint_sediment_equation(self, i):
+        raise NotImplementedError("Continuous adjoint sediment equation not implemented")
+
+    def _create_adjoint_exner_equation(self, i):
+        raise NotImplementedError("Continuous adjoint Exner equation not implemented")
 
     # --- Error estimators
 
@@ -505,6 +532,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self._create_exner_error_estimator(i)
 
     def _create_shallow_water_error_estimator(self, i):
+        from .swe.error_estimation import ShallowWaterGOErrorEstimator
+
         self.error_estimators[i].shallow_water = ShallowWaterGOErrorEstimator(
             self.V[i],
             self.depth[i],
@@ -512,8 +541,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
 
     def _create_tracer_error_estimator(self, i):
+        from .tracer.error_estimation import TracerGOErrorEstimator
+
         if self.tracer_options[i].use_tracer_conservative_form:
-            raise NotImplementedError("Error estimators for conservative tracer not yet implemented.")  # TODO
+            raise NotImplementedError("Error estimation for conservative tracers not implemented.")
         else:
             estimator = TracerGOErrorEstimator
         self.error_estimators[i].tracer = estimator(
@@ -524,10 +555,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
 
     def _create_sediment_error_estimator(self, i):
-        raise NotImplementedError("Error estimators for sediment not yet implemented.")
+        raise NotImplementedError("Error estimators for sediment not implemented.")
 
     def _create_exner_error_estimator(self, i):
-        raise NotImplementedError("Error estimators for Exner not yet implemented.")
+        raise NotImplementedError("Error estimators for Exner not implemented.")
 
 
     # --- Timestepping
@@ -543,18 +574,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self._create_forward_sediment_timestepper(i, self.integrator)
         if self.op.solve_exner:
             self._create_forward_exner_timestepper(i, self.integrator)
-
-    def create_adjoint_timesteppers(self, i):
-        if i == self.num_meshes-1:
-            self.simulation_time = self.op.end_time
-        if self.op.solve_swe:
-            self._create_adjoint_shallow_water_timestepper(i, self.integrator)
-        if self.op.solve_tracer:
-            self._create_adjoint_tracer_timestepper(i, self.integrator)
-        if self.op.solve_sediment:
-            raise NotImplementedError
-        if self.op.solve_exner:
-            raise NotImplementedError
 
     def _get_fields_for_shallow_water_timestepper(self, i):
         fields = AttrDict({
@@ -694,6 +713,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         self.timesteppers[i].exner = integrator(*args, **kwargs)
 
+    def create_adjoint_timesteppers(self, i):
+        if i == self.num_meshes-1:
+            self.simulation_time = self.op.end_time
+        if self.op.solve_swe:
+            self._create_adjoint_shallow_water_timestepper(i, self.integrator)
+        if self.op.solve_tracer:
+            self._create_adjoint_tracer_timestepper(i, self.integrator)
+        if self.op.solve_sediment:
+            self._create_adjoint_sediment_timestepper(i, self.integrator)
+        if self.op.solve_exner:
+            self._create_adjoint_exner_timestepper(i, self.integrator)
+
     def _create_adjoint_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
         fields['uv_2d'], fields['elev_2d'] = self.fwd_solutions[i].split()
@@ -738,6 +769,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
         self.timesteppers[i].adjoint_tracer = integrator(*args, **kwargs)
+
+    def _create_adjoint_sediment_timestepper(self, i, integrator):
+        raise NotImplementedError("Continuous adjoint sediment timestepping not implemented")
+
+    def _create_adjoint_exner_timestepper(self, i, integrator):
+        raise NotImplementedError("Continuous adjoint Exner timestepping not implemented")
 
     # --- Solvers
 
@@ -1318,6 +1355,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
         """
         op = self.op
+        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
@@ -1442,6 +1480,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
+        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
