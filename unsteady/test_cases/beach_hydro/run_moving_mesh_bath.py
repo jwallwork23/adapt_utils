@@ -26,7 +26,10 @@ def export_final_state(inputdir, bathymetry_2d):
     File(inputdir + '/bathout.pvd').write(bathymetry_2d)
     chk.close()
 
-    plex = bathymetry_2d.function_space().mesh()._plex
+    try:
+        plex = bathymetry_2d.function_space().mesh()._plex
+    except AttributeError:
+        plex = bathymetry_2d.function_space().mesh()._topology_dm
     viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
     viewer(plex)
 
