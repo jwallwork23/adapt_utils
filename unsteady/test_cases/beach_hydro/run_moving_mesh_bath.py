@@ -4,7 +4,7 @@ from thetis import *
 
 import numpy as np
 
-from adapt_utils.unsteady.test_cases.beach_suspended_only.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_hydro.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
 from adapt_utils.norms import local_frobenius_norm, local_norm
@@ -48,14 +48,14 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.25
+nx = 0.5
 ny = 0.5
 
-alpha = 2
+alpha = 0.5
 beta = 1
-gamma = 0.5
+gamma = 1
 
-kappa = 50
+kappa = 20
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -117,20 +117,20 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = ka
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
     mon_init = project(Constant(1.0) + comp_new2, P1)
 
-    #H = Function(P1)
-    #tau = TestFunction(P1)
-
-    #a = (inner(tau, H)*dx)+(K*inner(tau.dx(1), H.dx(1))*dx) - inner(tau, mon_init)*dx
-    #solve(a == 0, H)
-
     H = Function(P1)
     tau = TestFunction(P1)
 
-    n = FacetNormal(mesh)
-
-    a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
-    a -= inner(tau, mon_init)*dx
+    a = (inner(tau, H)*dx)+(K*inner(tau.dx(1), H.dx(1))*dx) - inner(tau, mon_init)*dx
     solve(a == 0, H)
+
+    #H = Function(P1)
+    #tau = TestFunction(P1)
+
+    #n = FacetNormal(mesh)
+
+    #a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
+    #a -= inner(tau, mon_init)*dx
+    #solve(a == 0, H)
 
     return H
 
@@ -172,3 +172,4 @@ bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_660')
 print('L2')
 print(fire.errornorm(bath, bath_real))
 print(kappa)
+print('diff y')
