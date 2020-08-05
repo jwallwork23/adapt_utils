@@ -64,7 +64,7 @@ class TohokuOptions(TsunamiOptions):
         self.resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
         self.level = level
         self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(self.level))
-        postproc = kwargs.get('postproc', True)
+        postproc = kwargs.get('postproc', False)
         if mesh is None:
             if postproc:
                 from firedrake.petsc import PETSc

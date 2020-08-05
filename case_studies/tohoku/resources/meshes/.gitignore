@@ -1,0 +1,10 @@
+*.shp
+*.shx
+*.geo
+*.nc
+*.prj
+*.qpj
+*.dbf
+*.cpg
+*.ipynb
+log
