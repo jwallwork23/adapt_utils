@@ -72,11 +72,12 @@ kwargs = {
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
     'r_adapt_rtol': 1.0e-3,
+
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
     'use_automatic_sipg_parameter': True,
-    'friction': 'manning'
+    'friction': 'manning',
 }
 
 op = BeachOptions(**kwargs)
@@ -85,7 +86,7 @@ swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
+def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
