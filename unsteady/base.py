@@ -71,10 +71,7 @@ class AdaptiveProblemBase(object):
         # Mesh movement
         self.mesh_movers = [None for i in range(self.num_meshes)]
 
-        # Outputs
-        self.bathymetry_file = File(os.path.join(self.di, 'bathymetry.pvd'))
-        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
-        self.kernel_file = File(os.path.join(self.di, 'kernel.pvd'))
+        # Checkpointing
         self.checkpoint = []
 
         # Storage for diagnostics over mesh adaptation loop
