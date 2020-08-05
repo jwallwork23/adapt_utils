@@ -1,14 +1,10 @@
 from __future__ import absolute_import
 
 from thetis import *
-from thetis.callback import CallbackManager
-from firedrake.petsc import PETSc
 
 import os
 import numpy as np
-import warnings
 
-from adapt_utils.adapt.r import MeshMover
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
@@ -89,6 +85,8 @@ class AdaptiveProblemBase(object):
         Setup everything which isn't explicitly associated with either the forward or adjoint
         problem.
         """
+        from thetis.callback import CallbackManager
+
         op = self.op
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
@@ -120,7 +118,7 @@ class AdaptiveProblemBase(object):
 
         NOTE: If a single mesh is passed to the constructor then it is symlinked into each slot
               rather than explicitly copied. This rears its head in :attr:`run_dwr`, where a the
-              enriched meshes are build from a single mesh hierarchy.
+              enriched meshes are built from a single mesh hierarchy.
         """
         self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
         self.mesh_velocities = [None for i in range(self.num_meshes)]
@@ -239,15 +237,22 @@ class AdaptiveProblemBase(object):
 
     def store_plexes(self, di=None):
         """Save meshes to disk using DMPlex format."""
+        from firedrake.petsc import PETSc
+
         di = di or os.path.join(self.di, self.approach)
         fname = os.path.join(di, 'plex_{:d}.h5')
         for i, mesh in enumerate(self.meshes):
             assert os.path.isdir(di)
             viewer = PETSc.Viewer().createHDF5(fname.format(i), 'w')
-            viewer(mesh._plex)
+            try:
+                viewer(mesh._topology_dm)
+            except AttributeError:
+                viewer(mesh._plex)  # backwards compatability
 
     def load_plexes(self, fname):
         """Load meshes in DMPlex format."""
+        from firedrake.petsc import PETSc
+
         for i in range(self.num_meshes):
             newplex = PETSc.DMPlex().create()
             newplex.createFromFile('_'.join([fname, '{:d}.h5'.format(i)]))
@@ -298,7 +303,9 @@ class AdaptiveProblemBase(object):
         self.op.print_debug("CHECKPOINT SAVE: {:3d} currently stored".format(len(self.checkpoint)))
 
     def collect_from_checkpoint(self, mode='memory', **kwargs):
-        """Extremely simple checkpointing scheme which pops off the top of a stack of copied fields."""
+        """
+        Extremely simple checkpointing scheme which pops off the top of a stack of copied fields.
+        """
         assert mode in ('memory', 'disk')
         if mode == 'disk':
             # delete = kwargs.get('delete', True)
@@ -336,11 +343,16 @@ class AdaptiveProblemBase(object):
     # --- Mesh movement
 
     def set_monitor_functions(self, monitors):
+        from adapt_utils.adapt.r import MeshMover
+
+        # Sanitise input
         assert self.approach in ('monge_ampere', 'laplacian_smoothing')
         assert monitors is not None
         if callable(monitors):
             monitors = [monitors, ]
         assert len(monitors) == self.num_meshes
+
+        # Create `MeshMover` objects which drive r-adaptation
         kwargs = {
             'method': self.approach,
             'bc': None,  # TODO
@@ -395,6 +407,7 @@ class AdaptiveProblemBase(object):
         r = interpolate(JacobianDeterminant(mesh)/orig_signs, self.P0[i]).vector().gather()
         num_inverted = len(r[r < 0])
         if num_inverted > 0:
+            import warnings
             warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
 
     def move_mesh_monge_ampere(self, i):  # TODO: Annotation
@@ -417,7 +430,6 @@ class AdaptiveProblemBase(object):
         self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
         for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
             sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
-        del tmp
 
         # Re-interpolate fields
         self.set_fields()
