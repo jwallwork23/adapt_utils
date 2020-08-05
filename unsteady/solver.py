@@ -811,10 +811,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         print_output(80*'=')
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         if self.num_meshes == 1:
-            msg = "FORWARD SOLVE  time {:8.2f}  ({:6.2f}) seconds"
+            msg = "FORWARD SOLVE  time {:8.2f}  ({:6.2f} seconds)"
             print_output(msg.format(self.simulation_time, 0.0))
         else:
-            msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f}) seconds"
+            msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
             print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
