@@ -114,6 +114,7 @@ class Options(FrozenConfigurable):
         default_value='basic',
         help="""Choose debugging mode from {'basic', 'full'}.""").tag(config=True)
     plot_pvd = Bool(True, help="Toggle saving fields to .pvd and .vtu.").tag(config=True)
+    plot_bathymetry = Bool(False, help="Toggle plotting bathymetry to .pvd and .vtu.").tag(config=True)
     save_hdf5 = Bool(False, help="Toggle saving fields to HDF5.").tag(config=True)
 
     # --- Adaptation

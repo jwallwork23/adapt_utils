@@ -96,7 +96,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.adjoint_tracer_file = File(os.path.join(self.di, 'adjoint_tracer.pvd'))
         if self.op.solve_sediment:
             self.sediment_file = File(os.path.join(self.di, 'sediment.pvd'))
-        if self.op.solve_exner:
+        if self.op.plot_bathymetry or self.op.solve_exner:
             self.exner_file = File(os.path.join(self.di, 'modified_bathymetry.pvd'))
 
     def set_finite_elements(self):
@@ -492,7 +492,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_sediment:
             self._create_sediment_error_estimator(i)
         if self.op.solve_exner:
-            raise NotImplementedError
+            self._create_exner_error_estimator(i)
 
     def _create_shallow_water_error_estimator(self, i):
         self.error_estimators[i].shallow_water = ShallowWaterGOErrorEstimator(
@@ -514,7 +514,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
 
     def _create_sediment_error_estimator(self, i):
-        raise NotImplementedError("Error estimators for sediment not yet implemented.")  # TODO
+        raise NotImplementedError("Error estimators for sediment not yet implemented.")
+
+    def _create_exner_error_estimator(self, i):
+        raise NotImplementedError("Error estimators for Exner not yet implemented.")
 
     # --- Timestepping
 
@@ -538,6 +541,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_tracer:
             self._create_adjoint_tracer_timestepper(i, self.integrator)
         if self.op.solve_sediment:
+            raise NotImplementedError
+        if self.op.solve_exner:
             raise NotImplementedError
 
     def _get_fields_for_shallow_water_timestepper(self, i):
@@ -731,6 +736,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.callbacks[i].add(ElevationNormCallback(self, i), 'export')
         if self.op.solve_tracer:
             self.callbacks[i].add(TracerNormCallback(self, i), 'export')
+        # TODO: Callbacks for sediment
+        # TODO: Callbacks for Exner
 
     def setup_solver_forward(self, i):
         """Setup forward solver on mesh `i`."""
@@ -837,11 +844,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if i == 0:
                 proj_sediment.project(self.fwd_solutions_sediment[i])
                 self.sediment_file.write(proj_sediment)
-        if op.solve_exner and plot_pvd:
+        if (op.plot_bathymetry or op.solve_exner) and plot_pvd:
             proj_bath = Function(self.P1[i], name="Projected bathymetry")
             self.exner_file._topology = None
+            b = self.fwd_solutions_bathymetry[i] if op.solve_exner else self.bathymetry[i]
             if i == 0:
-                proj_bath.project(self.fwd_solutions_bathymetry[i])
+                proj_bath.project(b)
                 self.exner_file.write(proj_bath)
 
         # Time integrate
@@ -910,8 +918,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if op.solve_sediment and plot_pvd:
                     proj_sediment.project(self.fwd_solutions_sediment[i])
                     self.sediment_file.write(proj_sediment)
-                if op.solve_exner and plot_pvd:
-                    proj_bath.project(self.fwd_solutions_bathymetry[i])
+                if (op.plot_bathymetry or op.solve_exner) and plot_pvd:
+                    b = self.fwd_solutions_bathymetry[i] if op.solve_exner else self.bathymetry[i]
+                    proj_bath.project(b)
                     self.exner_file.write(proj_bath)
                 if export_func is not None:
                     export_func()
