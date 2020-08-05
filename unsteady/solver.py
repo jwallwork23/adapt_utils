@@ -1047,12 +1047,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Collect forward solution from checkpoint and free associated memory
             #   NOTE: We need collect the checkpoints from the stack in reverse order
             if self.checkpointing:
+                if op.solve_exner:
+                    self.fwd_solutions_bathymetry[i].assign(self.collect_from_checkpoint())
+                if op.solve_sediment:
+                    self.fwd_solutions_sediment[i].assign(self.collect_from_checkpoint())
                 if op.solve_tracer:
                     self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint())
                 if op.solve_swe:
-                    # chk = self.collect_from_checkpoint()
-                    # self.fwd_solutions[i].assign(chk)
-                    # del chk
                     self.fwd_solutions[i].assign(self.collect_from_checkpoint())
 
             # Solve adjoint PDE(s)
