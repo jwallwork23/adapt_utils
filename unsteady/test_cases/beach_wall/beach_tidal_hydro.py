@@ -35,7 +35,7 @@ def boundary_conditions_fn_balzano(bathymetry_2d, flag = None, morfac = 1, t_new
    
     # boundary conditions
     h_amp = 0.25     # ocean boundary forcing amplitude
-    omega = 0.05    # ocean boundary forcing period
+    omega = 0.5    # ocean boundary forcing period
     ocean_elev_func = lambda t: (h_amp * np.cos(-omega *t))
 
     vel_amp = 0.5
@@ -60,8 +60,8 @@ def boundary_conditions_fn_balzano(bathymetry_2d, flag = None, morfac = 1, t_new
 # define mesh
 lx = 220
 ly = 10
-nx = np.int(lx*1)
-ny = 10
+nx = np.int(lx*0.5)
+ny = 5
 mesh2d = th.RectangleMesh(nx, ny, lx, ly)
 
 x,y = th.SpatialCoordinate(mesh2d)

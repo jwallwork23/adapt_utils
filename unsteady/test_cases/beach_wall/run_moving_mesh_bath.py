@@ -48,10 +48,10 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 1
-ny = 1
+nx = 0.5
+ny = 0.5
 
-alpha = 2
+alpha = 3
 beta = 1
 gamma = 1
 
