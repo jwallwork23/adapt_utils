@@ -44,13 +44,13 @@ class CoupledOptions(Options):
     sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     norm_smoother = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
     tracer_advective_velocity_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
-    
+
     # Exner transport model
     solve_exner = Bool(False).tag(config=True)
     bathymetry_family = Enum(['dg', 'cg'], default_value='cg').tag(config=True)
     morphological_acceleration_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
     porosity = FiredrakeScalarExpression(Constant(0.4)).tag(config=True)
-    
+
     # Adaptation
     adapt_field = Unicode('all_avg', help="Adaptation field of interest.").tag(config=True)
     region_of_interest = List(default_value=[]).tag(config=True)

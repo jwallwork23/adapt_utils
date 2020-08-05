@@ -64,12 +64,12 @@ with stop_annotating():
     else:
         func_values = np.zeros(n)
         for i, m in enumerate(control_values):
-            op.control_parameter.assign(m)
+            op.control_parameters[0].assign(m)
             swp.set_initial_condition()
             swp.solve_forward()
             func_values[i] = op.J/len(op.times)
     np.save(fname, func_values)
-    op.control_parameter.assign(float(args.initial_guess or 10.0))
+    op.control_parameters[0].assign(float(args.initial_guess or 10.0))
 for i, m in enumerate(control_values):
     print_output("{:2d}: control value {:.4e}  functional value {:.4e}".format(i, m, func_values[i]))
 
@@ -130,7 +130,7 @@ if optimised_value is None:
         'maxiter': 10,
         'gtol': 1.0e-03,
     }
-    Jhat = ReducedFunctional(J, Control(op.control_parameter), derivative_cb_post=derivative_cb_post)
+    Jhat = ReducedFunctional(J, Control(op.control_parameters[0]), derivative_cb_post=derivative_cb_post)
     m_opt = minimize(Jhat, method='BFGS', options=opt_kwargs)
 
     # Store trajectory

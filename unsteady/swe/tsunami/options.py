@@ -21,10 +21,12 @@ class TsunamiOptions(CoupledOptions):
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
     bathymetry_cap = NonNegativeFloat(30.0, allow_none=True, help="Minimum depth").tag(config=True)
 
-    def __init__(self, **kwargs):
+    def __init__(self, regularisation=0.0, **kwargs):
         super(TsunamiOptions, self).__init__(**kwargs)
         self.solve_swe = True
         self.solve_tracer = False
+        self.rotational = True
+        self.regularisation = regularisation
         if not hasattr(self, 'force_zone_number'):
             self.force_zone_number = False
         self.gauges = {}
@@ -105,13 +107,14 @@ class TsunamiOptions(CoupledOptions):
         eta.interpolate(self.set_initial_surface(prob.P1[0]))
 
     def set_coriolis(self, fs):
-        # x, y = SpatialCoordinate(fs.mesh())
-        # lat, lon = to_latlon(
-        #     x, y, self.force_zone_number,
-        #     northern=True, coords=fs.mesh().coordinates, force_longitude=True
-        # )
-        # return interpolate(2*self.Omega*sin(radians(lat)), fs)
-        return
+        if not self.rotational:
+            return
+        x, y = SpatialCoordinate(fs.mesh())
+        lat, lon = to_latlon(
+            x, y, self.force_zone_number,
+            northern=True, coords=fs.mesh().coordinates, force_longitude=True
+        )
+        return interpolate(2*self.Omega*sin(radians(lat)), fs)
 
     def set_qoi_kernel(self, prob, i):
         fs = prob.V[i]
@@ -149,6 +152,17 @@ class TsunamiOptions(CoupledOptions):
 
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")
+
+    def check_in_domain(self, point):
+        """
+        Check that a `point` lies within at least one of the UTM and longitude-latitude domains.
+        """
+        try:
+            self.default_mesh.coordinates.at(point)
+        except PointNotInDomainError:
+            if not hasattr(self, 'lonlat_mesh'):
+                self.get_lonlat_mesh()
+            self.lonlat_mesh.coordinates.at(point)
 
     # TODO: Plot multiple mesh approaches
     # TODO: UPDATE

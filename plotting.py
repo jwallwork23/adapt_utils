@@ -1,5 +1,3 @@
-import firedrake
-import matplotlib
 from matplotlib.transforms import Bbox, TransformedBbox, blended_transform_factory
 from mpl_toolkits.axes_grid1.inset_locator import BboxPatch, BboxConnector, BboxConnectorPatch
 

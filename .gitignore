@@ -1,6 +1,5 @@
 # Directories
 __pycache__/
-unsteady/swe/tsunami/utils/
 
 # Specific files
 FIXME
@@ -27,3 +26,5 @@ condition.py
 *.xyz
 *.tar.gz
 *.tiff
+*.tap
+*.pyc
