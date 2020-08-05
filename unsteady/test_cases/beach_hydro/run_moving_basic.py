@@ -66,16 +66,22 @@ kwargs = {
     'approach': 'monge_ampere',
     'nx': nx,
     'ny': ny,
-    'plot_pvd': True,
-    'input_dir': inputdir,
-    'output_dir': outputdir,
+
+    # Mesh movement
     'nonlinear_method': 'relaxation',
     'r_adapt_rtol': 1.0e-3,
+
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
     'use_automatic_sipg_parameter': True,
-    'friction': 'manning'
+    'friction': 'manning',
+
+    # I/O
+    'plot_pvd': True,
+    'input_dir': inputdir,
+    'output_dir': outputdir,
+    'plot_bathymetry': True,
 }
 
 op = BeachOptions(**kwargs)

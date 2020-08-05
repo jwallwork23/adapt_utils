@@ -11,6 +11,7 @@ import datetime
 from adapt_utils.unsteady.test_cases.beach_hydro.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
+
 def export_final_state(inputdir, bathymetry_2d):
     """
     Export fields to be used in a subsequent simulation
@@ -59,14 +60,18 @@ kwargs = {
     'approach': 'fixed_mesh',
     'nx': nx,
     'ny': ny,
-    'plot_pvd': True,
-    'input_dir': inputdir,
-    'output_dir': outputdir,
+
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
     'use_automatic_sipg_parameter': True,
-    'friction': 'manning'
+    'friction': 'manning',
+
+    # I/O
+    'plot_pvd': True,
+    'input_dir': inputdir,
+    'output_dir': outputdir,
+    'plot_bathymetry': True,
 }
 
 op = BeachOptions(**kwargs)
