@@ -2,7 +2,7 @@ from thetis import *
 
 
 __all__ = ["VelocityNormCallback", "ElevationNormCallback", "TracerNormCallback",
-           "QoICallback", "GaugeCallback"]
+           "SedimentNormCallback", "ExnerNormCallback", "QoICallback", "GaugeCallback"]
 
 
 class TimeseriesCallback(object):
@@ -63,6 +63,22 @@ class TracerNormCallback(TimeseriesCallback):
         self.name = "tracer norm"
         c = prob.fwd_solutions_tracer[i]
         super(TracerNormCallback, self).__init__(prob, lambda t: norm(c), i, "tracer_norm")
+
+
+class SedimentNormCallback(TimeseriesCallback):
+    """Callback for evaluating the L2 norm of the sediment at each timestep/export."""
+    def __init__(self, prob, i):
+        self.name = "sediment norm"
+        s = prob.fwd_solutions_sediment[i]
+        super(SedimentNormCallback, self).__init__(prob, lambda t: norm(s), i, "sediment_norm")
+
+
+class ExnerNormCallback(TimeseriesCallback):
+    """Callback for evaluating the L2 norm of the modified bathymetry at each timestep/export."""
+    def __init__(self, prob, i):
+        self.name = "bathymetry norm"
+        b = prob.fwd_solutions_bathymetry[i]
+        super(ExnerNormCallback, self).__init__(prob, lambda t: norm(b), i, "bathymetry_norm")
 
 
 class QoICallback(TimeseriesCallback):
