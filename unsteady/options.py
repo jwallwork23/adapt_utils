@@ -146,6 +146,12 @@ class CoupledOptions(Options):
     def set_terminal_condition_tracer(self, prob):
         prob.adj_solutions_tracer[0].assign(0.0)
 
+    def set_terminal_condition_sediment(self, prob):
+        prob.adj_solutions_sediment[0].assign(0.0)
+
+    def set_terminal_condition_exner(self, prob):
+        prob.adj_solutions_exner[0].assign(0.0)
+
     def set_bathymetry(self, fs):
         """Should be implemented in derived class."""
         return Function(fs).assign(1.0)

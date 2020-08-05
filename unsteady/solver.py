@@ -33,6 +33,8 @@ __all__ = ["AdaptiveProblem"]
 
 # TODO LATER:
 #  * Multiple tracers
+#  * Checkpointing to disk
+#  * Allow mesh dependent Lax-Friedrichs parameter(s)
 
 class AdaptiveProblem(AdaptiveProblemBase):
     """
@@ -123,6 +125,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         There are two options for the tracer finite element:
           * Continuous Galerkin     Pp    'cg';
           * Discontinuous Galerkin  PpDG  'dg'.
+
+        For the sediment and Exner models, you are required to use DG and CG,
+        respectively.
         """
         p = self.op.degree
         family = self.op.family
@@ -150,6 +155,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.finite_element_tracer = FiniteElement("DG", triangle, p)
             else:
                 raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
+
         if self.op.solve_sediment:
             p = self.op.degree_sediment
             family = self.op.sediment_family
@@ -157,6 +163,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.finite_element_sediment = FiniteElement("DG", triangle, p)
             else:
                 raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
+
         if self.op.solve_exner:
             p = self.op.degree_bathymetry
             family = self.op.bathymetry_family
@@ -180,7 +187,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Shallow water space
         self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
 
-        # Tracer space
+        # Tracer space(s)
         if self.op.solve_tracer:
             self.Q = [FunctionSpace(mesh, self.finite_element_tracer) for mesh in self.meshes]
         if self.op.solve_sediment:
@@ -214,12 +221,50 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.adj_solutions_tracer = [Function(Q, name="Adjoint tracer solution") for Q in self.Q]
         if self.op.solve_sediment:
             self.fwd_solutions_sediment = [Function(Q, name="Forward sediment solution") for Q in self.Q]
+            # self.adj_solutions_sediment = [Function(Q, name="Adjoint sediment solution") for Q in self.Q]
         if self.op.solve_exner:
             self.fwd_solutions_bathymetry = [Function(W, name="Forward bathymetry solution") for W in self.W]
+            # self.adj_solutions_bathymetry = [Function(W, name="Adjoint bathymetry solution") for W in self.W]
 
-    def set_fields(self, init = False):
-        """Set velocity field, viscosity, etc *on each mesh*."""
+    def set_fields(self, init=False):
+        """
+        Set various fields *on each mesh*, including:
+
+            * viscosity;
+            * diffusivity;
+            * the Coriolis parameter;
+            * drag coefficients;
+            * bed roughness.
+
+        The bathymetry is defined via a modified version of the `DepthExpression` found Thetis.
+        """
         self.fields = [AttrDict() for P1 in self.P1]
+        for i, P1 in enumerate(self.P1):
+            self.fields[i].update({
+                'horizontal_viscosity': self.op.set_viscosity(P1),
+                'horizontal_diffusivity': self.op.set_diffusivity(P1),
+                'coriolis_frequency': self.op.set_coriolis(P1),
+                'nikuradse_bed_roughness': self.op.ksp,
+                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
+                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
+                'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
+            })
+        if self.op.solve_tracer:
+            for i, P1DG in enumerate(self.P1DG):
+                self.fields[i].update({
+                    'tracer_source_2d': self.op.set_tracer_source(P1DG),
+                })
+        if self.op.solve_sediment or self.op.solve_exner:
+            for i, P1DG in enumerate(self.P1DG):
+                self.fields[i].update({
+                    'sediment_source_2d': self.op.set_sediment_source(P1DG),
+                    'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
+                    'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
+                    'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
+                })
+        self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
+
+        # Bathymetry
         if self.op.solve_exner:
             if init:
                 for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
@@ -256,6 +301,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
                     wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
                 )
+<<<<<<< HEAD
         for i, P1 in enumerate(self.P1):
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
@@ -290,6 +336,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
                 wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
             )
+=======
+>>>>>>> 4b8bb85... unsteady: further consistencies across models
 
     # --- Stabilisation
 
@@ -302,58 +350,63 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_swe:
             self._set_shallow_water_stabilisation_step(i)
         if self.op.solve_tracer:
-            self._set_tracer_stabilisation_step(i)
+            self._set_tracer_stabilisation_step(i, sediment=False)
         if self.op.solve_sediment:
-            self._set_tracer_stabilisation_step(i)
+            self._set_tracer_stabilisation_step(i, sediment=True)
 
     def _set_shallow_water_stabilisation_step(self, i):
         op = self.op
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
         sipg = None
-        if hasattr(op, 'sipg_parameter'):
-            sipg = op.sipg_parameter
-        if self.shallow_water_options[i].use_automatic_sipg_parameter:
-            for i, mesh in enumerate(self.meshes):
-                cot_theta = 1.0/tan(self.minimum_angles[i])
+        if op.element_family != 'cg-cg':
+            if hasattr(op, 'sipg_parameter'):
+                sipg = op.sipg_parameter
+            if self.shallow_water_options[i].use_automatic_sipg_parameter:
+                for i, mesh in enumerate(self.meshes):
+                    cot_theta = 1.0/tan(self.minimum_angles[i])
 
-                # Penalty parameter for shallow water
-                nu = self.fields[i].horizontal_viscosity
-                if nu is not None:
-                    p = self.V[i].sub(0).ufl_element().degree()
-                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
-                    alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                    sipg = interpolate(alpha, self.P0[i])
+                    # Penalty parameter for shallow water
+                    nu = self.fields[i].horizontal_viscosity
+                    if nu is not None:
+                        p = self.V[i].sub(0).ufl_element().degree()
+                        alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                        alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                        sipg = interpolate(alpha, self.P0[i])
         self.shallow_water_options[i].sipg_parameter = sipg
 
         # Stabilisation
         if self.stabilisation is None:
             return
         elif self.stabilisation == 'lax_friedrichs':
+            assert op.element_family != 'cg-cg'
             assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
             self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
 
-    def _set_tracer_stabilisation_step(self, i):
+    def _set_tracer_stabilisation_step(self, i, sediment=False):
         op = self.op
+        eq_options = self.sediment_options if sediment else self.tracer_options
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
+        family = op.sediment_family if sediment else op.tracer_family
         sipg = None
-        if hasattr(op, 'sipg_parameter_tracer'):
-            sipg = op.sipg_parameter_tracer
-        if self.tracer_options[i].use_automatic_sipg_parameter:
-            for i, mesh in enumerate(self.meshes):
-                cot_theta = 1.0/tan(self.minimum_angles[i])
+        if family == 'dg':
+            if hasattr(op, 'sipg_parameter_tracer'):
+                sipg = op.sipg_parameter_tracer
+            if self.tracer_options[i].use_automatic_sipg_parameter:
+                for i, mesh in enumerate(self.meshes):
+                    cot_theta = 1.0/tan(self.minimum_angles[i])
 
-                # Penalty parameter for shallow water
-                nu = self.fields[i].horizontal_diffusivity
-                if nu is not None:
-                    p = self.Q[i].ufl_element().degree()
-                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
-                    alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                    sipg = interpolate(alpha, self.P0[i])
+                    # Penalty parameter for shallow water
+                    nu = self.fields[i].horizontal_diffusivity
+                    if nu is not None:
+                        p = self.Q[i].ufl_element().degree()
+                        alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                        alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                        sipg = interpolate(alpha, self.P0[i])
         self.tracer_options[i].sipg_parameter = sipg
 
         # Stabilisation
@@ -361,11 +414,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
             return
         elif self.stabilisation == 'lax_friedrichs':
             assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')
-            self.tracer_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
-            self.sediment_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
+            assert family == 'dg'
+            eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
         elif self.stabilisation == 'su':
+            assert family == 'cg'
             raise NotImplementedError  # TODO
         elif self.stabilisation == 'supg':
+            assert family == 'cg'
             raise NotImplementedError  # TODO
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
@@ -388,10 +443,22 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.op.set_terminal_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.op.set_terminal_condition_tracer(self, **kwargs)
+        if self.op.solve_sediment:
+            self.op.set_terminal_condition_sediment(self, **kwargs)
+        if self.op.solve_exner:
+            self.op.set_terminal_condition_exner(self, **kwargs)
 
-    def project_forward_solution(self, i, j):
-        """Project forward solution(s) from mesh `i` to mesh `j`."""
-        self.project(self.fwd_solutions, i, j)  # TODO: Interpolate from data if not solve_swe
+    def project_forward_solution(self, i, j, **kwargs):
+        """
+        Project forward solution(s) from mesh `i` to mesh `j`.
+        
+        If the shallow water equations are not solved then the fluid velocity
+        and surface elevation are set via the initial condition.
+        """
+        if self.op.solve_swe:
+            self.project(self.fwd_solutions, i, j)
+        else:
+            self.op.set_initial_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.project(self.fwd_solutions_tracer, i, j)
         if self.op.solve_sediment:
@@ -399,9 +466,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.project(self.fwd_solutions_bathymetry, i, j)
 
-    def project_adjoint_solution(self, i, j):
-        """Project adjoint solution(s) from mesh `i` to mesh `j`."""
-        self.project(self.adj_solutions, i, j)  # TODO: Interpolate from data if not solve_swe
+    def project_adjoint_solution(self, i, j, **kwargs):
+        """
+        Project adjoint solution(s) from mesh `i` to mesh `j`.
+        
+        If the adjoint shallow water equations are not solved then the adjoint
+        fluid velocity and surface elevation are set via the terminal condition.
+        """
+        if self.op.solve_swe:
+            self.project(self.adj_solutions, i, j)
+        else:
+            self.op.set_terminal_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.project(self.adj_solutions_tracer, i, j)
         if self.op.solve_sediment:
