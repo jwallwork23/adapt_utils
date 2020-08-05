@@ -130,7 +130,10 @@ class AdaptiveMesh():
         Save mesh in DMPlex format.
         """
         viewer = PETSc.Viewer().createHDF5(filename, 'w')
-        viewer(self.mesh._plex)
+        try:
+            viewer(self.mesh._topology_dm)
+        except AttributeError:
+            viewer(self.mesh._plex)  # backwards compatibility
 
     def load_plex(self, filename):
         """
