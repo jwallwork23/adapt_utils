@@ -387,6 +387,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         if self.op.solve_exner:
             raise NotImplementedError
+
     # --- Equations
 
     def create_forward_equations(self, i):
