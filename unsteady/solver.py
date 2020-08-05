@@ -736,8 +736,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.callbacks[i].add(ElevationNormCallback(self, i), 'export')
         if self.op.solve_tracer:
             self.callbacks[i].add(TracerNormCallback(self, i), 'export')
-        # TODO: Callbacks for sediment
-        # TODO: Callbacks for Exner
+        if self.op.solve_sediment:
+            self.callbacks[i].add(SedimentNormCallback(self, i), 'export')
+        if self.op.solve_exner:
+            self.callbacks[i].add(ExnerNormCallback(self, i), 'export')
 
     def setup_solver_forward(self, i):
         """Setup forward solver on mesh `i`."""
