@@ -64,7 +64,9 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
             self.callbacks[i].add(PowerOutputCallback(self, i, farm_id), 'timestep')
 
     def quantity_of_interest(self):
-        self.qoi = sum(c['timestep']['qoi'].time_integrate() for c in self.callbacks)
+        # self.qoi = sum(c['timestep']['qoi'].time_integrate() for c in self.callbacks)
+        # self.qoi = sum(c['timestep']['power_output'].time_integrate() for c in self.callbacks)
+        self.qoi = sum(c['timestep']['power_output_everywhere'].time_integrate() for c in self.callbacks)
         return self.qoi
 
     def quantity_of_interest_form(self, i):

@@ -22,4 +22,5 @@ class PowerOutputCallback(TimeseriesCallback):
         # Power output functional
         power_output = lambda t: self.farm.evaluate_timestep()[0]
 
-        super(PowerOutputCallback, self).__init__(prob, power_output, i, "power_output")
+        label = "power_output_{:}".format(farm_id)
+        super(PowerOutputCallback, self).__init__(prob, power_output, i, label)
