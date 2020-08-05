@@ -64,7 +64,7 @@ class TohokuOptions(TsunamiOptions):
         self.resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
         self.level = level
         self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(self.level))
-        postproc = kwargs.get('postproc', True)
+        postproc = kwargs.get('postproc', False)
         if mesh is None:
             if postproc:
                 from firedrake.petsc import PETSc
@@ -170,7 +170,7 @@ class TohokuOptions(TsunamiOptions):
         loi = self.locations_of_interest
         self.region_of_interest = [loi[loc]["coords"] + (radii[loc], ) for loc in loi]
 
-    def read_bathymetry_file(self, source='gebco'):
+    def read_bathymetry_file(self, source='etopo1'):
         self.print_debug("Reading bathymetry file...")
         if source == 'gebco':
             nc = netCDF4.Dataset(os.path.join(self.resource_dir, 'bathymetry', 'gebco.nc'), 'r')
