@@ -75,13 +75,13 @@ kwargs = {
     'family': 'dg-dg',
     'stabilisation': None,
     'use_automatic_sipg_parameter': True,
-    'friction': 'manning'
+    'friction': 'manning',
 
     # I/O
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
-    'plot_bathymetry': True
+    'plot_bathymetry': True,
 }
 
 op = BeachOptions(**kwargs)
