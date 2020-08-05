@@ -872,14 +872,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         ts = self.timesteppers[i]
         while self.simulation_time <= end_time - t_epsilon:
 
-            # Obtain the mesh movement transformation
+            # Mesh movement
             if self.iteration % op.dt_per_mesh_movement == 0:
                 if self.mesh_movers[i] is not None:  # TODO: generalise
-                    self.mesh_movers[i].adapt()
-
-            # Move *mesh i*
-            if self.iteration % op.dt_per_mesh_movement == 0:
-               self.move_mesh(i)
+                    self.mesh_movers[i].adapt()  # Obtain the mesh movement transformation
+                self.move_mesh(i)  # Move *mesh i*
 
             # TODO: Update mesh velocity
 
@@ -902,9 +899,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if not op.solve_sediment:
                     self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i])
                 ts.exner.advance(self.simulation_time, update_forcings)
-            # Move *mesh i*
-            #if self.iteration % op.dt_per_mesh_movement == 0:
-            #   self.move_mesh(i)
 
             # Save to checkpoint
             if self.checkpointing:
