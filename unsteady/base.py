@@ -107,6 +107,10 @@ class AdaptiveProblemBase(object):
         op.print_debug(op.indent + "SETUP: Creating output files...")
         self.di = create_directory(op.di)
         self.create_outfiles()
+        op.print_debug(op.indent + "SETUP: Creating intermediary spaces...")
+        self.create_intermediary_spaces()
+
+        # Various empty lists and dicts
         self.equations = [AttrDict() for mesh in self.meshes]
         self.error_estimators = [AttrDict() for mesh in self.meshes]
         self.timesteppers = [AttrDict() for mesh in self.meshes]
@@ -133,6 +137,14 @@ class AdaptiveProblemBase(object):
 
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")
+
+    def create_intermediary_spaces(self):
+        # TODO: doc
+        if self.op.approach != 'monge_ampere':
+            return
+        self.intermediary_meshes = [Mesh(mesh.coordinates.copy(deepcopy=True)) for mesh in self.meshes]
+        intermediary_spaces = [FunctionSpace(V.mesh(), V.ufl_element()) for V in self.V]
+        self.intermediary_solutions = [Function(fs) for fs in intermediary_spaces]
 
     def create_function_spaces(self):
         raise NotImplementedError("To be implemented in derived class")
@@ -415,21 +427,23 @@ class AdaptiveProblemBase(object):
         #       know how the coordinate transform was derived, only what the result was. In any
         #       case, the current implementation involves a supermesh projection which is not
         #       yet annotated in pyadjoint.
+        solutions = self.fwd_solutions[i]
+
+        # Get intermediary meshes and solutions
+        self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
+        intermediary_solutions = self.intermediary_solutions[i]
 
         # Compute new physical mesh coordinates
         self.mesh_movers[i].adapt()
 
         # Project a copy of the current solution onto mesh defined on new coordinates
-        mesh = Mesh(self.mesh_movers[i].x)
-        V = FunctionSpace(mesh, self.V[i].ufl_element())
-        tmp = Function(V)
-        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-            tmp_i.project(sol_i)
+        for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
+            int_sol.project(sol)
 
         # Update physical mesh and solution fields defined on it
-        self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
-        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-            sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
+        self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data
+        for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
+            sol.dat.data[:] = int_sol.dat.data  # FIXME: Need annotation
 
         # Re-interpolate fields
         self.set_fields()

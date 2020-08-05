@@ -185,6 +185,20 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.W = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in self.meshes]
 
+    def create_intermediary_spaces(self):
+        super(AdaptiveProblem, self).create_intermediary_spaces()
+        if self.op.approach != 'monge_ampere':
+            return
+        if self.op.solve_tracer:
+            intermediary_spaces = [FunctionSpace(Q.mesh(), Q.ufl_element()) for Q in self.Q]
+            self.intermediary_solutions_tracer = [Function(fs) for fs in intermediary_spaces]
+        if self.op.solve_sediment:
+            intermediary_spaces = [FunctionSpace(Q.mesh(), Q.ufl_element()) for Q in self.Q]
+            self.intermediary_solutions_sediment = [Function(fs) for fs in intermediary_spaces]
+        if self.op.solve_exner:
+            intermediary_spaces = [FunctionSpace(W.mesh(), W.ufl_element()) for W in self.W]
+            self.intermediary_solutions_bathymetry = [Function(fs) for fs in intermediary_spaces]
+
     def create_solutions(self):
         """
         Set up `Function`s in the prognostic spaces to hold forward and adjoint solutions.
@@ -310,7 +324,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
         sipg = None
-        if op.element_family != 'cg-cg':
+        if op.family != 'cg-cg':
             if hasattr(op, 'sipg_parameter'):
                 sipg = op.sipg_parameter
             if self.shallow_water_options[i].use_automatic_sipg_parameter:
@@ -330,7 +344,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.stabilisation is None:
             return
         elif self.stabilisation == 'lax_friedrichs':
-            assert op.element_family != 'cg-cg'
+            assert op.family != 'cg-cg'
             assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
             self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
         else:
@@ -1151,6 +1165,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Metric
 
+    # TODO: Allow Hessian metric for tracer / sediment / Exner
     def get_hessian_metric(self, adjoint=False, **kwargs):
         kwargs.setdefault('normalise', True)
         kwargs['op'] = self.op
@@ -1348,7 +1363,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 print_output("Converged number of mesh elements!")
                 break
 
-    # TODO: Tracer?
     # TODO: Modify indicator for time interval
     def run_dwp(self, **kwargs):
         r"""
@@ -1707,69 +1721,42 @@ class AdaptiveProblem(AdaptiveProblemBase):
         #      know how the coordinate transform was derived, only what the result was. In any
         #      case, the current implementation involves a supermesh projection which is not
         #      yet annotated in pyadjoint.  # TODO
+        op = self.op
+        solutions = self.fwd_solutions[i]
+
+        # Get intermediary meshes and solutions
+        self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
+        intermediary_solutions = self.intermediary_solutions[i]
 
         # Project a copy of the current solution onto mesh defined on new coordinates
-        mesh = Mesh(self.mesh_movers[i].x)
-        V = FunctionSpace(mesh, self.V[i].ufl_element())
-        tmp = Function(V)
-        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-            tmp_i.project(sol_i)
+        for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
+            int_sol.project(sol)
 
         # Same for tracers etc.
         if self.op.solve_tracer:
-            Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-            tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
+            self.intermediary_solutions_tracer[i].project(self.fwd_solutions_tracer[i])
         if self.op.solve_sediment:
-            Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-            tmp_sediment = project(self.fwd_solutions_sediment[i], Q)
+            self.intermediary_solutions_sediment[i].project(self.fwd_solutions_sediment[i])
         if self.op.solve_exner:
-            W = FunctionSpace(mesh, self.W[i].ufl_element())
-            tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
-
-        self.a_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
-        print('here')
-        if not hasattr(self, "b_mc"):
-            self.b_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
-        print(self.a_mc - self.b_mc)
-
-        self.b_mc = assemble(tmp_bathymetry*dx)
-        print(self.b_mc-self.a_mc)
-        #tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
-
-        #tmp_depth = project(self.op.sediment_model.depth, W)
-        #tmp_tob = project(self.op.sediment_model.TOB, W)
-
-        #R = VectorFunctionSpace(mesh, "CG", 1)
-        #tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
-        # tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
-        # tmp_depth = project(self.op.sediment_model.depth, W)
-        # tmp_tob = project(self.op.sediment_model.TOB, W)
-        # R = VectorFunctionSpace(mesh, "CG", 1)
-        # tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
+            self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
 
         # Update physical mesh and solution fields defined on it
-        self.meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
+        self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data[:]
 
-        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-            sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
-        del tmp
+        # Update physical mesh and solution fields defined on it
+        self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
+        for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
+            sol.dat.data[:] = int_sol.dat.data  # FIXME: Need annotation
+
+        # Same for tracers etc.
         if self.op.solve_tracer:  # FIXME: Need annotation
-            self.fwd_solutions_tracer[i].dat.data[:] = tmp_tracer.dat.data
-            del tmp_tracer
+            self.fwd_solutions_tracer[i].dat.data[:] = self.intermediary_solutions_tracer[i].dat.data
         if self.op.solve_sediment:  # FIXME: Need annotation
-            self.fwd_solutions_sediment[i].dat.data[:] = tmp_sediment.dat.data
-            del tmp_sediment
+            self.fwd_solutions_sediment[i].dat.data[:] = self.intermediary_solutions_sediment[i].dat.data
         if self.op.solve_exner:  # FIXME: Need annotation
-            self.fwd_solutions_bathymetry[i].dat.data[:] = tmp_bathymetry.dat.data
-            del tmp_bathymetry
-        #self.op.sediment_model.old_bathymetry_2d.dat.data[:] = tmp_old_bath.dat.data[:]
-        #self.op.sediment_model.depth.dat.data[:] = tmp_depth.dat.data
-        #del tmp_depth
-        #self.op.sediment_model.TOB.dat.data[:] = tmp_tob.dat.data
-        #del tmp_tob
-        #self.op.sediment_model.uv_cg.dat.data[:] = tmp_uv_cg.dat.data
-        #del tmp_uv_cg
+            self.fwd_solutions_bathymetry[i].dat.data[:] = self.intermediary_solutions_bathymetry[i].dat.data
+
         # Re-interpolate fields
         self.set_fields()
-        #self.create_forward_equations(i)
-        #self.create_forward_timesteppers(i)
+        # self.create_forward_equations(i)
+        # self.create_forward_timesteppers(i)
