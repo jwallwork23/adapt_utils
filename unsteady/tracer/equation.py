@@ -54,7 +54,7 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
         # DG tracers
         if self.horizontal_dg:
             args = (solution, solution_old, fields, fields_old, )
-            f += -super(HorizontalAdvectionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+            f += -super(ConservativeHorizontalAdvectionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
             return -f
 
         raise NotImplementedError  # TODO: Consider CG case
