@@ -117,9 +117,9 @@ class BeachOptions(CoupledOptions):
         self.angle_correction = False
         self.suspended = False
         self.convective_vel_flag = False
-        self.bedload = False
-        self.solve_sediment = False
-        self.solve_exner = False
+        self.bedload = True
+        self.solve_sediment = True
+        self.solve_exner = True
 
         self.norm_smoother = Constant(10/25)
 

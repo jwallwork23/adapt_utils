@@ -8,7 +8,7 @@ import numpy as np
 import time
 import datetime
 
-from adapt_utils.unsteady.test_cases.beach_suspended_only.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_hydro.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 def export_final_state(inputdir, bathymetry_2d):
