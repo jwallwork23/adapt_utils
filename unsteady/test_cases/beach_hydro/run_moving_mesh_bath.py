@@ -26,7 +26,10 @@ def export_final_state(inputdir, bathymetry_2d):
     File(inputdir + '/bathout.pvd').write(bathymetry_2d)
     chk.close()
 
-    plex = bathymetry_2d.function_space().mesh()._plex
+    try:
+        plex = bathymetry_2d.function_space().mesh()._plex
+    except AttributeError:
+        plex = bathymetry_2d.function_space().mesh()._topology_dm
     viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
     viewer(plex)
 
@@ -72,11 +75,12 @@ kwargs = {
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
     'r_adapt_rtol': 1.0e-3,
+
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
     'use_automatic_sipg_parameter': True,
-    'friction': 'manning'
+    'friction': 'manning',
 }
 
 op = BeachOptions(**kwargs)
@@ -85,7 +89,7 @@ swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
+def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
 
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
