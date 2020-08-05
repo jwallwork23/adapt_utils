@@ -51,8 +51,8 @@ outputdir = 'outputs' + st
 nx = 0.5
 ny = 0.5
 
-alpha = 0.5
-beta = 1
+alpha = 2
+beta = 0
 gamma = 1
 
 kappa = 20
