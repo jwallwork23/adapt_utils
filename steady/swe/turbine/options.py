@@ -59,6 +59,7 @@ class TurbineOptions(CoupledOptions):
         self.h_max = 500.0
 
     def max_depth(self):
+        """Compute maximum depth from bathymetry field."""
         if hasattr(self, 'bathymetry'):
             if isinstance(self.bathymetry, Constant):
                 return self.bathymetry.values()[0]

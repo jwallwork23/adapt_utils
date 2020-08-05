@@ -1,7 +1,8 @@
-from firedrake import *
+from thetis import *
 
 
-__all__ = ["QoICallback", "GaugeCallback"]
+__all__ = ["VelocityNormCallback", "ElevationNormCallback", "TracerNormCallback",
+           "QoICallback", "GaugeCallback"]
 
 
 class TimeseriesCallback(object):
@@ -20,9 +21,13 @@ class TimeseriesCallback(object):
         self.name = name
         self.func = func
         self.timeseries = []
+        self.msg = "    {:16s}".format(self.name) + " at time {:6.1f} = {:11.4e}"
 
     def evaluate(self, **kwargs):
-        self.timeseries.append(self.func(self.prob.simulation_time))
+        t = self.prob.simulation_time
+        value = self.func(t)
+        print_output(self.msg.format(t, value))
+        self.timeseries.append(value)
 
     def time_integrate(self):
         N = len(self.timeseries)
@@ -34,6 +39,30 @@ class TimeseriesCallback(object):
         for i in range(1, N-1):
             val += op.dt*self.timeseries[i]
         return val
+
+
+class VelocityNormCallback(TimeseriesCallback):
+    """Callback for evaluating the L2 norm of the velocity field at each timestep/export."""
+    def __init__(self, prob, i):
+        self.name = "velocity norm"
+        u, eta = prob.fwd_solutions[i].split()
+        super(VelocityNormCallback, self).__init__(prob, lambda t: norm(u), i, "velocity_norm")
+
+
+class ElevationNormCallback(TimeseriesCallback):
+    """Callback for evaluating the L2 norm of the elevation field at each timestep/export."""
+    def __init__(self, prob, i):
+        self.name = "elevation norm"
+        u, eta = prob.fwd_solutions[i].split()
+        super(ElevationNormCallback, self).__init__(prob, lambda t: norm(eta), i, "elevation_norm")
+
+
+class TracerNormCallback(TimeseriesCallback):
+    """Callback for evaluating the L2 norm of the tracer concentration at each timestep/export."""
+    def __init__(self, prob, i):
+        self.name = "tracer norm"
+        c = prob.fwd_solutions_tracer[i]
+        super(TracerNormCallback, self).__init__(prob, lambda t: norm(c), i, "tracer_norm")
 
 
 class QoICallback(TimeseriesCallback):
@@ -52,6 +81,7 @@ class QoICallback(TimeseriesCallback):
         :arg prob: :class:`AdaptiveProblem` object.
         :arg i: mesh index.
         """
+        self.name = "QoI"
         ks = prob.kernels[i]  # Kernel in space
         kt = Constant(0.0)    # Kernel in time
         sol = prob.fwd_solutions[i]
@@ -75,6 +105,7 @@ class GaugeCallback(TimeseriesCallback):
         :arg i: mesh index.
         :arg gauge: name of gauge to be evaluated.
         """
+        self.name = gauge
         u, eta = prob.fwd_solutions[i].split()
         gauge_location = prob.op.gauges[gauge]["coords"]
 

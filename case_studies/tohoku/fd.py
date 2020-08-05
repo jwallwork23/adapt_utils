@@ -1,9 +1,7 @@
 from thetis import *
 
 import argparse
-import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.case_studies.tohoku.options import *
@@ -30,9 +28,9 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Adjoint
-    'control_parameter': 10.0,
+    'control_parameters': [10.0, ],
     'optimal_value': 5.0,
-    'artificial': True,
+    'synthetic': True,
     'qoi_scaling': 1.0e-12,
 
     # Misc
@@ -43,7 +41,7 @@ nonlinear = False  # TODO
 op = TohokuGaussianBasisOptions(**kwargs)
 
 # Solve the forward problem to get data with 'optimal' control parameter m = 5
-op.control_parameter.assign(kwargs['optimal_value'])
+op.control_parameters[0].assign(kwargs['optimal_value'])
 swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
 swp.solve_forward()
 for gauge in op.gauges:
@@ -51,7 +49,7 @@ for gauge in op.gauges:
 op.save_timeseries = False
 
 # Solve the forward problem with 'suboptimal' control parameter m = 10, checkpointing state
-op.control_parameter.assign(kwargs['control_parameter'])
+op.control_parameters[0].assign(kwargs['control_parameters'][0])
 swp.solve_forward()
 J = op.J
 assert not np.allclose(J, 0.0)
@@ -64,7 +62,7 @@ converged = False
 rtol = 1.0e-05
 g_fd_ = None
 while not converged:
-    op.control_parameter.assign(kwargs['control_parameter'] + epsilon)
+    op.control_parameters[0].assign(kwargs['control_parameters'][0] + epsilon)
     swp.solve_forward(plot_pvd=False)
     J_step = op.J
     g_fd = (J_step - J)/epsilon

@@ -1,24 +1,21 @@
 from thetis import *
 from thetis.configuration import *
-from firedrake.petsc import PETSc
 
 import os
 import netCDF4
-import matplotlib.pyplot as plt
 
 from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
-from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
-from adapt_utils.misc import gaussian, ellipse
 
 
-__all__ = ["TohokuOptions", "TohokuGaussianBasisOptions"]
+__all__ = ["TohokuOptions", "TohokuBoxBasisOptions", "TohokuGaussianBasisOptions", "TohokuOkadaOptions"]
 
 
 class TohokuOptions(TsunamiOptions):
     """
     Setup for model of the Tohoku tsunami which struck the east coast of Japan in 2011, leading to
     the meltdown of Daiichi nuclear power plant, Fukushima.
+
 
     Data sources:
       * Bathymetry data extracted from GEBCO (https://www.gebco.net/).
@@ -32,30 +29,46 @@ class TohokuOptions(TsunamiOptions):
       * Timeseries for gauges 21401, 21413, 21418 and 21419 obtained from the US National Oceanic
         and Atmospheric Administration (NOAA) via https://www.ndbc.noaa.gov.
 
+
     [Saito et al.] T. Saito, Y. Ito, D. Inazu, R. Hino, "Tsunami source of the 2011 Tohoku‐Oki
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, mesh=None, level=0, postproc=True, save_timeseries=False, artificial=False, locations=["Fukushima Daiichi", ], radii=[50.0e+03, ], qoi_scaling=1.0e-10, **kwargs):
+    def __init__(self, mesh=None, level=0, save_timeseries=False, synthetic=False, **kwargs):
+        """
+        :kwarg mesh: optionally use a custom mesh.
+        :kwarg level: mesh resolution level, to be used if no mesh is provided.
+        :kwarg save_timeseries: :type:`bool` toggling the extraction and storage of timeseries data.
+        :kwarg synthetic: :type:`bool` toggling whether real or synthetic timeseries data are used.
+        :kwarg qoi_scaling: custom scaling for quantity of interest (defaults to unity).
+        :kwarg base_viscosity: :type:`float` value to be assigned to constant viscosity field.
+        :kwarg postproc: :type:`bool` value toggling whether to use an initial mesh which has been
+            postprocessed using Pragmatic (see `resources/meshes/postproc.py`.)
+        :kwarg locations: a list of strings indicating locations of interest.
+        :kwarg radii: a list of distances indicating radii around the locations of interest, thereby
+            determining regions of interest for use in hazard assessment QoIs.
+        """
         self.force_zone_number = 54
         super(TohokuOptions, self).__init__(**kwargs)
         self.save_timeseries = save_timeseries
-        self.artificial = artificial
-        self.qoi_scaling = qoi_scaling
+        self.synthetic = synthetic
+        self.qoi_scaling = kwargs.get('qoi_scaling', 1.0)
 
         # Stabilisation
         self.use_automatic_sipg_parameter = False
         self.sipg_parameter = None
-        self.base_viscosity = 0.0
-        # self.base_viscosity = 1.0e-03
+        self.base_viscosity = kwargs.get('base_viscosity', 0.0)
 
         # Mesh
         self.print_debug("Loading mesh...")
         self.resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
         self.level = level
         self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(self.level))
+        postproc = kwargs.get('postproc', True)
         if mesh is None:
             if postproc:
+                from firedrake.petsc import PETSc
+
                 newplex = PETSc.DMPlex().create()
                 newplex.createFromFile(self.meshfile + '.h5')
                 self.default_mesh = Mesh(newplex)
@@ -66,17 +79,36 @@ class TohokuOptions(TsunamiOptions):
         self.print_debug("Done!")
 
         # Fields
-        self.friction = None
-        # self.friction = 'manning'
-        # self.friction_coeff = 0.025
+        self.friction = 'manning'
+        self.friction_coeff = 0.025
 
-        # Timestepping: export once per minute for 24 minutes
+        # Timestepping
+        # ============
+        #
+        # NOTES:
+        #  * Export once per minute for 24 minutes.
+        #  * There is a trade-off between having an unneccesarily small timestep and being able to
+        #    represent the gauge timeseries profiles.
         self.timestepper = 'CrankNicolson'
-        self.dt = 5.0
+        # self.dt = 5.0
+        self.dt = 60.0*0.5**level
         self.dt_per_export = int(60.0/self.dt)
-        self.start_time = 15*60.0
+        # self.start_time = 15*60.0
+        self.start_time = 0.0
         self.end_time = 24*60.0
         # self.end_time = 60*60.0
+
+        # Compute CFL number
+        if self.debug:
+            P0 = FunctionSpace(self.default_mesh, "DG", 0)
+            P1 = FunctionSpace(self.default_mesh, "CG", 1)
+            b = self.set_bathymetry(P1).vector().gather().max()
+            g = self.g.values()[0]
+            celerity = np.sqrt(g*b)
+            dx = interpolate(CellDiameter(self.default_mesh), P0).vector().gather().max()
+            cfl = celerity*self.dt/dx
+            msg = "dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
+            print_output(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
 
         # Gauges where we have timeseries
         self.gauges = {
@@ -103,6 +135,8 @@ class TohokuOptions(TsunamiOptions):
         self.gps_gauges = ("801", "802", "803", "804", "806")
 
         # Possible coastal locations of interest, including major cities and nuclear power plants
+        locations = kwargs.get('locations', ["Fukushima Daiichi", ])
+        radii = kwargs.get('radii', [50.0e+03, ])
         locations_of_interest = {
             "Fukushima Daiichi": {"lonlat": (141.0281, 37.4213)},
             "Onagawa": {"lonlat": (141.5008, 38.3995)},
@@ -168,93 +202,150 @@ class TohokuOptions(TsunamiOptions):
         return lon, lat, elev
 
     def _get_update_forcings_forward(self, prob, i):
-        self.J = 0
-        scaling = Constant(self.qoi_scaling)
-        weight = Constant(1.0)
-        eta_obs = Constant(0.0)
-        eta = prob.fwd_solutions[i].split()[1]
+        from adapt_utils.misc import ellipse
+        from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
+
+        if np.isclose(self.regularisation, 0.0):
+            self.J = 0
+        else:
+            self.J = self.get_regularisation_term(prob)
+        scaling = Constant(0.5*self.qoi_scaling)
+        weight = Constant(1.0)  # Quadrature weight for time integration scheme
+
+        # These will be updated by the checkpointing routine
+        u, eta = prob.fwd_solutions[i].split()
+
+        # Account for timeseries shift
+        # ============================
+        #   This can be troublesome business. With synthetic data, we can actually get away with not
+        #   shifting, provided we are solving the linearised equations. However, in the nonlinear case
+        #   and when using real data, we should make sure that the timeseries are comparable by always
+        #   shifting them by the initial elevation at each gauge. This isn't really a problem for the
+        #   continuous adjoint method. However, for discrete adjoint we need to annotate the initial
+        #   gauge evaluation. Until point evaluation is annotated in Firedrake, the best thing is to
+        #   just use the initial surface *field*. This does modify the QoI, but it shouldn't be too much
+        #   of a problem if the mesh is sufficiently fine (and hence the indicator regions are
+        #   sufficiently small.
+        if self.synthetic:
+            self.eta_init = Constant(0.0)
+        else:
+            # TODO: Use point evaluation once it is annotated
+            self.eta_init = Function(eta.function_space()).assign(eta)
+
         mesh = eta.function_space().mesh()
-        self.times = []
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
+        self.times = []
         for gauge in self.gauges:
-            if self.save_timeseries:
-                if not self.artificial or "data" not in self.gauges[gauge]:
-                    self.gauges[gauge]["data"] = []
-                self.gauges[gauge]["timeseries"] = []
-                self.gauges[gauge]["timeseries_smooth"] = []
-                self.gauges[gauge]["diff"] = []
-                self.gauges[gauge]["diff_smooth"] = []
-                self.gauges[gauge]["init"] = eta.at(self.gauges[gauge]["coords"])
+            gauge_dat = self.gauges[gauge]
+            gauge_dat["obs"] = Constant(0.0)  # Constant associated with free surface observations
+
+            # Setup interpolator
             sample = 1 if gauge[0] == '8' else 60
-            self.gauges[gauge]["interpolator"] = sample_timeseries(gauge, sample=sample)
-            loc = self.gauges[gauge]["coords"]
-            self.gauges[gauge]["indicator"] = interpolate(ellipse([loc + (radius,), ], mesh), prob.P0[i])
-            self.gauges[gauge]["area"] = assemble(self.gauges[gauge]["indicator"]*dx, annotate=False)
+            gauge_dat["interpolator"] = sample_timeseries(gauge, sample=sample)
+
+            # Assemble an area-normalised indicator function
+            x, y = gauge_dat["coords"]
+            disc = ellipse([(x, y, radius,), ], mesh)
+            area = assemble(disc*dx, annotate=False)
+            gauge_dat["indicator"] = interpolate(disc/area, prob.P0[i])
+            I = gauge_dat["indicator"]
+
+            # Get initial pointwise and area averaged values
+            gauge_dat["init"] = eta.at(gauge_dat["coords"])
+            gauge_dat["init_smooth"] = assemble(I*eta*dx, annotate=False)
+
+            # Initialise arrays for storing timeseries
+            if self.save_timeseries:
+                gauge_dat["timeseries"] = []
+                gauge_dat["timeseries_smooth"] = []
+                gauge_dat["diff"] = []
+                gauge_dat["diff_smooth"] = []
+                if not self.synthetic or "data" not in self.gauges[gauge]:
+                    gauge_dat["data"] = []
 
         def update_forcings(t):
-            weight.assign(0.5 if t < 0.5*self.dt or t >= self.end_time - 0.5*self.dt else 1.0)
-            dtc = Constant(self.dt)
-            # iteration = len(self.times)
-            iteration = prob.iteration
-            for gauge in self.gauges:
+            """
+            Evaluate free surface elevation at gauges, compute the contribution to the quantity of
+            interest from the current timestep and store data in :attr:`self.gauges`.
 
-                # Point evaluation at gauges
-                if self.save_timeseries:
-                    eta_discrete = eta.at(self.gauges[gauge]["coords"]) - self.gauges[gauge]["init"]
-                    self.gauges[gauge]["timeseries"].append(eta_discrete)
-
-                # Interpolate observations
-                if self.gauges[gauge]["data"] != []:
-                    if self.artificial:
-                        obs = self.gauges[gauge]["data"][iteration]
-                    else:
-                        obs = float(self.gauges[gauge]["interpolator"](t))
-                    eta_obs.assign(obs)
-
-                    if self.save_timeseries:
-                        if not self.artificial:
-                            self.gauges[gauge]["data"].append(obs)
-
-                        # Discrete form of error
-                        diff = 0.5*(eta_discrete - eta_obs.dat.data[0])**2
-                        self.gauges[gauge]["diff"].append(diff)
-
-                    # Continuous form of error
-                    I = self.gauges[gauge]["indicator"]
-                    A = self.gauges[gauge]["area"]
-                    diff = 0.5*I*(eta - eta_obs)**2
-                    self.J += assemble(scaling*weight*dtc*diff*dx)
-                    self.gauges[gauge]["diff_smooth"].append(assemble(diff*dx, annotate=False)/A)
-                    self.gauges[gauge]["timeseries_smooth"].append(assemble(I*eta_obs*dx, annotate=False)/A)
+            NOTE: `update_forcings` is called one timestep along so we shift time back.
+            """
+            dt = self.dt
+            t = t - dt
+            weight.assign(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
             self.times.append(t)
-            return
+            for gauge in self.gauges:
+                gauge_dat = self.gauges[gauge]
+                I = gauge_dat["indicator"]
+
+                # Point evaluation and average value at gauges
+                if self.save_timeseries:
+                    eta_discrete = eta.at(gauge_dat["coords"]) - gauge_dat["init"]
+                    gauge_dat["timeseries"].append(eta_discrete)
+                    eta_smoothed = assemble(I*eta*dx, annotate=False) - gauge_dat["init_smooth"]
+                    gauge_dat["timeseries_smooth"].append(eta_smoothed)
+                if self.synthetic and gauge_dat["data"] == []:
+                    continue
+
+                # Read data
+                interpolator = gauge_dat["interpolator"]
+                obs = gauge_dat["data"][prob.iteration] if self.synthetic else float(interpolator(t))
+                gauge_dat["obs"].assign(obs)
+                if self.save_timeseries:
+                    if not self.synthetic:
+                        gauge_dat["data"].append(obs)
+
+                    # Discrete form of error
+                    gauge_dat["diff"].append(0.5*(eta_discrete - gauge_dat["obs"].dat.data[0])**2)
+
+                # Continuous form of error
+                #   NOTES:
+                #     * The initial free surface *field* is subtracted in some cases.
+                #     * Factor of half is included in `scaling`
+                #     * Quadrature weights and timestep included in `weight`
+                diff = I*(eta - self.eta_init - gauge_dat["obs"])**2
+                self.J += assemble(scaling*weight*diff*dx)
+                if self.save_timeseries:
+                    gauge_dat["diff_smooth"].append(assemble(diff*dx, annotate=False))
 
         return update_forcings
 
     def _get_update_forcings_adjoint(self, prob, i):
-        eta_obs = Constant(0.0)
-        scaling = Constant(self.qoi_scaling)
+        expr = 0
+        # scaling = Constant(self.qoi_scaling)
+        scaling = Constant(2*self.qoi_scaling)  # TODO: TEMPORARY FACTOR OF 2
+        msg = "CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e} (iteration {:d})"
+
+        # Gauge data (to be loaded from checkpoint)
+        u_saved, eta_saved = prob.fwd_solutions[i].split()
+
+        # Construct an expression for the RHS of the adjoint continuity equation
+        #   NOTE: The initial free surface *field* is subtracted in some cases.
+        for gauge in self.gauges:
+            gauge_dat = self.gauges[gauge]
+            expr += scaling*gauge_dat["indicator"]*(eta_saved - self.eta_init - gauge_dat["obs"])
+        k_u, k_eta = prob.kernels[i].split()
 
         def update_forcings(t):
+            """
+            Evaluate RHS for adjoint equations using forward solution data retreived from checkpoint.
 
-            # Get gauge data (loaded from checkpoint)
-            u_saved, eta_saved = prob.fwd_solutions[i].split()
+            NOTE: `update_forcings` is called one timestep along so we shift time.
+            """
+            t = t + self.dt
+            if self.debug:
+                print_output(msg.format(norm(u_saved), norm(eta_saved), prob.iteration))
 
-            # Sum differences between checkpoint and data
-            expr = 0
+            # Get timeseries data, implicitly modifying the expression
             for gauge in self.gauges:
-                if self.artificial:
-                    obs = self.gauges[gauge]["data"][prob.iteration-1]
-                else:
-                    obs = float(self.gauges[gauge]["interpolator"](t))
-                eta_obs.assign(obs)
-                expr += self.gauges[gauge]["indicator"]*(eta_saved - eta_obs)
+                gauge_dat = self.gauges[gauge]
+                obs = gauge_dat["data"][prob.iteration-1] if self.synthetic else float(interpolator(t))
+                gauge_dat["obs"].assign(obs)
 
-            # Interpolate onto RHS
-            k_u, k_eta = prob.kernels[i].split()
-            k_eta.interpolate(scaling*expr)
-
-            return
+            # Interpolate expression onto RHS
+            k_eta.interpolate(expr)
+            if self.debug and prob.iteration % self.dt_per_export == 0:
+                prob.kernel_file.write(k_eta)
 
         return update_forcings
 
@@ -263,6 +354,43 @@ class TohokuOptions(TsunamiOptions):
             return self._get_update_forcings_adjoint(prob, i)
         else:
             return self._get_update_forcings_forward(prob, i)
+
+    def get_regularisation_term(self, prob):
+        """
+        Tikhonov regularisation term that enforces spatial smoothness in the initial surface.
+
+        NOTES:
+          * Assumes the forward model has been initialised but not taken any iterations.
+          * Assumes a linear relationship between control parameters and source.
+        """
+        from adapt_utils.adapt.recovery import construct_gradient
+
+        # Set regularisation parameter
+        if np.isclose(self.regularisation, 0.0):
+            return 0
+        alpha = Constant(self.regularisation)
+
+        # Recover gradient of initial surface using L2 projection
+        u0, eta0 = prob.fwd_solutions[0].split()
+        deta0dx = construct_gradient(eta0, op=self)
+
+        # Compute regularisation term
+        R = assemble(0.5*alpha*inner(deta0dx, deta0dx)*dx)
+        print_output("Regularisation term = {:.4e}".format(R))
+        self.regularisation_term = R
+
+        # Compute components of gradient of regularisation term
+        self.regularisation_term_gradients = []
+        for i in range(len(self.basis_functions)):
+            dphidx = construct_gradient(self.basis_functions[i].split()[1], op=self)
+            dRdm = assemble(alpha*inner(dphidx, deta0dx)*dx)
+            if len(self.basis_functions) == 1:
+                print_output("Gradient of regularisation term = {:.4e}".format(dRdm))
+            else:
+                print_output("(Gradient of regularisation term)[{:d}] = {:.4e}".format(i, dRdm))
+            self.regularisation_term_gradients.append(dRdm)
+
+        return R
 
     def set_boundary_conditions(self, prob, i):
         ocean_tag = 100
@@ -322,25 +450,527 @@ class TohokuOptions(TsunamiOptions):
             )
 
 
-class TohokuGaussianBasisOptions(TohokuOptions):
+class TohokuBoxBasisOptions(TohokuOptions):
     """
-    Initialise the free surface with initial condition consisting of a single Gaussian basis function
-    scaled by a control parameter.
+    Initialise the free surface with an initial condition consisting of an array of rectangular
+    indicator functions, each scaled by a control parameter. Setups of this type have been used by
+    numerous authors in the tsunami modelling literature.
 
-    This is useful for inversion experiments because the control parameter space is one dimensional,
-    meaning it can be easily plotted.
+    The source region centre is predefined. In the 1D case the basis function is centred at the same
+    point. In the case of multiple basis functions they are distributed linearly both perpendicular and
+    parallel to the fault axis. Note that the support does not overlap, unlike with radial basis
+    functions.
+
+    The 1D case is useful for inversion experiments because the control parameter space is one
+    dimensional, meaning it can be easily plotted.
     """
-    def __init__(self, control_parameter=10.0, **kwargs):
-        super(TohokuGaussianBasisOptions, self).__init__(**kwargs)
+    def __init__(self, **kwargs):
+        """
+        :kwarg control_parameters: a list of values to use for the basis function coefficients.
+        :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates [m].
+        :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates [m].
+        :kwarg nx: number of basis functions along strike direction (i.e. along the fault).
+        :kwarg ny: number of basis functions perpendicular to the strike direction.
+        :kwarg radius_x: radius of basis function along strike direction [m].
+        :kwarg radius_y: radius of basis function perpendicular to the strike direction [m].
+        :kwarg strike angle: angle of fault to north [radians].
+        """
+        super(TohokuBoxBasisOptions, self).__init__(**kwargs)
+        self.nx = kwargs.get('nx', 1)
+        self.ny = kwargs.get('ny', 1)
+        N_b = self.nx*self.ny
+        control_parameters = kwargs.get('control_parameters', [0.0 for i in range(N_b)])
+        N_c = len(control_parameters)
+        if N_c != N_b:
+            raise ValueError("{:d} controls inconsistent with {:d} basis functions".format(N_c, N_b))
+
+        # Parametrisation of source region
+        self.centre_x = kwargs.get('centre_x', 0.7e+06)
+        self.centre_y = kwargs.get('centre_y', 4.2e+06)
+        self.radius_x = kwargs.get('radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
+        self.radius_y = kwargs.get('radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
+
+        # Parametrisation of source basis
         R = FunctionSpace(self.default_mesh, "R", 0)
-        self.control_parameter = Function(R, name="Control parameter")
-        self.control_parameter.assign(control_parameter)
+        self.control_parameters = []
+        for i in range(N_c):
+            self.control_parameters.append(Function(R, name="Control parameter {:d}".format(i)))
+            self.control_parameters[i].assign(control_parameters[i])
+        self.strike_angle = kwargs.get('strike_angle', 7*pi/12)
 
     def set_initial_condition(self, prob):
-        self.basis_function = Function(prob.V[0])
-        psi, phi = self.basis_function.split()
-        loc = (0.7e+06, 4.2e+06)
-        radii = (48e+03, 96e+03)
-        angle = pi/12
-        phi.interpolate(gaussian([loc + radii, ], prob.meshes[0], rotation=angle))
-        prob.fwd_solutions[0].project(self.control_parameter*self.basis_function)
+        from adapt_utils.misc import box, rotation_matrix
+
+        # Gather parameters
+        x0, y0 = self.centre_x, self.centre_y  # Centre of basis region
+        nx, ny = self.nx, self.ny              # Number of basis functions in each component direction
+        N = nx*ny                              # Total number of basis functions
+        rx, ry = self.radius_x, self.radius_y  # Radius of each basis function in each direction
+        angle = self.strike_angle              # Angle by which to rotate basis array
+
+        # Setup array coordinates
+        X = np.linspace((1 - nx)*rx, (nx - 1)*rx, nx)
+        Y = np.linspace((1 - ny)*ry, (ny - 1)*ry, ny)
+
+        # Assemble an array of Gaussian basis functions, rotated by specified angle
+        self.basis_functions = [Function(prob.V[0]) for i in range(N)]
+        R = rotation_matrix(-angle)
+        for j, y in enumerate(Y):
+            for i, x in enumerate(X):
+                psi, phi = self.basis_functions[i + j*nx].split()
+                x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
+                phi.interpolate(box([(x_rot, y_rot, rx, ry), ], prob.meshes[0], rotation=angle))
+
+        # Assemble initial surface
+        #   NOTE: The calculation is split up for large arrays in order to avoid the UFL recursion limit
+        prob.fwd_solutions[0].assign(0.0)
+        l = 100
+        for n in range(0, N, l):
+            expr = sum(m*g for m, g in zip(self.control_parameters[n:n+l], self.basis_functions[n:n+l]))
+            prob.fwd_solutions[0].assign(prob.fwd_solutions[0] + project(expr, prob.V[0]))
+
+
+class TohokuGaussianBasisOptions(TohokuOptions):
+    """
+    Initialise the free surface with an initial condition consisting of an array of Gaussian basis
+    functions, each scaled by a control parameter. The setup with a 10 x 13 array was presented in
+    [Saito et al. 2011].
+
+    The source region centre is predefined. In the 1D case the basis function is centred at the same
+    point. In the case of multiple basis functions they are distributed linearly both perpendicular and
+    parallel to the fault axis. Note that support of basis functions is overlapping, unlike the case
+    where indicator functions are used.
+
+    The 1D case is useful for inversion experiments because the control parameter space is one
+    dimensional, meaning it can be easily plotted.
+
+
+    [Saito et al.] T. Saito, Y. Ito, D. Inazu, R. Hino, "Tsunami source of the 2011 Tohoku‐Oki
+                   earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
+                   Geophysical Research Letters (2011), 38(7).
+    """
+    def __init__(self, **kwargs):
+        """
+        :kwarg control_parameters: a list of values to use for the basis function coefficients.
+        :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates [m].
+        :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates [m].
+        :kwarg extent_x: extent of source region along the strike direction (i.e. along the fault) [m].
+        :kwarg extent_y: extent of source region perpendicular to the strike direction [m].
+        :kwarg nx: number of basis functions along strike direction.
+        :kwarg ny: number of basis functions perpendicular to the strike direction.
+        :kwarg radius_x: radius of basis function along strike direction [m].
+        :kwarg radius_y: radius of basis function perpendicular to the strike direction [m].
+        :kwarg strike_angle: angle of fault to north [radians].
+        """
+        super(TohokuGaussianBasisOptions, self).__init__(**kwargs)
+        self.nx = kwargs.get('nx', 1)
+        self.ny = kwargs.get('ny', 1)
+        N_b = self.nx*self.ny
+        control_parameters = kwargs.get('control_parameters', [0.0 for i in range(N_b)])
+        N_c = len(control_parameters)
+        if N_c != N_b:
+            raise ValueError("{:d} controls inconsistent with {:d} basis functions".format(N_c, N_b))
+
+        # Parametrisation of source region
+        self.centre_x = kwargs.get('centre_x', 0.7e+06)
+        self.centre_y = kwargs.get('centre_y', 4.2e+06)
+        self.extent_x = kwargs.get('extent_x', 560.0e+03)
+        self.extent_y = kwargs.get('extent_y', 240.0e+03)
+
+        # Parametrisation of source basis
+        self.radius_x = kwargs.get('radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
+        self.radius_y = kwargs.get('radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
+        R = FunctionSpace(self.default_mesh, "R", 0)
+        self.control_parameters = []
+        for i in range(N_c):
+            self.control_parameters.append(Function(R, name="Control parameter {:d}".format(i)))
+            self.control_parameters[i].assign(control_parameters[i])
+        self.strike_angle = kwargs.get('strike_angle', 7*pi/12)
+
+    def set_initial_condition(self, prob):
+        from adapt_utils.misc import gaussian, rotation_matrix
+
+        # Gather parameters
+        x0, y0 = self.centre_x, self.centre_y  # Centre of basis region
+        nx, ny = self.nx, self.ny              # Number of basis functions in each component direction
+        N = nx*ny                              # Total number of basis functions
+        rx, ry = self.radius_x, self.radius_y  # Radius of each basis function in each direction
+        dx, dy = self.extent_x, self.extent_y  # Extent of basis region in each component direction
+        angle = self.strike_angle              # Angle by which to rotate basis array
+
+        # Setup array coordinates
+        X = np.array([0.0, ]) if nx == 1 else np.linspace(-0.5*dx, 0.5*dx, nx)
+        Y = np.array([0.0, ]) if ny == 1 else np.linspace(-0.5*dy, 0.5*dy, ny)
+
+        # Assemble an array of Gaussian basis functions, rotated by specified angle
+        self.basis_functions = [Function(prob.V[0]) for i in range(N)]
+        R = rotation_matrix(-angle)
+        for j, y in enumerate(Y):
+            for i, x in enumerate(X):
+                psi, phi = self.basis_functions[i + j*nx].split()
+                x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
+                phi.interpolate(gaussian([(x_rot, y_rot, rx, ry), ], prob.meshes[0], rotation=angle))
+
+        # Assemble initial surface
+        #   NOTE: The calculation is split up for large arrays in order to avoid the UFL recursion limit
+        prob.fwd_solutions[0].assign(0.0)
+        l = 100
+        for n in range(0, N, 100):
+            expr = sum(m*g for m, g in zip(self.control_parameters[n:n+l], self.basis_functions[n:n+l]))
+            prob.fwd_solutions[0].assign(prob.fwd_solutions[0] + project(expr, prob.V[0]))
+
+
+class TohokuOkadaOptions(TohokuOptions):
+    """
+    Initialise the free surface with an initial condition generated using Okada functions.
+
+    Note that, unlike in the basis comprised of an array of indicator functions or Gaussians, the
+    relationship between the control parameters and the initial surface is nonlinear. In addition,
+    zero is not a feasible initial guess for the Okada parameters, meaning some physical intuition is
+    required in order to set up the problem.
+
+    Control parameters comprise of a dictionary of lists containing the following parameters. The
+    list index corresponds to the subfault within the main fault. By default, a 19 x 10 grid of
+    25km x 20km subfaults is considered, using the work of [Shao et al. 2011].
+
+      * 'depth'     - depth of the centroid of the subfault plane [m].
+      * 'length'    - length of the subfault plane [m].
+      * 'width'     - width of the subfault plane [m].
+      * 'slip'      - average displacement [m].
+      * 'strike'    - angle from north of subfault [radians].
+      * 'dip'       - angle from horizontal [radians].
+      * 'rake'      - slip of one subfault block compared to another [radians].
+      * 'latitude'  - latitude of the centroid of the subfault [degrees].
+      * 'longitude' - longitude of the centroid of the subfault [degrees].
+
+    [Shao et al. 2011] G. Shao, X. Li, C. Ji & T. Maeda, "Focal mechanism and slip history of the
+                       2011 Mw 9.1 off the Pacific coast of Tohoku Earthquake, constrained with
+                       teleseismic body and surface waves", Earth, Planets and Space 63.7 (2011),
+                       p.559--564.
+    """
+    def __init__(self, **kwargs):
+        """
+        :kwarg control_parameters: a dictionary of values to use for the basis function coefficients.
+        :kwarg centre_x: x-coordinate of centre of source region in UTM coordinates.
+        :kwarg centre_y: y-coordinate of centre of source region in UTM coordinates.
+        :kwarg nx: number of sub-faults along strike direction.
+        :kwarg ny: number of sub-faults perpendicular to the strike direction.
+        :kwarg okada_grid_resolution: integer N giving rise to an N x N grid upon which to evaluate
+            the Okada functions and hence the resulting fault surface.
+        :kwarg okada_grid_length_lon: extent of the Okada grid in the longitudinal direction.
+        :kwarg okada_grid_length_lat: extent of the Okada grid in the latitudinal direction.
+        :kwarg okada_grid_lon_min: minimum longitude in the Okada grid.
+        :kwarg okada_grid_lat_min: minimum latitude in the Okada grid.
+        """
+        # self.force_zone_number = 54
+        super(TohokuOkadaOptions, self).__init__(**kwargs)
+        self.control_parameters = kwargs.get('control_parameters')
+        self.coordinate_specification = kwargs.get('coordinate_specification', 'centroid')
+        self.N = kwargs.get('okada_grid_resolution', 101)
+        self.lx = kwargs.get('okada_grid_length_lon', 10)
+        self.ly = kwargs.get('okada_grid_length_lat', 10)
+        self.xmin = kwargs.get('okada_grid_lon_min', 138)
+        self.ymin = kwargs.get('okada_grid_lat_min', 32)
+        self.subfaults = []
+        self.get_subfaults()
+        self.all_controls = (
+            'latitude', 'longitude', 'depth',
+            'slip', 'rake', 'strike', 'dip',
+            'length', 'width',
+        )
+
+        # Numbers of sub-faults in each direction
+        self.nx = kwargs.get('nx', 19)
+        self.ny = kwargs.get('ny', 10)
+        assert self.nx*self.ny == len(self.subfaults)
+
+        # Active controls for automatic differentation
+        self.active_controls = ('slip', 'rake', 'strike', 'dip')
+
+    def download_okada_parameters(self):
+        """
+        Download the Okada parameters generated by [Shao et al. 2011] from the webpage
+          `http://ji.faculty.geol.ucsb.edu/big_earthquakes/2011/03/0311_v3/result_c/static_out`.
+
+        A 19 x 10 array of Okada functions was assumed, each of which with a length of 25km and a
+        width of 20km. Note that the webpage also provides initial times, rise times and end times
+        for each subfault, although we do not use these here.
+        """
+        # TODO: Use geoclaw's inbuild functionality for reading from UCSB format
+        import urllib.request
+
+        # Read the data if already downloaded
+        fname = os.path.join(self.resource_dir, 'surf', 'okada_parameters.txt')
+        if os.path.exists(fname):
+            data = open(fname, 'r').readlines()
+
+        # Download the data
+        else:
+            url = "http://ji.faculty.geol.ucsb.edu/big_earthquakes/2011/03/0311_v3/result_c/static_out"
+            with urllib.request.urlopen(url) as fp:
+                data_bytes = fp.read()                # read webpage as bytes
+                data_str = data_bytes.decode("utf8")  # convert to a string
+                with open(fname, 'w+') as f:
+                    f.write(data_str)                 # save for future use
+                data = data_str.split('\n')
+
+        # Create a dictionary to contain the parameters
+        self.all_controls = ('latitude', 'longitude', 'depth', 'slip', 'rake', 'strike', 'dip')
+        self.control_parameters = {}
+        for control in self.all_controls:
+            self.control_parameters[control] = []
+        self.control_parameters['length'] = []
+        self.control_parameters['width'] = []
+
+        # Extract the data and enter it into the dictionary
+        for i, line in enumerate(data):
+            if i < 12:
+                continue
+            for word, control in zip(line.split(), self.all_controls):
+                val = float(word)
+                if control == 'slip':
+                    val /= 100  # convert from cm to m
+                if control == 'depth':
+                    val *= 1000  # convert from km to m
+                self.control_parameters[control].append(val)
+            if line not in ('', '\n'):
+                self.control_parameters['length'].append(25.0e+03)
+                self.control_parameters['width'].append(20.0e+03)
+        self.all_controls += ('length', 'width', )
+
+    def get_subfaults(self, check_validity=False):
+        """
+        Create GeoCLAW :class:`SubFault` objects from provided subfault parameters, as well as a
+        :class`Fault` object.
+
+        If control parameters were not provided then data are downloaded according to the
+        `download_okada_parameters` method.
+        """
+        from adapt_utils.unsteady.swe.tsunami.dtopotools import Fault, SubFault
+
+        # If no Okada parameters have been provided then download them from a default webpage
+        if self.control_parameters is None or self.control_parameters == {}:
+            self.download_okada_parameters()
+
+        # Check consistency of the inputs
+        num_subfaults = len(self.control_parameters['latitude'])
+        msg = "Mismatching '{:s}' data: {:d} controls vs. {:d} subfaults"
+        for var in self.control_parameters:
+            num_ctrls = len(self.control_parameters[var])
+            assert num_ctrls == num_subfaults, msg.format(var, num_ctrls, num_subfaults)
+
+        # Check validity of the inputs
+        if check_validity:
+            for i in range(num_subfaults):
+                for var in ('depth', 'slip'):
+                    value = self.control_parameters[var][i]
+                    assert value > 0, "{:s} is not allowed to be negative".format(var.capitalize())
+                lon = self.control_parameters['longitude'][i]
+                lat = self.control_parameters['latitude'][i]
+                self.check_in_domain([lon, lat])
+
+        # Create subfaults
+        for i in range(num_subfaults):
+            subfault = SubFault()
+            subfault.coordinate_specification = self.coordinate_specification
+            self.subfaults.append(subfault)
+
+        # Create a lon-lat grid upon which to represent the source
+        x = np.linspace(self.xmin, self.xmin + self.lx, self.N)
+        y = np.linspace(self.ymin, self.ymin + self.ly, self.N)
+
+        # Create fault
+        self.fault = Fault(x, y, subfaults=self.subfaults)
+
+    def create_topography(self, annotate=False, **kwargs):
+        """
+        Compute the topography dislocation due to the earthquake using the Okada model. This
+        implementation makes use of the :class:`Fault` and :class:`SubFault` objects from GeoClaw.
+
+        If annotation is turned on, the rupture process is annotated using the Python wrapper `pyadolc`
+        to the C++ operator overloading automatic differentation tool ADOL-C.
+
+        :kwarg annotate: toggle annotation using pyadolc.
+        :kwarg tag: label for tape.
+        """
+        msg = "Fault corresponds to an earthquake with moment magnitude {:4.1e}"
+        if annotate:
+            self._create_topography_active(**kwargs)
+            self.print_debug(msg.format(self.fault.Mw().val))
+        else:
+            self._create_topography_passive()
+            self.print_debug(msg.format(self.fault.Mw()))
+
+    def _create_topography_passive(self):
+        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        for i, subfault in enumerate(self.subfaults):
+            for control in self.all_controls:
+                subfault.__setattr__(control, self.control_parameters[control][i])
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo()))
+        self.fault.create_dtopography(verbose=self.debug, active=False)
+
+    def _create_topography_active(self, tag=0, separate_faults=True):
+        import adolc
+
+        # Sanitise kwargs
+        assert isinstance(tag, int)
+        assert tag >= 0
+        for control in self.active_controls:
+            assert control in self.all_controls
+
+        # Initialise tape
+        adolc.trace_on(tag)
+
+        # Read parameters and mark active variables as independent
+        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        for i, subfault in enumerate(self.subfaults):
+            for control in self.all_controls:
+                if control in self.active_controls:
+                    subfault.__setattr__(control, adolc.adouble(self.control_parameters[control][i]))
+                    adolc.independent(subfault.__getattribute__(control))
+                else:
+                    subfault.__setattr__(control, self.control_parameters[control][i])
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val))
+
+        # Create the topography, thereby calling Okada
+        self.print_debug("SETUP: Creating topography using Okada model...")
+        self.fault.create_dtopography(verbose=self.debug, active=True)
+        self.print_debug("SETUP: Done!")
+
+        # Mark output as dependent
+        if separate_faults:
+            for subfault in self.subfaults:
+                adolc.dependent(subfault.dtopo.dZ)
+        else:
+            adolc.dependent(self.fault.dtopo.dZ_a)
+        adolc.trace_off()
+
+    def set_initial_condition(self, prob, annotate_source=False, **kwargs):
+        """
+        Set initial condition using the Okada parametrisation [Okada 85].
+
+        Uses code from GeoCLAW found in `geoclaw/src/python/geoclaw/dtopotools.py`.
+
+        [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
+                   half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
+                   pp.1135--1154, (1985).
+
+        :arg prob: :class:`AdaptiveTsunamiProblem` solver object.
+        :kwarg annotate_source: toggle annotation of the rupture process using pyadolc.
+        :kwarg tag: non-negative integer label for tape.
+        """
+        from scipy.interpolate import interp2d
+
+        # Create fault topography
+        self.create_topography(annotate=annotate_source, **kwargs)
+
+        # Interpolate it using SciPy
+        surf_interp = interp2d(self.fault.dtopo.x, self.fault.dtopo.y, self.fault.dtopo.dZ)
+
+        # Evaluate the interpolant at the mesh vertices
+        surf = Function(prob.P1[0])
+        if not hasattr(self, 'lonlat_mesh'):
+            self.get_lonlat_mesh()
+        for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
+            surf.dat.data[i] = surf_interp(*xy)
+
+        # Interpolate into the elevation space
+        u, eta = prob.fwd_solutions[0].split()
+        eta.interpolate(surf)
+
+    def get_input_vector(self):
+        """
+        Get a vector of the same length as the total number of controls and populate it with passive
+        versions of each parameter. This provides a point at which we can compute derivative matrices.
+        """
+        controls = self.control_parameters
+        num_subfaults = len(self.subfaults)
+        X = [controls[control][i] for i in range(num_subfaults) for control in self.active_controls]
+        self.input_vector = np.array(X)
+        return self.input_vector
+
+    def get_seed_matrices(self):
+        """
+        Whilst the Okada function on each subfault is a nonlinear function of the associated controls,
+        the total dislocation is just the sum over all subfaults. As such, the derivatives with respect
+        to each parameter type (e.g. slip) may be computed simultaneously. All we need to do is choose
+        an appropriate 'seed matrix' to propagate through the forward mode of AD.
+
+        In the default case we have four active controls and hence there are four seed matrices.
+        """
+        if not hasattr(self, 'input_vector'):
+            self.get_input_vector()
+        n = len(self.active_controls)
+        S = [[1 if i % n == j else 0 for j in range(n)] for i in range(len(self.input_vector))]
+        self.seed_matrices = np.array(S)
+        return self.seed_matrices
+
+    def get_interpolation_operators(self):
+        """
+        Establish the mapping between Okada grid
+        """
+        from firedrake.projection import SupermeshProjector
+
+        # Create a Firedrake mesh associated with the (uniform) Okada grid.
+        self.okada_mesh = SquareMesh(self.N-1, self.N-1, self.lx, self.ly)
+        self.okada_mesh.coordinates.dat.data[:] += [self.xmin, self.ymin]
+
+        # Create function spaces associated with both the Okada and longitude-latitude meshes
+        self.P1_okada = FunctionSpace(self.okada_mesh, "CG", 1)
+        self.P1_lonlat = FunctionSpace(self.lonlat_mesh, "CG", 1)
+
+        # Establish an index mapping between the logical x- and y- directions and the vertex
+        # ordering used by Firedrake's utility mesh, :class:`SquareMesh`.
+        self.print_debug("SETUP: Establishing index mapping for Okada mesh...")
+        self._x_locations, self._y_locations = [], []
+        for i, coord in enumerate(self.okada_mesh.coordinates.dat.data):
+            self._x_locations.append(int(np.round((coord[0] - self.xmin)*(self.N-1)/self.lx)))
+            self._y_locations.append(int(np.round((coord[1] - self.ymin)*(self.N-1)/self.ly)))
+        self.print_debug("SETUP: Done!")
+
+        # Create source and target images and a libsupermesh projector between them
+        self.print_debug("SETUP: Establishing supermesh projector between Okada and lonlat meshes...")
+        self.source_okada = Function(self.P1_okada, name="Interpolation source on Okada mesh")
+        self.target_lonlat = Function(self.P1_lonlat, name="Interpolation target on lonlat mesh")
+        self._okada2lonlat = SupermeshProjector(self.source_okada, self.target_lonlat)
+        self.print_debug("SETUP: Done!")
+
+        # Target image on UTM mesh
+        P1 = FunctionSpace(self.default_mesh, "CG", 1)
+        self.target_utm = Function(P1, name="Interpolation target on UTM mesh")
+
+    def _field_from_array(self, arr):
+        """
+        Insert an array `arr` from the Okada model into the source field defined on the Firedrake
+        Okada mesh.
+        """
+        if not hasattr(self, '_source'):
+            self.get_interpolation_operators()
+        assert arr.shape == (self.N, self.N)
+        for k in range(self.N*self.N):
+            self.source_okada.dat.data[k] = arr[self._y_locations[k], self._x_locations[k]]
+
+    def interpolate_okada_array(self, arr):
+        """
+        Given an array `arr` obtained from the Okada model, interpolate it onto the Firedrake mesh
+        in UTM coordinates, i.e. :attr:`self.default_mesh`.
+
+        The return value may also be found as :attr:`target_utm`. Along the way, we also obtain the
+        representation in longitude-latitude space, which may be found as :attr:`target_lonlat`. The
+        source image on the Okada mesh may be found as :attr:`source_okada`.
+        """
+        if not hasattr(self, '_source'):
+            self.get_interpolation_operators()
+
+        # Copy data onto Firedrake Okada mesh
+        self._field_from_array(arr)
+
+        # Project from Okada mesh to longitude-latitude mesh
+        self._okada2lonlat.project()
+
+        # Transfer from longitude-latitude to UTM mesh
+        self.target_utm.dat.data[:] = self.target_lonlat.dat.data
+        return self.target_utm
+
+    def get_regularisation_term(self, prob):
+        raise NotImplementedError  # TODO

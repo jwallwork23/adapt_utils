@@ -31,3 +31,5 @@ turbine_array/outputs/
 turbine_array/screenshots/
 turbine_array/videos/
 turbine_array/__pycache__/
+turbine_array/data/
+turbine_array/plots/

@@ -102,7 +102,7 @@ class AdaptiveProblemBase(object):
         op.print_debug(op.indent + "SETUP: Creating solutions...")
         self.create_solutions()
         op.print_debug(op.indent + "SETUP: Creating fields...")
-        self.set_fields(init = True)
+        self.set_fields(init=True)
         op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
@@ -290,16 +290,25 @@ class AdaptiveProblemBase(object):
         """Functional of interest which takes the PDE solution as input."""
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def save_to_checkpoint(self, f):  # TODO: Disk option
+    def save_to_checkpoint(self, f, mode='memory'):
         """Extremely simple checkpointing scheme with a simple stack of copied fields."""
-        self.checkpoint.append(f.copy(deepcopy=True))
-        self.op.print_debug("CHECKPOINTING: {:3d} currently stored".format(len(self.checkpoint)))
+        assert mode in ('memory', 'disk')
+        if mode == 'memory':
+            self.checkpoint.append(f.copy(deepcopy=True))
+        else:
+            raise NotImplementedError("Checkpointing to disk not yet implemented.")
+            # TODO: add a string to the stack which provides the (auto generated) file name
+        self.op.print_debug("CHECKPOINT SAVE: {:3d} currently stored".format(len(self.checkpoint)))
 
-    def collect_from_checkpoint(self):
+    def collect_from_checkpoint(self, mode='memory', **kwargs):
         """Extremely simple checkpointing scheme which pops off the top of a stack of copied fields."""
-        chk = self.checkpoint.pop(-1)  # TODO: TEMP
-        self.op.print_debug("CHECKPOINTING: {:3d} currently stored".format(len(self.checkpoint)))
-        return chk  # TODO: TEMP
+        assert mode in ('memory', 'disk')
+        if mode == 'disk':
+            # delete = kwargs.get('delete', True)
+            raise NotImplementedError("Checkpointing to disk not yet implemented.")
+            # TODO: pop file name from stack, load file, delete if requested
+        self.op.print_debug("CHECKPOINT LOAD: {:3d} currently stored".format(len(self.checkpoint)))
+        return self.checkpoint.pop(-1)
 
     def run(self, **kwargs):
         """

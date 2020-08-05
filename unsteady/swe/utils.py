@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from firedrake import *
+import thetis.utility as thetis_utils
 
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.recovery import DoubleL2ProjectorHessian
@@ -9,7 +10,7 @@ from adapt_utils.misc import get_component, get_component_space
 
 
 __all__ = ["get_hessian_metric", "ShallowWaterHessianRecoverer",
-           "vorticity", "speed", "heaviside_approx"]
+           "vorticity", "speed", "heaviside_approx", "DepthExpression"]
 
 
 def get_hessian_metric(sol, adapt_field, **kwargs):
@@ -117,3 +118,9 @@ def speed(sol):
 def heaviside_approx(H, alpha):
     """C0 continuous approximation to Heaviside function."""
     return 0.5*(H/(sqrt(H**2 + alpha**2))) + 0.5
+
+
+class DepthExpression(thetis_utils.DepthExpression):
+    """Depth expression from Thetis modified to include an approximation to the Heaviside function."""
+    def heaviside_approx(self, eta):
+        return heaviside_approx(self.get_total_depth(eta), self.wetting_and_drying_alpha)

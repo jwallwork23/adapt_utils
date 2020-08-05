@@ -11,8 +11,8 @@ from adapt_utils.steady.swe.turbine.solver import *
 from adapt_utils.plotting import *
 
 
-# plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})  # FIXME
-# plt.rc('text', usetex=True)  # FIXME
+plt.rc('font', **{'family': 'sans-serif', 'sans-serif': ['Helvetica']})
+plt.rc('text', usetex=True)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-approach', help="Mesh adaptation approach (default fixed_mesh)")

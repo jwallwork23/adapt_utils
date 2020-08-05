@@ -43,6 +43,9 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         NOTE: Only currently supported for either shallow water *or* tracer, *not* coupled mode.
         """
         i = 0  # TODO: Allow multiple meshes
+        if solve_step % self.op.dt_per_export == 0:
+            msg = "{:2d} {:s}  ADJOINT EXTRACT mesh {:2d}/{:2d}  time {:8.2f}"
+            print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.op.dt*solve_step))
         if not hasattr(self, 'solve_blocks'):
             self.get_solve_blocks()
         adj_sol = self.solve_blocks[solve_step].adj_sol
@@ -75,8 +78,9 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             iterator.extend([0, ])
         for j in iterator:
             self.extract_adjoint_solution(j)
-            proj.project(self.adj_solutions[i])
-            self.adjoint_solution_file.write(proj_u, proj_eta)
+            if self.op.plot_pvd:
+                proj.project(self.adj_solutions[i])
+                self.adjoint_solution_file.write(proj_u, proj_eta)
 
     def _save_adjoint_trajectory_tracer(self):
         i = 0  # TODO: Allow multiple meshes
@@ -86,5 +90,6 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             iterator.extend([0, ])
         for j in iterator:
             self.extract_adjoint_solution(j)
-            proj.project(self.adj_solutions_tracer[i])
-            self.adjoint_tracer_file.write(proj)
+            if self.op.plot_pvd:
+                proj.project(self.adj_solutions_tracer[i])
+                self.adjoint_tracer_file.write(proj)
