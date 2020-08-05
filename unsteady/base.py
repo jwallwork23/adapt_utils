@@ -400,22 +400,21 @@ class AdaptiveProblemBase(object):
         if num_inverted > 0:
             warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
 
-    def move_mesh_monge_ampere(self, i):
+    def move_mesh_monge_ampere(self, i):  # TODO: Annotation
         # NOTE: If we want to take the adjoint through mesh movement then there is no need to
         #       know how the coordinate transform was derived, only what the result was. In any
         #       case, the current implementation involves a supermesh projection which is not
         #       yet annotated in pyadjoint.
-        with stop_annotating():
 
-            # Compute new physical mesh coordinates
-            self.mesh_movers[i].adapt()
+        # Compute new physical mesh coordinates
+        self.mesh_movers[i].adapt()
 
-            # Project a copy of the current solution onto mesh defined on new coordinates
-            mesh = Mesh(self.mesh_movers[i].x)
-            V = FunctionSpace(mesh, self.V[i].ufl_element())
-            tmp = Function(V)
-            for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-                tmp_i.project(sol_i)
+        # Project a copy of the current solution onto mesh defined on new coordinates
+        mesh = Mesh(self.mesh_movers[i].x)
+        V = FunctionSpace(mesh, self.V[i].ufl_element())
+        tmp = Function(V)
+        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+            tmp_i.project(sol_i)
 
         # Update physical mesh and solution fields defined on it
         self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
