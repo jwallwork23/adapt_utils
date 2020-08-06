@@ -1,6 +1,7 @@
+
 from thetis import *
-import firedrake as fire
 from firedrake.petsc import PETSc
+import firedrake as fire
 
 import pylab as plt
 import pandas as pd
@@ -8,8 +9,10 @@ import numpy as np
 import time
 import datetime
 
-from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.norms import local_frobenius_norm, local_norm
+from adapt_utils.adapt import recovery
 
 def export_final_state(inputdir, bathymetry_2d):
     """
@@ -39,26 +42,33 @@ def initialise_fields(mesh2d, inputdir):
         bath = Function(V, name="bathymetry")
         chk.load(bath)
         chk.close()
+
     return bath
 
-t1 = time.time()
+nx = 1
+ny = 1
 
-nx = 0.5
-ny = 0.5
+alpha = 1
+beta = 1
+gamma = 1
+
+kappa = 100 #12.5
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
 inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
-
+print(inputdir)
 kwargs = {
-    'approach': 'fixed_mesh',
+    'approach': 'monge_ampere',
     'nx': nx,
     'ny': ny,
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
+    'nonlinear_method': 'relaxation',
+    'r_adapt_rtol': 1.0e-3,
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
@@ -67,7 +77,23 @@ kwargs = {
 }
 
 op = BeachOptions(**kwargs)
+assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
+swp.shallow_water_options[0]['mesh_velocity'] = None
+
+def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
+    P1 = FunctionSpace(mesh, "CG", 1)
+    b = swp.fwd_solutions_bathymetry[0]
+
+    if b is not None:
+    	abs_hor_vel_norm = Function(b.function_space()).project(conditional(b > 0.0, Constant(1.0), Constant(0.0)))
+    else:
+        abs_hor_vel_norm = Function(swp.bathymetry[0].function_space()).project(conditional(swp.bathymetry[0] > 0.0, Constant(1.0), Constant(0.0)))
+    comp_new = project(abs_hor_vel_norm, P1)
+    mon_init = project(1.0 + alpha * comp_new, P1)
+    return mon_init
+
+swp.set_monitor_functions(velocity_monitor)
 
 t1 = time.time()
 swp.solve_forward()
@@ -75,11 +101,12 @@ t2 = time.time()
 
 print(t2-t1)
 
-new_mesh = RectangleMesh(880, 20, 220, 10)
+#new_mesh = RectangleMesh(880, 20, 220, 10)
 
-bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
+#bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220)), bath)
+export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_basic", swp.fwd_solutions_bathymetry[0])
+
 
 xaxisthetis1 = []
 baththetis1 = []
@@ -88,9 +115,17 @@ for i in np.linspace(0, 219, 220):
     xaxisthetis1.append(i)
     baththetis1.append(-bath.at([i, 5]))
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
-df.to_csv("final_result_check_nx" + str(nx) + "_ny" + str(ny) + ".csv", index = False)
+df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_880')
+bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
+
+df_real = pd.read_csv('final_result_nx2_ny1.csv')
+print("Mesh error: ")
+print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+
+print(alpha)
+print(beta)
+print(gamma)
