@@ -2,7 +2,6 @@ from __future__ import absolute_import
 
 from thetis import *
 from thetis.limiter import VertexBasedP1DGLimiter
-from thetis.exner_eq import ExnerEquation
 
 import numpy as np
 import os
@@ -12,15 +11,7 @@ from ..adapt.adaptation import pragmatic_adapt
 from ..adapt.metric import *
 from .base import AdaptiveProblemBase
 from .callback import *
-from .swe.equation import ShallowWaterEquations
-from .swe.adjoint import AdjointShallowWaterEquations
-from .swe.error_estimation import ShallowWaterGOErrorEstimator
 from .swe.utils import *
-from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
-from .tracer.adjoint import AdjointTracerEquation2D, AdjointConservativeTracerEquation2D
-from .tracer.error_estimation import TracerGOErrorEstimator
-from .sediment.equation import SedimentEquation2D
-# from .sediment.sediments_model import SedimentModel
 
 
 __all__ = ["AdaptiveProblem"]
@@ -30,14 +21,27 @@ __all__ = ["AdaptiveProblem"]
 #  * Mesh movement ALE formulation
 #  * CG tracers (plus SU and SUPG stabilisation)
 #  * Multiple tracers
-#  * Documentation
+#  * Checkpointing to disk
+#  * Allow mesh dependent Lax-Friedrichs parameter(s)
 
 class AdaptiveProblem(AdaptiveProblemBase):
-    """Default model: 2D coupled shallow water + tracer transport."""
-    # TODO: doc for equations and supported terms
-    def __init__(self, op, nonlinear=True, **kwargs):
+    """
+    A class describing 2D models which may involve coupling of any of:
 
-        # Problem-specific options
+        * shallow water equations (hydrodynamics);
+        * tracer transport;
+        * sediment transport;
+        * Exner equation.
+
+    Mesh adaptation is supported both using the metric-based approach of Pragmatic, as well as
+    mesh movement methods. Mesh movement can either be driven by a prescribed velocity or by a
+    monitor function.
+
+    In addition to enabling the solution of these equations, the class provides means to solve
+    the associated continuous form adjoint equations, evaluate goal-oriented error estimators and
+    indicators, as well as various other utilities.
+    """
+    def __init__(self, op, nonlinear=True, **kwargs):
         self.shallow_water_options = [AttrDict() for i in range(op.num_meshes)]
         static_options = {
             'use_nonlinear_equations': nonlinear,
@@ -53,10 +57,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'norm_smoother': op.norm_smoother,
             'sipg_parameter': None,
             'mesh_velocity': None,
+            'tidal_turbine_farms': {},  # NOTE: This is only modified in AdaptiveTurbineProblem
         }
         for i, swo in enumerate(self.shallow_water_options):
             swo.update(static_options)
-            swo.tidal_turbine_farms = {}  # TODO
             if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
                 swo['sipg_parameter'] = op.sipg_parameter
         if not nonlinear:
@@ -109,6 +113,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         There are two options for the tracer finite element:
           * Continuous Galerkin     Pp    'cg';
           * Discontinuous Galerkin  PpDG  'dg'.
+
+        For the sediment and Exner models, you are required to use DG and CG,
+        respectively.
         """
         p = self.op.degree
         family = self.op.family
@@ -136,6 +143,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.finite_element_tracer = FiniteElement("DG", triangle, p)
             else:
                 raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
+
         if self.op.solve_sediment:
             p = self.op.degree_sediment
             family = self.op.sediment_family
@@ -143,6 +151,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.finite_element_sediment = FiniteElement("DG", triangle, p)
             else:
                 raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
+
         if self.op.solve_exner:
             p = self.op.degree_bathymetry
             family = self.op.bathymetry_family
@@ -166,7 +175,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Shallow water space
         self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
 
-        # Tracer space
+        # Tracer space(s)
         if self.op.solve_tracer:
             self.Q = [FunctionSpace(mesh, self.finite_element_tracer) for mesh in self.meshes]
         if self.op.solve_sediment:
@@ -175,6 +184,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Bathymetry space
         if self.op.solve_exner:
             self.W = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in self.meshes]
+
+    def create_intermediary_spaces(self):
+        super(AdaptiveProblem, self).create_intermediary_spaces()
+        if self.op.approach != 'monge_ampere':
+            return
+        mesh_copies = self.intermediary_meshes
+        if self.op.solve_tracer:
+            spaces = [FunctionSpace(mesh, self.finite_element_tracer) for mesh in mesh_copies]
+            self.intermediary_solutions_tracer = [Function(space) for space in spaces]
+        if self.op.solve_sediment:
+            spaces = [FunctionSpace(mesh, self.finite_element_sediment) for mesh in mesh_copies]
+            self.intermediary_solutions_sediment = [Function(space) for space in spaces]
+        if self.op.solve_exner:
+            spaces = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in mesh_copies]
+            self.intermediary_solutions_bathymetry = [Function(space) for space in spaces]
 
     def create_solutions(self):
         """
@@ -200,51 +224,24 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.adj_solutions_tracer = [Function(Q, name="Adjoint tracer solution") for Q in self.Q]
         if self.op.solve_sediment:
             self.fwd_solutions_sediment = [Function(Q, name="Forward sediment solution") for Q in self.Q]
+            # self.adj_solutions_sediment = [Function(Q, name="Adjoint sediment solution") for Q in self.Q]
         if self.op.solve_exner:
             self.fwd_solutions_bathymetry = [Function(W, name="Forward bathymetry solution") for W in self.W]
+            # self.adj_solutions_bathymetry = [Function(W, name="Adjoint bathymetry solution") for W in self.W]
 
     def set_fields(self, init=False):
-        """Set velocity field, viscosity, etc *on each mesh*."""
+        """
+        Set various fields *on each mesh*, including:
+
+            * viscosity;
+            * diffusivity;
+            * the Coriolis parameter;
+            * drag coefficients;
+            * bed roughness.
+
+        The bathymetry is defined via a modified version of the `DepthExpression` found Thetis.
+        """
         self.fields = [AttrDict() for P1 in self.P1]
-        if self.op.solve_exner:
-            if init:
-                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
-                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-                self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
-            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                # NOTE: DepthExpression is the modified version from `unsteady/swe/utils`.
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                )
-        elif self.op.solve_sediment:
-            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-            for i, bathymetry in enumerate(self.bathymetry):
-                if init:
-                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-                    self.depth = [None for bathymetry in self.bathymetry]
-            for i, bathymetry in enumerate(self.bathymetry):
-                # NOTE: DepthExpression is the modified version from `unsteady/swe/utils`.
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                )
-        else:
-            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-            self.depth = [None for bathymetry in self.bathymetry]
-            for i, bathymetry in enumerate(self.bathymetry):
-                # NOTE: DepthExpression is the modified version from `unsteady/swe/utils`.
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                )
         for i, P1 in enumerate(self.P1):
             self.fields[i].update({
                 'horizontal_viscosity': self.op.set_viscosity(P1),
@@ -270,6 +267,44 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
+        # Bathymetry
+        if self.op.solve_exner:
+            if init:
+                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
+                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
+                self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
+            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
+                self.depth[i] = DepthExpression(
+                    bathymetry,
+                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+                )
+        elif self.op.solve_sediment:
+            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
+            for i, bathymetry in enumerate(self.bathymetry):
+                if init:
+                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
+                    self.depth = [None for bathymetry in self.bathymetry]
+            for i, bathymetry in enumerate(self.bathymetry):
+                self.depth[i] = DepthExpression(
+                    bathymetry,
+                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+                )
+        else:
+            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
+            self.depth = [None for bathymetry in self.bathymetry]
+            for i, bathymetry in enumerate(self.bathymetry):
+                self.depth[i] = DepthExpression(
+                    bathymetry,
+                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+                )
+
     # --- Stabilisation
 
     def set_stabilisation_step(self, i):
@@ -281,58 +316,63 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_swe:
             self._set_shallow_water_stabilisation_step(i)
         if self.op.solve_tracer:
-            self._set_tracer_stabilisation_step(i)
+            self._set_tracer_stabilisation_step(i, sediment=False)
         if self.op.solve_sediment:
-            self._set_tracer_stabilisation_step(i)
+            self._set_tracer_stabilisation_step(i, sediment=True)
 
     def _set_shallow_water_stabilisation_step(self, i):
         op = self.op
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
         sipg = None
-        if hasattr(op, 'sipg_parameter'):
-            sipg = op.sipg_parameter
-        if self.shallow_water_options[i].use_automatic_sipg_parameter:
-            for i, mesh in enumerate(self.meshes):
-                cot_theta = 1.0/tan(self.minimum_angles[i])
+        if op.family != 'cg-cg':
+            if hasattr(op, 'sipg_parameter'):
+                sipg = op.sipg_parameter
+            if self.shallow_water_options[i].use_automatic_sipg_parameter:
+                for i, mesh in enumerate(self.meshes):
+                    cot_theta = 1.0/tan(self.minimum_angles[i])
 
-                # Penalty parameter for shallow water
-                nu = self.fields[i].horizontal_viscosity
-                if nu is not None:
-                    p = self.V[i].sub(0).ufl_element().degree()
-                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
-                    alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                    sipg = interpolate(alpha, self.P0[i])
+                    # Penalty parameter for shallow water
+                    nu = self.fields[i].horizontal_viscosity
+                    if nu is not None:
+                        p = self.V[i].sub(0).ufl_element().degree()
+                        alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                        alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                        sipg = interpolate(alpha, self.P0[i])
         self.shallow_water_options[i].sipg_parameter = sipg
 
         # Stabilisation
         if self.stabilisation is None:
             return
         elif self.stabilisation == 'lax_friedrichs':
+            assert op.family != 'cg-cg'
             assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
             self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
 
-    def _set_tracer_stabilisation_step(self, i):
+    def _set_tracer_stabilisation_step(self, i, sediment=False):
         op = self.op
+        eq_options = self.sediment_options if sediment else self.tracer_options
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
+        family = op.sediment_family if sediment else op.tracer_family
         sipg = None
-        if hasattr(op, 'sipg_parameter_tracer'):
-            sipg = op.sipg_parameter_tracer
-        if self.tracer_options[i].use_automatic_sipg_parameter:
-            for i, mesh in enumerate(self.meshes):
-                cot_theta = 1.0/tan(self.minimum_angles[i])
+        if family == 'dg':
+            if hasattr(op, 'sipg_parameter_tracer'):
+                sipg = op.sipg_parameter_tracer
+            if self.tracer_options[i].use_automatic_sipg_parameter:
+                for i, mesh in enumerate(self.meshes):
+                    cot_theta = 1.0/tan(self.minimum_angles[i])
 
-                # Penalty parameter for shallow water
-                nu = self.fields[i].horizontal_diffusivity
-                if nu is not None:
-                    p = self.Q[i].ufl_element().degree()
-                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
-                    alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                    sipg = interpolate(alpha, self.P0[i])
+                    # Penalty parameter for shallow water
+                    nu = self.fields[i].horizontal_diffusivity
+                    if nu is not None:
+                        p = self.Q[i].ufl_element().degree()
+                        alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                        alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                        sipg = interpolate(alpha, self.P0[i])
         self.tracer_options[i].sipg_parameter = sipg
 
         # Stabilisation
@@ -340,11 +380,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
             return
         elif self.stabilisation == 'lax_friedrichs':
             assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')
-            self.tracer_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
-            self.sediment_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
+            assert family == 'dg'
+            eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
         elif self.stabilisation == 'su':
+            assert family == 'cg'
             raise NotImplementedError  # TODO
         elif self.stabilisation == 'supg':
+            assert family == 'cg'
             raise NotImplementedError  # TODO
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
@@ -367,10 +409,22 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.op.set_terminal_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.op.set_terminal_condition_tracer(self, **kwargs)
+        if self.op.solve_sediment:
+            self.op.set_terminal_condition_sediment(self, **kwargs)
+        if self.op.solve_exner:
+            self.op.set_terminal_condition_exner(self, **kwargs)
 
-    def project_forward_solution(self, i, j):
-        """Project forward solution(s) from mesh `i` to mesh `j`."""
-        self.project(self.fwd_solutions, i, j)  # TODO: Interpolate from data if not solve_swe
+    def project_forward_solution(self, i, j, **kwargs):
+        """
+        Project forward solution(s) from mesh `i` to mesh `j`.
+        
+        If the shallow water equations are not solved then the fluid velocity
+        and surface elevation are set via the initial condition.
+        """
+        if self.op.solve_swe:
+            self.project(self.fwd_solutions, i, j)
+        else:
+            self.op.set_initial_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.project(self.fwd_solutions_tracer, i, j)
         if self.op.solve_sediment:
@@ -378,15 +432,65 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.project(self.fwd_solutions_bathymetry, i, j)
 
-    def project_adjoint_solution(self, i, j):
-        """Project adjoint solution(s) from mesh `i` to mesh `j`."""
-        self.project(self.adj_solutions, i, j)  # TODO: Interpolate from data if not solve_swe
+    def project_adjoint_solution(self, i, j, **kwargs):
+        """
+        Project adjoint solution(s) from mesh `i` to mesh `j`.
+        
+        If the adjoint shallow water equations are not solved then the adjoint
+        fluid velocity and surface elevation are set via the terminal condition.
+        """
+        if self.op.solve_swe:
+            self.project(self.adj_solutions, i, j)
+        else:
+            self.op.set_terminal_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.project(self.adj_solutions_tracer, i, j)
         if self.op.solve_sediment:
-            raise NotImplementedError
+            self.project(self.adj_solutions_sediment, i, j)
         if self.op.solve_exner:
-            raise NotImplementedError
+            self.project(self.adj_solutions_bathymetry, i, j)
+
+    def project_to_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).project_to_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.intermediary_solutions_tracer[i].project(self.fwd_solutions_tracer[i])
+        if self.op.solve_sediment:
+            self.intermediary_solutions_sediment[i].project(self.fwd_solutions_sediment[i])
+        if self.op.solve_exner:
+            self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
+
+        def debug(a, b, name):
+            if np.allclose(a, b):
+                print_output("WARNING: Is the intermediary {:s} solution just copied?".format(name))
+
+        if self.op.debug:
+            debug(self.fwd_solutions[i].dat.data[0],
+                  self.intermediary_solutions[i].dat.data[0],
+                  "velocity")
+            debug(self.fwd_solutions[i].dat.data[1],
+                  self.intermediary_solutions[i].dat.data[1],
+                  "elevation")
+            if self.op.solve_tracer:
+                debug(self.fwd_solutions_tracer[i].dat.data,
+                      self.intermediary_solutions_tracer[i].dat.data,
+                      "tracer")
+            if self.op.solve_sediment:
+                debug(self.fwd_solutions_sediment[i].dat.data,
+                      self.intermediary_solutions_sediment[i].dat.data,
+                      "sediment")
+            if self.op.solve_exner:
+                debug(self.fwd_solutions_bathymetry[i].dat.data,
+                      self.intermediary_solutions_bathymetry[i].dat.data,
+                      "bathymetry")
+
+    def copy_data_from_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.fwd_solutions_tracer[i].dat.data[:] = self.intermediary_solutions_tracer[i].dat.data
+        if self.op.solve_sediment:
+            self.fwd_solutions_sediment[i].dat.data[:] = self.intermediary_solutions_sediment[i].dat.data
+        if self.op.solve_exner:
+            self.fwd_solutions_bathymetry[i].dat.data[:] = self.intermediary_solutions_bathymetry[i].dat.data
 
     # --- Equations
 
@@ -400,17 +504,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self._create_forward_exner_equation(i)
 
-    def create_adjoint_equations(self, i):
-        if self.op.solve_swe:
-            self._create_adjoint_shallow_water_equations(i)
-        if self.op.solve_tracer:
-            self._create_adjoint_tracer_equation(i)
-        if self.op.solve_sediment:
-            raise NotImplementedError
-        if self.op.solve_exner:
-            raise NotImplementedError
-
     def _create_forward_shallow_water_equations(self, i):
+        from .swe.equation import ShallowWaterEquations
+
         if self.mesh_velocities[i] is not None:
             self.shallow_water_options[i]['mesh_velocity'] = self.mesh_velocities[i]
         self.equations[i].shallow_water = ShallowWaterEquations(
@@ -420,15 +516,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
-    def _create_adjoint_shallow_water_equations(self, i):
-        self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
-            self.V[i],
-            self.depth[i],
-            self.shallow_water_options[i],
-        )
-        self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
-
     def _create_forward_tracer_equation(self, i):
+        from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
+
         op = self.tracer_options[i]
         conservative = op.use_tracer_conservative_form
         model = ConservativeTracerEquation2D if conservative else TracerEquation2D
@@ -443,6 +533,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     def _create_forward_sediment_equation(self, i):
+        from .sediment.equation import SedimentEquation2D
+
         op = self.sediment_options[i]
         model = SedimentEquation2D
         self.equations[i].sediment = model(
@@ -458,6 +550,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].sediment.bnd_functions = self.boundary_conditions[i]['sediment']
 
     def _create_forward_exner_equation(self, i):
+        from thetis.exner_eq import ExnerEquation
+
         # op = self.exner_options[i]
         model = ExnerEquation
         self.equations[i].exner = model(
@@ -468,7 +562,29 @@ class AdaptiveProblem(AdaptiveProblemBase):
             sed_model=self.op.sediment_model,
         )
 
+    def create_adjoint_equations(self, i):
+        if self.op.solve_swe:
+            self._create_adjoint_shallow_water_equations(i)
+        if self.op.solve_tracer:
+            self._create_adjoint_tracer_equation(i)
+        if self.op.solve_sediment:
+            self._create_adjoint_sediment_equation(i)
+        if self.op.solve_exner:
+            self._create_adjoint_exner_equation(i)
+
+    def _create_adjoint_shallow_water_equations(self, i):
+        from .swe.adjoint import AdjointShallowWaterEquations
+
+        self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
+            self.V[i],
+            self.depth[i],
+            self.shallow_water_options[i],
+        )
+        self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
+
     def _create_adjoint_tracer_equation(self, i):
+        from .tracer.adjoint import AdjointTracerEquation2D, AdjointConservativeTracerEquation2D
+
         op = self.tracer_options[i]
         conservative = op.use_tracer_conservative_form
         model = AdjointConservativeTracerEquation2D if conservative else AdjointTracerEquation2D
@@ -481,6 +597,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
+
+    def _create_adjoint_sediment_equation(self, i):
+        raise NotImplementedError("Continuous adjoint sediment equation not implemented")
+
+    def _create_adjoint_exner_equation(self, i):
+        raise NotImplementedError("Continuous adjoint Exner equation not implemented")
 
     # --- Error estimators
 
@@ -495,6 +617,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self._create_exner_error_estimator(i)
 
     def _create_shallow_water_error_estimator(self, i):
+        from .swe.error_estimation import ShallowWaterGOErrorEstimator
+
         self.error_estimators[i].shallow_water = ShallowWaterGOErrorEstimator(
             self.V[i],
             self.depth[i],
@@ -502,8 +626,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
 
     def _create_tracer_error_estimator(self, i):
+        from .tracer.error_estimation import TracerGOErrorEstimator
+
         if self.tracer_options[i].use_tracer_conservative_form:
-            raise NotImplementedError("Error estimators for conservative tracer not yet implemented.")  # TODO
+            raise NotImplementedError("Error estimation for conservative tracers not implemented.")
         else:
             estimator = TracerGOErrorEstimator
         self.error_estimators[i].tracer = estimator(
@@ -514,10 +640,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
 
     def _create_sediment_error_estimator(self, i):
-        raise NotImplementedError("Error estimators for sediment not yet implemented.")
+        raise NotImplementedError("Error estimators for sediment not implemented.")
 
     def _create_exner_error_estimator(self, i):
-        raise NotImplementedError("Error estimators for Exner not yet implemented.")
+        raise NotImplementedError("Error estimators for Exner not implemented.")
 
     # --- Timestepping
 
@@ -532,18 +658,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self._create_forward_sediment_timestepper(i, self.integrator)
         if self.op.solve_exner:
             self._create_forward_exner_timestepper(i, self.integrator)
-
-    def create_adjoint_timesteppers(self, i):
-        if i == self.num_meshes-1:
-            self.simulation_time = self.op.end_time
-        if self.op.solve_swe:
-            self._create_adjoint_shallow_water_timestepper(i, self.integrator)
-        if self.op.solve_tracer:
-            self._create_adjoint_tracer_timestepper(i, self.integrator)
-        if self.op.solve_sediment:
-            raise NotImplementedError
-        if self.op.solve_exner:
-            raise NotImplementedError
 
     def _get_fields_for_shallow_water_timestepper(self, i):
         fields = AttrDict({
@@ -683,6 +797,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         self.timesteppers[i].exner = integrator(*args, **kwargs)
 
+    def create_adjoint_timesteppers(self, i):
+        if i == self.num_meshes-1:
+            self.simulation_time = self.op.end_time
+        if self.op.solve_swe:
+            self._create_adjoint_shallow_water_timestepper(i, self.integrator)
+        if self.op.solve_tracer:
+            self._create_adjoint_tracer_timestepper(i, self.integrator)
+        if self.op.solve_sediment:
+            self._create_adjoint_sediment_timestepper(i, self.integrator)
+        if self.op.solve_exner:
+            self._create_adjoint_exner_timestepper(i, self.integrator)
+
     def _create_adjoint_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
         fields['uv_2d'], fields['elev_2d'] = self.fwd_solutions[i].split()
@@ -727,6 +853,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
         self.timesteppers[i].adjoint_tracer = integrator(*args, **kwargs)
+
+    def _create_adjoint_sediment_timestepper(self, i, integrator):
+        raise NotImplementedError("Continuous adjoint sediment timestepping not implemented")
+
+    def _create_adjoint_exner_timestepper(self, i, integrator):
+        raise NotImplementedError("Continuous adjoint Exner timestepping not implemented")
 
     # --- Solvers
 
@@ -859,11 +991,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         while self.simulation_time <= end_time - t_epsilon:
 
             # Mesh movement
-            if self.iteration % op.dt_per_mesh_movement == 0:
-                if self.mesh_movers[i] is not None:  # TODO: generalise
-                    self.mesh_movers[i].adapt()
-
-            # Move *mesh i*
             if self.iteration % op.dt_per_mesh_movement == 0:
                self.move_mesh(i)
 
@@ -1076,6 +1203,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Metric
 
+    # TODO: Allow Hessian metric for tracer / sediment / Exner
     def get_hessian_metric(self, adjoint=False, **kwargs):
         kwargs.setdefault('normalise', True)
         kwargs['op'] = self.op
@@ -1273,7 +1401,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 print_output("Converged number of mesh elements!")
                 break
 
-    # TODO: Tracer?
     # TODO: Modify indicator for time interval
     def run_dwp(self, **kwargs):
         r"""
@@ -1300,6 +1427,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
         """
         op = self.op
+        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
@@ -1424,6 +1552,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
+        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
@@ -1621,42 +1750,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
+<<<<<<< HEAD
 
-    def move_mesh_monge_ampere(self, i):
-        # NOTES:
-        #    * Assumes we have already computed new physical mesh coordinates.
-        #
-        #    * If we want to take the adjoint through mesh movement then there is no need to
-        #      know how the coordinate transform was derived, only what the result was. In any
-        #      case, the current implementation involves a supermesh projection which is not
-        #      yet annotated in pyadjoint.  # TODO
-
-        # Project a copy of the current solution onto mesh defined on new coordinates
-        mesh = Mesh(self.mesh_movers[i].x)
-        V = FunctionSpace(mesh, self.V[i].ufl_element())
-        tmp = Function(V)
-        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-            tmp_i.project(sol_i)
-
-        # Same for tracers etc.
-        if self.op.solve_tracer:
-            Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-            tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
-        if self.op.solve_sediment:
-            Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-            tmp_sediment = project(self.fwd_solutions_sediment[i], Q)
-        if self.op.solve_exner:
-            W = FunctionSpace(mesh, self.W[i].ufl_element())
-            tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
-
-        #self.a_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
-        #print('here')
-        #if not hasattr(self, "b_mc"):
-        #    self.b_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
-        #print(self.a_mc - self.b_mc)
-
-        #self.b_mc = assemble(tmp_bathymetry*dx)
-        #print(self.b_mc-self.a_mc)
         #tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
 
         #tmp_depth = project(self.op.sediment_model.depth, W)
@@ -1670,29 +1765,3 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # R = VectorFunctionSpace(mesh, "CG", 1)
         # tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
 
-        # Update physical mesh and solution fields defined on it
-        self.meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
-
-        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-            sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
-        del tmp
-        if self.op.solve_tracer:  # FIXME: Need annotation
-            self.fwd_solutions_tracer[i].dat.data[:] = tmp_tracer.dat.data
-            del tmp_tracer
-        if self.op.solve_sediment:  # FIXME: Need annotation
-            self.fwd_solutions_sediment[i].dat.data[:] = tmp_sediment.dat.data
-            del tmp_sediment
-        if self.op.solve_exner:  # FIXME: Need annotation
-            self.fwd_solutions_bathymetry[i].dat.data[:] = tmp_bathymetry.dat.data
-            del tmp_bathymetry
-        #self.op.sediment_model.old_bathymetry_2d.dat.data[:] = tmp_old_bath.dat.data[:]
-        #self.op.sediment_model.depth.dat.data[:] = tmp_depth.dat.data
-        #del tmp_depth
-        #self.op.sediment_model.TOB.dat.data[:] = tmp_tob.dat.data
-        #del tmp_tob
-        #self.op.sediment_model.uv_cg.dat.data[:] = tmp_uv_cg.dat.data
-        #del tmp_uv_cg
-        # Re-interpolate fields
-        self.set_fields()
-        #self.create_forward_equations(i)
-        #self.create_forward_timesteppers(i)

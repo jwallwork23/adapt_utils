@@ -13,6 +13,7 @@ import pandas as pd
 import time
 import datetime
 
+
 def export_final_state(inputdir, bathymetry_2d):
     """
     Export fields to be used in a subsequent simulation
@@ -67,31 +68,37 @@ kwargs = {
     'approach': 'monge_ampere',
     'nx': nx,
     'ny': ny,
-    'plot_pvd': True,
-    'input_dir': inputdir,
-    'output_dir': outputdir,
+
+    # Mesh movement
     'nonlinear_method': 'relaxation',
     'r_adapt_rtol': 1.0e-3,
+
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
     'use_automatic_sipg_parameter': True,
-    'friction': 'manning'
+    'friction': 'manning',
+
+    # I/O
+    'plot_bathymetry': True,
+    'plot_pvd': True,
+    'input_dir': inputdir,
+    'output_dir': outputdir,
+
+    # Debugging
+    'debug': True,
 }
 
 op = BeachOptions(**kwargs)
-assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
 def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
-
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 
     NOTE: Defined on the *computational* mesh.
-
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
