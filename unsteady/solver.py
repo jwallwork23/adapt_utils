@@ -449,6 +449,24 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.project(self.adj_solutions_bathymetry, i, j)
 
+    def project_to_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).project_to_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.intermediary_solutions_tracer[i].project(self.fwd_solutions_tracer[i])
+        if self.op.solve_sediment:
+            self.intermediary_solutions_sediment[i].project(self.fwd_solutions_sediment[i])
+        if self.op.solve_exner:
+            self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
+
+    def copy_data_from_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.fwd_solutions_tracer[i].dat.data[:] = self.intermediary_solutions_tracer[i].dat.data
+        if self.op.solve_sediment:
+            self.fwd_solutions_sediment[i].dat.data[:] = self.intermediary_solutions_sediment[i].dat.data
+        if self.op.solve_exner:
+            self.fwd_solutions_bathymetry[i].dat.data[:] = self.intermediary_solutions_bathymetry[i].dat.data
+
     # --- Equations
 
     def create_forward_equations(self, i):
@@ -948,11 +966,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         while self.simulation_time <= end_time - t_epsilon:
 
             # Mesh movement
-            if self.iteration % op.dt_per_mesh_movement == 0:
-                if self.mesh_movers[i] is not None:  # TODO: generalise
-                    self.mesh_movers[i].adapt()
-
-            # Move *mesh i*
             if self.iteration % op.dt_per_mesh_movement == 0:
                self.move_mesh(i)
 
@@ -1712,50 +1725,3 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
-
-    def move_mesh_monge_ampere(self, i):
-        # NOTES:
-        #    * Assumes we have already computed new physical mesh coordinates.
-        #
-        #    * If we want to take the adjoint through mesh movement then there is no need to
-        #      know how the coordinate transform was derived, only what the result was. In any
-        #      case, the current implementation involves a supermesh projection which is not
-        #      yet annotated in pyadjoint.  # TODO
-        op = self.op
-        solutions = self.fwd_solutions[i]
-
-        # Get intermediary meshes and solutions
-        self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
-        intermediary_solutions = self.intermediary_solutions[i]
-
-        # Project a copy of the current solution onto mesh defined on new coordinates
-        for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
-            int_sol.project(sol)
-
-        # Same for tracers etc.
-        if self.op.solve_tracer:
-            self.intermediary_solutions_tracer[i].project(self.fwd_solutions_tracer[i])
-        if self.op.solve_sediment:
-            self.intermediary_solutions_sediment[i].project(self.fwd_solutions_sediment[i])
-        if self.op.solve_exner:
-            self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
-
-        # Update physical mesh and solution fields defined on it
-        self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data[:]
-
-        # Update physical mesh and solution fields defined on it
-        for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
-            sol.dat.data[:] = int_sol.dat.data  # FIXME: Need annotation
-
-        # Same for tracers etc.
-        if self.op.solve_tracer:  # FIXME: Need annotation
-            self.fwd_solutions_tracer[i].dat.data[:] = self.intermediary_solutions_tracer[i].dat.data
-        if self.op.solve_sediment:  # FIXME: Need annotation
-            self.fwd_solutions_sediment[i].dat.data[:] = self.intermediary_solutions_sediment[i].dat.data
-        if self.op.solve_exner:  # FIXME: Need annotation
-            self.fwd_solutions_bathymetry[i].dat.data[:] = self.intermediary_solutions_bathymetry[i].dat.data
-
-        # Re-interpolate fields
-        self.set_fields()
-        # self.create_forward_equations(i)
-        # self.create_forward_timesteppers(i)
