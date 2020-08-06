@@ -69,6 +69,9 @@ kwargs = {
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
+
+    # Debugging
+    'debug': True,
 }
 
 op = BeachOptions(**kwargs)
