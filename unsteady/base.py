@@ -384,12 +384,17 @@ class AdaptiveProblemBase(object):
 
     # --- Mesh movement
 
-    def set_monitor_functions(self, monitors):
+    def set_monitor_functions(self, monitors, bc=None, bbc=None):
         """
         Pass a monitor function to each mesh, thereby defining a `MeshMover` object which drives
         r-adaptation.
 
-        NOTE: The monitor function should be a function with one argument, namely the mesh.
+        This method is used under 'monge_ampere' and 'laplacian_smoothing' adaptation approaches.
+
+        :arg monitors: a monitor function which takes one argument (the mesh) or a list thereof.
+        :kwarg bc: boundary conditions to apply within the mesh movement algorithm.
+        :kwarg bbc: boundary conditions to apply within EquationBC objects which appear in the mesh
+            movement algorithm.
         """
         from adapt_utils.adapt.r import MeshMover
 
@@ -397,20 +402,21 @@ class AdaptiveProblemBase(object):
         assert self.approach in ('monge_ampere', 'laplacian_smoothing')
         assert monitors is not None
         if callable(monitors):
-            monitors = [monitors, ]
-        assert len(monitors) == self.num_meshes
+            monitors = [monitors for mesh in self.meshes]
 
         # Create `MeshMover` objects which drive r-adaptation
         kwargs = {
             'method': self.approach,
-            'bc': None,  # TODO
-            'bbc': None,  # TODO
+            'bc': bc,
+            'bbc': bbc,
             'op': self.op,
         }
-        self.base_meshes = [Mesh(mesh.coordinates.copy(deepcopy=True)) for mesh in self.meshes]
+        self.op.print_debug("MESH MOVEMENT: Creating MeshMover objects...")
         for i in range(self.num_meshes):
             assert monitors[i] is not None
-            self.mesh_movers[i] = MeshMover(self.base_meshes[i], monitors[i], **kwargs)
+            args = (Mesh(meshes[i].coordinates.copy(deepcopy=True)), monitors[i])
+            self.mesh_movers[i] = MeshMover(*args, **kwargs)
+        self.op.print_debug("MESH MOVEMENT: Done!")
 
     def move_mesh(self, i):
         # TODO: documentation
