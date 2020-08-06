@@ -79,7 +79,7 @@ class BeachOptions(CoupledOptions):
 
         # Time integration
 
-        self.dt = 0.05
+        self.dt = 0.5
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 54
         self.dt_per_export = 54
@@ -115,10 +115,10 @@ class BeachOptions(CoupledOptions):
         self.use_tracer_conservative_form = True
         self.slope_eff = True
         self.angle_correction = False
-        self.suspended = False
-        self.convective_vel_flag = False
+        self.suspended = True
+        self.convective_vel_flag = True
         self.bedload = True
-        self.solve_sediment = False
+        self.solve_sediment = True
         self.solve_exner = True
 
         self.norm_smoother = Constant(10/25)

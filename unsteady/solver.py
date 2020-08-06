@@ -1668,8 +1668,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             W = FunctionSpace(mesh, self.W[i].ufl_element())
             tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
 
-
-
         self.a_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
         print('here')
         if not hasattr(self, "b_mc"):
