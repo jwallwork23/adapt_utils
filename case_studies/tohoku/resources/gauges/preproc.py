@@ -1,8 +1,8 @@
-#!/home/jgw116/software/firedrake-pragmatic/bin/python3
+#!/usr/bin/env python3
 
-import os
 import argparse
 import numpy as np
+import os
 import scipy.interpolate as si
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
@@ -21,7 +21,7 @@ except AssertionError:
 pressure_gauge = fname[0] != '8'
 
 # Pressure gauge data is converted to free surface elevation so we need to know
-#   the total water depth. We interpolate it from GEBCO bathymetry if it is unknown.
+#   the total water depth. We interpolate it from ETOPO1 bathymetry if it is unknown.
 if pressure_gauge:
     op = TohokuOptions(setup=False)
 
