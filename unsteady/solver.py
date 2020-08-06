@@ -495,6 +495,24 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.project(self.adj_solutions_bathymetry, i, j)
 
+    def project_to_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).project_to_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.intermediary_solutions_tracer[i].project(self.fwd_solutions_tracer[i])
+        if self.op.solve_sediment:
+            self.intermediary_solutions_sediment[i].project(self.fwd_solutions_sediment[i])
+        if self.op.solve_exner:
+            self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
+
+    def copy_data_from_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.fwd_solutions_tracer[i].dat.data[:] = self.intermediary_solutions_tracer[i].dat.data
+        if self.op.solve_sediment:
+            self.fwd_solutions_sediment[i].dat.data[:] = self.intermediary_solutions_sediment[i].dat.data
+        if self.op.solve_exner:
+            self.fwd_solutions_bathymetry[i].dat.data[:] = self.intermediary_solutions_bathymetry[i].dat.data
+
     # --- Equations
 
     def create_forward_equations(self, i):
@@ -1764,6 +1782,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
+<<<<<<< HEAD
 
     def move_mesh_monge_ampere(self, i):
         # NOTES:
@@ -1842,3 +1861,5 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.set_fields()
         # self.create_forward_equations(i)
         # self.create_forward_timesteppers(i)
+=======
+>>>>>>> 61385be... monge_ampere: simplify

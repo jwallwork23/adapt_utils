@@ -247,6 +247,14 @@ class AdaptiveProblemBase(object):
         else:
             self.project_adjoint_solution(i+1, i)
 
+    def project_to_intermediary_mesh(self, i):
+        for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
+            f_int.project(f)
+
+    def copy_data_from_intermediary_mesh(self, i):
+        for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
+            f.dat.data[:] = f_int.dat.data
+
     def store_plexes(self, di=None):
         """Save meshes to disk using DMPlex format."""
         from firedrake.petsc import PETSc
@@ -377,12 +385,14 @@ class AdaptiveProblemBase(object):
             self.mesh_movers[i] = MeshMover(self.base_meshes[i], monitors[i], **kwargs)
 
     def move_mesh(self, i):
+        # TODO: documentation
         if self.op.approach in ('lagrangian', 'ale'):  # TODO: Make more robust (apply BCs etc.)
             self.move_mesh_ale(i)
         elif self.mesh_movers[i] is not None:
             self.move_mesh_monge_ampere(i)
 
     def move_mesh_ale(self, i):
+        # TODO: documentation
         mesh = self.meshes[i]
         t = self.simulation_time
         dt = self.op.dt
@@ -423,27 +433,37 @@ class AdaptiveProblemBase(object):
             warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
 
     def move_mesh_monge_ampere(self, i):  # TODO: Annotation
-        # NOTE: If we want to take the adjoint through mesh movement then there is no need to
-        #       know how the coordinate transform was derived, only what the result was. In any
-        #       case, the current implementation involves a supermesh projection which is not
-        #       yet annotated in pyadjoint.
-        solutions = self.fwd_solutions[i]
+        """
+        Move the physical mesh using a monitor based approach driven by solutions of a Monge-Ampere
+        type equation.
 
-        # Get intermediary meshes and solutions
-        self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
-        intermediary_solutions = self.intermediary_solutions[i]
+        Using the monitor function provided, new mesh coordinates are established. As an intermediate
+        step, these are passed to a separate 'intermediary' mesh. Solution fields are projected into
+        spaces defined on the intermediary mesh. Finally, the physical mesh coordinates are updated
+        and the projected solution data are copied into the solution fields on the physical mesh.
+
+        NOTE: If we want to take the adjoint through mesh movement then there is no need to
+              know how the coordinate transform was derived, only what the result was. In any
+              case, the current implementation involves a supermesh projection which is not
+              yet annotated in pyadjoint.
+        """  # TODO: documentation on how Monge-Ampere is solved.
+        if self.mesh_movers[i] is None:
+            raise ValueError("No monitor function was provided. Use `set_monitor_functions`.")
 
         # Compute new physical mesh coordinates
         self.mesh_movers[i].adapt()
 
-        # Project a copy of the current solution onto mesh defined on new coordinates
-        for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
-            int_sol.project(sol)
+        # Update intermediary mesh coordinates
+        self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
 
-        # Update physical mesh and solution fields defined on it
+        # Project a copy of the current solution onto mesh defined on new coordinates
+        self.project_to_intermediary_mesh(i)
+
+        # Update physical mesh coordinates
         self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data
-        for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
-            sol.dat.data[:] = int_sol.dat.data  # FIXME: Need annotation
+
+        # Copy over projected solution data
+        self.copy_data_from_intermediary_mesh(i)  # FIXME: Needs annotation
 
         # Re-interpolate fields
         self.set_fields()
