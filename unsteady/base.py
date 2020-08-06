@@ -479,19 +479,31 @@ class AdaptiveProblemBase(object):
             raise ValueError("No monitor function was provided. Use `set_monitor_functions`.")
 
         # Compute new physical mesh coordinates
+        self.op.print_debug("MESH MOVEMENT: Establishing mesh transformation...")
         self.mesh_movers[i].adapt()
+        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Update intermediary mesh coordinates
+        self.op.print_debug("MESH MOVEMENT: Updating intermediary mesh coordinates...")
         self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
+        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Project a copy of the current solution onto mesh defined on new coordinates
+        self.op.print_debug("MESH MOVEMENT: Projecting solutions onto intermediary mesh...")
         self.project_to_intermediary_mesh(i)
+        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Update physical mesh coordinates
+        self.op.print_debug("MESH MOVEMENT: Updating physical mesh coordinates...")
         self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data
+        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Copy over projected solution data
+        self.op.print_debug("MESH MOVEMENT: Transferring solution data from intermediary mesh...")
         self.copy_data_from_intermediary_mesh(i)  # FIXME: Needs annotation
+        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Re-interpolate fields
+        self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
         self.set_fields()
+        self.op.print_debug("MESH MOVEMENT: Done!")
