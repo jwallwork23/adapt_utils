@@ -225,6 +225,7 @@ class AdaptiveProblemBase(object):
         self.project(self.adj_solutions, i, j)
 
     def project_fields(self, fields, i):
+        """Project a dictionary of fields into corresponding spaces defined on mesh i."""
         for f in fields:
             if isinstance(fields[f], Function):
                 self.fields[i].project(fields[f])
@@ -248,10 +249,22 @@ class AdaptiveProblemBase(object):
             self.project_adjoint_solution(i+1, i)
 
     def project_to_intermediary_mesh(self, i):
+        """
+        Project solution fields from mesh i into corresponding function spaces defined on
+        intermediary mesh i.
+
+        This function is designed for use under Monge-Ampere type mesh movement methods.
+        """
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
             f_int.project(f)
 
     def copy_data_from_intermediary_mesh(self, i):
+        """
+        Copy the data from intermediary solution field i into the corresponding solution field
+        on the physical mesh.
+
+        This function is designed for use under Monge-Ampere type mesh movement methods.
+        """
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
             f.dat.data[:] = f_int.dat.data
 
@@ -358,11 +371,21 @@ class AdaptiveProblemBase(object):
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
 
     def get_qoi_kernels(self, i):
+        """
+        Define kernels associated with the quantity of interest from the corresponding
+        `set_qoi_kernel` method of the `Options` parameter class.
+        """
         self.op.set_qoi_kernel(self, i)
 
     # --- Mesh movement
 
     def set_monitor_functions(self, monitors):
+        """
+        Pass a monitor function to each mesh, thereby defining a `MeshMover` object which drives
+        r-adaptation.
+
+        NOTE: The monitor function should be a function with one argument, namely the mesh.
+        """
         from adapt_utils.adapt.r import MeshMover
 
         # Sanitise input
