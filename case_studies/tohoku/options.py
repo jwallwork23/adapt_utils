@@ -251,24 +251,32 @@ class TohokuOptions(TsunamiOptions):
         self.near_field_pressure_gauges = {
             "gauges": ( "P02", "P06"),
             "arrival_time": 0.0,
-            "weight": 1.0,
+            "weight": Constant(1.0),
         }
+        for gauge in self.near_field_pressure_gauges["gauges"]:
+            self.gauges["class"] = "near_field_pressure"
         self.far_field_pressure_gauges = {
             "gauges": ("KPG1", "KPG2", "21401", "21413", "21418", "21419"),
             # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21401", "21413", "21418", "21419"),
             "arrival_time": 10*60.0,
-            "weight": 1.0,
+            "weight": Constant(1.0),
         }
+        for gauge in self.far_field_pressure_gauges["gauges"]:
+            self.gauges["class"] = "far_field_pressure"
         self.near_field_gps_gauges = {
             "gauges": ("801", "802", "803", "804", "806", "807"),
             "arrival_time": 5*60.0,
-            "weight": 1.0,
+            "weight": Constant(1.0),
         }
+        for gauge in self.near_field_gps_gauges["gauges"]:
+            self.gauges["class"] = "near_field_gps"
         self.far_field_gps_gauges = {
             "gauges": ("811", "812", "813", "815"),
             "arrival_time": 10*60.0,
-            "weight": 1.0,
+            "weight": Constant(1.0),
         }
+        for gauge in self.far_field_gps_gauges["gauges"]:
+            self.gauges["class"] = "far_field_gps"
 
         # Gauges for consideration
         self.pressure_gauges = self.near_field_pressure_gauges
@@ -278,7 +286,7 @@ class TohokuOptions(TsunamiOptions):
         gauges_to_consider = self.pressure_gauges + self.gps_gauges
         for gauge in list(self.gauges.keys()):
             if gauge not in gauges_to_consider:
-                self.gauges.pop(gauge)
+                self.gauges.pop(gauge)  # e.g. we don't use MPG1 or MPG2
 
         # Convert coordinates to UTM and create timeseries array
         for gauge in gauges_to_consider:
@@ -355,7 +363,6 @@ class TohokuOptions(TsunamiOptions):
         else:
             self.J = self.get_regularisation_term(prob)
         scaling = Constant(0.5*self.qoi_scaling)
-        weight = Constant(1.0)  # Quadrature weight for time integration scheme
 
         # These will be updated by the checkpointing routine
         u, eta = prob.fwd_solutions[i].split()
@@ -382,7 +389,7 @@ class TohokuOptions(TsunamiOptions):
         self.times = []
         for gauge in self.gauges:
             gauge_dat = self.gauges[gauge]
-            gauge_dat["obs"] = Constant(0.0)  # Constant associated with free surface observations
+            gauge_dat["obs"] = Constant(0.0)     # Constant associated with free surface observations
 
             # Setup interpolator
             sample = 1 if gauge[0] == '8' else 60
@@ -417,11 +424,15 @@ class TohokuOptions(TsunamiOptions):
             """
             dt = self.dt
             t = t - dt
-            weight.assign(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
+            quadrature_weight = Constant(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
             self.times.append(t)
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
                 I = gauge_dat["indicator"]
+
+                # Weightings
+                if t < gauge_dat["arrival_time"]:  # We don't want to fit before the tsunami arrives
+                    continue
 
                 # Point evaluation and average value at gauges
                 if self.save_timeseries:
@@ -449,7 +460,7 @@ class TohokuOptions(TsunamiOptions):
                 #     * Factor of half is included in `scaling`
                 #     * Quadrature weights and timestep included in `weight`
                 diff = I*(eta - self.eta_init - gauge_dat["obs"])**2
-                self.J += assemble(scaling*weight*diff*dx)
+                self.J += assemble(scaling*quadrature_weight*gauge_dat["weight"]*diff*dx)
                 if self.save_timeseries:
                     gauge_dat["diff_smooth"].append(assemble(diff*dx, annotate=False))
 
@@ -466,9 +477,12 @@ class TohokuOptions(TsunamiOptions):
 
         # Construct an expression for the RHS of the adjoint continuity equation
         #   NOTE: The initial free surface *field* is subtracted in some cases.
+        weights = {}
         for gauge in self.gauges:
-            gauge_dat = self.gauges[gauge]
-            expr += scaling*gauge_dat["indicator"]*(eta_saved - self.eta_init - gauge_dat["obs"])
+            I = scaling*self.gauges[gauge]["indicator"]
+            weight = scaling*self.gauges[gauge]["weight"]
+            eta_obs = self.gauges[gauge]["obs"]
+            expr += I*weight*(eta_saved - self.eta_init - eta_obs)
         k_u, k_eta = prob.kernels[i].split()
 
         def update_forcings(t):
@@ -484,13 +498,23 @@ class TohokuOptions(TsunamiOptions):
             # Get timeseries data, implicitly modifying the expression
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
+                if t < gauge_data["arrival_time"]:  # TODO: Do we need to add/subtract a timestep?
+                    weights[gauge] = gauge_dat["weight"].values()[0]
+                    gauge_dat["weight"].assign(0.0)
                 obs = gauge_dat["data"][prob.iteration-1] if self.synthetic else float(interpolator(t))
                 gauge_dat["obs"].assign(obs)
 
             # Interpolate expression onto RHS
             k_eta.interpolate(expr)
+
+            # Plot kernel
             if self.debug and prob.iteration % self.dt_per_export == 0:
                 prob.kernel_file.write(k_eta)
+
+            # Reset weights
+            for gauge in list(weights.keys()):
+                self.gauge[gauge]["weight"].assign(weights[gauge])
+                weights.pop(gauge)
 
         return update_forcings
 
