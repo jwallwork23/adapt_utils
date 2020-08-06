@@ -419,41 +419,50 @@ class TohokuOptions(TsunamiOptions):
         Annotate `axes` in coordinate system `coords` with all gauges or locations of interest, as
         determined by the Boolean kwarg `gauges`.
         """
-        try:
-            assert coords in ("lonlat", "utm")
-        except AssertionError:
+        if coords not in ("lonlat", "utm"):
             raise ValueError("Coordinate system {:s} not recognised.".format(coords))
         dat = self.gauges if gauges else self.locations_of_interest
-        offset = 40.0e+03  # Offset by an extra 40 km
+        offset = 40.0e+03
         for loc in dat:
-            x, y = dat[loc][coords]
-            xytext = (x + offset, y)
-            color = "indigo"
-            ha = "right"
-            va = "center"
-            if loc == "Fukushima Daini":
-                continue
-            elif loc == "Fukushima Daiichi":
-                loc = "Fukushima"
+            x, y = np.copy(dat[loc][coords])
+            kwargs = {
+                "xy": dat[loc][coords],
+                "color": "indigo",
+                "ha": "right",
+                "va": "center",
+                "fontsize": fontsize,
+            }
+            if not gauges:
+                if loc == "Fukushima Daini":
+                    continue
+                elif loc == "Fukushima Daiichi":
+                    loc = "Fukushima"
+                x += offset
             elif "80" in loc:
-                color = "C3"
-                xytext = (x - offset, y)
-                ha = "right"
-            elif gauges:
-                color = "navy"
-                xytext = (x + offset, y)
-                ha = "left"
+                kwargs["color"] = "C3"
+                if int(loc[2]) in (2, 3, 6):
+                    x -= offset
+                if int(loc[2]) == 4:
+                    kwargs["va"] = "top"
+                    y += 2*offset
+                elif int(loc[2]) in (1, 3, 6):
+                    kwargs["va"] = "bottom"
+                    y -= 2*offset
+            else:
+                kwargs["color"] = "navy"
+                x += offset
+                kwargs["ha"] = "left"
                 if loc == "P02":
-                    xytext = (x + offset, y - offset)
-                    va = "bottom"
+                    y -= 2*offset
+                    kwargs["va"] = "bottom"
                 elif loc == "P06":
-                    xytext = (x + offset, y + offset)
-                    va = "top"
-            axes.plot(x, y, 'x', color=color)
-            axes.annotate(
-                loc, xy=(x, y), xycoords='data', xytext=xytext,
-                fontsize=fontsize, color=color, ha=ha, va=va
-            )
+                    y += 2*offset
+                    kwargs["va"] = "top"
+                elif loc == "MPG1":
+                    y -= offset
+            kwargs["xytext"] = (x, y)
+            axes.plot(*dat[loc][coords], 'x', color=kwargs["color"])
+            axes.annotate(loc, **kwargs)
 
 
 class TohokuBoxBasisOptions(TohokuOptions):
