@@ -1744,7 +1744,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data[:]
 
         # Update physical mesh and solution fields defined on it
-        self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
         for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
             sol.dat.data[:] = int_sol.dat.data  # FIXME: Need annotation
 
