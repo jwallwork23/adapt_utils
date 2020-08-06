@@ -185,6 +185,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.W = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in self.meshes]
 
+    def create_intermediary_spaces(self):
+        super(AdaptiveProblem, self).create_intermediary_spaces()
+        if self.op.approach != 'monge_ampere':
+            return
+        mesh_copies = self.intermediary_meshes
+        if self.op.solve_tracer:
+            spaces = [FunctionSpace(mesh, self.finite_element_tracer) for mesh in mesh_copies]
+            self.intermediary_solutions_tracer = [Function(space) for space in spaces]
+        if self.op.solve_sediment:
+            spaces = [FunctionSpace(mesh, self.finite_element_sediment) for mesh in mesh_copies]
+            self.intermediary_solutions_sediment = [Function(space) for space in spaces]
+        if self.op.solve_exner:
+            spaces = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in mesh_copies]
+            self.intermediary_solutions_bathymetry = [Function(space) for space in spaces]
+
     def create_solutions(self):
         """
         Set up `Function`s in the prognostic spaces to hold forward and adjoint solutions.
@@ -310,7 +325,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
         sipg = None
-        if op.element_family != 'cg-cg':
+        if op.family != 'cg-cg':
             if hasattr(op, 'sipg_parameter'):
                 sipg = op.sipg_parameter
             if self.shallow_water_options[i].use_automatic_sipg_parameter:
@@ -330,7 +345,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.stabilisation is None:
             return
         elif self.stabilisation == 'lax_friedrichs':
-            assert op.element_family != 'cg-cg'
+            assert op.family != 'cg-cg'
             assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
             self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
         else:
@@ -434,6 +449,48 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.project(self.adj_solutions_sediment, i, j)
         if self.op.solve_exner:
             self.project(self.adj_solutions_bathymetry, i, j)
+
+    def project_to_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).project_to_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.intermediary_solutions_tracer[i].project(self.fwd_solutions_tracer[i])
+        if self.op.solve_sediment:
+            self.intermediary_solutions_sediment[i].project(self.fwd_solutions_sediment[i])
+        if self.op.solve_exner:
+            self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
+
+        def debug(a, b, name):
+            if np.allclose(a, b):
+                print_output("WARNING: Is the intermediary {:s} solution just copied?".format(name))
+
+        if self.op.debug:
+            debug(self.fwd_solutions[i].dat.data[0],
+                  self.intermediary_solutions[i].dat.data[0],
+                  "velocity")
+            debug(self.fwd_solutions[i].dat.data[1],
+                  self.intermediary_solutions[i].dat.data[1],
+                  "elevation")
+            if self.op.solve_tracer:
+                debug(self.fwd_solutions_tracer[i].dat.data,
+                      self.intermediary_solutions_tracer[i].dat.data,
+                      "tracer")
+            if self.op.solve_sediment:
+                debug(self.fwd_solutions_sediment[i].dat.data,
+                      self.intermediary_solutions_sediment[i].dat.data,
+                      "sediment")
+            if self.op.solve_exner:
+                debug(self.fwd_solutions_bathymetry[i].dat.data,
+                      self.intermediary_solutions_bathymetry[i].dat.data,
+                      "bathymetry")
+
+    def copy_data_from_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.fwd_solutions_tracer[i].dat.data[:] = self.intermediary_solutions_tracer[i].dat.data
+        if self.op.solve_sediment:
+            self.fwd_solutions_sediment[i].dat.data[:] = self.intermediary_solutions_sediment[i].dat.data
+        if self.op.solve_exner:
+            self.fwd_solutions_bathymetry[i].dat.data[:] = self.intermediary_solutions_bathymetry[i].dat.data
 
     # --- Equations
 
@@ -935,11 +992,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Mesh movement
             if self.iteration % op.dt_per_mesh_movement == 0:
-                if self.mesh_movers[i] is not None:  # TODO: generalise
-                    self.mesh_movers[i].adapt()
-
-            # Move *mesh i*
-            if self.iteration % op.dt_per_mesh_movement == 0:
                self.move_mesh(i)
 
             # TODO: Update mesh velocity
@@ -1151,6 +1203,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Metric
 
+    # TODO: Allow Hessian metric for tracer / sediment / Exner
     def get_hessian_metric(self, adjoint=False, **kwargs):
         kwargs.setdefault('normalise', True)
         kwargs['op'] = self.op
@@ -1348,7 +1401,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 print_output("Converged number of mesh elements!")
                 break
 
-    # TODO: Tracer?
     # TODO: Modify indicator for time interval
     def run_dwp(self, **kwargs):
         r"""
@@ -1698,78 +1750,3 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
-
-    def move_mesh_monge_ampere(self, i):
-        # NOTES:
-        #    * Assumes we have already computed new physical mesh coordinates.
-        #
-        #    * If we want to take the adjoint through mesh movement then there is no need to
-        #      know how the coordinate transform was derived, only what the result was. In any
-        #      case, the current implementation involves a supermesh projection which is not
-        #      yet annotated in pyadjoint.  # TODO
-
-        # Project a copy of the current solution onto mesh defined on new coordinates
-        mesh = Mesh(self.mesh_movers[i].x)
-        V = FunctionSpace(mesh, self.V[i].ufl_element())
-        tmp = Function(V)
-        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-            tmp_i.project(sol_i)
-
-        # Same for tracers etc.
-        if self.op.solve_tracer:
-            Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-            tmp_tracer = project(self.fwd_solutions_tracer[i], Q)
-        if self.op.solve_sediment:
-            Q = FunctionSpace(mesh, self.Q[i].ufl_element())
-            tmp_sediment = project(self.fwd_solutions_sediment[i], Q)
-        if self.op.solve_exner:
-            W = FunctionSpace(mesh, self.W[i].ufl_element())
-            tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
-
-        self.a_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
-        print('here')
-        if not hasattr(self, "b_mc"):
-            self.b_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
-        print(self.a_mc - self.b_mc)
-
-        self.b_mc = assemble(tmp_bathymetry*dx)
-        print(self.b_mc-self.a_mc)
-        #tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
-
-        #tmp_depth = project(self.op.sediment_model.depth, W)
-        #tmp_tob = project(self.op.sediment_model.TOB, W)
-
-        #R = VectorFunctionSpace(mesh, "CG", 1)
-        #tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
-        # tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
-        # tmp_depth = project(self.op.sediment_model.depth, W)
-        # tmp_tob = project(self.op.sediment_model.TOB, W)
-        # R = VectorFunctionSpace(mesh, "CG", 1)
-        # tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
-
-        # Update physical mesh and solution fields defined on it
-        self.meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
-
-        for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
-            sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
-        del tmp
-        if self.op.solve_tracer:  # FIXME: Need annotation
-            self.fwd_solutions_tracer[i].dat.data[:] = tmp_tracer.dat.data
-            del tmp_tracer
-        if self.op.solve_sediment:  # FIXME: Need annotation
-            self.fwd_solutions_sediment[i].dat.data[:] = tmp_sediment.dat.data
-            del tmp_sediment
-        if self.op.solve_exner:  # FIXME: Need annotation
-            self.fwd_solutions_bathymetry[i].dat.data[:] = tmp_bathymetry.dat.data
-            del tmp_bathymetry
-        #self.op.sediment_model.old_bathymetry_2d.dat.data[:] = tmp_old_bath.dat.data[:]
-        #self.op.sediment_model.depth.dat.data[:] = tmp_depth.dat.data
-        #del tmp_depth
-        #self.op.sediment_model.TOB.dat.data[:] = tmp_tob.dat.data
-        #del tmp_tob
-        #self.op.sediment_model.uv_cg.dat.data[:] = tmp_uv_cg.dat.data
-        #del tmp_uv_cg
-        # Re-interpolate fields
-        self.set_fields()
-        #self.create_forward_equations(i)
-        #self.create_forward_timesteppers(i)

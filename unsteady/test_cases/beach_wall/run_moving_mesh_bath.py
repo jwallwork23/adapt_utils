@@ -84,10 +84,12 @@ kwargs = {
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
+
+    # Debugging
+    'debug': True,
 }
 
 op = BeachOptions(**kwargs)
-assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
