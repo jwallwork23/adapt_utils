@@ -504,6 +504,23 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
 
+        def debug(a, b):
+            if np.allclose(a, b):
+                print_output("WARNING: Is the intermediary solution just copied???")
+
+        if self.op.debug:
+            debug(self.fwd_solutions[i].dat.data[0], self.intermediary_solutions[i].dat.data[0])
+            debug(self.fwd_solutions[i].dat.data[1], self.intermediary_solutions[i].dat.data[1])
+            if self.op.solve_tracer:
+                debug(self.fwd_solutions_tracer[i].dat.data,
+                      self.intermediary_solutions_tracer[i].dat.data)
+            if self.op.solve_sediment:
+                debug(self.fwd_solutions_sediment[i].dat.data,
+                      self.intermediary_solutions_sediment[i].dat.data)
+            if self.op.solve_exner:
+                debug(self.fwd_solutions_bathymetry[i].dat.data,
+                      self.intermediary_solutions_bathymetry[i].dat.data)
+
     def copy_data_from_intermediary_mesh(self, i):
         super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
         if self.op.solve_tracer:
