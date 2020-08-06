@@ -139,12 +139,17 @@ class AdaptiveProblemBase(object):
         raise NotImplementedError("To be implemented in derived class")
 
     def create_intermediary_spaces(self):
-        # TODO: doc
+        """
+        Create a copy of each mesh and define function spaces and solution fields upon it.
+
+        This functionality is used for mesh movement driven by solving Monge-Ampere type equations.
+        """
         if self.op.approach != 'monge_ampere':
             return
-        self.intermediary_meshes = [Mesh(mesh.coordinates.copy(deepcopy=True)) for mesh in self.meshes]
-        intermediary_spaces = [FunctionSpace(V.mesh(), V.ufl_element()) for V in self.V]
-        self.intermediary_solutions = [Function(fs) for fs in intermediary_spaces]
+        mesh_copies = [Mesh(mesh.coordinates.copy(deepcopy=True)) for mesh in self.meshes]
+        spaces = [FunctionSpace(mesh, self.finite_element) for mesh in mesh_copies]
+        self.intermediary_meshes = mesh_copies
+        self.intermediary_solutions = [Function(space) for space in spaces]
 
     def create_function_spaces(self):
         raise NotImplementedError("To be implemented in derived class")

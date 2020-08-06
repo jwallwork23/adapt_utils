@@ -201,15 +201,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
         super(AdaptiveProblem, self).create_intermediary_spaces()
         if self.op.approach != 'monge_ampere':
             return
+        mesh_copies = self.intermediary_meshes
         if self.op.solve_tracer:
-            intermediary_spaces = [FunctionSpace(Q.mesh(), Q.ufl_element()) for Q in self.Q]
-            self.intermediary_solutions_tracer = [Function(fs) for fs in intermediary_spaces]
+            spaces = [FunctionSpace(mesh, self.finite_element_tracer) for mesh in mesh_copies]
+            self.intermediary_solutions_tracer = [Function(space) for space in spaces]
         if self.op.solve_sediment:
-            intermediary_spaces = [FunctionSpace(Q.mesh(), Q.ufl_element()) for Q in self.Q]
-            self.intermediary_solutions_sediment = [Function(fs) for fs in intermediary_spaces]
+            spaces = [FunctionSpace(mesh, self.finite_element_sediment) for mesh in mesh_copies]
+            self.intermediary_solutions_sediment = [Function(space) for space in spaces]
         if self.op.solve_exner:
-            intermediary_spaces = [FunctionSpace(W.mesh(), W.ufl_element()) for W in self.W]
-            self.intermediary_solutions_bathymetry = [Function(fs) for fs in intermediary_spaces]
+            spaces = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in mesh_copies]
+            self.intermediary_solutions_bathymetry = [Function(space) for space in spaces]
 
     def create_solutions(self):
         """
