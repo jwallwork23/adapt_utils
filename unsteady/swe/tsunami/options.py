@@ -1,10 +1,11 @@
 from thetis import *
 from thetis.configuration import *
 
-import scipy.interpolate as si
-import numpy as np
 import h5py
 import matplotlib.pyplot as plt
+import numpy as np
+import os
+import scipy.interpolate as si
 
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import *
@@ -207,3 +208,55 @@ class TsunamiOptions(CoupledOptions):
             if not hasattr(self, 'lonlat_mesh'):
                 self.get_lonlat_mesh()
             self.lonlat_mesh.coordinates.at(point)
+
+    def extract_data(self, gauge):
+        """
+        Extract time and elevation data from file as NumPy arrays.
+
+        Note that this isn't *raw* data because it has been converted to appropriate units using
+        `preproc.py`.
+        """
+        data_file = os.path.join(self.resource_dir, 'gauges', gauge + '.dat')
+        if not os.path.exists(data_file):
+            raise IOError("Requested timeseries for gauge '{:s}' cannot be found.".format(gauge))
+        times, data = [], []
+        with open(data_file, 'r') as f:
+            for line in f:
+                time, dat = line.split()
+                times.append(float(time))
+                data.append(float(dat))
+        return np.array(times), np.array(data)
+
+    def sample_timeseries(self, gauge, sample=1, **kwargs):
+        """
+        Interpolate from gauge data. Since the data is provided at regular intervals, we use linear
+        interpolation between the data points.
+
+        Since some of the timeseries are rather noisy, there is an optional `sample` parameter, which
+        averages over the specified number of datapoints before interpolating.
+
+        Keyword arguments are passed to `scipy.interpolate.interp1d`.
+        """
+        times, data = self.extract_data(gauge)
+
+        # Process data
+        i, time_prev = 0, 0.0
+        sampled_times, sampled_data, running = [], [], []
+        for time, dat in zip(times, data):
+            if np.isnan(dat):
+                continue
+            running.append(dat)
+            if i % sample == 0 and i > 0:
+                sampled_times.append(0.5*(time + time_prev))
+                sampled_data.append(np.mean(running))
+                time_prev = time
+                running = []
+            i += 1
+
+        # Construct interpolant
+        kwargs.setdefault('bounds_error', False)
+        kwargs.setdefault('fill_value', 'extrapolate')
+        interp = si.interp1d(sampled_times, sampled_data, **kwargs)
+
+        # Shift by initial value
+        self.gauges[gauge]["interpolator"] = lambda tau: interp(tau) - interp(0.0)
