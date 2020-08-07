@@ -10,5 +10,5 @@ tohoku/resources/boundaries_old
 tohoku/resources/meshes_old
 tohoku/run_fixed_mesh_old.py
 tohoku/notebooks/plotting.ipynb
-tohoku/notebooks/okada/*.npy
-tohoku/notebooks/okada/old/
+tohoku/notebooks/02-okada/*.npy
+tohoku/notebooks/02-okada/old/
