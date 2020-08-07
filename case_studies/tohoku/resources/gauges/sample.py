@@ -5,6 +5,8 @@ import numpy as np
 __all__ = ["get_raw_data", "sample_timeseries"]
 
 
+# TODO: REPLACE WITH VERSION IN OPTIONS CLASS
+
 def extract_data(gauge):
     """
     Extract time and elevation data from file as NumPy arrays.
