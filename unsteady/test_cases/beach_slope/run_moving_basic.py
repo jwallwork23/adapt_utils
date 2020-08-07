@@ -45,8 +45,8 @@ def initialise_fields(mesh2d, inputdir):
 
     return bath
 
-nx = 1
-ny = 1
+nx = 0.5
+ny = 0.5
 
 alpha = 1
 beta = 1
@@ -101,11 +101,11 @@ t2 = time.time()
 
 print(t2-t1)
 
-#new_mesh = RectangleMesh(880, 20, 220, 10)
+new_mesh = RectangleMesh(880, 20, 220, 10)
 
-#bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
+bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_basic", swp.fwd_solutions_bathymetry[0])
+export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_basic", bath)
 
 
 xaxisthetis1 = []

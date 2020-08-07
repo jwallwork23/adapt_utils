@@ -1,4 +1,0 @@
-dt = 0.05
-Using time integrator: CrankNicolson
-    0     0 T=      0.00 eta norm:     0.0000 u norm:     0.0000  0.00
-volume2d rel. error  0.0000e+00

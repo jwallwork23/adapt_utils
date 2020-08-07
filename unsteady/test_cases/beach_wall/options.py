@@ -81,8 +81,8 @@ class BeachOptions(CoupledOptions):
 
         self.dt = 0.5
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 54
-        self.dt_per_export = 54
+        self.dt_per_mesh_movement = 14
+        self.dt_per_export = 14
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
@@ -108,10 +108,10 @@ class BeachOptions(CoupledOptions):
         self.use_tracer_conservative_form = True
         self.slope_eff = True
         self.angle_correction = False
-        self.suspended = True
-        self.convective_vel_flag = True
+        self.suspended = False
+        self.convective_vel_flag = False
         self.bedload = True
-        self.solve_sediment = True
+        self.solve_sediment = False
         self.solve_exner = True
 
         self.norm_smoother = Constant(10/25)
@@ -177,6 +177,7 @@ class BeachOptions(CoupledOptions):
                 outflow_tag: {'un': Constant(0.0)},
             },
 	   'sediment': {
+               inflow_tag: {'value':self.sediment_model.equiltracer}
             }
         }
         return boundary_conditions    

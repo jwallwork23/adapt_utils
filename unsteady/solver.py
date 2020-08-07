@@ -241,31 +241,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         The bathymetry is defined via a modified version of the `DepthExpression` found Thetis.
         """
-        self.fields = [AttrDict() for P1 in self.P1]
-        for i, P1 in enumerate(self.P1):
-            self.fields[i].update({
-                'horizontal_viscosity': self.op.set_viscosity(P1),
-                'horizontal_diffusivity': self.op.set_diffusivity(P1),
-                'coriolis_frequency': self.op.set_coriolis(P1),
-                'nikuradse_bed_roughness': self.op.ksp,
-                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
-                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
-                'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
-            })
-        if self.op.solve_tracer:
-            for i, P1DG in enumerate(self.P1DG):
-                self.fields[i].update({
-                    'tracer_source_2d': self.op.set_tracer_source(P1DG),
-                })
-        if self.op.solve_sediment or self.op.solve_exner:
-            for i, P1DG in enumerate(self.P1DG):
-                self.fields[i].update({
-                    'sediment_source_2d': self.op.set_sediment_source(P1DG),
-                    'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
-                    'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
-                    'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
-                })
-        self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
         # Bathymetry
         if self.op.solve_exner:
@@ -304,6 +279,32 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
                     wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
                 )
+
+        self.fields = [AttrDict() for P1 in self.P1]
+        for i, P1 in enumerate(self.P1):
+            self.fields[i].update({
+                'horizontal_viscosity': self.op.set_viscosity(P1),
+                'horizontal_diffusivity': self.op.set_diffusivity(P1),
+                'coriolis_frequency': self.op.set_coriolis(P1),
+                'nikuradse_bed_roughness': self.op.ksp,
+                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
+                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
+                'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
+            })
+        if self.op.solve_tracer:
+            for i, P1DG in enumerate(self.P1DG):
+                self.fields[i].update({
+                    'tracer_source_2d': self.op.set_tracer_source(P1DG),
+                })
+        if self.op.solve_sediment or self.op.solve_exner:
+            for i, P1DG in enumerate(self.P1DG):
+                self.fields[i].update({
+                    'sediment_source_2d': self.op.set_sediment_source(P1DG),
+                    'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
+                    'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
+                    'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
+                })
+        self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
     # --- Stabilisation
 
@@ -374,7 +375,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         alpha = alpha*get_sipg_ratio(nu)*cot_theta
                         sipg = interpolate(alpha, self.P0[i])
         self.tracer_options[i].sipg_parameter = sipg
-
         # Stabilisation
         if self.stabilisation is None:
             return
@@ -718,7 +718,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.mesh_velocities[i] = u
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
         if self.stabilisation == 'lax_friedrichs':
-            fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
+            fields['lax_friedrichs_tracer_scaling_factor'] = self.sediment_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
 
     def _get_fields_for_exner_timestepper(self, i):
@@ -1750,7 +1750,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
-<<<<<<< HEAD
 
         #tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
 

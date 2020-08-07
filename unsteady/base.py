@@ -414,7 +414,7 @@ class AdaptiveProblemBase(object):
         self.op.print_debug("MESH MOVEMENT: Creating MeshMover objects...")
         for i in range(self.num_meshes):
             assert monitors[i] is not None
-            args = (Mesh(meshes[i].coordinates.copy(deepcopy=True)), monitors[i])
+            args = (Mesh(self.meshes[i].coordinates.copy(deepcopy=True)), monitors[i])
             self.mesh_movers[i] = MeshMover(*args, **kwargs)
         self.op.print_debug("MESH MOVEMENT: Done!")
 
