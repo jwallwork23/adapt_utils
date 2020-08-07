@@ -255,32 +255,40 @@ class TohokuOptions(TsunamiOptions):
             "weight": Constant(1.0),
         }
         for gauge in self.near_field_pressure_gauges["gauges"]:
-            self.gauges["class"] = "near_field_pressure"
-        self.far_field_pressure_gauges = {
-            "gauges": ("KPG1", "KPG2", "21401", "21413", "21418", "21419"),
-            # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21401", "21413", "21418", "21419"),
+            self.gauges[gauge]["class"] = "near_field_pressure"
+        self.mid_field_pressure_gauges = {
+            "gauges": ("KPG1", "KPG2"),
+            # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2"),
             "arrival_time": 10*60.0,
             "weight": Constant(1.0),
         }
+        for gauge in self.mid_field_pressure_gauges["gauges"]:
+            self.gauges[gauge]["class"] = "mid_field_pressure"
+        self.far_field_pressure_gauges = {
+            "gauges": ("21401", "21413", "21418", "21419"),
+            "arrival_time": 60*60.0,
+            "weight": Constant(1.0),
+        }
         for gauge in self.far_field_pressure_gauges["gauges"]:
-            self.gauges["class"] = "far_field_pressure"
+            self.gauges[gauge]["class"] = "far_field_pressure"
         self.near_field_gps_gauges = {
             "gauges": ("801", "802", "803", "804", "806", "807"),
             "arrival_time": 5*60.0,
             "weight": Constant(1.0),
         }
         for gauge in self.near_field_gps_gauges["gauges"]:
-            self.gauges["class"] = "near_field_gps"
+            self.gauges[gauge]["class"] = "near_field_gps"
         self.far_field_gps_gauges = {
             "gauges": ("811", "812", "813", "815"),
             "arrival_time": 10*60.0,
             "weight": Constant(1.0),
         }
         for gauge in self.far_field_gps_gauges["gauges"]:
-            self.gauges["class"] = "far_field_gps"
+            self.gauges[gauge]["class"] = "far_field_gps"
 
         # Gauges for consideration
         self.pressure_gauges = self.near_field_pressure_gauges["gauges"]
+        self.pressure_gauges += self.mid_field_pressure_gauges["gauges"]
         self.pressure_gauges += self.far_field_pressure_gauges["gauges"]
         self.gps_gauges = self.near_field_gps_gauges["gauges"]
         self.gps_gauges += self.far_field_gps_gauges["gauges"]
@@ -306,6 +314,14 @@ class TohokuOptions(TsunamiOptions):
                 self.print_debug("NOTE: Gauge {:5s} is not in the domain; removing it".format(gauge))
                 self.gauges.pop(gauge)
         self.print_debug("INIT: Done!")
+
+    def get_arrival_time(self, gauge):
+        """Read the estimated tsunami wave arrival time for a particular gauge from its class."""
+        return self.__getattribute__("_".join([self.gauges[gauge]["class"], "gauges"]))["arrival_time"]
+
+    def get_weight(self, gauge):
+        """Read the weighting for a particular gauge from its class."""
+        return self.__getattribute__("_".join([self.gauges[gauge]["class"], "gauges"]))["weight"]
 
     def get_locations_of_interest(self, **kwargs):
         """
