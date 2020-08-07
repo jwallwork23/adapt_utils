@@ -257,16 +257,16 @@ class TohokuOptions(TsunamiOptions):
         for gauge in self.near_field_pressure_gauges["gauges"]:
             self.gauges[gauge]["class"] = "near_field_pressure"
         self.mid_field_pressure_gauges = {
-            "gauges": ("KPG1", "KPG2"),
-            # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2"),
+            "gauges": ("KPG1", "KPG2", "21418"),
+            # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21418"),
             "arrival_time": 10*60.0,
             "weight": Constant(1.0),
         }
         for gauge in self.mid_field_pressure_gauges["gauges"]:
             self.gauges[gauge]["class"] = "mid_field_pressure"
         self.far_field_pressure_gauges = {
-            "gauges": ("21401", "21413", "21418", "21419"),
-            "arrival_time": 60*60.0,
+            "gauges": ("21401", "21413", "21419"),
+            "arrival_time": 50*60.0,
             "weight": Constant(1.0),
         }
         for gauge in self.far_field_pressure_gauges["gauges"]:
