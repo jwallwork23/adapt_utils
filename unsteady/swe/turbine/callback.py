@@ -7,8 +7,14 @@ __all__ = ["PowerOutputCallback"]
 
 
 class PowerOutputCallback(TimeseriesCallback):
-    # TODO: doc
+    """
+    Callback for evaluating the power output of all turbines in an array which have the label
+    `farm_id`. In the discrete turbine case, this will typically correspond to individual turbines.
+    However, in the continuous turbine case, the label 'everywhere' is used to refer to the entire
+    array.
 
+    Note that the integral of power is energy.
+    """
     def __init__(self, prob, i, farm_id):
         self.name = "power output {:}".format(farm_id)
         u, eta = split(prob.fwd_solutions[i])
@@ -22,5 +28,7 @@ class PowerOutputCallback(TimeseriesCallback):
         # Power output functional
         power_output = lambda t: self.farm.evaluate_timestep()[0]
 
-        label = "power_output_{:}".format(farm_id)
+        label = "power_output"
+        if farm_id != "everywhere":
+            label += "_{:}".format(farm_id)
         super(PowerOutputCallback, self).__init__(prob, power_output, i, label)
