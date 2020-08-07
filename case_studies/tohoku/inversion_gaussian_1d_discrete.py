@@ -4,6 +4,9 @@ If we have N_g gauges and N_T timesteps then we have N_g*N_T data points we woul
 a least squares fit. If N_g = 15 and N_T = 288 (as below) then we have 4320 data points.
 Compared with the single control parameter, this implies a massively overconstrained problem!
 
+[In practice the number of data points is smaller because we do not try to fit the gauge data in
+the period before the tsunami wave arrives.]
+
 This script allows for two modes, determined by the `real_data` argument.
 
 * `real_data == True`: gauge data are used.
