@@ -1,9 +1,28 @@
 import os
 import numpy as np
-import scipy.interpolate
 
 
-__all__ = ["sample_timeseries"]
+__all__ = ["get_raw_data", "sample_timeseries"]
+
+
+def extract_data(gauge):
+    """
+    Extract time and elevation data from file as NumPy arrays.
+
+    Note that this isn't *raw* data because it has been converted to appropriate units using
+    `preproc.py`.
+    """
+    fpath = os.path.dirname(__file__)
+    data_file = os.path.join(fpath, gauge + '.dat')
+    if not os.path.exists(data_file):
+        raise IOError("Requested timeseries for gauge '{:s}' cannot be found.".format(gauge))
+    times, data = [], []
+    with open(data_file, 'r') as f:
+        for line in f:
+            time, dat = line.split()
+            times.append(float(time))
+            data.append(float(dat))
+    return np.array(times), np.array(data)
 
 
 def sample_timeseries(gauge, sample=1):
@@ -14,25 +33,22 @@ def sample_timeseries(gauge, sample=1):
     Since some of the timeseries are rather noisy, there is an optional `sample` parameter, which
     averages over the specified number of datapoints before interpolating.
     """
-    time_prev = 0.0
-    fpath = os.path.dirname(__file__)
-    num_lines = sum(1 for line in open(os.path.join(fpath, gauge+'.dat'), 'r'))
-    t, d, running = [], [], []
-    with open(os.path.join(fpath, gauge+'.dat'), 'r') as f:
-        for i in range(num_lines):
-            time, dat = f.readline().split()
-            time, dat = float(time), float(dat)
-            if np.isnan(dat):
-                continue
-            running.append(dat)
-            if i % sample == 0 and i > 0:
-                t.append(0.5*(time + time_prev))
-                d.append(np.mean(running))
-                running = 0
-                time_prev = time
-                running = []
+    from scipy.interpolate import interp1d
 
-    interp = scipy.interpolate.interp1d(t, d, bounds_error=False, fill_value='extrapolate')
+    times, data = extract_data(gauge)
+    time_prev = 0.0
+    sampled_times, sampled_data, running = [], [], []
+    for time, dat in zip(times, data):
+        if np.isnan(dat):
+            continue
+        running.append(dat)
+        if i % sample == 0 and i > 0:
+            sampled_times.append(0.5*(time + time_prev))
+            sampled_data.append(np.mean(running))
+            time_prev = time
+            running = []
+
+    interp = interp1d(sampled_times, sampled_data, bounds_error=False, fill_value='extrapolate')
     init = interp(0.0)
 
     def shifted(tau):
