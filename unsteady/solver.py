@@ -200,17 +200,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
             spaces = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in mesh_copies]
             self.intermediary_solutions_bathymetry = [Function(space) for space in spaces]
         if hasattr(self.op, 'sediment_model'):
-            space_uv_cg = [FunctionSpace(mesh, self.op.sediment_model.uv_cg.ufl_element())]
+            space_uv_cg = [FunctionSpace(mesh, self.op.sediment_model.uv_cg.function_space().ufl_element()) for mesh in mesh_copies]
             self.intermediary_solutions_uv_cg = [Function(space) for space in space_uv_cg]
             spaces = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in mesh_copies]
             self.intermediary_solutions_old_bathymetry = [Function(space) for space in spaces]
             self.intermediary_solutions_TOB = [Function(space) for space in spaces]
             self.intermediary_solutions_depth = [Function(space) for space in spaces]
 
-            if self.op.suspendedload:
-                if self.op.convectivevel:
+            if self.op.suspended:
+                if self.op.convective_vel_flag:
                     self.intermediary_corr_vel_factor = [Function(space) for space in spaces]
-                space_dg = [FunctionSpace(mesh, self.op.sediment_model.coeff.ufl_element())]
+                space_dg = [FunctionSpace(mesh, self.op.sediment_model.coeff.function_space().ufl_element()) for mesh in mesh_copies]
                 self.intermediary_coeff = [Function(space) for space in space_dg]
                 self.intermediary_ceq = [Function(space) for space in space_dg]
                 self.intermediary_equiltracer = [Function(space) for space in space_dg]
@@ -474,18 +474,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
         if hasattr(self.op, 'sediment_model'):
-            print('here')
-            self.intermediary_solutions_old_bathymetry.project(self.op.sediment_model.old_bathymetry_2d)
-            self.intermediary_solutions_uv_cg.project(self.op.sediment_model.uv_cg)
-            self.intermediary_solutions_TOB.project(self.op.sediment_model.TOB)
-            self.intermediary_solutions_depth.project(self.op.sediment_model.depth)
+            self.intermediary_solutions_old_bathymetry[i].project(self.op.sediment_model.old_bathymetry_2d)
+            self.intermediary_solutions_uv_cg[i].project(self.op.sediment_model.uv_cg)
+            self.intermediary_solutions_TOB[i].project(self.op.sediment_model.TOB)
+            self.intermediary_solutions_depth[i].project(self.op.sediment_model.depth)
 
-            if self.op.suspendedload:
-                if self.op.convectivevel:
-                    self.intermediary_corr_vel_factor.project(self.op.sediment_model.corr_vel_factor)
-                self.intermediary_coeff.project(self.op.sediment_model.coeff)
-                self.intermediary_ceq.project(self.op.sediment_model.ceq)
-                self.intermediary_equiltracer.project(self.op.sediment_model.equiltracer)
+            if self.op.suspended:
+                if self.op.convective_vel_flag:
+                    self.intermediary_corr_vel_factor[i].project(self.op.sediment_model.corr_factor_model.corr_vel_factor)
+                self.intermediary_coeff[i].project(self.op.sediment_model.coeff)
+                self.intermediary_ceq[i].project(self.op.sediment_model.ceq)
+                self.intermediary_equiltracer[i].project(self.op.sediment_model.equiltracer)
             
         def debug(a, b, name):
             if np.allclose(a, b):
@@ -511,31 +510,31 @@ class AdaptiveProblem(AdaptiveProblemBase):
                       self.intermediary_solutions_bathymetry[i].dat.data,
                       "bathymetry")
             if hasattr(self.op, 'sediment_model'):
-                debug(self.op.sediment_model.old_bathymetry_2d).dat.data,
-                      self.intermediary_solutions_old_bathymetry.dat.data,
+                debug(self.op.sediment_model.old_bathymetry_2d.dat.data,
+                      self.intermediary_solutions_old_bathymetry[i].dat.data,
                       "old_bathymetry")
                 debug(self.op.sediment_model.uv_cg.dat.data,
-                      self.intermediary_solutions_uv_cg.dat.data,
+                      self.intermediary_solutions_uv_cg[i].dat.data,
                       "uv_cg")
                 debug(self.op.sediment_model.TOB.dat.data,
-                      self.intermediary_solutions_TOB.dat.data,
+                      self.intermediary_solutions_TOB[i].dat.data,
                       "TOB")
                 debug(self.op.sediment_model.depth.dat.data,
-                      self.intermediary_solutions_depth.dat.data,
+                      self.intermediary_solutions_depth[i].dat.data,
                       "depth")
-                if self.op.suspendedload:
-                    if self.op.convectivevel:
-                        debug(self.op.sediment_model.corr_vel_factor.dat.data,
-                              self.intermediary_corr_vel_factor.dat.data,
+                if self.op.suspended:
+                    if self.op.convective_vel_flag:
+                        debug(self.op.sediment_model.corr_factor_model.corr_vel_factor.dat.data,
+                              self.intermediary_corr_vel_factor[i].dat.data,
                               "corr_vel_factor")
                     debug(self.op.sediment_model.coeff.dat.data,
-                          self.intermediary_coeff.dat.data,
+                          self.intermediary_coeff[i].dat.data,
                           "coeff")
                     debug(self.op.sediment_model.ceq.dat.data,
-                          self.intermediary_ceq.dat.data,
+                          self.intermediary_ceq[i].dat.data,
                           "ceq")
                     debug(self.op.sediment_model.equiltracer.dat.data,
-                          self.intermediary_equiltracer.dat.data,
+                          self.intermediary_equiltracer[i].dat.data,
                           "equiltracer")
 
 
@@ -549,17 +548,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.fwd_solutions_bathymetry[i].dat.data[:] = self.intermediary_solutions_bathymetry[i].dat.data
 
         if hasattr(self.op, 'sediment_model'):
-            print('here')
-            self.op.sediment_model.old_bathymetry_2d.dat.data[:] = self.intermediary_solutions_old_bathymetry
-            self.op.sediment_model.uv_cg.dat.data[:] = self.intermediary_solutions_uv_cg
-            self.op.sediment_model.TOB.dat.data[:] = self.intermediary_solutions_TOB
-            self.op.sediment_model.depth.dat.data[:] = self.intermediary_solutions_depth
-            if self.op.suspendedload:
-                if self.op.convectivevel:
-                    self.op.sediment_model.corr_vel_factor.dat.data[:] = self.intermediary_corr_vel_factor
-                self.op.sediment_model.coeff.dat.data[:] = self.intermediary_coeff
-                self.op.sediment_model.ceq.dat.data[:] = self.intermediary_ceq
-                self.op.sediment_model.equiltracer.dat.data[:] = self.intermediary_equiltracer
+            self.op.sediment_model.old_bathymetry_2d.dat.data[:] = self.intermediary_solutions_old_bathymetry[i].dat.data
+            self.op.sediment_model.uv_cg.dat.data[:] = self.intermediary_solutions_uv_cg[i].dat.data
+            self.op.sediment_model.TOB.dat.data[:] = self.intermediary_solutions_TOB[i].dat.data
+            self.op.sediment_model.depth.dat.data[:] = self.intermediary_solutions_depth[i].dat.data
+            if self.op.suspended:
+                if self.op.convective_vel_flag:
+                    self.op.sediment_model.corr_factor_model.corr_vel_factor.dat.data[:] = self.intermediary_corr_vel_factor[i].dat.data
+                self.op.sediment_model.coeff.dat.data[:] = self.intermediary_coeff[i].dat.data
+                self.op.sediment_model.ceq.dat.data[:] = self.intermediary_ceq[i].dat.data
+                self.op.sediment_model.equiltracer.dat.data[:] = self.intermediary_equiltracer[i].dat.data
 
     # --- Equations
 
