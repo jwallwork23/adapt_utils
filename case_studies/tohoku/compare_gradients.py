@@ -8,7 +8,7 @@ import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
-from adapt_utils.case_studies.tohoku.options import *
+from adapt_utils.case_studies.tohoku.gaussian_options import TohokuGaussianBasisOptions
 
 
 parser = argparse.ArgumentParser()
