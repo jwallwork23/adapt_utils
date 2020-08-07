@@ -108,10 +108,10 @@ class BeachOptions(CoupledOptions):
         self.use_tracer_conservative_form = True
         self.slope_eff = True
         self.angle_correction = False
-        self.suspended = False
-        self.convective_vel_flag = False
+        self.suspended = True
+        self.convective_vel_flag = True
         self.bedload = True
-        self.solve_sediment = False
+        self.solve_sediment = True
         self.solve_exner = True
 
         self.norm_smoother = Constant(10/25)
@@ -177,7 +177,7 @@ class BeachOptions(CoupledOptions):
                 outflow_tag: {'un': Constant(0.0)},
             },
 	   'sediment': {
-               inflow_tag: {'value':self.sediment_model.equiltracer}
+               #inflow_tag: {'value':self.sediment_model.equiltracer}
             }
         }
         return boundary_conditions    
