@@ -211,6 +211,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             spaces = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in mesh_copies]
             self.intermediary_solutions_bathymetry = [Function(space) for space in spaces]
+        if hasattr(self.op, 'sediment_model'):
+            space_uv_cg = [FunctionSpace(mesh, self.op.sediment_model.uv_cg.ufl_element())]
+            self.intermediary_solutions_uv_cg = [Function(space) for space in space_uv_cg]
+            spaces = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in mesh_copies]
+            self.intermediary_solutions_old_bathymetry = [Function(space) for space in spaces]
+            self.intermediary_solutions_TOB = [Function(space) for space in spaces]
+            self.intermediary_solutions_depth = [Function(space) for space in spaces]
+
+            if self.op.suspendedload:
+                if self.op.convectivevel:
+                    self.intermediary_corr_vel_factor = [Function(space) for space in spaces]
+                space_dg = [FunctionSpace(mesh, self.op.sediment_model.coeff.ufl_element())]
+                self.intermediary_coeff = [Function(space) for space in space_dg]
+                self.intermediary_ceq = [Function(space) for space in space_dg]
+                self.intermediary_equiltracer = [Function(space) for space in space_dg]
 
     def create_solutions(self):
         """
@@ -504,7 +519,20 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.intermediary_solutions_sediment[i].project(self.fwd_solutions_sediment[i])
         if self.op.solve_exner:
             self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
+        if hasattr(self.op, 'sediment_model'):
+            print('here')
+            self.intermediary_solutions_old_bathymetry.project(self.op.sediment_model.old_bathymetry_2d)
+            self.intermediary_solutions_uv_cg.project(self.op.sediment_model.uv_cg)
+            self.intermediary_solutions_TOB.project(self.op.sediment_model.TOB)
+            self.intermediary_solutions_depth.project(self.op.sediment_model.depth)
 
+            if self.op.suspendedload:
+                if self.op.convectivevel:
+                    self.intermediary_corr_vel_factor.project(self.op.sediment_model.corr_vel_factor)
+                self.intermediary_coeff.project(self.op.sediment_model.coeff)
+                self.intermediary_ceq.project(self.op.sediment_model.ceq)
+                self.intermediary_equiltracer.project(self.op.sediment_model.equiltracer)
+            
         def debug(a, b, name):
             if np.allclose(a, b):
                 print_output("WARNING: Is the intermediary {:s} solution just copied?".format(name))
@@ -528,6 +556,34 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 debug(self.fwd_solutions_bathymetry[i].dat.data,
                       self.intermediary_solutions_bathymetry[i].dat.data,
                       "bathymetry")
+            if hasattr(self.op, 'sediment_model'):
+                debug(self.op.sediment_model.old_bathymetry_2d).dat.data,
+                      self.intermediary_solutions_old_bathymetry.dat.data,
+                      "old_bathymetry")
+                debug(self.op.sediment_model.uv_cg.dat.data,
+                      self.intermediary_solutions_uv_cg.dat.data,
+                      "uv_cg")
+                debug(self.op.sediment_model.TOB.dat.data,
+                      self.intermediary_solutions_TOB.dat.data,
+                      "TOB")
+                debug(self.op.sediment_model.depth.dat.data,
+                      self.intermediary_solutions_depth.dat.data,
+                      "depth")
+                if self.op.suspendedload:
+                    if self.op.convectivevel:
+                        debug(self.op.sediment_model.corr_vel_factor.dat.data,
+                              self.intermediary_corr_vel_factor.dat.data,
+                              "corr_vel_factor")
+                    debug(self.op.sediment_model.coeff.dat.data,
+                          self.intermediary_coeff.dat.data,
+                          "coeff")
+                    debug(self.op.sediment_model.ceq.dat.data,
+                          self.intermediary_ceq.dat.data,
+                          "ceq")
+                    debug(self.op.sediment_model.equiltracer.dat.data,
+                          self.intermediary_equiltracer.dat.data,
+                          "equiltracer")
+
 
     def copy_data_from_intermediary_mesh(self, i):
         super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
@@ -537,6 +593,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.fwd_solutions_sediment[i].dat.data[:] = self.intermediary_solutions_sediment[i].dat.data
         if self.op.solve_exner:
             self.fwd_solutions_bathymetry[i].dat.data[:] = self.intermediary_solutions_bathymetry[i].dat.data
+
+        if hasattr(self.op, 'sediment_model'):
+            print('here')
+            self.op.sediment_model.old_bathymetry_2d.dat.data[:] = self.intermediary_solutions_old_bathymetry
+            self.op.sediment_model.uv_cg.dat.data[:] = self.intermediary_solutions_uv_cg
+            self.op.sediment_model.TOB.dat.data[:] = self.intermediary_solutions_TOB
+            self.op.sediment_model.depth.dat.data[:] = self.intermediary_solutions_depth
+            if self.op.suspendedload:
+                if self.op.convectivevel:
+                    self.op.sediment_model.corr_vel_factor.dat.data[:] = self.intermediary_corr_vel_factor
+                self.op.sediment_model.coeff.dat.data[:] = self.intermediary_coeff
+                self.op.sediment_model.ceq.dat.data[:] = self.intermediary_ceq
+                self.op.sediment_model.equiltracer.dat.data[:] = self.intermediary_equiltracer
 
     # --- Equations
 
