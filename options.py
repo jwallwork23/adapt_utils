@@ -272,10 +272,18 @@ class Options(FrozenConfigurable):
             return
         return export_func
 
-    def print_debug(self, msg):
-        """Print a string `msg` only if debugging is on."""
-        if self.debug:
-            print_output(msg)
+    def print_debug(self, msg, mode='basic'):
+        """
+        Print a string `msg` only if debugging is on.
+
+        :kwarg mode: if 'full' is specified, the debugging statement will only be printed if
+            :attr:`debug_mode` is set to 'full'.
+        """
+        if not self.debug:
+            return
+        if mode == 'full' and self.debug_mode == 'basic':
+            return
+        print_output(msg)
 
     # TODO: USEME
     def get_mesh_velocity(self):
