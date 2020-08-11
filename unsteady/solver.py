@@ -226,6 +226,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_coeff = [Function(space) for space in space_dg]
                 self.intermediary_ceq = [Function(space) for space in space_dg]
                 self.intermediary_equiltracer = [Function(space) for space in space_dg]
+                self.intermediary_ero = [Function(space) for space in space_dg]
+                self.intermediary_ero_term = [Function(space) for space in space_dg]
+                self.intermediary_depo_term = [Function(space) for space in space_dg]
 
     def create_solutions(self):
         """
@@ -531,7 +534,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_coeff[i].project(self.op.sediment_model.coeff)
                 self.intermediary_ceq[i].project(self.op.sediment_model.ceq)
                 self.intermediary_equiltracer[i].project(self.op.sediment_model.equiltracer)
-            
+                self.intermediary_ero[i].project(self.op.sediment_model.ero)
+                self.intermediary_ero_term[i].project(self.op.sediment_model.ero_term)
+                self.intermediary_depo_term[i].project(self.op.sediment_model.depo_term)
+
+
         def debug(a, b, name):
             if np.allclose(a, b):
                 print_output("WARNING: Is the intermediary {:s} solution just copied?".format(name))
@@ -582,6 +589,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     debug(self.op.sediment_model.equiltracer.dat.data,
                           self.intermediary_equiltracer[i].dat.data,
                           "equiltracer")
+                    debug(self.op.sediment_model.ero.dat.data,
+                          self.intermediary_ero[i].dat.data,
+                          "ero")
+                    debug(self.op.sediment_model.ero_term.dat.data,
+                          self.intermediary_ero_term[i].dat.data,
+                          "ero_term")
+                    debug(self.op.sediment_model.depo_term.dat.data,
+                          self.intermediary_depo_term[i].dat.data,
+                          "depo_term")
 
 
     def copy_data_from_intermediary_mesh(self, i):
@@ -604,7 +620,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.op.sediment_model.coeff.dat.data[:] = self.intermediary_coeff[i].dat.data
                 self.op.sediment_model.ceq.dat.data[:] = self.intermediary_ceq[i].dat.data
                 self.op.sediment_model.equiltracer.dat.data[:] = self.intermediary_equiltracer[i].dat.data
-
+                self.op.sediment_model.ero.dat.data[:] = self.intermediary_ero[i].dat.data
+                self.op.sediment_model.ero_term.dat.data[:] = self.intermediary_ero_term[i].dat.data
+                self.op.sediment_model.depo_term.dat.data[:] = self.intermediary_depo_term[i].dat.data
     # --- Equations
 
     def create_forward_equations(self, i):
