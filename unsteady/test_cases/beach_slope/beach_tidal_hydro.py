@@ -12,7 +12,7 @@ import morphological_hydro_mud_source_sink as morph
 import numpy as np
 import os
 
-plot = False
+plot = True
 
 def boundary_conditions_fn_balzano(bathymetry_2d, flag = None, morfac = 1, t_new = 0, state = 'initial'):
     """
@@ -59,7 +59,7 @@ def boundary_conditions_fn_balzano(bathymetry_2d, flag = None, morfac = 1, t_new
 # define mesh
 lx = 220
 ly = 10
-nx = np.int(lx*1.5)
+nx = np.int(lx*1)
 ny = 10
 mesh2d = th.RectangleMesh(nx, ny, lx, ly)
 
@@ -87,7 +87,7 @@ value = 1/40
 
 sponge_fn = th.Function(V).interpolate(th.conditional(x>=100, -399 + 4*x, th.Constant(1.0)))
 
-solver_obj, update_forcings_hydrodynamics, outputdir = morph.hydrodynamics_only(boundary_conditions_fn_balzano, mesh2d, bathymetry_2d, uv_init, elev_init, wetting_and_drying = True, wetting_alpha = value, fluc_bcs = True, average_size = 200 * (10**(-6)), dt=0.05, t_end=100, friction = 'manning', sponge_viscosity = sponge_fn, viscosity = 0.5)
+solver_obj, update_forcings_hydrodynamics, outputdir = morph.hydrodynamics_only(boundary_conditions_fn_balzano, mesh2d, bathymetry_2d, uv_init, elev_init, wetting_and_drying = True, wetting_alpha = value, fluc_bcs = True, average_size = 200 * (10**(-6)), dt=0.05, t_end=60, friction = 'manning', sponge_viscosity = sponge_fn, viscosity = 0.5)
 
 # run model
 
@@ -102,7 +102,7 @@ else:
 
     x = np.linspace(0, 220, 221)
 
-    bath = [-(4 - i/40) for i in x]
+    bath = [-(4.5 - i/40) for i in x]
 
     # change t_end = 30
     wd_bath_displacement = solver_obj.depth.wd_bathymetry_displacement
