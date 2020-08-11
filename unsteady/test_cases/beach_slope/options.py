@@ -61,12 +61,12 @@ class BeachOptions(CoupledOptions):
 
         self.grad_depth_viscosity = True
 
-        self.num_hours = 720
+        self.num_hours = 3600
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
 
-        self.morphological_acceleration_factor = Constant(1000)
+        self.morphological_acceleration_factor = Constant(10000)
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
@@ -81,8 +81,8 @@ class BeachOptions(CoupledOptions):
 
         self.dt = 0.5
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 16
-        self.dt_per_export = 16
+        self.dt_per_mesh_movement = 1296
+        self.dt_per_export = 1296
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
@@ -237,9 +237,6 @@ class BeachOptions(CoupledOptions):
 
         def update_forcings(t):
             uv, elev = prob.fwd_solutions[0].split()
-            if np.round(t%2.7, 0) == 3:
-                print(t)
-                print(assemble(elev*dx))
             self.update_boundary_conditions(prob, t=t)
 
         return update_forcings

@@ -320,9 +320,9 @@ class SedimentModel(object):
             # erosion flux - above critical velocity bed is eroded
             self.ceq.project(Constant(0.015)*(self.average_size/self.a) * ((conditional(self.s0 < Constant(0), Constant(0), self.s0))**(1.5))/(self.dstar**0.3))
 
-            self.ero = self.settling_velocity*self.ceq
-            self.ero_term = self.ero/self.depth
-            self.depo_term = self.depo/self.depth
+            self.ero.project(self.settling_velocity*self.ceq)
+            self.ero_term.project(self.ero/self.depth)
+            self.depo_term.project(self.depo/self.depth)
 
             if self.convectivevel:
                 self.corr_factor_model.update()

@@ -71,9 +71,9 @@ class BeachOptions(CoupledOptions):
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
         v_amp = 0.5 # Ocean boundary foring velocity
-        omega = 0.1  # Ocean boundary forcing frequency
-        self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(500.0))))
-        self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(500.0))))
+        omega = 0.5  # Ocean boundary forcing frequency
+        self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(100.0))))
+        self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(100.0))))
 
         self.tracer_init = Constant(0.0)
 

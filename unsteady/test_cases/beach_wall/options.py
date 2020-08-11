@@ -177,7 +177,7 @@ class BeachOptions(CoupledOptions):
                 outflow_tag: {'un': Constant(0.0)},
             },
 	   'sediment': {
-               #inflow_tag: {'value':self.sediment_model.equiltracer}
+               inflow_tag: {'value':self.sediment_model.equiltracer}
             }
         }
         return boundary_conditions    
