@@ -56,7 +56,9 @@ class SpaceshipOptions(TurbineOptions):
         # self.implicitness_theta = 1.0
         self.dt = 10.0
         # self.end_time = self.tidal_forcing_end_time
-        self.end_time = 24*3600.0
+        self.T_ramp = 2.0*self.T_tide
+        # self.end_time = self.T_ramp + 2.0*self.T_tide
+        self.end_time = 3*24*3600.0
         self.dt_per_export = 30
 
         # Tidal farm
@@ -114,6 +116,8 @@ class SpaceshipOptions(TurbineOptions):
 
         def update_forcings(t):
             forcing = float(self.tidal_forcing_interpolator(t - 0.5*self.dt))
+            if t < self.T_ramp:
+                forcing *= t/self.T_ramp
             self.elev_in[i].assign(forcing)
             self.print_debug("DEBUG: forcing at time {:.0f} is {:6.4}".format(t, forcing))
 
