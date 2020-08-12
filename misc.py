@@ -10,9 +10,9 @@ from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
 __all__ = ["taylor_test", "StagnationError", "prod", "combine", "rotation_matrix", "rotate",
-           "box", "ellipse", "bump", "circular_bump", "gaussian", "cg2dg",
-           "copy_mesh", "get_finite_element", "get_component_space", "get_component", "get_boundary_nodes",
-           "is_symmetric", "is_pos_def", "is_spd", "check_spd",
+           "box", "ellipse", "bump", "circular_bump", "gaussian", "cg2dg", "copy_mesh",
+           "get_finite_element", "get_component_space", "get_component", "get_boundary_nodes",
+           "is_symmetric", "is_pos_def", "is_spd", "check_spd", "readfile", "num_days",
            "find", "suppress_output", "knownargs2dict", "unknownargs2dict", "index_string"]
 
 
@@ -416,14 +416,40 @@ def check_spd(M):
     print_output("TEST: Done!")
 
 
+# --- I/O
+
+def readfile(filename, reverse=False):
+    """
+    Read a file line-by-line.
+
+    :kwarg reverse: read the lines in reverse order.
+    """
+    with open(filename, 'r') as read_obj:
+        lines = read_obj.readlines()
+    lines = [line.strip() for line in lines]
+    if reverse:
+        lines = reversed(lines)
+    return lines
+
+
 # --- Non-Firedrake specific
 
-def index_string(index):
+def num_days(month, year):
+    """Get the number of days in a month"""
+    if month in (4, 6, 9, 11):
+        return 30
+    elif month in (1, 3, 5, 7, 8, 10, 12):
+        return 31
+    elif month == 2:
+        return 29 if year % 4 == 0 else 28
+
+
+def index_string(index, n=5):
     """
     :arg index: integer form of index.
-    :return: five-digit string form of index.
+    :return: n-digit string form of index.
     """
-    return (5 - len(str(index)))*'0' + str(index)
+    return (n - len(str(index)))*'0' + str(index)
 
 
 def find(pattern, path):
