@@ -1,6 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
+from math import e
 import os
 
 from adapt_utils.unsteady.swe.turbine.options import TurbineOptions
@@ -38,7 +39,10 @@ class SpaceshipOptions(TurbineOptions):
             raise IOError("Need to make mesh before initialising SpaceshipOptions object.")
 
         # Physics
-        self.base_viscosity = 5.0  # TODO: Sponge condition?
+        self.base_viscosity = 5.0
+        self.viscosity_sponge_type = 'linear'
+        # self.viscosity_sponge_type = 'exponential'
+        self.max_viscosity = 100.0
         self.friction_coeff = 0.0025
         self.max_depth = 25.5
 
@@ -74,6 +78,25 @@ class SpaceshipOptions(TurbineOptions):
         y1, y2 = 25.5, 4.5
         bathymetry.interpolate(min_value(((x - x1)*(y2 - y1)/(x2 - x1) + y1), y1))
         return bathymetry
+
+    def set_viscosity(self, fs):
+        """We use a sponge condition on the forced boundary."""
+        nu = Function(fs, name="Viscosity")
+        x, y = SpatialCoordinate(fs.mesh())
+        R = 30000.0  # Radius of semicircular part of domain
+        r = sqrt(x**2 + y**2)/R
+        base_viscosity = self.base_viscosity
+        if self.viscosity_sponge_type is None:
+            return Constant(base_viscosity)
+        if self.viscosity_sponge_type == 'linear':
+            sponge = base_viscosity + r*(self.max_viscosity - base_viscosity)
+        elif self.viscosity_sponge_type == 'exponential':
+            sponge = base_viscosity + (exp(r) - 1)/(e - 1)*(self.max_viscosity - base_viscosity)
+        else:
+            msg = "Viscosity sponge type {:s} not recognised."
+            raise ValueError(msg.format(self.viscosity_sponge_type))
+        nu.project(conditional(x <= 0.0, sponge, base_viscosity))
+        return nu
 
     def set_boundary_conditions(self, prob, i):
         # self.elev_in[i] = Function(prob.V[i].sub(1))

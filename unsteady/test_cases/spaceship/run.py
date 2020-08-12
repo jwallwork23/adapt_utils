@@ -1,4 +1,4 @@
-from thetis import create_directory, print_output
+from thetis import create_directory, print_output, File
 
 import argparse
 import matplotlib.pyplot as plt
@@ -55,8 +55,11 @@ kwargs = {
     },
 
     # Model
-    'stabilisation': 'lax_friedrichs',
-    # 'stabilisation': None,
+    'stabilisation': None,
+    # 'stabilisation': 'lax_friedrichs',
+    # 'viscosity_sponge_type': None,
+    'viscosity_sponge_type': 'linear',
+    # 'viscosity_sponge_type': 'exponential',
     'family': 'dg-cg',
 
     # I/O
@@ -65,6 +68,8 @@ kwargs = {
 
 op = SpaceshipOptions(approach=approach)
 op.update(kwargs)
+if op.viscosity_sponge_type is not None:
+    op.di = create_directory(os.path.join(op.di, op.viscosity_sponge_type))
 
 
 # --- Run model
@@ -74,6 +79,11 @@ data_dir = create_directory(os.path.join(os.path.dirname(__file__), 'data'))
 fname = os.path.join(data_dir, '_'.join([approach, 'power_output.npy']))
 if not plot_only:
     tp = AdaptiveTurbineProblem(op)
+
+    # Plot bathymetry and viscosity
+    tp.bathymetry_file.write(tp.bathymetry[0])
+    File(os.path.join(op.di, "viscosity.pvd")).write(tp.fields[0].horizontal_viscosity)
+
     cpu_timestamp = perf_counter()
     tp.solve()
     cpu_time = perf_counter() - cpu_timestamp
