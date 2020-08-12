@@ -211,7 +211,7 @@ class TsunamiOptions(CoupledOptions):
 
     def extract_data(self, gauge):
         """
-        Extract time and elevation data from file as NumPy arrays.
+        Extract gauge time and elevation data from file as NumPy arrays.
 
         Note that this isn't *raw* data because it has been converted to appropriate units using
         `preproc.py`.

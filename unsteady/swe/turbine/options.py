@@ -66,3 +66,36 @@ class TurbineOptions(CoupledOptions):
         else:
             assert hasattr(self, 'base_bathymetry')
             self.max_depth = self.base_bathymetry
+
+    def extract_data(self):
+        """
+        Extract tidal forcing time and elevation data from file as NumPy arrays.
+
+        Note that this isn't *raw* data because it has been converted to appropriate units using
+        `preproc.py`.
+        """
+        data_file = os.path.join(self.resource_dir, 'forcing.dat')
+        if not os.path.exists(data_file):
+            raise IOError("Tidal forcing data cannot be found in {:}.".format(self.resource_dir))
+        times, data = [], []
+        with open(data_file, 'r') as f:
+            for line in f:
+                time, dat = line.split()
+                times.append(float(time))
+                data.append(float(dat))
+        return np.array(times), np.array(data)
+
+    def interpolate_tidal_forcing(self):
+        """
+        Read tidal forcing data from the 'forcing.dat' file in the resource directory using the
+        method :attr:`extract_data` and create a 1D linear interpolator.
+
+        As a side-product, we determine the maximum amplitude of the tidal forcing and also the
+        time period within which these data are available.
+        """
+        import scipy.interpolate as si
+
+        times, data = self.extract_data()
+        self.tidal_forcing_interpolator = si.interp1d(times, data)
+        self.max_amplitude = np.max(np.abs(data))
+        self.tidal_forcing_end_time = times[-1]
