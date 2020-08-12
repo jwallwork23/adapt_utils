@@ -3,6 +3,7 @@ tohoku/videos/
 tohoku/resources/images/
 tohoku/resources/survey/
 tohoku/resources/gauges/GPS_gauges/
+tohoku/resources/gauges/__MACOSX/
 tohoku/resources/tohoku_utm.nc
 tohoku/resources/surf_zeroed_utm.nc
 tohoku/resources/log
