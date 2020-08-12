@@ -10,6 +10,8 @@ from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
 
+# --- Set parameters
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-approach", help="Mesh adaptation strategy")
 parser.add_argument("-plot_only", help="If True, the QoI is plotted and no simulations are run")
@@ -23,6 +25,10 @@ kwargs = {
     'plot_pvd': True,
 }
 op = TurbineArrayOptions(approach=approach)
+op.update(kwargs)
+
+
+# --- Run model
 
 # Run forward model and save QoI timeseries
 data_dir = create_directory(os.path.join(os.path.dirname(__file__), 'data'))
@@ -43,24 +49,39 @@ sea_water_density = 1030.0
 power_watts = np.load(fname)*sea_water_density
 power_kilowatts = power_watts/1.0e+03
 
-# Plot power timeseries
+
+# --- Plot power timeseries
+
 fig, axes = plt.subplots()
-num_timesteps = len(qoi_timeseries)
-time_hours = np.linspace(0.0, op.end_time/3600, num_timesteps)
+num_timesteps = len(power_watts)
+
+# Convert to appropriate units and plot
+r = op.T_ramp
+time_seconds = np.linspace(0.0, op.end_time, num_timesteps) - op.T_ramp
+time_hours = time_seconds/3600
 axes.plot(time_hours, power_kilowatts)
 axes.set_xlabel("Time [h]")
 axes.set_ylabel("Power output [kW]")
+
+# Add a dashed line when the ramp period is over
+ylim = axes.get_ylim()
+axes.axvline(0.0, *ylim, linestyle='--', color='k')
+axes.set_ylim(ylim)
+plotting_kwargs = {
+    "arrowprops": {
+        "arrowstyle": "<->",
+    },
+}
+r = op.T_ramp/3600
+axes.annotate("", xy=(-r, 0.0), xytext=(0.0, 0.0), annotation_clip=False, **plotting_kwargs)
+axes.annotate("Spin-up period", xy=(-0.8*r, -3.2), xytext=(-0.8*r, -3.2), annotation_clip=False)
+
+# Add second x-axis with non-dimensionalised time
+non_dimensionalise = lambda time: 3600*time/op.T_tide
+dimensionalise = lambda time: 3600*time*op.T_tide
+secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
+secax.set_xlabel("Time/Tidal period")
+
+# Save
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 plt.savefig(os.path.join(plot_dir, '_'.join([approach, 'power_output.pdf'])))
-
-# Plot power timeseries in non-dimensionalised time  # TODO: Just add a second x-axis to the above
-fig, axes = plt.subplots()
-time_non_dim = np.linspace(0.0, op.end_time/op.T_tide, num_timesteps)
-axes.plot(time_non_dim, power_kilowatts)
-axes.set_xlabel("Time/Tidal period")
-axes.set_ylabel("Power output [kW]")
-plt.savefig(os.path.join(plot_dir, '_'.join([approach, 'power_output_non_dimensional_time.pdf'])))
-plt.show()
-
-# TODO: Plot power output of individual turbines
-# TODO: Version of plot without spin up period
