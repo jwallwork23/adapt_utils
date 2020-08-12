@@ -45,6 +45,8 @@ if not plot_only:
     print_output("Average power output of array: {:.1f}W".format(average_power))
 
 # Adjust timeseries to account for density of water
+if not os.path.exists(fname):
+    raise IOError("Need to run the model in order to get power output timeseries.")
 sea_water_density = 1030.0
 power_watts = np.load(fname)*sea_water_density
 power_kilowatts = power_watts/1.0e+03

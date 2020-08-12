@@ -95,7 +95,7 @@ class SpaceshipOptions(TurbineOptions):
         else:
             msg = "Viscosity sponge type {:s} not recognised."
             raise ValueError(msg.format(self.viscosity_sponge_type))
-        nu.project(conditional(x <= 0.0, sponge, base_viscosity))
+        nu.interpolate(max_value((x <= 0.0)*sponge, base_viscosity))
         return nu
 
     def set_boundary_conditions(self, prob, i):
@@ -113,8 +113,9 @@ class SpaceshipOptions(TurbineOptions):
         interp = self.tidal_forcing_interpolator
 
         def update_forcings(t):
-            self.elev_in[i].assign(self.tidal_forcing_interpolator(t))
-            self.print_debug("DEBUG: t = {:.0f}".format(t))
+            forcing = float(self.tidal_forcing_interpolator(t - 0.5*self.dt))
+            self.elev_in[i].assign(forcing)
+            self.print_debug("DEBUG: forcing at time {:.0f} is {:6.4}".format(t, forcing))
 
         return update_forcings
 

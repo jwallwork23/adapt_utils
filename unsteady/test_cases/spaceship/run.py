@@ -15,13 +15,17 @@ from adapt_utils.unsteady.test_cases.spaceship.options import SpaceshipOptions
 parser = argparse.ArgumentParser()
 parser.add_argument("-approach", help="Mesh adaptation strategy")
 parser.add_argument("-plot_only", help="If True, the QoI is plotted and no simulations are run")
+parser.add_argument("-viscosity_sponge_type", help="""
+If set, a viscosity sponge is used to the forced boundary. Choose from 'linear' or 'exponential'.""")
+parser.add_argument("-stabilisation", help="""
+If set, must be 'lax_friedrichs'. Otherwise, no stabilisation is used.""")
 args = parser.parse_args()
 
 approach = args.approach or 'fixed_mesh'
 plot_only = bool(args.plot_only or False)
 
 kwargs = {
-    'solver_parameters': {  # TODO: Temporary
+    "solver_parameters": {  # TODO: Temporary
         "shallow_water": {
             # "mat_type": "aij",
             # "snes_monitor": None,
@@ -55,12 +59,9 @@ kwargs = {
     },
 
     # Model
-    'stabilisation': None,
-    # 'stabilisation': 'lax_friedrichs',
-    # 'viscosity_sponge_type': None,
-    'viscosity_sponge_type': 'linear',
-    # 'viscosity_sponge_type': 'exponential',
-    'family': 'dg-cg',
+    "stabilisation": args.stabilisation,
+    "viscosity_sponge_type": args.viscosity_sponge_type,
+    "family": "dg-cg",
 
     # I/O
     'plot_pvd': True,
@@ -74,16 +75,19 @@ if op.viscosity_sponge_type is not None:
 
 # --- Run model
 
-# Run forward model and save QoI timeseries
+# I/O
 data_dir = create_directory(os.path.join(os.path.dirname(__file__), 'data'))
 fname = os.path.join(data_dir, '_'.join([approach, 'power_output.npy']))
+
+# Create solver object
+tp = AdaptiveTurbineProblem(op)
+
+# Plot bathymetry and viscosity
+tp.bathymetry_file.write(tp.bathymetry[0])
+File(os.path.join(op.di, "viscosity.pvd")).write(tp.fields[0].horizontal_viscosity)
+
+# Run forward model and save QoI timeseries
 if not plot_only:
-    tp = AdaptiveTurbineProblem(op)
-
-    # Plot bathymetry and viscosity
-    tp.bathymetry_file.write(tp.bathymetry[0])
-    File(os.path.join(op.di, "viscosity.pvd")).write(tp.fields[0].horizontal_viscosity)
-
     cpu_timestamp = perf_counter()
     tp.solve()
     cpu_time = perf_counter() - cpu_timestamp
@@ -94,6 +98,8 @@ if not plot_only:
     print_output("Average power output of array: {:.1f}W".format(average_power))
 
 # Adjust timeseries to account for density of water
+if not os.path.exists(fname):
+    raise IOError("Need to run the model in order to get power output timeseries.")
 sea_water_density = 1030.0
 power_watts = np.load(fname)*sea_water_density
 power_kilowatts = power_watts/1.0e+03
