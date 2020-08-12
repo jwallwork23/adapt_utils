@@ -42,6 +42,8 @@ class TurbineOptions(CoupledOptions):
         Correction to account for the fact that the thrust coefficient is based on an upstream
         velocity whereas we are using a depth averaged at-the-turbine velocity (see Kramer and
         Piggott 2016, eq. (15))
+
+        NOTE: We're not yet correcting power output here, so that will be overestimated
         """
         if not correction:
             return self.thrust_coefficient
@@ -50,9 +52,8 @@ class TurbineOptions(CoupledOptions):
         else:
             D = max(self.turbine_length, self.turbine_width)
         A_T = pi*(D/2)**2
-        correction = 4/(1+sqrt(1-A_T/(self.max_depth*D)))**2
+        correction = 4/(1 + sqrt(1 - A_T/(self.max_depth*D)))**2
         return self.thrust_coefficient*correction
-        # NOTE: We're not yet correcting power output here, so that will be overestimated
 
     def get_max_depth(self, bathymetry=None):
         """Compute maximum depth from bathymetry field."""

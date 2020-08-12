@@ -54,6 +54,29 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
                 }
                 self.turbine_drag_coefficients[i] = 0.5*c_T*A_T*self.turbine_densities[i]
 
+    def set_fields(self):
+        """Set velocity field, viscosity, etc *on each mesh*."""
+        self.fields = [AttrDict() for mesh in self.meshes]
+        for i, P1 in enumerate(self.P1):
+            self.fields[i].update({
+                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
+                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
+            })
+        for i, P1DG in enumerate(self.P1DG):
+            self.fields[i].update({
+                'horizontal_viscosity': self.op.set_viscosity(P1),
+            })
+        self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
+        self.depth = [None for bathymetry in self.bathymetry]
+        for i, bathymetry in enumerate(self.bathymetry):
+            # NOTE: DepthExpression is the modified version from `unsteady/swe/utils`.
+            self.depth[i] = DepthExpression(
+                bathymetry,
+                use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+            )
+
     # --- Quantity of Interest
 
     def add_callbacks(self, i):
