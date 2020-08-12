@@ -16,6 +16,7 @@ class SpaceshipOptions(TurbineOptions):
     turbine_diameter = PositiveFloat(18.0).tag(config=False)
     num_turbines = PositiveInteger(2).tag(config=False)
     turbine_tags = [2, 3]
+    thrust_coefficient = NonNegativeFloat(8.0).tag(config=True)
 
     # Domain specification
     mesh_file = os.path.join(os.path.dirname(__file__), 'spaceship.msh')
@@ -23,6 +24,9 @@ class SpaceshipOptions(TurbineOptions):
     maximum_upstream_width = PositiveFloat(5000.0).tag(config=False)
     domain_length = PositiveFloat(61500.0).tag(config=False)
     domain_width = PositiveFloat(60000.0).tag(config=False)
+
+    # Resources
+    resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
 
     def __init__(self, **kwargs):
         super(SpaceshipOptions, self).__init__(**kwargs)
@@ -34,30 +38,33 @@ class SpaceshipOptions(TurbineOptions):
             raise IOError("Need to make mesh before initialising SpaceshipOptions object.")
 
         # Physics
-        self.base_viscosity = 1.0
+        self.base_viscosity = 5.0  # TODO: Sponge condition?
         self.friction_coeff = 0.0025
         self.max_depth = 25.5
 
+        # Boundary forcing
+        self.interpolate_tidal_forcing()
+        self.elev_in = [None for i in range(self.num_meshes)]
+
         # Timestepping
-        self.dt = 3.0
-        self.T_ramp = 1.0*self.T_tide
-        self.end_time = self.T_ramp + 2.0*self.T_tide
-        self.dt_per_export = 10
+        self.timestepper = 'CrankNicolson'
+        # self.timestepper = 'PressureProjectionPicard'
+        # self.implicitness_theta = 1.0
+        self.dt = 10.0
+        # self.end_time = self.tidal_forcing_end_time
+        self.end_time = 24*3600.0
+        self.dt_per_export = 30
 
         # Tidal farm
         D = self.turbine_diameter
         self.region_of_interest = [(6050, 0, D, D), (6450, 0, D, D)]
 
-        # Boundary forcing
-        self.max_amplitude = 3.0
-        self.omega = 2*pi/self.T_tide
-        self.elev_in = [None for i in range(self.num_meshes)]
-
         # Solver parameters and discretisation
         self.stabilisation = 'lax_friedrichs'
         # self.stabilisation = None
         self.grad_div_viscosity = False
-        self.grad_depth_viscosity = True
+        # self.grad_depth_viscosity = True
+        self.grad_depth_viscosity = False
         self.family = 'dg-cg'
 
     def set_bathymetry(self, fs):
@@ -69,7 +76,8 @@ class SpaceshipOptions(TurbineOptions):
         return bathymetry
 
     def set_boundary_conditions(self, prob, i):
-        self.elev_in[i] = Function(prob.V[i].sub(1))
+        # self.elev_in[i] = Function(prob.V[i].sub(1))
+        self.elev_in[i] = Constant(0.0)
         inflow_tag = 2
         boundary_conditions = {
             'shallow_water': {
@@ -79,12 +87,10 @@ class SpaceshipOptions(TurbineOptions):
         return boundary_conditions
 
     def get_update_forcings(self, prob, i, **kwargs):
-        tc = Constant(0.0)
-        hmax = Constant(self.max_amplitude)
+        interp = self.tidal_forcing_interpolator
 
         def update_forcings(t):
-            tc.assign(t)
-            self.elev_in[i].assign(hmax*cos(self.omega*(tc - self.T_ramp)))
+            self.elev_in[i].assign(self.tidal_forcing_interpolator(t))
             self.print_debug("DEBUG: t = {:.0f}".format(t))
 
         return update_forcings
@@ -95,10 +101,3 @@ class SpaceshipOptions(TurbineOptions):
 
         # Small velocity to avoid zero initial condition
         u.interpolate(as_vector([1e-8, 0.0]))
-
-        # Set initial elevation consistently with the boundary forcing
-        hmax = Constant(self.max_amplitude)
-        r = 0.5*self.domain_width
-        expr = hmax*(x**2 + y**2)/r**2
-        # eta.interpolate(conditional(x > 0, -expr, expr))
-        eta.interpolate(conditional(x > 0, 0, expr))

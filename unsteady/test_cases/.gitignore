@@ -15,6 +15,11 @@ rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/videos/
 rossby_wave/__pycache__/
+spaceship/outputs/
+spaceship/screenshots/
+spaceship/videos/
+spaceship/__pycache__/
+spaceship/nic.py
 solid_body_rotation/outputs/
 solid_body_rotation/screenshots/
 solid_body_rotation/videos/
