@@ -6,20 +6,8 @@ import os
 import scipy.interpolate as si
 
 from adapt_utils.case_studies.tohoku.options import TohokuOptions
+from adapt_utils.misc import readfile
 
-
-def readfile(filename, reverse=False):
-    """
-    Read a file line-by-line.
-
-    :kwarg reverse: read the lines in reverse order.
-    """
-    with open(filename, 'r') as read_obj:
-        lines = read_obj.readlines()
-    lines = [line.strip() for line in lines]
-    if reverse:
-        lines = reversed(lines)
-    return lines
 
 # Parse arguments
 parser = argparse.ArgumentParser()
@@ -75,23 +63,25 @@ with open(fname, 'w') as outfile:
             if gauge in op.pressure_gauges:
                 hms = ''.join([words[3], words[4], words[5]])
                 day = int(words[2])
-                if day != 11:
-                    continue
                 if gauge[0] == '2' and int(words[6]) == 1:
                     continue
             else:
+                day = int(words[0][6:8])
                 hms = words[0][-7:-1]
+            if day < 11:
+                continue
+            elif day > 11:
+                break
             assert len(hms) == 6
             hours, minutes, seconds = int(hms[:2]), int(hms[2:4]), int(hms[4:])
 
-            # Some gauge data are in JST
-            if op.gauges[gauge]["class"] == "near_field_pressure":
+            # Near-field gauge data are in JST
+            if "near_field" in op.gauges[gauge]["class"]:
                 if hours < 14 or (hours == 14 and minutes < 46) or hours > 17:
                     continue
 
-            # Other gauge data are in GMT
+            # DART gauge data are in GMT
             else:
-                # if hours < 4 or (hours == 4 and minutes < 46) or hours > 7:
                 if hours < 5 or (hours == 5 and minutes < 46) or hours > 8:
                     continue
 
@@ -106,8 +96,8 @@ with open(fname, 'w') as outfile:
         meas = words[-1][:-1]
         op.print_debug("time {:8f} meas {:}".format(time, meas))
 
-        # Data error code
-        if '9999' in meas:
+        # Data error codes
+        if '9999' in meas or '=' in meas:
             elev = np.nan
 
         # Pressure gauges whose data have already been converted to water depth
@@ -133,4 +123,5 @@ with open(fname, 'w') as outfile:
 
         # Write to output
         outfile.write("{:5d} {:6.4f}\n".format(time, elev))
+        time_prev = time
         time += 1  # For KPG1, KPG2, MPG1, MPG2
