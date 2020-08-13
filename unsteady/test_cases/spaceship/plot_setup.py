@@ -16,7 +16,7 @@ swp = AdaptiveTurbineProblem(op)
 # Plot mesh
 fig, axes = plt.subplots(ncols=2, figsize=(10, 4))
 ax = axes[0]
-triplot(swp.meshes[0], axes=ax)
+triplot(swp.meshes[0], axes=ax, interior_kw={'linewidth': 0.2})
 ax.legend()
 ax.axis(False)
 
@@ -29,7 +29,9 @@ cbar = fig.colorbar(tricontourf(b, axes=ax, levels=cbar_range, cmap='coolwarm'),
 cbar.set_ticks(np.linspace(4.5, 25.5, 11))
 cbar.set_label(r"Bathymetry $[m]$")
 ax.axis(False)
-axes[0].set_ylim(ax.get_ylim())
+ylim = 1.05*np.array(ax.get_ylim())
+axes[0].set_ylim(ylim)
+ax.set_ylim(ylim)
 
 # Save to file
 plt.tight_layout()
