@@ -20,6 +20,7 @@ spaceship/screenshots/
 spaceship/videos/
 spaceship/__pycache__/
 spaceship/nic.py
+spaceship/stephan/
 solid_body_rotation/outputs/
 solid_body_rotation/screenshots/
 solid_body_rotation/videos/
