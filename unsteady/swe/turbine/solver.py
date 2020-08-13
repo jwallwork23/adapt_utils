@@ -13,7 +13,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
 
     # --- Setup
 
-    def __init__(self, *args, remove_turbines=False, discrete_turbines=False, **kwargs):
+    def __init__(self, *args, remove_turbines=False, discrete_turbines=False, callback_dir=None, **kwargs):
         """
         :kwarg remove_turbines: toggle whether turbines are present in the flow or not.
         :kwarg discrete_turbines: toggle whether to use a discrete or continuous representation
@@ -21,6 +21,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         :kwarg thrust_correction: toggle whether to correct the turbine thrust coefficient.
         """
         super(AdaptiveTurbineProblem, self).__init__(*args, **kwargs)
+        self.callback_dir = callback_dir
         if remove_turbines:
             return
         op = self.op
@@ -61,7 +62,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         # self.get_qoi_kernels(i)
         # self.callbacks[i].add(QoICallback(self, i), 'timestep')
         for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
-            self.callbacks[i].add(PowerOutputCallback(self, i, farm_id), 'timestep')
+            self.callbacks[i].add(PowerOutputCallback(self, i, farm_id, callback_dir=self.callback_dir), 'timestep')
 
     def quantity_of_interest(self):
         # self.qoi = sum(c['timestep']['qoi'].time_integrate() for c in self.callbacks)
