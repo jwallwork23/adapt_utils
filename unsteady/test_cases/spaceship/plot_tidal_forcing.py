@@ -7,6 +7,8 @@ import os
 from adapt_utils.unsteady.test_cases.spaceship.options import SpaceshipOptions
 
 
+plt.rc('text', usetex=True)
+
 # Interpolate forcing onto time range
 op = SpaceshipOptions()
 time_seconds = np.linspace(0.0, op.tidal_forcing_end_time, 1001)
@@ -17,8 +19,8 @@ forcing = op.tidal_forcing_interpolator(time_seconds)
 # Plot the spin-up period only
 fig, axes = plt.subplots(figsize=(8, 6))
 axes.plot(time_hours, forcing)
-axes.set_xlabel("Time [h]")
-axes.set_ylabel("Tidal forcing [m]")
+axes.set_xlabel(r"Time $[h]$")
+axes.set_ylabel(r"Tidal forcing $[m]$")
 axes.set_xlim([0, op.T_ramp/3600])
 axes.set_xticks([0, 6, 12, 18, 24])
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
