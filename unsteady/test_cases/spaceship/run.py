@@ -93,7 +93,7 @@ if not plot_only:
     cpu_time = perf_counter() - cpu_timestamp
     msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
-    np.save(fname, tp.callbacks[0]["timestep"]["power_output_everywhere"].timeseries)
+    np.save(fname, tp.callbacks[0]["timestep"]["power_output"].timeseries)
     average_power = tp.quantity_of_interest()/op.end_time
     print_output("Average power output of array: {:.1f}W".format(average_power))
 
