@@ -377,7 +377,6 @@ class TohokuOptions(TsunamiOptions):
 
     def _get_update_forcings_forward(self, prob, i):
         from adapt_utils.misc import ellipse
-        from adapt_utils.case_studies.tohoku.resources.gauges.sample import sample_timeseries
 
         if np.isclose(self.regularisation, 0.0):
             self.J = 0
@@ -413,8 +412,7 @@ class TohokuOptions(TsunamiOptions):
             gauge_dat["obs"] = Constant(0.0)     # Constant associated with free surface observations
 
             # Setup interpolator
-            sample = 1 if gauge[0] == '8' else 60
-            gauge_dat["interpolator"] = sample_timeseries(gauge, sample=sample)
+            self.sample_timeseries(gauge, sample=1 if gauge[0] == '8' else 60)
 
             # Assemble an area-normalised indicator function
             x, y = gauge_dat["coords"]
