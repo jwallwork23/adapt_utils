@@ -2,14 +2,14 @@
 
 Test case as described in [Divett et al.].
 
-Many thanks to [Nicolas Barral][1] for coding the original fixed mesh version of this test case in
-Firedrake.
+Many thanks to [Nicolas Barral][1] for assisting with implementing this test case in Firedrake.
 
 ### Parameters:
   * TODO
 
 ### Boundary conditions:
-  * TODO
+  * Simple tidal forcings on the left hand and right hand boundaries which are exactly out of phase.
+  * On the top and bottom boundaries, free-slip conditions are assumed.
 
 ### Quantity of interest
 Power output (integral over turbine footprints and time period of cubed fluid speed, scaled by
