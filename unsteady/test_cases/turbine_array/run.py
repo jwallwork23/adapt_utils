@@ -31,8 +31,8 @@ op.update(kwargs)
 # --- Run model
 
 # Run forward model and save QoI timeseries
-data_dir = create_directory(os.path.join(os.path.dirname(__file__), 'data'))
-fname = os.path.join(data_dir, '_'.join([approach, 'power_output.npy']))
+data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
+fname = os.path.join(data_dir, "_".join([approach, "power_output.npy"]))
 if not plot_only:
     tp = AdaptiveTurbineProblem(op)
     cpu_timestamp = perf_counter()
@@ -85,6 +85,7 @@ secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalis
 secax.set_xlabel("Time/Tidal period")
 
 # Save
-plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
+plot_dir = create_directory(os.path.join(os.path.dirname(__file__), "plots"))
 plt.tight_layout()
-plt.savefig(os.path.join(plot_dir, '_'.join([approach, 'power_output.pdf'])))
+for ext in ("png", "pdf"):
+    plt.savefig(os.path.join(plot_dir, '_'.join([approach, ".".join(["power_output", ext])])))
