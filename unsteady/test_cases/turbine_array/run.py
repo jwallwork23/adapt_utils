@@ -86,4 +86,5 @@ secax.set_xlabel("Time/Tidal period")
 
 # Save
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
+plt.tight_layout()
 plt.savefig(os.path.join(plot_dir, '_'.join([approach, 'power_output.pdf'])))

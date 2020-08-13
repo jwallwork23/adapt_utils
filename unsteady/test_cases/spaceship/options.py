@@ -112,12 +112,9 @@ class SpaceshipOptions(TurbineOptions):
         return boundary_conditions
 
     def get_update_forcings(self, prob, i, **kwargs):
-        interp = self.tidal_forcing_interpolator
 
         def update_forcings(t):
             forcing = float(self.tidal_forcing_interpolator(t - 0.5*self.dt))
-            if t < self.T_ramp:
-                forcing *= t/self.T_ramp
             self.elev_in[i].assign(forcing)
             self.print_debug("DEBUG: forcing at time {:.0f} is {:6.4}".format(t, forcing))
 
@@ -128,4 +125,4 @@ class SpaceshipOptions(TurbineOptions):
         x, y = SpatialCoordinate(prob.meshes[0])
 
         # Small velocity to avoid zero initial condition
-        u.interpolate(as_vector([1e-8, 0.0]))
+        u.interpolate(as_vector([1.0e-08, 0.0]))
