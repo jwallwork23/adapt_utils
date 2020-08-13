@@ -15,10 +15,14 @@ class PowerOutputCallback(TimeseriesCallback):
 
     Note that the integral of power is energy.
     """
-    def __init__(self, prob, i, farm_id):
+    def __init__(self, prob, i, farm_id, **kwargs):
+        """
+        :arg prob: :class:`AdaptiveProblem` solver object.
+        :arg i: mesh index.
+        :arg farm_id: label used to indicate tidal farm.
+        """
         self.name = "power output {:}".format(farm_id)
         u, eta = split(prob.fwd_solutions[i])
-        # u, eta = prob.fwd_solutions[i].split()
         dt = prob.op.dt
 
         # Turbine farm object
@@ -31,4 +35,4 @@ class PowerOutputCallback(TimeseriesCallback):
         label = "power_output"
         if farm_id != "everywhere":
             label += "_{:}".format(farm_id)
-        super(PowerOutputCallback, self).__init__(prob, power_output, i, label)
+        super(PowerOutputCallback, self).__init__(prob, power_output, i, label, **kwargs)

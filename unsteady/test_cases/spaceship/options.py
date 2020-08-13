@@ -82,7 +82,13 @@ class SpaceshipOptions(TurbineOptions):
         return bathymetry
 
     def set_viscosity(self, fs):
-        """We use a sponge condition on the forced boundary."""
+        """
+        We use a sponge condition on the forced boundary.
+
+        The type of sponge condition is specified by :attr:`viscosity_sponge_type`, which may be
+        None, or chosen from {'linear', 'exponential'}. The sponge ramps up the viscosity from
+        :attr:`base_viscosity` to :attr:`max_viscosity`.
+        """
         nu = Function(fs, name="Viscosity")
         x, y = SpatialCoordinate(fs.mesh())
         R = 30000.0  # Radius of semicircular part of domain
