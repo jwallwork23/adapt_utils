@@ -659,3 +659,61 @@ class TohokuOptions(TsunamiOptions):
             kwargs["xytext"] = (x, y)
             axes.plot(*dat[loc][coords], 'x', color=kwargs["color"])
             axes.annotate(loc, **kwargs)
+
+    def detide(self, gauge):
+        """
+        Remove tidal constituents from the observed timeseries at a given gauge. This is done using
+        the Python re-implementation of the Matlab package UTide, available at
+        https://github.com/wesleybowman/UTide.
+
+        :arg gauge: string denoting the gauge of interest.
+        :returns: a 3-tuple of arrays corresponding to the observation times, the de-tided timeseries
+            and the original timeseries, respectively.
+        """
+        from pandas import date_range
+        import utide
+        from matplotlib.dates import date2num
+
+        # Read data from file
+        time, elev = self.extract_data(gauge)
+
+        # Start date and time of observations (in the GMT timezone)
+        start = '2011-03-11 05:46:00'
+
+        # Observation frequency
+        if gauge[0] == "8":
+            freq = "5S"
+        elif gauge[0] == "P" or "PG" in gauge:
+            freq = "S"
+        elif gauge[0] == "2":
+            freq = "60S"
+        else:
+            raise ValueError("Gauge {:s} not recognised.".format(gauge))
+        time_str = date2num(date_range(start=start, periods=len(time), freq=freq).to_pydatetime())
+
+        # Interpolate away any NaNs
+        if np.any(np.isnan(elev)):
+            self.sample_timeseries(gauge)
+            elev = np.array([self.gauges[gauge]["interpolator"](t) for t in time])
+
+        # Shift to zero
+        elev[:] -= elev[0]
+
+        # Get anomaly
+        anomaly = elev - elev.mean()
+        assert not np.any(np.isnan(anomaly))
+
+        # Apply de-tiding algorithm to anomaly
+        kwargs = {
+            'method': 'ols',     # ordinary least squares
+            'conf_int': 'none',  # linearised confidence intervals
+            'lat': np.array([self.gauges[gauge]["lonlat"][1], ]),
+        }
+        sol = utide.solve(time_str, anomaly, **kwargs)
+        tide = utide.reconstruct(time_str, sol)
+
+        # Subtract de-tided component
+        detided = anomaly - np.array(tide.h).reshape(anomaly.shape)
+        diff = detided - elev
+
+        return time, detided, elev

@@ -227,7 +227,7 @@ class TsunamiOptions(CoupledOptions):
                 data.append(float(dat))
         return np.array(times), np.array(data)
 
-    def sample_timeseries(self, gauge, sample=1, **kwargs):
+    def sample_timeseries(self, gauge, sample=1, detide=False, timeseries=None, **kwargs):
         """
         Interpolate from gauge data. Since the data is provided at regular intervals, we use linear
         interpolation between the data points.
@@ -237,7 +237,13 @@ class TsunamiOptions(CoupledOptions):
 
         Keyword arguments are passed to `scipy.interpolate.interp1d`.
         """
-        times, data = self.extract_data(gauge)
+        if detide:
+            times, data, _ = self.detide(gauge)
+        else:
+            times, data = self.extract_data(gauge)
+        if timeseries is not None:
+            assert len(data) == len(timeseries)
+            data[:] = timeseries
 
         # Process data
         i, time_prev = 0, 0.0
@@ -260,3 +266,7 @@ class TsunamiOptions(CoupledOptions):
 
         # Shift by initial value
         self.gauges[gauge]["interpolator"] = lambda tau: interp(tau) - interp(0.0)
+
+    def detide(self, gauge):
+        """To be implemented in subclass."""
+        raise NotImplementedError
