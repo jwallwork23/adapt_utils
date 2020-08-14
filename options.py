@@ -47,7 +47,7 @@ class Options(FrozenConfigurable):
 
     # Time discretisation
     timestepper = Enum(
-        ['SteadyState', 'CrankNicolson', ],  # TODO: Consider more timesteppers
+        ['SteadyState', 'CrankNicolson', 'PressureProjectionPicard'],
         default_value='CrankNicolson',
         help="Time integration scheme used.").tag(config=True)
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
@@ -84,7 +84,7 @@ class Options(FrozenConfigurable):
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="""
         Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.
-        """).tag(config=True)  # TODO: restrict input
+        """).tag(config=True)  # TODO: Account for different models
     use_automatic_sipg_parameter = Bool(True, help="""
         Toggle automatic generation of symmetric interior penalty method.""").tag(config=True)
 
@@ -180,6 +180,49 @@ class Options(FrozenConfigurable):
     outer_iterations = PositiveInteger(1, help="""
         Number of iterations in outer adaptation loop.""").tag(config=True)
     indent = Unicode('', help="Indent used in nested print statements.").tag(config=True)
+
+    # Solver parameters for Picard iteration (copied from thetis/options.py)
+    solver_parameters_pressure = PETScSolverParameters({
+        'ksp_type': 'preonly',  # we solve the full schur complement exactly, so no need for outer krylov
+        'mat_type': 'matfree',
+        'pc_type': 'fieldsplit',
+        'pc_fieldsplit_type': 'schur',
+        'pc_fieldsplit_schur_fact_type': 'full',
+        # velocity mass block:
+        'fieldsplit_U_2d': {
+            'ksp_type': 'gmres',
+            'pc_type': 'python',
+            'pc_python_type': 'firedrake.AssembledPC',
+            'assembled_ksp_type': 'preonly',
+            'assembled_pc_type': 'bjacobi',
+            'assembled_sub_pc_type': 'ilu',
+        },
+        # schur system: explicitly assemble the schur system
+        # this only works with pressureprojectionicard if the velocity block is just the mass matrix
+        # and if the velocity is DG so that this mass matrix can be inverted explicitly
+        'fieldsplit_H_2d': {
+            'ksp_type': 'preonly',
+            'pc_type': 'python',
+            'pc_python_type': 'thetis.AssembledSchurPC',
+            'schur_ksp_type': 'gmres',
+            'schur_ksp_max_it': 100,
+            'schur_ksp_converged_reason': False,
+            'schur_pc_type': 'gamg',
+        },
+    }).tag(config=True)
+    solver_parameters_momentum = PETScSolverParameters({
+        'ksp_type': 'gmres',
+            'ksp_converged_reason': False,
+            'pc_type': 'bjacobi',
+            'sub_ksp_type': 'preonly',
+            'sub_pc_type': 'sor',
+    }, help="""
+        Solver parameters for the momentum component of the forward model.
+        
+        Only relevant for timeintegration under PressureProjectionPicard.""").tag(config=True)
+    picard_iterations = PositiveInteger(2, help="""
+        Number of Picard iterations used under PressureProjectionPicard timestepper.
+        """).tag(config=True)
 
     def __init__(self, mesh=None, fpath=None, **kwargs):
         """

@@ -25,40 +25,10 @@ approach = args.approach or 'fixed_mesh'
 plot_only = bool(args.plot_only or False)
 
 kwargs = {
-    "solver_parameters": {  # TODO: Temporary
-        "shallow_water": {
-            # "mat_type": "aij",
-            # "snes_monitor": None,
-            "snes_converged_reason": None,
-            "ksp_type": "gmres",
-            # "ksp_type": "preonly",
-            # "ksp_monitor": None,
-            "ksp_converged_reason": None,
-            # "pc_type": "fieldsplit",
-            # "pc_type": "lu",
-            # "pc_factor_mat_solver_type": "mumps",
-            "pc_fieldsplit_type": "multiplicative",
-            "fieldsplit_U_2d": {
-                "ksp_type": "preonly",
-                "ksp_max_it": 10000,
-                "ksp_rtol": 1.0e-05,
-                "pc_type": "sor",
-                # "ksp_view": None,
-                # "ksp_converged_reason": None,
-            },
-            "fieldsplit_H_2d": {
-                "ksp_type": "preonly",
-                "ksp_max_it": 10000,
-                "ksp_rtol": 1.0e-05,
-                # "pc_type": "sor",
-                "pc_type": "jacobi",
-                # "ksp_view": None,
-                # "ksp_converged_reason": None,
-            },
-        },
-    },
 
     # Model
+    "timestepper": "PressureProjectionPicard",
+    "implicitness_theta": 1.0,
     "stabilisation": args.stabilisation,
     "viscosity_sponge_type": args.viscosity_sponge_type,
     "family": "dg-cg",
