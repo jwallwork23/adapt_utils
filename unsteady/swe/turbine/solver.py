@@ -27,33 +27,34 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         num_turbines = op.num_turbines
 
         # Set up tidal farm object
-        if discrete_turbines:
-            raise NotImplementedError  # TODO
+        smooth_indicators = kwargs.get('smooth_indicators', True)
+        shape = op.bump if smooth_indicators else op.box
+        self.farm_options = [TidalTurbineFarmOptions() for mesh in self.meshes]
+        self.turbine_densities = [None for mesh in self.meshes]
+        self.turbine_drag_coefficients = [None for mesh in self.meshes]
+        c_T = op.get_thrust_coefficient(correction=kwargs.get('thrust_correction', True))
+        if hasattr(op, 'turbine_diameter'):
+            D = op.turbine_diameter
+            A_T = D**2
         else:
-            smooth_indicators = kwargs.get('smooth_indicators', True)
-            shape = op.bump if smooth_indicators else op.box
-            self.farm_options = [TidalTurbineFarmOptions() for mesh in self.meshes]
-            self.turbine_densities = [None for mesh in self.meshes]
-            self.turbine_drag_coefficients = [None for mesh in self.meshes]
-            c_T = op.get_thrust_coefficient(correction=kwargs.get('thrust_correction', True))
-            if hasattr(op, 'turbine_diameter'):
-                D = op.turbine_diameter
-                A_T = D**2
+            D = max(op.turbine_length, op.turbine_width)
+            A_T = op.turbine_length, op.turbine_width
+            print_output("#### TODO: Account for non-square turbines")  # TODO
+        for i, mesh in enumerate(self.meshes):
+            if discrete_turbines:  # TODO: Use length and width
+                self.turbine_densities[i] = Constant(1.0/D**2, domain=self.meshes[i])
             else:
-                D = max(op.turbine_length, op.turbine_width)
-                A_T = op.turbine_length, op.turbine_width
-                print_output("#### TODO: Account for non-square turbines")  # TODO
-            for i, mesh in enumerate(self.meshes):
                 area = assemble(shape(self.meshes[i])*dx)
                 self.turbine_densities[i] = shape(self.meshes[i], scale=num_turbines/area)
-                self.farm_options[i].turbine_density = self.turbine_densities[i]
-                self.farm_options[i].turbine_options.diameter = D
-                self.farm_options[i].turbine_options.thrust_coefficient = c_T
-                self.turbine_drag_coefficients[i] = 0.5*c_T*A_T*self.turbine_densities[i]
 
-                self.shallow_water_options[i].tidal_turbine_farms = {
-                    farm_id: self.farm_options[i] for farm_id in op.farm_ids
-                }
+            self.farm_options[i].turbine_density = self.turbine_densities[i]
+            self.farm_options[i].turbine_options.diameter = D
+            self.farm_options[i].turbine_options.thrust_coefficient = c_T
+            self.turbine_drag_coefficients[i] = 0.5*c_T*A_T*self.turbine_densities[i]
+
+            self.shallow_water_options[i].tidal_turbine_farms = {
+                farm_id: self.farm_options[i] for farm_id in op.farm_ids
+            }
 
     # --- Quantity of Interest
 
