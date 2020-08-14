@@ -58,8 +58,8 @@ class TurbineArrayOptions(TurbineOptions):
         deltay = 7.5*D
         self.region_of_interest = []
         for i in range(-2, 3):
-            for j in range(-1, 2):
-                self.region_of_interest.append((i*deltax, j*deltay, D, d))
+            for j in range(1, -2, -1):
+                self.region_of_interest.append((i*deltax, j*deltay, d, D))
         assert len(self.region_of_interest) == self.num_turbines
         self.turbine_tags = list(range(2, 2+self.num_turbines))
 
