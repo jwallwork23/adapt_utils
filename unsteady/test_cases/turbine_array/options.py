@@ -25,6 +25,10 @@ class TurbineArrayOptions(TurbineOptions):
 
     def __init__(self, **kwargs):
         super(TurbineArrayOptions, self).__init__(**kwargs)
+        self.array_ids = np.array([[2, 5, 8, 11, 14],
+                                   [3, 6, 9, 12, 15],
+                                   [4, 7, 10, 13, 16]])
+        self.farm_ids = tuple(self.array_ids.reshape((15, )))
 
         # Domain and mesh
         if os.path.exists(self.mesh_file):

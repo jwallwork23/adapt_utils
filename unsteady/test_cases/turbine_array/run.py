@@ -32,7 +32,6 @@ op.update(kwargs)
 
 # Run forward model and save QoI timeseries
 data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data", "fixed_mesh"))
-fname = os.path.join(data_dir, "power_output.npy")
 if not plot_only:
     tp = AdaptiveTurbineProblem(op, callback_dir=data_dir)
     cpu_timestamp = perf_counter()
@@ -43,26 +42,35 @@ if not plot_only:
     average_power = tp.quantity_of_interest()/op.end_time
     print_output("Average power output of array: {:.1f}W".format(average_power))
 
-# Adjust timeseries to account for density of water
-if not os.path.exists(fname):
-    raise IOError("Need to run the model in order to get power output timeseries.")
+# Adjust timeseries to account for density of water and assemble as an array
+power_watts = []
 sea_water_density = 1030.0
-power_watts = np.load(fname)*sea_water_density
+for turbine in op.farm_ids:
+    fname = os.path.join(data_dir, "power_output_{:d}.npy".format(turbine))
+    if not os.path.exists(fname):
+        raise IOError("Need to run the model in order to get power output timeseries.")
+    power_watts.append(np.load(fname)*sea_water_density)
+num_timesteps = len(power_watts[0])
+power_watts = np.array(power_watts).reshape((3, 5, num_timesteps))
 power_kilowatts = power_watts/1.0e+03
+# TODO: Plot these as columns
+
+# Get total power
+array_power_watts = np.sum(power_watts, axis=(0, 1))
+array_power_kilowatts = array_power_watts/1.0e+03
 
 
 # --- Plot power timeseries
 
 fig, axes = plt.subplots()
-num_timesteps = len(power_watts)
 
 # Convert to appropriate units and plot
 r = op.T_ramp
 time_seconds = np.linspace(0.0, op.end_time, num_timesteps) - op.T_ramp
 time_hours = time_seconds/3600
-axes.plot(time_hours, power_kilowatts)
+axes.plot(time_hours, array_power_kilowatts)
 axes.set_xlabel("Time [h]")
-axes.set_ylabel("Power output [kW]")
+axes.set_ylabel("Array power output [kW]")
 
 # Add a dashed line when the ramp period is over
 ylim = axes.get_ylim()
@@ -87,4 +95,4 @@ secax.set_xlabel("Time/Tidal period")
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), "plots"))
 plt.tight_layout()
 for ext in ("png", "pdf"):
-    plt.savefig(os.path.join(plot_dir, '_'.join([approach, ".".join(["power_output", ext])])))
+    plt.savefig(os.path.join(plot_dir, '_'.join([approach, ".".join(["array_power_output", ext])])))

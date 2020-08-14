@@ -16,6 +16,7 @@ class TurbineOptions(CoupledOptions):
 
     def __init__(self, **kwargs):
         super(TurbineOptions, self).__init__(**kwargs)
+        self.farm_ids = ["everywhere"]
 
         # Timestepping
         self.timestepper = 'CrankNicolson'

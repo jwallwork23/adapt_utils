@@ -1,7 +1,6 @@
 from thetis import *
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
-# from adapt_utils.unsteady.callback import QoICallback
 from adapt_utils.unsteady.swe.turbine.callback import PowerOutputCallback
 
 
@@ -50,24 +49,24 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
                 self.farm_options[i].turbine_density = self.turbine_densities[i]
                 self.farm_options[i].turbine_options.diameter = D
                 self.farm_options[i].turbine_options.thrust_coefficient = c_T
-                self.shallow_water_options[i].tidal_turbine_farms = {
-                    'everywhere': self.farm_options[i],
-                }
                 self.turbine_drag_coefficients[i] = 0.5*c_T*A_T*self.turbine_densities[i]
+
+                self.shallow_water_options[i].tidal_turbine_farms = {
+                    farm_id: self.farm_options[i] for farm_id in op.farm_ids
+                }
 
     # --- Quantity of Interest
 
     def add_callbacks(self, i):
         super(AdaptiveTurbineProblem, self).add_callbacks(i)
-        # self.get_qoi_kernels(i)
-        # self.callbacks[i].add(QoICallback(self, i), 'timestep')
+        di = self.callback_dir
         for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
-            self.callbacks[i].add(PowerOutputCallback(self, i, farm_id, callback_dir=self.callback_dir), 'timestep')
+            self.callbacks[i].add(PowerOutputCallback(self, i, farm_id, callback_dir=di), 'timestep')
 
     def quantity_of_interest(self):
-        # self.qoi = sum(c['timestep']['qoi'].time_integrate() for c in self.callbacks)
-        # self.qoi = sum(c['timestep']['power_output'].time_integrate() for c in self.callbacks)
-        self.qoi = sum(c['timestep']['power_output_everywhere'].time_integrate() for c in self.callbacks)
+        self.qoi = 0.0
+        for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
+            self.qoi += sum(c['timestep'][farm_id].time_integrate() for c in self.callbacks)
         return self.qoi
 
     def quantity_of_interest_form(self, i):
