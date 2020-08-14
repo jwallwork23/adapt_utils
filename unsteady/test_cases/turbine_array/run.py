@@ -1,9 +1,10 @@
-from thetis import create_directory, print_output
+from thetis import create_directory, print_output, COMM_WORLD
 
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import sys
 from time import perf_counter
 
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
@@ -46,6 +47,13 @@ if not plot_only:
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
     average_power = tp.quantity_of_interest()/op.end_time
     print_output("Average power output of array: {:.1f}W".format(average_power))
+
+# Do not attempt to plot in parallel
+nproc = COMM_WORLD.size
+if nproc > 1:
+    msg = "Will not attempt to plot with {:d} processors. Run again in serial flagging -plot_only."
+    print_output(msg.format(nproc))
+    sys.exit(0)
 
 # Adjust timeseries to account for density of water and assemble as an array
 power_watts = []
