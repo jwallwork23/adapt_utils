@@ -25,9 +25,17 @@ plot_only = bool(args.plot_only or False)
 kwargs = {
     'plot_pvd': True,
 }
+font = {
+    "family" : "DejaVu Sans",
+    "size"   : 16,
+}
+plt.rc('font', **font)
 plotting_kwargs = {
+    "annotation_clip": False,
+    "color": "b",
     "arrowprops": {
         "arrowstyle": "<->",
+        "color": "b",
     },
 }
 op = TurbineArrayOptions(approach=approach)
@@ -78,19 +86,19 @@ array_power_kilowatts = array_power_watts/1.0e+03
 # --- Plot power timeseries of whole array
 
 # Convert to appropriate units and plot
-fig, axes = plt.subplots()
+fig, axes = plt.subplots(figsize=(8, 4))
 time_seconds = np.linspace(0.0, op.end_time, num_timesteps) - op.T_ramp
 time_hours = time_seconds/3600
 time_hours = time_hours[:num_timesteps]
-axes.plot(time_hours, array_power_kilowatts)
+axes.plot(time_hours, array_power_kilowatts, color="grey")
 axes.set_xlabel("Time [h]")
 axes.set_ylabel("Array power output [kW]")
 
 # Add a dashed line when the ramp period is over
-axes.axvline(0.0, linestyle='--', color='k')
+axes.axvline(0.0, linestyle='--', color="b")
 r = op.T_ramp/3600
-axes.annotate("", xy=(-r, 0.0), xytext=(0.0, 0.0), annotation_clip=False, **plotting_kwargs)
-axes.annotate("Spin-up period", xy=(-0.8*r, -3.2), xytext=(-0.8*r, -3.2), annotation_clip=False)
+axes.annotate("", xy=(-r, -20), xytext=(0, -20), **plotting_kwargs)
+axes.annotate("Spin-up period", xy=(-0.9*r, -28), xytext=(-0.9*r, -28), color="b", annotation_clip=False)
 
 # Add second x-axis with non-dimensionalised time
 non_dimensionalise = lambda time: 3600*time/op.T_tide
@@ -108,17 +116,19 @@ for ext in ("png", "pdf"):
 # --- Plot power timeseries of each column of the array
 
 # Convert to appropriate units and plot
-fig, axes = plt.subplots()
-for i in range(5):
-    axes.plot(time_hours, columnar_power_kilowatts[i, :], label="Column {:d}".format(i+1))
+fig, axes = plt.subplots(figsize=(8, 4))
+greys = ['k', 'dimgrey', 'grey', 'darkgrey', 'silver', 'lightgrey']
+for i, (linestyle, colour) in enumerate(zip(["-", "--", ":", "--", "-"], greys)):
+    axes.plot(time_hours, columnar_power_kilowatts[i, :],
+              label="Column {:d}".format(i+1), linestyle=linestyle, color=colour)
 axes.set_xlabel("Time [h]")
 axes.set_ylabel("Power output [kW]")
 axes.legend(loc="upper left")
 
 # Add a dashed line when the ramp period is over
-axes.axvline(0.0, linestyle='--', color='k')
-axes.annotate("", xy=(-r, 0.0), xytext=(0.0, 0.0), annotation_clip=False, **plotting_kwargs)
-axes.annotate("Spin-up period", xy=(-0.8*r, -3.2), xytext=(-0.8*r, -3.2), annotation_clip=False)
+axes.axvline(0.0, linestyle='--', color="b")
+axes.annotate("", xy=(-r, -4.0), xytext=(0.0, -4.0), **plotting_kwargs)
+axes.annotate("Spin-up period", xy=(-0.9*r, -5.6), xytext=(-0.9*r, -5.6), color="b", annotation_clip=False)
 
 # Add second x-axis with non-dimensionalised time
 secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
