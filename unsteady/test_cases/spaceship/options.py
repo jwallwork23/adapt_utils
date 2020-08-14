@@ -53,10 +53,9 @@ class SpaceshipOptions(TurbineOptions):
         self.elev_in = [None for i in range(self.num_meshes)]
 
         # Timestepping
-        # self.timestepper = 'CrankNicolson'
         self.timestepper = 'PressureProjectionPicard'
         self.implicitness_theta = 1.0
-        # self.implicitness_theta = 0.5
+        self.use_semi_implicit_linearisation = True
         self.dt = 10.0
         # self.end_time = self.tidal_forcing_end_time
         self.T_ramp = 2.0*self.T_tide
@@ -123,15 +122,13 @@ class SpaceshipOptions(TurbineOptions):
     def get_update_forcings(self, prob, i, **kwargs):
 
         def update_forcings(t):
-            forcing = float(self.tidal_forcing_interpolator(t - 0.5*self.dt))
+            tau = t - 0.5*self.dt
+            forcing = float(self.tidal_forcing_interpolator(tau))
             self.elev_in[i].assign(forcing)
-            self.print_debug("DEBUG: forcing at time {:.0f} is {:6.4}".format(t, forcing))
+            self.print_debug("DEBUG: forcing at time {:.0f} is {:6.4}".format(tau, forcing))
 
         return update_forcings
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
-        x, y = SpatialCoordinate(prob.meshes[0])
-
-        # Small velocity to avoid zero initial condition
-        u.interpolate(as_vector([1.0e-08, 0.0]))
+        u.interpolate(as_vector([1.0e-08, 0.0]))  # Small velocity to avoid zero initial condition
