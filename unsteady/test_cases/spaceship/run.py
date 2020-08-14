@@ -19,6 +19,7 @@ parser.add_argument("-viscosity_sponge_type", help="""
 If set, a viscosity sponge is used to the forced boundary. Choose from 'linear' or 'exponential'.""")
 parser.add_argument("-stabilisation", help="""
 If set, must be 'lax_friedrichs'. Otherwise, no stabilisation is used.""")
+parser.add_argument("-debug", help="Toggle debugging mode")
 args = parser.parse_args()
 
 approach = args.approach or 'fixed_mesh'
@@ -27,21 +28,26 @@ plot_only = bool(args.plot_only or False)
 kwargs = {
 
     # Model
-    "timestepper": "PressureProjectionPicard",
-    "implicitness_theta": 1.0,
     "stabilisation": args.stabilisation,
     "viscosity_sponge_type": args.viscosity_sponge_type,
     "family": "dg-cg",
 
     # I/O
     'plot_pvd': True,
+
+    # Debugging
+    'debug': bool(args.debug or False),
 }
 
 op = SpaceshipOptions(approach=approach)
 op.update(kwargs)
 if op.viscosity_sponge_type is not None:
     op.di = create_directory(os.path.join(op.di, op.viscosity_sponge_type))
-
+if op.debug:
+    op.solver_parameters_momentum['snes_monitor'] = None
+    op.solver_parameters_pressure['snes_monitor'] = None
+    op.solver_parameters_momentum['ksp_monitor'] = None
+    op.solver_parameters_pressure['ksp_monitor'] = None
 
 # --- Run model
 
@@ -50,7 +56,7 @@ data_dir = create_directory(os.path.join(os.path.dirname(__file__), 'data', 'fix
 fname = os.path.join(data_dir, approach, 'power_output.npy')
 
 # Create solver object
-tp = AdaptiveTurbineProblem(op, callback_dir=data_dir)
+tp = AdaptiveTurbineProblem(op, callback_dir=data_dir, discrete_turbines=True)
 
 # Plot bathymetry and viscosity
 tp.bathymetry_file.write(tp.bathymetry[0])
