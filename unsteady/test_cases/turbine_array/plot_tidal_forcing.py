@@ -7,6 +7,7 @@ import os
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
 
+# Set parameters
 font = {
     "family" : "DejaVu Sans",
     "size"   : 16,
@@ -21,9 +22,9 @@ plotting_kwargs = {
         "arrowstyle": "<->",
     },
 }
+op = TurbineArrayOptions()
 
 # Create parameter object and get time periods
-op = TurbineArrayOptions()
 time_seconds = np.linspace(0.0, op.end_time, 1001) - op.T_ramp
 time_hours = time_seconds/3600
 
