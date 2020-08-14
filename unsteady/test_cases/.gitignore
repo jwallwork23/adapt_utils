@@ -30,7 +30,6 @@ trench/outputs/
 trench/screenshots/
 trench/videos/
 trench/__pycache__/
-turbine_array/*.geo
 turbine_array/nic.py
 turbine_array/output/
 turbine_array/outputs/
