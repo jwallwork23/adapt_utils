@@ -17,6 +17,7 @@ class TurbineArrayOptions(TurbineOptions):
     turbine_width = PositiveFloat(5.0).tag(config=False)
     array_length = PositiveInteger(5).tag(config=False)
     array_width = PositiveInteger(3).tag(config=False)
+    num_turbines = PositiveInteger(15).tag(config=False)
 
     # Domain specification
     mesh_file = os.path.join(os.path.dirname(__file__), 'channel.msh')
@@ -28,7 +29,7 @@ class TurbineArrayOptions(TurbineOptions):
         self.array_ids = np.array([[2, 5, 8, 11, 14],
                                    [3, 6, 9, 12, 15],
                                    [4, 7, 10, 13, 16]])
-        self.farm_ids = tuple(self.array_ids.reshape((15, )))
+        self.farm_ids = tuple(self.array_ids.reshape((self.num_turbines, )))
 
         # Domain and mesh
         if os.path.exists(self.mesh_file):
@@ -56,7 +57,6 @@ class TurbineArrayOptions(TurbineOptions):
         deltax = 10.0*D
         deltay = 7.5*D
         self.region_of_interest = []
-        self.num_turbines = self.array_length*self.array_width
         for i in range(-2, 3):
             for j in range(-1, 2):
                 self.region_of_interest.append((i*deltax, j*deltay, D, d))
