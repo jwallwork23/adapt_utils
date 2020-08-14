@@ -73,9 +73,9 @@ class HorizontalAdvectionTerm(thetis_sw.HorizontalAdvectionTerm):
 
         # Allow for Taylor-Hood discretisation
         if self.u_continuity in ['dg', 'hdiv']:
-            f += inner(dot(uv_old, nabla_grad(uv)), self.u_test)*dx
-        else:
             f += -super(HorizontalAdvectionTerm, self).residual(*args, **kwargs)
+        else:
+            f += inner(dot(uv_old, nabla_grad(uv)), self.u_test)*dx
 
         return -f
 
