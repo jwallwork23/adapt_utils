@@ -17,7 +17,7 @@ class SpaceshipOptions(TurbineOptions):
     # Turbine parameters
     turbine_diameter = PositiveFloat(18.0).tag(config=False)
     num_turbines = PositiveInteger(2).tag(config=False)
-    thrust_coefficient = NonNegativeFloat(8.0).tag(config=True)
+    thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
 
     # Domain specification
     mesh_file = os.path.join(os.path.dirname(__file__), 'spaceship.msh')
@@ -53,9 +53,10 @@ class SpaceshipOptions(TurbineOptions):
         self.elev_in = [None for i in range(self.num_meshes)]
 
         # Timestepping
-        self.timestepper = 'CrankNicolson'
-        # self.timestepper = 'PressureProjectionPicard'
-        # self.implicitness_theta = 1.0
+        # self.timestepper = 'CrankNicolson'
+        self.timestepper = 'PressureProjectionPicard'
+        self.implicitness_theta = 1.0
+        # self.implicitness_theta = 0.5
         self.dt = 10.0
         # self.end_time = self.tidal_forcing_end_time
         self.T_ramp = 2.0*self.T_tide
@@ -71,8 +72,8 @@ class SpaceshipOptions(TurbineOptions):
         self.stabilisation = 'lax_friedrichs'
         # self.stabilisation = None
         self.grad_div_viscosity = False
-        # self.grad_depth_viscosity = True
-        self.grad_depth_viscosity = False
+        self.grad_depth_viscosity = True
+        # self.grad_depth_viscosity = False
         self.family = 'dg-cg'
 
     def set_bathymetry(self, fs):
