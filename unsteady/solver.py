@@ -442,10 +442,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def _create_forward_shallow_water_timestepper(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
         bcs = self.boundary_conditions[i]['shallow_water']
-        kwargs = {
-            'bnd_conditions': bcs,
-            'solver_parameters': self.op.solver_parameters['shallow_water'],
-        }
+        kwargs = {'bnd_conditions': bcs}
         if self.op.timestepper == 'PressureProjectionPicard':
             self.equations[i].shallow_water_momentum = ShallowWaterMomentumEquation(
                 TestFunction(self.V[i].sub(0)),
@@ -462,6 +459,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             kwargs['iterations'] = self.op.picard_iterations
         else:
             args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, self.op.dt, )
+            kwargs['solver_parameters'] = self.op.solver_parameters['shallow_water']
         if self.op.timestepper in ('CrankNicolson', 'PressureProjectionPicard'):
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
