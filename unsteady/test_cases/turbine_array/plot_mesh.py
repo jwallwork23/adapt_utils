@@ -19,7 +19,7 @@ kwargs = {
 }
 font = {
     "family" : "DejaVu Sans",
-    "size"   : 16,
+    "size"   : 24,
 }
 plt.rc("font", **font)
 plt.rc("text", usetex=True)
@@ -28,6 +28,8 @@ patch_kwargs = {
     "linewidth": 2,
 }
 op = TurbineArrayOptions()
+L = op.domain_length
+W = op.domain_width
 
 
 # --- Plot whole mesh
@@ -35,8 +37,11 @@ op = TurbineArrayOptions()
 fig, axes = plt.subplots(figsize=(12, 6))
 triplot(op.default_mesh, axes=axes, **kwargs)
 axes.legend().remove()
+axes.set_xlim([-L/2, L/2])
+axes.set_ylim([-W/2, W/2])
 axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
 axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$")
+axes.set_yticks(np.linspace(-W/2, W/2, 5))
 plt.tight_layout()
 
 # Annotate turbines
@@ -53,9 +58,10 @@ for ext in ("png", "pdf"):
 
 # --- Zoom in on array region
 
-z = 3
-axes.set_xlim([-1500/z, 1500/z])
-axes.set_ylim([-500/z, 500/z])
+z = 6
+axes.set_xlim([-L/z, L/z])
+axes.set_ylim([-W/z, W/z])
+axes.set_yticks(np.linspace(-150, 150, 7))
 
 # Save
 for ext in ("png", "pdf"):
