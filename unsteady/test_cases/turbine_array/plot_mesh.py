@@ -1,8 +1,8 @@
 from thetis import *
 
-import os
 import matplotlib.pyplot as plt
 import matplotlib.patches as ptch
+import os
 
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
