@@ -30,6 +30,7 @@ font = {
     "size"   : 16,
 }
 plt.rc('font', **font)
+plt.rc('text', usetex=True)
 plotting_kwargs = {
     "annotation_clip": False,
     "color": "b",
