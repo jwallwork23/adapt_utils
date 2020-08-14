@@ -47,6 +47,7 @@ class SpaceshipOptions(TurbineOptions):
         self.max_viscosity = 1000.0
         self.friction_coeff = 0.0025
         self.max_depth = 25.5
+        # self.max_depth = 25
 
         # Boundary forcing
         self.interpolate_tidal_forcing()
@@ -60,6 +61,7 @@ class SpaceshipOptions(TurbineOptions):
         # self.end_time = self.tidal_forcing_end_time
         self.T_ramp = 2.0*self.T_tide
         # self.end_time = self.T_ramp + 2.0*self.T_tide
+        # self.end_time = 24*3600.0
         self.end_time = 3*24*3600.0
         self.dt_per_export = 30
 
@@ -68,8 +70,8 @@ class SpaceshipOptions(TurbineOptions):
         self.region_of_interest = [(6050, 0, D, D), (6450, 0, D, D)]
 
         # Solver parameters and discretisation
-        self.stabilisation = 'lax_friedrichs'
-        # self.stabilisation = None
+        self.stabilisation = None
+        # self.stabilisation = 'lax_friedrichs'
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
         # self.grad_depth_viscosity = False
@@ -81,6 +83,7 @@ class SpaceshipOptions(TurbineOptions):
         x1, x2 = 20000, 31500
         y1, y2 = 25.5, 4.5
         bathymetry.interpolate(min_value(((x - x1)*(y2 - y1)/(x2 - x1) + y1), y1))
+        # bathymetry.project(Min(25.0 - 20.0*(x-20000.)/(31500.-20000.), 25.0))
         return bathymetry
 
     def set_viscosity(self, fs):
@@ -106,6 +109,7 @@ class SpaceshipOptions(TurbineOptions):
             msg = "Viscosity sponge type {:s} not recognised."
             raise ValueError(msg.format(self.viscosity_sponge_type))
         nu.interpolate(max_value((x <= 0.0)*sponge, base_viscosity))
+        # nu.interpolate(Max(((5-100)/3000*(30000-sqrt(x*x+y*y)) + 100)*(x<1), 5))
         return nu
 
     def set_boundary_conditions(self, prob, i):
