@@ -44,7 +44,7 @@ class SpaceshipOptions(TurbineOptions):
         self.base_viscosity = 5.0
         self.viscosity_sponge_type = 'linear'
         # self.viscosity_sponge_type = 'exponential'
-        self.max_viscosity = 100.0
+        self.max_viscosity = 1000.0
         self.friction_coeff = 0.0025
         self.max_depth = 25.5
 
