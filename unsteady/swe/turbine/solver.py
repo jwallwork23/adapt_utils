@@ -65,8 +65,9 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
 
     def quantity_of_interest(self):
         self.qoi = 0.0
-        for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
-            self.qoi += sum(c['timestep'][farm_id].time_integrate() for c in self.callbacks)
+        for i in range(self.num_meshes):
+            for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
+                self.qoi += self.callbacks[i]['timestep'][farm_id].time_integrate()
         return self.qoi
 
     def quantity_of_interest_form(self, i):
