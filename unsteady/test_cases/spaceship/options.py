@@ -2,6 +2,7 @@ from thetis import *
 from thetis.configuration import *
 
 from math import e
+import numpy as np
 import os
 
 from adapt_utils.unsteady.swe.turbine.options import TurbineOptions
@@ -16,7 +17,6 @@ class SpaceshipOptions(TurbineOptions):
     # Turbine parameters
     turbine_diameter = PositiveFloat(18.0).tag(config=False)
     num_turbines = PositiveInteger(2).tag(config=False)
-    turbine_tags = [2, 3]
     thrust_coefficient = NonNegativeFloat(8.0).tag(config=True)
 
     # Domain specification
@@ -31,6 +31,8 @@ class SpaceshipOptions(TurbineOptions):
 
     def __init__(self, **kwargs):
         super(SpaceshipOptions, self).__init__(**kwargs)
+        self.array_ids = np.array([3, 2])
+        self.farm_ids = tuple(self.array_ids)
 
         # Domain and mesh
         if os.path.exists(self.mesh_file):
