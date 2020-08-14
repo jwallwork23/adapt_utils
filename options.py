@@ -163,7 +163,7 @@ class Options(FrozenConfigurable):
     # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="""
     Spatial region related to quantity of interest""").tag(config=True)
-    estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)  # TODO: unused
+    estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)  # TODO: unused in unsteady
 
     # Adaptation loop
     element_rtol = PositiveFloat(0.005, help="""
@@ -179,53 +179,10 @@ class Options(FrozenConfigurable):
         Number of iterations in outer adaptation loop.""").tag(config=True)
     indent = Unicode('', help="Indent used in nested print statements.").tag(config=True)
 
-    # Solver parameters for Picard iteration (copied from thetis/options.py)
-    solver_parameters_pressure = PETScSolverParameters({
-        'ksp_type': 'preonly',  # we solve the full schur complement exactly, so no need for outer krylov
-        'mat_type': 'matfree',
-        'pc_type': 'fieldsplit',
-        'pc_fieldsplit_type': 'schur',
-        'pc_fieldsplit_schur_fact_type': 'full',
-        # velocity mass block:
-        'fieldsplit_U_2d': {
-            'ksp_type': 'gmres',
-            'pc_type': 'python',
-            'pc_python_type': 'firedrake.AssembledPC',
-            'assembled_ksp_type': 'preonly',
-            'assembled_pc_type': 'bjacobi',
-            'assembled_sub_pc_type': 'ilu',
-        },
-        # schur system: explicitly assemble the schur system
-        # this only works with pressureprojectionicard if the velocity block is just the mass matrix
-        # and if the velocity is DG so that this mass matrix can be inverted explicitly
-        'fieldsplit_H_2d': {
-            'ksp_type': 'preonly',
-            'pc_type': 'python',
-            'pc_python_type': 'thetis.AssembledSchurPC',
-            'schur_ksp_type': 'gmres',
-            'schur_ksp_max_it': 100,
-            'schur_ksp_converged_reason': False,
-            'schur_pc_type': 'gamg',
-        },
-    }).tag(config=True)
-    solver_parameters_momentum = PETScSolverParameters({
-        'ksp_type': 'gmres',
-            'ksp_converged_reason': False,
-            'pc_type': 'bjacobi',
-            'sub_ksp_type': 'preonly',
-            'sub_pc_type': 'sor',
-    }, help="""
-        Solver parameters for the momentum component of the forward model.
-        
-        Only relevant for timeintegration under PressureProjectionPicard.""").tag(config=True)
-    picard_iterations = PositiveInteger(2, help="""
-        Number of Picard iterations used under PressureProjectionPicard timestepper.
-        """).tag(config=True)
-
     def __init__(self, mesh=None, fpath=None, **kwargs):
         """
-        Upon initialising the class, any kwargs will be added and a output directory path will be created
-        as determined by :attr:`approach` as `outputs/<approach>/`.
+        Upon initialising the class, any kwargs will be added and a output directory path will be
+        created as determined by :attr:`approach` as `outputs/<approach>/`.
 
         :kwarg mesh: a mesh to use as the :attr:`default_mesh` instead of the default one defined in
             the subclass.
@@ -242,6 +199,12 @@ class Options(FrozenConfigurable):
                 set_log_level(INFO)
             else:
                 set_log_level(DEBUG)
+
+        # Extract the default PressureProjectionPicard parameters
+        pressure_op = options.PressureProjectionTimestepperOptions2d()
+        self.solver_parameters_pressure = pressure_op.solver_parameters_pressure
+        self.solver_parameters_momentum = pressure_op.solver_parameters_momentum
+        self.picard_iterations = pressure_op.picard_iterations
 
     def set_all_rtols(self, tol):
         """Set all relative tolerances to a single value, `tol`."""
