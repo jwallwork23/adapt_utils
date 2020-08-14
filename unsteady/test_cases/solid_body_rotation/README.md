@@ -20,7 +20,7 @@ A fixed mesh version of this test case was coded in Firedrake as [demo][1].
 
 ### This implementation
 
-* Unit square domain
+* Options of either unit square domain or circular domain.
 * P1DG with upwinding (see [demo][1]) or P1 with SUPG stabilisation.
 
 ### Remarks
