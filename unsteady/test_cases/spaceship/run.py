@@ -33,10 +33,10 @@ kwargs = {
     "family": "dg-cg",
 
     # I/O
-    'plot_pvd': True,
+    "plot_pvd": True,
 
     # Debugging
-    'debug': bool(args.debug or False),
+    "debug": bool(args.debug or False),
 }
 
 op = SpaceshipOptions(approach=approach)
@@ -46,8 +46,6 @@ if op.viscosity_sponge_type is not None:
 if op.debug:
     op.solver_parameters_momentum['snes_monitor'] = None
     op.solver_parameters_pressure['snes_monitor'] = None
-    op.solver_parameters_momentum['ksp_monitor'] = None
-    op.solver_parameters_pressure['ksp_monitor'] = None
 
 # --- Run model
 

@@ -27,12 +27,13 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         num_turbines = op.num_turbines
 
         # Set up tidal farm object
-        smooth_indicators = kwargs.get('smooth_indicators', True)
-        shape = op.bump if smooth_indicators else op.box
         self.farm_options = [TidalTurbineFarmOptions() for mesh in self.meshes]
         self.turbine_densities = [None for mesh in self.meshes]
         self.turbine_drag_coefficients = [None for mesh in self.meshes]
         c_T = op.get_thrust_coefficient(correction=kwargs.get('thrust_correction', True))
+        if not discrete_turbines:
+            smooth_indicators = kwargs.get('smooth_indicators', True)
+            shape = op.bump if smooth_indicators else op.box
         if hasattr(op, 'turbine_diameter'):
             D = op.turbine_diameter
             A_T = D**2
