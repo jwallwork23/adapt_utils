@@ -469,7 +469,8 @@ class TohokuOptions(TsunamiOptions):
 
             # Setup interpolator
             if not self.synthetic:
-                self.sample_timeseries(gauge, sample=1 if self.noisy_data else gauge["sample"])
+                sample = 1 if self.noisy_data else gauge["sample"]
+                self.sample_timeseries(gauge, sample=sample, detide=True)
 
             # Assemble an area-normalised indicator function
             x, y = gauge_dat["coords"]
