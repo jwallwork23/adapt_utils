@@ -45,25 +45,12 @@ parser.add_argument("-smooth_timeseries", help="Toggle discrete or smoothed time
 
 # I/O and debugging
 parser.add_argument("-plot_only", help="Just plot parameter space and optimisation progress")
+parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-debug", help="Toggle debugging")
 parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
 
 # --- Set parameters
-
-# Fonts
-matplotlib.rc('text', usetex=True)
-matplotlib.rcParams['mathtext.fontset'] = 'custom'
-matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
-matplotlib.rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
-matplotlib.rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
-matplotlib.rcParams['mathtext.fontset'] = 'stix'
-matplotlib.rcParams['font.family'] = 'STIXGeneral'
-
-# Plotting
-fontsize = 22
-fontsize_tick = 18
-plotting_kwargs = {'markevery': 5}
 
 # Parsed arguments
 args = parser.parse_args()
@@ -71,10 +58,13 @@ level = int(args.level or 0)
 recompute = bool(args.recompute_parameter_space or False)
 recompute_reg = bool(args.recompute_reg_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
+plot_pdf = bool(args.plot_pdf or False)
+plot_pvd = bool(args.plot_pvd or False)
 plot_only = bool(args.plot_only or False)
+if plot_only:
+    plot_pdf = True
 if optimise or recompute:
     assert not plot_only
-plot_pvd = bool(args.plot_pvd or False)
 real_data = bool(args.real_data or False)
 if args.optimal_control is not None:
     assert not real_data
@@ -105,6 +95,22 @@ kwargs = {
 use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 nonlinear = bool(args.nonlinear or False)
 op = TohokuGaussianBasisOptions(**kwargs)
+
+if plot_pdf:
+
+    # Fonts
+    matplotlib.rc('text', usetex=True)
+    matplotlib.rcParams['mathtext.fontset'] = 'custom'
+    matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
+    matplotlib.rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
+    matplotlib.rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
+    matplotlib.rcParams['mathtext.fontset'] = 'stix'
+    matplotlib.rcParams['font.family'] = 'STIXGeneral'
+
+    # Plotting
+    fontsize = 22
+    fontsize_tick = 18
+    plotting_kwargs = {'markevery': 5}
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
@@ -163,7 +169,7 @@ if use_regularisation:
 op.control_parameters[0].assign(float(args.initial_guess or 10.0))
 
 # Plot parameter space
-if recompute:
+if recompute and plot_pdf:
     fig, axes = plt.subplots(figsize=(8, 8))
     axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8, markevery=10)
     if use_regularisation:
@@ -218,24 +224,25 @@ if not plot_only:
     swp.checkpointing = True
 
     # Plot timeseries
-    gauges = list(op.gauges.keys())
-    N = int(np.ceil(np.sqrt(len(gauges))))
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
-    for i, gauge in enumerate(gauges):
-        T = np.array(op.gauges[gauge]['times'])/60
-        ax = axes[i//N, i % N]
-        ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-        ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' simulated', **plotting_kwargs)
-        ax.legend(loc='upper left')
-        ax.set_xlabel('Time (min)', fontsize=fontsize)
-        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-        plt.xticks(fontsize=fontsize_tick)
-        plt.yticks(fontsize=fontsize_tick)
-        ax.grid()
-    for i in range(len(gauges), N*N):
-        axes[i//N, i % N].axis(False)
-    plt.tight_layout()
-    plt.savefig(os.path.join(plot_dir, 'timeseries_{:d}.pdf'.format(level)))
+    if plot_pdf:
+        gauges = list(op.gauges.keys())
+        N = int(np.ceil(np.sqrt(len(gauges))))
+        fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
+        for i, gauge in enumerate(gauges):
+            T = np.array(op.gauges[gauge]['times'])/60
+            ax = axes[i//N, i % N]
+            ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
+            ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' simulated', **plotting_kwargs)
+            ax.legend(loc='upper left')
+            ax.set_xlabel('Time (min)', fontsize=fontsize)
+            ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+            plt.xticks(fontsize=fontsize_tick)
+            plt.yticks(fontsize=fontsize_tick)
+            ax.grid()
+        for i in range(len(gauges), N*N):
+            axes[i//N, i % N].axis(False)
+        plt.tight_layout()
+        plt.savefig(os.path.join(plot_dir, 'timeseries_{:d}.pdf'.format(level)))
 
 # Get filename for tracking progress
 fname = os.path.join(di, 'continuous', 'optimisation_progress_{:s}')
@@ -296,70 +303,72 @@ else:
         optimised_value = control_values_opt[-1]
         print_output("StagnationError: Stagnation of objective functional")
 
-# Fit a quadratic to the first three points and find its root
-assert len(control_values[::4]) == 3
-q = scipy.interpolate.lagrange(control_values[::4], func_values[::4])
-dq = q.deriv()
-q_min = -dq.coefficients[1]/dq.coefficients[0]
-assert dq.deriv().coefficients[0] > 0
-print_output("Minimiser of quadratic: {:.4f}".format(q_min))
-assert np.isclose(dq(q_min), 0.0)
+if plot_pdf:
 
-# Fit quadratic to regularised functional values
-if use_regularisation:
-    q_reg = scipy.interpolate.lagrange(control_values[::4], func_values_reg[::4])
-    dq_reg = q_reg.deriv()
-    q_reg_min = -dq_reg.coefficients[1]/dq_reg.coefficients[0]
-    assert dq_reg.deriv().coefficients[0] > 0
-    print_output("Minimiser of quadratic (regularised): {:.4f}".format(q_reg_min))
-    assert np.isclose(dq_reg(q_reg_min), 0.0)
+    # Fit a quadratic to the first three points and find its root
+    assert len(control_values[::4]) == 3
+    q = scipy.interpolate.lagrange(control_values[::4], func_values[::4])
+    dq = q.deriv()
+    q_min = -dq.coefficients[1]/dq.coefficients[0]
+    assert dq.deriv().coefficients[0] > 0
+    print_output("Minimiser of quadratic: {:.4f}".format(q_min))
+    assert np.isclose(dq(q_min), 0.0)
 
-# Plot progress of optimisation routine
-fig, axes = plt.subplots(figsize=(8, 8))
-params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'markevery': 10, }
-if use_regularisation:
-    params['label'] = r'$\alpha=0.00$'
-else:
-    params['label'] = r'Parameter space'
-x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
-axes.plot(x, q(x), '--x', **params)
-params = {'markersize': 14, 'color': 'C0', }
-if use_regularisation:
-    params['label'] = r'$m^\star|_{{\alpha=0.00}} = {:.4f}$'.format(q_min)
-else:
-    params['label'] = r'$m^\star = {:.4f}$'.format(q_min)
-axes.plot(q_min, q(q_min), '*', **params)
-if use_regularisation:
-    params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': r'$\alpha = {:.2f}$'.format(op.regularisation), 'markevery': 10, }
-    axes.plot(x, q_reg(x), '--x', **params)
-    params = {'markersize': 14, 'color': 'C6', 'label': r'$m^\star|_{{\alpha={:.2f}}} = {:.2f}$'.format(op.regularisation, q_reg_min), }
-    axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
-params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
-axes.plot(control_values_opt, func_values_opt, 'o', **params)
-delta_m = 0.25
-params = {'linewidth': 3, 'markersize': 8, 'color': 'C2', }
-for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
-    x = np.array([m - delta_m, m + delta_m])
+    # Fit quadratic to regularised functional values
+    if use_regularisation:
+        q_reg = scipy.interpolate.lagrange(control_values[::4], func_values_reg[::4])
+        dq_reg = q_reg.deriv()
+        q_reg_min = -dq_reg.coefficients[1]/dq_reg.coefficients[0]
+        assert dq_reg.deriv().coefficients[0] > 0
+        print_output("Minimiser of quadratic (regularised): {:.4f}".format(q_reg_min))
+        assert np.isclose(dq_reg(q_reg_min), 0.0)
+
+    # Plot progress of optimisation routine
+    fig, axes = plt.subplots(figsize=(8, 8))
+    params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'markevery': 10, }
+    if use_regularisation:
+        params['label'] = r'$\alpha=0.00$'
+    else:
+        params['label'] = r'Parameter space'
+    x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
+    axes.plot(x, q(x), '--x', **params)
+    params = {'markersize': 14, 'color': 'C0', }
+    if use_regularisation:
+        params['label'] = r'$m^\star|_{{\alpha=0.00}} = {:.4f}$'.format(q_min)
+    else:
+        params['label'] = r'$m^\star = {:.4f}$'.format(q_min)
+    axes.plot(q_min, q(q_min), '*', **params)
+    if use_regularisation:
+        params = {'linewidth': 1, 'markersize': 8, 'color': 'C6', 'label': r'$\alpha = {:.2f}$'.format(op.regularisation), 'markevery': 10, }
+        axes.plot(x, q_reg(x), '--x', **params)
+        params = {'markersize': 14, 'color': 'C6', 'label': r'$m^\star|_{{\alpha={:.2f}}} = {:.2f}$'.format(op.regularisation, q_reg_min), }
+        axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
+    params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
+    axes.plot(control_values_opt, func_values_opt, 'o', **params)
+    delta_m = 0.25
+    params = {'linewidth': 3, 'markersize': 8, 'color': 'C2', }
+    for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
+        x = np.array([m - delta_m, m + delta_m])
+        axes.plot(x, g*(x-m) + f, '-', **params)
+    params['label'] = 'Computed gradient'
     axes.plot(x, g*(x-m) + f, '-', **params)
-params['label'] = 'Computed gradient'
-axes.plot(x, g*(x-m) + f, '-', **params)
-axes.set_xlabel(r"Basis function coefficient, $m$", fontsize=fontsize)
-axes.set_ylabel(r"Square error", fontsize=fontsize)
-plt.xticks(fontsize=fontsize_tick)
-plt.yticks(fontsize=fontsize_tick)
-plt.xlim([1.5, 10.5])
-plt.ylim([0.0, 1.1*func_values[-1]])
-plt.tight_layout()
-axes.grid()
-plt.legend(fontsize=fontsize)
-axes.annotate(
-    r'$m = {:.4f}$'.format(control_values_opt[-1]),
-    xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
-)
-fname = os.path.join(plot_dir, 'continuous', 'optimisation_progress')
-if use_regularisation:
-    fname = '_'.join([fname, 'reg'])
-plt.savefig('_'.join([fname, '{:d}.pdf'.format(level)]))
+    axes.set_xlabel(r"Basis function coefficient, $m$", fontsize=fontsize)
+    axes.set_ylabel(r"Square error", fontsize=fontsize)
+    plt.xticks(fontsize=fontsize_tick)
+    plt.yticks(fontsize=fontsize_tick)
+    plt.xlim([1.5, 10.5])
+    plt.ylim([0.0, 1.1*func_values[-1]])
+    plt.tight_layout()
+    axes.grid()
+    plt.legend(fontsize=fontsize)
+    axes.annotate(
+        r'$m = {:.4f}$'.format(control_values_opt[-1]),
+        xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
+    )
+    fname = os.path.join(plot_dir, 'continuous', 'optimisation_progress')
+    if use_regularisation:
+        fname = '_'.join([fname, 'reg'])
+    plt.savefig('_'.join([fname, '{:d}.pdf'.format(level)]))
 
 if not plot_only:
 
@@ -376,23 +385,24 @@ if not plot_only:
     print_output("Mean square error QoI after optimisation = {:.4e}".format(J))
 
     # Plot timeseries for both initial guess and optimised control
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
-    for i, gauge in enumerate(gauges):
-        T = np.array(op.gauges[gauge]['times'])/60
-        ax = axes[i//N, i % N]
-        ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-        ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' initial guess', **plotting_kwargs)
-        ax.plot(T, op_opt.gauges[gauge][timeseries_type], '--x', label=gauge + ' optimised', **plotting_kwargs)
-        ax.legend(loc='upper left')
-        ax.set_xlabel('Time (min)', fontsize=fontsize)
-        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-        plt.xticks(fontsize=fontsize_tick)
-        plt.yticks(fontsize=fontsize_tick)
-        ax.grid()
-    for i in range(len(gauges), N*N):
-        axes[i//N, i % N].axis(False)
-    plt.tight_layout()
-    plt.savefig(os.path.join(plot_di, 'continuous', 'timeseries_optimised_{:d}.pdf'.format(level)))
+    if plot_pdf:
+        fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
+        for i, gauge in enumerate(gauges):
+            T = np.array(op.gauges[gauge]['times'])/60
+            ax = axes[i//N, i % N]
+            ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
+            ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' initial guess', **plotting_kwargs)
+            ax.plot(T, op_opt.gauges[gauge][timeseries_type], '--x', label=gauge + ' optimised', **plotting_kwargs)
+            ax.legend(loc='upper left')
+            ax.set_xlabel('Time (min)', fontsize=fontsize)
+            ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+            plt.xticks(fontsize=fontsize_tick)
+            plt.yticks(fontsize=fontsize_tick)
+            ax.grid()
+        for i in range(len(gauges), N*N):
+            axes[i//N, i % N].axis(False)
+        plt.tight_layout()
+        plt.savefig(os.path.join(plot_di, 'continuous', 'timeseries_optimised_{:d}.pdf'.format(level)))
 
     # Compare total variation
     msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"
