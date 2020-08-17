@@ -275,7 +275,7 @@ axes.annotate(
     r'$m = {:.4f}$'.format(control_values_opt[-1]),
     xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
-plt.savefig(os.path.join(plot_dir, 'optimisation_progress_discrete_{:d}.pdf'.format(level)))
+plt.savefig(os.path.join(plot_dir, 'discrete', 'optimisation_progress_{:d}.pdf'.format(level)))
 
 if not plot_only:
     tape = get_working_tape()
@@ -315,7 +315,7 @@ if not plot_only:
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
-    plt.savefig(os.path.join(plot_dir, 'timeseries_optimised_discrete_{:d}.pdf'.format(level)))
+    plt.savefig(os.path.join(plot_dir, 'discrete', 'timeseries_optimised_{:d}.pdf'.format(level)))
 
     # Compare total variation
     msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"
