@@ -64,7 +64,7 @@ class TohokuOptions(TsunamiOptions):
 
         # Mesh
         self.print_debug("INIT: Loading mesh...")
-        self.resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
+        self.resource_dir = os.path.join(os.path.dirname(__file__), '..', 'resources')
         self.level = level
         self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(self.level))
         postproc = kwargs.get('postproc', False)
@@ -92,8 +92,6 @@ class TohokuOptions(TsunamiOptions):
 
         # Timestepping
         # ============
-        #
-        # NOTES:
         #  * We export once per minute.
         #  * There is a trade-off between having an unneccesarily small timestep and being able to
         #    represent the gauge timeseries profiles.
@@ -104,6 +102,8 @@ class TohokuOptions(TsunamiOptions):
         # self.start_time = kwargs.get('start_time', 15*60.0)
         # self.end_time = kwargs.get('end_time', 24*60.0)
         self.end_time = kwargs.get('end_time', 60*60.0)
+        self.num_timesteps = int(self.end_time/self.dt + 1)
+        self.times = [i*self.dt for i in range(self.num_timesteps)]
 
         # Compute CFL number
         if self.debug:
@@ -118,6 +118,41 @@ class TohokuOptions(TsunamiOptions):
             msg = "dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
             print_output(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
             self.print_debug("INIT: Done!")
+
+        # Gauge classifications
+        self.near_field_pressure_gauges = {
+            "gauges": ( "P02", "P06"),
+            "arrival_time": 0.0,
+            "weight": Constant(1.0),
+        }
+        self.mid_field_pressure_gauges = {
+            "gauges": ("KPG1", "KPG2", "21418"),
+            # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21418"),
+            "arrival_time": 10*60.0,
+            "weight": Constant(1.0),
+        }
+        self.far_field_pressure_gauges = {
+            "gauges": ("21401", "21413", "21419"),
+            "arrival_time": 50*60.0,
+            "weight": Constant(1.0),
+        }
+        self.near_field_gps_gauges = {
+            "gauges": ("801", "802", "803", "804", "806", "807"),
+            "arrival_time": 5*60.0,
+            "weight": Constant(1.0),
+        }
+        self.far_field_gps_gauges = {
+            "gauges": ("811", "812", "813", "815"),
+            "arrival_time": 10*60.0,
+            "weight": Constant(1.0),
+        }
+        self.gauge_classifications_to_consider = (
+            "near_field_pressure",
+            "mid_field_pressure",
+            "far_field_pressure",
+            "near_field_gps",
+            # "far_field_gps",
+        )
 
         # Get gauges and locations of interest
         self.get_gauges()
@@ -248,54 +283,42 @@ class TohokuOptions(TsunamiOptions):
             "21419": {"lonlat": (155.717, 44.435), "depth": 5282.0, "operator": "NOAA"},
         }
 
-        # Gauge classifications
-        self.near_field_pressure_gauges = {
-            "gauges": ( "P02", "P06"),
-            "arrival_time": 0.0,
-            "weight": Constant(1.0),
-        }
-        for gauge in self.near_field_pressure_gauges["gauges"]:
-            self.gauges[gauge]["class"] = "near_field_pressure"
-        self.mid_field_pressure_gauges = {
-            "gauges": ("KPG1", "KPG2", "21418"),
-            # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21418"),
-            "arrival_time": 10*60.0,
-            "weight": Constant(1.0),
-        }
-        for gauge in self.mid_field_pressure_gauges["gauges"]:
-            self.gauges[gauge]["class"] = "mid_field_pressure"
-        self.far_field_pressure_gauges = {
-            "gauges": ("21401", "21413", "21419"),
-            "arrival_time": 50*60.0,
-            "weight": Constant(1.0),
-        }
-        for gauge in self.far_field_pressure_gauges["gauges"]:
-            self.gauges[gauge]["class"] = "far_field_pressure"
-        self.near_field_gps_gauges = {
-            "gauges": ("801", "802", "803", "804", "806", "807"),
-            "arrival_time": 5*60.0,
-            "weight": Constant(1.0),
-        }
-        for gauge in self.near_field_gps_gauges["gauges"]:
-            self.gauges[gauge]["class"] = "near_field_gps"
-        self.far_field_gps_gauges = {
-            "gauges": ("811", "812", "813", "815"),
-            "arrival_time": 10*60.0,
-            "weight": Constant(1.0),
-        }
-        for gauge in self.far_field_gps_gauges["gauges"]:
-            self.gauges[gauge]["class"] = "far_field_gps"
+        # Record the class containing each gauge and copy over parameters
+        self.pressure_gauges = ()
+        self.gps_gauges = ()
+        gauge_classifications_to_consider = list(self.gauge_classifications_to_consider)
+        for gauge_class in self.gauge_classifications_to_consider
+            gauge_class_obj = self.__getattribute__("_".join([gauge_class, "gauges"]))
+            arrival_time = gauge_class_obj["arrival_time"]
+            if arrival_time >= self.end_time:
+                gauge_classifications_to_consider.remove(gauge_class)
+                msg = "WARNING: Removing gauge class {:s} due to late arrival time."
+                self.print_debug(msg.format(gauge_class))
+                continue
+            gauges = gauge_class_obj["gauges"]
+            for gauge in gauges:
+                self.gauges[gauge]["class"] = gauge_class
 
-        # Gauges for consideration
-        self.pressure_gauges = self.near_field_pressure_gauges["gauges"]
-        self.pressure_gauges += self.mid_field_pressure_gauges["gauges"]
-        self.pressure_gauges += self.far_field_pressure_gauges["gauges"]
-        self.gps_gauges = self.near_field_gps_gauges["gauges"]
-        self.gps_gauges += self.far_field_gps_gauges["gauges"]
+                # Arrival time of tsunami weight
+                self.gauges[gauge]["arrival_time"] = arrival_time
+                self.gauges[gauge]["times"] = [t for t in self.times if t >= arrival_time]
+
+                # Optional weighting of gauge classes
+                self.gauges[gauge]["weight"] = gauge_class_obj["weight"]
+
+            # Note gauges to consider
+            if "pressure" in gauge_class:
+                self.pressure_gauges += gauges
+            elif "gps" in gauge_class:
+                self.gps_gauges += gauges
+        self.gauge_classifications_to_consider = tuple(self.gauge_classifications_to_consider)
         gauges_to_consider = self.pressure_gauges + self.gps_gauges
         for gauge in list(self.gauges.keys()):
+
+            # Remove unused gauges (e.g. we don't use MPG1 or MPG2)
             if gauge not in gauges_to_consider:
-                self.gauges.pop(gauge)  # e.g. we don't use MPG1 or MPG2
+                self.gauges.pop(gauge)
+                continue
 
         # Convert coordinates to UTM and create timeseries array
         for gauge in gauges_to_consider:
@@ -315,18 +338,10 @@ class TohokuOptions(TsunamiOptions):
                 self.gauges.pop(gauge)
         self.print_debug("INIT: Done!")
 
-    def get_arrival_time(self, gauge):
-        """Read the estimated tsunami wave arrival time for a particular gauge from its class."""
-        return self.__getattribute__("_".join([self.gauges[gauge]["class"], "gauges"]))["arrival_time"]
-
-    def get_weight(self, gauge):
-        """Read the weighting for a particular gauge from its class."""
-        return self.__getattribute__("_".join([self.gauges[gauge]["class"], "gauges"]))["weight"]
-
     def get_locations_of_interest(self, **kwargs):
         """
-        Read in locations of interest, determine their coordinates and check these coordinate lie within
-        the domain.
+        Read in locations of interest, determine their coordinates and check these coordinate lie
+        within the domain.
 
         The possible coastal locations of interest include major cities and nuclear power plants:
 
@@ -406,7 +421,6 @@ class TohokuOptions(TsunamiOptions):
 
         mesh = eta.function_space().mesh()
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
-        self.times = []
         for gauge in self.gauges:
             gauge_dat = self.gauges[gauge]
             gauge_dat["obs"] = Constant(0.0)     # Constant associated with free surface observations
@@ -444,7 +458,6 @@ class TohokuOptions(TsunamiOptions):
             dt = self.dt
             t = t - dt
             quadrature_weight = Constant(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
-            self.times.append(t)
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
                 I = gauge_dat["indicator"]
@@ -464,7 +477,8 @@ class TohokuOptions(TsunamiOptions):
 
                 # Read data
                 interpolator = gauge_dat["interpolator"]
-                obs = gauge_dat["data"][prob.iteration] if self.synthetic else float(interpolator(t))
+                idx = len(gauge_dat["data"]) - self.num_timesteps + prob.iteration
+                obs = gauge_dat["data"][idx] if self.synthetic else float(interpolator(t))
                 gauge_dat["obs"].assign(obs)
                 if self.save_timeseries:
                     if not self.synthetic:
@@ -518,7 +532,7 @@ class TohokuOptions(TsunamiOptions):
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
                 if t < gauge_data["arrival_time"]:  # TODO: Do we need to add/subtract a timestep?
-                    weights[gauge] = gauge_dat["weight"].values()[0]
+                    weights[gauge] = gauge_dat["weight"].dat.data[0]
                     gauge_dat["weight"].assign(0.0)
                 obs = gauge_dat["data"][prob.iteration-1] if self.synthetic else float(interpolator(t))
                 gauge_dat["obs"].assign(obs)
