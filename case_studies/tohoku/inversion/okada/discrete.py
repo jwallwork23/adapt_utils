@@ -9,6 +9,7 @@ import scipy
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
+from adapt_utils.misc import taylor_test
 from adapt_utils.norms import vecnorm
 
 
@@ -23,6 +24,7 @@ class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
 level = 0
 real_data = False
 optimise = True
+test_gradient = True
 N = 51
 active_controls = ('slip', 'rake')
 tape_tag = 0
@@ -145,6 +147,10 @@ def gradient(m):
     # Print optimisation progress
     print_output("J = {:.4e}  dJdm = {:.4e}".format(op.J, vecnorm(dJdm, order=np.Inf)))
     return dJdm
+
+# Taylor test the gradient
+if test_gradient:
+    taylor_test(reduced_functional, gradient, m_init, verbose=True)
 
 
 # Run optimisation
