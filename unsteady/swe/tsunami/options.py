@@ -162,25 +162,25 @@ class TsunamiOptions(CoupledOptions):
         return interpolate(2*self.Omega*sin(radians(lat)), fs)
 
     def set_qoi_kernel(self, prob, i):
-        fs = prob.V[i]
-
-        # b = self.ball(fs.mesh(), source=False)
-        # b = self.circular_bump(fs.mesh(), source=False)
-        b = self.gaussian(fs.mesh(), source=False)
+        # b = self.ball(prob.meshes[i], source=False)
+        # b = self.circular_bump(prob.meshes[i], source=False)
+        b = self.gaussian(prob.meshes[i], source=False)
 
         # TODO: Normalise by area computed on fine reference mesh
         # area = assemble(b*dx)
         # area_fine_mesh = ...
-        # rescaling = 1.0 if np.allclose(area, 0.0) else area_fine_mesh/area
-        rescaling = 1.0
+        # rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
+        rescaling = Constant(1.0)
 
-        prob.kernels[i] = Function(fs, name="QoI kernel")
+        prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
         kernel_u, kernel_eta = prob.kernels[i].split()
-        kernel_u.rename("QoI kernel (uv component)")
-        kernel_eta.rename("QoI kernel (elev component)")
+        kernel_u.rename("QoI kernel (velocity component)")
+        kernel_eta.rename("QoI kernel (elevation component)")
         kernel_eta.interpolate(rescaling*b)
 
     def set_terminal_condition(self, prob):  # TODO: For hazard case
+        prob.adj_solutions[-1].assign(0.0)
+
         # # b = self.ball(prob.meshes[-1], source=False)
         # # b = self.circular_bump(prob.meshes[-1], source=False)
         # b = self.gaussian(prob.meshes[-1], source=False)
@@ -235,6 +235,8 @@ class TsunamiOptions(CoupledOptions):
         Since some of the timeseries are rather noisy, there is an optional `sample` parameter, which
         averages over the specified number of datapoints before interpolating.
 
+        If the sampling frequency is set to unity then the raw data is used.
+
         Keyword arguments are passed to `scipy.interpolate.interp1d`.
         """
         if detide:
@@ -246,18 +248,21 @@ class TsunamiOptions(CoupledOptions):
             data[:] = timeseries
 
         # Process data
-        i, time_prev = 0, 0.0
+        time_prev = 0.0
         sampled_times, sampled_data, running = [], [], []
-        for time, dat in zip(times, data):
+        for i, (time, dat) in enumerate(zip(times, data)):
             if np.isnan(dat):
                 continue
-            running.append(dat)
-            if i % sample == 0 and i > 0:
-                sampled_times.append(0.5*(time + time_prev))
-                sampled_data.append(np.mean(running))
-                time_prev = time
-                running = []
-            i += 1
+            if sample == 1:
+                sampled_times.append(time)
+                sampled_data.append(dat)
+            else:
+                running.append(dat)
+                if i % sample == 0 and i > 0:
+                    sampled_times.append(0.5*(time + time_prev))
+                    sampled_data.append(np.mean(running))
+                    time_prev = time
+                    running = []
 
         # Construct interpolant
         kwargs.setdefault('bounds_error', False)
