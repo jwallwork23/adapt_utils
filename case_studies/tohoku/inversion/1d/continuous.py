@@ -44,7 +44,7 @@ parser.add_argument("-real_data", help="Toggle whether to use real data")
 parser.add_argument("-smooth_timeseries", help="Toggle discrete or smoothed timeseries data")
 
 # I/O and debugging
-parser.add_argument("-plot_only", help="Just plot parameter space and optimisation progress")
+parser.add_argument("-plot_only", help="Just plot parameter space, optimisation progress and timeseries")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-debug", help="Toggle debugging")
@@ -184,7 +184,18 @@ if recompute and plot_pdf:
 
 # --- Optimisation
 
-if not plot_only:
+gauges = list(op.gauges.keys())
+if plot_only:
+
+    # Load timeseries
+    for gauge in gauges:
+        fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
+        op.gauges[gauge]['data'] = np.load(fname)
+        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
+        op.gauges[gauge][timeseries_type] = np.load(fname)
+
+else:
+
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True)
 
     def reduced_functional(m):
@@ -223,26 +234,32 @@ if not plot_only:
     op.save_timeseries = False
     swp.checkpointing = True
 
-    # Plot timeseries
-    if plot_pdf:
-        gauges = list(op.gauges.keys())
-        N = int(np.ceil(np.sqrt(len(gauges))))
-        fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
-        for i, gauge in enumerate(gauges):
-            T = np.array(op.gauges[gauge]['times'])/60
-            ax = axes[i//N, i % N]
-            ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-            ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' simulated', **plotting_kwargs)
-            ax.legend(loc='upper left')
-            ax.set_xlabel('Time (min)', fontsize=fontsize)
-            ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-            plt.xticks(fontsize=fontsize_tick)
-            plt.yticks(fontsize=fontsize_tick)
-            ax.grid()
-        for i in range(len(gauges), N*N):
-            axes[i//N, i % N].axis(False)
-        plt.tight_layout()
-        plt.savefig(os.path.join(plot_dir, 'timeseries_{:d}.pdf'.format(level)))
+    # Save timeseries
+    for gauge in gauges:
+        fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
+        np.save(fname, op.gauges[gauge]['data'])
+        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
+        np.save(fname, op.gauges[gauge][timeseries_type])
+
+# Plot timeseries
+if plot_pdf:
+    N = int(np.ceil(np.sqrt(len(gauges))))
+    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
+    for i, gauge in enumerate(gauges):
+        T = np.array(op.gauges[gauge]['times'])/60
+        ax = axes[i//N, i % N]
+        ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
+        ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' simulated', **plotting_kwargs)
+        ax.legend(loc='upper left')
+        ax.set_xlabel('Time (min)', fontsize=fontsize)
+        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+        plt.xticks(fontsize=fontsize_tick)
+        plt.yticks(fontsize=fontsize_tick)
+        ax.grid()
+    for i in range(len(gauges), N*N):
+        axes[i//N, i % N].axis(False)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plot_dir, 'timeseries_{:d}.pdf'.format(level)))
 
 # Get filename for tracking progress
 fname = os.path.join(di, 'continuous', 'optimisation_progress_{:s}')
@@ -370,7 +387,16 @@ if plot_pdf:
         fname = '_'.join([fname, 'reg'])
     plt.savefig('_'.join([fname, '{:d}.pdf'.format(level)]))
 
-if not plot_only:
+if plot_only:
+
+    # Load timeseries
+    for gauge in gauges:
+        fname = os.path.join(op.di, '_'.join([gauge, 'data', str(level) + '.npy']))
+        op.gauges[gauge]['data'] = np.load(fname)
+        fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
+        op.gauges[gauge][timeseries_type] = np.load(fname)
+
+else:
 
     # Run forward again so that we can compare timeseries
     kwargs['control_parameters'] = [optimised_value, ]
@@ -384,25 +410,12 @@ if not plot_only:
     J = op.J
     print_output("Mean square error QoI after optimisation = {:.4e}".format(J))
 
-    # Plot timeseries for both initial guess and optimised control
-    if plot_pdf:
-        fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
-        for i, gauge in enumerate(gauges):
-            T = np.array(op.gauges[gauge]['times'])/60
-            ax = axes[i//N, i % N]
-            ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-            ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' initial guess', **plotting_kwargs)
-            ax.plot(T, op_opt.gauges[gauge][timeseries_type], '--x', label=gauge + ' optimised', **plotting_kwargs)
-            ax.legend(loc='upper left')
-            ax.set_xlabel('Time (min)', fontsize=fontsize)
-            ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-            plt.xticks(fontsize=fontsize_tick)
-            plt.yticks(fontsize=fontsize_tick)
-            ax.grid()
-        for i in range(len(gauges), N*N):
-            axes[i//N, i % N].axis(False)
-        plt.tight_layout()
-        plt.savefig(os.path.join(plot_di, 'continuous', 'timeseries_optimised_{:d}.pdf'.format(level)))
+    # Save timeseries
+    for gauge in gauges:
+        fname = os.path.join(op.di, '_'.join([gauge, 'data', str(level)]))
+        np.save(fname, op.gauges[gauge]['data'])
+        fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level)]))
+        np.save(fname, op.gauges[gauge][timeseries_type])
 
     # Compare total variation
     msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"
@@ -419,3 +432,23 @@ if not plot_only:
 
     if plot_pvd:
         swp.solve_adjoint()
+
+# Plot timeseries for both initial guess and optimised control
+if plot_pdf:
+    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
+    for i, gauge in enumerate(gauges):
+        T = np.array(op.gauges[gauge]['times'])/60
+        ax = axes[i//N, i % N]
+        ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
+        ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' initial guess', **plotting_kwargs)
+        ax.plot(T, op_opt.gauges[gauge][timeseries_type], '--x', label=gauge + ' optimised', **plotting_kwargs)
+        ax.legend(loc='upper left')
+        ax.set_xlabel('Time (min)', fontsize=fontsize)
+        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+        plt.xticks(fontsize=fontsize_tick)
+        plt.yticks(fontsize=fontsize_tick)
+        ax.grid()
+    for i in range(len(gauges), N*N):
+        axes[i//N, i % N].axis(False)
+    plt.tight_layout()
+    plt.savefig(os.path.join(plot_di, 'continuous', 'timeseries_optimised_{:d}.pdf'.format(level)))
