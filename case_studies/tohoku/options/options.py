@@ -19,12 +19,15 @@ class TohokuOptions(TsunamiOptions):
     for source inversion experiments and also for validating model runs. There are five gauge
     classifications ('near_field_pressure', 'mid_field_pressure', 'far_field_pressure',
     'near_field_gps', 'far_field_gps'), each of which has at least two gauges associated. The
-    arrival times, departure times and weighting for each classification are customisable, as are
-    the choices of gauges / gauge classifications to include or ignore. After modifying the details
-    as desired, call :attr:`get_gauges` to pass the data into the :attr:`gauges` dictionary
-    appropriately. Only gauges contained in that dictionary will be used during simulations.
+    arrival times, departure times, weighting and sampling frequency for each classification are
+    customisable, as are the choices of gauges / gauge classifications to include or ignore.
 
-    Data sources:
+    After modifying the details as desired, call :attr:`get_gauges` to pass the data into the
+    :attr:`gauges` dictionary appropriately. Only gauges contained in that dictionary will be used
+    during simulations.
+
+    Data sources
+    ============
 
       * Bathymetry data extracted from both GEBCO (https://www.gebco.net/) and ETOPO1
         (https://www.ngdc.noaa.gov/mgg/global/).
@@ -34,19 +37,20 @@ class TohokuOptions(TsunamiOptions):
 
       * Timeseries for gauges P02 and P06 obtained via personal communication with T. Saito.
 
-      * Timeseries for gauges 801-807 obtained from the Japanese Port and Airport Research
+      * Timeseries for gauges 8XX obtained from the Japanese Port and Airport Research
           Institute (PARI) via https://nowphas.mlit.go.jp/pastdata#contents3. Gauge locations and
           water depths are shown in https://nowphas.mlit.go.jp/pastdatars/PDF/list/dai_2017p.pdf.
           See also https://nowphas.mlit.go.jp/eng/ for further information.
 
-      * Timeseries for gauges KPG1 and KPG2 obtained from the Japanese Agency for Marine-Earth
-          Science and Technology (JAMSTEC) via http://www.jamstec.go.jp/scdc/top_e.html.
+      * Timeseries for gauges KPG1, KPG2, MPG1 and MPG2 obtained from the Japanese Agency for
+        Marine-Earth Science and Technology (JAMSTEC) via http://www.jamstec.go.jp/scdc/top_e.html.
 
       * Timeseries for gauges 21401, 21413, 21418 and 21419 obtained from the US National Oceanic
         and Atmospheric Administration (NOAA) via https://www.ndbc.noaa.gov.
 
 
-    References:
+    References
+    ==========
 
     [Saito et al.] T. Saito, Y. Ito, D. Inazu, R. Hino, "Tsunami source of the 2011 Tohoku‐Oki
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
@@ -60,17 +64,19 @@ class TohokuOptions(TsunamiOptions):
             outside of it.
         :kwarg save_timeseries: :type:`bool` toggling the extraction and storage of timeseries data.
         :kwarg synthetic: :type:`bool` toggling whether real or synthetic timeseries data are used.
+        :kwarg noisy_data: :type:`bool` toggling whether timeseries data are used as-is, or sampled.
         :kwarg qoi_scaling: custom scaling for quantity of interest (defaults to unity).
         :kwarg base_viscosity: :type:`float` value to be assigned to constant viscosity field.
         :kwarg postproc: :type:`bool` value toggling whether to use an initial mesh which has been
             postprocessed using Pragmatic (see `resources/meshes/postproc.py`.)
-        :kwarg locations: a list of strings indicating locations of interest.
-        :kwarg radii: a list of distances indicating radii around the locations of interest, thereby
+        :kwarg radius: distance indicating radii around the locations of interest, thereby
             determining regions of interest for use in hazard assessment QoIs.
         """
         super(TohokuOptions, self).__init__(force_zone_number=force_zone_number, **kwargs)
         self.save_timeseries = kwargs.get('save_timeseries', False)
         self.synthetic = kwargs.get('synthetic', False)
+        if not self.synthetic:
+            self.noisy_data = kwargs.get('noisy_data', True)
         self.qoi_scaling = kwargs.get('qoi_scaling', 1.0)
 
         # Mesh
@@ -137,6 +143,7 @@ class TohokuOptions(TsunamiOptions):
             "arrival_time": 0.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
+            "sample": 60, 
         }
         self.mid_field_pressure_gauges = {
             "gauges": ("KPG1", "KPG2", "21418"),
@@ -144,24 +151,28 @@ class TohokuOptions(TsunamiOptions):
             "arrival_time": 10*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
+            "sample": 60, 
         }
         self.far_field_pressure_gauges = {
             "gauges": ("21401", "21413", "21419"),
             "arrival_time": 50*60.0,
             "departure_time": self.end_time,
             "weight": Constant(1.0),
+            "sample": 1, 
         }
         self.near_field_gps_gauges = {
             "gauges": ("801", "802", "803", "804", "806", "807"),
             "arrival_time": 5*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
+            "sample": 1, 
         }
         self.far_field_gps_gauges = {
             "gauges": ("811", "812", "813", "815"),
             "arrival_time": 10*60.0,
             "departure_time": self.end_time,
             "weight": Constant(1.0),
+            "sample": 1, 
         }
         self.gauge_classifications_to_consider = (
             "near_field_pressure",
@@ -170,9 +181,18 @@ class TohokuOptions(TsunamiOptions):
             "near_field_gps",
             # "far_field_gps",
         )
-
-        # Get gauges and locations of interest
         self.get_gauges()
+
+        # Location classifications
+        self.locations_to_consider = (
+            # "Onagawa",
+            # "Tokai",
+            # "Hamaoka",
+            # "Tohoku",
+            # "Tokyo",
+            "Fukushima Daiichi",
+            # "Fukushima Daini",
+        )
         self.get_locations_of_interest(**kwargs)
 
     def read_bathymetry_file(self, source='etopo1'):
@@ -212,16 +232,17 @@ class TohokuOptions(TsunamiOptions):
 
         The gauge categories are as follows:
           * Near field GPS gauges: 801, 802, 803, 804, 806, 807;
-          * Far field GPS gauges: 811, 812, 813, 815;
+          * Far field GPS gauges (unused): 811, 812, 813, 815;
           * Near field pressure gauges: P02, P06;
-          * Far field pressure gauges: KPG1, KPG2, 21401, 21413, 21418, 21419.
+          * Mid field pressure gauges: KPG1, KPG2, MPG1 (unused), MPG2 (unused), 21418.
+          * Far field pressure gauges: 21401, 21413, 21419.
 
         These categorisations allow us to consider different:
           (a) start times for the period where we aim to fit the data;
           (b) weightings for the importance of the timeseries.
 
-        Conservative start times of 5 minutes, 10 minutes, 0 minutes and 10 minutes are set by default.
-        All gauges are equally weighted by unity by default.
+        Conservative start times of 5 minutes, 10 minutes, 0 minutes, 10 minutes and 50 minutes are
+        set by default. All gauges are equally weighted by unity by default.
         """
         self.gauges = {
             "801": {
@@ -326,6 +347,9 @@ class TohokuOptions(TsunamiOptions):
                 # Optional weighting of gauge classes
                 self.gauges[gauge]["weight"] = gauge_class_obj["weight"]
 
+                # Optional sampling of gauge data
+                self.gauges[gauge]["sample"] = gauge_class_obj["sample"]
+
             # Note gauges to consider
             if "pressure" in gauge_class:
                 self.pressure_gauges += gauges
@@ -333,9 +357,12 @@ class TohokuOptions(TsunamiOptions):
                 self.gps_gauges += gauges
         self.gauge_classifications_to_consider = tuple(self.gauge_classifications_to_consider)
         gauges_to_consider = self.pressure_gauges + self.gps_gauges
-        for gauge in list(self.gauges.keys()):
 
-            # Remove unused gauges (e.g. we don't use MPG1 or MPG2)
+        # Account for special case
+        self.gauges["21418"]["sample"] = self.far_field_pressure_gauges["sample"]
+
+        # Remove unused gauges (e.g. we don't use MPG1 or MPG2)
+        for gauge in list(self.gauges.keys()):
             if gauge not in gauges_to_consider:
                 self.gauges.pop(gauge)
                 continue
@@ -376,8 +403,7 @@ class TohokuOptions(TsunamiOptions):
           - Fukushima Daiichi;
           - Fukushima Daini.
         """
-        locations = kwargs.get('locations', ["Fukushima Daiichi", ])
-        radii = kwargs.get('radii', [50.0e+03, ])
+        radius = kwargs.get('radius', 50.0e+03)
         locations_of_interest = {
             "Onagawa": {"lonlat": (141.5008, 38.3995)},
             "Tokai": {"lonlat": (140.6067, 36.4664)},
@@ -387,19 +413,18 @@ class TohokuOptions(TsunamiOptions):
             "Fukushima Daiichi": {"lonlat": (141.0281, 37.4213)},
             "Fukushima Daini": {"lonlat": (141.0249, 37.3166)},
         }
-        self.locations_of_interest = {loc: locations_of_interest[loc] for loc in locations}
-        radii = {locations[i]: r for i, r in enumerate(radii)}
 
         # Convert coordinates to UTM and create timeseries array
-        for loc in self.locations_of_interest:
-            self.locations_of_interest[loc]["data"] = []
-            self.locations_of_interest[loc]["timeseries"] = []
+        self.locations_of_interest = {}
+        for loc in self.locations_to_consider:
+            self.locations_of_interest[loc] = {"data": [], "timeseries": []}
+            self.locations_of_interest[loc]["lonlat"] = locations_of_interest[loc]["lonlat"]
             lon, lat = self.locations_of_interest[loc]["lonlat"]
             self.locations_of_interest[loc]["utm"] = from_latlon(lat, lon, force_zone_number=54)
             self.locations_of_interest[loc]["coords"] = self.locations_of_interest[loc]["utm"]
 
         # Check validity of gauge coordinates
-        for loc in list(self.locations_of_interest.keys()):
+        for loc in self.locations_to_consider:
             try:
                 self.default_mesh.coordinates.at(self.locations_of_interest[loc]['coords'])
             except PointNotInDomainError:
@@ -408,7 +433,7 @@ class TohokuOptions(TsunamiOptions):
 
         # Regions of interest
         loi = self.locations_of_interest
-        self.region_of_interest = [loi[loc]["coords"] + (radii[loc], ) for loc in loi]
+        self.region_of_interest = [loi[loc]["coords"] + (radius, ) for loc in loi]
 
     def _get_update_forcings_forward(self, prob, i):
         from adapt_utils.misc import ellipse
@@ -443,7 +468,8 @@ class TohokuOptions(TsunamiOptions):
             gauge_dat["obs"] = Constant(0.0)     # Constant associated with free surface observations
 
             # Setup interpolator
-            self.sample_timeseries(gauge, sample=1 if gauge[0] == '8' else 60)  # TODO: Update
+            if not self.synthetic:
+                self.sample_timeseries(gauge, sample=1 if self.noisy_data else gauge["sample"])
 
             # Assemble an area-normalised indicator function
             x, y = gauge_dat["coords"]
@@ -495,9 +521,8 @@ class TohokuOptions(TsunamiOptions):
                     continue
 
                 # Read data
-                interpolator = gauge_dat["interpolator"]
                 idx = prob.iteration - gauge_dat["offset"]
-                obs = gauge_dat["data"][idx] if self.synthetic else float(interpolator(t))
+                obs = gauge_dat["data"][idx] if self.synthetic else float(gauge_dat["interpolator"](t))
                 gauge_dat["obs"].assign(obs)
                 if self.save_timeseries:
                     if not self.synthetic:
@@ -529,7 +554,6 @@ class TohokuOptions(TsunamiOptions):
 
         # Construct an expression for the RHS of the adjoint continuity equation
         #   NOTE: The initial free surface *field* is subtracted in some cases.
-        weights = {}
         for gauge in self.gauges:
             I = scaling*self.gauges[gauge]["indicator"]
             weight = scaling*self.gauges[gauge]["weight"]
@@ -550,10 +574,11 @@ class TohokuOptions(TsunamiOptions):
             # Get timeseries data, implicitly modifying the expression
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
-                if t < gauge_data["arrival_time"]:  # TODO: Do we need to add/subtract a timestep?
-                    weights[gauge] = gauge_dat["weight"].dat.data[0]
-                    gauge_dat["weight"].assign(0.0)
-                obs = gauge_dat["data"][prob.iteration-1] if self.synthetic else float(interpolator(t))
+                if gauge_dat["arrival_time"] < t < gauge_dat["departure_time"]:
+                    idx = prob.iteration - gauge_dat["offset"] - 1
+                    obs = gauge_dat["data"][idx] if self.synthetic else float(gauge_dat["interpolator"](t))
+                else:
+                    obs = 0.0
                 gauge_dat["obs"].assign(obs)
 
             # Interpolate expression onto RHS
@@ -562,11 +587,6 @@ class TohokuOptions(TsunamiOptions):
             # Plot kernel
             if self.debug and prob.iteration % self.dt_per_export == 0:
                 prob.kernel_file.write(k_eta)
-
-            # Reset weights
-            for gauge in list(weights.keys()):
-                self.gauge[gauge]["weight"].assign(weights[gauge])
-                weights.pop(gauge)
 
         return update_forcings
 
