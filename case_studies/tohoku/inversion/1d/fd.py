@@ -3,8 +3,8 @@ from thetis import *
 import argparse
 import numpy as np
 
+from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.case_studies.tohoku.gaussian_options import TohokuGaussianBasisOptions
 
 
 parser = argparse.ArgumentParser()
