@@ -1,6 +1,5 @@
 General
 =======
-  * Add the source to the bathymetry
   * Don't cap the bathymetry
   * Weight gauges on distance(?)
   * Use wetting and drying(?)

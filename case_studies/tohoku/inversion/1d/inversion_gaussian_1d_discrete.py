@@ -29,7 +29,7 @@ import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
-from adapt_utils.case_studies.tohoku.gaussian_options import TohokuGaussianBasisOptions
+from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
 from adapt_utils.misc import StagnationError
 from adapt_utils.norms import total_variation
 
@@ -98,8 +98,7 @@ op = TohokuGaussianBasisOptions(**kwargs)
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
-di = create_directory(os.path.join(dirname, 'outputs', 'inversion', '1d'))
-di = create_directory(os.path.join(di, 'realistic' if real_data else 'synthetic'))
+di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
 plot_dir = create_directory(os.path.join(di, 'plots'))
 
 # Toggle smoothed or discrete timeseries

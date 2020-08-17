@@ -3,7 +3,7 @@ from thetis import *
 import argparse
 import datetime
 
-from adapt_utils.case_studies.tohoku.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 

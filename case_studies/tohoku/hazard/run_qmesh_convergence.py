@@ -4,7 +4,7 @@ import datetime
 import argparse
 import os
 
-from adapt_utils.case_studies.tohoku.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 

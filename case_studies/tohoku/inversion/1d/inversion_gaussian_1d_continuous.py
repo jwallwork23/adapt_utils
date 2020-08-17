@@ -18,7 +18,7 @@ import os
 import scipy
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.case_studies.tohoku.gaussian_options import TohokuGaussianBasisOptions
+from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
 from adapt_utils.misc import StagnationError
 from adapt_utils.norms import total_variation
 
