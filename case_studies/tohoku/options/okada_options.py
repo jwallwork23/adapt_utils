@@ -307,6 +307,8 @@ class TohokuOkadaOptions(TohokuOptions):
 
         # Create function spaces associated with both the Okada and longitude-latitude meshes
         self.P1_okada = firedrake.FunctionSpace(self.okada_mesh, "CG", 1)
+        if not hasattr(self, 'lonlat_mesh'):
+            self.get_lonlat_mesh()
         self.P1_lonlat = firedrake.FunctionSpace(self.lonlat_mesh, "CG", 1)
 
         # Establish an index mapping between the logical x- and y- directions and the vertex
