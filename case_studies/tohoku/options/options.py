@@ -15,6 +15,15 @@ class TohokuOptions(TsunamiOptions):
     Setup for model of the Tohoku tsunami which struck the east coast of Japan in 2011, leading to
     the meltdown of Daiichi nuclear power plant, Fukushima.
 
+    There are timeseries data associated with a number of pressure and GPS gauges available, both
+    for source inversion experiments and also for validating model runs. There are five gauge
+    classifications ('near_field_pressure', 'mid_field_pressure', 'far_field_pressure',
+    'near_field_gps', 'far_field_gps'), each of which has at least two gauges associated. The
+    arrival times, departure times and weighting for each classification are customisable, as are
+    the choices of gauges / gauge classifications to include or ignore. After modifying the details
+    as desired, call :attr:`get_gauges` to pass the data into the :attr:`gauges` dictionary
+    appropriately. Only gauges contained in that dictionary will be used during simulations.
+
     Data sources:
 
       * Bathymetry data extracted from both GEBCO (https://www.gebco.net/) and ETOPO1
@@ -36,6 +45,8 @@ class TohokuOptions(TsunamiOptions):
       * Timeseries for gauges 21401, 21413, 21418 and 21419 obtained from the US National Oceanic
         and Atmospheric Administration (NOAA) via https://www.ndbc.noaa.gov.
 
+
+    References:
 
     [Saito et al.] T. Saito, Y. Ito, D. Inazu, R. Hino, "Tsunami source of the 2011 Tohoku‐Oki
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
@@ -101,7 +112,8 @@ class TohokuOptions(TsunamiOptions):
         self.start_time = kwargs.get('start_time', 0.0)
         # self.start_time = kwargs.get('start_time', 15*60.0)
         # self.end_time = kwargs.get('end_time', 24*60.0)
-        self.end_time = kwargs.get('end_time', 60*60.0)
+        # self.end_time = kwargs.get('end_time', 60*60.0)
+        self.end_time = kwargs.get('end_time', 120*60.0)
         self.num_timesteps = int(self.end_time/self.dt + 1)
         self.times = [i*self.dt for i in range(self.num_timesteps)]
 
@@ -123,27 +135,32 @@ class TohokuOptions(TsunamiOptions):
         self.near_field_pressure_gauges = {
             "gauges": ( "P02", "P06"),
             "arrival_time": 0.0,
+            "departure_time": 60*60.0,
             "weight": Constant(1.0),
         }
         self.mid_field_pressure_gauges = {
             "gauges": ("KPG1", "KPG2", "21418"),
             # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21418"),
             "arrival_time": 10*60.0,
+            "departure_time": 60*60.0,
             "weight": Constant(1.0),
         }
         self.far_field_pressure_gauges = {
             "gauges": ("21401", "21413", "21419"),
             "arrival_time": 50*60.0,
+            "departure_time": self.end_time,
             "weight": Constant(1.0),
         }
         self.near_field_gps_gauges = {
             "gauges": ("801", "802", "803", "804", "806", "807"),
             "arrival_time": 5*60.0,
+            "departure_time": 60*60.0,
             "weight": Constant(1.0),
         }
         self.far_field_gps_gauges = {
             "gauges": ("811", "812", "813", "815"),
             "arrival_time": 10*60.0,
+            "departure_time": self.end_time,
             "weight": Constant(1.0),
         }
         self.gauge_classifications_to_consider = (
@@ -287,10 +304,11 @@ class TohokuOptions(TsunamiOptions):
         self.pressure_gauges = ()
         self.gps_gauges = ()
         gauge_classifications_to_consider = list(self.gauge_classifications_to_consider)
-        for gauge_class in self.gauge_classifications_to_consider
+        for gauge_class in self.gauge_classifications_to_consider:
             gauge_class_obj = self.__getattribute__("_".join([gauge_class, "gauges"]))
-            arrival_time = gauge_class_obj["arrival_time"]
-            if arrival_time >= self.end_time:
+            t0 = gauge_class_obj["arrival_time"]
+            tf = gauge_class_obj["departure_time"]
+            if t0 >= self.end_time:
                 gauge_classifications_to_consider.remove(gauge_class)
                 msg = "WARNING: Removing gauge class {:s} due to late arrival time."
                 self.print_debug(msg.format(gauge_class))
@@ -299,9 +317,11 @@ class TohokuOptions(TsunamiOptions):
             for gauge in gauges:
                 self.gauges[gauge]["class"] = gauge_class
 
-                # Arrival time of tsunami weight
-                self.gauges[gauge]["arrival_time"] = arrival_time
-                self.gauges[gauge]["times"] = [t for t in self.times if t >= arrival_time]
+                # Arrival and departure times of tsunami wave
+                self.gauges[gauge]["arrival_time"] = t0
+                self.gauges[gauge]["offset"] = int(t0/self.dt)
+                self.gauges[gauge]["departure_time"] = tf
+                self.gauges[gauge]["times"] = [t for t in self.times if t0 <= t <= tf]
 
                 # Optional weighting of gauge classes
                 self.gauges[gauge]["weight"] = gauge_class_obj["weight"]
@@ -393,10 +413,7 @@ class TohokuOptions(TsunamiOptions):
     def _get_update_forcings_forward(self, prob, i):
         from adapt_utils.misc import ellipse
 
-        if np.isclose(self.regularisation, 0.0):
-            self.J = 0
-        else:
-            self.J = self.get_regularisation_term(prob)
+        self.J = 0 if np.isclose(self.regularisation, 0.0) else self.get_regularisation_term(prob)
         scaling = Constant(0.5*self.qoi_scaling)
 
         # These will be updated by the checkpointing routine
@@ -426,7 +443,7 @@ class TohokuOptions(TsunamiOptions):
             gauge_dat["obs"] = Constant(0.0)     # Constant associated with free surface observations
 
             # Setup interpolator
-            self.sample_timeseries(gauge, sample=1 if gauge[0] == '8' else 60)
+            self.sample_timeseries(gauge, sample=1 if gauge[0] == '8' else 60)  # TODO: Update
 
             # Assemble an area-normalised indicator function
             x, y = gauge_dat["coords"]
@@ -465,6 +482,8 @@ class TohokuOptions(TsunamiOptions):
                 # Weightings
                 if t < gauge_dat["arrival_time"]:  # We don't want to fit before the tsunami arrives
                     continue
+                if t > gauge_dat["departure_time"]:
+                    continue
 
                 # Point evaluation and average value at gauges
                 if self.save_timeseries:
@@ -477,7 +496,7 @@ class TohokuOptions(TsunamiOptions):
 
                 # Read data
                 interpolator = gauge_dat["interpolator"]
-                idx = len(gauge_dat["data"]) - self.num_timesteps + prob.iteration
+                idx = prob.iteration - gauge_dat["offset"]
                 obs = gauge_dat["data"][idx] if self.synthetic else float(interpolator(t))
                 gauge_dat["obs"].assign(obs)
                 if self.save_timeseries:
