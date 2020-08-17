@@ -47,6 +47,7 @@ parser.add_argument("-smooth_timeseries", help="Toggle discrete or smoothed time
 parser.add_argument("-plot_only", help="Just plot parameter space and optimisation progress")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-debug", help="Toggle debugging")
+parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
 
 # --- Set parameters
 
@@ -99,6 +100,7 @@ kwargs = {
     # Misc
     'plot_pvd': False,
     'debug': bool(args.debug or False),
+    'debug_mode': args.debug_mode or 'basic',
 }
 use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 nonlinear = bool(args.nonlinear or False)
