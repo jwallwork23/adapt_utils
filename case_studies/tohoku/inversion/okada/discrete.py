@@ -55,7 +55,7 @@ dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
 op.di = create_directory(os.path.join(di, 'discrete'))
 
-# Synthetic run to get timeseries data
+# Synthetic run to get timeseries data, with the default control values as the "optimal" case
 if not real_data:
     with stop_annotating():
         swp = AdaptiveProblem(op, nonlinear=nonlinear)
@@ -63,18 +63,16 @@ if not real_data:
         for gauge in op.gauges:
             op.gauges[gauge]["data"] = op.gauges[gauge]["timeseries"]
 
-# Copy data over to new parameter class  # TODO: Can we not just reuse the original one?
-op_opt = TohokuOkadaOptions(**kwargs)
-op_opt.active_controls = active_controls
-for gauge in op_opt.gauges:
-    op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
+# Get interpolation operator between Okada grid and computational mesh
+op.get_interpolation_operators()
 
-# Get interpolation operator between Okada grid and computational mesh, as well as seed matrices
-op_opt.get_interpolation_operators()
-op_opt.get_seed_matrices()
+# Get seed matrices which allow us to differentiate all active controls simultaneously
+op.get_seed_matrices()
 
-# Set a random perturbation initial guess for the optimisation
-#   NOTE: Under an initial guess of zero for the optimisation, rake stays at zero
+# Set initial guess for the optimisation
+# ======================================
+# Here we just use a random perturbation of the "optimal" controls. In the case where we just use a
+# zero initial guess, the gradient with respect to rake is zero.  # TODO: Maybe this is okay?
 kwargs['control_parameters'] = op.control_parameters
 mu, sigma = 0, 5
 m_init = []
@@ -84,31 +82,50 @@ for control in op.active_controls:
     kwargs['control_parameters'][control] += np.random.normal(loc=mu, scale=sigma, size=size)
     m_init.append(kwargs['control_parameters'][control])
 m_init = np.array(m_init)
+J_progress = []
 
-# Create solver object
-swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear)
+# Create discrete adjoint solver object for the optimisation
+swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear)
+
 
 def reduced_functional(m):
+    """
+    Given a vector of (active) control parameters, m, run the forward tsunami propagation model and
+    evaluate the gauge timeseries misfit quantity of interest (QoI) as a pyadjoint AdjFloat.
+    """
+    control_parameters = m.reshape((num_subfaults, num_active_controls))
+    for i, subfault in enumerate(op.subfaults):
+        for j, control in enumerate(active_controls):
+            op.control_parameters[control][i] = control_parameters[i, j]
 
     # Annotate ADOL-C's tape and propagate seed matrices through the forward mode of AD
     swp.set_initial_condition(annotate_source=True, tag=tape_tag)
-    swp.source_control = Control(swp.fwd_solutions[0])  # Store control as a pyadjoint Control
+
+    # Store control as a pyadjoint Control
+    swp.source_control = Control(swp.fwd_solutions[0])
 
     # Run forward with zero initial guess
     swp.setup_solver_forward(0)
     swp.solve_forward_step(0)
+    J = op.J
+    J_progress.append(J)
 
-    return op_opt.J
+    return J
 
-# # Test reduced functional function
-# J = reduced_functional(m_init)
 
 def gradient(m):
+    """
+    Compute the gradient of the QoI w.r.t. a vector of (active) control parameters, m.
+
+    The calculation is done in three steps:
+      * Propagate m through the forward mode of AD applied to the Okada earthquake source model;
+      * Solve the adjoint problem associated with the tsunami propagation;
+      * Assemble the gradient by integrating the products of the adjoint solution at time t = 0
+        with derivatives of the source model.
+    """
 
     # Propagate controls through forward mode of AD
-    F, dFdm = adolc.fov_forward(tape_tag, op_opt.input_vector, op_opt.seed_matrices)
-    # F = F.reshape(num_subfaults, N, N)
-    # F = sum(F[i, :, :] for i in range(num_subfaults))
+    F, dFdm = adolc.fov_forward(tape_tag, m, op.seed_matrices)
     dFdm = dFdm.reshape(num_subfaults, N, N, num_active_controls)
 
     # Solve adjoint problem and extract solution at t = 0
@@ -121,21 +138,16 @@ def gradient(m):
     dJdm = np.zeros((num_subfaults, num_active_controls))
     for i in range(num_subfaults):
         for j in range(num_active_controls):
-            deta0dm = op_opt.interpolate_okada_array(dFdm[i, :, :, j])
+            deta0dm = op.interpolate_okada_array(dFdm[i, :, :, j])
             dJdm[i, j] = assemble(eta_star*deta0dm*dx)
     dJdm = dJdm.reshape(num_subfaults*num_active_controls)
 
     # Print optimisation progress
-    print_output("J = {:.4e}  dJdm = {:.4e}".format(op_opt.J, vecnorm(dJdm, order=np.Inf)))
+    print_output("J = {:.4e}  dJdm = {:.4e}".format(op.J, vecnorm(dJdm, order=np.Inf)))
     return dJdm
 
-# # Test gradient function
-# g = gradient(m_init).reshape((num_subfaults, num_active_controls))
-# print("dJdm =")
-# print(g)
 
 # Run optimisation
-fname = os.path.join(op.di, "optimised_controls_{:d}".format(level))
 if optimise:
     opt_kwargs = {
         'maxiter': 100,
@@ -145,10 +157,21 @@ if optimise:
     }
     m_opt = scipy.optimize.fmin_bfgs(reduced_functional, m_init, **opt_kwargs)
     np.save(m_opt, fname)
+    fname = os.path.join(op.di, "optimised_controls_{:d}".format(level))
+    J_progress = np.array(J_progress)
+    fname = os.path.join(op.di, "optimisation_progress_{:d}".format(level))
+    np.save(fname, J_progress)
 else:
-    m_opt = np.load(fname + '.npy')
+    m_opt = np.load(os.path.join(op.di, "optimised_controls_{:d}.npy".format(level)))
+    J_progress = np.load(os.path.join(op.di, "optimisation_progress_{:d}.npy".format(level)))
 
 print("m =")
 print(m_opt)
+print("\nJ progress =")
+print(J_progress)
 
-# TODO: Rerun and plot to pvd
+# Rerun, plotting to .pvd
+with stop_annotating():
+    op.plot_pvd = True
+    swp = AdaptiveProblem(op, nonlinear=nonlinear)
+    swp.solve_forward()  # NOTE: pyadolc annotation is also off
