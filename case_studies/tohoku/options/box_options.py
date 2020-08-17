@@ -1,6 +1,6 @@
 import thetis
 import numpy as np
-from adapt_utils.case_studies.tohoku.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
 
 
 __all__ = ["TohokuBoxBasisOptions"]
