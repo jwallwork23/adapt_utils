@@ -3,7 +3,7 @@ from firedrake import *
 import numpy as np
 
 
-__all__ = ["lp_norm", "total_variation", "timeseries_error",
+__all__ = ["lp_norm", "total_variation", "vecnorm", "timeseries_error",
            "local_norm", "frobenius_norm", "local_frobenius_norm",
            "local_edge_integral", "local_interior_edge_integral", "local_boundary_integral"]
 
@@ -73,6 +73,16 @@ def lp_norm(f, p='l2'):
 def total_variation(f):
     """Calculate the total variation of a 1D array which may contain NaNs."""
     return timeseries_error(f, norm_type='tv')
+
+
+def vecnorm(x, order=2):
+    """Consistent with the norm used in `scipy/optimize.py`."""
+    if order == np.Inf:
+        return np.amax(np.abs(x))
+    elif order == -np.Inf:
+        return np.amin(np.abs(x))
+    else:
+        return np.sum(np.abs(x)**order, axis=0)**(1.0 / order)
 
 
 def timeseries_error(f, g=None, relative=False, norm_type='tv'):
