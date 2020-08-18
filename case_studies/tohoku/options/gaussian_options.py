@@ -159,21 +159,27 @@ class TohokuGaussianBasisOptions(TohokuOptions):
 
         # Get initial guess by point evaluation (which will probably be an overestimate)
         m_init = np.array([source.at(xy) for xy in self._array])
+        # m_init = np.zeros(self.nx*self.ny)
+
+        # Rescale to avoid precision loss  # TODO
+        rescaling = 1
+        # rescaling = 1/f
+        # rescaling = 1/np.mean(g)
 
         def J(m):
-            j = (np.dot(g, m) - f)**2
+            j = rescaling*(np.dot(g, m) - f)**2
             self.print_debug("INIT: functional = {:8.6e}".format(j))
             return j
 
         def dJdm(m):
-            djdm = 2*(np.dot(g, m) - f)*m
+            djdm = 2*rescaling*(np.dot(g, m) - f)*g
             self.print_debug("INIT: gradient = {:8.6e}".format(vecnorm(djdm, order=np.Inf)))
             return djdm
 
         # Run BFGS optimisation
         self.print_debug("INIT: Running optimisation to project optimal solution...")
         opt_kwargs = {
-            'maxiter': 100,
+            'maxiter': 10000,
             'gtol': 1.0e-08,
             'callback': lambda m: self.print_debug("INIT: LINE SEARCH COMPLETE"),
             'fprime': dJdm,
@@ -186,12 +192,67 @@ class TohokuGaussianBasisOptions(TohokuOptions):
             self.control_parameters[i].assign(mi)
 
     def interpolate(self, prob, source):
-        """
+        r"""
         Interpolate a source field into the box basis using point evaluation.
 
-        This involves solving an auxiliary optimisation problem!
+        This involves solving an auxiliary optimisation problem! The objective functional is
+
+      ..math::
+            J(\mathbf m) = \tilde J(\mathbf m) \cdot \tilde J(\mathbf m),
+
+        where :math:`m` is the control vector, :math:`\boldsymbol\phi` is the vector (radial) basis
+        functions, :math:`f` is the source field we seek to represent and
+
+      ..math::
+            \tilde J(\mathbf m)_i = \int_\Omega \sum_i (m_i\phi_i - f_i) \;\mathrm dx.
+
+        Due to the linearity of the basis expansion, the objective functional may be rewritten as
+
+      ..math::
+            J(\mathbf m) = (m\cdot\boldsymbol\Phi - F) \cdot (m\cdot\boldsymbol\Phi - F),
+
+        where :math:`\boldsymbol\Phi` and :math:`F` correspond to integrated quantities. These
+        quantities can be pre-computed, meaning we just have a linear algebraic optimisation problem.
         """
-        # TODO: doc
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
-        raise NotImplementedError  # TODO
+
+        # Get RHS
+        f = np.array([source.at(xy) for xy in self._array])
+
+        # Get vector of basis function masses
+        g = np.array([thetis.assemble(bf.split()[1]*thetis.dx) for bf in self.basis_functions])
+
+        # Get initial guess by point evaluation (which will probably be an overestimate)
+        m_init = np.array([source.at(xy) for xy in self._array])
+        # m_init = np.zeros(self.nx*self.ny)
+
+        # Rescale to avoid precision loss  # TODO
+        rescaling = 1
+        # rescaling = np.mean(f)
+        # rescaling = np.mean(g)
+
+        def J(m):
+            j = rescaling*sum([(mi*gi - fi)**2 for mi, gi, fi in zip(m, g, f)])
+            self.print_debug("INIT: functional = {:8.6e}".format(j))
+            return j
+
+        def dJdm(m):
+            djdm = 2*rescaling*np.array([(mi*gi - fi)*gi for mi, gi, fi in zip(m, g, f)])
+            self.print_debug("INIT: gradient = {:8.6e}".format(vecnorm(djdm, order=np.Inf)))
+            return djdm
+
+        # Run BFGS optimisation
+        self.print_debug("INIT: Running optimisation to interpolate optimal solution...")
+        opt_kwargs = {
+            'maxiter': 10000,
+            'gtol': 1.0e-08,
+            'callback': lambda m: self.print_debug("INIT: LINE SEARCH COMPLETE"),
+            'fprime': dJdm,
+        }
+        m_opt = scipy.optimize.fmin_bfgs(J, m_init, **opt_kwargs)
+        self.print_debug("INIT: Done!")
+
+        # Assign values
+        for i, mi in enumerate(m_opt):
+            self.control_parameters[i].assign(mi)
