@@ -72,12 +72,9 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         self.print_debug("INIT: Done!")
         self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
 
-    def set_initial_condition(self, prob, sum_pad=100):
+    def get_basis_functions(self, fs):
         """
-        :arg prob: the :class:`AdaptiveProblem` object to which the initial condition is assigned.
-        :kwarg sum_pad: when summing terms to assemble the initial surface, the calculation is split
-            up for large arrays in order to avoid the UFL recursion limit. That is, every `sum_pad`
-            terms are summed separately.
+        Assemble an array of (Gaussian) radial basis functions, rotated by specified angle.
         """
         from adapt_utils.misc import gaussian, rotation_matrix
 
@@ -95,20 +92,30 @@ class TohokuGaussianBasisOptions(TohokuOptions):
 
         # Assemble an array of Gaussian basis functions, rotated by specified angle
         self.print_debug("INIT: Assembling rotated array of Gaussians...")
-        self.basis_functions = [thetis.Function(prob.V[0]) for i in range(N)]
+        self.basis_functions = [thetis.Function(fs) for i in range(N)]
         R = rotation_matrix(-angle)
         for j, y in enumerate(Y):
             for i, x in enumerate(X):
                 psi, phi = self.basis_functions[i + j*nx].split()
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
-                phi.interpolate(gaussian([(x_rot, y_rot, rx, ry), ], prob.meshes[0], rotation=angle))
+                phi.interpolate(gaussian([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
         self.print_debug("INIT: Done!")
+
+    def set_initial_condition(self, prob, sum_pad=100):
+        """
+        :arg prob: the :class:`AdaptiveProblem` object to which the initial condition is assigned.
+        :kwarg sum_pad: when summing terms to assemble the initial surface, the calculation is split
+            up for large arrays in order to avoid the UFL recursion limit. That is, every `sum_pad`
+            terms are summed separately.
+        """
+        if not hasattr(self, 'basis_functions'):
+            self.get_basis_functions(prob.V[0])
 
         # Assemble initial surface
         self.print_debug("INIT: Assembling initial surface...")
         prob.fwd_solutions[0].assign(0.0)
         controls = self.control_parameters
-        for n in range(0, N, sum_pad):
+        for n in range(0, self.nx*self.ny, sum_pad):
             expr = sum(m*g for m, g in zip(controls[n:n+sum_pad], self.basis_functions[n:n+sum_pad]))
             prob.fwd_solutions[0].assign(prob.fwd_solutions[0] + thetis.project(expr, prob.V[0]))
         self.print_debug("INIT: Done!")
