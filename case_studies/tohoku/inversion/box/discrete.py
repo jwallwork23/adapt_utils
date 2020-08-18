@@ -22,6 +22,7 @@ parser = argparse.ArgumentParser()
 
 # Model
 parser.add_argument("-level", help="Mesh resolution level")
+parser.add_argument("-okada_grid_resolution", help="Mesh resolution level for the Okada grid")
 parser.add_argument("-family", help="Finite element pair")
 parser.add_argument("-stabilisation", help="Stabilisation approach")
 parser.add_argument("-nonlinear", help="Toggle nonlinear model")
@@ -61,7 +62,7 @@ timeseries_type = "timeseries"
 if use_smoothed_timeseries:
     timeseries_type = "_".join([timeseries_type, "smooth"])
 
-N = 51
+N = int(args.okada_grid_resolution or 51)
 kwargs = {
     'level': level,
     'save_timeseries': True,
@@ -158,11 +159,12 @@ if not real_data:
                 plt.savefig(fname + '.png')
 
         # Synthetic run
-        print_output("Run forward to get 'data'...")
-        swp.setup_solver_forward(0)
-        swp.solve_forward_step(0)
-        for gauge in op.gauges:
-            op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
+        if not plot_only:
+            print_output("Run forward to get 'data'...")
+            swp.setup_solver_forward(0)
+            swp.solve_forward_step(0)
+            for gauge in op.gauges:
+                op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
 
 # Set zero initial guess for the optimisation  # NOTE: zero gives an error so just choose small
 eps = 1.0e-03
@@ -226,6 +228,7 @@ if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')
 
     # Load trajectory
     control_values_opt = np.load(fname.format('ctrl', level))
+    print(control_values_opt.shape)
     func_values_opt = np.load(fname.format('func', level))
     gradient_values_opt = np.load(fname.format('grad', level))
     optimised_value = control_values_opt[-1]
@@ -238,8 +241,8 @@ else:
     gradient_values_opt = []
 
     def derivative_cb_post(j, dj, m):
-        control = m.dat.data
-        djdm = dj.dat.data
+        control = [mi.dat.data[0] for mi in m]
+        djdm = [dji.dat.data[0] for dji in dj]
         print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
 
         # Save progress to NumPy arrays on-the-fly
@@ -261,7 +264,8 @@ else:
         'gtol': 1.0e-08,
     }
     print_output("Optimisation begin...")
-    Jhat = ReducedFunctional(J, Control(op.control_parameters[0]), derivative_cb_post=derivative_cb_post)
+    controls = [Control(c) for c in op.control_parameters]
+    Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
     optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs).dat.data
     # try:
     #     optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs).dat.data
@@ -270,9 +274,9 @@ else:
     #     print_output("StagnationError: Stagnation of objective functional")
 
 # Create a new parameter class
-kwargs['control_parameters'] = [optimised_value, ]
+kwargs['control_parameters'] = optimised_value
 kwargs['plot_pvd'] = plot_pvd
-op_opt = TohokuGaussianBasisOptions(**kwargs)
+op_opt = TohokuBoxBasisOptions(**kwargs)
 
 if plot_only:
 
