@@ -237,13 +237,13 @@ else:
 
     def derivative_cb_post(j, dj, m):
         control = m.dat.data[0]
-        gradient = dj.dat.data[0]
-        print_output("control {:.8e}  J {:.8e}  gradient {:.8e}".format(control, j, gradient))
+        djdm = dj.dat.data[0]
+        print_output("control {:.8e}  functional {:.8e}  gradient {:.8e}".format(control, j, djdm))
 
         # Save progress to NumPy arrays on-the-fly
         control_values_opt.append(control)
         func_values_opt.append(j)
-        gradient_values_opt.append(gradient)
+        gradient_values_opt.append(djdm)
         np.save(fname.format('ctrl'), np.array(control_values_opt))
         np.save(fname.format('func'), np.array(func_values_opt))
         np.save(fname.format('grad'), np.array(gradient_values_opt))
@@ -269,8 +269,8 @@ else:
 if plot_pdf:
 
     # Fit a quadratic to the first three points and find its root
-    assert len(control_values[::4]) == 3
-    q = scipy.interpolate.lagrange(control_values[::4], func_values[::4])
+    assert len(control_values[::3]) == 3
+    q = scipy.interpolate.lagrange(control_values[::3], func_values[::3])
     dq = q.deriv()
     q_min = -dq.coefficients[1]/dq.coefficients[0]
     assert dq.deriv().coefficients[0] > 0

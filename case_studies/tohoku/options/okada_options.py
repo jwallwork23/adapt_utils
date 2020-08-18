@@ -264,6 +264,7 @@ class TohokuOkadaOptions(TohokuOptions):
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob, surf=surf)
+        return surf
 
     def get_input_vector(self):
         """
