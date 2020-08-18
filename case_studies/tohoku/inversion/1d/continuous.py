@@ -82,7 +82,7 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
-    'control_parameters': [float(args.initial_guess or 10.0), ],
+    'control_parameters': [float(args.initial_guess or 7.5), ],
     'synthetic': not real_data,
     'qoi_scaling': 1.0,
     'regularisation': float(args.regularisation or 0.0),
@@ -122,6 +122,7 @@ create_directory(os.path.join(plot_dir, 'continuous'))
 # Synthetic run
 if not real_data:
     if not plot_only:
+        print_output("Run forward to get 'data'...")
         op.control_parameters[0].assign(float(args.optimal_control or 5.0))
         swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
         swp.solve_forward()
@@ -129,14 +130,14 @@ if not real_data:
             op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
 
 # Explore parameter space
-n = 9
+n = 8
 op.save_timeseries = False
-control_values = np.linspace(2.0, 10.0, n)
+control_values = np.linspace(0.5, 7.5, n)
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
 recompute |= not os.path.exists(fname)
 if recompute:
     func_values = np.zeros(n)
-    swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
+    swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
     for i, m in enumerate(control_values):
         op.control_parameters[0].assign(m)
         swp.set_initial_condition()
@@ -166,10 +167,11 @@ if use_regularisation:
     np.save(fname, func_values_reg)
     for i, m in enumerate(control_values):
         print_output(msg.format(i, m, func_values_reg[i]))
-op.control_parameters[0].assign(float(args.initial_guess or 10.0))
+op.control_parameters[0].assign(float(args.initial_guess or 7.5))
 
 # Plot parameter space
 if recompute and plot_pdf:
+    print_output("Explore parameter space...")
     fig, axes = plt.subplots(figsize=(8, 8))
     axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8, markevery=10)
     if use_regularisation:
@@ -208,7 +210,7 @@ else:
         op.control_parameters[0].assign(m[0])
         swp.solve_forward()
         J = op.J
-        print_output("control = {:.8e}  functional = {:.8e}".format(m[0], J))
+        print_output("control = {:8.6e}  functional = {:8.6e}".format(m[0], J))
         return J
 
     def gradient(m):
@@ -222,15 +224,16 @@ else:
         g = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradients[0]
-        print_output("control = {:.8e}  gradient = {:.8e}".format(m[0], g))
+        J = op.J
+        print_output("control = {:8.6e}  functional = {:8.6e}  gradient = {:8.6e}".format(m[0], J, g))
         return np.array([g, ])
 
     # Solve the forward problem with some initial guess
     swp.checkpointing = False
     op.save_timeseries = True
-    m_init = np.array([float(args.initial_guess or 10.0), ])
+    m_init = np.array([float(args.initial_guess or 7.5), ])
+    print_output("Run forward to get timeseries...")
     J = reduced_functional(m_init)
-    print_output("Mean square error QoI = {:.4e}".format(J))
     op.save_timeseries = False
     swp.checkpointing = True
 
@@ -313,6 +316,7 @@ else:
         'fprime': gradient_hat,
     }
     m_init = op.control_parameters[0].dat.data
+    print_output("Optimisation begin...")
     try:
         m_opt = scipy.optimize.fmin_bfgs(reduced_functional_hat, m_init, **opt_kwargs)
         optimised_value = m_opt[0]
@@ -370,11 +374,11 @@ if plot_pdf:
     params['label'] = 'Computed gradient'
     axes.plot(x, g*(x-m) + f, '-', **params)
     axes.set_xlabel(r"Basis function coefficient, $m$", fontsize=fontsize)
-    axes.set_ylabel(r"Square error", fontsize=fontsize)
+    axes.set_ylabel(r"Mean square error", fontsize=fontsize)
     plt.xticks(fontsize=fontsize_tick)
     plt.yticks(fontsize=fontsize_tick)
-    plt.xlim([1.5, 10.5])
-    plt.ylim([0.0, 1.1*func_values[-1]])
+    plt.xlim([0, 8])
+    plt.ylim([0, 1.1*func_values[-1]])
     plt.tight_layout()
     axes.grid()
     plt.legend(fontsize=fontsize)
@@ -405,10 +409,10 @@ else:
     gauges = list(op_opt.gauges.keys())
     for gauge in gauges:
         op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
-    swp = AdaptiveProblem(op_opt, nonlinear=nonlinear, checkpointing=plot_pvd)
+    print_output("Run to plot optimised timeseries...")
+    swp = AdaptiveProblem(op_opt, nonlinear=nonlinear, checkpointing=plot_pvd, print_progress=False)
     swp.solve_forward()
     J = op.J
-    print_output("Mean square error QoI after optimisation = {:.4e}".format(J))
 
     # Save timeseries
     for gauge in gauges:
@@ -450,3 +454,4 @@ if plot_pdf:
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, 'continuous', 'timeseries_optimised_{:d}.pdf'.format(level)))
+print_output("Done!")
