@@ -276,7 +276,7 @@ else:
 # Create a new parameter class
 kwargs['control_parameters'] = optimised_value
 kwargs['plot_pvd'] = plot_pvd
-op_opt = TohokuBoxBasisOptions(**kwargs)
+op_opt = TohokuGaussianBasisOptions(**kwargs)
 
 if plot_only:
 
