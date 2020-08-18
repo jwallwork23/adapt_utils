@@ -122,3 +122,27 @@ class TohokuGaussianBasisOptions(TohokuOptions):
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
+
+    def project(self, prob, source):
+        """
+        Project a source field into the box basis.
+
+        This involves solving an auxiliary optimisation problem!
+        """
+        # TODO: doc
+        # TODO: Check for overlap
+        if not hasattr(self, 'basis_functions'):
+            self.get_basis_functions(prob.V[0])
+        raise NotImplementedError  # TODO
+
+    def interpolate(self, prob, source):
+        """
+        Interpolate a source field into the box basis using point evaluation.
+
+        This involves solving an auxiliary optimisation problem!
+        """
+        # TODO: doc
+        # TODO: Check for overlap
+        if not hasattr(self, 'basis_functions'):
+            self.get_basis_functions(prob.V[0])
+        raise NotImplementedError  # TODO
