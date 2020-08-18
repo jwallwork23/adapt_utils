@@ -32,10 +32,10 @@ class TohokuBoxBasisOptions(TohokuOptions):
         :kwarg strike angle: angle of fault to north [radians].
         """
         super(TohokuBoxBasisOptions, self).__init__(**kwargs)
-        self.nx = kwargs.get('nx', 1)
-        self.ny = kwargs.get('ny', 1)
+        self.nx = kwargs.get('nx', 13)
+        self.ny = kwargs.get('ny', 10)
         N_b = self.nx*self.ny
-        control_parameters = kwargs.get('control_parameters', [0.0 for i in range(N_b)])
+        control_parameters = kwargs.get('control_parameters', 10.0*np.random.rand(N_b))  # arbitrary
         N_c = len(control_parameters)
         if N_c != N_b:
             raise ValueError("{:d} controls inconsistent with {:d} basis functions".format(N_c, N_b))
@@ -43,8 +43,8 @@ class TohokuBoxBasisOptions(TohokuOptions):
         # Parametrisation of source region
         self.centre_x = kwargs.get('centre_x', 0.7e+06)
         self.centre_y = kwargs.get('centre_y', 4.2e+06)
-        self.radius_x = kwargs.get('radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
-        self.radius_y = kwargs.get('radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
+        self.radius_x = kwargs.get('radius_x', 0.5*560.0e+03/self.nx)
+        self.radius_y = kwargs.get('radius_y', 0.5*240.0e+03/self.ny)
 
         # Parametrisation of source basis
         self.print_debug("INIT: Assigning control parameter values...")
@@ -57,7 +57,7 @@ class TohokuBoxBasisOptions(TohokuOptions):
         self.print_debug("INIT: Done!")
         self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
 
-    def get_basis_functions(self):
+    def get_basis_functions(self, fs):
         """
         Assemble an array of piecewise constant indicator functions, rotated by specified angle.
         """
@@ -74,13 +74,13 @@ class TohokuBoxBasisOptions(TohokuOptions):
         X = np.linspace((1 - nx)*rx, (nx - 1)*rx, nx)
         Y = np.linspace((1 - ny)*ry, (ny - 1)*ry, ny)
         self.print_debug("INIT: Assembling rotated array of indicator functions...")
-        self.basis_functions = [thetis.Function(prob.V[0]) for i in range(N)]
+        self.basis_functions = [thetis.Function(fs) for i in range(N)]
         R = rotation_matrix(-angle)
         for j, y in enumerate(Y):
             for i, x in enumerate(X):
                 psi, phi = self.basis_functions[i + j*nx].split()
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
-                phi.interpolate(box([(x_rot, y_rot, rx, ry), ], prob.meshes[0], rotation=angle))
+                phi.interpolate(box([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
         self.print_debug("INIT: Done!")
 
     def set_initial_condition(self, prob, sum_pad=100):
@@ -91,13 +91,13 @@ class TohokuBoxBasisOptions(TohokuOptions):
             terms are summed separately.
         """
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions()
+            self.get_basis_functions(prob.V[0])
 
         # Assemble initial surface
         self.print_debug("INIT: Assembling initial surface...")
         prob.fwd_solutions[0].assign(0.0)
         controls = self.control_parameters
-        for n in range(0, N, sum_pad):
+        for n in range(0, self.nx*self.ny, sum_pad):
             expr = sum(m*g for m, g in zip(controls[n:n+sum_pad], self.basis_functions[n:n+sum_pad]))
             prob.fwd_solutions[0].assign(prob.fwd_solutions[0] + thetis.project(expr, prob.V[0]))
         self.print_debug("INIT: Done!")
