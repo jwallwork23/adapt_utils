@@ -37,7 +37,7 @@ class CrankNicolson(thetis_ts.CrankNicolson):
         self.theta = kwargs.get('theta')
         self.adjoint = adjoint
         self.error_estimator = error_estimator
-        print_output("#### TODO: Setup strong residual for Crank-Nicolson")  # TODO
+        # TODO: Setup strong residual for Crank-Nicolson
 
     def advance(self, t, update_forcings=None):
         """Advances equations for one time step."""
@@ -103,5 +103,5 @@ class PressureProjectionPicard(thetis_ts.PressureProjectionPicard):
         self.error_estimator = error_estimator
         if error_estimator is not None:
             raise NotImplementedError
-        print_output("#### TODO: Setup strong residual for Picard iteration")  # TODO
-        print_output("#### TODO: Setup error estimators for Picard iteration")  # TODO
+        # TODO: Setup strong residual for Picard iteration
+        # TODO: Setup error estimators for Picard iteration
