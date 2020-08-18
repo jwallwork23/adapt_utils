@@ -76,10 +76,12 @@ class TohokuBoxBasisOptions(TohokuOptions):
         self.print_debug("INIT: Assembling rotated array of indicator functions...")
         self.basis_functions = [thetis.Function(fs) for i in range(N)]
         R = rotation_matrix(-angle)
+        self._array = []
         for j, y in enumerate(Y):
             for i, x in enumerate(X):
                 psi, phi = self.basis_functions[i + j*nx].split()
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
+                self._array.append([x_rot, y_rot])
                 phi.interpolate(box([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
         self.print_debug("INIT: Done!")
 
@@ -104,3 +106,29 @@ class TohokuBoxBasisOptions(TohokuOptions):
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
+
+    def project(self, prob, source):
+        """
+        Project a source field into the box basis using a simple L2 projection.
+
+        Note that the approach relies on the fact that the supports of the basis functions do not
+        overlap.
+        """
+        if not hasattr(self, 'basis_functions'):
+            self.get_basis_functions(prob.V[0])
+        for i, bf in enumerate(self.basis_functions):
+            psi, phi = bf.split()
+            mass = thetis.assemble(phi*source*thetis.dx)
+            self.control_parameters[i].assign(mass/thetis.assemble(phi*thetis.dx))
+
+    def interpolate(self, prob, source):
+        """
+        Interpolate a source field into the box basis using point evaluation.
+
+        Note that the approach relies on the fact that the supports of the basis functions do not
+        overlap.
+        """
+        if not hasattr(self, 'basis_functions'):
+            self.get_basis_functions(prob.V[0])
+        for i, xy in enumerate(self._array):
+            self.control_parameters[i].assign(source.at(xy))

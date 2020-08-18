@@ -13,7 +13,7 @@ from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOp
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
-from adapt_utils.norms import vecnorm
+from adapt_utils.norms import total_variation, vecnorm
 
 
 # --- Parse arguments
@@ -118,16 +118,13 @@ if not real_data:
         swp = AdaptiveProblem(op_okada, nonlinear=nonlinear, print_progress=False)
         f_okada = op_okada.set_initial_condition(swp)
 
-        # Create BoxBasis parameter class and establish the basis functions
+        # Create BoxBasis parameter class and an associated AdaptiveProblem
         op = TohokuBoxBasisOptions(mesh=op_okada.default_mesh, **kwargs)
         op.di = create_directory(os.path.join(di, 'discrete'))
         swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
-        op.get_basis_functions(swp.V[0])
 
         # Construct 'optimal' control vector by projection
-        for i, bf in enumerate(op.basis_functions):
-            psi, phi = bf.split()
-            op.control_parameters[i].assign(assemble(phi*f_okada*dx)/assemble(phi*dx))
+        op.project(swp, f_okada)
         swp.set_initial_condition()
 
         # Plot optimum solution
@@ -228,7 +225,6 @@ if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')
 
     # Load trajectory
     control_values_opt = np.load(fname.format('ctrl', level))
-    print(control_values_opt.shape)
     func_values_opt = np.load(fname.format('func', level))
     gradient_values_opt = np.load(fname.format('grad', level))
     optimised_value = control_values_opt[-1]
