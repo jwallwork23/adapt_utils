@@ -142,6 +142,7 @@ op.save_timeseries = False
 control_values = np.linspace(0.5, 7.5, n)
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
 recompute |= not os.path.exists(fname)
+msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
 with stop_annotating():
     if recompute:
         func_values = np.zeros(n)
@@ -151,12 +152,13 @@ with stop_annotating():
             swp.set_initial_condition()
             swp.solve_forward()
             func_values[i] = op.J
+            print_output(msg.format(i, m, func_values[i]))
     else:
         func_values = np.load(fname)
+        for i, m in enumerate(control_values):
+            print_output(msg.format(i, m, func_values[i]))
     np.save(fname, func_values)
     op.control_parameters[0].assign(float(args.initial_guess or 7.5))
-for i, m in enumerate(control_values):
-    print_output("{:2d}: control value {:.4e}  functional value {:.4e}".format(i, m, func_values[i]))
 
 # Plot parameter space
 if recompute and plot_pdf:
