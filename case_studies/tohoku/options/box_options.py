@@ -57,12 +57,9 @@ class TohokuBoxBasisOptions(TohokuOptions):
         self.print_debug("INIT: Done!")
         self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
 
-    def set_initial_condition(self, prob, sum_pad=100):
+    def get_basis_functions(self):
         """
-        :arg prob: the :class:`AdaptiveProblem` object to which the initial condition is assigned.
-        :kwarg sum_pad: when summing terms to assemble the initial surface, the calculation is split
-            up for large arrays in order to avoid the UFL recursion limit. That is, every `sum_pad`
-            terms are summed separately.
+        Assemble an array of piecewise constant indicator functions, rotated by specified angle.
         """
         from adapt_utils.misc import box, rotation_matrix
 
@@ -76,8 +73,6 @@ class TohokuBoxBasisOptions(TohokuOptions):
         # Setup array coordinates
         X = np.linspace((1 - nx)*rx, (nx - 1)*rx, nx)
         Y = np.linspace((1 - ny)*ry, (ny - 1)*ry, ny)
-
-        # Assemble an array of Gaussian indicator functions, rotated by specified angle
         self.print_debug("INIT: Assembling rotated array of indicator functions...")
         self.basis_functions = [thetis.Function(prob.V[0]) for i in range(N)]
         R = rotation_matrix(-angle)
@@ -87,6 +82,16 @@ class TohokuBoxBasisOptions(TohokuOptions):
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
                 phi.interpolate(box([(x_rot, y_rot, rx, ry), ], prob.meshes[0], rotation=angle))
         self.print_debug("INIT: Done!")
+
+    def set_initial_condition(self, prob, sum_pad=100):
+        """
+        :arg prob: the :class:`AdaptiveProblem` object to which the initial condition is assigned.
+        :kwarg sum_pad: when summing terms to assemble the initial surface, the calculation is split
+            up for large arrays in order to avoid the UFL recursion limit. That is, every `sum_pad`
+            terms are summed separately.
+        """
+        if not hasattr(self, 'basis_functions'):
+            self.get_basis_functions()
 
         # Assemble initial surface
         self.print_debug("INIT: Assembling initial surface...")

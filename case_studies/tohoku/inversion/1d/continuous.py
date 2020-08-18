@@ -210,7 +210,6 @@ else:
         op.control_parameters[0].assign(m[0])
         swp.solve_forward()
         J = op.J
-        print_output("control = {:8.6e}  functional = {:8.6e}".format(m[0], J))
         return J
 
     def gradient(m):
@@ -327,8 +326,8 @@ else:
 if plot_pdf:
 
     # Fit a quadratic to the first three points and find its root
-    assert len(control_values[::4]) == 3
-    q = scipy.interpolate.lagrange(control_values[::4], func_values[::4])
+    assert len(control_values[::3]) == 3
+    q = scipy.interpolate.lagrange(control_values[::3], func_values[::3])
     dq = q.deriv()
     q_min = -dq.coefficients[1]/dq.coefficients[0]
     assert dq.deriv().coefficients[0] > 0
@@ -337,7 +336,7 @@ if plot_pdf:
 
     # Fit quadratic to regularised functional values
     if use_regularisation:
-        q_reg = scipy.interpolate.lagrange(control_values[::4], func_values_reg[::4])
+        q_reg = scipy.interpolate.lagrange(control_values[::3], func_values_reg[::3])
         dq_reg = q_reg.deriv()
         q_reg_min = -dq_reg.coefficients[1]/dq_reg.coefficients[0]
         assert dq_reg.deriv().coefficients[0] > 0
