@@ -134,8 +134,8 @@ if not real_data:
 
         # Get array coordinates before rotation and rescale down so that dx = dy = 1
         x0, y0 = op.centre_x, op.centre_y
-        x = (x0 + np.linspace(-0.5*op.extent_x, 0.5*op.extent_x, op.nx))/op.radius_x
-        y = (y0 + np.linspace(-0.5*op.extent_y, 0.5*op.extent_y, op.ny))/op.radius_y
+        x = np.linspace(-0.5*op.extent_x, 0.5*op.extent_x, op.nx)/op.radius_x
+        y = np.linspace(-0.5*op.extent_y, 0.5*op.extent_y, op.ny)/op.radius_y
         X, Y = np.meshgrid(x, y)
         eps = 1.0
 
@@ -143,16 +143,16 @@ if not real_data:
         R = rotation_matrix(op.strike_angle)  # NOTE: Opposite direction
         coords_x, coords_y = [], []
         for xy in op.default_mesh.coordinates.dat.data:
-            x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([xy[0], xy[1]])))
+            x_rot, y_rot = tuple(np.dot(R, np.array([xy[0] - x0, xy[1] - y0])))
             coords_x.append(x_rot)
             coords_y.append(y_rot)
         coords = [np.array(coords_x)/op.radius_x, np.array(coords_y)/op.radius_y]
 
         # Interpolate with radial basis functions
-        data = f_okada.dat.data
-        rbfi = scipy.interpolate.Rbf(*coords, data, function='gaussian', epsilon=eps)
-        for i, (xi, yi) in enumerate(zip(x, y)):
-            coeff = float(rbfi(xi, yi))
+        rbfi = scipy.interpolate.Rbf(*coords, f_okada.dat.data, function='gaussian', epsilon=eps)
+        eps = 1.0e-03
+        for i, (x, y) in enumerate(zip(X.flatten(), Y.flatten())):
+            coeff = float(rbfi(x, y))
             if np.abs(coeff) < eps:
                 coeff = eps
             print(i, x, y, coeff)
