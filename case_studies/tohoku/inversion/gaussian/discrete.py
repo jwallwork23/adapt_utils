@@ -14,7 +14,7 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 from adapt_utils.misc import rotation_matrix
-from adapt_utils.norms import vecnorm
+from adapt_utils.norms import total_variation, vecnorm
 
 
 # --- Parse arguments
@@ -108,9 +108,6 @@ di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data 
 plot_dir = create_directory(os.path.join(di, 'plots'))
 create_directory(os.path.join(plot_dir, 'discrete'))
 
-# Zero initial guess gives an error so just choose small
-eps = 1.0e-03
-
 # --- Synthetic run to get timeseries data
 
 if not real_data:
@@ -125,6 +122,7 @@ if not real_data:
         f_okada = op_okada.set_initial_condition(swp)
 
         # Create GaussianBasis parameter class and an associated AdaptiveProblem
+        kwargs['nx'], kwargs['ny'] = nx, ny
         op = TohokuGaussianBasisOptions(mesh=op_okada.default_mesh, **kwargs)
         op.di = create_directory(os.path.join(di, 'discrete'))
         swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
@@ -160,7 +158,6 @@ if not real_data:
                 plt.savefig(fname + '.pdf')
             if plot_png:
                 plt.savefig(fname + '.png')
-            plt.show()  # TODO: temp
 
         # Synthetic run
         if not plot_only:
@@ -232,7 +229,6 @@ if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')
 
     # Load trajectory
     control_values_opt = np.load(fname.format('ctrl', level))
-    print(control_values_opt.shape)
     func_values_opt = np.load(fname.format('func', level))
     gradient_values_opt = np.load(fname.format('grad', level))
     optimised_value = control_values_opt[-1]
