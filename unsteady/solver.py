@@ -590,10 +590,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             msg = "Mismatching start time: {:.2f} vs {:.2f}"
             raise ValueError(msg.format(self.simulation_time, start_time))
         # update_forcings(self.simulation_time)
-        print_output(80*'=')
+        self.print(80*'=')
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f}) seconds"
-        print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, 0.0))
+        self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
         # Callbacks
@@ -657,7 +657,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.callbacks[i].evaluate(mode='timestep')
             if self.iteration % op.dt_per_export == 0:
                 cpu_time = perf_counter() - cpu_timestamp
-                print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, cpu_time))
+                self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, cpu_time))
                 cpu_timestamp = perf_counter()
                 if op.solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
@@ -672,7 +672,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.callbacks[i].evaluate(mode='export')
         update_forcings(self.simulation_time + op.dt)  # TODO: TESTME
         op.print_debug("Done!")
-        print_output(80*'=')
+        self.print(80*'=')
 
     def setup_solver_adjoint(self, i):
         """Setup forward solver on mesh `i`."""
@@ -723,10 +723,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             msg = "Mismatching start time: {:f} vs {:f}"
             raise ValueError(msg.format(self.simulation_time, start_time))
         # update_forcings(self.simulation_time)
-        print_output(80*'=')
+        self.print(80*'=')
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
-        print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, 0.0))
+        self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
         # Callbacks
@@ -786,7 +786,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.iteration % op.dt_per_export == 0:
                 cpu_time = perf_counter() - cpu_timestamp
                 cpu_timestamp = perf_counter()
-                print_output(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, cpu_time))
+                self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, cpu_time))
                 if op.solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
@@ -800,7 +800,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         update_forcings(self.simulation_time - op.dt)  # TODO: TESTME
         op.print_debug("Done!")
-        print_output(80*'=')
+        self.print(80*'=')
 
     # --- Metric
 
@@ -922,11 +922,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Check QoI convergence
             qoi = self.quantity_of_interest()
-            print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
             self.qois.append(qoi)
             if len(self.qois) > 1:
                 if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    print_output("Converged quantity of interest!")
+                    self.print("Converged quantity of interest!")
                     break
 
             # Check maximum number of iterations
@@ -966,26 +966,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Adapt meshes
 
-            print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
-                print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
+                self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
                 self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            print_output("Done!")
+            self.print("Done!")
 
             # ---  Setup for next run / logging
 
             self.setup_all(self.meshes)
             self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
 
-            print_output("\nResulting meshes")
+            self.print("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
             for i, c in enumerate(complexities):
-                print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
+                self.print(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
             msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
-            print_output(msg.format(
+            self.print(msg.format(
                 self.st_complexities[-1],
                 sum(self.num_vertices[n+1])*self.dt_per_mesh,
                 sum(self.num_cells[n+1])*self.dt_per_mesh,
@@ -997,7 +997,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
                     converged = False
             if converged:
-                print_output("Converged number of mesh elements!")
+                self.print("Converged number of mesh elements!")
                 break
 
     # TODO: Tracer?
@@ -1039,11 +1039,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Check QoI convergence
             qoi = self.quantity_of_interest()
-            print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
             self.qois.append(qoi)
             if len(self.qois) > 1:
                 if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    print_output("Converged quantity of interest!")
+                    self.print("Converged quantity of interest!")
                     break
 
             # Check maximum number of iterations
@@ -1112,26 +1112,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Adapt meshes
 
-            print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
-                print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
+                self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
                 self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            print_output("Done!")
+            self.print("Done!")
 
             # ---  Setup for next run / logging
 
             self.setup_all(self.meshes)
             self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
 
-            print_output("\nResulting meshes")
+            self.print("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
             for i, c in enumerate(complexities):
-                print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
+                self.print(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
             msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
-            print_output(msg.format(
+            self.print(msg.format(
                 self.st_complexities[-1],
                 sum(self.num_vertices[n+1])*self.dt_per_mesh,
                 sum(self.num_cells[n+1])*self.dt_per_mesh,
@@ -1143,7 +1143,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
                     converged = False
             if converged:
-                print_output("Converged number of mesh elements!")
+                self.print("Converged number of mesh elements!")
                 break
 
     # TODO: Tracer
@@ -1163,11 +1163,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Check QoI convergence
             qoi = self.quantity_of_interest()
-            print_output("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
             self.qois.append(qoi)
             if len(self.qois) > 1:
                 if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    print_output("Converged quantity of interest!")
+                    self.print("Converged quantity of interest!")
                     break
 
             # Check maximum number of iterations
@@ -1182,11 +1182,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     same_mesh = False
                     break
             if same_mesh:
-                print_output("All meshes are identical so we use an identical hierarchy.")
+                self.print("All meshes are identical so we use an identical hierarchy.")
                 hierarchy = MeshHierarchy(self.meshes[0], 1)
                 refined_meshes = [hierarchy[1] for mesh in self.meshes]
             else:
-                print_output("Meshes differ so we create separate hierarchies.")
+                self.print("Meshes differ so we create separate hierarchies.")
                 hierarchies = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
                 refined_meshes = [hierarchy[1] for hierarchy in hierarchies]
             ep = type(self)(
@@ -1315,26 +1315,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Adapt meshes
 
-            print_output("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
-                print_output("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
+                self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
                 self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            print_output("Done!")
+            self.print("Done!")
 
             # ---  Setup for next run / logging
 
             self.setup_all(self.meshes)
             self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
 
-            print_output("\nResulting meshes")
+            self.print("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
             for i, c in enumerate(complexities):
-                print_output(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
+                self.print(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
             msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
-            print_output(msg.format(
+            self.print(msg.format(
                 self.st_complexities[-1],
                 sum(self.num_vertices[n+1])*self.dt_per_mesh,
                 sum(self.num_cells[n+1])*self.dt_per_mesh,
@@ -1346,5 +1346,5 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
                     converged = False
             if converged:
-                print_output("Converged number of mesh elements!")
+                self.print("Converged number of mesh elements!")
                 break

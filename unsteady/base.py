@@ -28,7 +28,7 @@ class AdaptiveProblemBase(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-    def __init__(self, op, meshes=None, nonlinear=True, checkpointing=False):
+    def __init__(self, op, meshes=None, nonlinear=True, checkpointing=False, print_progress=True):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -37,6 +37,7 @@ class AdaptiveProblemBase(object):
         self.approach = op.approach
         self.nonlinear = nonlinear
         self.checkpointing = checkpointing
+        self.print_progress = print_progress
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -429,3 +430,10 @@ class AdaptiveProblemBase(object):
 
             # Update fields
             self.set_fields()
+
+    # --- Misc
+
+    def print(self, print_str):
+        """Print a string `print_str` only if :attr:`print_progress` is set to True."""
+        if self.print_progress:
+            print_output(print_str)

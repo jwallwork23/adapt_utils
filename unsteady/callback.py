@@ -31,7 +31,7 @@ class TimeseriesCallback(object):
     def evaluate(self, **kwargs):
         t = self.prob.simulation_time
         value = self.func(t)
-        print_output(self.msg.format(t, value))
+        self.prob.print(self.msg.format(t, value))
         self.timeseries.append(value)
         if self.callback_dir is not None:
             np.save(os.path.join(self.callback_dir, self.name), self.timeseries)
