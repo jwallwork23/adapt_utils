@@ -1,6 +1,10 @@
 import thetis
+
 import numpy as np
+import scipy
+
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.norms import vecnorm
 
 
 __all__ = ["TohokuGaussianBasisOptions"]
@@ -42,7 +46,7 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         self.nx = kwargs.get('nx', 1)
         self.ny = kwargs.get('ny', 1)
         N_b = self.nx*self.ny
-        control_parameters = kwargs.get('control_parameters', [0.0 for i in range(N_b)])
+        control_parameters = kwargs.get('control_parameters', 10.0*np.random.rand(N_b))
         N_c = len(control_parameters)
         if N_c != N_b:
             raise ValueError("{:d} controls inconsistent with {:d} basis functions".format(N_c, N_b))
@@ -94,10 +98,12 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         self.print_debug("INIT: Assembling rotated array of Gaussians...")
         self.basis_functions = [thetis.Function(fs) for i in range(N)]
         R = rotation_matrix(-angle)
+        self._array = []
         for j, y in enumerate(Y):
             for i, x in enumerate(X):
                 psi, phi = self.basis_functions[i + j*nx].split()
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
+                self._array.append([x_rot, y_rot])
                 phi.interpolate(gaussian([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
         self.print_debug("INIT: Done!")
 
@@ -124,16 +130,60 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         self.subtract_surface_from_bathymetry(prob)
 
     def project(self, prob, source):
-        """
+        r"""
         Project a source field into the box basis.
 
-        This involves solving an auxiliary optimisation problem!
+        This involves solving an auxiliary optimisation problem! The objective functional is
+
+      ..math::
+            J(\mathbf m) = \left( \int_\Omega \sum_i (m_i\phi_i - f) \;\mathrm dx\right)^2,
+
+        where :math:`m` is the control vector, :math:`\boldsymbol\phi` is the vector (radial) basis
+        functions and :math:`f` is the source field we seek to represent. Due to the linearity of
+        the basis expansion, the objective functional may be rewritten as
+
+      ..math::
+            J(\mathbf m) = \left(m\cdot\boldsymbol\Phi - F\right)^2,
+
+        where :math:`\boldsymbol\Phi` and :math:`F` correspond to integrated quantities. These
+        quantities can be pre-computed, meaning we just have a linear algebraic optimisation problem.
         """
-        # TODO: doc
-        # TODO: Check for overlap
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
-        raise NotImplementedError  # TODO
+
+        # Get RHS (mass of source)
+        f = thetis.assemble(source*thetis.dx)
+
+        # Get vector of basis function masses
+        g = np.array([thetis.assemble(bf.split()[1]*thetis.dx) for bf in self.basis_functions])
+
+        # Get initial guess by point evaluation (which will probably be an overestimate)
+        m_init = np.array([source.at(xy) for xy in self._array])
+
+        def J(m):
+            j = (np.dot(g, m) - f)**2
+            self.print_debug("INIT: functional = {:8.6e}".format(j))
+            return j
+
+        def dJdm(m):
+            djdm = 2*(np.dot(g, m) - f)*m
+            self.print_debug("INIT: gradient = {:8.6e}".format(vecnorm(djdm, order=np.Inf)))
+            return djdm
+
+        # Run BFGS optimisation
+        self.print_debug("INIT: Running optimisation to project optimal solution...")
+        opt_kwargs = {
+            'maxiter': 100,
+            'gtol': 1.0e-08,
+            'callback': lambda m: self.print_debug("INIT: LINE SEARCH COMPLETE"),
+            'fprime': dJdm,
+        }
+        m_opt = scipy.optimize.fmin_bfgs(J, m_init, **opt_kwargs)
+        self.print_debug("INIT: Done!")
+
+        # Assign values
+        for i, mi in enumerate(m_opt):
+            self.control_parameters[i].assign(mi)
 
     def interpolate(self, prob, source):
         """
@@ -142,7 +192,6 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         This involves solving an auxiliary optimisation problem!
         """
         # TODO: doc
-        # TODO: Check for overlap
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
         raise NotImplementedError  # TODO
