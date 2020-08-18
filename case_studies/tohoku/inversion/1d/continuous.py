@@ -315,7 +315,7 @@ else:
     m_init = op.control_parameters[0].dat.data
     try:
         m_opt = scipy.optimize.fmin_bfgs(reduced_functional_hat, m_init, **opt_kwargs)
-        optimised_value = m_opt.dat.data[0]
+        optimised_value = m_opt[0]
     except StagnationError:
         optimised_value = control_values_opt[-1]
         print_output("StagnationError: Stagnation of objective functional")
@@ -387,21 +387,21 @@ if plot_pdf:
         fname = '_'.join([fname, 'reg'])
     plt.savefig('_'.join([fname, '{:d}.pdf'.format(level)]))
 
+# Create a new parameter class
+kwargs['control_parameters'] = [optimised_value, ]
+kwargs['plot_pvd'] = plot_pvd
+op_opt = TohokuGaussianBasisOptions(**kwargs)
+
 if plot_only:
 
     # Load timeseries
     for gauge in gauges:
-        fname = os.path.join(op.di, '_'.join([gauge, 'data', str(level) + '.npy']))
-        op.gauges[gauge]['data'] = np.load(fname)
         fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
-        op.gauges[gauge][timeseries_type] = np.load(fname)
+        op_opt.gauges[gauge][timeseries_type] = np.load(fname)
 
 else:
 
     # Run forward again so that we can compare timeseries
-    kwargs['control_parameters'] = [optimised_value, ]
-    kwargs['plot_pvd'] = plot_pvd
-    op_opt = TohokuGaussianBasisOptions(**kwargs)
     gauges = list(op_opt.gauges.keys())
     for gauge in gauges:
         op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
@@ -412,10 +412,8 @@ else:
 
     # Save timeseries
     for gauge in gauges:
-        fname = os.path.join(op.di, '_'.join([gauge, 'data', str(level)]))
-        np.save(fname, op.gauges[gauge]['data'])
         fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level)]))
-        np.save(fname, op.gauges[gauge][timeseries_type])
+        np.save(fname, op_opt.gauges[gauge][timeseries_type])
 
     # Compare total variation
     msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"
