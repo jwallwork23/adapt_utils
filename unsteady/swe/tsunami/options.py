@@ -140,15 +140,29 @@ class TsunamiOptions(CoupledOptions):
         from the bathymetry field. This is in line with the fact the earthquake disturbs the bed.
         In the hydrostatic case, we can assume that this translates to an idential disturbance to
         the ocean surface.
+
+        Note that we reset the bathymetry first, in case this method has already been called.
         """
         self.print_debug("INIT: Subtracting initial surface from bathymetry field...")
-        assert hasattr(prob, 'bathymetry')
+
+        # Reset bathymetry
+        fs = prob.bathymetry[0].function_space()
+        prob.bathymetry[0] = self.set_bathymetry(fs)
+
+        # Project bathymetry into P1 space
+        P1 = prob.P1[0]
+        b = project(prob.bathymetry[0], P1)
+
+        # Interpolate free surface into P1 space
         if surf is None:
-            surf = interpolate(prob.fwd_solutions[0].split()[1], prob.P1[0])
-        assert prob.bathymetry[0].function_space() == surf.function_space()
-        prob.bathymetry[0] -= surf
-        for i in range(1, self.num_meshes):
-            prob.bathymetry[1].project(prob.bathymetry[0])
+            surf = interpolate(prob.fwd_solutions[0].split()[1], P1)
+
+        # Subtract surface from bathymetry
+        b -= surf
+
+        # Project updated bathymetry onto each mesh
+        for i in range(self.num_meshes):
+            prob.bathymetry[i].project(b)
         self.print_debug("INIT: Done!")
 
     def set_coriolis(self, fs):
