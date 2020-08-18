@@ -135,6 +135,7 @@ op.save_timeseries = False
 control_values = np.linspace(0.5, 7.5, n)
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
 recompute |= not os.path.exists(fname)
+msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
 if recompute:
     func_values = np.zeros(n)
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
@@ -143,12 +144,12 @@ if recompute:
         swp.set_initial_condition()
         swp.solve_forward()
         func_values[i] = op.J
+        print_output(msg.format(i, m, func_values[i]))
 else:
     func_values = np.load(fname)
+    for i, m in enumerate(control_values):
+        print_output(msg.format(i, m, func_values[i]))
 np.save(fname, func_values)
-msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
-for i, m in enumerate(control_values):
-    print_output(msg.format(i, m, func_values[i]))
 
 # Explore regularised parameter space
 if use_regularisation:
