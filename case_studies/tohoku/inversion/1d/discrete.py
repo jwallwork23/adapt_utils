@@ -130,7 +130,7 @@ if not real_data:
     if not plot_only:
         with stop_annotating():
             op.control_parameters[0].assign(float(args.optimal_control or 5.0))
-            swp = AdaptiveProblem(op, nonlinear=nonlinear)
+            swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
             swp.solve_forward()
             for gauge in op.gauges:
                 op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
@@ -144,7 +144,7 @@ recompute |= not os.path.exists(fname)
 with stop_annotating():
     if recompute:
         func_values = np.zeros(n)
-        swp = AdaptiveProblem(op, nonlinear=nonlinear)
+        swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
         for i, m in enumerate(control_values):
             op.control_parameters[0].assign(m)
             swp.set_initial_condition()

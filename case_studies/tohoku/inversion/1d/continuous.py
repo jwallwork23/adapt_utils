@@ -123,7 +123,7 @@ create_directory(os.path.join(plot_dir, 'continuous'))
 if not real_data:
     if not plot_only:
         op.control_parameters[0].assign(float(args.optimal_control or 5.0))
-        swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
+        swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
         swp.solve_forward()
         for gauge in op.gauges:
             op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
@@ -155,7 +155,7 @@ if use_regularisation:
     recompute_reg |= not os.path.exists(fname)
     if recompute_reg:
         func_values_reg = np.zeros(n)
-        swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
+        swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
         for i, m in enumerate(control_values):
             op.control_parameters[0].assign(m)
             swp.set_initial_condition()
@@ -196,7 +196,7 @@ if plot_only:
 
 else:
 
-    swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True)
+    swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True, print_progress=False)
 
     def reduced_functional(m):
         """
@@ -449,4 +449,4 @@ if plot_pdf:
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
-    plt.savefig(os.path.join(plot_di, 'continuous', 'timeseries_optimised_{:d}.pdf'.format(level)))
+    plt.savefig(os.path.join(plot_dir, 'continuous', 'timeseries_optimised_{:d}.pdf'.format(level)))

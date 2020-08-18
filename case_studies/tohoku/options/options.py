@@ -546,8 +546,8 @@ class TohokuOptions(TsunamiOptions):
 
     def _get_update_forcings_adjoint(self, prob, i):
         expr = 0
-        # scaling = Constant(self.qoi_scaling)
-        scaling = Constant(2*self.qoi_scaling)  # TODO: TEMPORARY FACTOR OF 2
+        scaling = Constant(self.qoi_scaling)
+        # scaling = Constant(2*self.qoi_scaling)  # TODO: TEMPORARY FACTOR OF 2
         msg = "CHECKPOINT LOAD:  u norm: {:.8e}  eta norm: {:.8e} (iteration {:d})"
 
         # Gauge data (to be loaded from checkpoint)
