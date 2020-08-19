@@ -138,8 +138,8 @@ if not real_data:
 
         # Construct 'optimal' control vector by projection
         swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
-        # op.project(swp, f_okada)
-        op.interpolate(swp, f_okada)
+        op.project(swp, f_okada)
+        # op.interpolate(swp, f_okada)
         swp.set_initial_condition()
 
         # Plot optimum solution
