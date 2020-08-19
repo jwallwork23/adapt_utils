@@ -44,14 +44,14 @@ def initialise_fields(mesh2d, inputdir):
 
     return bath
 
-nx = 1
-ny = 1
+nx = 0.25
+ny = 0.5
 
-alpha = 10
-beta = 1
+alpha = 15
+beta = 0
 gamma = 1
 
-kappa = 10
+kappa = 160
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -147,11 +147,19 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output2/hydrodynamics_beach_bath_mov_new_no_diff_"+ str(op.dt_per_export) + "_" +str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
+export_final_state("adapt_output/hydrodynamics_beach_bath_mov_"+ str(op.dt_per_export) + "_" + str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
 
 bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
 print(kappa)
-print('no diff')
+
+V = V = FunctionSpace(new_mesh, 'CG', 1)
+
+bath_mod = Function(V).interpolate(conditional(x > 70, bath, Constant(0.0)))
+bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(0.0)))
+
+print('subdomain')
+
+print(fire.errornorm(bath_mod, bath_real_mod))

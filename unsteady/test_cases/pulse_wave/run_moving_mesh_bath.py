@@ -4,7 +4,7 @@ from thetis import *
 
 import numpy as np
 
-from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
+from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
 from adapt_utils.norms import local_frobenius_norm, local_norm
@@ -44,6 +44,10 @@ def initialise_fields(mesh2d, inputdir):
 
     return bath
 
+ts = time.time()
+st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
+outputdir = 'outputs' + st
+
 nx = 0.5
 ny = 0.5
 
@@ -81,8 +85,6 @@ swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-print(op.dt_per_export)
-
 def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
 
     """
@@ -93,13 +95,11 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = ka
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
-    b = swp.fwd_solutions_bathymetry[0]
-    x, y = SpatialCoordinate(b.function_space().mesh())
-
     # eta = swp.solution.split()[1]
+    b = swp.fwd_solutions_bathymetry[0]
     bath_gradient = recovery.construct_gradient(b)
     bath_hess = recovery.construct_hessian(b, op=op)
-    frob_bath_hess = Function(b.function_space()).project(conditional(x > 70, local_frobenius_norm(bath_hess), Constant(-100)))
+    frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 
     if max(abs(frob_bath_hess.dat.data[:]))<1e-10:
         frob_bath_norm = Function(b.function_space()).project(frob_bath_hess)
@@ -108,14 +108,13 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = ka
 
     current_mesh = b.function_space().mesh()
     bath_grad2 = Function(bath_gradient.function_space()).project(bath_gradient+as_vector((0.025, 0.0)))
-    l2_bath_grad = Function(b.function_space()).project(conditional(x > 70, abs(local_norm(bath_gradient)), Constant(-100)))
+    l2_bath_grad = Function(b.function_space()).project(abs(local_norm(bath_gradient)))
 
     bath_dx_l2_norm = Function(b.function_space()).interpolate(l2_bath_grad/max(l2_bath_grad.dat.data[:]))
     #comp = interpolate(alpha*bath_dx_l2_norm, b.function_space())
-    comp = interpolate(alpha*gamma*frob_bath_norm, b.function_space()) #conditional(alpha*beta*bath_dx_l2_norm > alpha*gamma*frob_bath_norm, alpha*beta*bath_dx_l2_norm, alpha*gamma*frob_bath_norm), b.function_space())
+    comp = interpolate(conditional(alpha*beta*bath_dx_l2_norm > alpha*gamma*frob_bath_norm, alpha*beta*bath_dx_l2_norm, alpha*gamma*frob_bath_norm), b.function_space())
     comp_new = project(comp, P1)
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
-    print(min(comp_new2.dat.data[:]))
     mon_init = project(Constant(1.0) + comp_new2, P1)
 
     H = Function(P1)
@@ -152,10 +151,25 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output/hydrodynamics_beach_bath_mov_" + str(kappa) + '_' + str(op.dt_per_export) + '_' +str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
+export_final_state("adapt_output/hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
 
-bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
+
+xaxisthetis1 = []
+baththetis1 = []
+
+for i in np.linspace(0, 219, 220):
+    xaxisthetis1.append(i)
+    baththetis1.append(-bath.at([i, 5]))
+df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
+df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
+
+df_real = pd.read_csv('final_result_nx3_ny1.csv')
+print("Mesh error: ")
+print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+
+bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_660')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
 print(kappa)
+print('diff y')

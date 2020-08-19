@@ -96,7 +96,7 @@ solver_obj.iterate(update_forcings = update_forcings_hydrodynamics)
 uv, elev = solver_obj.fields.solution_2d.split()
 
 if plot == False:
-    morph.export_final_state("hydrodynamics_beach_l_sep_nx_"+str(nx), uv, elev)
+    morph.export_final_state("hydrodynamics_beach_l_sep_nx_"+str(nx) + '_' + str(ny), uv, elev)
 else:
     import pylab as plt
 
