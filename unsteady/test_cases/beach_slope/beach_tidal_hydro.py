@@ -59,7 +59,7 @@ def boundary_conditions_fn_balzano(bathymetry_2d, flag = None, morfac = 1, t_new
 # define mesh
 lx = 220
 ly = 10
-nx = np.int(lx*1.5)
+nx = np.int(lx*0.25)
 ny = 10
 mesh2d = th.RectangleMesh(nx, ny, lx, ly)
 
@@ -96,7 +96,7 @@ solver_obj.iterate(update_forcings = update_forcings_hydrodynamics)
 uv, elev = solver_obj.fields.solution_2d.split()
 
 if plot == False:
-    morph.export_final_state("hydrodynamics_beach_l_sep_nx_"+str(nx), uv, elev)
+    morph.export_final_state("hydrodynamics_beach_l_sep_nx_"+str(nx) + '_' + str(ny), uv, elev)
 else:
     import pylab as plt
 

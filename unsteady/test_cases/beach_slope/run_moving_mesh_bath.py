@@ -44,20 +44,20 @@ def initialise_fields(mesh2d, inputdir):
 
     return bath
 
-nx = 1
+nx = 0.5
 ny = 1
 
-alpha = 10
-beta = 1
+alpha = 17
+beta = 0
 gamma = 1
 
-kappa = 10
+kappa = 80
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
+inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220)) + '_10'
 print(inputdir)
 kwargs = {
     'approach': 'monge_ampere',
@@ -147,11 +147,17 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output2/hydrodynamics_beach_bath_mov_new_no_diff_"+ str(op.dt_per_export) + "_" +str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
+export_final_state("adapt_output/hydrodynamics_beach_bath_mov_"+ str(op.dt_per_export) + "_" + str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
 
 bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
 print(kappa)
-print('no diff')
+
+bath_mod = th.Function(V).interpolate(th.conditional(x > 70, bath, th.Constant(0.0)))
+bath_real_mod = th.Function(V).interpolate(th.conditional(x > 70, bath_real, th.Constant(0.0)))
+
+print('subdomain')
+
+print(fire.errornorm(bath_mod, bath_real_mod))
