@@ -76,7 +76,7 @@ class TohokuOptions(TsunamiOptions):
         self.save_timeseries = kwargs.get('save_timeseries', False)
         self.synthetic = kwargs.get('synthetic', False)
         if not self.synthetic:
-            self.noisy_data = kwargs.get('noisy_data', True)
+            self.noisy_data = kwargs.get('noisy_data', False)
         self.qoi_scaling = kwargs.get('qoi_scaling', 1.0)
 
         # Mesh
@@ -469,7 +469,7 @@ class TohokuOptions(TsunamiOptions):
 
             # Setup interpolator
             if not self.synthetic:
-                sample = 1 if self.noisy_data else gauge["sample"]
+                sample = 1 if self.noisy_data else gauge_dat["sample"]
                 self.sample_timeseries(gauge, sample=sample, detide=True)
 
             # Assemble an area-normalised indicator function
