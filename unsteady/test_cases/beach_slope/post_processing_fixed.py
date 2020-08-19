@@ -32,15 +32,17 @@ x,y = th.SpatialCoordinate(new_mesh)
 
 bath_init = th.Function(V).interpolate(th.Constant(180/40) - x/40)
 
-bath0 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed44')
-bath1 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed55')
-bath2 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed132')
-bath3 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed165')
-bath4 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed220')
-bath5 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed330')
+bath0 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_44_0.5')
+bath1 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_55_0.5')
+bath2 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_110_1')
+bath3 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_132_1')
+bath4 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_165_1')
+bath5 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_220_1')
+bath6 = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_330_1')
 bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
 
 errorlist = []
+errorlist.append(fire.errornorm(bath6, bath_real))
 errorlist.append(fire.errornorm(bath5, bath_real))
 errorlist.append(fire.errornorm(bath4, bath_real))
 errorlist.append(fire.errornorm(bath3, bath_real))
@@ -51,12 +53,12 @@ errorlist.append(fire.errornorm(bath0, bath_real))
 print(errorlist)
 
 
-plt.loglog([2/3, 1, 4/3, 5/3, 4, 5], errorlist, '-o')
+plt.loglog([2/3, 1, 4/3, 5/3, 2, 4, 5], errorlist, '-o')
 plt.ylabel('Error norm (m)')
 plt.xlabel(r'$\Delta x$ (m)')
 plt.show()
 
-logx = np.log([2/3, 1, 4/3, 5/3, 4, 5])
+logx = np.log([2/3, 1, 4/3, 5/3, 2, 4, 5])
 log_error = np.log(errorlist)
 poly = np.polyfit(logx, log_error, 1)
 print(poly[0])
@@ -90,9 +92,11 @@ bath2_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath2, th.Constan
 bath3_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath3, th.Constant(0.0)))
 bath4_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath4, th.Constant(0.0)))
 bath5_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath5, th.Constant(0.0)))
+bath6_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath6, th.Constant(0.0)))
 bath_real_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath_real, th.Constant(0.0)))
 
 errorlist = []
+errorlist.append(fire.errornorm(bath6_mod, bath_real_mod))
 errorlist.append(fire.errornorm(bath5_mod, bath_real_mod))
 errorlist.append(fire.errornorm(bath4_mod, bath_real_mod))
 errorlist.append(fire.errornorm(bath3_mod, bath_real_mod))
@@ -102,12 +106,12 @@ errorlist.append(fire.errornorm(bath0_mod, bath_real_mod))
 
 print(errorlist)
 
-plt.loglog([2/3, 1, 4/3, 5/3, 4, 5], errorlist, '-o')
+plt.loglog([2/3, 1, 4/3, 5/3, 2, 4, 5], errorlist, '-o')
 plt.ylabel('Error norm (m)')
 plt.xlabel(r'$\Delta x$ (m)')
 plt.show()
 
-logx = np.log([2/3, 1, 4/3, 5/3, 4, 5])
+logx = np.log([2/3, 1, 4/3, 5/3, 2, 4, 5])
 log_error = np.log(errorlist)
 poly = np.polyfit(logx, log_error, 1)
 print(poly[0])
