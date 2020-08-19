@@ -131,64 +131,56 @@ class TohokuGaussianBasisOptions(TohokuOptions):
 
     def project(self, prob, source):
         r"""
-        Project a source field into the box basis.
-
-        This involves solving an auxiliary optimisation problem! The objective functional is
-
-      ..math::
-            J(\mathbf m) = \frac1{N^2}\left( \int_\Omega \sum_i(m_i\phi_i - f) \;\mathrm dx\right)^2,
-
-        where :math:`m` is the control vector, :math:`\boldsymbol\phi` is the vector (radial) basis
-        functions and :math:`f` is the source field we seek to represent. Here :math:`N` is the
-        number of radial basis functions. Due to the linearity of the basis expansion, the objective
-        functional may be rewritten as
+        Project a source field into the box basis. This involves solving an auxiliary linear system.
+        We seek a vector of control parameters :math:`\mathbf m` satisfying
 
       ..math::
-            J(\mathbf m) = \frac1{N^2} \left(m\cdot\boldsymbol\Phi - F\right)^2,
+            \sum_i m_i\phi_i = f,
 
-        where :math:`\boldsymbol\Phi` and :math:`F` correspond to integrated quantities. These
-        quantities can be pre-computed, meaning we just have a linear algebraic optimisation problem.
+        where :math:`\boldsymbol\phi` is the vector (radial) basis functions and :math:`f` is the
+        source field we seek to represent. For an L2 projection we achieve this by solving the
+        problem weakly:
+
+      ..math::
+            \sum_j \sum_i \int_\Omega m_i\phi_i\phi_j \;\mathrm dx =
+                \sum_j \int_\Omega f\phi_j \;\mathrm dx, \quad \forall j.
+
+        For ease, we simply assemble the mass matrix and RHS vector and solve using NumPy's `solve`.
         """
+        from thetis import assemble, dx
+
+        # Get basis functions
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
+        phi = [bf.split()[1] for bf in self.basis_functions]
         N = self.nx*self.ny
 
-        # Get RHS (mass of source)
-        f = thetis.assemble(source*thetis.dx)
+        # Assemble mass matrix
+        self.print_debug("INTERPOLATION: Assembling mass matrix...")
+        A = np.zeros((N, N))
+        for i in range(N):
+            for j in range(i+1):
+                A[i, j] = assemble(phi[i]*phi[j]*dx)
+        for i in range(N):
+            for j in range(i+1, N):
+                A[i, j] = A[j, i]
+        self.print_debug("INTERPOLATION: Done!")
 
-        # Get vector of basis function masses
-        g = np.array([thetis.assemble(bf.split()[1]*thetis.dx) for bf in self.basis_functions])
+        # Assemble RHS
+        self.print_debug("INTERPOLATION: Assembling RHS...")
+        b = np.array([assemble(phi[i]*source*dx) for i in range(N)])
+        self.print_debug("INTERPOLATION: Done!")
 
-        # Get initial guess by point evaluation (which will probably be an overestimate)
-        m_init = np.array([source.at(xy) for xy in self._array])
-
-        # Rescale to avoid precision loss
-        rescaling = 1/N**2
-
-        def J(m):
-            j = rescaling*(np.dot(g, m) - f)**2
-            self.print_debug("INIT: functional = {:8.6e}".format(j))
-            return j
-
-        def dJdm(m):
-            djdm = 2*rescaling*(np.dot(g, m) - f)*g
-            self.print_debug("INIT: gradient = {:8.6e}".format(vecnorm(djdm, order=np.Inf)))
-            return djdm
-
-        # Run BFGS optimisation
-        self.print_debug("INIT: Running optimisation to project optimal solution...")
-        opt_kwargs = {
-            'maxiter': 10000,
-            'gtol': 1.0e-08,
-            'callback': lambda m: self.print_debug("INIT: LINE SEARCH COMPLETE"),
-            'fprime': dJdm,
-        }
-        m_opt = scipy.optimize.fmin_bfgs(J, m_init, **opt_kwargs)
-        self.print_debug("INIT: Done!")
+        # Create solution vector and solve
+        self.print_debug("INTERPOLATION: Solving linear system...")
+        m = np.linalg.solve(A, b)
+        self.print_debug("INTERPOLATION: Done!")
 
         # Assign values
-        for i, mi in enumerate(m_opt):
+        self.print_debug("INTERPOLATION: Assigning values...")
+        for i, mi in enumerate(m):
             self.control_parameters[i].assign(mi)
+        self.print_debug("INTERPOLATION: Done!")
 
     def interpolate(self, prob, source):
         r"""
@@ -232,25 +224,27 @@ class TohokuGaussianBasisOptions(TohokuOptions):
 
         def J(m):
             j = rescaling*sum([(np.dot(g[i, :], m) - f[i])**2 for i in range(N)])
-            self.print_debug("INIT: functional = {:8.6e}".format(j))
+            self.print_debug("INTERPOLATION: functional = {:8.6e}".format(j))
             return j
 
         def dJdm(m):
             djdm = 2*rescaling*sum([(np.dot(g[i, :], m) - f[i])*g[i, :] for i in range(N)])
-            self.print_debug("INIT: gradient = {:8.6e}".format(vecnorm(djdm, order=np.Inf)))
+            self.print_debug("INTERPOLATION: gradient = {:8.6e}".format(vecnorm(djdm, order=np.Inf)))
             return djdm
 
         # Run BFGS optimisation
-        self.print_debug("INIT: Running optimisation to interpolate optimal solution...")
+        self.print_debug("INTERPOLATION: Running optimisation to interpolate optimal solution...")
         opt_kwargs = {
             'maxiter': 10000,
             'gtol': 1.0e-08,
-            'callback': lambda m: self.print_debug("INIT: LINE SEARCH COMPLETE"),
+            'callback': lambda m: self.print_debug("INTERPOLATION: LINE SEARCH COMPLETE"),
             'fprime': dJdm,
         }
         m_opt = scipy.optimize.fmin_bfgs(J, m_init, **opt_kwargs)
-        self.print_debug("INIT: Done!")
+        self.print_debug("INTERPOLATION: Done!")
 
         # Assign values
+        self.print_debug("INTERPOLATION: Assigning values...")
         for i, mi in enumerate(m_opt):
             self.control_parameters[i].assign(mi)
+        self.print_debug("INTERPOLATION: Done!")
