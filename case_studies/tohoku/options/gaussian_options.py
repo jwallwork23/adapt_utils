@@ -136,20 +136,22 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         This involves solving an auxiliary optimisation problem! The objective functional is
 
       ..math::
-            J(\mathbf m) = \left( \int_\Omega \sum_i (m_i\phi_i - f) \;\mathrm dx\right)^2,
+            J(\mathbf m) = \frac1{N^2}\left( \int_\Omega \sum_i(m_i\phi_i - f) \;\mathrm dx\right)^2,
 
         where :math:`m` is the control vector, :math:`\boldsymbol\phi` is the vector (radial) basis
-        functions and :math:`f` is the source field we seek to represent. Due to the linearity of
-        the basis expansion, the objective functional may be rewritten as
+        functions and :math:`f` is the source field we seek to represent. Here :math:`N` is the
+        number of radial basis functions. Due to the linearity of the basis expansion, the objective
+        functional may be rewritten as
 
       ..math::
-            J(\mathbf m) = \left(m\cdot\boldsymbol\Phi - F\right)^2,
+            J(\mathbf m) = \frac1{N^2} \left(m\cdot\boldsymbol\Phi - F\right)^2,
 
         where :math:`\boldsymbol\Phi` and :math:`F` correspond to integrated quantities. These
         quantities can be pre-computed, meaning we just have a linear algebraic optimisation problem.
         """
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
+        N = self.nx*self.ny
 
         # Get RHS (mass of source)
         f = thetis.assemble(source*thetis.dx)
@@ -159,12 +161,9 @@ class TohokuGaussianBasisOptions(TohokuOptions):
 
         # Get initial guess by point evaluation (which will probably be an overestimate)
         m_init = np.array([source.at(xy) for xy in self._array])
-        # m_init = np.zeros(self.nx*self.ny)
 
-        # Rescale to avoid precision loss  # TODO
-        rescaling = 1
-        # rescaling = 1/f
-        # rescaling = 1/np.mean(g)
+        # Rescale to avoid precision loss
+        rescaling = 1/N**2
 
         def J(m):
             j = rescaling*(np.dot(g, m) - f)**2
@@ -193,7 +192,7 @@ class TohokuGaussianBasisOptions(TohokuOptions):
 
     def interpolate(self, prob, source):
         r"""
-        Interpolate a source field into the box basis using point evaluation.
+        Interpolate a source field into the radial basis using point evaluation.
 
         This involves solving an auxiliary optimisation problem! The objective functional is
 
@@ -204,41 +203,40 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         functions, :math:`f` is the source field we seek to represent and
 
       ..math::
-            \tilde J(\mathbf m)_i = \int_\Omega \sum_i (m_i\phi_i - f_i) \;\mathrm dx.
+            \tilde J(\mathbf m)_i = \frac1N \int_\Omega \sum_i (m_i\phi_i - f_i) \;\mathrm dx.
 
-        Due to the linearity of the basis expansion, the objective functional may be rewritten as
+        Here :math:`N` is the number of radial basis functions. Due to the linearity of the basis
+        expansion, the objective functional may be rewritten as
 
       ..math::
-            J(\mathbf m) = (m\cdot\boldsymbol\Phi - F) \cdot (m\cdot\boldsymbol\Phi - F),
+            J(\mathbf m) = \frac1{N^2} (m\cdot\boldsymbol\Phi - F) \cdot (m\cdot\boldsymbol\Phi - F),
 
         where :math:`\boldsymbol\Phi` and :math:`F` correspond to integrated quantities. These
         quantities can be pre-computed, meaning we just have a linear algebraic optimisation problem.
         """
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
+        N = self.nx*self.ny
 
         # Get RHS
         f = np.array([source.at(xy) for xy in self._array])
 
-        # Get vector of basis function masses
-        g = np.array([thetis.assemble(bf.split()[1]*thetis.dx) for bf in self.basis_functions])
+        # Get vector of pointwise basis function values
+        g = np.array([[bf.split()[1].at(xy) for bf in self.basis_functions] for xy in self._array])
 
         # Get initial guess by point evaluation (which will probably be an overestimate)
-        m_init = np.array([source.at(xy) for xy in self._array])
-        # m_init = np.zeros(self.nx*self.ny)
+        m_init = f.copy()
 
-        # Rescale to avoid precision loss  # TODO
-        rescaling = 1
-        # rescaling = np.mean(f)
-        # rescaling = np.mean(g)
+        # Rescale to avoid precision loss
+        rescaling = 1/N**2
 
         def J(m):
-            j = rescaling*sum([(mi*gi - fi)**2 for mi, gi, fi in zip(m, g, f)])
+            j = rescaling*sum([(np.dot(g[i, :], m) - f[i])**2 for i in range(N)])
             self.print_debug("INIT: functional = {:8.6e}".format(j))
             return j
 
         def dJdm(m):
-            djdm = 2*rescaling*np.array([(mi*gi - fi)*gi for mi, gi, fi in zip(m, g, f)])
+            djdm = 2*rescaling*sum([(np.dot(g[i, :], m) - f[i])*g[i, :] for i in range(N)])
             self.print_debug("INIT: gradient = {:8.6e}".format(vecnorm(djdm, order=np.Inf)))
             return djdm
 
