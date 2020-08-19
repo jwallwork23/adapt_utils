@@ -77,6 +77,7 @@ if COMM_WORLD.size > 1 and (plot_pdf or plot_png):
 
 def savefig(filename):
     """To avoid duplication."""
+    plt.tight_layout()
     if plot_pdf:
         plt.savefig(filename + '.pdf')
     if plot_png:
@@ -144,6 +145,11 @@ if not real_data:
 
         # Plot optimum solution
         if plot_pdf or plot_png:
+            levels = np.linspace(-6, 16, 51)
+            ticks = np.linspace(-5, 15, 9)
+
+            # Project into P1 for plotting
+            f_radial = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
 
             # Get corners of zoom
             lonlat_corners = [(138, 32), (148, 42), (138, 42)]
@@ -152,19 +158,14 @@ if not real_data:
             ylim = [utm_corners[0][1], utm_corners[2][1]]
 
             # Plot optimum in both (original) Okada basis and also in (projected) box basis
-            fig, axes = plt.subplots(ncols=2, figsize=(9, 4))
-            f_radial = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
-            levels = np.linspace(-6, 16, 51)
-            ticks = np.linspace(-5, 15, 9)
-            for f, ax in zip((f_okada, f_radial), (axes[0], axes[1])):
-                cbar = fig.colorbar(tricontourf(f, axes=ax, levels=levels, cmap='coolwarm'), ax=ax)
+            for f, name in zip((f_okada, f_radial), ('okada', 'radial')):
+                fig, axes = plt.subplots(figsize=(4.5, 4))
+                cbar = fig.colorbar(tricontourf(f, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
                 cbar.set_ticks(ticks)
-                ax.set_xlim(xlim)
-                ax.set_ylim(ylim)
-                ax.axis(False)
-            axes[0].set_title("Okada basis")
-            axes[1].set_title("Radial basis")
-            savefig(os.path.join(plot_dir, 'optimum_{:d}'.format(level)))
+                axes.set_xlim(xlim)
+                axes.set_ylim(ylim)
+                axes.axis(False)
+                savefig(os.path.join(plot_dir, 'optimum_{:s}_{:d}'.format(name, level)))
 
         # Synthetic run
         if not plot_only:
