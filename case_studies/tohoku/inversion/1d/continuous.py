@@ -378,7 +378,7 @@ if plot_pdf:
     plt.xticks(fontsize=fontsize_tick)
     plt.yticks(fontsize=fontsize_tick)
     plt.xlim([0, 8])
-    plt.ylim([0, 1.1*func_values[-1]])
+    # plt.ylim([0, 1.1*func_values[-1]])
     plt.tight_layout()
     axes.grid()
     plt.legend(fontsize=fontsize)

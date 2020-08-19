@@ -132,11 +132,11 @@ if not real_data:
         kwargs_okada['nx'], kwargs_okada['ny'] = 19, 10
         kwargs_okada.update(kwargs)
         op_okada = TohokuOkadaOptions(mesh=op.default_mesh, **kwargs_okada)
-        swp = AdaptiveProblem(op_okada, nonlinear=nonlinear, print_progress=False)
+        swp = AdaptiveProblem(op_okada, nonlinear=nonlinear, print_progress=op.debug)
         f_okada = op_okada.set_initial_condition(swp)
 
         # Construct 'optimal' control vector by projection
-        swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
+        swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
         op.project(swp, f_okada)
         # op.interpolate(swp, f_okada)
         swp.set_initial_condition()
@@ -195,7 +195,7 @@ else:
     # Solve the forward problem with initial guess
     op.save_timeseries = True
     print_output("Run forward to get timeseries...")
-    swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
+    swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
     swp.solve_forward()
     J = op.J
 
@@ -308,7 +308,7 @@ if plot_pdf or plot_png:
     savefig(os.path.join(plot_dir, 'discrete', 'optimisation_progress_dJdm_{:d}'.format(level)))
 
 # Plot initial surface
-swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=False)
+swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=op.debug)
 swp.set_initial_condition()
 
 # Plot optimised source against optimum
@@ -354,8 +354,8 @@ else:
     # Compare total variation
     msg = "total variation for gauge {:s}:  before {:.4e}  after {:.4e}  reduction {:.1f}%"
     for tt, cd in zip(('diff', 'diff_smooth'), ('Continuous', 'Discrete')):
+        print_output("\n{:s} form QoI:".format(cd))
         for gauge in op.gauges:
-            print_output("\n{:s} form QoI:".format(cd))
             tv = total_variation(op.gauges[gauge][tt])
             tv_opt = total_variation(op_opt.gauges[gauge][tt])
             print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
