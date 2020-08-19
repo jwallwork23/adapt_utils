@@ -148,7 +148,7 @@ class TohokuOptions(TsunamiOptions):
         self.mid_field_pressure_gauges = {
             "gauges": ("KPG1", "KPG2", "21418"),
             # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21418"),
-            "arrival_time": 10*60.0,
+            "arrival_time": 15*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
             "sample": 60, 
