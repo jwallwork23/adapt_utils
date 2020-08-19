@@ -30,8 +30,8 @@ V = th.FunctionSpace(new_mesh, 'CG', 1)
 
 x,y = th.SpatialCoordinate(new_mesh)
 
-bath0 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_beach_bath_mov_1296_110_7_0_1')
-bath1 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_beach_bath_mov_648_110_7_0_1')
+bath0 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_beach_bath_mov_2592_110_5_1_0')
+bath1 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_beach_bath_mov_2592_110_7_0_1')
 bath2 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_beach_bath_mov_324_110_7_0_1')
 bath3 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_beach_bath_mov_96_110_7_0_1')
 bath4 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_beach_bath_mov_72_110_7_0_1')
@@ -40,14 +40,14 @@ bath6 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_beach_bath_mov_4
 bath7 = initialise_fields(new_mesh, 'adapt_output/hydrodynamics_beach_bath_mov_32_110_7_0_1')
 bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
 
-bath0_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath0, th.Constant(0.0)))
-bath1_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath1, th.Constant(0.0)))
-bath2_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath2, th.Constant(0.0)))
-bath3_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath3, th.Constant(0.0)))
-bath4_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath4, th.Constant(0.0)))
-bath5_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath5, th.Constant(0.0)))
-bath6_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath6, th.Constant(0.0)))
-bath7_mod = th.Function(V).interpolate(th.conditional(x >= 70, bath7, th.Constant(0.0)))
+bath0_mod = th.Function(V).interpolate(th.conditional(x > 70, bath0, th.Constant(0.0)))
+bath1_mod = th.Function(V).interpolate(th.conditional(x > 70, bath1, th.Constant(0.0)))
+bath2_mod = th.Function(V).interpolate(th.conditional(x > 70, bath2, th.Constant(0.0)))
+bath3_mod = th.Function(V).interpolate(th.conditional(x > 70, bath3, th.Constant(0.0)))
+bath4_mod = th.Function(V).interpolate(th.conditional(x > 70, bath4, th.Constant(0.0)))
+bath5_mod = th.Function(V).interpolate(th.conditional(x > 70, bath5, th.Constant(0.0)))
+bath6_mod = th.Function(V).interpolate(th.conditional(x > 70, bath6, th.Constant(0.0)))
+bath7_mod = th.Function(V).interpolate(th.conditional(x > 70, bath7, th.Constant(0.0)))
 bath_real_mod = th.Function(V).interpolate(th.conditional(x > 70, bath_real, th.Constant(0.0)))
 
 errorlist = []

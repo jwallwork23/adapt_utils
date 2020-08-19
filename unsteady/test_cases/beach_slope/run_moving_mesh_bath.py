@@ -44,20 +44,20 @@ def initialise_fields(mesh2d, inputdir):
 
     return bath
 
-nx = 0.5
-ny = 1
+nx = 0.25
+ny = 0.5
 
-alpha = 17
+alpha = 15
 beta = 0
 gamma = 1
 
-kappa = 80
+kappa = 160
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220)) + '_10'
+inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
 print(inputdir)
 kwargs = {
     'approach': 'monge_ampere',
@@ -155,8 +155,10 @@ print('L2')
 print(fire.errornorm(bath, bath_real))
 print(kappa)
 
-bath_mod = th.Function(V).interpolate(th.conditional(x > 70, bath, th.Constant(0.0)))
-bath_real_mod = th.Function(V).interpolate(th.conditional(x > 70, bath_real, th.Constant(0.0)))
+V = V = FunctionSpace(new_mesh, 'CG', 1)
+
+bath_mod = Function(V).interpolate(conditional(x > 70, bath, Constant(0.0)))
+bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(0.0)))
 
 print('subdomain')
 
