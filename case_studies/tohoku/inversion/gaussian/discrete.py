@@ -35,7 +35,7 @@ parser.add_argument("-nonlinear", help="Toggle nonlinear model")
 # Inversion
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
 parser.add_argument("-real_data", help="Toggle whether to use real data")
-parser.add_argument("-sample_data", help="Toggle whether to sample noisy data")
+parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data")
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
 
 # I/O and debugging
@@ -99,6 +99,7 @@ kwargs = {
     # Inversion
     'synthetic': not real_data,
     'qoi_scaling': 1.0,
+    'noisy_data': bool(args.noisy_data or False),
 
     # I/O and debugging
     'plot_pvd': False,
