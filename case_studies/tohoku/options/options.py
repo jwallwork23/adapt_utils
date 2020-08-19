@@ -760,9 +760,12 @@ class TohokuOptions(TsunamiOptions):
             'method': 'ols',     # ordinary least squares
             'conf_int': 'none',  # linearised confidence intervals
             'lat': np.array([self.gauges[gauge]["lonlat"][1], ]),
+            'verbose': self.debug,
         }
+        self.print_debug("INIT: Applying UTide de-tiding algorithm to gauge {:s}...".format(gauge))
         sol = utide.solve(time_str, anomaly, **kwargs)
-        tide = utide.reconstruct(time_str, sol)
+        tide = utide.reconstruct(time_str, sol, verbose=self.debug)
+        self.print_debug("INIT: Done!")
 
         # Subtract de-tided component
         detided = anomaly - np.array(tide.h).reshape(anomaly.shape)

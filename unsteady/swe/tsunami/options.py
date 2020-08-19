@@ -133,6 +133,7 @@ class TsunamiOptions(CoupledOptions):
 
         # Subtract from the bathymetry field
         self.subtract_surface_from_bathymetry(prob, surf=surf)
+        return surf
 
     def subtract_surface_from_bathymetry(self, prob, surf=None):
         """
