@@ -2,18 +2,23 @@ from thetis import *
 from firedrake_adjoint import *
 
 import argparse
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import scipy
 
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaOptions
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
+from adapt_utils.plotting import *
+from adapt_utils.norms import total_variation, vecnorm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
-from adapt_utils.norms import total_variation, vecnorm
+
+
+class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
+    """The subclass exists to pass the QoI as required."""
+    def quantity_of_interest(self):
+        return self.op.J
 
 
 # --- Parse arguments
@@ -38,6 +43,7 @@ parser.add_argument("-plot_only", help="Just plot parameter space, optimisation 
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
+parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
 parser.add_argument("-debug", help="Toggle debugging")
 parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
 
@@ -50,10 +56,12 @@ optimise = bool(args.rerun_optimisation or False)
 plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
+plot_all = bool(args.plot_all or False)
 plot_only = bool(args.plot_only or False)
 if plot_only:
-    plot_pdf = True
-    plot_png = True
+    plot_all = True
+if plot_all:
+    plot_pvd = plot_pdf = plot_png = True
 if optimise:
     assert not plot_only
 real_data = bool(args.real_data or False)
@@ -61,6 +69,15 @@ use_smoothed_timeseries = bool(args.smooth_timeseries or False)
 timeseries_type = "timeseries"
 if use_smoothed_timeseries:
     timeseries_type = "_".join([timeseries_type, "smooth"])
+
+
+def savefig(filename):
+    """To avoid duplication."""
+    if plot_pdf:
+        plt.savefig(filename + '.pdf')
+    if plot_png:
+        plt.savefig(filename + '.png')
+
 
 N = int(args.okada_grid_resolution or 51)
 kwargs = {
@@ -83,18 +100,8 @@ kwargs = {
 }
 nonlinear = bool(args.nonlinear or False)
 
+# Plotting parameters
 if plot_pdf or plot_png:
-
-    # Fonts
-    matplotlib.rc('text', usetex=True)
-    matplotlib.rcParams['mathtext.fontset'] = 'custom'
-    matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
-    matplotlib.rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
-    matplotlib.rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
-    matplotlib.rcParams['mathtext.fontset'] = 'stix'
-    matplotlib.rcParams['font.family'] = 'STIXGeneral'
-
-    # Plotting
     fontsize = 22
     fontsize_tick = 18
     plotting_kwargs = {'markevery': 5}
@@ -149,11 +156,7 @@ if not real_data:
                 ax.axis(False)
             axes[0].set_title("Okada basis")
             axes[1].set_title("Piecewise constant basis")
-            fname = os.path.join(plot_dir, 'optimum_{:d}'.format(level))
-            if plot_pdf:
-                plt.savefig(fname + '.pdf')
-            if plot_png:
-                plt.savefig(fname + '.png')
+            savefig(os.path.join(plot_dir, 'optimum_{:d}'.format(level)))
 
         # Synthetic run
         if not plot_only:
@@ -214,11 +217,7 @@ if plot_pdf or plot_png:
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
-    fname = os.path.join(plot_dir, 'timeseries_{:d}'.format(level))
-    if plot_pdf:
-        plt.savefig(fname + '.pdf')
-    if plot_png:
-        plt.savefig(fname + '.png')
+    savefig(os.path.join(plot_dir, 'timeseries_{:d}'.format(level)))
 
 fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) and not optimise:
@@ -256,13 +255,13 @@ else:
 
     # Run BFGS optimisation
     opt_kwargs = {
-        'maxiter': 100,
+        'maxiter': 1000,
         'gtol': 1.0e-08,
     }
     print_output("Optimisation begin...")
     controls = [Control(c) for c in op.control_parameters]
     Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
-    optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs).dat.data
+    optimised_value = [o.dat.data[0] for o in minimize(Jhat, method='BFGS', options=opt_kwargs)]
     # try:
     #     optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs).dat.data
     # except StagnationError:
@@ -273,6 +272,53 @@ else:
 kwargs['control_parameters'] = optimised_value
 kwargs['plot_pvd'] = plot_pvd
 op_opt = TohokuBoxBasisOptions(**kwargs)
+gauges = list(op_opt.gauges.keys())
+for gauge in gauges:
+    op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
+
+# Clear tape
+tape = get_working_tape()
+tape.clear_tape()
+
+
+# --- Plotting
+
+# Plot optimisation progress
+if plot_pdf or plot_png:
+
+    # Plot progress of QoI
+    fig, axes = plt.subplots(figsize=(6, 4))
+    axes.plot(func_values_opt)
+    axes.set_xlabel("Iteration")
+    axes.set_ylabel("Mean square error")
+    savefig(os.path.join(plot_dir, 'discrete', 'optimisation_progress_J_{:d}'.format(level)))
+
+    # Plot progress of gradient
+    fig, axes = plt.subplots(figsize=(6, 4))
+    axes.semilogy([vecnorm(djdm, order=np.Inf) for djdm in gradient_values_opt])
+    axes.set_xlabel("Iteration")
+    axes.set_ylabel(r"$\ell_\infty$-norm of gradient")
+    savefig(os.path.join(plot_dir, 'discrete', 'optimisation_progress_dJdm_{:d}'.format(level)))
+
+# Plot initial surface
+swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=False)
+swp.set_initial_condition()
+
+# Plot optimised source against optimum
+if plot_pdf or plot_png:
+    fig, axes = plt.subplots(ncols=2, figsize=(9, 4))
+    f_opt = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
+    levels = np.linspace(-6, 16, 51)
+    ticks = np.linspace(-5, 15, 9)
+    for f, ax in zip((f_box, f_opt), (axes[0], axes[1])):
+        cbar = fig.colorbar(tricontourf(f, axes=ax, levels=levels, cmap='coolwarm'), ax=ax)
+        cbar.set_ticks(ticks)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        ax.axis(False)
+    axes[0].set_title("Optimum source field")
+    axes[1].set_title("Optimised source field")
+    savefig(os.path.join(plot_dir, 'discrete', 'optimised_source_{:d}'.format(level)))
 
 if plot_only:
 
@@ -282,22 +328,17 @@ if plot_only:
         op_opt.gauges[gauge][timeseries_type] = np.load(fname)
 
 else:
-    tape = get_working_tape()
-    tape.clear_tape()
-
-    class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
-        """The subclass exists to pass the QoI as required."""
-        def quantity_of_interest(self):
-            return self.op.J
 
     # Run forward again so that we can compare timeseries
-    gauges = list(op_opt.gauges.keys())
-    for gauge in gauges:
-        op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
     print_output("Run to plot optimised timeseries...")
-    swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=False)
-    swp.solve_forward()
+    swp.setup_solver_forward(0)
+    swp.solve_forward_step(0)
     J = swp.quantity_of_interest()
+
+    # Save timeseries
+    for gauge in gauges:
+        fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level)]))
+        np.save(fname, op_opt.gauges[gauge][timeseries_type])
 
     # Compare total variation
     msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"
@@ -336,9 +377,5 @@ if plot_pdf or plot_png:
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
-    fname = os.path.join(plot_dir, 'discrete', 'timeseries_optimised_{:d}'.format(level))
-    if plot_pdf:
-        plt.savefig(fname + '.pdf')
-    if plot_png:
-        plt.savefig(fname + '.png')
+    savefig(os.path.join(plot_dir, 'discrete', 'timeseries_optimised_{:d}'.format(level)))
 print_output("Done!")
