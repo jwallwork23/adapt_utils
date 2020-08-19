@@ -421,11 +421,34 @@ class TohokuOkadaOptions(TohokuOptions):
         raise NotImplementedError  # TODO
 
     def project(self, prob, source):
-        raise NotImplementedError  # TODO
+        raise NotImplementedError("""
+            Projection not implemented in Okada bases (and it probably isn't what you want anyway).
+            Use interpolate instead.""")
 
     def interpolate(self, prob, source, tag=0):
-        # TODO: doc
+        r"""
+        Interpolate a source field into the radial basis using point evaluation.
+
+        This involves solving an auxiliary optimisation problem! The objective functional is
+
+      ..math::
+            J(\mathbf m) = \tilde J(\mathbf m) \cdot \tilde J(\mathbf m),
+
+        where :math:`m` is the control vector, :math:`\boldsymbol\phi` is the vector (radial) basis
+        functions, :math:`f` is the source field we seek to represent and
+
+      ..math::
+            \tilde J(\mathbf m)_i = \frac1N\int_\Omega\sum_i(f^{okada}(\mathbf m)_i-f_i)\;\mathrm dx,
+
+        where :math:`f^{okada}(\mathbf m)_i` is the result of the Okada model with control parameters
+        :math:`\mathbf m`, evaluated at the centre of basis function :math:`i`. and :math:`N` is the
+        number of radial basis functions.
+
+        Solving this optimisation problem using a gradient-based approach means that we need to be
+        able to differentiate the Okada model. We do this using the PyADOLC Python wrapper for the
+        C++ operator overloading AD tool, ADOL-C.
+        """
         self._data_to_interpolate = source  # TODO: Probably needs discretising on Okada grid
         self.create_topography(annotate=True, interpolate=True, tag=tag)
         self.get_seed_matrices()
-        raise NotImplementedError  # TODO
+        raise NotImplementedError  # TODO: Copy over from notebook
