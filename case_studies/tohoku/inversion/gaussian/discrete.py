@@ -352,17 +352,13 @@ else:
         np.save(fname, op_opt.gauges[gauge][timeseries_type])
 
     # Compare total variation
-    msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"
-    print_output("\nContinuous form QoI:")
-    for gauge in op.gauges:
-        tv = total_variation(op.gauges[gauge]['diff_smooth'])
-        tv_opt = total_variation(op_opt.gauges[gauge]['diff_smooth'])
-        print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
-    print_output("\nDiscrete form QoI:")
-    for gauge in op.gauges:
-        tv = total_variation(op.gauges[gauge]['diff'])
-        tv_opt = total_variation(op_opt.gauges[gauge]['diff'])
-        print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
+    msg = "total variation for gauge {:s}:  before {:.4e}  after {:.4e}  reduction {:.1f}%"
+    for tt, cd in zip(('diff', 'diff_smooth'), ('Continuous', 'Discrete')):
+        for gauge in op.gauges:
+            print_output("\n{:s} form QoI:".format(cd))
+            tv = total_variation(op.gauges[gauge][tt])
+            tv_opt = total_variation(op_opt.gauges[gauge][tt])
+            print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
 
     # Solve adjoint problem and plot solution fields
     if plot_pvd:
