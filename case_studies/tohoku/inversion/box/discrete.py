@@ -33,17 +33,17 @@ parser.add_argument("-stabilisation", help="Stabilisation approach")
 parser.add_argument("-nonlinear", help="Toggle nonlinear model")
 
 # Inversion
-parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
 parser.add_argument("-real_data", help="Toggle whether to use real data")
-parser.add_argument("-smooth_timeseries", help="Toggle discrete or smoothed timeseries data")
+parser.add_argument("-sample_data", help="Toggle whether to sample noisy data")
+parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
 
 # I/O and debugging
-parser.add_argument("-plot_only", help="Just plot parameter space, optimisation progress and timeseries")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
+parser.add_argument("-plot_only", help="Just plot using saved data")
 parser.add_argument("-debug", help="Toggle debugging")
 parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
 
@@ -65,10 +65,14 @@ if plot_all:
 if optimise:
     assert not plot_only
 real_data = bool(args.real_data or False)
-use_smoothed_timeseries = bool(args.smooth_timeseries or False)
 timeseries_type = "timeseries"
-if use_smoothed_timeseries:
+if bool(args.continuous_timeseries or False):
     timeseries_type = "_".join([timeseries_type, "smooth"])
+
+# Do not attempt to plot in parallel
+if COMM_WORLD.size > 1 and (plot_pdf or plot_png):
+    print_output(120*'*' + "\nWARNING: Plotting turned off when running in parallel.\n" + 120*'*')
+    plot_pdf = plot_png = False
 
 
 def savefig(filename):
@@ -79,6 +83,7 @@ def savefig(filename):
         plt.savefig(filename + '.png')
 
 
+# Collect initialisation parameters
 N = int(args.okada_grid_resolution or 51)
 kwargs = {
     'level': level,
@@ -99,6 +104,7 @@ kwargs = {
     'debug_mode': args.debug_mode or 'basic',
 }
 nonlinear = bool(args.nonlinear or False)
+op = TohokuBoxBasisOptions(**kwargs)
 
 # Plotting parameters
 if plot_pdf or plot_png:
@@ -109,11 +115,13 @@ if plot_pdf or plot_png:
 # Setup output directories
 dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
+op.di = create_directory(os.path.join(di, 'discrete'))
 plot_dir = create_directory(os.path.join(di, 'plots'))
 create_directory(os.path.join(plot_dir, 'discrete'))
 
 # --- Synthetic run to get timeseries data
 
+# Project optimal solution in the 'synthetic' case
 if not real_data:
     with stop_annotating():
         print_output("Projecting optimal solution...")
@@ -121,17 +129,14 @@ if not real_data:
         # Create Okada parameter class and set the default initial conditionm
         kwargs_okada = {"okada_grid_resolution": N}
         kwargs_okada.update(kwargs)
-        op_okada = TohokuOkadaOptions(**kwargs_okada)
+        op_okada = TohokuOkadaOptions(mesh=op.default_mesh, **kwargs_okada)
         swp = AdaptiveProblem(op_okada, nonlinear=nonlinear, print_progress=False)
         f_okada = op_okada.set_initial_condition(swp)
 
-        # Create BoxBasis parameter class and an associated AdaptiveProblem
-        op = TohokuBoxBasisOptions(mesh=op_okada.default_mesh, **kwargs)
-        op.di = create_directory(os.path.join(di, 'discrete'))
-        swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
-
         # Construct 'optimal' control vector by projection
+        swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
         op.project(swp, f_okada)
+        # op.interpolate(swp, f_okada)
         swp.set_initial_condition()
 
         # Plot optimum solution
@@ -305,20 +310,24 @@ swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=
 swp.set_initial_condition()
 
 # Plot optimised source against optimum
-if plot_pdf or plot_png:
-    fig, axes = plt.subplots(ncols=2, figsize=(9, 4))
-    f_opt = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
-    levels = np.linspace(-6, 16, 51)
-    ticks = np.linspace(-5, 15, 9)
-    for f, ax in zip((f_box, f_opt), (axes[0], axes[1])):
-        cbar = fig.colorbar(tricontourf(f, axes=ax, levels=levels, cmap='coolwarm'), ax=ax)
-        cbar.set_ticks(ticks)
-        ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
-        ax.axis(False)
-    axes[0].set_title("Optimum source field")
-    axes[1].set_title("Optimised source field")
-    savefig(os.path.join(plot_dir, 'discrete', 'optimised_source_{:d}'.format(level)))
+if not real_data:
+    if plot_pdf or plot_png:
+        fig, axes = plt.subplots(ncols=2, figsize=(9, 4))
+        f_opt = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
+        levels = np.linspace(-6, 16, 51)
+        ticks = np.linspace(-5, 15, 9)
+        for f, ax in zip((f_box, f_opt), (axes[0], axes[1])):
+            cbar = fig.colorbar(tricontourf(f, axes=ax, levels=levels, cmap='coolwarm'), ax=ax)
+            cbar.set_ticks(ticks)
+            ax.set_xlim(xlim)
+            ax.set_ylim(ylim)
+            ax.axis(False)
+        axes[0].set_title("Optimum source field")
+        axes[1].set_title("Optimised source field")
+        savefig(os.path.join(plot_dir, 'discrete', 'optimised_source_{:d}'.format(level)))
+
+
+# --- Compare timeseries
 
 if plot_only:
 
