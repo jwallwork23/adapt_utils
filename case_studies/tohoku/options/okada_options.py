@@ -1,5 +1,8 @@
 import numpy as np
+import scipy
+
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.norms import vecnorm
 
 
 __all__ = ["TohokuOkadaOptions"]
@@ -165,7 +168,7 @@ class TohokuOkadaOptions(TohokuOptions):
         # Create fault
         self.fault = Fault(x, y, subfaults=self.subfaults)
 
-    def create_topography(self, annotate=False, **kwargs):
+    def create_topography(self, annotate=False, interpolate=False, **kwargs):
         """
         Compute the topography dislocation due to the earthquake using the Okada model. This
         implementation makes use of the :class:`Fault` and :class:`SubFault` objects from GeoClaw.
@@ -174,11 +177,15 @@ class TohokuOkadaOptions(TohokuOptions):
         `pyadolc` to the C++ operator overloading automatic differentation tool ADOL-C.
 
         :kwarg annotate: toggle annotation using pyadolc.
+        :kwarg interpolate: see the :attr:`interpolate` method.
         :kwarg tag: label for tape.
         """
         msg = "Fault corresponds to an earthquake with moment magnitude {:4.1e}"
         if annotate:
-            self._create_topography_active(**kwargs)
+            if interpolate:
+                self._create_topography_active_interpolate(**kwargs)
+            else:
+                self._create_topography_active(**kwargs)
             self.print_debug(msg.format(self.fault.Mw().val))
         else:
             self._create_topography_passive()
@@ -226,6 +233,51 @@ class TohokuOkadaOptions(TohokuOptions):
                 adolc.dependent(subfault.dtopo.dZ)
         else:
             adolc.dependent(self.fault.dtopo.dZ_a)
+        adolc.trace_off()
+
+    def _create_topography_active_interpolate(self, tag=0, separate_faults=False):
+        import adolc
+
+        # Sanitise kwargs
+        assert isinstance(tag, int)
+        assert tag >= 0
+        for control in self.active_controls:
+            assert control in self.all_controls
+
+        # Initialise tape
+        adolc.trace_on(tag)
+
+        # Read parameters and mark active variables as independent
+        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        for i, subfault in enumerate(self.subfaults):
+            for control in self.all_controls:
+                if control in self.active_controls:
+                    subfault.__setattr__(control, adolc.adouble(self.control_parameters[control][i]))
+                    adolc.independent(subfault.__getattribute__(control))
+                else:
+                    subfault.__setattr__(control, self.control_parameters[control][i])
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val))
+
+        # Create the topography, thereby calling Okada
+        self.print_debug("SETUP: Creating topography using Okada model...")
+        self.fault.create_dtopography(verbose=self.debug, active=True)
+        self.print_debug("SETUP: Done!")
+
+        # Compute quantity of interest
+        self.J_subfaults = [0.0 for j in range(self.N)]
+        data = self._data_to_interpolate
+        for j in range(self.N):
+            for i in range(self.N):
+                self.J_subfaults[j] += (data[i, j] - self.fault.dtopo.dZ_a[i, j])**2
+            self.J_subfaults[j] /= self.N**2
+        self.J = sum(self.J_subfaults)
+
+        # Mark dependence
+        if separate_faults:
+            for j in range(self.N):
+                adolc.dependent(self.J_subfaults[j])
+        else:
+            adolc.dependent(self.J)
         adolc.trace_off()
 
     def set_initial_condition(self, prob, annotate_source=False, **kwargs):
@@ -366,4 +418,14 @@ class TohokuOkadaOptions(TohokuOptions):
         return self.target_utm
 
     def get_regularisation_term(self, prob):
+        raise NotImplementedError  # TODO
+
+    def project(self, prob, source):
+        raise NotImplementedError  # TODO
+
+    def interpolate(self, prob, source, tag=0):
+        # TODO: doc
+        self._data_to_interpolate = source  # TODO: Probably needs discretising on Okada grid
+        self.create_topography(annotate=True, interpolate=True, tag=tag)
+        self.get_seed_matrices()
         raise NotImplementedError  # TODO
