@@ -130,16 +130,16 @@ if not real_data:
 
         # Create Okada parameter class and set the default initial conditionm
         kwargs_okada = {"okada_grid_resolution": N}
-        kwargs_okada['nx'], kwargs_okada['ny'] = 19, 10
         kwargs_okada.update(kwargs)
+        kwargs_okada['nx'], kwargs_okada['ny'] = 19, 10
         op_okada = TohokuOkadaOptions(mesh=op.default_mesh, **kwargs_okada)
         swp = AdaptiveProblem(op_okada, nonlinear=nonlinear, print_progress=op.debug)
         f_okada = op_okada.set_initial_condition(swp)
 
         # Construct 'optimal' control vector by projection
         swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
-        op.project(swp, f_okada)
-        # op.interpolate(swp, f_okada)
+        # op.project(swp, f_okada)
+        op.interpolate(swp, f_okada)
         swp.set_initial_condition()
 
         # Plot optimum solution
