@@ -1,9 +1,4 @@
-all: project discrete
-
-project:
-	@echo "Testing projection for BoxBasis"
-	@python3 test_project.py -plot_all 1
-	@echo "Done!"
+all: discrete
 
 discrete:
 	@echo "Running discrete adjoint inversion on mesh 1/3..."
