@@ -215,7 +215,7 @@ if plot_pdf or plot_png:
         ax = axes[i//N, i % N]
         ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
         ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' simulated', **plotting_kwargs)
-        ax.legend(loc='upper left')
+        ax.legend(loc='best')
         ax.set_xlabel('Time (min)', fontsize=fontsize)
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         plt.xticks(fontsize=fontsize_tick)
@@ -297,7 +297,7 @@ if plot_pdf or plot_png:
     fig, axes = plt.subplots(figsize=(6, 4))
     axes.plot(func_values_opt)
     axes.set_xlabel("Iteration")
-    axes.set_ylabel("Mean square error")
+    axes.set_ylabel("Square error")
     savefig(os.path.join(plot_dir, 'discrete', 'optimisation_progress_J_{:d}'.format(level)))
 
     # Plot progress of gradient
@@ -375,7 +375,7 @@ if plot_pdf or plot_png:
         ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
         ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' initial guess', **plotting_kwargs)
         ax.plot(T, op_opt.gauges[gauge][timeseries_type], '--x', label=gauge + ' optimised', **plotting_kwargs)
-        ax.legend(loc='upper left')
+        ax.legend(loc='best')
         ax.set_xlabel('Time (min)', fontsize=fontsize)
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         plt.xticks(fontsize=fontsize_tick)

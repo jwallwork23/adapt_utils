@@ -3,7 +3,7 @@ from firedrake_adjoint import *
 
 import argparse
 
-from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
+from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
@@ -48,7 +48,7 @@ if use_smoothed_timeseries:
 
 # Artifical run
 with stop_annotating():
-    op = TohokuGaussianBasisOptions(**kwargs)
+    op = TohokuRadialBasisOptions(**kwargs)
     op.control_parameters[0].assign(float(args.optimal_control or 5.0))
     swp = AdaptiveProblem(op, nonlinear=nonlinear)
     swp.solve_forward()
@@ -64,7 +64,7 @@ class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
 
 # Run with 'suboptimal' control
 kwargs['plot_pvd'] = True
-op_opt = TohokuGaussianBasisOptions(fpath='discrete/' + kwargs['family'], **kwargs)
+op_opt = TohokuRadialBasisOptions(fpath='discrete/' + kwargs['family'], **kwargs)
 gauges = list(op_opt.gauges.keys())
 for gauge in gauges:
     op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]

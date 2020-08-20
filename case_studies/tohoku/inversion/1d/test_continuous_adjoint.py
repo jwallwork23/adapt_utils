@@ -2,7 +2,7 @@ from thetis import *
 
 import argparse
 
-from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
+from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
@@ -46,7 +46,7 @@ if use_smoothed_timeseries:
     timeseries_type = "_".join([timeseries_type, "smooth"])
 
 # Artifical run
-op = TohokuGaussianBasisOptions(**kwargs)
+op = TohokuRadialBasisOptions(**kwargs)
 op.control_parameters[0].assign(float(args.optimal_control or 5.0))
 swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False)
 swp.solve_forward()
@@ -55,7 +55,7 @@ for gauge in op.gauges:
 
 # Run with 'suboptimal' control
 kwargs['plot_pvd'] = True
-op_opt = TohokuGaussianBasisOptions(fpath='continuous/' + kwargs['family'], **kwargs)
+op_opt = TohokuRadialBasisOptions(fpath='continuous/' + kwargs['family'], **kwargs)
 gauges = list(op_opt.gauges.keys())
 for gauge in gauges:
     op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]

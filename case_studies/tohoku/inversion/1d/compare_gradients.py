@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
+from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
@@ -46,7 +46,7 @@ kwargs = {
 }
 nonlinear = bool(args.nonlinear or False)
 fd = bool(args.finite_differences or False)
-op = TohokuGaussianBasisOptions(fpath='discrete', **kwargs)
+op = TohokuRadialBasisOptions(fpath='discrete', **kwargs)
 
 # Toggle smoothed or discrete timeseries
 timeseries_type = "timeseries"

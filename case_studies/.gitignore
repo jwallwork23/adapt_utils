@@ -2,7 +2,7 @@ tohoku/outputs/
 tohoku/hazard/outputs/
 tohoku/inversion/1d/outputs/
 tohoku/inversion/box/outputs/
-tohoku/inversion/gaussian/outputs/
+tohoku/inversion/radial/outputs/
 tohoku/inversion/okada/outputs/
 tohoku/videos/
 tohoku/resources/images/

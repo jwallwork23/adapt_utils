@@ -12,10 +12,10 @@ class TohokuOkadaOptions(TohokuOptions):
     """
     Initialise the free surface with an initial condition generated using Okada functions.
 
-    Note that, unlike in the basis comprised of an array of indicator functions or Gaussians, the
-    relationship between the control parameters and the initial surface is nonlinear. In addition,
-    zero is not a feasible initial guess for the Okada parameters, meaning some physical intuition is
-    required in order to set up the problem.
+    Note that, unlike in the basis comprised of an array of piecewise constant or radial basis
+    functions, the relationship between the control parameters and the initial surface is nonlinear.
+    In addition, zero is not a feasible initial guess for the Okada parameters, meaning some physical
+    intuition is required in order to set up the problem.
 
     Control parameters comprise of a dictionary of lists containing the following parameters. The
     list index corresponds to the subfault within the main fault. By default, a 19 x 10 grid of

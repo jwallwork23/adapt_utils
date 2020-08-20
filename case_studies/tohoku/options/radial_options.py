@@ -7,14 +7,14 @@ from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
 from adapt_utils.norms import vecnorm
 
 
-__all__ = ["TohokuGaussianBasisOptions"]
+__all__ = ["TohokuRadialBasisOptions"]
 
 
-class TohokuGaussianBasisOptions(TohokuOptions):
+class TohokuRadialBasisOptions(TohokuOptions):
     """
-    Initialise the free surface with an initial condition consisting of an array of Gaussian basis
+    Initialise the free surface with an initial condition consisting of an array of radial basis
     functions, each scaled by a control parameter. The setup with a 13 x 10 array was presented in
-    [Saito et al. 2011].
+    [Saito et al. 2011]. By default, the radial basis functions are Gaussians.
 
     The source region centre is predefined. In the 1D case the basis function is centred at the same
     point. In the case of multiple basis functions they are distributed linearly both perpendicular
@@ -42,7 +42,7 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         :kwarg radius_y: radius of basis function perpendicular to strike direction [m].
         :kwarg strike_angle: angle of fault to north [radians].
         """
-        super(TohokuGaussianBasisOptions, self).__init__(**kwargs)
+        super(TohokuRadialBasisOptions, self).__init__(**kwargs)
         self.nx = kwargs.get('nx', 1)
         self.ny = kwargs.get('ny', 1)
         N_b = self.nx*self.ny
@@ -76,9 +76,9 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         self.print_debug("INIT: Done!")
         self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
 
-    def get_basis_functions(self, fs):
+    def get_basis_functions(self, fs):  # TODO: Implement radial basis functions other than Gaussians
         """
-        Assemble an array of (Gaussian) radial basis functions, rotated by specified angle.
+        Assemble an array of radial basis functions, rotated by specified angle.
         """
         from adapt_utils.misc import gaussian, rotation_matrix
 
@@ -94,8 +94,8 @@ class TohokuGaussianBasisOptions(TohokuOptions):
         X = np.array([0.0, ]) if nx == 1 else np.linspace(-0.5*dx, 0.5*dx, nx)
         Y = np.array([0.0, ]) if ny == 1 else np.linspace(-0.5*dy, 0.5*dy, ny)
 
-        # Assemble an array of Gaussian basis functions, rotated by specified angle
-        self.print_debug("INIT: Assembling rotated array of Gaussians...")
+        # Assemble array
+        self.print_debug("INIT: Assembling rotated radial basis function array...")
         self.basis_functions = [thetis.Function(fs) for i in range(N)]
         R = rotation_matrix(-angle)
         self._array = []

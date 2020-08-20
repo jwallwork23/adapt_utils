@@ -3,7 +3,7 @@ from thetis import *
 import argparse
 import numpy as np
 
-from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
+from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
@@ -38,7 +38,7 @@ kwargs = {
     'debug': bool(args.debug or False),
 }
 nonlinear = False  # TODO
-op = TohokuGaussianBasisOptions(**kwargs)
+op = TohokuRadialBasisOptions(**kwargs)
 
 # Solve the forward problem to get data with 'optimal' control parameter m = 5
 op.control_parameters[0].assign(kwargs['optimal_value'])
