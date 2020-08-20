@@ -31,7 +31,7 @@ def taylor_test(function, gradient, m, verbose=False):
     :kwarg verbose: toggle printing to screen.
     """
     if verbose:
-        print(24*"=" + "TAYLOR TEST" + 24*"=")
+        print_output(24*"=" + "TAYLOR TEST" + 24*"=")
     m = np.array(m).reshape((prod(np.shape(m)), ))
     delta_m = np.random.normal(loc=0.0, scale=1.0, size=m.shape)
 
@@ -44,11 +44,11 @@ def taylor_test(function, gradient, m, verbose=False):
     for i in range(3):
         h = pow(0.5, i)
         if verbose:
-            print("h = {:.4e}".format(h))
+            print_output("h = {:.4e}".format(h))
         J_step = function(m + h*delta_m)
         remainders[i] = np.abs(J_step - Jm - h*np.dot(dJdm, delta_m))
         if verbose:
-            print("Taylor remainder = {:.4e}".format(remainders[i]))
+            print_output("Taylor remainder = {:.4e}".format(remainders[i]))
         if i > 0:
             ratio = remainders[i-1]/remainders[i]
             try:
@@ -57,7 +57,7 @@ def taylor_test(function, gradient, m, verbose=False):
                 msg = "Taylor remainders do not decrease quadratically (ratio {:.4e})"
                 raise ConvergenceError(msg.format(ratio))
     if verbose:
-        print(20*"=" + "TAYLOR TEST PASSED!" + 20*"=")
+        print_output(20*"=" + "TAYLOR TEST PASSED!" + 20*"=")
 
 
 class StagnationError(Exception):
