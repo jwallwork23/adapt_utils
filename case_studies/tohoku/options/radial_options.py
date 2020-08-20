@@ -43,8 +43,8 @@ class TohokuRadialBasisOptions(TohokuOptions):
         :kwarg strike_angle: angle of fault to north [radians].
         """
         super(TohokuRadialBasisOptions, self).__init__(**kwargs)
-        self.nx = kwargs.get('nx', 1)
-        self.ny = kwargs.get('ny', 1)
+        self.nx = kwargs.get('nx', 13)
+        self.ny = kwargs.get('ny', 10)
         N_b = self.nx*self.ny
         control_parameters = kwargs.get('control_parameters', 10.0*np.random.rand(N_b))
         N_c = len(control_parameters)
@@ -52,12 +52,6 @@ class TohokuRadialBasisOptions(TohokuOptions):
             raise ValueError("{:d} controls inconsistent with {:d} basis functions".format(N_c, N_b))
 
         # Parametrisation of source region
-        self.centre_x = kwargs.get('centre_x', 0.7e+06)
-        self.centre_y = kwargs.get('centre_y', 4.2e+06)
-        self.extent_x = kwargs.get('extent_x', 560.0e+03)
-        self.extent_y = kwargs.get('extent_y', 240.0e+03)
-
-        # Parametrisation of source basis
         self.centre_x = kwargs.get('centre_x', 0.7e+06)
         self.centre_y = kwargs.get('centre_y', 4.2e+06)
         self.extent_x = kwargs.get('extent_x', 560.0e+03)

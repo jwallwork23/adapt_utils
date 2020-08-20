@@ -124,6 +124,7 @@ for level in range(levels):
     swp_radial = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
     op.project(swp_radial, ic_saito)
     op.set_initial_condition(swp_radial)
+    ic_radial = project(swp_radial.fwd_solutions[0].split()[1], swp_radial.P1[0])
 
     # Load or save timeseries, as appropriate
     if plot_only:
@@ -165,7 +166,6 @@ for level in range(levels):
 
     # Plot
     fig, axes = plt.subplots(ncols=2, figsize=(9, 4))
-    ic_radial = project(swp_radial.fwd_solutions[0].split()[1], swp_radial.P1[0])
     levels = np.linspace(-3, 8, 51)
     ticks = np.linspace(-2.5, 7.5, 9)
     for ic, ax in zip((ic_saito, ic_radial), (axes[0], axes[1])):
