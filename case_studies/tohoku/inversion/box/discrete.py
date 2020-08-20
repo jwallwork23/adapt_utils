@@ -255,11 +255,6 @@ else:
         np.save(fname.format('func'), np.array(func_values_opt))
         np.save(fname.format('grad'), np.array(gradient_values_opt))
 
-        # # Stagnation termination condition
-        # if len(func_values_opt) > 1:
-        #     if abs(func_values_opt[-1] - func_values_opt[-2]) < 1.0e-06*abs(func_values_opt[-2]):
-        #         raise StagnationError
-
     # Run BFGS optimisation
     opt_kwargs = {
         'maxiter': 1000,
@@ -269,11 +264,6 @@ else:
     controls = [Control(c) for c in op.control_parameters]
     Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
     optimised_value = [o.dat.data[0] for o in minimize(Jhat, method='BFGS', options=opt_kwargs)]
-    # try:
-    #     optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs).dat.data
-    # except StagnationError:
-    #     optimised_value = control_values_opt[-1]
-    #     print_output("StagnationError: Stagnation of objective functional")
 
 # Create a new parameter class
 kwargs['control_parameters'] = optimised_value
