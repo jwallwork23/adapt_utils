@@ -1,5 +1,6 @@
 """
-Top matter courtesy of Tobias Bieniek, 2012.
+Based on the UTM conversion code by [Tobias Bieniek, 2012]. This version of the code is modified to
+account for UFL.
 """
 import ufl
 import numpy as np
@@ -38,7 +39,7 @@ P3 = 21.0/16*_E2-55.0/32*_E4
 P4 = 151.0/96*_E3-417.0/128*_E5
 P5 = 1097.0/512*_E4
 
-R = 6378137
+R = 6378137  # Mean radius of the Earth
 
 ZONE_LETTERS = "CDEFGHJKLMNPQRSTUVWXX"
 
