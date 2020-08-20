@@ -7,7 +7,7 @@ import numpy as np
 import os
 
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaOptions
-from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
+from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.plotting import *
 from adapt_utils.norms import total_variation, vecnorm
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -108,7 +108,7 @@ kwargs = {
     'debug_mode': args.debug_mode or 'basic',
 }
 nonlinear = bool(args.nonlinear or False)
-op = TohokuGaussianBasisOptions(**kwargs)
+op = TohokuRadialBasisOptions(**kwargs)
 
 # Plotting parameters
 if plot_pdf or plot_png:
@@ -217,7 +217,7 @@ if plot_pdf or plot_png:
         ax = axes[i//N, i % N]
         ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
         ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' simulated', **plotting_kwargs)
-        ax.legend(loc='upper left')
+        ax.legend(loc='best')
         ax.set_xlabel('Time (min)', fontsize=fontsize)
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         plt.xticks(fontsize=fontsize_tick)
@@ -280,7 +280,7 @@ else:
 # Create a new parameter class
 kwargs['control_parameters'] = optimised_value
 kwargs['plot_pvd'] = plot_pvd
-op_opt = TohokuGaussianBasisOptions(**kwargs)
+op_opt = TohokuRadialBasisOptions(**kwargs)
 gauges = list(op_opt.gauges.keys())
 for gauge in gauges:
     op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
@@ -299,7 +299,7 @@ if plot_pdf or plot_png:
     fig, axes = plt.subplots(figsize=(6, 4))
     axes.plot(func_values_opt)
     axes.set_xlabel("Iteration")
-    axes.set_ylabel("Mean square error")
+    axes.set_ylabel("Square error")
     savefig(os.path.join(plot_dir, 'discrete', 'optimisation_progress_J_{:d}'.format(level)))
 
     # Plot progress of gradient
@@ -377,7 +377,7 @@ if plot_pdf or plot_png:
         ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
         ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' initial guess', **plotting_kwargs)
         ax.plot(T, op_opt.gauges[gauge][timeseries_type], '--x', label=gauge + ' optimised', **plotting_kwargs)
-        ax.legend(loc='upper left')
+        ax.legend(loc='best')
         ax.set_xlabel('Time (min)', fontsize=fontsize)
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         plt.xticks(fontsize=fontsize_tick)

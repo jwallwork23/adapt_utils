@@ -4,21 +4,6 @@ General
   * Weight gauges on distance(?)
   * Use wetting and drying(?)
 
-Runs with real data
-===================
-  * Apply a de-tiding algorithm
-  * Make sure the start times of the timeseries data are consistent
-  * Reduce the QoI time extent to only include the period where we have data
-
-Arrays
-======
-Consider a 19 x 10 array of rectangular subfaults and invert for the initial surface under the
-assumption that the source is:
-  (a) piecewise constant;
-  (b) a rectangular Gaussian;
-  (c) represented by the Okada model
-on each subfault.
-
 Unit sources(?)
 ===============
   * The subfault database is available at http://sift.pmel.noaa.gov/ComMIT/compressed/info_sz.dat

@@ -1,9 +1,9 @@
 """
 Source inversion for a 'synthetic' tsunami generated from an initial condition given by scaling a
-single Gaussian basis function. Given that the 'optimal' scaling parameter is m = 5, we seek to
-find this value through PDE constrained optimisation with an initial guess m = 10. What is 'optimal'
-is determined via an objective functional J which quantifies the misfit at timeseries with those data
-recorded under the m = 5 case.
+single (Gaussian) radial basis function. Given that the 'optimal' scaling parameter is m = 5, we seek
+to find this value through PDE constrained optimisation with an initial guess m = 10. What is
+'optimal' is determined via an objective functional J which quantifies the misfit at timeseries with
+those data recorded under the m = 5 case.
 
 In this script, we use the continuous adjoint approach to approximate the gradient of J w.r.t. m.
 We observe the phenomenon of inconsistent gradients for the continuous adjoint approach.
@@ -18,9 +18,10 @@ import os
 import scipy
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
+from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.misc import StagnationError
 from adapt_utils.norms import total_variation
+from adapt_utils.plotting import *
 
 
 # --- Parse arguments
@@ -94,23 +95,12 @@ kwargs = {
 }
 use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 nonlinear = bool(args.nonlinear or False)
-op = TohokuGaussianBasisOptions(**kwargs)
+op = TohokuRadialBasisOptions(**kwargs)
 
-if plot_pdf:
-
-    # Fonts
-    matplotlib.rc('text', usetex=True)
-    matplotlib.rcParams['mathtext.fontset'] = 'custom'
-    matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
-    matplotlib.rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
-    matplotlib.rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
-    matplotlib.rcParams['mathtext.fontset'] = 'stix'
-    matplotlib.rcParams['font.family'] = 'STIXGeneral'
-
-    # Plotting
-    fontsize = 22
-    fontsize_tick = 18
-    plotting_kwargs = {'markevery': 5}
+# Plotting parameters
+fontsize = 22
+fontsize_tick = 18
+plotting_kwargs = {'markevery': 5}
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
@@ -394,7 +384,7 @@ if plot_pdf:
 # Create a new parameter class
 kwargs['control_parameters'] = [optimised_value, ]
 kwargs['plot_pvd'] = plot_pvd
-op_opt = TohokuGaussianBasisOptions(**kwargs)
+op_opt = TohokuRadialBasisOptions(**kwargs)
 
 if plot_only:
 

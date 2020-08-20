@@ -1,5 +1,5 @@
 """
-Invert for an initial condition defined over a Gaussian radial basis with a single basis function.
+Invert for an initial condition defined over a (Gaussian) radial basis with a single basis function.
 If we have N_g gauges and N_T timesteps then we have N_g*N_T data points we would like to fit using
 a least squares fit. If N_g = 15 and N_T = 288 (as below) then we have 4320 data points.
 Compared with the single control parameter, this implies a massively overconstrained problem!
@@ -29,9 +29,10 @@ import os
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
-from adapt_utils.case_studies.tohoku.options.gaussian_options import TohokuGaussianBasisOptions
+from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.misc import StagnationError
 from adapt_utils.norms import total_variation
+from adapt_utils.plotting import *
 
 
 # --- Parse arguments
@@ -100,23 +101,12 @@ kwargs = {
     'debug_mode': args.debug_mode or 'basic',
 }
 nonlinear = bool(args.nonlinear or False)
-op = TohokuGaussianBasisOptions(**kwargs)
+op = TohokuRadialBasisOptions(**kwargs)
 
-if plot_pdf:
-
-    # Fonts
-    matplotlib.rc('text', usetex=True)
-    matplotlib.rcParams['mathtext.fontset'] = 'custom'
-    matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
-    matplotlib.rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
-    matplotlib.rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
-    matplotlib.rcParams['mathtext.fontset'] = 'stix'
-    matplotlib.rcParams['font.family'] = 'STIXGeneral'
-
-    # Plotting
-    fontsize = 22
-    fontsize_tick = 18
-    plotting_kwargs = {'markevery': 5}
+# Plotting parameters
+fontsize = 22
+fontsize_tick = 18
+plotting_kwargs = {'markevery': 5}
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
@@ -312,7 +302,7 @@ if plot_pdf:
 # Create a new parameter class
 kwargs['control_parameters'] = [optimised_value, ]
 kwargs['plot_pvd'] = plot_pvd
-op_opt = TohokuGaussianBasisOptions(**kwargs)
+op_opt = TohokuRadialBasisOptions(**kwargs)
 
 if plot_only:
 
