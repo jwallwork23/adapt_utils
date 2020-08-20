@@ -1,8 +1,6 @@
 import numpy as np
-import scipy
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
-from adapt_utils.norms import vecnorm
 
 
 __all__ = ["TohokuOkadaBasisOptions"]
@@ -20,7 +18,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
     Control parameters comprise of a dictionary of lists containing the following parameters. The
     list index corresponds to the subfault within the main fault. By default, a 19 x 10 grid of
     25km x 20km subfaults is considered, using the work of [Shao et al. 2011].
-    
+
       * 'depth'     - depth of the centroid of the subfault plane [m].
       * 'length'    - length of the subfault plane [m].
       * 'width'     - width of the subfault plane [m].
@@ -36,6 +34,9 @@ class TohokuOkadaBasisOptions(TohokuOptions):
                        teleseismic body and surface waves", Earth, Planets and Space 63.7 (2011),
                        p.559--564.
     """
+
+    # --- Initialisation
+
     def __init__(self, **kwargs):
         """
         :kwarg control_parameters: a dictionary of values to use for the basis function coefficients.
@@ -128,7 +129,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         """
         Create GeoCLAW :class:`SubFault` objects from provided subfault parameters, as well as a
         :class`Fault` object.
-        
+
         If control parameters were not provided then data are downloaded according to the
         `download_okada_parameters` method.
         """
@@ -168,6 +169,44 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         # Create fault
         self.fault = Fault(x, y, subfaults=self.subfaults)
 
+    def set_initial_condition(self, prob, annotate_source=False, **kwargs):
+        """
+        Set initial condition using the Okada parametrisation [Okada 85].
+
+        Uses code from GeoCLAW found in `geoclaw/src/python/geoclaw/dtopotools.py`.
+
+        [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
+                   half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
+                   pp.1135--1154, (1985).
+
+        :arg prob: :class:`AdaptiveTsunamiProblem` solver object.
+        :kwarg annotate_source: toggle annotation of the rupture process using pyadolc.
+        :kwarg tag: non-negative integer label for tape.
+        """
+        from scipy.interpolate import interp2d
+        import firedrake
+
+        # Create fault topography
+        self.create_topography(annotate=annotate_source, **kwargs)
+
+        # Interpolate it using SciPy
+        surf_interp = interp2d(self.fault.dtopo.x, self.fault.dtopo.y, self.fault.dtopo.dZ)
+
+        # Evaluate the interpolant at the mesh vertices
+        surf = firedrake.Function(prob.P1[0])
+        if not hasattr(self, 'lonlat_mesh'):
+            self.get_lonlat_mesh()
+        for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
+            surf.dat.data[i] = surf_interp(*xy)
+
+        # Interpolate into the elevation space
+        u, eta = prob.fwd_solutions[0].split()
+        eta.interpolate(surf)
+
+        # Subtract initial surface from the bathymetry field
+        self.subtract_surface_from_bathymetry(prob, surf=surf)
+        return surf
+
     def create_topography(self, annotate=False, interpolate=False, **kwargs):
         """
         Compute the topography dislocation due to the earthquake using the Okada model. This
@@ -198,6 +237,8 @@ class TohokuOkadaBasisOptions(TohokuOptions):
                 subfault.__setattr__(control, self.control_parameters[control][i])
             self.print_debug(msg.format(i, subfault.mu, subfault.Mo()))
         self.fault.create_dtopography(verbose=self.debug, active=False)
+
+    # --- Automatic differentiation
 
     def _create_topography_active(self, tag=0, separate_faults=True):
         import adolc
@@ -280,44 +321,6 @@ class TohokuOkadaBasisOptions(TohokuOptions):
             adolc.dependent(self.J)
         adolc.trace_off()
 
-    def set_initial_condition(self, prob, annotate_source=False, **kwargs):
-        """
-        Set initial condition using the Okada parametrisation [Okada 85].
-
-        Uses code from GeoCLAW found in `geoclaw/src/python/geoclaw/dtopotools.py`.
-
-        [Okada 85] Yoshimitsu Okada, "Surface deformation due to shear and tensile faults in a
-                   half-space", Bulletin of the Seismological Society of America, Vol. 75, No. 4,
-                   pp.1135--1154, (1985).
-
-        :arg prob: :class:`AdaptiveTsunamiProblem` solver object.
-        :kwarg annotate_source: toggle annotation of the rupture process using pyadolc.
-        :kwarg tag: non-negative integer label for tape.
-        """
-        from scipy.interpolate import interp2d
-        import firedrake
-
-        # Create fault topography
-        self.create_topography(annotate=annotate_source, **kwargs)
-
-        # Interpolate it using SciPy
-        surf_interp = interp2d(self.fault.dtopo.x, self.fault.dtopo.y, self.fault.dtopo.dZ)
-
-        # Evaluate the interpolant at the mesh vertices
-        surf = firedrake.Function(prob.P1[0])
-        if not hasattr(self, 'lonlat_mesh'):
-            self.get_lonlat_mesh()
-        for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
-            surf.dat.data[i] = surf_interp(*xy)
-
-        # Interpolate into the elevation space
-        u, eta = prob.fwd_solutions[0].split()
-        eta.interpolate(surf)
-
-        # Subtract initial surface from the bathymetry field
-        self.subtract_surface_from_bathymetry(prob, surf=surf)
-        return surf
-
     def get_input_vector(self):
         """
         Get a vector of the same length as the total number of controls and populate it with passive
@@ -346,6 +349,8 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         S = [[1 if i % n == j else 0 for j in range(n)] for i in range(len(self.input_vector))]
         self.seed_matrices = np.array(S)
         return self.seed_matrices
+
+    # --- Interpolation between Okada grid and computational mesh
 
     def get_interpolation_operators(self):
         """
@@ -389,7 +394,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         Insert an array `arr` from the Okada model into the source field defined on the Firedrake
         Okada mesh.
         """
-        if not hasattr(self, '_source'):
+        if not hasattr(self, 'source_okada'):
             self.get_interpolation_operators()
         assert arr.shape == (self.N, self.N)
         for k in range(self.N*self.N):
@@ -404,7 +409,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         representation in longitude-latitude space, which may be found as :attr:`target_lonlat`. The
         source image on the Okada mesh may be found as :attr:`source_okada`.
         """
-        if not hasattr(self, '_source'):
+        if not hasattr(self, 'source_okada'):
             self.get_interpolation_operators()
 
         # Copy data onto Firedrake Okada mesh
@@ -417,8 +422,12 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         self.target_utm.dat.data[:] = self.target_lonlat.dat.data
         return self.target_utm
 
+    # --- Regularisation
+
     def get_regularisation_term(self, prob):
         raise NotImplementedError  # TODO
+
+    # --- Projection and interpolation into Okada basis
 
     def project(self, prob, source):
         raise NotImplementedError("""
@@ -448,6 +457,8 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         able to differentiate the Okada model. We do this using the PyADOLC Python wrapper for the
         C++ operator overloading AD tool, ADOL-C.
         """
+        # from adapt_utils.norms import vecnorm
+
         self._data_to_interpolate = source  # TODO: Probably needs discretising on Okada grid
         self.create_topography(annotate=True, interpolate=True, tag=tag)
         self.get_seed_matrices()
