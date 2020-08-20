@@ -17,7 +17,6 @@ from time import clock
 
 import clawpack.geoclaw.dtopotools
 from clawpack.geoclaw.dtopotools import *
-from clawpack.geoclaw.data import DEG2RAD, LAT2METER
 
 
 class Fault(clawpack.geoclaw.dtopotools.Fault):
@@ -53,7 +52,7 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
                 tic = clock()
         if active:
             self.dtopo.dZ_a = dz
-            self.dtopo.dZ = numpy.array([dzi.val for dzi in numpy.ravel(dz)]).reshape((1, ) +  dz.shape)
+            self.dtopo.dZ = numpy.array([dzi.val for dzi in numpy.ravel(dz)]).reshape((1, ) + dz.shape)
         else:
             self.dtopo.dZ = dz
 

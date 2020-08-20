@@ -139,11 +139,11 @@ class TohokuOptions(TsunamiOptions):
 
         # Gauge classifications
         self.near_field_pressure_gauges = {
-            "gauges": ( "P02", "P06"),
+            "gauges": ("P02", "P06"),
             "arrival_time": 0.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
-            "sample": 60, 
+            "sample": 60,
         }
         self.mid_field_pressure_gauges = {
             "gauges": ("KPG1", "KPG2", "21418"),
@@ -151,28 +151,28 @@ class TohokuOptions(TsunamiOptions):
             "arrival_time": 15*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
-            "sample": 60, 
+            "sample": 60,
         }
         self.far_field_pressure_gauges = {
             "gauges": ("21401", "21413", "21419"),
             "arrival_time": 50*60.0,
             "departure_time": self.end_time,
             "weight": Constant(1.0),
-            "sample": 1, 
+            "sample": 1,
         }
         self.near_field_gps_gauges = {
             "gauges": ("801", "802", "803", "804", "806", "807"),
             "arrival_time": 5*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
-            "sample": 1, 
+            "sample": 1,
         }
         self.far_field_gps_gauges = {
             "gauges": ("811", "812", "813", "815"),
             "arrival_time": 10*60.0,
             "departure_time": self.end_time,
             "weight": Constant(1.0),
-            "sample": 1, 
+            "sample": 1,
         }
         self.gauge_classifications_to_consider = (
             "near_field_pressure",
@@ -315,7 +315,7 @@ class TohokuOptions(TsunamiOptions):
             "MPG1": {"lonlat": (134.4753, 32.3907), "depth": 2308.0, "operator": "JAMSTEC"},
             "MPG2": {"lonlat": (134.3712, 32.6431), "depth": 1507.0, "operator": "JAMSTEC"},
 
-            "21401": {"lonlat": (152.583, 42.617), "operator": "NOAA"}, # TODO: depth not on webpage
+            "21401": {"lonlat": (152.583, 42.617), "operator": "NOAA"},  # TODO: depth not on webpage
             "21413": {"lonlat": (152.132, 30.533), "depth": 5880.0, "operator": "NOAA"},
             "21418": {"lonlat": (148.655, 38.735), "depth": 5777.0, "operator": "NOAA"},
             "21419": {"lonlat": (155.717, 44.435), "depth": 5282.0, "operator": "NOAA"},
@@ -768,6 +768,6 @@ class TohokuOptions(TsunamiOptions):
 
         # Subtract de-tided component
         detided = anomaly - np.array(tide.h).reshape(anomaly.shape)
-        diff = detided - elev
+        # diff = detided - elev
 
         return time, detided, elev

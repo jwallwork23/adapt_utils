@@ -1,15 +1,12 @@
 from thetis import *
 from thetis.configuration import *
 
-import h5py
-import matplotlib.pyplot as plt
 import numpy as np
 import os
 import scipy.interpolate as si
 
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import *
-from adapt_utils.norms import timeseries_error
 
 
 __all__ = ["TsunamiOptions"]
@@ -123,7 +120,7 @@ class TsunamiOptions(CoupledOptions):
 
         # Read initial surface data from file
         surf = self.set_initial_surface(prob.P1[0])
-        
+
         # Set initial condition
         self.print_debug("INIT: Setting initial condition...")
         u, eta = prob.fwd_solutions[0].split()

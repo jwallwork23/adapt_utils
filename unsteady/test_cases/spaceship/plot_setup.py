@@ -19,8 +19,8 @@ kwargs = {
     },
 }
 font = {
-    "family" : "DejaVu Sans",
-    "size"   : 18,
+    "family": "DejaVu Sans",
+    "size": 18,
 }
 plt.rc("font", **font)
 plt.rc("text", usetex=True)

@@ -9,8 +9,8 @@ from adapt_utils.unsteady.test_cases.spaceship.options import SpaceshipOptions
 
 # Set parameters
 font = {
-    "family" : "DejaVu Sans",
-    "size"   : 20,
+    "family": "DejaVu Sans",
+    "size": 20,
 }
 plt.rc('font', **font)
 plt.rc('text', usetex=True)

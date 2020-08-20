@@ -11,7 +11,6 @@ We observe the phenomenon of inconsistent gradients for the continuous adjoint a
 from thetis import *
 
 import argparse
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import os

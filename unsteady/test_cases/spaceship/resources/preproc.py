@@ -6,7 +6,6 @@ in seconds from the start of the simulation and elevation is measured in metres.
 The user should specify the filename using the -fname flag, which defaults to 'forcing'.
 """
 import argparse
-import numpy as np
 import os
 
 from adapt_utils.misc import readfile, num_days, index_string

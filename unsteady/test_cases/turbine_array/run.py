@@ -26,8 +26,8 @@ kwargs = {
     'plot_pvd': True,
 }
 font = {
-    "family" : "DejaVu Sans",
-    "size"   : 16,
+    "family": "DejaVu Sans",
+    "size": 16,
 }
 plt.rc('font', **font)
 plt.rc('text', usetex=True)

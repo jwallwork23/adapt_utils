@@ -165,7 +165,7 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
                 total_h = self.depth.get_total_depth(fields.get('elev_2d'))
                 eta_star_jump = eta_star - eta_star_ext
                 un_star_rie = 0.5*inner(u_star + u_star_ext, n) + sqrt(total_h/g_grav)*eta_star_jump
-                un_star_jump = inner(u_star - u_star_ext, n)
+                # un_star_jump = inner(u_star - u_star_ext, n)
                 f += -g_grav*self.eta_star_test*un_star_rie*ds_bnd
 
                 # f += -g_grav*self.eta_star_test*inner(u_star_ext, self.normal)*ds_bnd
