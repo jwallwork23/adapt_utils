@@ -6,7 +6,7 @@ import numpy as np
 import os
 import scipy
 
-from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaOptions
+from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.misc import taylor_test
@@ -47,7 +47,7 @@ kwargs = {
     "debug": False,
 }
 nonlinear = False
-op = TohokuOkadaOptions(**kwargs)
+op = TohokuOkadaBasisOptions(**kwargs)
 op.active_controls = active_controls
 num_subfaults = len(op.subfaults)
 num_active_controls = len(active_controls)

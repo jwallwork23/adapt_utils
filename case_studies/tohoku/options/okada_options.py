@@ -5,10 +5,10 @@ from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
 from adapt_utils.norms import vecnorm
 
 
-__all__ = ["TohokuOkadaOptions"]
+__all__ = ["TohokuOkadaBasisOptions"]
 
 
-class TohokuOkadaOptions(TohokuOptions):
+class TohokuOkadaBasisOptions(TohokuOptions):
     """
     Initialise the free surface with an initial condition generated using Okada functions.
 
@@ -50,7 +50,7 @@ class TohokuOkadaOptions(TohokuOptions):
         :kwarg okada_grid_lon_min: minimum longitude in the Okada grid.
         :kwarg okada_grid_lat_min: minimum latitude in the Okada grid.
         """
-        super(TohokuOkadaOptions, self).__init__(**kwargs)
+        super(TohokuOkadaBasisOptions, self).__init__(**kwargs)
         self.control_parameters = kwargs.get('control_parameters')
         self.coordinate_specification = kwargs.get('coordinate_specification', 'centroid')
         self.N = kwargs.get('okada_grid_resolution', 101)

@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaOptions
+from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 from adapt_utils.plotting import *
 from adapt_utils.norms import total_variation, vecnorm
@@ -131,7 +131,7 @@ if not real_data:
         # Create Okada parameter class and set the default initial conditionm
         kwargs_okada = {"okada_grid_resolution": N}
         kwargs_okada.update(kwargs)
-        op_okada = TohokuOkadaOptions(mesh=op.default_mesh, **kwargs_okada)
+        op_okada = TohokuOkadaBasisOptions(mesh=op.default_mesh, **kwargs_okada)
         swp = AdaptiveProblem(op_okada, nonlinear=nonlinear, print_progress=op.debug)
         f_okada = op_okada.set_initial_condition(swp)
 
