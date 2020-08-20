@@ -16,6 +16,7 @@ class TsunamiOptions(CoupledOptions):
     """
     Parameter class for general tsunami propagation problems.
     """
+    # TODO: more doc details
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
     bathymetry_cap = NonNegativeFloat(30.0, allow_none=True, help="Minimum depth").tag(config=True)
 
@@ -53,18 +54,54 @@ class TsunamiOptions(CoupledOptions):
             raise ValueError("Regularisation parameter should be non-negative.")
 
     def get_utm_mesh(self):
+        """
+        Given a mesh in longitude-latitude coordinates, establish a corresponding mesh in UTM
+        coordinates using the conversion code in `adapt_utils.unsteady.swe.tsunami.conversion`.
+        """
+        assert hasattr(self, 'lonlat_mesh')
         zone = self.force_zone_number
         self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
         lon, lat = SpatialCoordinate(self.default_mesh)
-        self.default_mesh.coordinates.interpolate(as_vector(lonlat_to_utm(lon, lat, zone)))
+        x, y = lonlat_to_utm(lon, lat, zone)
+        self.default_mesh.coordinates.interpolate(as_vector([x, y]))
 
     def get_lonlat_mesh(self, northern=True):
+        """
+        Given a mesh in UTM coordinates, establish a corresponding mesh in longitude-latitude
+        coordinates using the conversion code in `adapt_utils.unsteady.swe.tsunami.conversion`.
+
+        :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
+        """
+        assert hasattr(self, 'default_mesh')
         zone = self.force_zone_number
         self.lonlat_mesh = Mesh(Function(self.default_mesh.coordinates))
         x, y = SpatialCoordinate(self.lonlat_mesh)
-        self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
+        lon, lat = utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)
+        self.lonlat_mesh.coordinates.interpolate(as_vector([lon, lat]))
 
     def set_bathymetry(self, fs=None, dat=None, northern=True, force_longitude=True, **kwargs):
+        """
+        Derived classes should implement :attr:`read_bathymetry_file` such that it returns a 3-tuple
+        of longitude, latitude and elevation data over a rectangular grid.
+
+        If a minimum water depth has been provided via :attr:`bathymetry_cap` the this is enforced
+        at this stage.
+
+        Note on interpolation
+        =====================
+        We should always be cautious of accessing `f.dat.data` for a Firedrake :class:`Function` `f`,
+        because it isn't parallel safe in some cases. However, as described in the documentation
+        (https://firedrakeproject.org/interpolation.html#interpolation-from-external-data), what we
+        do is okay in the case of interpolating external data. The interpolation is just done on all
+        processors and Firedrake manages halo updates.
+
+        :kwarg fs: :class:`FunctionSpace` for the bathymetry to live in. By default, P1 space is used
+        :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
+        :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
+        :kwarg force_longitude: toggle checking validity of the UTM zone.
+        
+        All other kwargs are passed to the :attr:`read_bathymetry_file` method.
+        """
         if self.bathymetry_cap is not None:
             assert self.bathymetry_cap >= 0.0
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
@@ -94,13 +131,32 @@ class TsunamiOptions(CoupledOptions):
 
         return bathymetry
 
-    def set_initial_surface(self, fs=None, northern=True, force_longitude=True, **kwargs):
+    def set_initial_surface(self, fs=None, dat=None, northern=True, force_longitude=True, **kwargs):
+        """
+        Derived classes should implement :attr:`read_surface_file` such that it returns a 3-tuple
+        of longitude, latitude and elevation data over a rectangular grid.
+
+        Note on interpolation
+        =====================
+        We should always be cautious of accessing `f.dat.data` for a Firedrake :class:`Function` `f`,
+        because it isn't parallel safe in some cases. However, as described in the documentation
+        (https://firedrakeproject.org/interpolation.html#interpolation-from-external-data), what we
+        do is okay in the case of interpolating external data. The interpolation is just done on all
+        processors and Firedrake manages halo updates.
+
+        :kwarg fs: :class:`FunctionSpace` for the bathymetry to live in. By default, P1 space is used
+        :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
+        :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
+        :kwarg force_longitude: toggle checking validity of the UTM zone.
+        
+        All other kwargs are passed to the :attr:`read_surface_file` method.
+        """
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
         initial_surface = Function(fs, name="Initial free surface")
 
         # Interpolate bathymetry data *in lonlat space*
         self.print_debug("INIT: Creating surface interpolator...")
-        lon, lat, elev = self.read_surface_file(**kwargs)
+        lon, lat, elev = dat or self.read_surface_file(**kwargs)
         surf_interp = si.RectBivariateSpline(lat, lon, elev)
         self.print_debug("INIT: Done!")
 
@@ -117,6 +173,13 @@ class TsunamiOptions(CoupledOptions):
         return initial_surface
 
     def set_initial_condition(self, prob):
+        """
+        Initialise the hydrodynamics in :class:`AdaptiveProblem` `prob` using the
+        :attr:`set_initial_surface` method.
+
+        We follow the standard practice in the tsunami modelling literature by assuming zero initial
+        velocity.
+        """
 
         # Read initial surface data from file
         surf = self.set_initial_surface(prob.P1[0])
