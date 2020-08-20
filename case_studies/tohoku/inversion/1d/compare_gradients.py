@@ -39,6 +39,8 @@ kwargs = {
     'optimal_value': 5.0,
     'synthetic': True,
     'qoi_scaling': 1.0,
+    'nx': 1,
+    'ny': 1,
 
     # Misc
     'plot_pvd': False,

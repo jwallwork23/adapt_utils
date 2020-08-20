@@ -87,6 +87,8 @@ kwargs = {
     'synthetic': not real_data,
     'qoi_scaling': 1.0,
     'regularisation': float(args.regularisation or 0.0),
+    'nx': 1,
+    'ny': 1,
 
     # Misc
     'plot_pvd': False,

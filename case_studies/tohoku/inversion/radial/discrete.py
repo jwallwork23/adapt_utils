@@ -8,11 +8,11 @@ import os
 
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
-from adapt_utils.plotting import *
-from adapt_utils.norms import total_variation, vecnorm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
+from adapt_utils.norms import total_variation, vecnorm
+from adapt_utils.plotting import *
 
 
 class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):

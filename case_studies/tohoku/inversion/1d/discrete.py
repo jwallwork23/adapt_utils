@@ -94,6 +94,8 @@ kwargs = {
     'control_parameters': [float(args.initial_guess or 7.5), ],
     'synthetic': not real_data,
     'qoi_scaling': 1.0,
+    'nx': 1,
+    'ny': 1,
 
     # Misc
     'plot_pvd': False,
