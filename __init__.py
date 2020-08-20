@@ -19,7 +19,7 @@ from thetis import *  # NOQA
 
 # Check whether Firedrake has Pragmatic installed
 try:
-    from firedrake import adapt
+    from firedrake import adapt  # NOQA
     os.environ['FIREDRAKE_ADAPT'] = '1'
 except ImportError:
     os.environ['FIREDRAKE_ADAPT'] = '0'

@@ -348,7 +348,7 @@ class AdaptiveProblemBase(object):
         """
         assert mode in ('memory', 'disk')
         if mode == 'disk':
-            delete = kwargs.get('delete', True)
+            # delete = kwargs.get('delete', True)
             raise NotImplementedError("Checkpointing to disk not yet implemented.")
             # TODO: pop file name from stack, load file, delete if requested
         self.op.print_debug("CHECKPOINT LOAD: {:3d} currently stored".format(len(self.checkpoint)))

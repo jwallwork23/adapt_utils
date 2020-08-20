@@ -9,8 +9,8 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 
 # Set parameters
 font = {
-    "family" : "DejaVu Sans",
-    "size"   : 16,
+    "family": "DejaVu Sans",
+    "size": 16,
 }
 plt.rc('font', **font)
 plt.rc('text', usetex=True)

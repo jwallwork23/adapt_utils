@@ -21,7 +21,6 @@ from thetis import *
 from firedrake_adjoint import *
 
 import argparse
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy

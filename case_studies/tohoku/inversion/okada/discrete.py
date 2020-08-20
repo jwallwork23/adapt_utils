@@ -224,6 +224,7 @@ def gradient(m):
     print_output("J = {:.4e}  dJdm = {:.4e}".format(op.J, vecnorm(dJdm, order=np.Inf)))
     return dJdm
 
+
 # Taylor test the gradient
 if test_gradient:
     taylor_test(reduced_functional, gradient, m_init, verbose=True)
