@@ -20,10 +20,6 @@ if not os.path.exists(di):
 
 # Instantiate TohokuOptions object and setup interpolator
 op = TohokuOptions()
-op.gauges.pop('811')
-op.gauges.pop('812')
-op.gauges.pop('813')
-op.gauges.pop('815')
 gauges = list(op.gauges)
 num_gauges = len(gauges)
 for gauge in gauges:

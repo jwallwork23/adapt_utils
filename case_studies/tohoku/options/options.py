@@ -1,7 +1,7 @@
 from thetis import *
 
-import os
 import netCDF4
+import os
 
 from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
@@ -146,8 +146,8 @@ class TohokuOptions(TsunamiOptions):
             "sample": 60,
         }
         self.mid_field_pressure_gauges = {
-            "gauges": ("KPG1", "KPG2", "21418"),
-            # "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21418"),
+            # "gauges": ("KPG1", "KPG2", "21418"),
+            "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21418"),
             "arrival_time": 15*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
