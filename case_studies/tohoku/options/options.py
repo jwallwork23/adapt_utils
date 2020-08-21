@@ -146,15 +146,14 @@ class TohokuOptions(TsunamiOptions):
             "sample": 60,
         }
         self.mid_field_pressure_gauges = {
-            # "gauges": ("KPG1", "KPG2", "21418"),
-            "gauges": ("KPG1", "KPG2", "MPG1", "MPG2", "21418"),
+            "gauges": ("KPG1", "KPG2", "21418"),
             "arrival_time": 15*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
             "sample": 60,
         }
         self.far_field_pressure_gauges = {
-            "gauges": ("21401", "21413", "21419"),
+            "gauges": ("21401", "21413", "21419", "MPG1", "MPG2"),
             "arrival_time": 50*60.0,
             "departure_time": self.end_time,
             "weight": Constant(1.0),
@@ -358,8 +357,10 @@ class TohokuOptions(TsunamiOptions):
         self.gauge_classifications_to_consider = tuple(self.gauge_classifications_to_consider)
         gauges_to_consider = self.pressure_gauges + self.gps_gauges
 
-        # Account for special case
+        # Account for special cases
         self.gauges["21418"]["sample"] = self.far_field_pressure_gauges["sample"]
+        self.gauges["MPG1"]["sample"] = self.mid_field_pressure_gauges["sample"]
+        self.gauges["MPG2"]["sample"] = self.mid_field_pressure_gauges["sample"]
 
         # Remove unused gauges (e.g. we don't use MPG1 or MPG2)
         for gauge in list(self.gauges.keys()):
