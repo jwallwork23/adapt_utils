@@ -18,7 +18,7 @@ __all__ = ["taylor_test", "StagnationError", "prod", "combine", "rotation_matrix
 
 # --- Optimisation
 
-def taylor_test(function, gradient, m, verbose=False):
+def taylor_test(function, gradient, m, verbose=False, ratio_tol=3.95):
     """
     Apply a 'Taylor test' to verify that the provided `gradient` function is a consistent approximation
     to the provided `function` at point `m`. This is done by choosing a random search direction and
@@ -29,6 +29,7 @@ def taylor_test(function, gradient, m, verbose=False):
     :arg gradient: proposed gradient of above function, to be tested.
     :arg m: vector at which to perform the test.
     :kwarg verbose: toggle printing to screen.
+    :kwarg ratio_tol: value which must be exceeded for convergence.
     """
     if verbose:
         print_output(24*"=" + "TAYLOR TEST" + 24*"=")
@@ -52,10 +53,10 @@ def taylor_test(function, gradient, m, verbose=False):
         if i > 0:
             ratio = remainders[i-1]/remainders[i]
             try:
-                assert ratio > 3.95
+                assert ratio > ratio_tol
             except AssertionError:
-                msg = "Taylor remainders do not decrease quadratically (ratio {:.4e})"
-                raise ConvergenceError(msg.format(ratio))
+                msg = "Taylor remainders do not decrease quadratically (ratio {:.4e} < {:.4e})"
+                raise ConvergenceError(msg.format(ratio, ratio_tol))
     if verbose:
         print_output(20*"=" + "TAYLOR TEST PASSED!" + 20*"=")
 
