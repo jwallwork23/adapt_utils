@@ -7,14 +7,19 @@
 # which occured on 2011-03-11. However, it can be easily modified for    #
 # other events.                                                          #
 #                                                                        #
-# Data is accessible from http://www.jamstec.go.jp/scdc/top_e.html.      #
+# For this application, please make an application to download the PG    #
+# data for the Muroto region from                                        #
+#     http://www.jamstec.go.jp/scdc/top_e.html                           #
+# and save it in this directory as `muroto1655.tar.gz` (default).        #
 #                                                                        #
-# WIN can be downloaded at http://wwweic.eri.u-tokyo.ac.jp/WIN/pub/win/. #
+# WIN can be downloaded at http://wwweic.eri.u-tokyo.ac.jp/WIN/pub/win/  #
+# and the relevant command for this script is `dewin`, i.e. extract from #
+# WIN format.                                                            #
 # ====================================================================== #
 
 tar -xzvf muroto1655.tar.gz
 
-# Loop over gauges KPG1 and KPG2
+# Loop over gauges MPG1 and MPG2
 for i in 1 2; do
 
 	# Clear output file
@@ -26,14 +31,14 @@ for i in 1 2; do
 	touch $out
 
         # Loop over hours
-	for h in {14..18}; do
+	for h in {14..16}; do
 
 		# Loop over minutes (padded with zeroes for 2 digits)
 		for m in {00..59}; do
-			# Restrict to the 2 hour window from 14:45 to 16:45
-			if [ $h -eq 14 ] && [ $m -lt 45 ]; then
+			# Restrict to the 2 hour window from 14:46 to 16:46
+			if [ $h -eq 14 ] && [ $m -lt 46 ]; then
 				continue
-			elif [ $h -eq 18 ] && [ $m -gt 44 ]; then
+			elif [ $h -eq 16 ] && [ $m -gt 45 ]; then
 				break
 			fi
 
