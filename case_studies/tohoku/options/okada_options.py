@@ -125,7 +125,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
                 self.control_parameters['width'].append(20.0e+03)
         self.all_controls += ('length', 'width', )
 
-    def get_subfaults(self, check_validity=False):
+    def get_subfaults(self, check_validity=False, reset=False):
         """
         Create GeoCLAW :class:`SubFault` objects from provided subfault parameters, as well as a
         :class`Fault` object.
@@ -134,6 +134,10 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         `download_okada_parameters` method.
         """
         from adapt_utils.unsteady.swe.tsunami.dtopotools import Fault, SubFault
+
+        # Reset subfaults if requested
+        if reset:
+            self.subfaults = []
 
         # If no Okada parameters have been provided then download them from a default webpage
         if self.control_parameters is None or self.control_parameters == {}:
@@ -199,8 +203,9 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
             surf.dat.data[i] = surf_interp(*xy)
 
-        # Interpolate into the elevation space
+        # Assume zero initial velocity and interpolate into the elevation space
         u, eta = prob.fwd_solutions[0].split()
+        u.assign(0.0)
         eta.interpolate(surf)
 
         # Subtract initial surface from the bathymetry field
