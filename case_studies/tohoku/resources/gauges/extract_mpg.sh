@@ -44,7 +44,7 @@ for i in 1 2; do
 
 			# Extract data and append to output file
 			#   NOTE that we need to choose the
-			#   appropriate channels, CD1B and CD1D.
+			#   appropriate channels, CD1A and CD1C.
 			fname="mpg$i"
 			fname+="_mmh.20110311_"
 			fname+=$h
@@ -56,9 +56,9 @@ for i in 1 2; do
 			fi
 			echo $fname
 			if [ $i -eq 1 ]; then
-				dewin -acen CD1B $fname >> $out
+				dewin -acen CD1A $fname >> $out
 			else
-				dewin -acen CD1D $fname >> $out
+				dewin -acen CD1C $fname >> $out
 			fi
 			rm $fname
 		done
