@@ -44,14 +44,14 @@ def initialise_fields(mesh2d, inputdir):
 
     return bath
 
-nx = 0.25
-ny = 0.5
+nx = 0.75
+ny = 1
 
-alpha = 15
-beta = 0
+alpha = 17
+beta = 1
 gamma = 1
 
-kappa = 160
+kappa = 53 + (1/3)
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -155,7 +155,9 @@ print('L2')
 print(fire.errornorm(bath, bath_real))
 print(kappa)
 
-V = V = FunctionSpace(new_mesh, 'CG', 1)
+V = FunctionSpace(new_mesh, 'CG', 1)
+
+x,y = SpatialCoordinate(new_mesh)
 
 bath_mod = Function(V).interpolate(conditional(x > 70, bath, Constant(0.0)))
 bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(0.0)))
