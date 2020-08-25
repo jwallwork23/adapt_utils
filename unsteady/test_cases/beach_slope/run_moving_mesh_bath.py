@@ -44,14 +44,14 @@ def initialise_fields(mesh2d, inputdir):
 
     return bath
 
-nx = 0.75
-ny = 1
+nx = 0.2
+ny = 0.5
 
-alpha = 17
-beta = 1
+alpha = 3
+beta = 0
 gamma = 1
 
-kappa = 53 + (1/3)
+kappa = 200
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')

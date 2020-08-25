@@ -1,4 +1,4 @@
-r"""
+"""
 2D advection diffusion equation for sediment transport.
 
 This can be either conservative :math:`q=HT` or non-conservative :math:`T` and allows
@@ -17,11 +17,27 @@ velocities, and :math:`\mu_h` denotes horizontal diffusivity.
 from __future__ import absolute_import
 from thetis.utility import *
 from thetis.equation import Equation
-from thetis.tracer_eq_2d import HorizontalDiffusionTerm
-from thetis.sediment_eq_2d import SedimentTerm
+from thetis.tracer_eq_2d import HorizontalDiffusionTerm, TracerTerm
 from thetis.conservative_tracer_eq_2d import ConservativeHorizontalDiffusionTerm
 from adapt_utils.unsteady.tracer.equation import HorizontalAdvectionTerm
 from adapt_utils.unsteady.tracer.cons_equation import ConservativeHorizontalAdvectionTerm
+
+
+class SedimentTerm(TracerTerm):
+    """
+    Generic sediment term that provides commonly used members.
+    """
+    def __init__(self, function_space, depth,
+                 use_lax_friedrichs=True, sipg_parameter=Constant(10.0), conservative=False):
+        """
+        :arg function_space: :class:`FunctionSpace` where the solution belongs
+        :arg depth: :class: `DepthExpression` containing depth info
+        :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
+        :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
+        :kwarg bool conservative: whether to use conservative tracer
+        """
+        super(SedimentTerm, self).__init__(function_space, depth)
+        self.conservative = conservative
 
 
 class SedimentSourceTerm(SedimentTerm):
