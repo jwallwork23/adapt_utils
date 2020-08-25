@@ -1,4 +1,4 @@
-### Mesh adaptation in Firedrake
+## Mesh adaptation for coastal ocean modelling in Firedrake
 
 In this code, anisotropic and isotropic goal-oriented mesh adaptation is applied to solving a variety
 of 2D coastal ocean modelling problems using the coastal, estuarine and ocean modelling solver
