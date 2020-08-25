@@ -14,13 +14,6 @@ def get_mesh(dim, n):
         raise ValueError("Dimension {:d} not supported".format(dim))
 
 
-def check_entity_counts(mesh1, mesh2):
-    assert mesh1.num_vertices() == mesh2.num_vertices()
-    assert mesh1.num_edges() == mesh2.num_edges()
-    assert mesh1.num_cells() == mesh2.num_cells()
-    assert mesh1.num_facets() == mesh2.num_facets()
-
-
 def check_coordinates(mesh1, mesh2):
     """Verify that the vertices of `mesh1` are all vertices of `mesh2`."""
     for v1 in mesh1.coordinates.dat.data:
@@ -55,7 +48,7 @@ def test_indentity_metric(dim):
     P1_ten = TensorFunctionSpace(mesh, "CG", 1)
     M_hardcoded = interpolate(identity, P1_ten)
     newmesh = pragmatic_adapt(mesh, M_hardcoded)
-    check_entity_counts(mesh, newmesh)
+    assert mesh.num_vertices() == newmesh.num_vertices()
     check_coordinates(mesh, newmesh)
 
     # Adapt using an identity metric created using the isotropic_metric driver
@@ -64,7 +57,7 @@ def test_indentity_metric(dim):
     M = isotropic_metric(f, normalise=False, enforce_constraints=False)
     newmesh = pragmatic_adapt(mesh, M)
     assert np.allclose(M_hardcoded.dat.data, M.dat.data)
-    check_entity_counts(mesh, newmesh)
+    assert mesh.num_vertices() == newmesh.num_vertices()
     check_coordinates(mesh, newmesh)
 
 
