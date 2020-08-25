@@ -31,16 +31,29 @@ class Options(FrozenConfigurable):
           'cg': Continuous Galerkin    (Pp);
           'dg': Discontinuous Galerkin (PpDG),
         where p is the polynomial order specified by :attr:`degree_tracer`.""").tag(config=True)
+    sediment_family = Unicode('dg', help="""
+        Finite element pair to use for the sediment transport model. Choose from:
+          'cg': Continuous Galerkin    (Pp);
+          'dg': Discontinuous Galerkin (PpDG),
+        where p is the polynomial order specified by :attr:`degree_sediment`.""").tag(config=True)
     degree = NonNegativeInteger(1, help="""
         Polynomial order for shallow water finite element pair :attr:`family'.""").tag(config=True)
     degree_tracer = NonNegativeInteger(1, help="""
         Polynomial order for tracer finite element pair :attr:`tracer_family'.""").tag(config=True)
+    degree_bathymetry = NonNegativeInteger(1, help="""
+        Polynomial order for tracer finite element pair :attr:`tracer_family'.""").tag(config=True)
+    degree_sediment = NonNegativeInteger(1, help="""
+        Polynomial order for sediment finite element pair :attr:`sediment_family'.""").tag(config=True)
     degree_increase = NonNegativeInteger(0, help="""
         When defining an enriched shallow water finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)
     degree_increase_tracer = NonNegativeInteger(1, help="""
         When defining an enriched tracer finite element space, how much should the
+        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+        """).tag(config=True)
+    degree_increase_sediment = NonNegativeInteger(1, help="""
+        When defining an enriched sediment finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)
     periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
@@ -266,13 +279,13 @@ class Options(FrozenConfigurable):
     def exact_qoi(self):  # TODO: surely it needs an arg
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def get_update_forcings(self, prob, i):
+    def get_update_forcings(self, prob, i, **kwargs):
         """Should be implemented in derived class."""
         def update_forcings(t):
             return
         return update_forcings
 
-    def get_export_func(self, prob, i):
+    def get_export_func(self, prob, i, **kwargs):
         """Should be implemented in derived class."""
         def export_func():
             return

@@ -30,7 +30,8 @@ class CoupledOptions(Options):
     grad_depth_viscosity = Bool(False).tag(config=True)
     wetting_and_drying = Bool(False).tag(config=True)
     wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(4.3)).tag(config=True)
-    lax_friedrichs_velocity_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
+    lax_friedrichs_velocity_scaling_factor = FiredrakeConstantTraitlet(
+        Constant(1.0), help="Scaling factor for Lax Friedrichs stabilisation term in horizontal momentum advection.").tag(config=True)
     sipg_parameter = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
 
     # Tracer transport model
@@ -43,13 +44,13 @@ class CoupledOptions(Options):
     sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     norm_smoother = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
     tracer_advective_velocity_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
-    
+
     # Exner transport model
     solve_exner = Bool(False).tag(config=True)
     bathymetry_family = Enum(['dg', 'cg'], default_value='cg').tag(config=True)
     morphological_acceleration_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
     porosity = FiredrakeScalarExpression(Constant(0.4)).tag(config=True)
-    
+
     # Adaptation
     adapt_field = Unicode('all_avg', help="Adaptation field of interest.").tag(config=True)
     region_of_interest = List(default_value=[]).tag(config=True)

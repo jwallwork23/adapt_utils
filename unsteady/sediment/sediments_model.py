@@ -152,10 +152,8 @@ class SedimentModel(object):
         self.dzdx = self.old_bathymetry_2d.dx(0)
         self.dzdy = self.old_bathymetry_2d.dx(1)
 
-
         self.depth_expr = DepthExpression(self.bathymetry_2d, use_wetting_and_drying=self.wetting_and_drying, wetting_and_drying_alpha=self.wetting_alpha)
         self.depth = Function(self.V).project(self.depth_expr.get_total_depth(self.elev_init))
-
 
         self.horizontal_velocity = self.uv_cg[0]
         self.vertical_velocity = self.uv_cg[1]
@@ -333,4 +331,3 @@ class SedimentModel(object):
                 self.equiltracer.project(self.depth*self.ceq/self.coeff)
             else:
                 self.equiltracer.project(self.ceq/self.coeff)
-
