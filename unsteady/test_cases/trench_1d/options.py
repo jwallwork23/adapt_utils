@@ -213,7 +213,7 @@ class TrenchSedimentOptions(CoupledOptions):
         """
         from firedrake.petsc import PETSc
         try:
-            import firedrake.cython.dmplex as dmplex
+            import firedrake.cython.dmcommon as dmplex
         except:
             import firedrake.dmplex as dmplex  # Older version
         # mesh

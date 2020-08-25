@@ -1,7 +1,7 @@
 """
-Runs the unsteady test case scripts found in `unsteady/test_cases/`. In some cases these examples include
-assertions which verify desired behaviour, but in most cases it is just verified that the solve does not
-crash and reaches the end of the required time period.
+Runs the unsteady test case scripts found in `unsteady/test_cases/`. In some cases these examples
+include assertions which verify desired behaviour, but in most cases it is just verified that the
+solve does not crash and reaches the end of the simulation.
 
 The code used in this script was largely copied from `thetis/test/examples.py`.
 """
@@ -14,17 +14,26 @@ import shutil
 
 
 examples = [
-    'cosine_prescribed_velocity/run.py',
+    'balzano/run_fixed_mesh.py',
+    'balzano/run_moving_mesh.py',  # TODO: Takes a while to run
+    'beach_slope/run_fixed_mesh.py',
+    # 'beach_slope/run_moving_mesh.py',  # TODO
+    'beach_wall/run_fixed_mesh.py',
+    # 'beach_wall/run_moving_mesh.py',  # TODO
+    # 'bubble_shear/run.py',  # TODO: Currently requires an 'interpretation' input parameter
+    'cosine_prescribed_velocity/run.py',  # FIXME
+    'pulse_wave/run_fixed_mesh.py',
+    # 'pulse_wave/run_moving_mesh.py',  # TODO
+    'rossby_wave/run_fixed_mesh.py',  # TODO: Takes a while to run
+    # 'rossby_wave/run_moving_mesh.py',  # TODO: Currently takes too long to run
     'solid_body_rotation/run_fixed_mesh.py',
     'solid_body_rotation/run_lagrangian.py',
-    # 'bubble_shear/run.py',  # TODO: Currently requires an 'interpretation' input parameter
-    'rossby_wave/run_fixed_mesh.py',
-    # 'rossby_wave/run_moving_mesh.py',  # TODO: Currently takes too long to run
-    'balzano/run_fixed_mesh.py',
-    'balzano/run_moving_mesh.py',
-    # 'trench/run_fixed_mesh.py',  # TODO
-    # 'trench/run_moving_mesh.py',  # TODO
-    # 'turbine_array/run.py',  # TODO
+    # 'spaceship/run_fixed_mesh.py',
+    'trench_1d/run_fixed_mesh.py',
+    # 'trench_1d/run_moving_mesh.py',  # TODO
+    'trench_slant/run_fixed_mesh.py',
+    # 'trench_slant/run_moving_mesh.py',  # TODO
+    # 'turbine_array/run_fixed_mesh.py',  # TODO: Currently takes too long to run
 ]
 
 cwd = os.path.abspath(os.path.dirname(__file__))

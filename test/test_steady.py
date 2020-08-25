@@ -1,7 +1,6 @@
 """
 Runs the steady test case scripts found in `steady/test_cases/`. In some cases these examples include
-assertions which verify desired behaviour, but in most cases it is just verified that the solve does not
-crash.
+assertions which verify desired behaviour, but in most cases it is just verified that the solve does not crash.
 
 The code used in this script was largely copied from `thetis/test/examples.py`.
 """
