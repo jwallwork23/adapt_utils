@@ -135,7 +135,7 @@ class Options(FrozenConfigurable):
     target = PositiveFloat(1.0e+2, help="""
         Target complexity / inverse desired error for normalisation, as appropriate.""").tag(config=True)
     norm_order = NonNegativeFloat(None, allow_none=True, help="""
-        Degree p of Lp norm used in spatial normalisation. Use 'None' to specify infinity norm.
+        Degree p of Lp norm used in spatial normalisation. Use `None` to specify infinity norm.
         """).tag(config=True)
     intersect_boundary = Bool(False, help="Intersect with initial boundary metric.").tag(config=True)
 
