@@ -1,4 +1,4 @@
-from thetis import *
+from thetis.utility import *
 
 
 class Corrective_Velocity_Factor:

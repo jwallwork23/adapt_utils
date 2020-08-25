@@ -3,6 +3,10 @@ balzano/outputs/
 balzano/screenshots/
 balzano/videos/
 balzano/__pycache__/
+beach_slope/archived/
+beach_slope/results/
+beach_wall/archived/
+beach_wall/results/
 bubble_shear/outputs/
 bubble_shear/screenshots/
 bubble_shear/videos/
@@ -11,6 +15,8 @@ cosine_prescribed_velocity/outputs/
 cosine_prescribed_velocity/screenshots/
 cosine_prescribed_velocity/videos/
 cosine_prescribed_velocity/__pycache__/
+pulse_wave/archived/
+pulse_wave/results/
 rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/videos/
@@ -26,11 +32,9 @@ solid_body_rotation/outputs/
 solid_body_rotation/screenshots/
 solid_body_rotation/videos/
 solid_body_rotation/__pycache__/
-trench/mesh.geo
-trench/outputs/
-trench/screenshots/
-trench/videos/
-trench/__pycache__/
+trench_1d/outputs/
+trench_1d/results/
+trench_slant/results/
 turbine_array/nic.py
 turbine_array/output/
 turbine_array/outputs/
