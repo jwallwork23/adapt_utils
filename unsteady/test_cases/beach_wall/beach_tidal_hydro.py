@@ -7,7 +7,7 @@ Created on Mon May 25 14:59:04 2020
 """
 
 import thetis as th
-import morphological_hydro_mud_source_sink as morph
+import hydro_fns as hydro
 
 import numpy as np
 import os
@@ -16,7 +16,7 @@ plot = False
 
 def boundary_conditions_fn_balzano(bathymetry_2d, flag = None, morfac = 1, t_new = 0, state = 'initial'):
     """
-    Define boundary conditions for problem to be used in morphological section.
+    Define boundary conditions for problem
     
     Inputs:
     morfac - morphological scale factor used when calculating time dependent boundary conditions
@@ -88,7 +88,7 @@ value = 1/40
 
 sponge_fn = th.Function(V).interpolate(th.conditional(x>=100, -399 + 4*x, th.Constant(1.0)))
 
-solver_obj, update_forcings_hydrodynamics, outputdir = morph.hydrodynamics_only(boundary_conditions_fn_balzano, mesh2d, bathymetry_2d, uv_init, elev_init, wetting_and_drying = False, wetting_alpha = value, fluc_bcs = True, average_size = 200 * (10**(-6)), dt=0.05, t_end=100, friction = 'manning', sponge_viscosity = sponge_fn, viscosity = 0.5)
+solver_obj, update_forcings_hydrodynamics, outputdir = hydro.hydrodynamics_only(boundary_conditions_fn_balzano, mesh2d, bathymetry_2d, uv_init, elev_init, wetting_and_drying = False, wetting_alpha = value, fluc_bcs = True, average_size = 200 * (10**(-6)), dt=0.05, t_end=100, friction = 'manning', sponge_viscosity = sponge_fn, viscosity = 0.5)
 
 # run model
 
@@ -97,7 +97,7 @@ solver_obj.iterate(update_forcings = update_forcings_hydrodynamics)
 uv, elev = solver_obj.fields.solution_2d.split()
 
 if plot == False:
-    morph.export_final_state("hydrodynamics_beach_l_sep_nx_"+str(nx), uv, elev)
+    hydro.export_final_state("hydrodynamics_beach_l_sep_nx_"+str(nx), uv, elev)
 else:
     import pylab as plt
 

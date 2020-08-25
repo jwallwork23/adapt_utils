@@ -7,7 +7,7 @@ Created on Fri Apr  5 15:13:47 2019
 """
 
 import thetis as th
-import morphological_hydro_fns_non_imp as morph
+import hydro_fns as hydro
 import numpy as np
 import pandas as pd
 import pylab as plt
@@ -19,7 +19,7 @@ fac2 = 3
 
 def boundary_conditions_fn_trench(bathymetry_2d, flag, morfac=1, t_new=0, state='initial'):
     """
-    Define boundary conditions for problem to be used in morphological section.
+    Define boundary conditions for problem.
 
     Inputs:
     morfac - morphological scale factor used when calculating time dependent boundary conditions
@@ -86,11 +86,11 @@ stop
 elev_init = th.Function(P1_2d).interpolate(th.Constant(0.4))
 uv_init = th.as_vector((0.51, 0.0))
 
-solver_obj, update_forcings_hydrodynamics = morph.hydrodynamics_only(boundary_conditions_fn_trench, mesh2d, bathymetry_2d, uv_init, elev_init, ks=0.025, average_size=160 * (10**(-6)), dt=timestep, t_end=500)
+solver_obj, update_forcings_hydrodynamics = hydro.hydrodynamics_only(boundary_conditions_fn_trench, mesh2d, bathymetry_2d, uv_init, elev_init, ks=0.025, average_size=160 * (10**(-6)), dt=timestep, t_end=500)
 
 # run model
 solver_obj.iterate(update_forcings=update_forcings_hydrodynamics)
 
 
 uv, elev = solver_obj.fields.solution_2d.split()
-morph.export_final_state("hydrodynamics_trench_slant_"+str(fac), uv, elev)
+hydro.export_final_state("hydrodynamics_trench_slant_"+str(fac), uv, elev)
