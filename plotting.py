@@ -1,3 +1,4 @@
+import matplotlib
 from matplotlib.transforms import Bbox, TransformedBbox, blended_transform_factory
 from mpl_toolkits.axes_grid1.inset_locator import BboxPatch, BboxConnector, BboxConnectorPatch
 
@@ -5,9 +6,17 @@ from mpl_toolkits.axes_grid1.inset_locator import BboxPatch, BboxConnector, Bbox
 __all__ = ["zoom_effect01", "zoom_effect02"]
 
 
-def connect_bbox(bbox1, bbox2,
-                 loc1a, loc2a, loc1b, loc2b,
-                 prop_lines, prop_patches=None):
+# Fonts
+matplotlib.rc('text', usetex=True)
+matplotlib.rcParams['mathtext.fontset'] = 'custom'
+matplotlib.rcParams['mathtext.rm'] = 'Bitstream Vera Sans'
+matplotlib.rcParams['mathtext.it'] = 'Bitstream Vera Sans:italic'
+matplotlib.rcParams['mathtext.bf'] = 'Bitstream Vera Sans:bold'
+matplotlib.rcParams['mathtext.fontset'] = 'stix'
+matplotlib.rcParams['font.family'] = 'STIXGeneral'
+
+
+def connect_bbox(bbox1, bbox2, loc1a, loc2a, loc1b, loc2b, prop_lines, prop_patches=None):
     """
     Copied from https://matplotlib.org/3.1.3/gallery/subplots_axes_and_figures/axes_zoom_effect.html
     """
@@ -26,7 +35,6 @@ def connect_bbox(bbox1, bbox2,
     bbox_patch2 = BboxPatch(bbox2, **prop_patches)
 
     p = BboxConnectorPatch(bbox1, bbox2,
-                           # loc1a=3, loc2a=2, loc1b=4, loc2b=1,
                            loc1a=loc1a, loc2a=loc2a, loc1b=loc1b, loc2b=loc2b,
                            **prop_patches)
     p.set_clip_on(False)

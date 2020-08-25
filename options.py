@@ -60,7 +60,7 @@ class Options(FrozenConfigurable):
 
     # Time discretisation
     timestepper = Enum(
-        ['SteadyState', 'CrankNicolson', ],  # TODO: Consider more timesteppers
+        ['SteadyState', 'CrankNicolson', 'PressureProjectionPicard'],
         default_value='CrankNicolson',
         help="Time integration scheme used.").tag(config=True)
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
@@ -97,7 +97,7 @@ class Options(FrozenConfigurable):
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="""
         Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.
-        """).tag(config=True)  # TODO: restrict input
+        """).tag(config=True)  # TODO: Account for different models
     use_automatic_sipg_parameter = Bool(True, help="""
         Toggle automatic generation of symmetric interior penalty method.""").tag(config=True)
 
@@ -178,7 +178,7 @@ class Options(FrozenConfigurable):
     # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="""
     Spatial region related to quantity of interest""").tag(config=True)
-    estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)  # TODO: unused
+    estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)  # TODO: unused in unsteady
 
     # Adaptation loop
     element_rtol = PositiveFloat(0.005, help="""
@@ -196,8 +196,8 @@ class Options(FrozenConfigurable):
 
     def __init__(self, mesh=None, fpath=None, **kwargs):
         """
-        Upon initialising the class, any kwargs will be added and a output directory path will be created
-        as determined by :attr:`approach` as `outputs/<approach>/`.
+        Upon initialising the class, any kwargs will be added and a output directory path will be
+        created as determined by :attr:`approach` as `outputs/<approach>/`.
 
         :kwarg mesh: a mesh to use as the :attr:`default_mesh` instead of the default one defined in
             the subclass.
@@ -214,6 +214,12 @@ class Options(FrozenConfigurable):
                 set_log_level(INFO)
             else:
                 set_log_level(DEBUG)
+
+        # Extract the default PressureProjectionPicard parameters
+        pressure_op = options.PressureProjectionTimestepperOptions2d()
+        self.solver_parameters_pressure = pressure_op.solver_parameters_pressure
+        self.solver_parameters_momentum = pressure_op.solver_parameters_momentum
+        self.picard_iterations = pressure_op.picard_iterations
 
     def set_all_rtols(self, tol):
         """Set all relative tolerances to a single value, `tol`."""
@@ -285,10 +291,18 @@ class Options(FrozenConfigurable):
             return
         return export_func
 
-    def print_debug(self, msg):
-        """Print a string `msg` only if debugging is on."""
-        if self.debug:
-            print_output(msg)
+    def print_debug(self, msg, mode='basic'):
+        """
+        Print a string `msg` only if debugging is on.
+
+        :kwarg mode: if 'full' is specified, the debugging statement will only be printed if
+            :attr:`debug_mode` is set to 'full'.
+        """
+        if not self.debug:
+            return
+        if mode == 'full' and self.debug_mode == 'basic':
+            return
+        print_output(msg)
 
     # TODO: USEME
     def get_mesh_velocity(self):

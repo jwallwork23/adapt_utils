@@ -13,7 +13,7 @@ from thetis.utility import *
 import thetis.shallowwater_eq as thetis_sw
 
 
-__all__ = ["ShallowWaterEquations"]
+__all__ = ["ShallowWaterEquations", "ShallowWaterMomentumEquation"]
 
 
 g_grav = physical_constants['g_grav']
@@ -121,7 +121,6 @@ class BaseShallowWaterEquation(thetis_sw.BaseShallowWaterEquation):
 
 class ShallowWaterEquations(BaseShallowWaterEquation):
     """Copied here from `thetis/shallowwater_eq` to hook up modified terms."""
-
     def __init__(self, function_space, depth, options):
         """
         :arg function_space: Mixed function space where the solution belongs
@@ -150,4 +149,25 @@ class ShallowWaterEquations(BaseShallowWaterEquation):
         else:
             uv, eta = split(solution)
         uv_old, eta_old = split(solution_old)
+        return self.residual_uv_eta(label, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions)
+
+
+class ShallowWaterMomentumEquation(BaseShallowWaterEquation):
+    """Copied here from `thetis/shallowwater_eq` to hook up modified terms."""
+    def __init__(self, u_test, u_space, eta_space, depth, options):
+        """
+        :arg u_test: test function of the velocity function space
+        :arg u_space: velocity function space
+        :arg eta_space: elevation function space
+        :arg depth: :class: `DepthExpression` containing depth info
+        :arg options: :class:`.AttrDict` object containing all circulation model options
+        """
+        super(ShallowWaterMomentumEquation, self).__init__(u_space, depth, options)
+        self.add_momentum_terms(u_test, u_space, eta_space, depth, options)
+
+    def residual(self, label, solution, solution_old, fields, fields_old, bnd_conditions):
+        uv = solution
+        uv_old = solution_old
+        eta = fields['eta']
+        eta_old = fields_old['eta']
         return self.residual_uv_eta(label, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions)

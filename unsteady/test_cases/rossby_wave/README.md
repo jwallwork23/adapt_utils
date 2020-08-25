@@ -5,14 +5,14 @@
 ### Original problem
 
 * Unsteady shallow water: "propagation of a small amplitude Rossby soliton on an equatorial beta
-  plane"
+  plane".
 * Zonal equatorial channel, [-24, 24]x[-12, 12].
 * BCs: rigid walls to N and S; periodic E-W.
 * ICs: "modon with two sea level peaks of equal size and strength decaying exponentially with
-  distance away from their centers"
+  distance away from their centers".
 * Zero diffusivity.
 * Time duration: 120.
-* Time steps considered: 0.01, 0.005, 0.002
+* Time steps considered: 0.01, 0.005, 0.002.
 * Solver: finite volume.
 
 * Beta-plane Coriolis approximation `f = f0 + beta*y` with `f0 = 0`, `beta = 1`.

@@ -1,4 +1,4 @@
-all: clean fixed_mesh
+all: fixed_mesh
 
 fixed_mesh:
 	@echo "Solving inundated beach problem on a fixed mesh..."
@@ -8,9 +8,4 @@ fixed_mesh:
 moving_mesh:
 	@echo "Solving inundated beach problem on a moving mesh..."
 	@python3 run_moving_mesh.py
-	@echo "Done!"
-
-clean:
-	@echo "Cleaning directory..."
-	@rm -Rf *.msh
 	@echo "Done!"

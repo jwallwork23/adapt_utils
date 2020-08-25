@@ -2,7 +2,7 @@ from thetis.utility import *
 import thetis.timeintegrator as thetis_ts
 
 
-__all__ = ["SteadyState", "CrankNicolson"]
+__all__ = ["SteadyState", "CrankNicolson", "PressureProjectionPicard"]
 
 
 class SteadyState(thetis_ts.SteadyState):
@@ -20,10 +20,9 @@ class SteadyState(thetis_ts.SteadyState):
 
     def setup_error_estimator(self, solution, adjoint, bnd_conditions):
         assert self.error_estimator is not None
-        u = solution
-        f = self.fields
-        bnd = bnd_conditions
-        self.error_estimator.setup_components('all', u, u, z, z, f, f, bnd)
+        self.error_estimator.setup_components(
+            'all', solution, solution, adjoint, adjoint, self.fields, self.fields, bnd_conditions
+        )
 
 
 class CrankNicolson(thetis_ts.CrankNicolson):
@@ -38,7 +37,7 @@ class CrankNicolson(thetis_ts.CrankNicolson):
         self.theta = kwargs.get('theta')
         self.adjoint = adjoint
         self.error_estimator = error_estimator
-        print_output("#### TODO: Setup strong residual for Crank-Nicolson")  # TODO
+        # TODO: Setup strong residual for Crank-Nicolson
 
     def advance(self, t, update_forcings=None):
         """Advances equations for one time step."""
@@ -86,3 +85,23 @@ class CrankNicolson(thetis_ts.CrankNicolson):
         ee.residual_terms = residual_terms
         ee.inter_element_flux_terms = inter_element_flux_terms
         ee.bnd_flux_terms = bnd_flux_terms
+
+
+class PressureProjectionPicard(thetis_ts.PressureProjectionPicard):
+    """
+    Extension of Thetis PressureProjectionPicard time integrator for error estimation.
+
+    See `thetis/timeintegrator.py` for original version.
+    """
+    def __init__(self, *args, error_estimator=None, adjoint=False, **kwargs):
+        super(PressureProjectionPicard, self).__init__(*args, **kwargs)
+        self.semi_implicit = kwargs.get('semi_implicit')
+        self.theta = kwargs.get('theta')
+        self.adjoint = adjoint
+        if adjoint:
+            raise NotImplementedError
+        self.error_estimator = error_estimator
+        if error_estimator is not None:
+            raise NotImplementedError
+        # TODO: Setup strong residual for Picard iteration
+        # TODO: Setup error estimators for Picard iteration

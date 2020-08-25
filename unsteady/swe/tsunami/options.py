@@ -1,14 +1,12 @@
 from thetis import *
 from thetis.configuration import *
 
-import scipy.interpolate as si
 import numpy as np
-import h5py
-import matplotlib.pyplot as plt
+import os
+import scipy.interpolate as si
 
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import *
-from adapt_utils.norms import timeseries_error
 
 
 __all__ = ["TsunamiOptions"]
@@ -18,19 +16,29 @@ class TsunamiOptions(CoupledOptions):
     """
     Parameter class for general tsunami propagation problems.
     """
+    # TODO: more doc details
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
     bathymetry_cap = NonNegativeFloat(30.0, allow_none=True, help="Minimum depth").tag(config=True)
 
     def __init__(self, regularisation=0.0, **kwargs):
+        """
+        kwarg regularisation: non-negative constant parameter used for Tikhonov regularisation
+            methods for the quantity of interest.
+        """
         super(TsunamiOptions, self).__init__(**kwargs)
         self.solve_swe = True
         self.solve_tracer = False
-        self.rotational = True
-        self.regularisation = regularisation
-        if not hasattr(self, 'force_zone_number'):
-            self.force_zone_number = False
+        self.force_zone_number = kwargs.get('force_zone_number', False)
         self.gauges = {}
         self.locations_of_interest = {}
+
+        # Model
+        self.rotational = True
+
+        # Bathymetry shift
+        # ================
+        self.shift_bathymetry = True
+        self.shift_bathymetry_flag = False
 
         # Stabilisation
         # =============
@@ -40,19 +48,60 @@ class TsunamiOptions(CoupledOptions):
         self.base_viscosity = 1.0e-03
         self.sipg_parameter = Constant(100.0)
 
+        # Quantity of interest
+        self.regularisation = regularisation
+        if self.regularisation < 0.0:
+            raise ValueError("Regularisation parameter should be non-negative.")
+
     def get_utm_mesh(self):
+        """
+        Given a mesh in longitude-latitude coordinates, establish a corresponding mesh in UTM
+        coordinates using the conversion code in `adapt_utils.unsteady.swe.tsunami.conversion`.
+        """
+        assert hasattr(self, 'lonlat_mesh')
         zone = self.force_zone_number
         self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
         lon, lat = SpatialCoordinate(self.default_mesh)
-        self.default_mesh.coordinates.interpolate(as_vector(lonlat_to_utm(lon, lat, zone)))
+        x, y = lonlat_to_utm(lon, lat, zone)
+        self.default_mesh.coordinates.interpolate(as_vector([x, y]))
 
     def get_lonlat_mesh(self, northern=True):
+        """
+        Given a mesh in UTM coordinates, establish a corresponding mesh in longitude-latitude
+        coordinates using the conversion code in `adapt_utils.unsteady.swe.tsunami.conversion`.
+
+        :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
+        """
+        assert hasattr(self, 'default_mesh')
         zone = self.force_zone_number
         self.lonlat_mesh = Mesh(Function(self.default_mesh.coordinates))
         x, y = SpatialCoordinate(self.lonlat_mesh)
-        self.lonlat_mesh.coordinates.interpolate(as_vector(utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)))
+        lon, lat = utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)
+        self.lonlat_mesh.coordinates.interpolate(as_vector([lon, lat]))
 
     def set_bathymetry(self, fs=None, dat=None, northern=True, force_longitude=True, **kwargs):
+        """
+        Derived classes should implement :attr:`read_bathymetry_file` such that it returns a 3-tuple
+        of longitude, latitude and elevation data over a rectangular grid.
+
+        If a minimum water depth has been provided via :attr:`bathymetry_cap` the this is enforced
+        at this stage.
+
+        Note on interpolation
+        =====================
+        We should always be cautious of accessing `f.dat.data` for a Firedrake :class:`Function` `f`,
+        because it isn't parallel safe in some cases. However, as described in the documentation
+        (https://firedrakeproject.org/interpolation.html#interpolation-from-external-data), what we
+        do is okay in the case of interpolating external data. The interpolation is just done on all
+        processors and Firedrake manages halo updates.
+
+        :kwarg fs: :class:`FunctionSpace` for the bathymetry to live in. By default, P1 space is used
+        :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
+        :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
+        :kwarg force_longitude: toggle checking validity of the UTM zone.
+        
+        All other kwargs are passed to the :attr:`read_bathymetry_file` method.
+        """
         if self.bathymetry_cap is not None:
             assert self.bathymetry_cap >= 0.0
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
@@ -60,51 +109,122 @@ class TsunamiOptions(CoupledOptions):
 
         # Interpolate bathymetry data *in lonlat space*
         lon, lat, elev = dat or self.read_bathymetry_file(**kwargs)
-        self.print_debug("Creating bathymetry interpolator...")
+        self.print_debug("INIT: Creating bathymetry interpolator...")
         bath_interp = si.RectBivariateSpline(lat, lon, elev)
-        self.print_debug("Done!")
+        self.print_debug("INIT: Done!")
 
         # Insert interpolated data onto nodes of *problem domain space*
-        self.print_debug("Interpolating bathymetry...")
-        # msg = "Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
-        depth = bathymetry.dat.data
-        # initial_surface = self.set_initial_surface(fs)  # DUPLICATED
+        self.print_debug("INIT: Interpolating bathymetry...")
+        msg = "    Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
-            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, northern=northern, force_longitude=force_longitude)
-            # depth[i] -= initial_surface.dat.data[i]  # TODO?
-            depth[i] -= bath_interp(lat, lon)
-            # self.print_debug(msg.format(xy[0], xy[1], depth[i]/1000))
+            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number,
+                                     northern=northern, force_longitude=force_longitude)
+            bathymetry.dat.data[i] -= bath_interp(lat, lon)
+            self.print_debug(msg.format(xy[0], xy[1], bathymetry.dat.data[i]/1000), mode='full')
+        self.print_debug("INIT: Done!")
+
+        # Cap bathymetry to enforce a minimum depth
+        self.print_debug("INIT: Capping bathymetry...")  # TODO: Should we really be doing this?
         if self.bathymetry_cap is not None:
             bathymetry.interpolate(max_value(self.bathymetry_cap, bathymetry))
-        self.print_debug("Done!")
+        self.print_debug("INIT: Done!")
+
         return bathymetry
 
-    def set_initial_surface(self, fs=None, northern=True, force_longitude=True, **kwargs):
+    def set_initial_surface(self, fs=None, dat=None, northern=True, force_longitude=True, **kwargs):
+        """
+        Derived classes should implement :attr:`read_surface_file` such that it returns a 3-tuple
+        of longitude, latitude and elevation data over a rectangular grid.
+
+        Note on interpolation
+        =====================
+        We should always be cautious of accessing `f.dat.data` for a Firedrake :class:`Function` `f`,
+        because it isn't parallel safe in some cases. However, as described in the documentation
+        (https://firedrakeproject.org/interpolation.html#interpolation-from-external-data), what we
+        do is okay in the case of interpolating external data. The interpolation is just done on all
+        processors and Firedrake manages halo updates.
+
+        :kwarg fs: :class:`FunctionSpace` for the bathymetry to live in. By default, P1 space is used
+        :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
+        :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
+        :kwarg force_longitude: toggle checking validity of the UTM zone.
+        
+        All other kwargs are passed to the :attr:`read_surface_file` method.
+        """
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
         initial_surface = Function(fs, name="Initial free surface")
 
         # Interpolate bathymetry data *in lonlat space*
-        lon, lat, elev = self.read_surface_file(**kwargs)
+        self.print_debug("INIT: Creating surface interpolator...")
+        lon, lat, elev = dat or self.read_surface_file(**kwargs)
         surf_interp = si.RectBivariateSpline(lat, lon, elev)
+        self.print_debug("INIT: Done!")
 
         # Insert interpolated data onto nodes of *problem domain space*
-        self.print_debug("Interpolating initial surface...")
-        # msg = "Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
+        self.print_debug("INIT: Interpolating initial surface...")
+        msg = "    Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
-            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, northern=northern, force_longitude=force_longitude)
+            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number,
+                                     northern=northern, force_longitude=force_longitude)
             initial_surface.dat.data[i] = surf_interp(lat, lon)
-            # self.print_debug(msg.format(xy[0], xy[1], initial_surface.dat.data[i]))
-        self.print_debug("Done!")
+            self.print_debug(msg.format(xy[0], xy[1], initial_surface.dat.data[i]), mode='full')
+        self.print_debug("INIT: Done!")
+
         return initial_surface
 
     def set_initial_condition(self, prob):
+        """
+        Initialise the hydrodynamics in :class:`AdaptiveProblem` `prob` using the
+        :attr:`set_initial_surface` method.
+
+        We follow the standard practice in the tsunami modelling literature by assuming zero initial
+        velocity.
+        """
+
+        # Read initial surface data from file
+        surf = self.set_initial_surface(prob.P1[0])
+
+        # Set initial condition
+        self.print_debug("INIT: Setting initial condition...")
         u, eta = prob.fwd_solutions[0].split()
+        u.assign(0.0)  # (Naively) assume zero initial velocity
+        eta.interpolate(surf)  # Initial surface from inversion data
+        self.print_debug("INIT: Done!")
 
-        # (Naively) assume zero initial velocity
-        u.assign(0.0)
+        # Subtract from the bathymetry field
+        self.subtract_surface_from_bathymetry(prob, surf=surf)
+        return surf
 
-        # Interpolate free surface from inversion data
-        eta.interpolate(self.set_initial_surface(prob.P1[0]))
+    def subtract_surface_from_bathymetry(self, prob, surf=None):
+        """
+        It is common practice in the tsunami modelling literature to subtract the initial surface
+        from the bathymetry field. This is in line with the fact the earthquake disturbs the bed.
+        In the hydrostatic case, we can assume that this translates to an idential disturbance to
+        the ocean surface.
+
+        Note that we reset the bathymetry first, in case this method has already been called.
+        """
+        self.print_debug("INIT: Subtracting initial surface from bathymetry field...")
+
+        # Reset bathymetry
+        fs = prob.bathymetry[0].function_space()
+        prob.bathymetry[0] = self.set_bathymetry(fs)
+
+        # Project bathymetry into P1 space
+        P1 = prob.P1[0]
+        b = project(prob.bathymetry[0], P1)
+
+        # Interpolate free surface into P1 space
+        if surf is None:
+            surf = interpolate(prob.fwd_solutions[0].split()[1], P1)
+
+        # Subtract surface from bathymetry
+        b -= surf
+
+        # Project updated bathymetry onto each mesh
+        for i in range(self.num_meshes):
+            prob.bathymetry[i].project(b)
+        self.print_debug("INIT: Done!")
 
     def set_coriolis(self, fs):
         if not self.rotational:
@@ -117,25 +237,25 @@ class TsunamiOptions(CoupledOptions):
         return interpolate(2*self.Omega*sin(radians(lat)), fs)
 
     def set_qoi_kernel(self, prob, i):
-        fs = prob.V[i]
-
-        # b = self.ball(fs.mesh(), source=False)
-        # b = self.circular_bump(fs.mesh(), source=False)
-        b = self.gaussian(fs.mesh(), source=False)
+        # b = self.ball(prob.meshes[i], source=False)
+        # b = self.circular_bump(prob.meshes[i], source=False)
+        b = self.gaussian(prob.meshes[i], source=False)
 
         # TODO: Normalise by area computed on fine reference mesh
         # area = assemble(b*dx)
         # area_fine_mesh = ...
-        # rescaling = 1.0 if np.allclose(area, 0.0) else area_fine_mesh/area
-        rescaling = 1.0
+        # rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
+        rescaling = Constant(1.0)
 
-        prob.kernels[i] = Function(fs, name="QoI kernel")
+        prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
         kernel_u, kernel_eta = prob.kernels[i].split()
-        kernel_u.rename("QoI kernel (uv component)")
-        kernel_eta.rename("QoI kernel (elev component)")
+        kernel_u.rename("QoI kernel (velocity component)")
+        kernel_eta.rename("QoI kernel (elevation component)")
         kernel_eta.interpolate(rescaling*b)
 
     def set_terminal_condition(self, prob):  # TODO: For hazard case
+        prob.adj_solutions[-1].assign(0.0)
+
         # # b = self.ball(prob.meshes[-1], source=False)
         # # b = self.circular_bump(prob.meshes[-1], source=False)
         # b = self.gaussian(prob.meshes[-1], source=False)
@@ -164,156 +284,70 @@ class TsunamiOptions(CoupledOptions):
                 self.get_lonlat_mesh()
             self.lonlat_mesh.coordinates.at(point)
 
-    # TODO: Plot multiple mesh approaches
-    # TODO: UPDATE
-    def plot_timeseries(self, gauge, axes=None, **kwargs):
+    def extract_data(self, gauge):
         """
-        Plot timeseries for `gauge` under all stored mesh resolutions.
+        Extract gauge time and elevation data from file as NumPy arrays.
 
-        :arg gauge: tag for gauge to be plotted.
-        :kwarg cutoff: time cutoff level.
+        Note that this isn't *raw* data because it has been converted to appropriate units using
+        `preproc.py`.
         """
-        print_output("Plotting timeseries for gauge {:s}...".format(gauge))
-        cutoff = kwargs.get('cutoff', 24)
-        sample = kwargs.get('sample', 60)
-        if gauge not in self.gauges:
-            msg = "Gauge '{:s}' is not valid. Choose from {:}."
-            raise ValueError(msg.format(gauge, self.gauges.keys()))
-        fexts = []
-        if kwargs.get('plot_pdf', False):
-            fexts.append('pdf')
-        if kwargs.get('plot_png', axes is None):
-            fexts.append('png')
-        plot_errors = axes is None
-        plot_nonlinear = axes is None
-        linearities = ('linear', )
-        if plot_nonlinear:
-            linearities += ('nonlinear', )
+        data_file = os.path.join(self.resource_dir, 'gauges', gauge + '.dat')
+        if not os.path.exists(data_file):
+            raise IOError("Requested timeseries for gauge '{:s}' cannot be found.".format(gauge))
+        times, data = [], []
+        with open(data_file, 'r') as f:
+            for line in f:
+                time, dat = line.split()
+                times.append(float(time))
+                data.append(float(dat))
+        return np.array(times), np.array(data)
 
-        # Get data
-        if 'data' not in self.gauges[gauge]:
-            self.get_gauge_data(gauge, sample=sample)
-        data, time = self.gauges[gauge]['data'], self.gauges[gauge]['time']
-        time = np.array([t/60.0 for t in time if t/60 <= cutoff + 1])
-        data = np.array([d for d, t in zip(data, time)])
-        data -= data[0]
-        time -= time[0]
-        assert len(time) == len(data)
+    def sample_timeseries(self, gauge, sample=1, detide=False, timeseries=None, **kwargs):
+        """
+        Interpolate from gauge data. Since the data is provided at regular intervals, we use linear
+        interpolation between the data points.
 
-        # Dictionary for norms and errors of timeseries
-        if 'data' in self.gauges[gauge]:
-            errors = {
-                'tv': {'name': 'total variation'},
-                # 'l1': {'name': r'$\ell_1$ error'},
-                'l2': {'name': r'$\ell_2$ error'},
-                # 'linf': {'name': r'$\ell_\infty$ error'},
-            }
-            for norm_type in errors:
-                errors[norm_type]['data'] = timeseries_error(data, norm_type=norm_type)
-                for linearity in ('linear', 'nonlinear'):
-                    errors[norm_type][linearity] = {'abs': [], 'rel': []}
+        Since some of the timeseries are rather noisy, there is an optional `sample` parameter, which
+        averages over the specified number of datapoints before interpolating.
 
-        # Consider cases of both linear and nonlinear shallow water equations
-        num_cells = {}
-        for linearity in linearities:
-            num_cells[linearity] = []
+        If the sampling frequency is set to unity then the raw data is used.
 
-            # Plot observations
-            if axes is None:
-                fig, axes = plt.subplots(figsize=(10.0, 5.0))
-            axes.plot(time, data, label='Data', linestyle='solid')
+        Keyword arguments are passed to `scipy.interpolate.interp1d`.
+        """
+        if detide:
+            times, data, _ = self.detide(gauge)
+        else:
+            times, data = self.extract_data(gauge)
+        if timeseries is not None:
+            assert len(data) == len(timeseries)
+            data[:] = timeseries
 
-            # Loop over runs
-            for level in range(5):
-                tag = '{:s}_level{:d}'.format(linearity, level)
-                fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, '0.hdf5']))
-                if not os.path.exists(fname):
-                    continue
-                fname = os.path.join(self.di, '_'.join(['meshdata', tag, '0.hdf5']))
-                if not os.path.exists(fname):
-                    continue
-                with h5py.File(fname, 'r') as f:
-                    num_cells[linearity].append(f['num_cells'][()])
+        # Process data
+        time_prev = 0.0
+        sampled_times, sampled_data, running = [], [], []
+        for i, (time, dat) in enumerate(zip(times, data)):
+            if np.isnan(dat):
+                continue
+            if sample == 1:
+                sampled_times.append(time)
+                sampled_data.append(dat)
+            else:
+                running.append(dat)
+                if i % sample == 0 and i > 0:
+                    sampled_times.append(0.5*(time + time_prev))
+                    sampled_data.append(np.mean(running))
+                    time_prev = time
+                    running = []
 
-                # Global time and profile arrays
-                T = np.array([])
-                Y = np.array([])
+        # Construct interpolant
+        kwargs.setdefault('bounds_error', False)
+        kwargs.setdefault('fill_value', 'extrapolate')
+        interp = si.interp1d(sampled_times, sampled_data, **kwargs)
 
-                # Loop over mesh iterations  # FIXME: Only currently works for fixed mesh
-                for i in range(self.num_meshes):
-                    fname = os.path.join(self.di, '_'.join(['diagnostic_gauges', tag, str(i)+'.hdf5']))
-                    assert os.path.exists(fname)
-                    with h5py.File(fname, 'r') as f:
-                        gauge_time = f["time"][()]
-                        gauge_time = gauge_time.reshape(len(gauge_time),)
-                        gauge_time = np.array([t/60.0 for t in gauge_time if t <= 60*cutoff])
-                        gauge_data = f[gauge][()]
-                        gauge_data = gauge_data.reshape(len(gauge_data),)
+        # Shift by initial value
+        arrival_time = self.gauges[gauge]["arrival_time"]
+        self.gauges[gauge]["interpolator"] = lambda tau: interp(tau) - interp(arrival_time)
 
-                        # Set first value as reference point
-                        if i == 0:
-                            gauge_data0 = gauge_data[0]
-                        gauge_data -= gauge_data0
-
-                    # Put arrays from individual meshes into global arrays
-                    Y = np.concatenate((Y, gauge_data))
-                    T = np.concatenate((T, gauge_time))
-
-                # Plot timeseries for current mesh
-                label = '{:s} ({:d} elements)'.format(self.approach, num_cells[linearity][-1])
-                label = label.replace('_', ' ').title()
-                axes.plot(T, Y, label=label, linestyle='dashed', marker='x')
-
-                r = 1
-                if len(data) % len(Y) == 0:
-                    r = len(data)//len(Y)
-                else:
-                    msg = "Gauge data and observations have incompatible lengths ({:d} vs {:d})"
-                    raise ValueError(msg.format(len(gauge_data), len(data)))
-
-                # Compute absolute and relative errors
-                if 'data' in self.gauges[gauge]:
-                    for norm_type in errors:
-                        err = timeseries_error(data[::r], Y[:cutoff+1], norm_type=norm_type)
-                        errors[norm_type][linearity]['abs'].append(err)
-                        errors[norm_type][linearity]['rel'].append(err/errors[norm_type]['data'])
-
-            # Plot labels etc.
-            axes.set_title("{:s} timeseries ({:s})".format(gauge, linearity))
-            axes.set_xlabel("Time [min]")
-            axes.set_ylabel("Free surface displacement [m]")
-            axes.set_xlim([0, cutoff])
-            plt.grid(True)
-            box = axes.get_position()
-            axes.set_position([box.x0, box.y0, box.width*0.8, box.height])
-            axes.legend(loc='center left', bbox_to_anchor=(1, 0.5))
-            fname = "gauge_timeseries_{:s}_{:s}".format(gauge, linearity)
-            for fext in fexts:
-                fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
-            axes = None
-        print_output("Done!")
-
-        if not plot_errors:
-            return
-
-        # Plot relative errors
-        print_output("Plotting errors for gauge {:s}...".format(gauge))
-        if 'data' not in self.gauges[gauge]:
-            raise ValueError("Data not found.")
-        for key in errors:
-            fig, axes = plt.subplots(figsize=(3.2, 4.8))
-            for linearity in linearities:
-                relative_errors = 100.0*np.array(errors[key][linearity]['rel'])
-                cells = num_cells[linearity][:len(relative_errors)]
-                axes.semilogx(cells, relative_errors, marker='o', label=linearity.title())
-            axes.set_title("{:s}".format(gauge))
-            axes.set_xlabel("Number of elements")
-            axes.set_ylabel("Relative {:s} (%)".format(errors[key]['name']))
-            plt.grid(True)
-            axes.legend()
-            fname = "gauge_{:s}_error_{:s}".format(key, gauge)
-            plt.tight_layout()
-            for fext in fexts:
-                fig.savefig(os.path.join(self.di, '.'.join([fname, fext])))
-            plt.close()
-        print_output("Done!")
+    def detide(self, gauge):
+        """To be implemented in subclass."""
+        raise NotImplementedError

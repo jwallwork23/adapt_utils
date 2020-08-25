@@ -24,7 +24,7 @@ class AdaptiveProblemBase(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-    def __init__(self, op, meshes=None, nonlinear=True, checkpointing=False):
+    def __init__(self, op, meshes=None, nonlinear=True, checkpointing=False, print_progress=True):
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -33,6 +33,7 @@ class AdaptiveProblemBase(object):
         self.approach = op.approach
         self.nonlinear = nonlinear
         self.checkpointing = checkpointing
+        self.print_progress = print_progress
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -55,6 +56,7 @@ class AdaptiveProblemBase(object):
         implemented_steppers = {
             'CrankNicolson': CrankNicolson,
             'SteadyState': SteadyState,
+            'PressureProjectionPicard': PressureProjectionPicard,
         }
         try:
             assert op.timestepper in implemented_steppers
@@ -466,6 +468,7 @@ class AdaptiveProblemBase(object):
             import warnings
             warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
 
+<<<<<<< HEAD
     def move_mesh_monge_ampere(self, i):  # TODO: Annotation
         """
         Move the physical mesh using a monitor based approach driven by solutions of a Monge-Ampere
@@ -513,3 +516,43 @@ class AdaptiveProblemBase(object):
         self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
         self.set_fields()
         self.op.print_debug("MESH MOVEMENT: Done!")
+=======
+            # NOTE: If we want to take the adjoint through mesh movement then there is no need to
+            #       know how the coordinate transform was derived, only what the result was. In any
+            #       case, the current implementation involves a supermesh projection which is not
+            #       yet annotated in pyadjoint.
+            with stop_annotating():
+
+                # Compute new physical mesh coordinates
+                self.mesh_movers[i].adapt()
+
+                # Project a copy of the current solution onto mesh defined on new coordinates
+                mesh = Mesh(self.mesh_movers[i].x)
+                V = FunctionSpace(mesh, self.V[i].ufl_element())
+                tmp = Function(V)
+                for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+                    tmp_i.project(sol_i)
+                if self.op.solve_tracer:
+                    Q = FunctionSpace(mesh, self.Q[i].ufl_element())
+                    tmp_tracer = Function(Q)
+                    tmp_tracer.project(self.fwd_solutions_tracer[i])
+
+            # Update physical mesh and current solution defined on it
+            self.meshes[i].coordinates.assign(self.mesh_movers[i].x)
+            for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
+                sol_i.dat.data[:] = tmp_i.dat.data  # FIXME: Need annotation
+            if self.op.solve_tracer:
+                self.fwd_solutions_tracer[i].dat.data[:] = tmp_tracer.dat.data  # FIXME: Need annotation
+                del tmp_tracer
+            del tmp
+
+            # Update fields
+            self.set_fields()
+
+    # --- Misc
+
+    def print(self, print_str):
+        """Print a string `print_str` only if :attr:`print_progress` is set to True."""
+        if self.print_progress:
+            print_output(print_str)
+>>>>>>> origin/master

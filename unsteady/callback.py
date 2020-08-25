@@ -1,5 +1,8 @@
 from thetis import *
 
+import numpy as np
+import os
+
 
 __all__ = ["VelocityNormCallback", "ElevationNormCallback", "TracerNormCallback",
            "SedimentNormCallback", "ExnerNormCallback", "QoICallback", "GaugeCallback"]
@@ -10,24 +13,28 @@ class TimeseriesCallback(object):
     Generic callback object for storing timseries extracted during a
     simulation and integrating in time.
     """
-    def __init__(self, prob, func, i, name):
+    def __init__(self, prob, func, i, name, callback_dir=None):
         """
         :arg prob: :class:`AdaptiveProblem` object.
         :arg func: user-provided function to be evaluated.
         :arg i: mesh index.
         :arg name: name for the callback object.
+        :kwarg callback_dir: if provided, timeseries is saved to that location every export.
         """
         self.prob = prob
         self.name = name
         self.func = func
         self.timeseries = []
         self.msg = "    {:16s}".format(self.name) + " at time {:6.1f} = {:11.4e}"
+        self.callback_dir = callback_dir
 
     def evaluate(self, **kwargs):
         t = self.prob.simulation_time
         value = self.func(t)
-        print_output(self.msg.format(t, value))
+        self.prob.print(self.msg.format(t, value))
         self.timeseries.append(value)
+        if self.callback_dir is not None:
+            np.save(os.path.join(self.callback_dir, self.name), self.timeseries)
 
     def time_integrate(self):
         N = len(self.timeseries)

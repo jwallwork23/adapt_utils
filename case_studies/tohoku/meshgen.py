@@ -1,5 +1,8 @@
 """
 Generate a hierarchy of meshes for the Tohoku tsunami problem.
+
+The bathymetry files used to extract contours were taken from both GEBCO (https://www.gebco.net/)
+and ETOPO1 (https://www.ngdc.noaa.gov/mgg/global/).
 """
 import os
 import qmesh
@@ -57,10 +60,14 @@ class MeshSetup:
         Generate mesh for Tohoku domain using QMESH.
         """
         boundary_di = os.path.join(self.di, 'boundaries')
+        boundary_coarse_di = os.path.join(self.di, 'boundaries_coarse')
 
         # Read shapefile describing domain boundaries
         boundaries = qmesh.vector.Shapes()
-        boundaries.fromFile(os.path.join(boundary_di, 'boundaries.shp'))
+        if self.level == 0:
+            boundaries.fromFile(os.path.join(boundary_coarse_di, 'boundaries.shp'))
+        else:
+            boundaries.fromFile(os.path.join(boundary_di, 'boundaries.shp'))
         loop_shapes = qmesh.vector.identifyLoops(boundaries, **self.loop_kwargs)
         polygon_shapes = qmesh.vector.identifyPolygons(loop_shapes, **self.polygon_kwargs)
         polygon_shapes.writeFile(os.path.join(boundary_di, 'polygons.shp'))
@@ -70,26 +77,31 @@ class MeshSetup:
         fukushima_coast.fromFile(os.path.join(boundary_di, 'fukushima.shp'))
         gradation_raster_fukushima = qmesh.raster.gradationToShapes()
         gradation_raster_fukushima.setShapes(fukushima_coast)
-        gradation_raster_fukushima.setRasterBounds(135.0, 149.0, 30.0, 45.0)
+        # gradation_raster_fukushima.setRasterBounds(135.0, 149.0, 30.0, 45.0)  # old geometry
+        gradation_raster_fukushima.setRasterBounds(130.0, 161.0, 22.0, 50.0)
         gradation_raster_fukushima.setRasterResolution(300, 300)
         gradation_raster_fukushima.setGradationParameters(*self.gradation_args_fukushima)
         gradation_raster_fukushima.calculateLinearGradation()
         gradation_raster_fukushima.writeNetCDF(os.path.join(self.di, 'meshes', 'gradation_fukushima.nc'))
 
         # Create raster for mesh gradation towards rest of coast (Could be a polygon, line or point)
-        gebco_coast = qmesh.vector.Shapes()
-        gebco_coast.fromFile(os.path.join(boundary_di, 'coastline.shp'))
-        gradation_raster_gebco = qmesh.raster.gradationToShapes()
-        gradation_raster_gebco.setShapes(gebco_coast)
-        gradation_raster_gebco.setRasterBounds(135.0, 149.0, 30.0, 45.0)
-        gradation_raster_gebco.setRasterResolution(300, 300)
-        gradation_raster_gebco.setGradationParameters(*self.gradation_args_else)
-        gradation_raster_gebco.calculateLinearGradation()
-        gradation_raster_gebco.writeNetCDF(os.path.join(self.di, 'meshes', 'gradation_gebco.nc'))
+        etopo1_coast = qmesh.vector.Shapes()
+        if self.level == 0:
+            etopo1_coast.fromFile(os.path.join(boundary_coarse_di, 'coastline.shp'))
+        else:
+            etopo1_coast.fromFile(os.path.join(boundary_di, 'coastline.shp'))
+        gradation_raster_etopo1 = qmesh.raster.gradationToShapes()
+        gradation_raster_etopo1.setShapes(etopo1_coast)
+        # gradation_raster_etopo1.setRasterBounds(135.0, 149.0, 30.0, 45.0)  # old geometry
+        gradation_raster_etopo1.setRasterBounds(130.0, 161.0, 22.0, 50.0)
+        gradation_raster_etopo1.setRasterResolution(300, 300)
+        gradation_raster_etopo1.setGradationParameters(*self.gradation_args_else)
+        gradation_raster_etopo1.calculateLinearGradation()
+        gradation_raster_etopo1.writeNetCDF(os.path.join(self.di, 'meshes', 'gradation_etopo1.nc'))
 
         # Create overall mesh metric
         mesh_metric_raster = qmesh.raster.meshMetricTools.minimumRaster(
-            [gradation_raster_fukushima, gradation_raster_gebco])
+            [gradation_raster_fukushima, gradation_raster_etopo1])
         mesh_metric_raster.writeNetCDF(os.path.join(self.di, 'meshes', 'mesh_metric_raster.nc'))
 
         # Create domain object and write GMSH files
@@ -112,7 +124,7 @@ class MeshSetup:
         TohokuMesh.writeShapefile(os.path.join(self.di, 'meshes', self.name + '.shp'))
 
 
-for i in range(5):
+for i in range(4):
     ms = MeshSetup(i)
     qmesh.setLogOutputFile(ms.log)  # Store QMESH log for later reference
     qmesh.initialise()              # Initialise QGIS API

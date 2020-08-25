@@ -120,7 +120,8 @@ else:
         ax_main.set_ylim([0.0, op.domain_width])
         ax_zoom.set_xlim(centre_t1[0] - 2*D, centre_t2[0] + 2*D)
         ax_zoom.set_ylim(op.domain_width/2 - 3.5*D, op.domain_width/2 + 3.5*D)
-        zoom_effect02(ax_zoom, ax, color='w')
+        zoom_effect02(ax_zoom, ax, color='w')  # TODO: Remove and delete in plotting.py
+        # TODO: Use http://akuederle.com/matplotlib-zoomed-up-inset instead
 
         # Save to file
         fname = '{:s}_offset{:d}_target{:d}_elem{:d}'.format(op.approach, op.offset, int(op.target), tp.num_cells[-1])

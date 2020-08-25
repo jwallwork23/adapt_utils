@@ -19,12 +19,9 @@ condition.py
 *.patch
 *.png
 *.fld
-*.dbf
-*.prj
-*.cpg
-*.qpj
 *.xyz
 *.tar.gz
 *.tiff
 *.tap
 *.pyc
+*.zip
