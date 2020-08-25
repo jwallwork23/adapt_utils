@@ -635,14 +635,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].sediment.bnd_functions = self.boundary_conditions[i]['sediment']
 
     def _create_forward_exner_equation(self, i):
-        from thetis.exner_eq import ExnerEquation
+        from .sediment.equation import ExnerEquation
 
-        # op = self.exner_options[i]
         model = ExnerEquation
         self.equations[i].exner = model(
             self.W[i],
             self.depth[i],
-            # self.op.sediment_model.depth_expr,
             conservative=self.op.use_tracer_conservative_form,
             sed_model=self.op.sediment_model,
         )
@@ -1077,7 +1075,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Mesh movement
             if self.iteration % op.dt_per_mesh_movement == 0:
-               self.move_mesh(i)
+                self.move_mesh(i)
 
             # TODO: Update mesh velocity
 
@@ -1100,10 +1098,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if not op.solve_sediment:
                     self.op.sediment_model.update(ts.shallow_water.solution, self.fwd_solutions_bathymetry[i])
                 ts.exner.advance(self.simulation_time, update_forcings)
-
-            # Move *mesh i*
-            #if self.iteration % op.dt_per_mesh_movement == 0:
-            #    self.move_mesh(i)
 
             # Save to checkpoint
             if self.checkpointing:
@@ -1212,7 +1206,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
         export_func = export_func or self.op.get_export_func(self, i)
-        # if i == self.num_meshes-1:
         if export_func is not None:
             export_func()
 
@@ -1835,17 +1828,4 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 print_output("Converged number of mesh elements!")
                 break
-
-        #tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
-
-        #tmp_depth = project(self.op.sediment_model.depth, W)
-        #tmp_tob = project(self.op.sediment_model.TOB, W)
-
-        #R = VectorFunctionSpace(mesh, "CG", 1)
-        #tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
-        # tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
-        # tmp_depth = project(self.op.sediment_model.depth, W)
-        # tmp_tob = project(self.op.sediment_model.TOB, W)
-        # R = VectorFunctionSpace(mesh, "CG", 1)
-        # tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
 
