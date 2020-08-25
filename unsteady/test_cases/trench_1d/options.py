@@ -66,12 +66,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
 
-        # Adaptivity
-        self.h_min = 1e-8
-        self.h_max = 10.
-
         # Timeseries
-        self.wd_obs = []
         self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
         tol = 1e-8  # FIXME: Point evaluation hack
         self.xrange = np.linspace(tol, 16-tol, 20)
