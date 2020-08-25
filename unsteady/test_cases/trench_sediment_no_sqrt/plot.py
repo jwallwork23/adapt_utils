@@ -24,7 +24,7 @@ plt.gca().ticklabel_format(style='sci', scilimits=(0,1), axis='y')
 
 color = 'tab:red'
 ax1.set_xlabel('Number of timesteps per mesh movement')
-ax1.set_ylabel('Mesh error', color=color)
+ax1.set_ylabel('Discretisation error', color=color)
 #ax1.semilogx(diff_time.columns.values[2:-1], diff_time.iloc[0][2:-1], ':', label = r'$\alpha = 3$', color=color)
 ax1.semilogx(diff_time.columns.values[2:-1], diff_time.iloc[1][2:-1], '-o', label = 'Mesh movement', color=color)
 #ax1.semilogx(diff_time.columns.values[2:-1], diff_time.iloc[2][2:-1], ':', label = r'$\alpha = 5$', color=color)
@@ -57,7 +57,7 @@ fig, ax1 = plt.subplots()
 
 color = 'tab:red'
 ax1.set_xlabel('Number of timesteps per mesh movement')
-ax1.set_ylabel('Mesh error', color=color)
+ax1.set_ylabel('Discretisation error', color=color)
 #ax1.semilogx(diff_time.iloc[13][2:], diff_time.iloc[14][2:], ':', label = r'$\alpha = 1$', color=color)
 ax1.semilogx(diff_time.iloc[13][2:-1], diff_time.iloc[15][2:-1], '-o', label = 'Mesh movement', color=color)
 #ax1.semilogx(diff_time.iloc[13][2:], diff_time.iloc[16][2:], ':', label = r'$\alpha = 2$', color=color)

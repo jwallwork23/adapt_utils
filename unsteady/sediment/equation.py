@@ -17,12 +17,79 @@ velocities, and :math:`\mu_h` denotes horizontal diffusivity.
 from __future__ import absolute_import
 from thetis.utility import *
 from thetis.equation import Equation
-from thetis.tracer_eq_2d import HorizontalDiffusionTerm, TracerTerm
-from thetis.sediment_eq_2d import SedimentSourceTerm, SedimentSinkTerm
+from thetis.tracer_eq_2d import HorizontalDiffusionTerm
+from thetis.sediment_eq_2d import SedimentTerm
 from thetis.conservative_tracer_eq_2d import ConservativeHorizontalDiffusionTerm
 from adapt_utils.unsteady.tracer.equation import HorizontalAdvectionTerm
 from adapt_utils.unsteady.tracer.cons_equation import ConservativeHorizontalAdvectionTerm
 
+
+class SedimentSourceTerm(SedimentTerm):
+    r"""
+    Generic source term
+
+    The weak form reads
+
+    .. math::
+        F_s = \int_\Omega \sigma \phi dx
+
+    where :math:`\sigma` is a user defined scalar :class:`Function`.
+
+    """
+    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        f = 0
+        source = fields.get('source')
+        depth_int_source = fields.get('depth_integrated_source')
+        if depth_int_source is not None:
+            if self.conservative:
+                f += -inner(depth_int_source, self.test) * self.dx
+            else:
+                raise NotImplementedError("Depth-integrated source term not implemented for non-conservative case")
+        elif source is not None:
+            if self.conservative:
+                H = self.depth.get_total_depth(fields['elev_2d'])
+                f += -inner(H*source, self.test)*self.dx
+            else:
+                f += -inner(source, self.test)*self.dx
+        else:
+            warning("no source term implemented")
+
+        if source is not None and depth_int_source is not None:
+            raise AttributeError("Assigned both a source term and a depth-integrated source term\
+                                 but only one can be implemented. Choose the most appropriate for your case")
+
+        return -f
+
+
+class SedimentSinkTerm(SedimentTerm):
+    r"""
+    Liner sink term
+
+    The weak form reads
+
+    .. math::
+        F_s = - \int_\Omega \sigma solution \phi dx
+
+    where :math:`\sigma` is a user defined scalar :class:`Function`.
+
+    """
+    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        f = 0
+        sink = fields.get('sink')
+        depth_int_sink = fields.get('depth_integrated_sink')
+        if depth_int_sink is not None:
+            if self.conservative:
+                f += -inner(-depth_int_sink*solution, self.test) * self.dx
+            else:
+                raise NotImplementedError("Depth-integrated sink term not implemented for non-conservative case")
+        elif sink is not None:
+            f += -inner(-sink*solution, self.test)*self.dx
+        else:
+            warning("no sink term implemented")
+        if sink is not None and depth_int_sink is not None:
+            raise AttributeError("Assigned both a sink term and a depth-integrated sink term\
+                                 but only one can be implemented. Choose the most appropriate for your case")
+        return -f
 
 class SedimentEquation2D(Equation):
     """

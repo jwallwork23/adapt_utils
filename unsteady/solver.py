@@ -682,11 +682,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _create_forward_exner_equation(self, i):
         op = self.exner_options[i]
+        from .sediment.equation import ExnerEquation
         model = ExnerEquation
         self.equations[i].exner = model(
             self.W[i],
             self.depth[i],
-            #self.op.sediment_model.depth_expr,
             conservative=self.op.use_tracer_conservative_form,
             sed_model=self.op.sediment_model,
         )
@@ -1269,7 +1269,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
         export_func = export_func or self.op.get_export_func(self, i)
-        # if i == self.num_meshes-1:
         if export_func is not None:
             export_func()
 
@@ -1909,50 +1908,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
         intermediary_solutions = self.intermediary_solutions[i]
 
         # Project a copy of the current solution onto mesh defined on new coordinates
-<<<<<<< HEAD
-
-
         mesh = Mesh(self.mesh_movers[i].x)
         V = FunctionSpace(mesh, self.V[i].ufl_element())
         tmp = Function(V)
         for tmp_i, sol_i in zip(tmp.split(), self.fwd_solutions[i].split()):
             tmp_i.project(sol_i)
-=======
-        for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
-            int_sol.project(sol)
-
->>>>>>> a2ce6fb... monge_ampere: use intermediary meshes and solutions
         # Same for tracers etc.
         if self.op.solve_tracer:
             self.intermediary_solutions_tracer[i].project(self.fwd_solutions_tracer[i])
         if self.op.solve_sediment:
             self.intermediary_solutions_sediment[i].project(self.fwd_solutions_sediment[i])
         if self.op.solve_exner:
-<<<<<<< HEAD
-            W = FunctionSpace(mesh, self.W[i].ufl_element())
-            tmp_bathymetry = project(self.fwd_solutions_bathymetry[i], W)
-
-        self.a_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
-        print('here')
-        if not hasattr(self, "b_mc"):
-            self.b_mc = assemble(self.fwd_solutions_bathymetry[i]*dx)
-        print(self.a_mc - self.b_mc)
-
-        self.b_mc = assemble(tmp_bathymetry*dx)
-        print(self.b_mc-self.a_mc)
-        #tmp_old_bath = project(self.op.sediment_model.old_bathymetry_2d, W)
-
-        #tmp_depth = project(self.op.sediment_model.depth, W)
-        #tmp_tob = project(self.op.sediment_model.TOB, W)
-
-        #R = VectorFunctionSpace(mesh, "CG", 1)
-        #tmp_uv_cg = project(self.op.sediment_model.uv_cg, R)
-=======
             self.intermediary_solutions_bathymetry[i].project(self.fwd_solutions_bathymetry[i])
 
         # Update physical mesh and solution fields defined on it
         self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data[:]
->>>>>>> a2ce6fb... monge_ampere: use intermediary meshes and solutions
 
         # Update physical mesh and solution fields defined on it
         for int_sol, sol in zip(intermediary_solutions.split(), solutions.split()):
@@ -1970,5 +1940,3 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.set_fields()
         # self.create_forward_equations(i)
         # self.create_forward_timesteppers(i)
-=======
->>>>>>> 61385be... monge_ampere: simplify
