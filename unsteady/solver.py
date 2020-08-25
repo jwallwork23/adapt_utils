@@ -635,7 +635,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].sediment.bnd_functions = self.boundary_conditions[i]['sediment']
 
     def _create_forward_exner_equation(self, i):
-        from .sediment.equation import ExnerEquation
+        from .sediment.exner_eq import ExnerEquation
 
         model = ExnerEquation
         self.equations[i].exner = model(
