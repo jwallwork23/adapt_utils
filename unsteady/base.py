@@ -82,6 +82,10 @@ class AdaptiveProblemBase(object):
         self.st_complexities = [np.nan]
         self.outer_iteration = 0
 
+    def print(self, msg):
+        if self.print_progress:
+            print_output(msg)
+
     def setup_all(self, meshes):
         """
         Setup everything which isn't explicitly associated with either the forward or adjoint
