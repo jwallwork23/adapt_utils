@@ -11,7 +11,12 @@ class MorphOptions(ShallowWaterOptions):
     """
     Parameter class for general morphological problems.
     """
-    def set_up_suspended(self, mesh, tracer = None): 
+    def set_up_suspended(self, mesh, tracer=None):
+        P1 = FunctionSpace(mesh, "CG", 1)
+        P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+        P1DG = FunctionSpace(mesh, "DG", 1)
+        P1DG_vec = VectorFunctionSpace(mesh, "DG", 1)
+
         R = Constant(2650/1000 - 1)
         self.dstar = Constant(self.average_size*((self.g*R)/(self.base_viscosity**2))**(1/3))
         if max(self.dstar.dat.data[:] < 1):
@@ -35,74 +40,72 @@ class MorphOptions(ShallowWaterOptions):
             self.settling_velocity = Constant((10*self.base_viscosity/self.average_size)*(sqrt(1 + 0.01*((((2650/1000) - 1)*9.81*(self.average_size**3))/(self.base_viscosity**2)))-1))
         else:
             self.settling_velocity = Constant(1.1*sqrt(9.81*self.average_size*((2650/1000) - 1)))                
-
-        self.uv_d = Function(self.P1_vec_dg).project(self.uv_d)
-        self.eta_d = Function(self.P1DG).project(self.eta_d)
+        self.uv_d = project(self.uv_d, P1DG_vec)
+        self.eta_d = project(self.eta_d, P1DG)
         
-        self.u_cg = Function(self.P1_vec).project(self.uv_d)
-        self.horizontal_velocity = Function(self.P1).project(self.u_cg[0])
-        self.vertical_velocity = Function(self.P1).project(self.u_cg[1])
-        self.elev_cg = Function(self.P1).project(self.eta_d)
-        
+        self.u_cg = project(self.uv_d, P1_vec)
+        self.horizontal_velocity = project(self.u_cg[0], P1)
+        self.vertical_velocity = project(self.u_cg[1], P1)
+        self.elev_cg = project(self.eta_d, P1)
         
         if self.t_old.dat.data[:] == 0.0:
-            self.set_bathymetry(self.P1)
+            self.set_bathymetry(P1)
         else:
-            self.bathymetry = Function(self.P1).project(self.bathymetry)
+            self.bathymetry = project(self.bathymetry, P1)
 
-        self.depth = Function(self.P1).project(self.elev_cg + self.bathymetry)
+        self.depth = project(self.elev_cg + self.bathymetry, P1)
     
-        self.unorm = Function(self.P1DG).project((self.horizontal_velocity**2)+ (self.vertical_velocity**2))
+        self.unorm = project(self.horizontal_velocity**2 + self.vertical_velocity**2, P1DG)
 
-        self.hc = Function(self.P1DG).project(conditional(self.depth > 0.001, self.depth, 0.001))
-        self.aux = Function(self.P1DG).project(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001))
-        self.qfc = Function(self.P1DG).project(2/(ln(self.aux)/0.4)**2)
+        self.hc = project(conditional(self.depth > 0.001, self.depth, 0.001), P1DG)
+        self.aux = project(conditional(11.036*self.hc/self.ks > 1.001, 11.036*self.hc/self.ks, 1.001, P1DG))
+        self.qfc = project(2/(ln(self.aux)/0.4)**2, P1DG)
         
-        self.TOB = Function(self.P1).project(1000*0.5*self.qfc*self.unorm)
+        self.TOB = project(1000*0.5*self.qfc*self.unorm, P1)
         
         
         # skin friction coefficient
         
-        self.cfactor = Function(self.P1DG).project(self.get_cfactor())
+        self.cfactor = project(self.get_cfactor(), P1DG)
         # mu - ratio between skin friction and normal friction
-        self.mu = Function(self.P1DG).project(conditional(self.qfc > 0, self.cfactor/self.qfc, 0))
+        self.mu = project(conditional(self.qfc > 0, self.cfactor/self.qfc, 0), P1DG)
         
         
         self.a = (self.ks)/2
-        self.B = Function(self.P1DG).project(conditional(self.a > self.depth, 1, self.a/self.depth))
-        self.ustar = Function(self.P1DG).project(sqrt(0.5*self.qfc*self.unorm))
-        self.exp1 = Function(self.P1DG).project(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0))
-        self.coefftest = Function(self.P1DG).project(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), self.B*(1-self.B**self.exp1)/self.exp1, -self.B*ln(self.B)))
-        self.coeff = Function(self.P1DG).project(conditional(self.coefftest>0, 1/self.coefftest, 0))
+        self.B = project(conditional(self.a > self.depth, 1, self.a/self.depth), P1DG)
+        self.ustar = project(sqrt(0.5*self.qfc*self.unorm), P1DG)
+        self.exp1 = project(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), conditional((self.settling_velocity/(0.4*self.ustar)) -1 > 3, 3, (self.settling_velocity/(0.4*self.ustar))-1), 0), P1DG)
+        self.coefftest = project(conditional((conditional((self.settling_velocity/(0.4*self.ustar)) - 1 > 0, (self.settling_velocity/(0.4*self.ustar)) -1, -(self.settling_velocity/(0.4*self.ustar)) + 1)) > 10**(-4), self.B*(1-self.B**self.exp1)/self.exp1, -self.B*ln(self.B)), P1DG)
+        self.coeff = project(conditional(self.coefftest>0, 1/self.coefftest, 0), P1DG)
         
         
         # erosion flux - for vanrijn
-        self.s0 = Function(self.P1DG).project((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr)
-        self.ceq = Function(self.P1DG).project(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3))
+        self.s0 = project((conditional(1000*0.5*self.qfc*self.unorm*self.mu > 0, 1000*0.5*self.qfc*self.unorm*self.mu, 0) - self.taucr)/self.taucr, P1DG)
+        self.ceq = project(0.015*(self.average_size/self.a) * ((conditional(self.s0 < 0, 0, self.s0))**(1.5))/(self.dstar**0.3), P1DG)
         
-        self.tracer_init = Function(self.P1DG).project(self.ceq/self.coeff)
+        self.tracer_init = project(self.ceq/self.coeff, P1DG)
         
         
         self.tracer_init_value = Constant(self.ceq.at([0,0])/self.coeff.at([0,0]))
-        self.source = Function(self.P1DG).project(self.set_source_tracer(self.P1DG, solver_obj = None, init = True, t_old = self.t_old, tracer = tracer)) 
-        self.qbsourcedepth = Function(self.P1).project(self.source * self.depth)
+        self.source = project(self.set_source_tracer(P1DG, solver_obj = None, init = True, t_old = self.t_old, tracer = tracer), P1DG)
+        self.qbsourcedepth = project(self.source * self.depth, P1)
         
         if self.convective_vel_flag:
             # correction factor to advection velocity in sediment concentration equation
 
-            self.Bconv = Function(self.P1DG).interpolate(conditional(self.depth > 1.1*self.ksp, self.ksp/self.depth, self.ksp/(1.1*self.ksp)))
-            self.Aconv = Function(self.P1DG).interpolate(conditional(self.depth > 1.1* self.a, self.a/self.depth, self.a/(1.1*self.a)))
+            self.Bconv = interpolate(conditional(self.depth > 1.1*self.ksp, self.ksp/self.depth, self.ksp/(1.1*self.ksp)), P1DG)
+            self.Aconv = interpolate(conditional(self.depth > 1.1* self.a, self.a/self.depth, self.a/(1.1*self.a)), P1DG)
                     
             # take max of value calculated either by ksp or depth
-            self.Amax = Function(self.P1DG).interpolate(conditional(self.Aconv > self.Bconv, self.Aconv, self.Bconv))
+            self.Amax = interpolate(conditional(self.Aconv > self.Bconv, self.Aconv, self.Bconv), P1DG)
 
-            self.r1conv = Function(self.P1DG).interpolate(1 - (1/0.4)*conditional(self.settling_velocity/self.ustar < 1, self.settling_velocity/self.ustar, 1))
+            self.r1conv = interpolate(1 - (1/0.4)*conditional(self.settling_velocity/self.ustar < 1, self.settling_velocity/self.ustar, 1), P1DG)
 
-            self.Ione = Function(self.P1DG).interpolate(conditional(self.r1conv > 10**(-8), (1 - self.Amax**self.r1conv)/self.r1conv, conditional(self.r1conv < - 10**(-8), (1 - self.Amax**self.r1conv)/self.r1conv, ln(self.Amax))))
+            self.Ione = interpolate(conditional(self.r1conv > 10**(-8), (1 - self.Amax**self.r1conv)/self.r1conv, conditional(self.r1conv < - 10**(-8), (1 - self.Amax**self.r1conv)/self.r1conv, ln(self.Amax))), P1DG)
 
-            self.Itwo = Function(self.P1DG).interpolate(conditional(self.r1conv > 10**(-8), -(self.Ione + (ln(self.Amax)*(self.Amax**self.r1conv)))/self.r1conv, conditional(self.r1conv < - 10**(-8), -(self.Ione + (ln(self.Amax)*(self.Amax**self.r1conv)))/self.r1conv, -0.5*ln(self.Amax)**2)))
+            self.Itwo = interpolate(conditional(self.r1conv > 10**(-8), -(self.Ione + (ln(self.Amax)*(self.Amax**self.r1conv)))/self.r1conv, conditional(self.r1conv < - 10**(-8), -(self.Ione + (ln(self.Amax)*(self.Amax**self.r1conv)))/self.r1conv, -0.5*ln(self.Amax)**2)), P1DG)
 
-            self.alpha = Function(self.P1DG).interpolate(-(self.Itwo - (ln(self.Amax) - ln(30))*self.Ione)/(self.Ione * ((ln(self.Amax) - ln(30)) + 1)))
+            self.alpha = interpolate(-(self.Itwo - (ln(self.Amax) - ln(30))*self.Ione)/(self.Ione * ((ln(self.Amax) - ln(30)) + 1)), P1DG)
 
             # final correction factor
             self.corrective_velocity_factor = Function(self.P1DG).interpolate(conditional(conditional(self.alpha > 1, 1, self.alpha) < 0, 0, conditional(self.alpha > 1, 1, self.alpha)))
@@ -110,21 +113,23 @@ class MorphOptions(ShallowWaterOptions):
         else:
             self.corrective_velocity_factor = Function(self.P1DG).interpolate(Constant(1.0))
         
-        self.z_n = Function(self.P1)
-        self.z_n1 = Function(self.P1)
-        self.v = TestFunction(self.P1)
-        self.old_bathymetry_2d = Function(self.P1).interpolate(self.bathymetry)
+        self.z_n = Function(P1)
+        self.z_n1 = Function(P1)
+        self.v = TestFunction(P1)
+        self.old_bathymetry_2d = interpolate(self.bathymetry, P1)
         
         # define bed gradient
-        self.dzdx = Function(self.P1).interpolate(self.old_bathymetry_2d.dx(0))
-        self.dzdy = Function(self.P1).interpolate(self.old_bathymetry_2d.dx(1))
+        self.dzdx = interpolate(self.old_bathymetry_2d.dx(0), P1)
+        self.dzdy = interpolate(self.old_bathymetry_2d.dx(1), P1)
         
     def set_up_bedload(self, mesh):   
+        P1 = FunctionSpace(mesh, "CG", 1)
+        P1_vec = VectorFunctionSpace(mesh, "CG", 1)
 
         #calculate angle of flow
-        self.calfa = Function(self.P1).interpolate(self.horizontal_velocity/sqrt(self.unorm))
-        self.salfa = Function(self.P1).interpolate(self.vertical_velocity/sqrt(self.unorm))
-        self.div_function = Function(self.P1_vec).interpolate(as_vector((self.calfa, self.salfa)))
+        self.calfa = interpolate(self.horizontal_velocity/sqrt(self.unorm), P1)
+        self.salfa = interpolate(self.vertical_velocity/sqrt(self.unorm), P1)
+        self.div_function = interpolate(as_vector((self.calfa, self.salfa)), P1_vec)
         
         self.beta = 1.3
         
@@ -133,31 +138,31 @@ class MorphOptions(ShallowWaterOptions):
         
         if self.slope_eff:    
             # slope effect magnitude correction due to gravity where beta is a parameter normally set to 1.3
-            self.slopecoef = Function(self.P1).interpolate(1 + self.beta*(self.dzdx*self.calfa + self.dzdy*self.salfa))
+            self.slopecoef = interpolate(1 + self.beta*(self.dzdx*self.calfa + self.dzdy*self.salfa), P1)
         else:
-            self.slopecoef = Function(self.P1).interpolate(Constant(1.0))
+            self.slopecoef = interpolate(Constant(1.0), P1)
             
         if self.angle_correction == True:
             # slope effect angle correction due to gravity
-            self.tt1 = Function(self.P1).interpolate(conditional(1000*0.5*self.qfc*self.unorm > 10**(-10), sqrt(self.cparam/(1000*0.5*self.qfc*self.unorm)), sqrt(self.cparam/(10**(-10)))))
+            self.tt1 = interpolate(conditional(1000*0.5*self.qfc*self.unorm > 10**(-10), sqrt(self.cparam/(1000*0.5*self.qfc*self.unorm)), sqrt(self.cparam/(10**(-10)))), P1)
             # add on a factor of the bed gradient to the normal
-            self.aa = Function(self.P1).interpolate(self.salfa + self.tt1*self.dzdy)
-            self.bb = Function(self.P1).interpolate(self.calfa + self.tt1*self.dzdx)
-            self.norm = Function(self.P1).interpolate(conditional(sqrt(self.aa**2 + self.bb**2) > 10**(-10), sqrt(self.aa**2 + self.bb**2),10**(-10)))
-            self.calfamod = Function(self.P1).interpolate(self.bb/self.norm)
-            self.salfamod = Function(self.P1).interpolate(self.aa/self.norm)            
+            self.aa = interpolate(self.salfa + self.tt1*self.dzdy, P1)
+            self.bb = interpolate(self.calfa + self.tt1*self.dzdx, P1)
+            self.norm = interpolate(conditional(sqrt(self.aa**2 + self.bb**2) > 10**(-10), sqrt(self.aa**2 + self.bb**2),10**(-10)), P1)
+            self.calfamod = interpolate(self.bb/self.norm, P1)
+            self.salfamod = interpolate(self.aa/self.norm, P1)            
 
         # implement meyer-peter-muller bedload transport formula
-        self.thetaprime = Function(self.P1).interpolate(self.mu*(1000*0.5*self.qfc*self.unorm)/((2650-1000)*9.81*self.average_size))
+        self.thetaprime = interpolate(self.mu*(1000*0.5*self.qfc*self.unorm)/((2650-1000)*9.81*self.average_size), P1)
 
         # if velocity above a certain critical value then transport occurs
-        self.phi = Function(self.P1).interpolate(conditional(self.thetaprime < self.thetacr, 0, 8*(self.thetaprime-self.thetacr)**1.5))
+        self.phi = interpolate(conditional(self.thetaprime < self.thetacr, 0, 8*(self.thetaprime-self.thetacr)**1.5), P1)
         
-        self.z_n = Function(self.P1)
-        self.z_n1 = Function(self.P1)
-        self.v = TestFunction(self.P1)
-        self.n = FacetNormal(self.P1.mesh())
-        self.old_bathymetry_2d = Function(self.P1)        
+        self.z_n = Function(P1)
+        self.z_n1 = Function(P1)
+        self.v = TestFunction(P1)
+        self.n = FacetNormal(mesh)
+        self.old_bathymetry_2d = Function(P1)
         
 
     def update_key_hydro(self, solver_obj):
@@ -219,7 +224,7 @@ class MorphOptions(ShallowWaterOptions):
         self.tracer_init_value.assign(self.ceq.at([0,0])/self.coeff.at([0,0]))
 
 
-        self.source.interpolate(self.set_source_tracer(self.P1DG, solver_obj))
+        self.source.interpolate(self.set_source_tracer(P1DG, solver_obj))
         
         
         self.qbsourcedepth.interpolate(self.source*self.depth)
