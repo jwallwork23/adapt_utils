@@ -1,31 +1,49 @@
 ### Mesh adaptation in Firedrake
 
-In this code, anisotropic and isotropic goal-oriented mesh adaptation is applied to solving shallow
-water and tracer transport problems using the coastal, estuarine and ocean modelling solver provided
-by [Thetis][2]. Thetis is built upon the [Firedrake][1] project, which enables the efficient
-solution of FEM problems in Python by automatic generation of [PETSc][3] code. Anisotropic mesh
-adaptation is achieved using [PRAgMaTIc][4]. A continuous adjoint solver is provided for advection-diffusion problems and the discrete adjoint code [Pyadjoint][5] can be used to generate adjoint
-solutions for more general problems. This is research of the Applied Modelling and Computation Group
-([AMCG][6]) at Imperial College London.
+In this code, anisotropic and isotropic goal-oriented mesh adaptation is applied to solving a variety
+of 2D coastal ocean modelling problems using the coastal, estuarine and ocean modelling solver
+provided by [Thetis][2]. Thetis is built upon the [Firedrake][1] project, which enables the efficient
+solution of FEM problems in Python by automatic generation of [PETSc][3] code.
 
-### Versions
+Currently supported model components:
+  * Shallow water equations (i.e. depth-averaged hydrodynamics);
+  * Passive tracer transport (both non-conservative and conservative options available);
+  * Sediment transport;
+  * Exner equation.
 
-* `v1.0`: 'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3358565.svg)](https://doi.org/10.5281/zenodo.3358565)
+Anisotropic mesh adaptation based on Riemannian metric fields is achieved using [PRAgMaTIc][4]. This
+code provides a wide range of utilities for metric-based adaptation, including Hessian recovery,
+metric combination and (isotropic and anisotropic) goal-oriented error estimators and metrics.
+Mesh movement is also supported using hand-coded Firedrake-based Monge-Ampere and ALE solvers.
 
-* `v1.3`: 'Goal-Oriented Error Estimation and Mesh Adaptation for Shallow Water Modelling': [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3695801.svg)](https://doi.org/10.5281/zenodo.3695801)
+Continuous adjoint solvers are provided for shallow water and advection-diffusion problems. The
+discrete adjoint code [Pyadjoint][5] can also be used to generate adjoint solutions for more general
+problems.
+
+This is research of the Applied Modelling and Computation Group ([AMCG][6]) at Imperial College
+London.
+
+
+### Publications and associated versions
+
+  * J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, <em>'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake'</em>, In: 28th International Meshing Roundtable, pp.83-100, (2020). DOI: 10.5281/zenodo.3653101.
+    * Paper: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3653101.svg)](https://doi.org/10.5281/zenodo.3653101), URL: https://doi.org/10.5281/zenodo.3653101.
+    * Code: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3358565.svg)](https://doi.org/10.5281/zenodo.3358565) (`v1.0`).
+
+  * J. G. Wallwork, N. Barral, S. C. Kramer, D. A. Ham, M. D. Piggott, <em>'Goal-Oriented Error Estimation and Mesh Adaptation for Shallow Water Modelling'</em>, Springer Nature Applied Sciences, volume 2, pp.1053--1063 (2020).
+    * Paper: DOI:10.1007/s42452-020-2745-9, URL: https://rdcu.be/b35wZ.
+    * Code: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3695801.svg)](https://doi.org/10.5281/zenodo.3695801) (`v1.3`).
 
 
 ### User instructions
 
-* Clone this repository and make it accessible to the `PYTHONPATH` environment variable.
-* If using `v1.0`, download Firedrake, PETSc and Pragmatic using [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3250888.svg)](https://doi.org/10.5281/zenodo.3250888).
-* If using `v1.3`:
-	* Install the same PETSc version as used in `v1.0`.
-	* Download Firedrake using [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3568997.svg)](https://doi.org/10.5281/zenodo.3568997), with the flag `--honour-petsc-dir` and the Thetis version [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3689727.svg)](https://doi.org/10.5281/zenodo.3689727).
+  * Clone this repository and make it accessible to the `$PYTHONPATH` environment variable.
+  * Set the `$SOFTWARE` environment variable to where you would like your PETSc and Firedrake installations to exist.
+  * Copy the contents of the `install` directory into `$SOFTWARE` and enter that directory.
+  * Call `source install_petsc.sh` and then `source install_firedrake.sh`, modifying these scripts, if desired.
+
 
 #### For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
-
-[My personal webpage][7]
 
 [1]: http://firedrakeproject.org/ "Firedrake"
 [2]: http://thetisproject.org/index.html "Thetis"
@@ -33,4 +51,3 @@ solutions for more general problems. This is research of the Applied Modelling a
 [4]: https://github.com/meshadaptation/pragmatic "PRAgMaTIc"
 [5]: https://bitbucket.org/dolfin-adjoint/pyadjoint/src "Pyadjoint"
 [6]: http://www.imperial.ac.uk/earth-science/research/research-groups/amcg/ "AMCG"
-[7]: http://www.imperial.ac.uk/people/j.wallwork16 "My personal webpage."
