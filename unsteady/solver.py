@@ -1046,8 +1046,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # update_forcings(self.simulation_time)
         self.print(80*'=')
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f}) seconds"
-        self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, 0.0))
+        if self.num_meshes == 1:
+            msg = "FORWARD SOLVE  time {:8.2f}  ({:6.2f}) seconds"
+            self.print(msg.format(self.simulation_time, 0.0))
+        else:
+            msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f}) seconds"
+            self.print(msg.format(self.outer_iteration, '  '*i, i+1,
+                                  self.num_meshes, self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
         # Callbacks
@@ -1136,7 +1141,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.callbacks[i].evaluate(mode='timestep')
             if self.iteration % op.dt_per_export == 0:
                 cpu_time = perf_counter() - cpu_timestamp
-                self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, cpu_time))
+                if self.num_meshes == 1:
+                    self.print(msg.format(self.simulation_time, cpu_time))
+                else:
+                    self.print(msg.format(self.outer_iteration, '  '*i, i+1,
+                                          self.num_meshes, self.simulation_time, cpu_time))
                 cpu_timestamp = perf_counter()
                 if op.solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
@@ -1211,8 +1220,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # update_forcings(self.simulation_time)
         self.print(80*'=')
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
-        msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
-        self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, 0.0))
+        if self.num_meshes == 1:
+            msg = "ADJOINT SOLVE mesh  time {:8.2f}  ({:6.2f} seconds)"
+            self.print(msg.format(self.simulation_time, 0.0))
+        else:
+            msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
+            self.print(msg.format(self.outer_iteration, '  '*i, i+1,
+                                  self.num_meshes, self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
         # Callbacks
@@ -1272,7 +1286,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.iteration % op.dt_per_export == 0:
                 cpu_time = perf_counter() - cpu_timestamp
                 cpu_timestamp = perf_counter()
-                self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, self.simulation_time, cpu_time))
+                if self.num_meshes == 1:
+                    self.print(msg.format(self.simulation_time, cpu_time))
+                else:
+                    self.print(msg.format(self.outer_iteration, '  '*i, i+1,
+                                          self.num_meshes, self.simulation_time, cpu_time))
                 if op.solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
