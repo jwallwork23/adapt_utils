@@ -67,6 +67,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for model in op.solver_parameters:
                 op.solver_parameters[model]['snes_type'] = 'ksponly'
                 op.adjoint_solver_parameters[model]['snes_type'] = 'ksponly'
+        if op.debug:
+            for model in op.solver_parameters:
+                op.solver_parameters[model]['ksp_converged_reason'] = None
+                op.solver_parameters[model]['snes_converged_reason'] = None
+                op.adjoint_solver_parameters[model]['ksp_converged_reason'] = None
+                op.adjoint_solver_parameters[model]['snes_converged_reason'] = None
+                if op.debug_mode == 'full':
+                    op.solver_parameters[model]['ksp_monitor'] = None
+                    op.solver_parameters[model]['snes_monitor'] = None
+                    op.adjoint_solver_parameters[model]['ksp_monitor'] = None
+                    op.adjoint_solver_parameters[model]['snes_monitor'] = None
         self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
         self.sediment_options = [AttrDict() for i in range(op.num_meshes)]
         self.exner_options = [AttrDict() for i in range(op.num_meshes)]
@@ -1050,8 +1061,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print(msg.format(self.simulation_time, 0.0))
         else:
             msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f}) seconds"
-            self.print(msg.format(self.outer_iteration, '  '*i, i+1,
-                                  self.num_meshes, self.simulation_time, 0.0))
+            indent = '' if op.debug else '  '*i
+            self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                                  self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
         # Callbacks
@@ -1143,8 +1155,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.num_meshes == 1:
                     self.print(msg.format(self.simulation_time, cpu_time))
                 else:
-                    self.print(msg.format(self.outer_iteration, '  '*i, i+1,
-                                          self.num_meshes, self.simulation_time, cpu_time))
+                    indent = '' if op.debug else '  '*i
+                    self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                                          self.simulation_time, cpu_time))
                 cpu_timestamp = perf_counter()
                 if op.solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
@@ -1223,9 +1236,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             msg = "ADJOINT SOLVE time {:8.2f}  ({:6.2f} seconds)"
             self.print(msg.format(self.simulation_time, 0.0))
         else:
+            indent = '' if op.debug else '  '*i
             msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
-            self.print(msg.format(self.outer_iteration, '  '*i, i+1,
-                                  self.num_meshes, self.simulation_time, 0.0))
+            self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                                  self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
         # Callbacks
@@ -1288,8 +1302,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.num_meshes == 1:
                     self.print(msg.format(self.simulation_time, cpu_time))
                 else:
-                    self.print(msg.format(self.outer_iteration, '  '*i, i+1,
-                                          self.num_meshes, self.simulation_time, cpu_time))
+                    indent = '' if op.debug else '  '*i
+                    self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                                          self.simulation_time, cpu_time))
                 if op.solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
