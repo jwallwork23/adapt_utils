@@ -2,7 +2,6 @@ from thetis import *
 
 import argparse
 
-from adapt_utils.adapt.r import MeshMover
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 
@@ -10,7 +9,6 @@ from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-interpretation", help="Choose from {'eulerian', 'lagrangian'}.")
 parser.add_argument("-n", help="Resolution of initial mesh.")
 parser.add_argument("-num_adapt", help="Number of initial mesh adaptations.")
 parser.add_argument("-conservative", help="Toggle conservative tracer equation")
@@ -23,13 +21,6 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-interpretation = args.interpretation or 'eulerian'
-if interpretation == 'eulerian':
-    approach = 'fixed_mesh'
-elif interpretation == 'lagrangian':
-    approach = 'lagrangian'
-else:
-    raise ValueError("Interpretation '{:s}' not recognised.".format(interpretation))
 kwargs = {
 
     # Spatial discretisation
@@ -48,38 +39,13 @@ kwargs = {
 }
 if os.getenv('REGRESSION_TEST') is not None:
     kwargs['end_time'] = 1.5
-op = BubbleOptions(approach=approach, n=int(args.n or 1))
+op = BubbleOptions(approach='fixed_mesh', n=int(args.n or 1))
 op.update(kwargs)
-
-
-# --- Initialise the mesh
-
-tp = AdaptiveProblem(op)
-
-# Note:
-#  * We use Monge-Ampere with a monitor function indicating the initial condition
-
-if approach != 'fixed_mesh':
-
-    alpha = 10.0   # Parameter controlling significance of refined region
-    eps = 1.0e-03  # Parameter controlling width of refined region
-
-    def monitor(mesh):
-        x, y = SpatialCoordinate(mesh)
-        x0, y0, r = op.source_loc[0]
-        return conditional(le(abs((x-x0)**2 + (y-y0)**2 - r**2), eps), alpha, 1.0)
-
-    mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
-    mesh_mover.adapt()
-    tp.__init__(op, meshes=[Mesh(mesh_mover.x), ])
 
 
 # --- Solve the tracer transport problem
 
-# Note:
-#  * Pure Lagrangian leads to tangled elements after only a few iterations
-#  * This motivates applying monitor based methods throughout the simulation  # TODO
-
+tp = AdaptiveProblem(op)
 tp.set_initial_condition()
 init_norm = norm(tp.fwd_solutions_tracer[0])
 init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
