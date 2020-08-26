@@ -24,7 +24,7 @@ parser.add_argument("-stabilisation", help="Stabilisation method to use (default
 
 # QoI
 parser.add_argument("-start_time", help="""
-    Start time of period of interest in seconds (default 1440s, i.e. 24mins)""")
+    Start time of period of interest in seconds (default zero)""")
 parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')""")
@@ -70,7 +70,7 @@ kwargs = {
     'radius': radius,
     'locations': locations,
 
-    # Misc
+    # I/O and debugging
     'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',

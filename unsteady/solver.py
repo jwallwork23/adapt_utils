@@ -1406,6 +1406,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                             for j, H in enumerate(H_window):
                                 if op.hessian_time_combination == 'intersect':
                                     H_window[j] *= op.dt*self.dt_per_mesh
+                                print(H_window[j])
                                 H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration

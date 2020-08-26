@@ -25,7 +25,7 @@ parser.add_argument("-levels", help="Number of mesh levels to consider (default 
 
 # QoI
 parser.add_argument("-start_time", help="""
-    Start time of period of interest in seconds (default 1200s i.e. 20min)""")
+    Start time of period of interest in seconds (default zero)""")
 parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
@@ -63,7 +63,7 @@ kwargs = {
     'radius': radius,
     'locations': locations,
 
-    # Misc
+    # I/O and debugging
     'plot_pvd': True,
     'debug': bool(args.debug or False),
 }

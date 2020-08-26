@@ -26,7 +26,7 @@ parser.add_argument("-stabilisation", help="Stabilisation method to use (default
 
 # QoI
 parser.add_argument("-start_time", help="""
-    Start time of period of interest in seconds (default 1440s i.e. 24min)""")
+    Start time of period of interest in seconds (default zero)""")
 parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
@@ -47,9 +47,9 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
+plot_pvd = bool(args.plot_pvd or False)
 plot_all = bool(args.plot_all or False)
 plot_only = bool(args.plot_only or False)
 if plot_only:
@@ -93,7 +93,7 @@ kwargs = {
     'radius': radius,
     'locations': locations,
 
-    # Misc
+    # I/O and debugging
     'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
