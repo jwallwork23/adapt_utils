@@ -134,7 +134,7 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init, e
 
 
 
-def export_final_state(inputdir, uv, elev,):
+def export_final_state(inputdir, uv, elev):  # TODO: Put into io?
     """
     Export fields to be used in a subsequent simulation
     """
@@ -155,7 +155,7 @@ def export_final_state(inputdir, uv, elev,):
     viewer(plex)
 
 
-def initialise_fields(mesh2d, inputdir, outputdir,):
+def initialise_fields(mesh2d, inputdir, outputdir):  # TODO: Put into io?
     """
     Initialise simulation with results from a previous simulation
     """

@@ -1,15 +1,15 @@
 from thetis import *
 
+import datetime
 import numpy as np
-
-from adapt_utils.unsteady.test_cases.trench_1d.options import TrenchSedimentOptions
-from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.adapt import recovery
-from adapt_utils.norms import local_frobenius_norm
-
 import pandas as pd
 import time
-import datetime
+
+from adapt_utils.adapt import recovery
+from adapt_utils.norms import local_frobenius_norm
+from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.unsteady.test_cases.trench_1d.options import TrenchSedimentOptions
+
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -43,12 +43,10 @@ swp = AdaptiveProblem(op)
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
 def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
-
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 
     NOTE: Defined on the *computational* mesh.
-
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 

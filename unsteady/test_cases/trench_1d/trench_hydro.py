@@ -15,7 +15,7 @@ import numpy as np
 import time
 
 
-def export_final_state(inputdir, uv, elev,):
+def export_final_state(inputdir, uv, elev):  # TODO: Put into io?
     """
     Export fields to be used in a subsequent simulation
     """

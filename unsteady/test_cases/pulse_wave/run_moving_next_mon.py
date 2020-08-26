@@ -2,47 +2,17 @@ from thetis import *
 from firedrake.petsc import PETSc
 import firedrake as fire
 
-import pylab as plt
-import pandas as pd
-import numpy as np
-import time
 import datetime
+import numpy as np
+import pandas as pd
+import time
 
-from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
-from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.adapt import recovery
+from adapt_utils.io import initialise_fields, export_final_state
+from adapt_utils.norms import local_frobenius_norm, local_norm
+from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
 
-def export_final_state(inputdir, bathymetry_2d):
-    """
-    Export fields to be used in a subsequent simulation
-    """
-    if not os.path.exists(inputdir):
-        os.makedirs(inputdir)
-    print_output("Exporting fields for subsequent simulation")
-
-    chk = DumbCheckpoint(inputdir + "/bathymetry", mode=FILE_CREATE)
-    chk.store(bathymetry_2d, name="bathymetry")
-    File(inputdir + '/bathout.pvd').write(bathymetry_2d)
-    chk.close()
-
-    plex = bathymetry_2d.function_space().mesh()._plex
-    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
-    viewer(plex)
-
-def initialise_fields(mesh2d, inputdir):
-    """
-    Initialise simulation with results from a previous simulation
-    """
-    V = FunctionSpace(mesh2d, 'CG', 1)
-    # elevation
-    with timed_stage('initialising bathymetry'):
-        chk = DumbCheckpoint(inputdir + "/bathymetry", mode=FILE_READ)
-        bath = Function(V, name="bathymetry")
-        chk.load(bath)
-        chk.close()
-
-    return bath
 
 nx = 0.5
 ny = 0.5
@@ -139,14 +109,14 @@ for i in np.linspace(0, 219, 220):
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
 df.to_csv("adapt_output/final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
 
-#bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
+# bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
 
-#print('L2')
-#print(fire.errornorm(bath, bath_real))
+# print('L2')
+# print(fire.errornorm(bath, bath_real))
 
-#df_real = pd.read_csv('final_result_nx2_ny1.csv')
-#print("Mesh error: ")
-#print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+# df_real = pd.read_csv('final_result_nx2_ny1.csv')
+# print("Mesh error: ")
+# print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
 
 print(alpha)
 print(beta)
