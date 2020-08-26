@@ -72,12 +72,13 @@ kwargs = {
     'r_adapt_rtol': 1.0e-3,
     'nonlinear_method': 'relaxation',
     # 'nonlinear_method': 'quasi_newton',
+    'dt_per_mesh_movement': 1,  # TODO: Could probably get away with many more
 
     # Misc
     'debug': bool(args.debug or False),
 }
 if os.getenv('REGRESSION_TEST') is not None:
-    kwargs['end_time'] = 30.0
+    kwargs['end_time'] = kwargs['dt']*kwargs['dt_per_export']
 fpath = 'resolution_{:d}'.format(n_coarse)
 if initial_monitor_type is not None:
     fpath = os.path.join(fpath, initial_monitor_type)

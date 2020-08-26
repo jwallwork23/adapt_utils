@@ -18,28 +18,34 @@ os.environ['REGRESSION_TEST'] = "1"
 
 # Collate a list of all examples to be tested
 examples = [
-    'balzano/run_fixed_mesh.py',
-    'balzano/run_moving_mesh.py',
-    'beach_slope/run_fixed_mesh.py',
-    # 'beach_slope/run_moving_mesh.py',  # TODO
-    'beach_wall/run_fixed_mesh.py',  # FIXME: HDF5 error
-    # 'beach_wall/run_moving_mesh.py',  # TODO
-    'bubble_shear/run_fixed_mesh.py',
-    # 'bubble_shear/run_lagrangian.py',  # TODO: xfail it
-    # 'bubble_shear/run_moving_mesh.py',  # TODO
-    'cosine_prescribed_velocity/eulerian_vs_lagrangian.py',  # FIXME: Lagrangian coords do not match
-    'pulse_wave/run_fixed_mesh.py',
-    # 'pulse_wave/run_moving_mesh.py',  # TODO
-    'rossby_wave/run_fixed_mesh.py',
-    'rossby_wave/run_moving_mesh.py',
+
+    # Fixed mesh
+    'balzano/run_fixed_mesh.py',              # Has been cut short
+    'beach_slope/run_fixed_mesh.py',          # FIXME: HDF5 error
+    'beach_wall/run_fixed_mesh.py',           # FIXME: HDF5 error
+    'bubble_shear/run_fixed_mesh.py',         # Has been cut short
+    'pulse_wave/run_fixed_mesh.py',           # Has been cut (very) short
+    'rossby_wave/run_fixed_mesh.py',          # Has been cut short
     'solid_body_rotation/run_fixed_mesh.py',
+    # 'spaceship/run_fixed_mesh.py',          # Takes too long to run
+    'trench_1d/run_fixed_mesh.py',            # FIXME: HDF5 error
+    'trench_slant/run_fixed_mesh.py',         # FIXME: HDF5 error
+    # 'turbine_array/run_fixed_mesh.py',      # Takes too long to run
+
+    # Moving mesh
+    'balzano/run_moving_mesh.py',             # Has been cut short
+    # 'beach_slope/run_moving_mesh.py',       # TODO
+    # 'beach_wall/run_moving_mesh.py',        # TODO
+    # 'bubble_shear/run_lagrangian.py',       # TODO: xfail it
+    # 'bubble_shear/run_moving_mesh.py',      # TODO
+    'cosine_prescribed_velocity/compare.py',  # FIXME: Lagrangian coords do not match
+    # 'pulse_wave/run_moving_mesh.py',        # TODO
+    'rossby_wave/run_moving_mesh.py',         # Has been cut (very) short
     'solid_body_rotation/run_lagrangian.py',
-    # 'spaceship/run_fixed_mesh.py',  # Takes too long to run
-    'trench_1d/run_fixed_mesh.py',
-    # 'trench_1d/run_moving_mesh.py',  # TODO
-    'trench_slant/run_fixed_mesh.py',
-    # 'trench_slant/run_moving_mesh.py',  # TODO
-    # 'turbine_array/run_fixed_mesh.py',  # Takes too long to run
+    # 'trench_1d/run_moving_mesh.py',         # TODO
+    # 'trench_slant/run_moving_mesh.py',      # TODO
+
+    # Metric-based  # TODO
 ]
 cwd = os.path.abspath(os.path.dirname(__file__))
 unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'unsteady', 'test_cases'))
