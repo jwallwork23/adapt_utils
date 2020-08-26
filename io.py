@@ -3,7 +3,7 @@ from thetis import *
 import os
 
 
-__all__ = ["initialise_fields", "export_final_state"]
+__all__ = ["save_mesh", "load_mesh", "initialise_fields", "export_final_state"]
 
 
 def save_mesh(mesh, fname, fpath):
@@ -12,6 +12,8 @@ def save_mesh(mesh, fname, fpath):
     :arg fname: file name (without '.h5' extension).
     :arg fpath: directory to store the file.
     """
+    if COMM_WORLD.size > 1:
+        raise IOError("Saving a mesh to HDF5 only works in serial.")
     try:
         plex = mesh._topology_dm
     except AttributeError:
@@ -26,6 +28,8 @@ def load_mesh(fname, fpath):
     :arg fpath: directory where the file is stored.
     :return: mesh loaded from DMPlex format.
     """
+    if COMM_WORLD.size > 1:
+        raise IOError("Loading a mesh from HDF5 only works in serial.")
     newplex = PETSc.DMPlex().create()
     newplex.createFromFile(os.path.join(fpath, fname))
     return Mesh(newplex)
