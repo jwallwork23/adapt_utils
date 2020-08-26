@@ -1,9 +1,12 @@
 from thetis import *
 
 import argparse
+import matplotlib.pyplot as plt
+import numpy as np
 import os
 
 from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
+from adapt_utils.plotting import *
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
@@ -31,7 +34,11 @@ parser.add_argument("-locations", help="""
 parser.add_argument("-radius", help="Radius of interest (default 100km)")
 
 # I/O and debugging
-parser.add_argument("-plot_pvd", help="Toggle saving output to .pvd")
+parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
+parser.add_argument("-plot_png", help="Toggle plotting to .png")
+parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
+parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
+parser.add_argument("-plot_only", help="Just plot using saved data")
 parser.add_argument("-debug", help="Print all debugging statements")
 parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
 
@@ -40,15 +47,33 @@ args = parser.parse_args()
 
 # --- Set parameters
 
+plot_pvd = bool(args.plot_pvd or False)
+plot_pdf = bool(args.plot_pdf or False)
+plot_png = bool(args.plot_png or False)
+plot_all = bool(args.plot_all or False)
+plot_only = bool(args.plot_only or False)
+if plot_only:
+    plot_all = True
+if plot_all:
+    plot_pvd = plot_pdf = plot_png = True
+plot_any = plot_pdf or plot_png
+extensions = []
+if plot_pdf:
+    extensions.append('pdf')
+if plot_png:
+    extensions.append('png')
+if plot_only:
+    assert len(extensions) > 0
 if args.locations is None:  # TODO: Parse as list
     locations = ['Fukushima Daiichi', ]
 else:
     locations = args.locations.split(',')
-radius = args.radius or 100.0e+03
-plot_pvd = bool(args.plot_pvd or False)
+radius = float(args.radius or 100.0e+03)
 kwargs = {
+    'approach': 'fixed_mesh',
 
     # Space-time domain
+    'level': int(args.level or 0),
     'num_meshes': int(args.num_meshes or 1),
     'end_time': float(args.end_time or 24*60.0),
 
@@ -64,7 +89,7 @@ kwargs = {
     'wetting_and_drying_alpha': Constant(10.0),
 
     # QoI
-    'start_time': float(args.start_time or 15*60.0),
+    'start_time': float(args.start_time or 0.0),
     'radius': radius,
     'locations': locations,
 
@@ -73,27 +98,43 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-level = int(args.level or 0)
 nonlinear = bool(args.nonlinear or False)
-op = TohokuHazardOptions(approach='fixed_mesh', level=level)
-op.update(kwargs)
+op = TohokuHazardOptions(**kwargs)
+data_dir = create_directory(os.path.join(op.di, 'data'))
+plot_dir = create_directory(os.path.join(op.di, 'plots'))
 
 
 # --- Solve
 
-swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
-if plot_pvd:
-    kernel_file = File(os.path.join(op.di, 'kernel.pvd'))
-    for i, P1 in enumerate(swp.P1):
-        swp.get_qoi_kernels(i)
-        k_u, k_eta = swp.kernels[i].split()
-        kernel = Function(P1, name="QoI kernel")
-        kernel.project(k_eta)
-        kernel_file._topology = None
-        kernel_file.write(kernel)
-swp.solve_forward()
+fname = 'qoi_timeseries'
+if plot_only:
+    qoi_timeseries = np.load(os.path.join(data_dir, fname + '.npy'))
+else:
+    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
+    if plot_pvd:
+        kernel_file = File(os.path.join(op.di, 'kernel.pvd'))
+        for i, P1 in enumerate(swp.P1):
+            swp.get_qoi_kernels(i)
+            k_u, k_eta = swp.kernels[i].split()
+            kernel = Function(P1, name="QoI kernel")
+            kernel.project(k_eta)
+            kernel_file._topology = None
+            kernel_file.write(kernel)
+    swp.solve_forward()
+    print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
+    qoi_timeseries = np.array(swp.qoi_timeseries)
+    np.save(os.path.join(data_dir, fname), qoi_timeseries)
 
 
-# --- Diagnostics
+# --- Plotting
 
-print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
+# Timeseries of QoI integrand
+if plot_any:
+    fig, axes = plt.subplots(figsize=(6, 5))
+    time_seconds = np.linspace(op.start_time, op.end_time, len(qoi_timeseries))
+    time_minutes = time_seconds/60
+    axes.plot(time_minutes, qoi_timeseries, '--x')
+    axes.set_xlabel(r"Time [$\mathrm{min}$]")
+    axes.set_ylabel(r"Quantity of interest [$m^3$]")
+    for ext in extensions:
+        plt.savefig(os.path.join(plot_dir, fname + ext))

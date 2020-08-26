@@ -44,11 +44,13 @@ if args.locations is None:  # TODO: Parse as list
     locations = ['Fukushima Daiichi', ]
 else:
     locations = args.locations.split(',')
-radius = args.radius or 100.0e+03
+radius = float(args.radius or 100.0e+03)
 plot_pvd = bool(args.plot_pvd or False)
 kwargs = {
+    'approach': 'fixed_mesh',
 
     # Space-time domain
+    'level': int(args.level or 0),
     'num_meshes': int(args.num_meshes or 1),
     'end_time': float(args.end_time or 24*60.0),
 
@@ -64,7 +66,7 @@ kwargs = {
     'wetting_and_drying_alpha': Constant(10.0),
 
     # QoI
-    'start_time': float(args.start_time or 15*60.0),
+    'start_time': float(args.start_time or 0.0),
     'radius': radius,
     'locations': locations,
 
@@ -73,10 +75,8 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-level = int(args.level or 0)
 nonlinear = bool(args.nonlinear or False)
-op = TohokuHazardOptions(approach='fixed_mesh', level=level)
-op.update(kwargs)
+op = TohokuHazardOptions(**kwargs)
 
 
 # --- Initialisation

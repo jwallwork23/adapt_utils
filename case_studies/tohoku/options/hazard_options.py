@@ -22,7 +22,7 @@ class TohokuHazardOptions(TohokuOptions):
         #     2 hour simulation period.
         #   * In this class we are only interested in the tsunami's approach of the coast and
         #     therefore use a reduced time window.
-        self.start_time = kwargs.get('start_time', 15*60.0)
+        self.start_time = kwargs.get('start_time', 0.0)
         self.end_time = kwargs.get('end_time', 24*60.0)
         # self.end_time = kwargs.get('end_time', 60*60.0)
 

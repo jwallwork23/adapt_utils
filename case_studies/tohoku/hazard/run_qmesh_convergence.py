@@ -59,7 +59,7 @@ kwargs = {
     'use_wetting_and_drying': False,
 
     # QoI
-    'start_time': float(args.start_time or 15*60.0),
+    'start_time': float(args.start_time or 0.0),
     'radius': radius,
     'locations': locations,
 
