@@ -117,19 +117,6 @@ class TohokuOptions(TsunamiOptions):
         self.num_timesteps = int(self.end_time/self.dt + 1)
         self.times = [i*self.dt for i in range(self.num_timesteps)]
 
-        # Compute CFL number
-        if self.debug:
-            self.print_debug("INIT: Computing CFL number...")
-            P0 = FunctionSpace(self.default_mesh, "DG", 0)
-            P1 = FunctionSpace(self.default_mesh, "CG", 1)
-            b = self.set_bathymetry(P1).vector().gather().max()
-            g = self.g.values()[0]
-            celerity = np.sqrt(g*b)
-            dx = interpolate(CellDiameter(self.default_mesh), P0).vector().gather().max()
-            cfl = celerity*self.dt/dx
-            msg = "INIT:   dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
-            self.print_debug(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
-
         # Gauge classifications
         self.near_field_pressure_gauges = {
             "gauges": ("P02", "P06"),

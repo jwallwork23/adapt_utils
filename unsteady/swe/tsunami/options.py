@@ -344,3 +344,14 @@ class TsunamiOptions(CoupledOptions):
     def detide(self, gauge):
         """To be implemented in subclass."""
         raise NotImplementedError
+
+    def check_cfl_criterion(self, prob):
+        for i, (mesh, P0, bathymetry) in enumerate(zip(prob.meshes, prob.P0, prob.bathymetry)):
+            self.print_debug("INIT: Computing CFL number on mesh {:d}...".format(i))
+            b = bathymetry.vector().gather().max()
+            g = self.g.values()[0]
+            celerity = np.sqrt(g*b)
+            dx = interpolate(CellDiameter(mesh), P0).vector().gather().min()
+            cfl = celerity*self.dt/dx
+            msg = "INIT:   dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
+            self.print_debug(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))

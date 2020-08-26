@@ -14,7 +14,8 @@ __all__ = ["pragmatic_adapt", "AdaptiveMesh"]
 
 
 def pragmatic_adapt(mesh, M, op=Options):
-    if not op.debug:
+    debug_full = op.debug and op.debug_mode == 'fill'
+    if not debug_full:
         with suppress_output():
             out = adapt(mesh, M)
     else:
