@@ -1160,7 +1160,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.callbacks[i].evaluate(mode='export')
             self.callbacks[i].evaluate(mode='timestep')
         update_forcings(self.simulation_time + op.dt)
-        op.print_debug("Done!")
         self.print(80*'=')
 
     def setup_solver_adjoint(self, i):
@@ -1297,7 +1296,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     export_func()
         self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         update_forcings(self.simulation_time - op.dt)
-        op.print_debug("Done!")
         self.print(80*'=')
 
     # --- Metric
@@ -1474,7 +1472,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            self.print("Done!")
 
             # ---  Setup for next run / logging
 
@@ -1620,7 +1617,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            self.print("Done!")
 
             # ---  Setup for next run / logging
 
@@ -1824,7 +1820,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            self.print("Done!")
 
             # ---  Setup for next run / logging
 

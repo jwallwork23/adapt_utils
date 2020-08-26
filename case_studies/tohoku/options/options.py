@@ -94,7 +94,6 @@ class TohokuOptions(TsunamiOptions):
                 self.default_mesh = Mesh(os.path.join(self.mesh_dir, self.mesh_file) + '.msh')
         else:
             self.default_mesh = mesh
-        self.print_debug("INIT: Done!")
 
         # Physics
         self.friction = 'manning'
@@ -130,7 +129,6 @@ class TohokuOptions(TsunamiOptions):
             cfl = celerity*self.dt/dx
             msg = "INIT:   dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
             self.print_debug(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
-            self.print_debug("INIT: Done!")
 
         # Gauge classifications
         self.near_field_pressure_gauges = {
@@ -192,7 +190,6 @@ class TohokuOptions(TsunamiOptions):
         else:
             raise ValueError("Bathymetry data source {:s} not recognised.".format(source))
         nc.close()
-        self.print_debug("INIT: Done!")
         return lon, lat, elev
 
     def read_surface_file(self, zeroed=True):
@@ -205,7 +202,6 @@ class TohokuOptions(TsunamiOptions):
         lat = nc.variables['lat' if zeroed else 'y'][:]
         elev = nc.variables['z'][:, :]
         nc.close()
-        self.print_debug("INIT: Done!")
         return lon, lat, elev
 
     def get_gauges(self):
@@ -367,7 +363,6 @@ class TohokuOptions(TsunamiOptions):
             except PointNotInDomainError:
                 self.print_debug("NOTE: Gauge {:5s} is not in the domain; removing it".format(gauge))
                 self.gauges.pop(gauge)
-        self.print_debug("INIT: Done!")
 
     def _get_update_forcings_forward(self, prob, i):  # TODO: Use QoICallback
         from adapt_utils.misc import ellipse
@@ -693,7 +688,6 @@ class TohokuOptions(TsunamiOptions):
         self.print_debug("INIT: Applying UTide de-tiding algorithm to gauge {:s}...".format(gauge))
         sol = utide.solve(time_str, anomaly, **kwargs)
         tide = utide.reconstruct(time_str, sol, verbose=self.debug)
-        self.print_debug("INIT: Done!")
 
         # Subtract de-tided component
         detided = anomaly - np.array(tide.h).reshape(anomaly.shape)

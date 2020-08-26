@@ -43,7 +43,6 @@ for gauge in gauges:
             gauge_lon, gauge_lat = op.gauges[gauge]["lonlat"]
             lon, lat, b = op.read_bathymetry_file()
             b = float(-si.RectBivariateSpline(lat, lon, b)(gauge_lat, gauge_lon))
-    op.print_debug("GAUGES: Done!")
 
     # I/O
     fname = os.path.join(os.path.dirname(__file__), '.'.join([gauge, 'txt']))

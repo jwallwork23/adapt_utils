@@ -54,7 +54,6 @@ class TohokuBoxBasisOptions(TohokuOptions):
             control = thetis.Function(R, name="Control parameter {:d}".format(i))
             control.assign(control_parameters[i])
             self.control_parameters.append(control)
-        self.print_debug("INIT: Done!")
         self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
 
     def get_basis_functions(self, fs):
@@ -83,7 +82,6 @@ class TohokuBoxBasisOptions(TohokuOptions):
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
                 self._array.append([x_rot, y_rot])
                 phi.interpolate(box([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
-        self.print_debug("INIT: Done!")
 
     def set_initial_condition(self, prob, sum_pad=100):
         """
@@ -102,7 +100,6 @@ class TohokuBoxBasisOptions(TohokuOptions):
         for n in range(0, self.nx*self.ny, sum_pad):
             expr = sum(m*g for m, g in zip(controls[n:n+sum_pad], self.basis_functions[n:n+sum_pad]))
             prob.fwd_solutions[0].assign(prob.fwd_solutions[0] + thetis.project(expr, prob.V[0]))
-        self.print_debug("INIT: Done!")
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)

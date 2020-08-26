@@ -111,7 +111,6 @@ class TsunamiOptions(CoupledOptions):
         lon, lat, elev = dat or self.read_bathymetry_file(**kwargs)
         self.print_debug("INIT: Creating bathymetry interpolator...")
         bath_interp = si.RectBivariateSpline(lat, lon, elev)
-        self.print_debug("INIT: Done!")
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating bathymetry...")
@@ -121,13 +120,11 @@ class TsunamiOptions(CoupledOptions):
                                      northern=northern, force_longitude=force_longitude)
             bathymetry.dat.data[i] -= bath_interp(lat, lon)
             self.print_debug(msg.format(xy[0], xy[1], bathymetry.dat.data[i]/1000), mode='full')
-        self.print_debug("INIT: Done!")
 
         # Cap bathymetry to enforce a minimum depth
         self.print_debug("INIT: Capping bathymetry...")  # TODO: Should we really be doing this?
         if self.bathymetry_cap is not None:
             bathymetry.interpolate(max_value(self.bathymetry_cap, bathymetry))
-        self.print_debug("INIT: Done!")
 
         return bathymetry
 
@@ -158,7 +155,6 @@ class TsunamiOptions(CoupledOptions):
         self.print_debug("INIT: Creating surface interpolator...")
         lon, lat, elev = dat or self.read_surface_file(**kwargs)
         surf_interp = si.RectBivariateSpline(lat, lon, elev)
-        self.print_debug("INIT: Done!")
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating initial surface...")
@@ -168,7 +164,6 @@ class TsunamiOptions(CoupledOptions):
                                      northern=northern, force_longitude=force_longitude)
             initial_surface.dat.data[i] = surf_interp(lat, lon)
             self.print_debug(msg.format(xy[0], xy[1], initial_surface.dat.data[i]), mode='full')
-        self.print_debug("INIT: Done!")
 
         return initial_surface
 
@@ -189,7 +184,6 @@ class TsunamiOptions(CoupledOptions):
         u, eta = prob.fwd_solutions[0].split()
         u.assign(0.0)  # (Naively) assume zero initial velocity
         eta.interpolate(surf)  # Initial surface from inversion data
-        self.print_debug("INIT: Done!")
 
         # Subtract from the bathymetry field
         self.subtract_surface_from_bathymetry(prob, surf=surf)
@@ -224,7 +218,6 @@ class TsunamiOptions(CoupledOptions):
         # Project updated bathymetry onto each mesh
         for i in range(self.num_meshes):
             prob.bathymetry[i].project(b)
-        self.print_debug("INIT: Done!")
 
     def set_coriolis(self, fs):
         if not self.rotational:

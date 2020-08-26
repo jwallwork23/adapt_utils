@@ -414,7 +414,6 @@ def check_spd(M):
     except AssertionError:
         raise ValueError("FAIL: Matrix is not positive-definite")
     print_output("PASS: Matrix is indeed positive-definite")
-    print_output("TEST: Done!")
 
 
 # --- I/O

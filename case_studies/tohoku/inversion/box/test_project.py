@@ -138,7 +138,6 @@ for level in range(levels):
             print_output("Solving forward on {:s}...".format(swp.__class__.__name__))
             swp.setup_solver_forward(0)
             swp.solve_forward_step(0)
-            print_output("Done!")
         for gauge in gauges:
             for options, name in zip((op_saito, op), ('original', 'projected')):
                 for tt in ('timeseries', 'timeseries_smooth'):
