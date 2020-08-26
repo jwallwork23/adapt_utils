@@ -34,8 +34,15 @@ class AdaptiveTsunamiProblem(AdaptiveProblem):
         self.get_qoi_kernels(i)
         self.callbacks[i].add(QoICallback(self, i), 'timestep')
 
+    def get_qoi_timeseries(self):
+        self.qoi_timeseries = []
+        for c in self.callbacks:
+            self.qoi_timeseries.extend(c['timestep']['qoi'].timeseries)
+        return self.qoi_timeseries
+
     def quantity_of_interest(self):
-        self.qoi = sum(c['timestep']['qoi'].time_integrate() for c in self.callbacks)
+        self.get_qoi_timeseries()
+        self.qoi = sum(self.qoi_timeseries)
         return self.qoi
 
     # def save_gauge_data(self, fname):

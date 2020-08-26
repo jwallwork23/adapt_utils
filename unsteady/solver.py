@@ -1055,6 +1055,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if export_func is not None:
             export_func()
         self.callbacks[i].evaluate(mode='export')
+        self.callbacks[i].evaluate(mode='timestep')
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
@@ -1131,7 +1132,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Export
             self.iteration += 1
             self.simulation_time += op.dt
-            self.callbacks[i].evaluate(mode='timestep')
             if self.iteration % op.dt_per_export == 0:
                 cpu_time = perf_counter() - cpu_timestamp
                 if self.num_meshes == 1:
@@ -1158,6 +1158,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if export_func is not None:
                     export_func()
                 self.callbacks[i].evaluate(mode='export')
+            self.callbacks[i].evaluate(mode='timestep')
         update_forcings(self.simulation_time + op.dt)
         op.print_debug("Done!")
         self.print(80*'=')
