@@ -70,8 +70,6 @@ class TohokuOptions(TsunamiOptions):
         :kwarg base_viscosity: :type:`float` value to be assigned to constant viscosity field.
         :kwarg postproc: :type:`bool` value toggling whether to use an initial mesh which has been
             postprocessed using Pragmatic (see `resources/meshes/postproc.py`.)
-        :kwarg radius: distance indicating radii around the locations of interest, thereby
-            determining regions of interest for use in hazard assessment QoIs.
         """
         super(TohokuOptions, self).__init__(force_zone_number=force_zone_number, **kwargs)
 
@@ -178,18 +176,6 @@ class TohokuOptions(TsunamiOptions):
             # "far_field_gps",
         )
         self.get_gauges()
-
-        # Location classifications
-        self.locations_to_consider = (
-            # "Onagawa",
-            # "Tokai",
-            # "Hamaoka",
-            # "Tohoku",
-            # "Tokyo",
-            "Fukushima Daiichi",
-            # "Fukushima Daini",
-        )
-        self.get_locations_of_interest(**kwargs)
 
     def read_bathymetry_file(self, source='etopo1'):
         self.print_debug("INIT: Reading bathymetry file...")
@@ -383,57 +369,7 @@ class TohokuOptions(TsunamiOptions):
                 self.gauges.pop(gauge)
         self.print_debug("INIT: Done!")
 
-    def get_locations_of_interest(self, **kwargs):
-        """
-        Read in locations of interest, determine their coordinates and check these coordinate lie
-        within the domain.
-
-        The possible coastal locations of interest include major cities and nuclear power plants:
-
-        * Cities:
-          - Onagawa;
-          - Tokai;
-          - Hamaoka;
-          - Tohoku;
-          - Tokyo.
-
-        * Nuclear power plants:
-          - Fukushima Daiichi;
-          - Fukushima Daini.
-        """
-        radius = kwargs.get('radius', 50.0e+03)
-        locations_of_interest = {
-            "Onagawa": {"lonlat": (141.5008, 38.3995)},
-            "Tokai": {"lonlat": (140.6067, 36.4664)},
-            "Hamaoka": {"lonlat": (138.1433, 34.6229)},
-            "Tohoku": {"lonlat": (141.3903, 41.1800)},
-            "Tokyo": {"lonlat": (139.6917, 35.6895)},
-            "Fukushima Daiichi": {"lonlat": (141.0281, 37.4213)},
-            "Fukushima Daini": {"lonlat": (141.0249, 37.3166)},
-        }
-
-        # Convert coordinates to UTM and create timeseries array
-        self.locations_of_interest = {}
-        for loc in self.locations_to_consider:
-            self.locations_of_interest[loc] = {"data": [], "timeseries": []}
-            self.locations_of_interest[loc]["lonlat"] = locations_of_interest[loc]["lonlat"]
-            lon, lat = self.locations_of_interest[loc]["lonlat"]
-            self.locations_of_interest[loc]["utm"] = from_latlon(lat, lon, force_zone_number=54)
-            self.locations_of_interest[loc]["coords"] = self.locations_of_interest[loc]["utm"]
-
-        # Check validity of gauge coordinates
-        for loc in self.locations_to_consider:
-            try:
-                self.default_mesh.coordinates.at(self.locations_of_interest[loc]['coords'])
-            except PointNotInDomainError:
-                self.print_debug("NOTE: Location {:s} is not in the domain; removing it".format(loc))
-                self.locations_of_interest.pop(loc)
-
-        # Regions of interest
-        loi = self.locations_of_interest
-        self.region_of_interest = [loi[loc]["coords"] + (radius, ) for loc in loi]
-
-    def _get_update_forcings_forward(self, prob, i):
+    def _get_update_forcings_forward(self, prob, i):  # TODO: Use QoICallback
         from adapt_utils.misc import ellipse
 
         self.J = 0 if np.isclose(self.regularisation, 0.0) else self.get_regularisation_term(prob)
@@ -647,31 +583,26 @@ class TohokuOptions(TsunamiOptions):
         #          different PhysID.
         return boundary_conditions
 
-    def annotate_plot(self, axes, coords="utm", gauges=False, fontsize=12):
+    def annotate_plot(self, axes, coords="utm", fontsize=12):
         """
-        Annotate `axes` in coordinate system `coords` with all gauges or locations of interest, as
-        determined by the Boolean kwarg `gauges`.
+        Annotate `axes` in coordinate system `coords` with all gauges.
+
+        :arg axes: `matplotlib.pyplot` :class:`axes` object.
+        :kwarg coords: coordinate system, from 'lonlat' and 'utm'.
+        :kwarg fontsize: font size to use in annotations.
         """
         if coords not in ("lonlat", "utm"):
             raise ValueError("Coordinate system {:s} not recognised.".format(coords))
-        dat = self.gauges if gauges else self.locations_of_interest
         offset = 40.0e+03
-        for loc in dat:
-            x, y = np.copy(dat[loc][coords])
+        for loc in self.gauges:
+            x, y = np.copy(self.gauges[loc][coords])
             kwargs = {
-                "xy": dat[loc][coords],
-                "color": "indigo",
+                "xy": self.gauges[loc][coords],
                 "ha": "right",
                 "va": "center",
                 "fontsize": fontsize,
             }
-            if not gauges:
-                if loc == "Fukushima Daini":
-                    continue
-                elif loc == "Fukushima Daiichi":
-                    loc = "Fukushima"
-                x += offset
-            elif loc[0] == "8":
+            if loc[0] == "8":
                 kwargs["color"] = "C3"
 
                 # Horizontal alignment
@@ -706,7 +637,7 @@ class TohokuOptions(TsunamiOptions):
                 elif loc == "MPG1":
                     y -= offset
             kwargs["xytext"] = (x, y)
-            axes.plot(*dat[loc][coords], 'x', color=kwargs["color"])
+            axes.plot(*self.gauges[loc][coords], 'x', color=kwargs["color"])
             axes.annotate(loc, **kwargs)
 
     def detide(self, gauge):

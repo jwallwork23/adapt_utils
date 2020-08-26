@@ -2,9 +2,11 @@ from thetis import *
 
 import argparse
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
+
+# --- Parse arguments
 
 parser = argparse.ArgumentParser(prog="run_fixed_mesh")
 
@@ -19,17 +21,21 @@ parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default Fals
 
 # QoI
 parser.add_argument("-start_time", help="""
-Start time of period of interest in seconds (default 1200s i.e. 20min)""")
+    Start time of period of interest in seconds (default 1440s i.e. 24min)""")
 parser.add_argument("-locations", help="""
-Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
-'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
-""")
+    Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
+    'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
+    """)
 parser.add_argument("-radii", help="Radii of interest, separated by commas (default 100km)")
 
-# Misc
+# I/O and debugging
 parser.add_argument("-debug", help="Print all debugging statements")
-parser.add_argument("-just_plot", help="Only plot gauge timeseries and errors")
+parser.add_argument("-plot_only", help="Only plot gauge timeseries and errors")
+
 args = parser.parse_args()
+
+
+# --- Set parameters
 
 # Collect locations and radii
 if args.locations is None:
@@ -74,18 +80,14 @@ kwargs = {
 level = int(args.level or 0)
 nonlinear = bool(args.nonlinear or False)
 ext = '{:s}linear_level{:d}'.format('non' if nonlinear else '', level)
-op = TohokuOptions(approach='fixed_mesh', level=level)
+op = TohokuHazardOptions(approach='fixed_mesh', level=level)
 op.update(kwargs)
 
-# Solve
-just_plot = bool(args.just_plot or False)
-if not just_plot:
+
+# --- Solve
+
+plot_only = bool(args.plot_only or False)
+if not plot_only:
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
     swp.solve_forward()
-    swp.save_gauge_data('test')
     print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
-# TODO: Hook back up!
-# for g in op.gps_gauges:
-#     op.plot_timeseries(g, sample=30)
-# for g in op.pressure_gauges:
-#     op.plot_timeseries(g, sample=60)
