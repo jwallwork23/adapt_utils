@@ -24,14 +24,13 @@ class BalzanoOptions(CoupledOptions):
     [1] A. Balzano, "Evaluation of methods for numerical simulation of wetting and drying in
         shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
     """
-
-    def __init__(self, friction='manning', plot_timeseries=False, n=1, bathymetry_type=1, **kwargs):
+    def __init__(self, n=1, bathymetry_type=1, plot_timeseries=False, **kwargs):
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
         self.default_mesh = RectangleMesh(17*n, n, 1.5*self.basin_x, 1200.0)
         self.plot_pvd = True
-        self.num_hours = 24
+        self.num_hours = kwargs.get('num_hours', 24)
 
         # Three possible bathymetries
         try:
@@ -46,6 +45,7 @@ class BalzanoOptions(CoupledOptions):
         self.base_diffusivity = 0.15
         self.wetting_and_drying = True
         self.wetting_and_drying_alpha = Constant(0.43)
+        friction = kwargs.get('friction', 'manning')
         try:
             assert friction in ('nikuradse', 'manning')
         except AssertionError:
@@ -70,10 +70,6 @@ class BalzanoOptions(CoupledOptions):
         self.dt_per_export = 1
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 0.5
-
-        # Adaptivity
-        self.h_min = 1e-8
-        self.h_max = 10.
 
         # Timeseries
         self.wd_obs = []

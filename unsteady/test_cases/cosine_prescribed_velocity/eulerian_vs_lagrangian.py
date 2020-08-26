@@ -8,7 +8,8 @@ from adapt_utils.unsteady.test_cases.cosine_prescribed_velocity.options import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
-# Collect user specified arguments
+# --- Parse arguments
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
@@ -17,7 +18,8 @@ parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-debug", help="Toggle debugging mode")
 args = parser.parse_args()
 
-# Setup
+# --- Set parameters
+
 kwargs = {
     'approach': 'fixed_mesh',
 
@@ -31,12 +33,15 @@ kwargs = {
     # Misc
     'debug': bool(args.debug or False),
 }
+
+
+# --- Create solver and copy initial solution
+
 ep = AdaptiveProblem(CosinePrescribedVelocityOptions(**kwargs))
 ep.set_initial_condition()
-
-# Get initial solution and coordinates
 init_sol = ep.fwd_solutions_tracer[0].copy(deepcopy=True)
 init_norm = norm(init_sol)
+
 
 # --- Eulerian interpretation
 
@@ -44,6 +49,7 @@ ep.solve_forward()
 final_sol_eulerian = ep.fwd_solutions_tracer[-1]
 relative_error_eulerian = abs(errornorm(init_sol, final_sol_eulerian)/init_norm)
 print_output("Relative error in Eulerian case:   {:.2f}%".format(100*relative_error_eulerian))
+
 
 # --- Lagrangian interpretation
 
@@ -57,10 +63,11 @@ final_sol_lagrangian = lp.fwd_solutions_tracer[-1]
 
 final_coords = lp.meshes[-1].coordinates.dat.data
 final_coords[:] -= [10.0, 0.0]  # TODO: Implement periodicity
-try:
-    assert np.allclose(init_coords, final_coords)
-except AssertionError:
+if not np.allclose(init_coords, final_coords):  # FIXME
     raise ValueError("Initial and final mesh coordinates do not match")
+
+
+# --- Comparison
 
 relative_error_lagrangian = abs(errornorm(init_sol, final_sol_lagrangian)/init_norm)
 print_output("Relative error in Lagrangian case: {:.2f}%".format(100*relative_error_lagrangian))

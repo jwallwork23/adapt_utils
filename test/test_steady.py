@@ -2,7 +2,7 @@
 Runs the steady test case scripts found in `steady/test_cases/`. In some cases these examples include
 assertions which verify desired behaviour, but in most cases it is just verified that the solve does not crash.
 
-The code used in this script was largely copied from `thetis/test/examples.py`.
+The code used in this script was largely copied from `thetis/test/test_examples.py`.
 """
 import pytest
 import os
@@ -12,6 +12,7 @@ import subprocess
 import shutil
 
 
+# Collate a list of all examples to be tested
 examples = [
     # TODO: 'box_discharge2d/run.py',
     # TODO: 'point_discharge2d/run.py',
@@ -22,7 +23,6 @@ examples = [
     # TODO: 'turbine_array/run_uniform_convergence.py',
     # TODO: 'turbine_array/run_adaptive_convergence.py',
 ]
-
 cwd = os.path.abspath(os.path.dirname(__file__))
 unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'steady', 'test_cases'))
 examples = [os.path.join(unsteady_dir, f) for f in examples]

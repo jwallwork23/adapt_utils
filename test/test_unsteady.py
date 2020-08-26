@@ -3,7 +3,7 @@ Runs the unsteady test case scripts found in `unsteady/test_cases/`. In some cas
 include assertions which verify desired behaviour, but in most cases it is just verified that the
 solve does not crash and reaches the end of the simulation.
 
-The code used in this script was largely copied from `thetis/test/examples.py`.
+The code used in this script was largely copied from `thetis/test/test_examples.py`.
 """
 import pytest
 import os
@@ -13,29 +13,33 @@ import subprocess
 import shutil
 
 
+# Set environment flag so indicate shorter tests
+os.environ['REGRESSION_TEST'] = "1"
+
+# Collate a list of all examples to be tested
 examples = [
     'balzano/run_fixed_mesh.py',
-    'balzano/run_moving_mesh.py',  # TODO: Takes a while to run
+    'balzano/run_moving_mesh.py',
     'beach_slope/run_fixed_mesh.py',
     # 'beach_slope/run_moving_mesh.py',  # TODO
     'beach_wall/run_fixed_mesh.py',
     # 'beach_wall/run_moving_mesh.py',  # TODO
-    # 'bubble_shear/run.py',  # TODO: Currently requires an 'interpretation' input parameter
-    'cosine_prescribed_velocity/run.py',  # FIXME
+    'bubble_shear/run.py',
+    # TODO: bubble shear with Monge-Ampere
+    'cosine_prescribed_velocity/eulerian_vs_lagrangian.py',  # FIXME: Lagrangian coords do not match
     'pulse_wave/run_fixed_mesh.py',
     # 'pulse_wave/run_moving_mesh.py',  # TODO
-    'rossby_wave/run_fixed_mesh.py',  # TODO: Takes a while to run
-    # 'rossby_wave/run_moving_mesh.py',  # TODO: Currently takes too long to run
+    'rossby_wave/run_fixed_mesh.py',
+    'rossby_wave/run_moving_mesh.py',
     'solid_body_rotation/run_fixed_mesh.py',
     'solid_body_rotation/run_lagrangian.py',
-    # 'spaceship/run_fixed_mesh.py',
+    # 'spaceship/run_fixed_mesh.py',  # Takes too long to run
     'trench_1d/run_fixed_mesh.py',
     # 'trench_1d/run_moving_mesh.py',  # TODO
     'trench_slant/run_fixed_mesh.py',
     # 'trench_slant/run_moving_mesh.py',  # TODO
-    # 'turbine_array/run_fixed_mesh.py',  # TODO: Currently takes too long to run
+    # 'turbine_array/run_fixed_mesh.py',  # Takes too long to run
 ]
-
 cwd = os.path.abspath(os.path.dirname(__file__))
 unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'unsteady', 'test_cases'))
 examples = [os.path.join(unsteady_dir, f) for f in examples]

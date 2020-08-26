@@ -3,12 +3,14 @@ from thetis import *
 import argparse
 
 from adapt_utils.adapt.r import MeshMover
-from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 
+
+# --- Parse arguments
 
 parser = argparse.ArgumentParser()
-parser.add_argument("interpretation", help="Choose from {'eulerian', 'lagrangian'}.")
+parser.add_argument("-interpretation", help="Choose from {'eulerian', 'lagrangian'}.")
 parser.add_argument("-n", help="Resolution of initial mesh.")
 parser.add_argument("-num_adapt", help="Number of initial mesh adaptations.")
 parser.add_argument("-conservative", help="Toggle conservative tracer equation")
@@ -18,8 +20,16 @@ parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-debug", help="Toggle debugging mode.")
 args = parser.parse_args()
 
-approach = 'fixed_mesh' if args.interpretation == 'eulerian' else 'lagrangian'
 
+# --- Set parameters
+
+interpretation = args.interpretation or 'eulerian'
+if interpretation == 'eulerian':
+    approach = 'fixed_mesh'
+elif interpretation == 'lagrangian':
+    approach = 'lagrangian'
+else:
+    raise ValueError("Interpretation '{:s}' not recognised.".format(interpretation))
 kwargs = {
 
     # Spatial discretisation
@@ -36,12 +46,15 @@ kwargs = {
     # Misc
     'debug': bool(args.debug or False),
 }
-
+if os.getenv('REGRESSION_TEST') is not None:
+    kwargs['end_time'] = 1.5
 op = BubbleOptions(approach=approach, n=int(args.n or 1))
 op.update(kwargs)
-tp = AdaptiveProblem(op)
+
 
 # --- Initialise the mesh
+
+tp = AdaptiveProblem(op)
 
 # Note:
 #  * We use Monge-Ampere with a monitor function indicating the initial condition
@@ -59,6 +72,7 @@ if approach != 'fixed_mesh':
     mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
     mesh_mover.adapt()
     tp.__init__(op, meshes=[Mesh(mesh_mover.x), ])
+
 
 # --- Solve the tracer transport problem
 
