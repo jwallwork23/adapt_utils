@@ -27,8 +27,7 @@ class BeachOptions(CoupledOptions):
     mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
     """
 
-    def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh = None, input_dir = None, output_dir = None, **kwargs):
-
+    def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh=None, input_dir=None, output_dir=None, **kwargs):
         super(BeachOptions, self).__init__(**kwargs)
 
         try:
@@ -70,15 +69,14 @@ class BeachOptions(CoupledOptions):
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude
-        v_amp = 0.5 # Ocean boundary foring velocity
-        omega = 0.5  # Ocean boundary forcing frequency
-        self.ocean_elev_func = lambda t: (h_amp * np.cos(-omega *(t+(100.0))))
-        self.ocean_vel_func = lambda t: (v_amp * np.cos(-omega *(t+(100.0))))
+        v_amp = 0.5   # Ocean boundary foring velocity
+        omega = 0.5   # Ocean boundary forcing frequency
+        self.ocean_elev_func = lambda t: (h_amp*np.cos(-omega*(t + (100.0))))
+        self.ocean_vel_func = lambda t: (v_amp*np.cos(-omega*(t + (100.0))))
 
         self.tracer_init = Constant(0.0)
 
         # Time integration
-
         self.dt = 0.5
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 14
@@ -124,9 +122,9 @@ class BeachOptions(CoupledOptions):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
 
-        #if uv_init is None:
+        # if uv_init is None:
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
-        #if elev_init is None:
+        # if elev_init is None:
         self.eta_d = Function(self.P1DG).project(self.elev_init)
 
         self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
@@ -244,14 +242,10 @@ class BeachOptions(CoupledOptions):
         Initialise simulation with results from a previous simulation
         """
         from firedrake.petsc import PETSc
-        try:
-            import firedrake.cython.dmcommon as dmplex
-        except:
-            import firedrake.dmplex as dmplex  # Older version        
         # mesh
         with timed_stage('mesh'):
             # Load
-            newplex = PETSc.DMPlex().create()
+            newplex = PETSc.DMPlex().create()  # TODO: Use functionality in io.py
             newplex.createFromFile(inputdir + '/myplex.h5')
             mesh = Mesh(newplex)
     

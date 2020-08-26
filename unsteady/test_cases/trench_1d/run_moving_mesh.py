@@ -2,6 +2,7 @@ from thetis import *
 
 import datetime
 import numpy as np
+import os
 import pandas as pd
 import time
 
@@ -13,7 +14,8 @@ from adapt_utils.unsteady.test_cases.trench_1d.options import TrenchSedimentOpti
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-outputdir = 'outputs' + st
+di = os.path.dirname(__file__)
+outputdir = os.path.join(di, 'outputs' + st)
 
 nx = 1
 alpha = 2
@@ -23,7 +25,7 @@ alpha = 2
 
 # we have included the hydrodynamics input dir for nx = 1 as an example
 
-inputdir = 'hydrodynamics_trench_' + str(nx)
+inputdir = os.path.join(di, 'hydrodynamics_trench_' + str(nx))
 
 kwargs = {
     'approach': 'monge_ampere',

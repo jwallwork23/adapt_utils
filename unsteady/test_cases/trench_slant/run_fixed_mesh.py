@@ -4,6 +4,7 @@ from firedrake.petsc import PETSc
 
 import datetime
 import numpy as np
+import os
 import pandas as pd
 import time
 
@@ -14,7 +15,8 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-outputdir = 'outputs' + st
+di = os.path.dirname(__file__)
+outputdir = os.path.join(di, 'outputs' + st)
 
 nx = 1
 ny = 1
@@ -24,7 +26,7 @@ ny = 1
 
 # we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
 
-inputdir = 'hydrodynamics_trench_slant_' + str(nx)
+inputdir = os.path.join(di, 'hydrodynamics_trench_slant_' + str(nx))
 
 kwargs = {
     'approach': 'fixed_mesh',

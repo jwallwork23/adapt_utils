@@ -4,6 +4,7 @@ from firedrake.petsc import PETSc
 
 import datetime
 import numpy as np
+import os
 import pandas as pd
 import time
 
@@ -19,14 +20,15 @@ ny = 1
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-outputdir = 'outputs' + st
+di = os.path.dirname(__file__)
+outputdir = os.path.join(di, 'outputs' + st)
 
 # to create the input hydrodynamics directiory please run beach_tidal_hydro.py
 # setting nx and ny to be the same values as above
 
 # we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
 
-inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
+inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220)))
 print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',

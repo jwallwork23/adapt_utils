@@ -12,6 +12,7 @@ Solves the initial hydrodynamics simulation of a migrating trench.
 from thetis import *
 
 import numpy as np
+import os
 import time
 
 
@@ -66,7 +67,8 @@ uv_init = as_vector((0.51, 0.0))
 # choose directory to output results
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-outputdir = 'outputs' + st
+di = os.path.dirname(__file__)
+outputdir = os.path.join(di, 'outputs' + st)
 
 print_output('Exporting to '+outputdir)
 
