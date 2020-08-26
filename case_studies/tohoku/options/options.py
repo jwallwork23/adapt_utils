@@ -3,6 +3,7 @@ from thetis import *
 import netCDF4
 import os
 
+from adapt_utils.io import load_mesh
 from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
 
@@ -56,7 +57,7 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, mesh=None, level=0, force_zone_number=54, **kwargs):
+    def __init__(self, mesh=None, force_zone_number=54, **kwargs):
         """
         :kwarg mesh: optionally use a custom mesh.
         :kwarg level: mesh resolution level, to be used if no mesh is provided.
@@ -73,27 +74,26 @@ class TohokuOptions(TsunamiOptions):
             determining regions of interest for use in hazard assessment QoIs.
         """
         super(TohokuOptions, self).__init__(force_zone_number=force_zone_number, **kwargs)
+
+        # Process keyword arguments
+        self.level = kwargs.get('level', 0)
         self.save_timeseries = kwargs.get('save_timeseries', False)
         self.synthetic = kwargs.get('synthetic', False)
         if not self.synthetic:
             self.noisy_data = kwargs.get('noisy_data', False)
         self.qoi_scaling = kwargs.get('qoi_scaling', 1.0)
+        postproc = kwargs.get('postproc', False)
 
         # Mesh
         self.print_debug("INIT: Loading mesh...")
         self.resource_dir = os.path.join(os.path.dirname(__file__), '..', 'resources')
-        self.level = level
-        self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(self.level))
-        postproc = kwargs.get('postproc', False)
+        self.mesh_dir = os.path.join(self.resource_dir, 'meshes')
+        self.mesh_file = 'Tohoku{:d}'.format(self.level)
         if mesh is None:
             if postproc:
-                from firedrake.petsc import PETSc
-
-                newplex = PETSc.DMPlex().create()
-                newplex.createFromFile(self.meshfile + '.h5')
-                self.default_mesh = Mesh(newplex)
+                self.default_mesh = load_mesh(self.mesh_file, self.mesh_dir)
             else:
-                self.default_mesh = Mesh(self.meshfile + '.msh')
+                self.default_mesh = Mesh(os.path.join(self.mesh_dir, self.mesh_file) + '.msh')
         else:
             self.default_mesh = mesh
         self.print_debug("INIT: Done!")
@@ -116,9 +116,6 @@ class TohokuOptions(TsunamiOptions):
         self.dt = kwargs.get('dt', 60.0*0.5**level)
         self.dt_per_export = int(60.0/self.dt)
         self.start_time = kwargs.get('start_time', 0.0)
-        # self.start_time = kwargs.get('start_time', 15*60.0)
-        # self.end_time = kwargs.get('end_time', 24*60.0)
-        # self.end_time = kwargs.get('end_time', 60*60.0)
         self.end_time = kwargs.get('end_time', 120*60.0)
         self.num_timesteps = int(self.end_time/self.dt + 1)
         self.times = [i*self.dt for i in range(self.num_timesteps)]
@@ -133,8 +130,8 @@ class TohokuOptions(TsunamiOptions):
             celerity = np.sqrt(g*b)
             dx = interpolate(CellDiameter(self.default_mesh), P0).vector().gather().max()
             cfl = celerity*self.dt/dx
-            msg = "dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
-            print_output(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
+            msg = "INIT:   dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
+            self.print_debug(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
             self.print_debug("INIT: Done!")
 
         # Gauge classifications

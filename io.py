@@ -31,7 +31,7 @@ def load_mesh(fname, fpath):
     if COMM_WORLD.size > 1:
         raise IOError("Loading a mesh from HDF5 only works in serial.")
     newplex = PETSc.DMPlex().create()
-    newplex.createFromFile(os.path.join(fpath, fname))
+    newplex.createFromFile(os.path.join(fpath, fname + '.h5'))
     return Mesh(newplex)
 
 
