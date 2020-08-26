@@ -21,15 +21,15 @@ examples = [
 
     # Fixed mesh
     'balzano/run_fixed_mesh.py',              # Has been cut short
-    'beach_slope/run_fixed_mesh.py',          # FIXME: HDF5 error
-    'beach_wall/run_fixed_mesh.py',           # FIXME: HDF5 error
+    'beach_slope/run_fixed_mesh.py',          # TODO: Cut short
+    'beach_wall/run_fixed_mesh.py',           # TODO: Cut short
     'bubble_shear/run_fixed_mesh.py',         # Has been cut short
     'pulse_wave/run_fixed_mesh.py',           # Has been cut (very) short
     'rossby_wave/run_fixed_mesh.py',          # Has been cut short
     'solid_body_rotation/run_fixed_mesh.py',
     # 'spaceship/run_fixed_mesh.py',          # Takes too long to run
-    'trench_1d/run_fixed_mesh.py',            # FIXME: HDF5 error
-    'trench_slant/run_fixed_mesh.py',         # FIXME: HDF5 error
+    'trench_1d/run_fixed_mesh.py',            # TODO: Cut short
+    'trench_slant/run_fixed_mesh.py',         # TODO: Cut short
     # 'turbine_array/run_fixed_mesh.py',      # Takes too long to run
 
     # Moving mesh
