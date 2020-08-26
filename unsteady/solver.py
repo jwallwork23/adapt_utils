@@ -326,7 +326,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Check CFL criterion
         if self.op.debug and hasattr(self.op, 'check_cfl_criterion'):
-            self.op.check_cfl_criterion(self)
+            self.op.check_cfl_criterion(self, error_factor=None)
+            # TODO: parameter for error_factor, defaulted by timestepper choice
+            # TODO: allow t-adaptation in a given subinterval
 
     # --- Stabilisation
 
