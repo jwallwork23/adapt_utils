@@ -41,6 +41,7 @@ London.
   * Set the `$SOFTWARE` environment variable to where you would like your PETSc and Firedrake installations to exist.
   * Copy the contents of the `install` directory into `$SOFTWARE` and enter that directory.
   * Call `source install_petsc.sh` and then `source install_firedrake.sh`, modifying these scripts, if desired.
+  * Once you have a working Firedrake installation, get to grips with `adapt_utils` by looking at the test cases in `steady/test_cases` and `unsteady/test_cases`, as well as the notebooks hosted [here][7].
 
 
 #### For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
@@ -51,3 +52,4 @@ London.
 [4]: https://github.com/meshadaptation/pragmatic "PRAgMaTIc"
 [5]: https://bitbucket.org/dolfin-adjoint/pyadjoint/src "Pyadjoint"
 [6]: http://www.imperial.ac.uk/earth-science/research/research-groups/amcg/ "AMCG"
+[7]: https://github.com/jwallwork23/adapt_utils_notebooks "adapt_utils_notebooks"
