@@ -40,7 +40,7 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-if args.locations is None:
+if args.locations is None:  # TODO: Parse as list
     locations = ['Fukushima Daiichi', ]
 else:
     locations = args.locations.split(',')
@@ -67,7 +67,7 @@ kwargs = {
     'plot_pvd': True,
     'debug': bool(args.debug or False),
 }
-levels = int(args.levels or 5)
+levels = int(args.levels or 4)
 nonlinear = bool(args.nonlinear or False)
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh'))
 

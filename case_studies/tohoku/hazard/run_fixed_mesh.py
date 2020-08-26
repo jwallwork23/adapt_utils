@@ -83,11 +83,14 @@ op.update(kwargs)
 
 swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
 if plot_pvd:
-    swp.get_qoi_kernels(0)
-    k_u, k_eta = swp.kernels[0].split()
-    kernel = Function(swp.P1[0], name="QoI kernel")
-    kernel.project(k_eta)
-    File(os.path.join(op.di, 'kernel.pvd')).write(kernel)
+    kernel_file = File(os.path.join(op.di, 'kernel.pvd'))
+    for i, P1 in enumerate(swp.P1):
+        swp.get_qoi_kernels(i)
+        k_u, k_eta = swp.kernels[i].split()
+        kernel = Function(P1, name="QoI kernel")
+        kernel.project(k_eta)
+        kernel_file._topology = None
+        kernel_file.write(kernel)
 swp.solve_forward()
 
 

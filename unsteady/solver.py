@@ -1214,7 +1214,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.print(80*'=')
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         if self.num_meshes == 1:
-            msg = "ADJOINT SOLVE mesh  time {:8.2f}  ({:6.2f} seconds)"
+            msg = "ADJOINT SOLVE time {:8.2f}  ({:6.2f} seconds)"
             self.print(msg.format(self.simulation_time, 0.0))
         else:
             msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
