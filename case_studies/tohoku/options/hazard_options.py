@@ -1,6 +1,9 @@
-import thetis
+from thetis import PointNotInDomainError
+
 import numpy as np
+
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
 
 
 __all__ = ["TohokuHazardOptions"]
@@ -89,14 +92,14 @@ class TohokuHazardOptions(TohokuOptions):
 
     def _get_update_forcings_forward(self, prob, i):
 
-        def update_forcings():
+        def update_forcings(t):
             return
 
         return update_forcings
 
     def _get_update_forcings_adjoint(self, prob, i):
 
-        def update_forcings():
+        def update_forcings(t):
             return
 
         return update_forcings

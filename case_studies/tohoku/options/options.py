@@ -111,7 +111,7 @@ class TohokuOptions(TsunamiOptions):
         #  * There is a trade-off between having an unneccesarily small timestep and being able to
         #    represent the gauge timeseries profiles.
         self.timestepper = 'CrankNicolson'
-        self.dt = kwargs.get('dt', 60.0*0.5**level)
+        self.dt = kwargs.get('dt', 60.0*0.5**self.level)
         self.dt_per_export = int(60.0/self.dt)
         self.start_time = kwargs.get('start_time', 0.0)
         self.end_time = kwargs.get('end_time', 120*60.0)

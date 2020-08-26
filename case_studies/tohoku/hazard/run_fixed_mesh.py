@@ -18,6 +18,7 @@ parser.add_argument("-num_meshes", help="Number of meshes to consider (for testi
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space (default 'dg-cg')")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
+parser.add_argument("-stabilisation", help="Stabilisation method to use (default None)")
 
 # QoI
 parser.add_argument("-start_time", help="""
@@ -29,8 +30,9 @@ parser.add_argument("-locations", help="""
 parser.add_argument("-radii", help="Radii of interest, separated by commas (default 100km)")
 
 # I/O and debugging
+parser.add_argument("-plot_pvd", help="Toggle saving output to .pvd")
 parser.add_argument("-debug", help="Print all debugging statements")
-parser.add_argument("-plot_only", help="Only plot gauge timeseries and errors")
+parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
 
 args = parser.parse_args()
 
@@ -49,13 +51,11 @@ else:
 if len(locations) != len(radii):
     msg = "Number of locations ({:d}) and radii ({:d}) do not match."
     raise ValueError(msg.format(len(locations), len(radii)))
-
-# Set parameters for fixed mesh run
 kwargs = {
 
     # Space-time domain
     'num_meshes': int(args.num_meshes or 1),
-    'end_time': float(args.end_time or 1440.0),
+    'end_time': float(args.end_time or 24*60.0),
 
     # Physics
     'bathymetry_cap': 30.0,  # FIXME
@@ -63,31 +63,29 @@ kwargs = {
 
     # Solver
     'family': args.family or 'cg-cg',
-    'stabilsation': None,  # TODO: Lax-Friedrichs
+    'stabilsation': args.stabilisation,
     # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
     'wetting_and_drying_alpha': Constant(10.0),
 
     # QoI
-    'start_time': float(args.start_time or 1200.0),
+    'start_time': float(args.start_time or 15*60.0),
     'radii': radii,
     'locations': locations,
 
     # Misc
-    'plot_pvd': True,
+    'plot_pvd': bool(args.plot_pvd or False),
     'debug': bool(args.debug or False),
+    'debug_mode': args.debug_mode or 'basic',
 }
 level = int(args.level or 0)
 nonlinear = bool(args.nonlinear or False)
-ext = '{:s}linear_level{:d}'.format('non' if nonlinear else '', level)
 op = TohokuHazardOptions(approach='fixed_mesh', level=level)
 op.update(kwargs)
 
 
 # --- Solve
 
-plot_only = bool(args.plot_only or False)
-if not plot_only:
-    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
-    swp.solve_forward()
-    print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
+swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
+swp.solve_forward()
+print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))

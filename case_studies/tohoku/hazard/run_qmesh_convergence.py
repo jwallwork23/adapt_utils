@@ -78,14 +78,13 @@ qois = []
 num_cells = []
 for level in range(levels):
     print_output("Running qmesh convergence on level {:d}".format(level))
-    ext = "{:s}linear_level{:d}".format('non' if nonlinear else '', level)
 
     # Set parameters
     op = TohokuOptions(approach='fixed_mesh', level=level)
     op.update(kwargs)
 
     # Solve
-    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
+    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
     swp.solve_forward()
     qoi = swp.quantity_of_interest()
     print_output("Quantity of interest: {:.4e}".format(qoi))
