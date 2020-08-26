@@ -7,15 +7,8 @@ import numpy as np
 import os
 from time import perf_counter
 
-from adapt_utils.adapt.adaptation import pragmatic_adapt
-from adapt_utils.adapt.metric import *
-from .swe.equation import ShallowWaterEquations, ShallowWaterMomentumEquation
-from .swe.adjoint import AdjointShallowWaterEquations
-from .swe.error_estimation import ShallowWaterGOErrorEstimator
-from .swe.utils import *
-from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
-from .tracer.adjoint import AdjointTracerEquation2D, AdjointConservativeTracerEquation2D
-from .tracer.error_estimation import TracerGOErrorEstimator
+from ..adapt.adaptation import pragmatic_adapt
+from ..adapt.metric import *
 from .base import AdaptiveProblemBase
 from .callback import *
 from .swe.utils import *
@@ -442,7 +435,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def project_forward_solution(self, i, j, **kwargs):
         """
         Project forward solution(s) from mesh `i` to mesh `j`.
-        
+
         If the shallow water equations are not solved then the fluid velocity
         and surface elevation are set via the initial condition.
         """
@@ -460,7 +453,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def project_adjoint_solution(self, i, j, **kwargs):
         """
         Project adjoint solution(s) from mesh `i` to mesh `j`.
-        
+
         If the adjoint shallow water equations are not solved then the adjoint
         fluid velocity and surface elevation are set via the terminal condition.
         """
@@ -498,7 +491,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_ero[i].project(self.op.sediment_model.ero)
                 self.intermediary_ero_term[i].project(self.op.sediment_model.ero_term)
                 self.intermediary_depo_term[i].project(self.op.sediment_model.depo_term)
-
 
         def debug(a, b, name):
             if np.allclose(a, b):
@@ -559,7 +551,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     debug(self.op.sediment_model.depo_term.dat.data,
                           self.intermediary_depo_term[i].dat.data,
                           "depo_term")
-
 
     def copy_data_from_intermediary_mesh(self, i):
         super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
@@ -835,6 +826,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         bcs = self.boundary_conditions[i]['shallow_water']
         kwargs = {'bnd_conditions': bcs}
         if self.op.timestepper == 'PressureProjectionPicard':
+            from .swe.equation import ShallowWaterMomentumEquation
+
             self.equations[i].shallow_water_momentum = ShallowWaterMomentumEquation(
                 TestFunction(self.V[i].sub(0)),
                 self.V[i].sub(0),
@@ -1855,4 +1848,3 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 self.print("Converged number of mesh elements!")
                 break
-

@@ -22,7 +22,8 @@ g_grav = physical_constants['g_grav']
 class ExternalPressureGradientTerm(thetis_sw.ExternalPressureGradientTerm):
     """
     External pressure gradient term from Thetis, modified to account for P2-P1 Taylor-Hood
-    discretisation. In that case, Dirichlet conditions on free surface elevation are enforced strongly.
+    discretisation. In that case, Dirichlet conditions on free surface elevation are enforced
+    strongly.
     """
     def residual(self, *args, **kwargs):
         if self.options.get('element_family') == 'cg-cg':
@@ -33,7 +34,8 @@ class ExternalPressureGradientTerm(thetis_sw.ExternalPressureGradientTerm):
 
 class HUDivTerm(thetis_sw.HUDivTerm):
     """
-    Continuity term from Thetis, modified to account for mesh movement under a prescribed mesh velocity.
+    Continuity term from Thetis, modified to account for mesh movement under a prescribed mesh
+    velocity.
     """
     def residual(self, *args, **kwargs):
         f = -super(HUDivTerm, self).residual(*args, **kwargs)

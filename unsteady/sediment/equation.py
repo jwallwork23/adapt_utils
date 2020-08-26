@@ -1,4 +1,4 @@
-"""
+r"""
 2D advection diffusion equation for sediment transport.
 
 This can be either conservative :math:`q=HT` or non-conservative :math:`T` and allows
@@ -105,6 +105,7 @@ class SedimentSinkTerm(SedimentTerm):
             raise AttributeError("Assigned both a sink term and a depth-integrated sink term\
                                  but only one can be implemented. Choose the most appropriate for your case")
         return -f
+
 
 class SedimentEquation2D(Equation):
     """

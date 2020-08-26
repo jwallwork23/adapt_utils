@@ -99,7 +99,7 @@ class TsunamiOptions(CoupledOptions):
         :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
         :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
         :kwarg force_longitude: toggle checking validity of the UTM zone.
-        
+
         All other kwargs are passed to the :attr:`read_bathymetry_file` method.
         """
         if self.bathymetry_cap is not None:
@@ -148,7 +148,7 @@ class TsunamiOptions(CoupledOptions):
         :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
         :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
         :kwarg force_longitude: toggle checking validity of the UTM zone.
-        
+
         All other kwargs are passed to the :attr:`read_surface_file` method.
         """
         fs = fs or FunctionSpace(self.default_mesh, "CG", 1)
