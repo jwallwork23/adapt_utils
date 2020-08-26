@@ -22,12 +22,11 @@ examples = [
     'balzano/run_moving_mesh.py',
     'beach_slope/run_fixed_mesh.py',
     # 'beach_slope/run_moving_mesh.py',  # TODO
-    'beach_wall/run_fixed_mesh.py',
+    'beach_wall/run_fixed_mesh.py',  # FIXME: HDF5 error
     # 'beach_wall/run_moving_mesh.py',  # TODO
     'bubble_shear/run_fixed_mesh.py',
     # 'bubble_shear/run_lagrangian.py',  # TODO: xfail it
     # 'bubble_shear/run_moving_mesh.py',  # TODO
-    # TODO: bubble shear with Monge-Ampere
     'cosine_prescribed_velocity/eulerian_vs_lagrangian.py',  # FIXME: Lagrangian coords do not match
     'pulse_wave/run_fixed_mesh.py',
     # 'pulse_wave/run_moving_mesh.py',  # TODO
