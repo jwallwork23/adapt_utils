@@ -1,12 +1,14 @@
 from thetis import print_output, create_directory
 
-import datetime
 import argparse
+import datetime
 import os
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
+
+# --- Parse arguments
 
 parser = argparse.ArgumentParser(prog="run_qmesh_convergence")
 
@@ -23,36 +25,31 @@ parser.add_argument("-levels", help="Number of mesh levels to consider (default 
 
 # QoI
 parser.add_argument("-start_time", help="""
-Start time of period of interest in seconds (default 1200s i.e. 20min)""")
+    Start time of period of interest in seconds (default 1200s i.e. 20min)""")
 parser.add_argument("-locations", help="""
-Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
-'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
-""")
-parser.add_argument("-radii", help="Radii of interest, separated by commas (default 100km)")
+    Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
+    'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
+    """)
+parser.add_argument("-radius", help="Radius of interest (default 100km)")
 
-# Misc
+# I/O and debugging
 parser.add_argument("-debug", help="Print all debugging statements")
+
 args = parser.parse_args()
 
-# Collect locations and radii
+
+# --- Set parameters
+
 if args.locations is None:
     locations = ['Fukushima Daiichi', ]
 else:
     locations = args.locations.split(',')
-if args.radii is None:
-    radii = [100.0e+03 for l in locations]
-else:
-    radii = [float(r) for r in args.radii.split(',')]
-if len(locations) != len(radii):
-    msg = "Number of locations ({:d}) and radii ({:d}) do not match."
-    raise ValueError(msg.format(len(locations), len(radii)))
-
-# Read parameters
+radius = args.radius or 100.0e+03
 kwargs = {
 
     # Space-time domain
     'num_meshes': int(args.num_meshes or 1),
-    'end_time': float(args.end_time or 1440.0),
+    'end_time': float(args.end_time or 24*60.0),
 
     # Physics
     'bathymetry_cap': 30.0,  # FIXME
@@ -62,8 +59,8 @@ kwargs = {
     'use_wetting_and_drying': False,
 
     # QoI
-    'start_time': float(args.start_time or 1200.0),
-    'radii': radii,
+    'start_time': float(args.start_time or 15*60.0),
+    'radius': radius,
     'locations': locations,
 
     # Misc
@@ -72,7 +69,10 @@ kwargs = {
 }
 levels = int(args.levels or 5)
 nonlinear = bool(args.nonlinear or False)
-di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs/qmesh'))
+di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh'))
+
+
+# --- Loop over mesh hierarchy
 
 qois = []
 num_cells = []
@@ -93,7 +93,9 @@ for level in range(levels):
     qois.append(qoi)
     num_cells.append(swp.num_cells[0][0])
 
-# Print/log results
+
+# --- Log results
+
 with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
     for line in gitlog:
         words = line.split()
@@ -119,9 +121,3 @@ with open(os.path.join(logdir, 'log'), 'w') as logfile:
     logfile.write(logstr)
 print_output(logstr)
 print_output(logdir)
-
-# Plot timeseries
-for g in op.gps_gauges:
-    op.plot_timeseries(g, sample=30)
-for g in op.pressure_gauges:
-    op.plot_timeseries(g, sample=60)

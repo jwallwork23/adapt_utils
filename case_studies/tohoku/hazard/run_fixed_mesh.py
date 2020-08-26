@@ -1,6 +1,7 @@
 from thetis import *
 
 import argparse
+import os
 
 from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
@@ -27,7 +28,7 @@ parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
     """)
-parser.add_argument("-radii", help="Radii of interest, separated by commas (default 100km)")
+parser.add_argument("-radius", help="Radius of interest (default 100km)")
 
 # I/O and debugging
 parser.add_argument("-plot_pvd", help="Toggle saving output to .pvd")
@@ -39,18 +40,12 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-# Collect locations and radii
-if args.locations is None:
+if args.locations is None:  # TODO: Parse as list
     locations = ['Fukushima Daiichi', ]
 else:
     locations = args.locations.split(',')
-if args.radii is None:
-    radii = [100.0e+03 for l in locations]
-else:
-    radii = [float(r) for r in args.radii.split(',')]
-if len(locations) != len(radii):
-    msg = "Number of locations ({:d}) and radii ({:d}) do not match."
-    raise ValueError(msg.format(len(locations), len(radii)))
+radius = args.radius or 100.0e+03
+plot_pvd = bool(args.plot_pvd or False)
 kwargs = {
 
     # Space-time domain
@@ -62,7 +57,7 @@ kwargs = {
     # 'bathymetry_cap': None,
 
     # Solver
-    'family': args.family or 'cg-cg',
+    'family': args.family or 'dg-cg',
     'stabilsation': args.stabilisation,
     # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
@@ -70,11 +65,11 @@ kwargs = {
 
     # QoI
     'start_time': float(args.start_time or 15*60.0),
-    'radii': radii,
+    'radius': radius,
     'locations': locations,
 
     # Misc
-    'plot_pvd': bool(args.plot_pvd or False),
+    'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
@@ -87,5 +82,15 @@ op.update(kwargs)
 # --- Solve
 
 swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
+if plot_pvd:
+    swp.get_qoi_kernels(0)
+    k_u, k_eta = swp.kernels[0].split()
+    kernel = Function(swp.P1[0], name="QoI kernel")
+    kernel.project(k_eta)
+    File(os.path.join(op.di, 'kernel.pvd')).write(kernel)
 swp.solve_forward()
+
+
+# --- Diagnostics
+
 print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))

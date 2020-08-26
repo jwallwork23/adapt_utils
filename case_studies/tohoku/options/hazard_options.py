@@ -1,5 +1,3 @@
-from thetis import PointNotInDomainError
-
 import numpy as np
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
@@ -77,14 +75,6 @@ class TohokuHazardOptions(TohokuOptions):
             lon, lat = self.locations_of_interest[loc]["lonlat"]
             self.locations_of_interest[loc]["utm"] = from_latlon(lat, lon, force_zone_number=54)
             self.locations_of_interest[loc]["coords"] = self.locations_of_interest[loc]["utm"]
-
-        # Check validity of gauge coordinates
-        for loc in self.locations_to_consider:
-            try:
-                self.default_mesh.coordinates.at(self.locations_of_interest[loc]['coords'])
-            except PointNotInDomainError:
-                self.print_debug("NOTE: Location {:s} is not in the domain; removing it".format(loc))
-                self.locations_of_interest.pop(loc)
 
         # Regions of interest
         loi = self.locations_of_interest
