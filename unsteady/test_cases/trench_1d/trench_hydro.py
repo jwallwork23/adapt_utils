@@ -43,8 +43,8 @@ mesh2d = RectangleMesh(nx, ny, lx, ly)
 x, y = SpatialCoordinate(mesh2d)
 
 # define function spaces
-V = get_function_space(mesh2d, "CG", 1)
-P1_2d = get_function_space(mesh2d, "DG", 1)
+V = FunctionSpace(mesh2d, "CG", 1)
+P1_2d = FunctionSpace(mesh2d, "DG", 1)
 
 # define underlying bathymetry
 bathymetry_2d = Function(V, name='Bathymetry')

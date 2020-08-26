@@ -15,8 +15,13 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.8
+nx = 1
 alpha = 2
+
+# to create the input hydrodynamics directiory please run trench_hydro.py
+# setting nx to be the same values as above
+
+# we have included the hydrodynamics input dir for nx = 1 as an example
 
 inputdir = 'hydrodynamics_trench_' + str(nx)
 

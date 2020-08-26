@@ -20,7 +20,6 @@ ny = 0.5
 st = datetime.datetime.fromtimestamp(t1).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
 
 kwargs = {
     'approach': 'fixed_mesh',
@@ -35,7 +34,6 @@ kwargs = {
 
     # I/O
     'plot_pvd': True,
-    'input_dir': inputdir,
     'output_dir': outputdir,
 }
 if os.getenv('REGRESSION_TEST') is not None:

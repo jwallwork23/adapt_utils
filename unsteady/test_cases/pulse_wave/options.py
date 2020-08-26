@@ -43,7 +43,6 @@ class BeachOptions(CoupledOptions):
         # Initialisation
         self.elev_init = Constant(0.0)
         self.uv_init = as_vector((10**(-4), 0.0))
-        # self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
         self.tracer_init = Constant(0.0)
 
         # Models

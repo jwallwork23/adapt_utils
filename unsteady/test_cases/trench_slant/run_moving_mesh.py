@@ -24,6 +24,11 @@ alpha = 18
 beta = 1
 gamma = 1
 
+# to create the input hydrodynamics directiory please run hydro_trench_slant.py
+# setting nx and ny to be the same values as above
+
+# we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
+
 inputdir = 'hydrodynamics_trench_slant_'  + str(nx)
 
 kwargs = {

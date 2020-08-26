@@ -27,14 +27,11 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
-print(inputdir)
 kwargs = {
     'approach': 'monge_ampere',
     'nx': nx,
     'ny': ny,
     'plot_pvd': True,
-    'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
     'r_adapt_rtol': 1.0e-3,
