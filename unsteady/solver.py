@@ -103,6 +103,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         super(AdaptiveProblem, self).__init__(op, nonlinear=nonlinear, **kwargs)
 
     def create_outfiles(self):
+        if not self.op.plot_pvd:
+            return
         if self.op.solve_swe:
             self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
             self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
@@ -1543,7 +1545,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
         """
         op = self.op
-        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+        if op.plot_pvd:
+            self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
@@ -1620,8 +1623,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
             for i, M in enumerate(metrics):
-                self.indicator_file._topology = None
-                self.indicator_file.write(self.indicators[i]['dwp'])
+                if op.plot_pvd:
+                    self.indicator_file._topology = None
+                    self.indicator_file.write(self.indicators[i]['dwp'])
                 # metric_file._topology = None
                 # metric_file.write(M)
                 complexities.append(metric_complexity(M))
@@ -1667,7 +1671,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
-        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+        if op.plot_pvd:
+            self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
@@ -1823,8 +1828,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
             for i, M in enumerate(metrics):
-                self.indicator_file._topology = None
-                self.indicator_file.write(self.indicators[i]['dwr'])
+                if op.plot_pvd:
+                    self.indicator_file._topology = None
+                    self.indicator_file.write(self.indicators[i]['dwr'])
                 # metric_file._topology = None
                 # metric_file.write(M)
                 complexities.append(metric_complexity(M))
