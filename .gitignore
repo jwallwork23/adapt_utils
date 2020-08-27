@@ -4,6 +4,7 @@ swe/tsunami/tsunami1d/
 steady/spacetime/
 adapt_utils/
 test/interp/plots/
+docs/_build/
 
 # Specific files
 TODO
