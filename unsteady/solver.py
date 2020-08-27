@@ -1550,8 +1550,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
         """
         op = self.op
-        if op.plot_pvd:
-            self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
@@ -1580,7 +1578,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for i, P1 in enumerate(self.P1):
                 self.indicators[i]['dwp'] = Function(P1, name="DWP indicator")
             metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
-            for i in range(self.num_meshes-1, -1, -1):
+            for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 adj_solutions_step = []
 
@@ -1622,17 +1620,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Normalise metrics
 
+            if op.debug and op.plot_pvd:
+                metric_file = File(os.path.join(self.di, 'metric_before_normalisation.pvd'))
+                for i, M in enumerate(metrics):
+                    metric_file._topology = None
+                    metric_file.write(M)
+
             space_time_normalise(metrics, op=op)
 
             # Output to .pvd and .vtu
-            # metric_file = File(os.path.join(self.di, 'metric.pvd'))
+            if op.plot_pvd:
+                self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+                metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
             for i, M in enumerate(metrics):
                 if op.plot_pvd:
                     self.indicator_file._topology = None
                     self.indicator_file.write(self.indicators[i]['dwp'])
-                # metric_file._topology = None
-                # metric_file.write(M)
+                    metric_file._topology = None
+                    metric_file.write(M)
                 complexities.append(metric_complexity(M))
             self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
 
@@ -1676,8 +1682,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
-        if op.plot_pvd:
-            self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
@@ -1728,7 +1732,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for i, P1 in enumerate(self.P1):
                 self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
             metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
-            for i in range(self.num_meshes-1, -1, -1):
+            for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 fwd_solutions_step_old = []
                 adj_solutions_step = []
@@ -1827,17 +1831,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Normalise metrics
 
+            if op.debug and op.plot_pvd:
+                metric_file = File(os.path.join(self.di, 'metric_before_normalisation.pvd'))
+                for i, M in enumerate(metrics):
+                    metric_file._topology = None
+                    metric_file.write(M)
+
             space_time_normalise(metrics, op=op)
 
             # Output to .pvd and .vtu
-            # metric_file = File(os.path.join(self.di, 'metric.pvd'))
+            if op.plot_pvd:
+                self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+                metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
             for i, M in enumerate(metrics):
                 if op.plot_pvd:
                     self.indicator_file._topology = None
                     self.indicator_file.write(self.indicators[i]['dwr'])
-                # metric_file._topology = None
-                # metric_file.write(M)
+                    metric_file._topology = None
+                    metric_file.write(M)
                 complexities.append(metric_complexity(M))
             self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
 
