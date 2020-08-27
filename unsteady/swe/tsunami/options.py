@@ -114,12 +114,12 @@ class TsunamiOptions(CoupledOptions):
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating bathymetry...")
-        msg = "    Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
+        # msg = "    Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number,
                                      northern=northern, force_longitude=force_longitude)
             bathymetry.dat.data[i] -= bath_interp(lat, lon)
-            self.print_debug(msg.format(xy[0], xy[1], bathymetry.dat.data[i]/1000), mode='full')
+            # self.print_debug(msg.format(xy[0], xy[1], bathymetry.dat.data[i]/1000), mode='full')
 
         # Cap bathymetry to enforce a minimum depth
         self.print_debug("INIT: Capping bathymetry...")  # TODO: Should we really be doing this?
@@ -158,12 +158,12 @@ class TsunamiOptions(CoupledOptions):
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating initial surface...")
-        msg = "    Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
+        # msg = "    Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number,
                                      northern=northern, force_longitude=force_longitude)
             initial_surface.dat.data[i] = surf_interp(lat, lon)
-            self.print_debug(msg.format(xy[0], xy[1], initial_surface.dat.data[i]), mode='full')
+            # self.print_debug(msg.format(xy[0], xy[1], initial_surface.dat.data[i]), mode='full')
 
         return initial_surface
 
