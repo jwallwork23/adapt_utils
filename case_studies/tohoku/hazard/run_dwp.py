@@ -84,7 +84,7 @@ kwargs = {
     'approach': 'dwp',
 
     # Space-time domain
-    'level': int(args.level or 2),  # NOTE
+    'level': int(args.level or 0),
     'end_time': float(args.end_time or 1440.0),
     'num_meshes': int(args.num_meshes or 12),
 
