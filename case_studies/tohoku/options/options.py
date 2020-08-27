@@ -96,7 +96,8 @@ class TohokuOptions(TsunamiOptions):
             self.default_mesh = mesh
 
         # Physics
-        self.friction = 'manning'
+        self.friction = None
+        # self.friction = 'manning'  # FIXME
         self.friction_coeff = 0.025
         self.base_viscosity = kwargs.get('base_viscosity', 0.0)
 
