@@ -1,7 +1,6 @@
 from thetis import *
 
 import os
-import sys
 import math
 import fnmatch
 import numpy as np
