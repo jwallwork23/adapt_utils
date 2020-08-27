@@ -80,6 +80,26 @@ class TohokuHazardOptions(TohokuOptions):
         loi = self.locations_of_interest
         self.region_of_interest = [loi[loc]["coords"] + (radius, ) for loc in loi]
 
+    def set_qoi_kernel(self, prob, i):
+        # from firedrake import assemble, Constant, Function
+        from firedrake import Constant, Function
+
+        # b = self.ball(prob.meshes[i], source=False)
+        # b = self.circular_bump(prob.meshes[i], source=False)
+        b = self.gaussian(prob.meshes[i], source=False)
+
+        # TODO: Normalise by area computed on fine reference mesh
+        # area = assemble(b*dx)
+        # area_fine_mesh = ...
+        # rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
+        rescaling = Constant(1.0)
+
+        prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
+        kernel_u, kernel_eta = prob.kernels[i].split()
+        kernel_u.rename("QoI kernel (velocity component)")
+        kernel_eta.rename("QoI kernel (elevation component)")
+        kernel_eta.interpolate(rescaling*b)
+
     def _get_update_forcings_forward(self, prob, i):
 
         def update_forcings(t):

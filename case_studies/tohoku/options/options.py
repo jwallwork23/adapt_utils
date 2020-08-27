@@ -682,3 +682,11 @@ class TohokuOptions(TsunamiOptions):
         # diff = detided - elev
 
         return time, detided, elev
+
+    def set_qoi_kernel(self, prob, i):  # TODO: Use this instead of update_forcings
+        prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
+        kernel_u, kernel_eta = prob.kernels[i].split()
+        kernel_u.rename("QoI kernel (velocity component)")
+        kernel_eta.rename("QoI kernel (elevation component)")
+        kernel_u.assign(0.0)
+        kernel_eta.assign(0.0)

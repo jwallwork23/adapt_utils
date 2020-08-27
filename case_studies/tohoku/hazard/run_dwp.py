@@ -5,8 +5,8 @@ import datetime
 import matplotlib.pyplot as plt
 import os
 
-from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
-from adapt_utils.unsteady.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
+from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
 # --- Parse arguments
@@ -124,7 +124,7 @@ for key in kwargs:
     logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
 logstr += "    {:34s}: {:}\n".format('nonlinear', nonlinear)
 print_output(logstr + 80*'*' + '\n')
-op = TohokuOptions(**kwargs)
+op = TohokuHazardOptions(**kwargs)
 
 
 # --- Solve

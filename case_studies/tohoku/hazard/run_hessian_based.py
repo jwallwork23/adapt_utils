@@ -4,7 +4,7 @@ import argparse
 import datetime
 import os
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
@@ -120,7 +120,7 @@ print_output(logstr + 80*'*' + '\n')
 
 # --- Solve
 
-op = TohokuOptions(**kwargs)
+op = TohokuHazardOptions(**kwargs)
 swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)  # TODO: Option to load plexes
 swp.run_hessian_based()
 

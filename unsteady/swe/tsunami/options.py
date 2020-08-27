@@ -226,21 +226,7 @@ class TsunamiOptions(CoupledOptions):
         return interpolate(2*self.Omega*sin(radians(lat)), fs)
 
     def set_qoi_kernel(self, prob, i):
-        # b = self.ball(prob.meshes[i], source=False)
-        # b = self.circular_bump(prob.meshes[i], source=False)
-        b = self.gaussian(prob.meshes[i], source=False)
-
-        # TODO: Normalise by area computed on fine reference mesh
-        # area = assemble(b*dx)
-        # area_fine_mesh = ...
-        # rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
-        rescaling = Constant(1.0)
-
-        prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
-        kernel_u, kernel_eta = prob.kernels[i].split()
-        kernel_u.rename("QoI kernel (velocity component)")
-        kernel_eta.rename("QoI kernel (elevation component)")
-        kernel_eta.interpolate(rescaling*b)
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def set_terminal_condition(self, prob):  # TODO: For hazard case
         prob.adj_solutions[-1].assign(0.0)
