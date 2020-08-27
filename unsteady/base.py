@@ -91,8 +91,6 @@ class AdaptiveProblemBase(object):
         Setup everything which isn't explicitly associated with either the forward or adjoint
         problem.
         """
-        from thetis.callback import CallbackManager
-
         op = self.op
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
@@ -108,8 +106,6 @@ class AdaptiveProblemBase(object):
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
         self.set_boundary_conditions()
-        op.print_debug(op.indent + "SETUP: Creating CallbackManagers...")
-        self.callbacks = [CallbackManager() for mesh in self.meshes]
         op.print_debug(op.indent + "SETUP: Creating output files...")
         self.di = create_directory(op.di)
         self.create_outfiles()
@@ -117,10 +113,11 @@ class AdaptiveProblemBase(object):
         self.create_intermediary_spaces()
 
         # Various empty lists and dicts
+        self.callbacks = [None for mesh in self.meshes]
         self.equations = [AttrDict() for mesh in self.meshes]
         self.error_estimators = [AttrDict() for mesh in self.meshes]
-        self.timesteppers = [AttrDict() for mesh in self.meshes]
         self.kernels = [None for mesh in self.meshes]
+        self.timesteppers = [AttrDict() for mesh in self.meshes]
 
     def set_meshes(self, meshes):
         """

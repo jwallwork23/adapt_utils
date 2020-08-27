@@ -981,6 +981,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
     # --- Solvers
 
     def add_callbacks(self, i):
+        from thetis.callback import CallbackManager
+
+        # Create a new CallbackManager object on every mesh
+        #   NOTE: This overwrites any pre-existing CallbackManagers
+        self.op.print_debug(self.op.indent + "SETUP: Creating CallbackManagers...")
+        self.callbacks[i] = CallbackManager()
+
+        # Add default callbacks
         if self.op.solve_swe:
             self.callbacks[i].add(VelocityNormCallback(self, i), 'export')
             self.callbacks[i].add(ElevationNormCallback(self, i), 'export')
@@ -1019,19 +1027,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         dbcs.append(DirichletBC(self.Q[i], bcs['tracer'][j]['value'], j))
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_tracer")
-            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         if op.solve_sediment:
             ts = self.timesteppers[i]['sediment']
             dbcs = []
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_sediment")
-            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         if op.solve_exner:
             ts = self.timesteppers[i]['exner']
             dbcs = []
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_exner")
-            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
+        op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i)
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
