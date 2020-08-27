@@ -6,7 +6,7 @@ import os
 
 
 __all__ = ["save_mesh", "load_mesh", "initialise_fields", "export_final_state",
-           "TimeDependentAdaptationLogger"]
+           "OuterLoopLogger", "TimeDependentAdaptationLogger"]
 
 
 def save_mesh(mesh, fname, fpath):
@@ -78,10 +78,11 @@ def export_final_state(fpath, f, fname='bathymetry', name='bathymetry', plexname
     save_mesh(f.function_space().mesh(), plexname, fpath)
 
 
-class TimeDependentAdaptationLogger(object):
+class OuterLoopLogger(object):
     """
-    A simple logger for simulations which use time-dependent mesh adaptation with an outer loop.
-    Statistics on metrics and meshes are printed to screen, saved to a log file, or both.
+    A simple logger for simulations which have an outer loop over meshes. This might be for
+    convergence analysis on a hierarchy of fixed meshes, or on sequences of time-dependent adapted
+    meshes.
     """
     def __init__(self, prob, verbose=True, **known):
         """
@@ -108,6 +109,16 @@ class TimeDependentAdaptationLogger(object):
         if self.verbose:
             print_output(self.logstr + self.divider)
 
+    def log_git_sha(self):
+        """
+        Add a line to the log string which records the sha of the adapt_utils git commit in use.
+        """
+        adapt_utils_home = os.environ.get('ADAPT_UTILS_HOME')
+        with open(os.path.join(adapt_utils_home, '.git', 'logs', 'HEAD'), 'r') as gitlog:
+            for line in gitlog:
+                words = line.split()  # TODO: Just read last line
+            self.logstr += self.msg.format('adapt_utils git commit', words[1])
+
     def create_log_dir(self, fpath):
         """
         :arg fpath: directory to save log file in.
@@ -122,6 +133,49 @@ class TimeDependentAdaptationLogger(object):
                 break
             j += 1
 
+    def write(self, fpath):
+        """
+        Write the log out to file.
+
+        :arg fpath: directory to save log file in.
+        """
+        if fpath is None:
+            return
+        self.create_log_dir(fpath)
+        with open(os.path.join(self.di, 'log'), 'w') as logfile:
+            logfile.write(self.logstr)
+        if save_meshes:
+            self.prob.store_meshes(fpath=self.di)
+        if self.verbose:
+            print_output("logdir: {:s}".format(self.di))
+
+    # TODO: Allow logging during simulation
+    def log(self, fname='log', fpath=None, save_meshes=False):
+        """
+        :args unknown: expanded list of unknown parsed arguments.
+        :kwarg fname: filename for log file.
+        :kwarg fpath: directory to save log file in. If `None`, the log is simply printed.
+        :kwarg save_meshes: save meshes to file in the same directory.
+        """
+        self.log_git_sha()
+
+        # Log element count and QoI from each outer iteration
+        self.logstr += self.divider + 35*' ' + 'SUMMARY\n' + self.divider
+        self.logstr += "{:8s}    {:7s}\n".format('Elements', 'QoI')
+        for num_cells, qoi in zip(self.prob.num_cells, self.prob.qois):
+            self.logstr += "{:8d}    {:7.4e}\n".format(num_cells, qoi)
+        if self.verbose:
+            print_output(self.logstr)
+
+        # Write out
+        self.write(fpath)
+
+
+class TimeDependentAdaptationLogger(OuterLoopLogger):
+    """
+    A simple logger for simulations which use time-dependent mesh adaptation with an outer loop.
+    Statistics on metrics and meshes are printed to screen, saved to a log file, or both.
+    """
     # TODO: Allow logging during simulation
     def log(self, *unknown, fname='log', fpath=None, save_meshes=False):
         """
@@ -130,17 +184,11 @@ class TimeDependentAdaptationLogger(object):
         :kwarg fpath: directory to save log file in. If `None`, the log is simply printed.
         :kwarg save_meshes: save meshes to file in the same directory.
         """
-        adapt_utils_home = os.environ.get('ADAPT_UTILS_HOME')
+        self.log_git_sha()
 
         # Log unknown parameters
         for i in range(len(unknown)//2):
             self.logstr += self.msg.format(unknown[2*i][1:], unknown[2*i+1])
-
-        # Add git sha
-        with open(os.path.join(adapt_utils_home, '.git', 'logs', 'HEAD'), 'r') as gitlog:
-            for line in gitlog:
-                words = line.split()
-            self.logstr += self.msg.format('adapt_utils git commit', words[1])
 
         # Log mesh and metric stats from each outer iteration
         self.logstr += self.divider + 35*' ' + 'SUMMARY\n' + self.divider
@@ -159,12 +207,5 @@ class TimeDependentAdaptationLogger(object):
         if self.verbose:
             print_output(self.logstr)
 
-        # Write to log file
-        if fpath is not None:
-            self.create_log_dir(fpath)
-            with open(os.path.join(self.di, 'log'), 'w') as logfile:
-                logfile.write(self.logstr)
-            if save_meshes:
-                self.prob.store_meshes(fpath=self.di)
-            if self.verbose:
-                print_output(self.di)
+        # Write out
+        self.write(fpath)
