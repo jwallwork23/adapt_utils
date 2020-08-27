@@ -14,7 +14,7 @@ import hydro_fns as hydro
 import numpy as np
 import os
 
-plot = True
+plot = False
 
 def boundary_conditions_fn_balzano(bathymetry_2d, flag = None, morfac = 1, t_new = 0, state = 'initial'):
     """
@@ -61,8 +61,8 @@ def boundary_conditions_fn_balzano(bathymetry_2d, flag = None, morfac = 1, t_new
 # define mesh
 lx = 220
 ly = 10
-nx = np.int(lx*1)
-ny = 10
+nx = np.int(lx*0.2)
+ny = 5
 mesh2d = th.RectangleMesh(nx, ny, lx, ly)
 
 x,y = th.SpatialCoordinate(mesh2d)
@@ -89,7 +89,7 @@ value = 1/40
 
 sponge_fn = th.Function(V).interpolate(th.conditional(x>=100, -399 + 4*x, th.Constant(1.0)))
 
-solver_obj, update_forcings_hydrodynamics, outputdir = hydro.hydrodynamics_only(boundary_conditions_fn_balzano, mesh2d, bathymetry_2d, uv_init, elev_init, wetting_and_drying = True, wetting_alpha = value, fluc_bcs = True, average_size = 200 * (10**(-6)), dt=0.05, t_end=60, friction = 'manning', sponge_viscosity = sponge_fn, viscosity = 0.5)
+solver_obj, update_forcings_hydrodynamics, outputdir = hydro.hydrodynamics_only(boundary_conditions_fn_balzano, mesh2d, bathymetry_2d, uv_init, elev_init, wetting_and_drying = True, wetting_alpha = value, fluc_bcs = True, average_size = 200 * (10**(-6)), dt=0.05, t_end=100, friction = 'manning', sponge_viscosity = sponge_fn, viscosity = 0.5)
 
 # run model
 

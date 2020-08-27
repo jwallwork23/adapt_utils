@@ -238,10 +238,10 @@ class BeachOptions(CoupledOptions):
         Initialise simulation with results from a previous simulation
         """
         from firedrake.petsc import PETSc
-        try:
-            import firedrake.cython.dmcommon as dmplex
-        except:
-            import firedrake.dmplex as dmplex  # Older version        
+        #try:
+        #    import firedrake.cython.dmcommon as dmplex
+        #except:
+        #    import firedrake.dmplex as dmplex  # Older version        
         # mesh
         with timed_stage('mesh'):
             # Load
