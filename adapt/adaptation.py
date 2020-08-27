@@ -7,20 +7,13 @@ import warnings
 
 from adapt_utils.adapt.kernels import *
 from adapt_utils.options import Options
-from adapt_utils.misc import suppress_output
 
 
 __all__ = ["pragmatic_adapt", "AdaptiveMesh"]
 
 
-def pragmatic_adapt(mesh, M, op=Options):
-    debug_full = op.debug and op.debug_mode == 'fill'
-    if not debug_full:
-        with suppress_output():
-            out = adapt(mesh, M)
-    else:
-        out = adapt(mesh, M)
-    return out
+def pragmatic_adapt(mesh, M):
+    return adapt(mesh, M)
 
 
 class AdaptiveMesh():

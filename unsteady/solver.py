@@ -1428,7 +1428,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                                 H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
-
                 self.setup_solver_forward(i)
                 self.solve_forward_step(i, export_func=export_func, update_forcings=update_forcings, plot_pvd=op.plot_pvd)
 
@@ -1488,7 +1487,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
@@ -1633,7 +1632,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
@@ -1836,7 +1835,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
