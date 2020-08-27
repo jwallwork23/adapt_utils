@@ -58,12 +58,17 @@ p = args.norm_order
 
 # --- Set parameters
 
+plot_pvd = bool(args.plot_pvd or False)
 if args.locations is None:
     locations = ['Fukushima Daiichi', ]
 else:
     locations = args.locations.split(',')
-radius = args.radius or 100.0e+03
-plot_pvd = bool(args.plot_pvd or False)
+radius = float(args.radius or 100.0e+03)
+family = args.family or 'cg-cg'  # FIXME: what's wrong with dg-cg?
+nonlinear = bool(args.nonlinear or False)
+stabilisation = args.stabilisation or 'lax_friedrichs'
+if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
+    stabilisation = None
 kwargs = {
     'approach': 'hessian',
 
@@ -76,8 +81,8 @@ kwargs = {
     'bathymetry_cap': 30.0,  # FIXME
 
     # Solver
-    'family': args.family or 'dg-cg',
-    'stabilisation': args.stabilisation,
+    'family': family,
+    'stabilisation': stabilisation,
     # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
     'wetting_and_drying_alpha': Constant(10.0),
@@ -117,13 +122,13 @@ print_output(logstr + 80*'*' + '\n')
 # --- Solve
 
 op = TohokuOptions(**kwargs)
-swp = AdaptiveTsunamiProblem(op)  # TODO: Option to load plexes
+swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)  # TODO: Option to load plexes
 swp.run_hessian_based()
 
 
 # --- Logging
 
-with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
+with open(os.path.join(os.path.dirname(__file__), '../../../.git/logs/HEAD'), 'r') as gitlog:
     for line in gitlog:
         words = line.split()
     logstr += "    {:34s}: {:}\n".format('adapt_utils git commit', words[1])

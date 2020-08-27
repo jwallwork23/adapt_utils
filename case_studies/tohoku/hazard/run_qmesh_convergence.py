@@ -40,11 +40,17 @@ args = parser.parse_args()
 
 # --- Set parameters
 
+plot_pvd = bool(args.plot_pvd or False)
 if args.locations is None:  # TODO: Parse as list
     locations = ['Fukushima Daiichi', ]
 else:
     locations = args.locations.split(',')
-radius = args.radius or 100.0e+03
+radius = float(args.radius or 100.0e+03)
+family = args.family or 'cg-cg'
+nonlinear = bool(args.nonlinear or False)
+stabilisation = args.stabilisation or 'lax_friedrichs'
+if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
+    stabilisation = None
 kwargs = {
 
     # Space-time domain
@@ -55,7 +61,8 @@ kwargs = {
     'bathymetry_cap': 30.0,  # FIXME
 
     # Solver
-    'family': args.family or 'dg-cg',
+    'family': family,
+    'stabilisation': stabilisation,
     'use_wetting_and_drying': False,
 
     # QoI
@@ -64,11 +71,10 @@ kwargs = {
     'locations': locations,
 
     # I/O and debugging
-    'plot_pvd': True,
+    'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
 }
 levels = int(args.levels or 4)
-nonlinear = bool(args.nonlinear or False)
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh'))
 
 
@@ -96,7 +102,7 @@ for level in range(levels):
 
 # --- Log results
 
-with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
+with open(os.path.join(os.path.dirname(__file__), '../../../.git/logs/HEAD'), 'r') as gitlog:
     for line in gitlog:
         words = line.split()
     kwargs['adapt_utils git commit'] = words[1]

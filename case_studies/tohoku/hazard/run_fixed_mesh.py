@@ -69,6 +69,11 @@ if args.locations is None:  # TODO: Parse as list
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)
+family = args.family or 'cg-cg'
+nonlinear = bool(args.nonlinear or False)
+stabilisation = args.stabilisation or 'lax_friedrichs'
+if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
+    stabilisation = None
 kwargs = {
     'approach': 'fixed_mesh',
 
@@ -82,11 +87,11 @@ kwargs = {
     # 'bathymetry_cap': None,
 
     # Solver
-    'family': args.family or 'dg-cg',
-    'stabilsation': args.stabilisation,
+    'family': family,
+    'stabilsation': stabilisation,
     # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
-    'wetting_and_drying_alpha': Constant(10.0),
+    # 'wetting_and_drying_alpha': Constant(10.0),
 
     # QoI
     'start_time': float(args.start_time or 0.0),
@@ -98,7 +103,6 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-nonlinear = bool(args.nonlinear or False)
 op = TohokuHazardOptions(**kwargs)
 data_dir = create_directory(os.path.join(op.di, 'data'))
 plot_dir = create_directory(os.path.join(op.di, 'plots'))
