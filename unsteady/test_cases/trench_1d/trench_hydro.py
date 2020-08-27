@@ -12,7 +12,11 @@ Solves the initial hydrodynamics simulation of a migrating trench.
 from thetis import *
 
 import numpy as np
+import os
 import time
+
+import os
+from firedrake.petsc import PETSc
 
 
 def export_final_state(inputdir, uv, elev):  # TODO: Put into io?
@@ -30,6 +34,10 @@ def export_final_state(inputdir, uv, elev):  # TODO: Put into io?
     chk.store(elev, name="elevation")
     File(inputdir + '/elevationout.pvd').write(elev)
     chk.close()
+
+    plex = elev.function_space().mesh()._plex
+    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
+    viewer(plex)
 
 res = 1
 
@@ -66,7 +74,8 @@ uv_init = as_vector((0.51, 0.0))
 # choose directory to output results
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-outputdir = 'outputs' + st
+di = os.path.dirname(__file__)
+outputdir = os.path.join(di, 'outputs' + st)
 
 print_output('Exporting to '+outputdir)
 

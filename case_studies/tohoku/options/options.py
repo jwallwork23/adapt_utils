@@ -3,6 +3,7 @@ from thetis import *
 import netCDF4
 import os
 
+from adapt_utils.io import load_mesh
 from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
 from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
 
@@ -56,7 +57,7 @@ class TohokuOptions(TsunamiOptions):
                    earthquake, Japan: Inversion analysis based on dispersive tsunami simulations",
                    Geophysical Research Letters (2011), 38(7).
     """
-    def __init__(self, mesh=None, level=0, force_zone_number=54, **kwargs):
+    def __init__(self, mesh=None, force_zone_number=54, **kwargs):
         """
         :kwarg mesh: optionally use a custom mesh.
         :kwarg level: mesh resolution level, to be used if no mesh is provided.
@@ -69,37 +70,34 @@ class TohokuOptions(TsunamiOptions):
         :kwarg base_viscosity: :type:`float` value to be assigned to constant viscosity field.
         :kwarg postproc: :type:`bool` value toggling whether to use an initial mesh which has been
             postprocessed using Pragmatic (see `resources/meshes/postproc.py`.)
-        :kwarg radius: distance indicating radii around the locations of interest, thereby
-            determining regions of interest for use in hazard assessment QoIs.
         """
         super(TohokuOptions, self).__init__(force_zone_number=force_zone_number, **kwargs)
+
+        # Process keyword arguments
+        self.level = kwargs.get('level', 0)
         self.save_timeseries = kwargs.get('save_timeseries', False)
         self.synthetic = kwargs.get('synthetic', False)
         if not self.synthetic:
             self.noisy_data = kwargs.get('noisy_data', False)
         self.qoi_scaling = kwargs.get('qoi_scaling', 1.0)
+        postproc = kwargs.get('postproc', False)
 
         # Mesh
         self.print_debug("INIT: Loading mesh...")
         self.resource_dir = os.path.join(os.path.dirname(__file__), '..', 'resources')
-        self.level = level
-        self.meshfile = os.path.join(self.resource_dir, 'meshes', 'Tohoku{:d}'.format(self.level))
-        postproc = kwargs.get('postproc', False)
+        self.mesh_dir = os.path.join(self.resource_dir, 'meshes')
+        self.mesh_file = 'Tohoku{:d}'.format(self.level)
         if mesh is None:
             if postproc:
-                from firedrake.petsc import PETSc
-
-                newplex = PETSc.DMPlex().create()
-                newplex.createFromFile(self.meshfile + '.h5')
-                self.default_mesh = Mesh(newplex)
+                self.default_mesh = load_mesh(self.mesh_file, self.mesh_dir)
             else:
-                self.default_mesh = Mesh(self.meshfile + '.msh')
+                self.default_mesh = Mesh(os.path.join(self.mesh_dir, self.mesh_file) + '.msh')
         else:
             self.default_mesh = mesh
-        self.print_debug("INIT: Done!")
 
         # Physics
-        self.friction = 'manning'
+        self.friction = None
+        # self.friction = 'manning'  # FIXME
         self.friction_coeff = 0.025
         self.base_viscosity = kwargs.get('base_viscosity', 0.0)
 
@@ -113,29 +111,12 @@ class TohokuOptions(TsunamiOptions):
         #  * There is a trade-off between having an unneccesarily small timestep and being able to
         #    represent the gauge timeseries profiles.
         self.timestepper = 'CrankNicolson'
-        self.dt = kwargs.get('dt', 60.0*0.5**level)
+        self.dt = kwargs.get('dt', 60.0*0.5**self.level)
         self.dt_per_export = int(60.0/self.dt)
         self.start_time = kwargs.get('start_time', 0.0)
-        # self.start_time = kwargs.get('start_time', 15*60.0)
-        # self.end_time = kwargs.get('end_time', 24*60.0)
-        # self.end_time = kwargs.get('end_time', 60*60.0)
         self.end_time = kwargs.get('end_time', 120*60.0)
         self.num_timesteps = int(self.end_time/self.dt + 1)
         self.times = [i*self.dt for i in range(self.num_timesteps)]
-
-        # Compute CFL number
-        if self.debug:
-            self.print_debug("INIT: Computing CFL number...")
-            P0 = FunctionSpace(self.default_mesh, "DG", 0)
-            P1 = FunctionSpace(self.default_mesh, "CG", 1)
-            b = self.set_bathymetry(P1).vector().gather().max()
-            g = self.g.values()[0]
-            celerity = np.sqrt(g*b)
-            dx = interpolate(CellDiameter(self.default_mesh), P0).vector().gather().max()
-            cfl = celerity*self.dt/dx
-            msg = "dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
-            print_output(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
-            self.print_debug("INIT: Done!")
 
         # Gauge classifications
         self.near_field_pressure_gauges = {
@@ -182,18 +163,6 @@ class TohokuOptions(TsunamiOptions):
         )
         self.get_gauges()
 
-        # Location classifications
-        self.locations_to_consider = (
-            # "Onagawa",
-            # "Tokai",
-            # "Hamaoka",
-            # "Tohoku",
-            # "Tokyo",
-            "Fukushima Daiichi",
-            # "Fukushima Daini",
-        )
-        self.get_locations_of_interest(**kwargs)
-
     def read_bathymetry_file(self, source='etopo1'):
         self.print_debug("INIT: Reading bathymetry file...")
         if source == 'gebco':
@@ -209,7 +178,6 @@ class TohokuOptions(TsunamiOptions):
         else:
             raise ValueError("Bathymetry data source {:s} not recognised.".format(source))
         nc.close()
-        self.print_debug("INIT: Done!")
         return lon, lat, elev
 
     def read_surface_file(self, zeroed=True):
@@ -222,7 +190,6 @@ class TohokuOptions(TsunamiOptions):
         lat = nc.variables['lat' if zeroed else 'y'][:]
         elev = nc.variables['z'][:, :]
         nc.close()
-        self.print_debug("INIT: Done!")
         return lon, lat, elev
 
     def get_gauges(self):
@@ -384,59 +351,8 @@ class TohokuOptions(TsunamiOptions):
             except PointNotInDomainError:
                 self.print_debug("NOTE: Gauge {:5s} is not in the domain; removing it".format(gauge))
                 self.gauges.pop(gauge)
-        self.print_debug("INIT: Done!")
 
-    def get_locations_of_interest(self, **kwargs):
-        """
-        Read in locations of interest, determine their coordinates and check these coordinate lie
-        within the domain.
-
-        The possible coastal locations of interest include major cities and nuclear power plants:
-
-        * Cities:
-          - Onagawa;
-          - Tokai;
-          - Hamaoka;
-          - Tohoku;
-          - Tokyo.
-
-        * Nuclear power plants:
-          - Fukushima Daiichi;
-          - Fukushima Daini.
-        """
-        radius = kwargs.get('radius', 50.0e+03)
-        locations_of_interest = {
-            "Onagawa": {"lonlat": (141.5008, 38.3995)},
-            "Tokai": {"lonlat": (140.6067, 36.4664)},
-            "Hamaoka": {"lonlat": (138.1433, 34.6229)},
-            "Tohoku": {"lonlat": (141.3903, 41.1800)},
-            "Tokyo": {"lonlat": (139.6917, 35.6895)},
-            "Fukushima Daiichi": {"lonlat": (141.0281, 37.4213)},
-            "Fukushima Daini": {"lonlat": (141.0249, 37.3166)},
-        }
-
-        # Convert coordinates to UTM and create timeseries array
-        self.locations_of_interest = {}
-        for loc in self.locations_to_consider:
-            self.locations_of_interest[loc] = {"data": [], "timeseries": []}
-            self.locations_of_interest[loc]["lonlat"] = locations_of_interest[loc]["lonlat"]
-            lon, lat = self.locations_of_interest[loc]["lonlat"]
-            self.locations_of_interest[loc]["utm"] = from_latlon(lat, lon, force_zone_number=54)
-            self.locations_of_interest[loc]["coords"] = self.locations_of_interest[loc]["utm"]
-
-        # Check validity of gauge coordinates
-        for loc in self.locations_to_consider:
-            try:
-                self.default_mesh.coordinates.at(self.locations_of_interest[loc]['coords'])
-            except PointNotInDomainError:
-                self.print_debug("NOTE: Location {:s} is not in the domain; removing it".format(loc))
-                self.locations_of_interest.pop(loc)
-
-        # Regions of interest
-        loi = self.locations_of_interest
-        self.region_of_interest = [loi[loc]["coords"] + (radius, ) for loc in loi]
-
-    def _get_update_forcings_forward(self, prob, i):
+    def _get_update_forcings_forward(self, prob, i):  # TODO: Use QoICallback
         from adapt_utils.misc import ellipse
 
         self.J = 0 if np.isclose(self.regularisation, 0.0) else self.get_regularisation_term(prob)
@@ -650,31 +566,26 @@ class TohokuOptions(TsunamiOptions):
         #          different PhysID.
         return boundary_conditions
 
-    def annotate_plot(self, axes, coords="utm", gauges=False, fontsize=12):
+    def annotate_plot(self, axes, coords="utm", fontsize=12):
         """
-        Annotate `axes` in coordinate system `coords` with all gauges or locations of interest, as
-        determined by the Boolean kwarg `gauges`.
+        Annotate `axes` in coordinate system `coords` with all gauges.
+
+        :arg axes: `matplotlib.pyplot` :class:`axes` object.
+        :kwarg coords: coordinate system, from 'lonlat' and 'utm'.
+        :kwarg fontsize: font size to use in annotations.
         """
         if coords not in ("lonlat", "utm"):
             raise ValueError("Coordinate system {:s} not recognised.".format(coords))
-        dat = self.gauges if gauges else self.locations_of_interest
         offset = 40.0e+03
-        for loc in dat:
-            x, y = np.copy(dat[loc][coords])
+        for loc in self.gauges:
+            x, y = np.copy(self.gauges[loc][coords])
             kwargs = {
-                "xy": dat[loc][coords],
-                "color": "indigo",
+                "xy": self.gauges[loc][coords],
                 "ha": "right",
                 "va": "center",
                 "fontsize": fontsize,
             }
-            if not gauges:
-                if loc == "Fukushima Daini":
-                    continue
-                elif loc == "Fukushima Daiichi":
-                    loc = "Fukushima"
-                x += offset
-            elif loc[0] == "8":
+            if loc[0] == "8":
                 kwargs["color"] = "C3"
 
                 # Horizontal alignment
@@ -709,7 +620,7 @@ class TohokuOptions(TsunamiOptions):
                 elif loc == "MPG1":
                     y -= offset
             kwargs["xytext"] = (x, y)
-            axes.plot(*dat[loc][coords], 'x', color=kwargs["color"])
+            axes.plot(*self.gauges[loc][coords], 'x', color=kwargs["color"])
             axes.annotate(loc, **kwargs)
 
     def detide(self, gauge):
@@ -765,10 +676,17 @@ class TohokuOptions(TsunamiOptions):
         self.print_debug("INIT: Applying UTide de-tiding algorithm to gauge {:s}...".format(gauge))
         sol = utide.solve(time_str, anomaly, **kwargs)
         tide = utide.reconstruct(time_str, sol, verbose=self.debug)
-        self.print_debug("INIT: Done!")
 
         # Subtract de-tided component
         detided = anomaly - np.array(tide.h).reshape(anomaly.shape)
         # diff = detided - elev
 
         return time, detided, elev
+
+    def set_qoi_kernel(self, prob, i):  # TODO: Use this instead of update_forcings
+        prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
+        kernel_u, kernel_eta = prob.kernels[i].split()
+        kernel_u.rename("QoI kernel (velocity component)")
+        kernel_eta.rename("QoI kernel (elevation component)")
+        kernel_u.assign(0.0)
+        kernel_eta.assign(0.0)

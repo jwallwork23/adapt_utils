@@ -13,14 +13,11 @@ dir:
 	@mkdir -p outputs/loseille_averaged/hdf5
 	@mkdir -p outputs/loseille_superposed/hdf5
 	@mkdir -p data
-	@echo "Done!"
 
 uniform:
 	@echo "Running uniform convergence test..."
 	@python3 run_uniform_convergence.py
-	@echo "Done!"
 
 table:
 	@echo "Writing to LaTeX formatted table..."
 	@python3 write_table.py
-	@echo "Done!"

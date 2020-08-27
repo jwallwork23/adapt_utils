@@ -6,20 +6,15 @@ import matplotlib.pyplot as plt
 import warnings
 
 from adapt_utils.adapt.kernels import *
+from adapt_utils.io import save_mesh, load_mesh
 from adapt_utils.options import Options
-from adapt_utils.misc import suppress_output
 
 
 __all__ = ["pragmatic_adapt", "AdaptiveMesh"]
 
 
-def pragmatic_adapt(mesh, M, op=Options):
-    if not op.debug:
-        with suppress_output():
-            out = adapt(mesh, M)
-    else:
-        out = adapt(mesh, M)
-    return out
+def pragmatic_adapt(mesh, M):
+    return adapt(mesh, M)
 
 
 class AdaptiveMesh():
@@ -125,29 +120,29 @@ class AdaptiveMesh():
         if savefig:
             plt.savefig(os.path.join(self.op.di, 'scaled_jacobian.pdf'))
 
-    def save_plex(self, filename):
+    def save_mesh(self, *args):
         """
-        Save mesh in DMPlex format.
-        """
-        viewer = PETSc.Viewer().createHDF5(filename, 'w')
-        try:
-            viewer(self.mesh._topology_dm)
-        except AttributeError:
-            viewer(self.mesh._plex)  # backwards compatibility
+        Save mesh to DMPlex format.
 
-    def load_plex(self, filename):
+        :arg fname: file name (without '.h5' extension).
+        :arg fpath: directory to store the file.
+        """
+        save_mesh(self.mesh, *args)
+
+    def load_mesh(self, *args):
         """
         Load mesh from DMPlex format. The `MeshHierarchy` is reinstated.
+
+        :arg fname: file name (without '.h5' extension).
+        :arg fpath: directory where the file is stored.
         """
-        newplex = PETSc.DMPlex().create()
-        newplex.createFromFile(filename)
-        self.__init__(Mesh(newplex), levels=self.levels)
+        self.__init__(load_mesh(*args), levels=self.levels)
 
     def pragmatic_adapt(self, metric):
         """
         Adapt mesh using a specified metric. The `MeshHierarchy` is reinstated.
         """
-        self.__init__(adapt(self.mesh, metric), levels=self.levels)
+        self.__init__(pragmatic_adapt(self.mesh, metric), levels=self.levels)
 
     def get_edge_lengths(self):
         """

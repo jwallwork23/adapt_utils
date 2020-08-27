@@ -79,7 +79,7 @@ class TsunamiOptions(CoupledOptions):
         lon, lat = utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)
         self.lonlat_mesh.coordinates.interpolate(as_vector([lon, lat]))
 
-    def set_bathymetry(self, fs=None, dat=None, northern=True, force_longitude=True, **kwargs):
+    def set_bathymetry(self, fs=None, northern=True, force_longitude=True, **kwargs):
         """
         Derived classes should implement :attr:`read_bathymetry_file` such that it returns a 3-tuple
         of longitude, latitude and elevation data over a rectangular grid.
@@ -96,7 +96,6 @@ class TsunamiOptions(CoupledOptions):
         processors and Firedrake manages halo updates.
 
         :kwarg fs: :class:`FunctionSpace` for the bathymetry to live in. By default, P1 space is used
-        :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
         :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
         :kwarg force_longitude: toggle checking validity of the UTM zone.
 
@@ -108,30 +107,26 @@ class TsunamiOptions(CoupledOptions):
         bathymetry = Function(fs, name="Bathymetry")
 
         # Interpolate bathymetry data *in lonlat space*
-        lon, lat, elev = dat or self.read_bathymetry_file(**kwargs)
-        self.print_debug("INIT: Creating bathymetry interpolator...")
-        bath_interp = si.RectBivariateSpline(lat, lon, elev)
-        self.print_debug("INIT: Done!")
+        if not hasattr(self, 'bathymetry_interpolator'):
+            lon, lat, elev = self.read_bathymetry_file(**kwargs)
+            self.print_debug("INIT: Creating bathymetry interpolator...")
+            self.bathymetry_interpolator = si.RectBivariateSpline(lat, lon, elev)
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating bathymetry...")
-        msg = "    Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
+        conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
-            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number,
-                                     northern=northern, force_longitude=force_longitude)
-            bathymetry.dat.data[i] -= bath_interp(lat, lon)
-            self.print_debug(msg.format(xy[0], xy[1], bathymetry.dat.data[i]/1000), mode='full')
-        self.print_debug("INIT: Done!")
+            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
+            bathymetry.dat.data[i] -= self.bathymetry_interpolator(lat, lon)
 
         # Cap bathymetry to enforce a minimum depth
         self.print_debug("INIT: Capping bathymetry...")  # TODO: Should we really be doing this?
         if self.bathymetry_cap is not None:
             bathymetry.interpolate(max_value(self.bathymetry_cap, bathymetry))
-        self.print_debug("INIT: Done!")
 
         return bathymetry
 
-    def set_initial_surface(self, fs=None, dat=None, northern=True, force_longitude=True, **kwargs):
+    def set_initial_surface(self, fs=None, northern=True, force_longitude=True, **kwargs):
         """
         Derived classes should implement :attr:`read_surface_file` such that it returns a 3-tuple
         of longitude, latitude and elevation data over a rectangular grid.
@@ -145,7 +140,6 @@ class TsunamiOptions(CoupledOptions):
         processors and Firedrake manages halo updates.
 
         :kwarg fs: :class:`FunctionSpace` for the bathymetry to live in. By default, P1 space is used
-        :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
         :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
         :kwarg force_longitude: toggle checking validity of the UTM zone.
 
@@ -155,20 +149,17 @@ class TsunamiOptions(CoupledOptions):
         initial_surface = Function(fs, name="Initial free surface")
 
         # Interpolate bathymetry data *in lonlat space*
-        self.print_debug("INIT: Creating surface interpolator...")
-        lon, lat, elev = dat or self.read_surface_file(**kwargs)
-        surf_interp = si.RectBivariateSpline(lat, lon, elev)
-        self.print_debug("INIT: Done!")
+        if not hasattr(self, 'surface_interpolator'):
+            self.print_debug("INIT: Creating surface interpolator...")
+            lon, lat, elev = self.read_surface_file(**kwargs)
+            self.surface_interpolator = si.RectBivariateSpline(lat, lon, elev)
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating initial surface...")
-        msg = "    Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
+        conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
-            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number,
-                                     northern=northern, force_longitude=force_longitude)
-            initial_surface.dat.data[i] = surf_interp(lat, lon)
-            self.print_debug(msg.format(xy[0], xy[1], initial_surface.dat.data[i]), mode='full')
-        self.print_debug("INIT: Done!")
+            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
+            initial_surface.dat.data[i] = self.surface_interpolator(lat, lon)
 
         return initial_surface
 
@@ -189,7 +180,6 @@ class TsunamiOptions(CoupledOptions):
         u, eta = prob.fwd_solutions[0].split()
         u.assign(0.0)  # (Naively) assume zero initial velocity
         eta.interpolate(surf)  # Initial surface from inversion data
-        self.print_debug("INIT: Done!")
 
         # Subtract from the bathymetry field
         self.subtract_surface_from_bathymetry(prob, surf=surf)
@@ -224,7 +214,6 @@ class TsunamiOptions(CoupledOptions):
         # Project updated bathymetry onto each mesh
         for i in range(self.num_meshes):
             prob.bathymetry[i].project(b)
-        self.print_debug("INIT: Done!")
 
     def set_coriolis(self, fs):
         if not self.rotational:
@@ -237,21 +226,7 @@ class TsunamiOptions(CoupledOptions):
         return interpolate(2*self.Omega*sin(radians(lat)), fs)
 
     def set_qoi_kernel(self, prob, i):
-        # b = self.ball(prob.meshes[i], source=False)
-        # b = self.circular_bump(prob.meshes[i], source=False)
-        b = self.gaussian(prob.meshes[i], source=False)
-
-        # TODO: Normalise by area computed on fine reference mesh
-        # area = assemble(b*dx)
-        # area_fine_mesh = ...
-        # rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
-        rescaling = Constant(1.0)
-
-        prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
-        kernel_u, kernel_eta = prob.kernels[i].split()
-        kernel_u.rename("QoI kernel (velocity component)")
-        kernel_eta.rename("QoI kernel (elevation component)")
-        kernel_eta.interpolate(rescaling*b)
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def set_terminal_condition(self, prob):  # TODO: For hazard case
         prob.adj_solutions[-1].assign(0.0)
@@ -351,3 +326,20 @@ class TsunamiOptions(CoupledOptions):
     def detide(self, gauge):
         """To be implemented in subclass."""
         raise NotImplementedError
+
+    def check_cfl_criterion(self, prob, error_factor=None):
+        for i, (mesh, P0, bathymetry) in enumerate(zip(prob.meshes, prob.P0, prob.bathymetry)):
+            self.print_debug("INIT: Computing CFL number on mesh {:d}...".format(i))
+            b = bathymetry.vector().gather().max()
+            g = self.g.values()[0]
+            celerity = np.sqrt(g*b)
+            dx = interpolate(CellDiameter(mesh), P0).vector().gather().min()
+            cfl = celerity*self.dt/dx
+            msg = "INIT:   dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
+            self.print_debug(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
+            if error_factor is not None and cfl >= error_factor:
+                if np.isclose(error_factor, 1.0):
+                    raise ValueError("CFL criterion not met! (CFL number {:.4e})".format(cfl))
+                else:
+                    msg = "Relaxed CFL criterion not met! (CFL number {:.4e} > {:.4e})"
+                    raise ValueError(msg.format(cfl, error_factor))

@@ -5,6 +5,7 @@ from thetis import *
 import os
 import numpy as np
 
+from ..io import save_mesh, load_mesh
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
@@ -91,8 +92,6 @@ class AdaptiveProblemBase(object):
         Setup everything which isn't explicitly associated with either the forward or adjoint
         problem.
         """
-        from thetis.callback import CallbackManager
-
         op = self.op
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
@@ -108,8 +107,6 @@ class AdaptiveProblemBase(object):
         self.set_stabilisation()
         op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
         self.set_boundary_conditions()
-        op.print_debug(op.indent + "SETUP: Creating CallbackManagers...")
-        self.callbacks = [CallbackManager() for mesh in self.meshes]
         op.print_debug(op.indent + "SETUP: Creating output files...")
         self.di = create_directory(op.di)
         self.create_outfiles()
@@ -117,10 +114,11 @@ class AdaptiveProblemBase(object):
         self.create_intermediary_spaces()
 
         # Various empty lists and dicts
+        self.callbacks = [None for mesh in self.meshes]
         self.equations = [AttrDict() for mesh in self.meshes]
         self.error_estimators = [AttrDict() for mesh in self.meshes]
-        self.timesteppers = [AttrDict() for mesh in self.meshes]
         self.kernels = [None for mesh in self.meshes]
+        self.timesteppers = [AttrDict() for mesh in self.meshes]
 
     def set_meshes(self, meshes):
         """
@@ -140,6 +138,15 @@ class AdaptiveProblemBase(object):
             # if self.op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO
             #     coords = mesh.coordinates
             #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
+
+    def get_plex(self, i):
+        """
+        :return: DMPlex associated with the ith mesh.
+        """
+        try:
+            return self.meshes[i]._topology_dm
+        except AttributeError:
+            return self.meshes[i]._plex  # Backwards compatability
 
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")
@@ -279,28 +286,27 @@ class AdaptiveProblemBase(object):
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
             f.dat.data[:] = f_int.dat.data
 
-    def store_plexes(self, di=None):
-        """Save meshes to disk using DMPlex format."""
-        from firedrake.petsc import PETSc
+    def save_meshes(self, fname='plex', fpath=None):
+        """
+        Save meshes to disk using DMPlex format in HDF5 files.
 
-        di = di or os.path.join(self.di, self.approach)
-        fname = os.path.join(di, 'plex_{:d}.h5')
+        :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
+        :kwarg fpath: directory in which to save the HDF5 files.
+        """
+        fpath = fpath or os.path.join(self.di, self.approach)
         for i, mesh in enumerate(self.meshes):
-            assert os.path.isdir(di)
-            viewer = PETSc.Viewer().createHDF5(fname.format(i), 'w')
-            try:
-                viewer(mesh._topology_dm)
-            except AttributeError:
-                viewer(mesh._plex)  # backwards compatability
+            save_mesh(mesh, '_'.join([fname, '{:d}.h5'.format(i)]), fpath)
 
-    def load_plexes(self, fname):
-        """Load meshes in DMPlex format."""
-        from firedrake.petsc import PETSc
+    def load_meshes(self, fname='plex', fpath=None):
+        """
+        Load meshes in DMPlex format in HDF5 files.
 
+        :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
+        :kwarg fpath: filepath to where the HDF5 files are to be loaded from.
+        """
+        fpath = fpath or os.path.join(self.di, self.approach)
         for i in range(self.num_meshes):
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile('_'.join([fname, '{:d}.h5'.format(i)]))
-            self.meshes[i] = Mesh(newplex)
+            self.meshes[i] = load_mesh('_'.join([fname, '{:d}.h5'.format(i)]), fpath)
 
     def solve(self, adjoint=False, **kwargs):
         """
@@ -422,7 +428,6 @@ class AdaptiveProblemBase(object):
             assert monitors[i] is not None
             args = (Mesh(self.meshes[i].coordinates.copy(deepcopy=True)), monitors[i])
             self.mesh_movers[i] = MeshMover(*args, **kwargs)
-        self.op.print_debug("MESH MOVEMENT: Done!")
 
     def move_mesh(self, i):
         # TODO: documentation
@@ -493,29 +498,23 @@ class AdaptiveProblemBase(object):
         # Compute new physical mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Establishing mesh transformation...")
         self.mesh_movers[i].adapt()
-        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Update intermediary mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating intermediary mesh coordinates...")
         self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
-        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Project a copy of the current solution onto mesh defined on new coordinates
         self.op.print_debug("MESH MOVEMENT: Projecting solutions onto intermediary mesh...")
         self.project_to_intermediary_mesh(i)
-        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Update physical mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating physical mesh coordinates...")
         self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data
-        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Copy over projected solution data
         self.op.print_debug("MESH MOVEMENT: Transferring solution data from intermediary mesh...")
         self.copy_data_from_intermediary_mesh(i)  # FIXME: Needs annotation
-        self.op.print_debug("MESH MOVEMENT: Done!")
 
         # Re-interpolate fields
         self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
         self.set_fields()
-        self.op.print_debug("MESH MOVEMENT: Done!")

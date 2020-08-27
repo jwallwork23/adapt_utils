@@ -87,9 +87,7 @@ class CoupledOptions(Options):
         #     ---------------- ------------ ----------------
         self.solver_parameters = {
             "shallow_water": {
-                # "snes_converged_reason": None,
                 "ksp_type": "gmres",
-                # "ksp_converged_reason": None,
                 "pc_type": "fieldsplit",
                 "pc_fieldsplit_type": "multiplicative",
                 "fieldsplit_U_2d": {
@@ -97,8 +95,6 @@ class CoupledOptions(Options):
                     "ksp_max_it": 10000,
                     "ksp_rtol": 1.0e-05,
                     "pc_type": "sor",
-                    # "ksp_view": None,
-                    # "ksp_converged_reason": None,
                 },
                 "fieldsplit_H_2d": {
                     "ksp_type": "preonly",
@@ -106,27 +102,19 @@ class CoupledOptions(Options):
                     "ksp_rtol": 1.0e-05,
                     # "pc_type": "sor",
                     "pc_type": "jacobi",
-                    # "ksp_view": None,
-                    # "ksp_converged_reason": None,
                 },
             },
             "tracer": {
                 "ksp_type": "gmres",
                 "pc_type": "sor",
-                # "ksp_monitor": None,
-                # "ksp_converged_reason": None,
             },
             "sediment": {
                 "ksp_type": "gmres",
                 "pc_type": "sor",
-                # "ksp_monitor": None,
-                # "ksp_converged_reason": None,
             },
             "exner": {
                 "ksp_type": "gmres",
                 "pc_type": "sor",
-                # "ksp_monitor": None,
-                # "ksp_converged_reason": None,
             }
         }
         self.adjoint_solver_parameters.update(self.solver_parameters)

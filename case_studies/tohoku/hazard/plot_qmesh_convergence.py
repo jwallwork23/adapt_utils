@@ -1,26 +1,35 @@
 from thetis import create_directory
 
-import matplotlib.pyplot as plt
-import os
-import numpy as np
-import datetime
 import argparse
+import datetime
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
-plt.style.use('seaborn-talk')
+from adapt_utils.plotting import *
+
+
+# --- Parse arguments
 
 parser = argparse.ArgumentParser()
 parser.add_argument("dates")
 parser.add_argument("runs")
 args = parser.parse_args()
 
-di = os.path.join(os.path.dirname(__file__), 'outputs/qmesh')
+
+# --- Set parameters
+
+di = os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh')
 dates = args.dates.split(',')
 runs = args.runs.split(',')
 if len(dates) < len(runs):
     dates = [dates[0] for r in runs]
 assert len(dates) == len(runs)
-
 qois_old = None
+
+
+# --- Load data and plot
+
 for date, run in zip(dates, runs):
     filename = os.path.join(di, '-'.join([date, 'run', run]), 'log')
     use = False
@@ -45,10 +54,7 @@ for date, run in zip(dates, runs):
 plt.xlabel("Element count")
 plt.ylabel(r"Quantity of interest, $J(\mathbf{u},\eta)$")
 plt.legend()
-
 date = datetime.date.today()
 date = '{:d}-{:d}-{:d}'.format(date.year, date.month, date.day)
-di = os.path.join(di, '{:s}-runs-{:s}'.format(date, '-'.join([r for r in runs])))
-if not os.path.exists(di):
-    create_directory(di)
+di = create_directory(os.path.join(di, '{:s}-runs-{:s}'.format(date, '-'.join([r for r in runs]))))
 plt.savefig(os.path.join(di, 'qoi_convergence.png'))

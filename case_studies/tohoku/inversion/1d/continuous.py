@@ -445,4 +445,3 @@ if plot_pdf:
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
     plt.savefig(os.path.join(plot_dir, 'continuous', 'timeseries_optimised_{:d}.pdf'.format(level)))
-print_output("Done!")

@@ -375,4 +375,3 @@ if plot_pdf or plot_png:
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
     savefig(os.path.join(plot_dir, 'discrete', 'timeseries_optimised_{:d}'.format(level)))
-print_output("Done!")

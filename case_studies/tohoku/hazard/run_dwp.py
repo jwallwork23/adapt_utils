@@ -2,10 +2,14 @@ from thetis import *
 
 import argparse
 import datetime
+import matplotlib.pyplot as plt
+import os
 
-from adapt_utils.unsteady.case_studies.tohoku.options.options import TohokuOptions
-from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
+from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
+from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
+
+# --- Parse arguments
 
 parser = argparse.ArgumentParser(prog="run_dwp")
 
@@ -16,6 +20,8 @@ parser.add_argument("-num_meshes", help="Number of meshes to consider (default 1
 
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space (default cg-cg)")
+parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
+parser.add_argument("-stabilisation", help="Stabilisation method to use (default None)")
 
 # Mesh adaptation
 parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
@@ -31,36 +37,54 @@ parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of intere
 
 # QoI
 parser.add_argument("-start_time", help="""
-Start time of period of interest (default 1200s i.e. 20mins)""")
+    Start time of period of interest in seconds (default zero)""")
 parser.add_argument("-locations", help="""
-Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
-'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
-""")
-parser.add_argument("-radii", help="Radii of interest, separated by commas (default 100km)")
+    Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
+    'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
+    """)
+parser.add_argument("-radius", help="Radius of interest (default 100km)")
 
-# Misc
+# I/O and debugging
+parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
+parser.add_argument("-plot_png", help="Toggle plotting to .png")
+parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
+parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
 parser.add_argument("-debug", help="Print all debugging statements")
+parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
+
 args, unknown = parser.parse_known_args()
 p = args.norm_order
 
-# Collect locations and radii
+
+# --- Set parameters
+
+plot_pdf = bool(args.plot_pdf or False)
+plot_png = bool(args.plot_png or False)
+plot_pvd = bool(args.plot_pvd or False)
+plot_all = bool(args.plot_all or False)
+if plot_all:
+    plot_pvd = plot_pdf = plot_png = True
+plot_any = plot_pdf or plot_png
+extensions = []
+if plot_pdf:
+    extensions.append('pdf')
+if plot_png:
+    extensions.append('png')
 if args.locations is None:
     locations = ['Fukushima Daiichi', ]
 else:
     locations = args.locations.split(',')
-if args.radii is None:
-    radii = [100.0e+03 for l in locations]
-else:
-    radii = [float(r) for r in args.radii.split(',')]
-if len(locations) != len(radii):
-    msg = "Number of locations ({:d}) and radii ({:d}) do not match."
-    raise ValueError(msg.format(len(locations), len(radii)))
-
-# Set parameters for fixed mesh run
+radius = float(args.radius or 100.0e+03)
+family = args.family or 'cg-cg'  # FIXME: what's wrong with dg-cg?
+nonlinear = bool(args.nonlinear or False)
+stabilisation = args.stabilisation or 'lax_friedrichs'
+if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
+    stabilisation = None
 kwargs = {
+    'approach': 'dwp',
 
     # Space-time domain
-    'level': int(args.level or 2),
+    'level': int(args.level or 0),
     'end_time': float(args.end_time or 1440.0),
     'num_meshes': int(args.num_meshes or 12),
 
@@ -68,13 +92,13 @@ kwargs = {
     'bathymetry_cap': 30.0,  # FIXME
 
     # Solver
-    'family': args.family or 'cg-cg',
-    'stabilsation': None,  # TODO: Lax-Friedrichs
+    'family': family,
+    'stabilsation': stabilisation,
+    'use_wetting_and_drying': False,
 
     # QoI
-    'start_time': float(args.start_time or 1200.0),
-    # 'start_time': float(args.start_time or 720.0),
-    'radii': radii,
+    'start_time': float(args.start_time or 0.0),
+    'radius': radius,
     'locations': locations,
 
     # Mesh adaptation
@@ -90,23 +114,28 @@ kwargs = {
     'num_adapt': int(args.num_adapt or 35),
 
     # Misc
+    'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
-    'plot_pvd': True,
+    'debug_mode': args.debug_mode or 'basic'
 }
 assert 0.0 <= kwargs['start_time'] <= kwargs['end_time']
 logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
 for key in kwargs:
     logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
+logstr += "    {:34s}: {:}\n".format('nonlinear', nonlinear)
 print_output(logstr + 80*'*' + '\n')
+op = TohokuHazardOptions(**kwargs)
 
-# Create parameter class and problem object
-op = TohokuOptions(approach='dwp')
-op.update(kwargs)
-swp = AdaptiveTsunamiProblem(op)
+
+# --- Solve
+
+swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
 swp.run_dwp()
 
-# Print summary / logging
-with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
+
+# --- Logging
+
+with open(os.path.join(os.path.dirname(__file__), '../../../.git/logs/HEAD'), 'r') as gitlog:
     for line in gitlog:
         words = line.split()
     logstr += "    {:34s}: {:}\n".format('adapt_utils git commit', words[1])
@@ -139,9 +168,10 @@ with open(os.path.join(di, 'log'), 'w') as logfile:
 print_output(di)
 
 # Plot element counts on a pie chart
-import matplotlib.pyplot as plt
-N = swp.num_cells[-1]
-plt.pie(N, labels=["Mesh {:d} ({:d})".format(i, n) for i, n in enumerate(N)])
-plt.title("Element counts for DWP adaptation")
-plt.savefig(os.path.join(di, 'pie.png'))
-plt.show()
+if plot_any:
+    N = swp.num_cells[-1]
+    plt.pie(N, labels=["Mesh {:d} ({:d})".format(i, n) for i, n in enumerate(N)])
+    plt.title("Element counts for DWP adaptation")
+    for ext in extensions:
+        plt.savefig(os.path.join(di, 'pie' + ext))
+    plt.show()

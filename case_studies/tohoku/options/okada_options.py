@@ -271,7 +271,6 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         # Create the topography, thereby calling Okada
         self.print_debug("SETUP: Creating topography using Okada model...")
         self.fault.create_dtopography(verbose=self.debug, active=True)
-        self.print_debug("SETUP: Done!")
 
         # Mark output as dependent
         if separate_faults:
@@ -307,7 +306,6 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         # Create the topography, thereby calling Okada
         self.print_debug("SETUP: Creating topography using Okada model...")
         self.fault.create_dtopography(verbose=self.debug, active=True)
-        self.print_debug("SETUP: Done!")
 
         # Compute quantity of interest
         self.J_subfaults = [0.0 for j in range(self.N)]
@@ -381,14 +379,12 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         for i, coord in enumerate(self.okada_mesh.coordinates.dat.data):
             self._x_locations.append(int(np.round((coord[0] - self.xmin)*(self.N-1)/self.lx)))
             self._y_locations.append(int(np.round((coord[1] - self.ymin)*(self.N-1)/self.ly)))
-        self.print_debug("SETUP: Done!")
 
         # Create source and target images and a libsupermesh projector between them
         self.print_debug("SETUP: Establishing supermesh projector between Okada and lonlat meshes...")
         self.source_okada = firedrake.Function(self.P1_okada, name="Interp. source on Okada mesh")
         self.target_lonlat = firedrake.Function(self.P1_lonlat, name="Interp. target on lonlat mesh")
         self._okada2lonlat = SupermeshProjector(self.source_okada, self.target_lonlat)
-        self.print_debug("SETUP: Done!")
 
         # Target image on UTM mesh
         P1 = firedrake.FunctionSpace(self.default_mesh, "CG", 1)
