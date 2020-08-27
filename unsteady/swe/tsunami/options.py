@@ -79,7 +79,7 @@ class TsunamiOptions(CoupledOptions):
         lon, lat = utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)
         self.lonlat_mesh.coordinates.interpolate(as_vector([lon, lat]))
 
-    def set_bathymetry(self, fs=None, dat=None, northern=True, force_longitude=True, **kwargs):
+    def set_bathymetry(self, fs=None, northern=True, force_longitude=True, **kwargs):
         """
         Derived classes should implement :attr:`read_bathymetry_file` such that it returns a 3-tuple
         of longitude, latitude and elevation data over a rectangular grid.
@@ -96,7 +96,6 @@ class TsunamiOptions(CoupledOptions):
         processors and Firedrake manages halo updates.
 
         :kwarg fs: :class:`FunctionSpace` for the bathymetry to live in. By default, P1 space is used
-        :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
         :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
         :kwarg force_longitude: toggle checking validity of the UTM zone.
 
@@ -108,18 +107,17 @@ class TsunamiOptions(CoupledOptions):
         bathymetry = Function(fs, name="Bathymetry")
 
         # Interpolate bathymetry data *in lonlat space*
-        lon, lat, elev = dat or self.read_bathymetry_file(**kwargs)
-        self.print_debug("INIT: Creating bathymetry interpolator...")
-        bath_interp = si.RectBivariateSpline(lat, lon, elev)
+        if not hasattr(self, 'bathymetry_interpolator'):
+            lon, lat, elev = self.read_bathymetry_file(**kwargs)
+            self.print_debug("INIT: Creating bathymetry interpolator...")
+            self.bathymetry_interpolator = si.RectBivariateSpline(lat, lon, elev)
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating bathymetry...")
-        # msg = "    Coordinates ({:.1f}, {:.1f}) Bathymetry {:.3f} km"
+        conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
-            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number,
-                                     northern=northern, force_longitude=force_longitude)
-            bathymetry.dat.data[i] -= bath_interp(lat, lon)
-            # self.print_debug(msg.format(xy[0], xy[1], bathymetry.dat.data[i]/1000), mode='full')
+            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
+            bathymetry.dat.data[i] -= self.bathymetry_interpolator(lat, lon)
 
         # Cap bathymetry to enforce a minimum depth
         self.print_debug("INIT: Capping bathymetry...")  # TODO: Should we really be doing this?
@@ -128,7 +126,7 @@ class TsunamiOptions(CoupledOptions):
 
         return bathymetry
 
-    def set_initial_surface(self, fs=None, dat=None, northern=True, force_longitude=True, **kwargs):
+    def set_initial_surface(self, fs=None, northern=True, force_longitude=True, **kwargs):
         """
         Derived classes should implement :attr:`read_surface_file` such that it returns a 3-tuple
         of longitude, latitude and elevation data over a rectangular grid.
@@ -142,7 +140,6 @@ class TsunamiOptions(CoupledOptions):
         processors and Firedrake manages halo updates.
 
         :kwarg fs: :class:`FunctionSpace` for the bathymetry to live in. By default, P1 space is used
-        :kwarg dat: optionally feed the longitude-latitude-elevation 3-tuple directly.
         :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
         :kwarg force_longitude: toggle checking validity of the UTM zone.
 
@@ -152,18 +149,17 @@ class TsunamiOptions(CoupledOptions):
         initial_surface = Function(fs, name="Initial free surface")
 
         # Interpolate bathymetry data *in lonlat space*
-        self.print_debug("INIT: Creating surface interpolator...")
-        lon, lat, elev = dat or self.read_surface_file(**kwargs)
-        surf_interp = si.RectBivariateSpline(lat, lon, elev)
+        if not hasattr(self, 'surface_interpolator'):
+            self.print_debug("INIT: Creating surface interpolator...")
+            lon, lat, elev = self.read_surface_file(**kwargs)
+            self.surface_interpolator = si.RectBivariateSpline(lat, lon, elev)
 
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating initial surface...")
-        # msg = "    Coordinates ({:.1f}, {:.1f}) Surface {:.3f} m"
+        conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
         for i, xy in enumerate(fs.mesh().coordinates.dat.data):
-            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number,
-                                     northern=northern, force_longitude=force_longitude)
-            initial_surface.dat.data[i] = surf_interp(lat, lon)
-            # self.print_debug(msg.format(xy[0], xy[1], initial_surface.dat.data[i]), mode='full')
+            lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
+            initial_surface.dat.data[i] = self.surface_interpolator(lat, lon)
 
         return initial_surface
 
