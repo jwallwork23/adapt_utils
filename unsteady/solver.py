@@ -1301,7 +1301,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Increment counters
             self.iteration -= 1
             self.simulation_time -= op.dt
-            self.callbacks[i].evaluate(mode='timestep')
 
             # Export
             if self.iteration % op.dt_per_export == 0:
