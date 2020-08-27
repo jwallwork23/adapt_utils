@@ -89,9 +89,7 @@ kwargs = {
     # Solver
     'family': family,
     'stabilsation': stabilisation,
-    # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
-    # 'wetting_and_drying_alpha': Constant(10.0),
 
     # QoI
     'start_time': float(args.start_time or 0.0),

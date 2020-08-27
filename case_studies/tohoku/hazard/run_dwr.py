@@ -94,6 +94,7 @@ kwargs = {
     # Solver
     'family': args.family or 'cg-cg',
     'stabilsation': None,  # TODO: Lax-Friedrichs
+    'use_wetting_and_drying': False,
 
     # QoI
     'start_time': float(args.start_time or 0.0),
@@ -113,13 +114,15 @@ kwargs = {
     'num_adapt': int(args.num_adapt or 5),  # As recommended in [Belme et al. 2012]
 
     # Misc
-    'debug': bool(args.debug or False),
     'plot_pvd': True,
+    'debug': bool(args.debug or False),
+    'debug_mode': args.debug_mode or 'basic'
 }
 assert 0.0 <= kwargs['start_time'] <= kwargs['end_time']
 logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
 for key in kwargs:
     logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
+logstr += "    {:34s}: {:}\n".format('nonlinear', nonlinear)
 print_output(logstr + 80*'*' + '\n')
 op = TohokuOptions(**kwargs)
 

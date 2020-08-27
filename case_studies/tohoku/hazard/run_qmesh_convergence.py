@@ -19,6 +19,7 @@ parser.add_argument("-num_meshes", help="Number of meshes to consider (for testi
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space (default 'dg-cg')")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
+parser.add_argument("-stabilisation", help="Stabilisation method to use (default None)")
 
 # Outer loop
 parser.add_argument("-levels", help="Number of mesh levels to consider (default 5)")
@@ -34,13 +35,13 @@ parser.add_argument("-radius", help="Radius of interest (default 100km)")
 
 # I/O and debugging
 parser.add_argument("-debug", help="Print all debugging statements")
+parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
 
 args = parser.parse_args()
 
 
 # --- Set parameters
 
-plot_pvd = bool(args.plot_pvd or False)
 if args.locations is None:  # TODO: Parse as list
     locations = ['Fukushima Daiichi', ]
 else:
@@ -52,6 +53,7 @@ stabilisation = args.stabilisation or 'lax_friedrichs'
 if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
 kwargs = {
+    'approach': 'fixed_mesh',
 
     # Space-time domain
     'num_meshes': int(args.num_meshes or 1),
@@ -71,7 +73,6 @@ kwargs = {
     'locations': locations,
 
     # I/O and debugging
-    'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
 }
 levels = int(args.levels or 4)
@@ -86,8 +87,8 @@ for level in range(levels):
     print_output("Running qmesh convergence on level {:d}".format(level))
 
     # Set parameters
-    op = TohokuOptions(approach='fixed_mesh', level=level)
-    op.update(kwargs)
+    kwargs['level'] = level
+    op = TohokuOptions(**kwargs)
 
     # Solve
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)

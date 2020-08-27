@@ -83,9 +83,7 @@ kwargs = {
     # Solver
     'family': family,
     'stabilisation': stabilisation,
-    # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
-    'wetting_and_drying_alpha': Constant(10.0),
 
     # Mesh adaptation
     'adapt_field': args.adapt_field or 'elevation',
@@ -116,6 +114,7 @@ save_plex = bool(args.save_plex or False)
 logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
 for key in kwargs:
     logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
+logstr += "    {:34s}: {:}\n".format('nonlinear', nonlinear)
 print_output(logstr + 80*'*' + '\n')
 
 

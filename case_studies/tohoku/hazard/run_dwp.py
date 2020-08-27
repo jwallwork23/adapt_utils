@@ -94,6 +94,7 @@ kwargs = {
     # Solver
     'family': family,
     'stabilsation': stabilisation,
+    'use_wetting_and_drying': False,
 
     # QoI
     'start_time': float(args.start_time or 0.0),
@@ -121,6 +122,7 @@ assert 0.0 <= kwargs['start_time'] <= kwargs['end_time']
 logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
 for key in kwargs:
     logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
+logstr += "    {:34s}: {:}\n".format('nonlinear', nonlinear)
 print_output(logstr + 80*'*' + '\n')
 op = TohokuOptions(**kwargs)
 
