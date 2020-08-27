@@ -67,6 +67,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for model in op.solver_parameters:
                 op.solver_parameters[model]['snes_type'] = 'ksponly'
                 op.adjoint_solver_parameters[model]['snes_type'] = 'ksponly'
+        if op.debug:
+            for model in op.solver_parameters:
+                op.solver_parameters[model]['ksp_converged_reason'] = None
+                op.solver_parameters[model]['snes_converged_reason'] = None
+                op.adjoint_solver_parameters[model]['ksp_converged_reason'] = None
+                op.adjoint_solver_parameters[model]['snes_converged_reason'] = None
+                if op.debug_mode == 'full':
+                    op.solver_parameters[model]['ksp_monitor'] = None
+                    op.solver_parameters[model]['snes_monitor'] = None
+                    op.adjoint_solver_parameters[model]['ksp_monitor'] = None
+                    op.adjoint_solver_parameters[model]['snes_monitor'] = None
         self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
         self.sediment_options = [AttrDict() for i in range(op.num_meshes)]
         self.exner_options = [AttrDict() for i in range(op.num_meshes)]
@@ -92,6 +103,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         super(AdaptiveProblem, self).__init__(op, nonlinear=nonlinear, **kwargs)
 
     def create_outfiles(self):
+        if not self.op.plot_pvd:
+            return
         if self.op.solve_swe:
             self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
             self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
@@ -323,6 +336,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
                 })
         self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
+
+        # Check CFL criterion
+        if self.op.debug and hasattr(self.op, 'check_cfl_criterion'):
+            self.op.check_cfl_criterion(self, error_factor=None)
+            # TODO: parameter for error_factor, defaulted by timestepper choice
+            # TODO: allow t-adaptation in a given subinterval
 
     # --- Stabilisation
 
@@ -962,6 +981,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
     # --- Solvers
 
     def add_callbacks(self, i):
+        from thetis.callback import CallbackManager
+
+        # Create a new CallbackManager object on every mesh
+        #   NOTE: This overwrites any pre-existing CallbackManagers
+        self.op.print_debug(self.op.indent + "SETUP: Creating CallbackManagers...")
+        self.callbacks[i] = CallbackManager()
+
+        # Add default callbacks
         if self.op.solve_swe:
             self.callbacks[i].add(VelocityNormCallback(self, i), 'export')
             self.callbacks[i].add(ElevationNormCallback(self, i), 'export')
@@ -1000,19 +1027,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         dbcs.append(DirichletBC(self.Q[i], bcs['tracer'][j]['value'], j))
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_tracer")
-            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         if op.solve_sediment:
             ts = self.timesteppers[i]['sediment']
             dbcs = []
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_sediment")
-            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         if op.solve_exner:
             ts = self.timesteppers[i]['exner']
             dbcs = []
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_exner")
-            op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
+        op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i)
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
@@ -1044,8 +1069,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print(msg.format(self.simulation_time, 0.0))
         else:
             msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f}) seconds"
-            self.print(msg.format(self.outer_iteration, '  '*i, i+1,
-                                  self.num_meshes, self.simulation_time, 0.0))
+            indent = '' if op.debug else '  '*i
+            self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                                  self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
         # Callbacks
@@ -1055,6 +1081,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if export_func is not None:
             export_func()
         self.callbacks[i].evaluate(mode='export')
+        self.callbacks[i].evaluate(mode='timestep')
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
@@ -1131,14 +1158,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Export
             self.iteration += 1
             self.simulation_time += op.dt
-            self.callbacks[i].evaluate(mode='timestep')
             if self.iteration % op.dt_per_export == 0:
                 cpu_time = perf_counter() - cpu_timestamp
                 if self.num_meshes == 1:
                     self.print(msg.format(self.simulation_time, cpu_time))
                 else:
-                    self.print(msg.format(self.outer_iteration, '  '*i, i+1,
-                                          self.num_meshes, self.simulation_time, cpu_time))
+                    indent = '' if op.debug else '  '*i
+                    self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                                          self.simulation_time, cpu_time))
                 cpu_timestamp = perf_counter()
                 if op.solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
@@ -1158,8 +1185,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if export_func is not None:
                     export_func()
                 self.callbacks[i].evaluate(mode='export')
+            self.callbacks[i].evaluate(mode='timestep')
         update_forcings(self.simulation_time + op.dt)
-        op.print_debug("Done!")
         self.print(80*'=')
 
     def setup_solver_adjoint(self, i):
@@ -1214,12 +1241,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.print(80*'=')
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         if self.num_meshes == 1:
-            msg = "ADJOINT SOLVE mesh  time {:8.2f}  ({:6.2f} seconds)"
+            msg = "ADJOINT SOLVE time {:8.2f}  ({:6.2f} seconds)"
             self.print(msg.format(self.simulation_time, 0.0))
         else:
+            indent = '' if op.debug else '  '*i
             msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
-            self.print(msg.format(self.outer_iteration, '  '*i, i+1,
-                                  self.num_meshes, self.simulation_time, 0.0))
+            self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                                  self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
         # Callbacks
@@ -1273,7 +1301,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Increment counters
             self.iteration -= 1
             self.simulation_time -= op.dt
-            self.callbacks[i].evaluate(mode='timestep')
 
             # Export
             if self.iteration % op.dt_per_export == 0:
@@ -1282,8 +1309,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.num_meshes == 1:
                     self.print(msg.format(self.simulation_time, cpu_time))
                 else:
-                    self.print(msg.format(self.outer_iteration, '  '*i, i+1,
-                                          self.num_meshes, self.simulation_time, cpu_time))
+                    indent = '' if op.debug else '  '*i
+                    self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                                          self.simulation_time, cpu_time))
                 if op.solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
@@ -1296,7 +1324,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     export_func()
         self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         update_forcings(self.simulation_time - op.dt)
-        op.print_debug("Done!")
         self.print(80*'=')
 
     # --- Metric
@@ -1408,7 +1435,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                                 H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
-
                 self.setup_solver_forward(i)
                 self.solve_forward_step(i, export_func=export_func, update_forcings=update_forcings, plot_pvd=op.plot_pvd)
 
@@ -1468,11 +1494,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            self.print("Done!")
 
             # ---  Setup for next run / logging
 
@@ -1525,7 +1550,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
         """
         op = self.op
-        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+        if op.plot_pvd:
+            self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
@@ -1602,8 +1628,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
             for i, M in enumerate(metrics):
-                self.indicator_file._topology = None
-                self.indicator_file.write(self.indicators[i]['dwp'])
+                if op.plot_pvd:
+                    self.indicator_file._topology = None
+                    self.indicator_file.write(self.indicators[i]['dwp'])
                 # metric_file._topology = None
                 # metric_file.write(M)
                 complexities.append(metric_complexity(M))
@@ -1614,11 +1641,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            self.print("Done!")
 
             # ---  Setup for next run / logging
 
@@ -1650,7 +1676,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
-        self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
+        if op.plot_pvd:
+            self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
         for n in range(op.num_adapt):
             self.outer_iteration = n
 
@@ -1706,7 +1733,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 fwd_solutions_step_old = []
                 adj_solutions_step = []
                 enriched_adj_solutions_step = []
-                tm = dmhooks.get_transfer_manager(self.meshes[i]._plex)
+                tm = dmhooks.get_transfer_manager(self.get_plex(i))
 
                 # --- Setup forward solver for enriched problem
 
@@ -1806,8 +1833,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # metric_file = File(os.path.join(self.di, 'metric.pvd'))
             complexities = []
             for i, M in enumerate(metrics):
-                self.indicator_file._topology = None
-                self.indicator_file.write(self.indicators[i]['dwr'])
+                if op.plot_pvd:
+                    self.indicator_file._topology = None
+                    self.indicator_file.write(self.indicators[i]['dwr'])
                 # metric_file._topology = None
                 # metric_file.write(M)
                 complexities.append(metric_complexity(M))
@@ -1818,11 +1846,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M, op=op)
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
             del metrics
             self.num_cells.append([mesh.num_cells() for mesh in self.meshes])
             self.num_vertices.append([mesh.num_vertices() for mesh in self.meshes])
-            self.print("Done!")
 
             # ---  Setup for next run / logging
 

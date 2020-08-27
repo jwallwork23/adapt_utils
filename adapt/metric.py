@@ -59,19 +59,16 @@ def steady_metric(f=None, H=None, projector=None, **kwargs):
     op.print_debug("METRIC: Constructing metric from Hessian...")
     kernel = eigen_kernel(metric_from_hessian, dim)
     op2.par_loop(kernel, V.node_set, M.dat(op2.RW), H.dat(op2.READ))
-    op.print_debug("METRIC: Done!")
 
     # Apply Lp normalisation
     if kwargs.get('normalise'):
         op.print_debug("METRIC: Normalising metric in space...")
         space_normalise(M, noscale=kwargs.get('noscale'), f=f, op=op)
-        op.print_debug("METRIC: Done!")
 
     # Enforce maximum/minimum element sizes and anisotropy
     if kwargs.get('enforce_constraints'):
         op.print_debug("METRIC: Enforcing elemental constraints...")
         enforce_element_constraints(M, op=op)
-        op.print_debug("METRIC: Done!")
 
     return M
 
@@ -115,7 +112,6 @@ def space_time_normalise(hessians, timestep_integrals=None, enforce_constraints=
             glob_norm *= pow(integral, 1/p)
     else:
         raise ValueError("Normalisation approach {:s} not recognised.".format(op.normalisation))
-    op.print_debug("METRIC: Done!")
     op.print_debug("METRIC: Target space-time complexity = {:.4e}".format(N_st))
     op.print_debug("METRIC: Global normalisation factor = {:.4e}".format(glob_norm))
 
@@ -132,8 +128,6 @@ def space_time_normalise(hessians, timestep_integrals=None, enforce_constraints=
         if enforce_constraints:
             op.print_debug("METRIC: Enforcing size and ansisotropy constraints...")
             enforce_element_constraints(H, op=op)
-            op.print_debug("METRIC: Done!")
-    op.print_debug("METRIC: Done!")
 
 
 def space_normalise(M, f=None, **kwargs):
@@ -294,7 +288,6 @@ def isotropic_metric(f, **kwargs):
     op.print_debug("METRIC: Constructing isotropic metric...")
     M_diag = project(max_value(abs(f), 1e-10), V)
     M_diag.interpolate(abs(M_diag))  # Ensure positivity
-    op.print_debug("METRIC: Done!")
 
     # Normalise
     if kwargs.get('normalise'):
@@ -314,13 +307,11 @@ def isotropic_metric(f, **kwargs):
             if p is not None:
                 M_diag *= pow(assemble(detM*dx), 1/p)
             M_diag *= dim/rescale
-        op.print_debug("METRIC: Done!")
 
     # Enforce maximum/minimum element sizes
     if kwargs.get('enforce_constraints'):
         op.print_debug("METRIC: Enforcing elemental constraints...")
         M_diag = max_value(1/pow(op.h_max, 2), min_value(M_diag, 1/pow(op.h_min, 2)))
-        op.print_debug("METRIC: Done!")
 
     return interpolate(M_diag*Identity(dim), V_ten)
 
@@ -432,13 +423,11 @@ class SteadyHessianMetric():
         kernel = eigen_kernel(metric_from_hessian, self.dim)
         op2.par_loop(kernel, self.fs.node_set, tmp.dat(op2.RW), self.M.dat(op2.READ))
         self.M.assign(tmp)
-        self.op.print_debug("METRIC: Done!")
 
     def normalise(self, noscale=False):
         # TODO: put doc here
         self.op.print_debug("METRIC: Normalising metric in space...")
         space_normalise(self.M, noscale=noscale, op=self.op)  # TODO: put here
-        self.op.print_debug("METRIC: Done!")
 
     def enforce_element_constraints(M, op=Options()):
         """

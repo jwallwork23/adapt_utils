@@ -22,7 +22,7 @@ for level in range(4):
 
     newmesh = adapt(mesh, M)
     viewer = PETSc.Viewer().createHDF5(fname + '.h5', 'w')
-    viewer(newmesh._plex)
+    viewer(newmesh._topology_dm)
 
     print("\n" + 40*"=" + "\n           before     after\n" + 40*"=")
     print("#elements: {:8d}     {:8d}".format(mesh.num_cells(), newmesh.num_cells()))

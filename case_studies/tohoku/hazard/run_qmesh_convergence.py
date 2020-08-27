@@ -1,12 +1,14 @@
 from thetis import print_output, create_directory
 
-import datetime
 import argparse
+import datetime
 import os
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
+
+# --- Parse arguments
 
 parser = argparse.ArgumentParser(prog="run_qmesh_convergence")
 
@@ -17,75 +19,79 @@ parser.add_argument("-num_meshes", help="Number of meshes to consider (for testi
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space (default 'dg-cg')")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
+parser.add_argument("-stabilisation", help="Stabilisation method to use (default None)")
 
 # Outer loop
 parser.add_argument("-levels", help="Number of mesh levels to consider (default 5)")
 
 # QoI
 parser.add_argument("-start_time", help="""
-Start time of period of interest in seconds (default 1200s i.e. 20min)""")
+    Start time of period of interest in seconds (default zero)""")
 parser.add_argument("-locations", help="""
-Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
-'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
-""")
-parser.add_argument("-radii", help="Radii of interest, separated by commas (default 100km)")
+    Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
+    'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
+    """)
+parser.add_argument("-radius", help="Radius of interest (default 100km)")
 
-# Misc
+# I/O and debugging
 parser.add_argument("-debug", help="Print all debugging statements")
+parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
+
 args = parser.parse_args()
 
-# Collect locations and radii
-if args.locations is None:
+
+# --- Set parameters
+
+if args.locations is None:  # TODO: Parse as list
     locations = ['Fukushima Daiichi', ]
 else:
     locations = args.locations.split(',')
-if args.radii is None:
-    radii = [100.0e+03 for l in locations]
-else:
-    radii = [float(r) for r in args.radii.split(',')]
-if len(locations) != len(radii):
-    msg = "Number of locations ({:d}) and radii ({:d}) do not match."
-    raise ValueError(msg.format(len(locations), len(radii)))
-
-# Read parameters
+radius = float(args.radius or 100.0e+03)
+family = args.family or 'cg-cg'
+nonlinear = bool(args.nonlinear or False)
+stabilisation = args.stabilisation or 'lax_friedrichs'
+if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
+    stabilisation = None
 kwargs = {
+    'approach': 'fixed_mesh',
 
     # Space-time domain
     'num_meshes': int(args.num_meshes or 1),
-    'end_time': float(args.end_time or 1440.0),
+    'end_time': float(args.end_time or 24*60.0),
 
     # Physics
     'bathymetry_cap': 30.0,  # FIXME
 
     # Solver
-    'family': args.family or 'dg-cg',
+    'family': family,
+    'stabilisation': stabilisation,
     'use_wetting_and_drying': False,
 
     # QoI
-    'start_time': float(args.start_time or 1200.0),
-    'radii': radii,
+    'start_time': float(args.start_time or 0.0),
+    'radius': radius,
     'locations': locations,
 
-    # Misc
-    'plot_pvd': True,
+    # I/O and debugging
     'debug': bool(args.debug or False),
 }
-levels = int(args.levels or 5)
-nonlinear = bool(args.nonlinear or False)
-di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs/qmesh'))
+levels = int(args.levels or 4)
+di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh'))
+
+
+# --- Loop over mesh hierarchy
 
 qois = []
 num_cells = []
 for level in range(levels):
     print_output("Running qmesh convergence on level {:d}".format(level))
-    ext = "{:s}linear_level{:d}".format('non' if nonlinear else '', level)
 
     # Set parameters
-    op = TohokuOptions(approach='fixed_mesh', level=level)
-    op.update(kwargs)
+    kwargs['level'] = level
+    op = TohokuOptions(**kwargs)
 
     # Solve
-    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, extension=ext)
+    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
     swp.solve_forward()
     qoi = swp.quantity_of_interest()
     print_output("Quantity of interest: {:.4e}".format(qoi))
@@ -94,8 +100,10 @@ for level in range(levels):
     qois.append(qoi)
     num_cells.append(swp.num_cells[0][0])
 
-# Print/log results
-with open(os.path.join(os.path.dirname(__file__), '../../.git/logs/HEAD'), 'r') as gitlog:
+
+# --- Log results
+
+with open(os.path.join(os.path.dirname(__file__), '../../../.git/logs/HEAD'), 'r') as gitlog:
     for line in gitlog:
         words = line.split()
     kwargs['adapt_utils git commit'] = words[1]
@@ -120,9 +128,3 @@ with open(os.path.join(logdir, 'log'), 'w') as logfile:
     logfile.write(logstr)
 print_output(logstr)
 print_output(logdir)
-
-# Plot timeseries
-for g in op.gps_gauges:
-    op.plot_timeseries(g, sample=30)
-for g in op.pressure_gauges:
-    op.plot_timeseries(g, sample=60)

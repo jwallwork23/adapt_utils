@@ -94,4 +94,3 @@ tp_continuous = UnannotatedTracerProblem(op)
 tp_continuous.set_initial_condition()  # Adjoint propagation is driven by reverse flow
 print_output("Running continuous adjoint model...")
 tp_continuous.solve_adjoint()
-print_output("Done!")

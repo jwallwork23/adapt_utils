@@ -13,7 +13,7 @@ __all__ = ["taylor_test", "StagnationError", "prod", "combine", "rotation_matrix
            "box", "ellipse", "bump", "circular_bump", "gaussian", "cg2dg", "copy_mesh",
            "get_finite_element", "get_component_space", "get_component", "get_boundary_nodes",
            "is_symmetric", "is_pos_def", "is_spd", "check_spd", "readfile", "num_days",
-           "find", "suppress_output", "knownargs2dict", "unknownargs2dict", "index_string"]
+           "find", "knownargs2dict", "unknownargs2dict", "index_string"]
 
 
 # --- Optimisation
@@ -414,7 +414,6 @@ def check_spd(M):
     except AssertionError:
         raise ValueError("FAIL: Matrix is not positive-definite")
     print_output("PASS: Matrix is indeed positive-definite")
-    print_output("TEST: Done!")
 
 
 # --- I/O
@@ -491,27 +490,3 @@ def unknownargs2dict(ua):
         else:
             out[key] = val
     return out
-
-
-class suppress_output(object):
-    """Class used to suppress standard output or another stream."""
-    def __init__(self, stream=None):
-        self.origstream = stream or sys.stdout
-        self.origstreamfd = self.origstream.fileno()
-        self.pipe_out, self.pipe_in = os.pipe()  # Create a pipe to capture stream
-
-    def __enter__(self):
-        self.start()
-        return self
-
-    def __exit__(self, type, value, traceback):
-        self.stop()
-
-    def start(self):
-        """Start diverting stream data to pipe."""
-        os.dup2(self.pipe_in, self.origstreamfd)
-
-    def stop(self):
-        """Stop fiverting stream data to pipe."""
-        os.close(self.pipe_in)
-        os.close(self.pipe_out)

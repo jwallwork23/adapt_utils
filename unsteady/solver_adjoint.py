@@ -22,7 +22,10 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
     def clear_tape(self):
         self.tape.clear_tape()
 
-    # TODO: just call `solve_adjoint` (once merged)
+    def solve_adjoint(self, scaling=1.0):
+        """Solve the discrete adjoint problem for some quantity of interest."""
+        J = self.quantity_of_interest()
+        return solve_adjoint(J, adj_value=scaling)
 
     def compute_gradient(self, controls, scaling=1.0):
         """Compute the gradient of the quantity of interest with respect to a list of controls."""
