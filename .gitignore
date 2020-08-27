@@ -2,6 +2,7 @@
 __pycache__/
 swe/tsunami/tsunami1d/
 steady/spacetime/
+docs/_build/
 
 # Specific files
 TODO
