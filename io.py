@@ -1,10 +1,12 @@
 from thetis import *
 from firedrake.petsc import PETSc
 
+import datetime
 import os
 
 
-__all__ = ["save_mesh", "load_mesh", "initialise_fields", "export_final_state"]
+__all__ = ["save_mesh", "load_mesh", "initialise_fields", "export_final_state",
+           "TimeDependentAdaptationLogger"]
 
 
 def save_mesh(mesh, fname, fpath):
@@ -74,3 +76,95 @@ def export_final_state(fpath, f, fname='bathymetry', name='bathymetry', plexname
 
     # Save mesh to DMPlex format
     save_mesh(f.function_space().mesh(), plexname, fpath)
+
+
+class TimeDependentAdaptationLogger(object):
+    """
+    A simple logger for simulations which use time-dependent mesh adaptation with an outer loop.
+    Statistics on metrics and meshes are printed to screen, saved to a log file, or both.
+    """
+    def __init__(self, prob, verbose=True, **known):
+        """
+        :arg prob: :class:`AdaptiveProblem` solver object.
+        :kwarg verbose: print during logging.
+        :kwargs known: expanded dictionary of parameters.
+        """
+        self.prob = prob
+        self.verbose = verbose
+        self.divider = 80*'*' + '\n'
+        self.msg = "    {:34s}: {:}\n"
+
+        # Create a log string
+        self.logstr = self.divider + 33*' ' + 'PARAMETERS\n' + self.divider
+
+        # Check we have a time-dependent adaptive run
+        assert prob.op.approach != 'fixed_mesh'
+
+        # Log known parameters
+        for key in known:
+            self.logstr += self.msg.format(key, known[key])
+
+        # Print parameters to screen
+        if self.verbose:
+            print_output(self.logstr + self.divider)
+
+    def create_log_dir(self, fpath):
+        """
+        :arg fpath: directory to save log file in.
+        """
+        today = datetime.date.today()
+        date = '{:d}-{:d}-{:d}'.format(today.year, today.month, today.day)
+        j = 0
+        while True:
+            self.di = os.path.join(fpath, '{:s}-run-{:d}'.format(date, j))
+            if not os.path.exists(self.di):
+                create_directory(self.di)
+                break
+            j += 1
+
+    # TODO: Allow logging during simulation
+    def log(self, *unknown, fname='log', fpath=None, save_meshes=False):
+        """
+        :args unknown: expanded list of unknown parsed arguments.
+        :kwarg fname: filename for log file.
+        :kwarg fpath: directory to save log file in. If `None`, the log is simply printed.
+        :kwarg save_meshes: save meshes to file in the same directory.
+        """
+        adapt_utils_home = os.environ.get('ADAPT_UTILS_HOME')
+
+        # Log unknown parameters
+        for i in range(len(unknown)//2):
+            self.logstr += self.msg.format(unknown[2*i][1:], unknown[2*i+1])
+
+        # Add git sha
+        with open(os.path.join(adapt_utils_home, '.git', 'logs', 'HEAD'), 'r') as gitlog:
+            for line in gitlog:
+                words = line.split()
+            self.logstr += self.msg.format('adapt_utils git commit', words[1])
+
+        # Log mesh and metric stats from each outer iteration
+        self.logstr += self.divider + 35*' ' + 'SUMMARY\n' + self.divider
+        for n, (qoi, complexity) in enumerate(zip(self.prob.qois, self.prob.st_complexities)):
+            self.logstr += "Mesh iteration {:2d}: qoi {:.4e}".format(n+1, qoi)
+            if n > 0:
+                self.logstr += " space-time complexity {:.4e}".format(complexity)
+            self.logstr += "\n"
+
+        # Log stats from last outer iteration
+        self.logstr += self.divider + 30*' ' + 'FINAL ELEMENT COUNTS\n' + self.divider
+        l = self.prob.op.end_time/self.prob.op.num_meshes
+        for i, num_cells in enumerate(self.prob.num_cells[-1]):
+            self.logstr += "Time window ({:7.1f},{:7.1f}]: {:7d}\n".format(i*l, (i+1)*l, num_cells)
+        self.logstr += self.divider
+        if self.verbose:
+            print_output(self.logstr)
+
+        # Write to log file
+        if fpath is not None:
+            self.create_log_dir(fpath)
+            with open(os.path.join(self.di, 'log'), 'w') as logfile:
+                logfile.write(self.logstr)
+            if save_meshes:
+                self.prob.store_meshes(fpath=self.di)
+            if self.verbose:
+                print_output(self.di)
