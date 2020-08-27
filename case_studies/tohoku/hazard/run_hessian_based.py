@@ -1,10 +1,7 @@
-from thetis import *
-
 import argparse
-import datetime
-import os
 
 from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
+from adapt_utils.io import TimeDependentAdaptationLogger
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
@@ -110,51 +107,14 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic'
 }
+assert 0.0 <= kwargs['start_time'] <= kwargs['end_time']
 save_meshes = bool(args.save_meshes or False)
-logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
-for key in kwargs:
-    logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
-logstr += "    {:34s}: {:}\n".format('nonlinear', nonlinear)
-print_output(logstr + 80*'*' + '\n')
 
 
 # --- Solve
 
 op = TohokuHazardOptions(**kwargs)
 swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)  # TODO: Option to load meshes
+logger = TimeDependentAdaptationLogger(swp, nonlinear=nonlinear, **kwargs)
 swp.run_hessian_based()
-
-
-# --- Logging
-
-with open(os.path.join(os.path.dirname(__file__), '../../../.git/logs/HEAD'), 'r') as gitlog:
-    for line in gitlog:
-        words = line.split()
-    logstr += "    {:34s}: {:}\n".format('adapt_utils git commit', words[1])
-for i in range(len(unknown)//2):
-    logstr += "    {:34s}: {:}\n".format(unknown[2*i][1:], unknown[2*i+1])
-logstr += 80*'*' + '\n' + 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
-logstr += "Mesh iteration  1: qoi {:.4e}\n".format(swp.qois[0])
-msg = "Mesh iteration {:2d}: qoi {:.4e} space-time complexity {:.4e}\n"
-for n in range(1, len(swp.qois)):
-    logstr += msg.format(n+1, swp.qois[n], swp.st_complexities[n])
-logstr += 80*'*' + '\n' + 30*' ' + 'FINAL ELEMENT COUNTS\n' + 80*'*' + '\n'
-l = op.end_time/op.num_meshes
-for i, num_cells in enumerate(swp.num_cells[-1]):
-    logstr += "Time window ({:7.1f},{:7.1f}]: {:7d}\n".format(i*l, (i+1)*l, num_cells)
-logstr += 80*'*' + '\n'
-print_output(logstr)
-date = datetime.date.today()
-date = '{:d}-{:d}-{:d}'.format(date.year, date.month, date.day)
-j = 0
-while True:
-    di = os.path.join(op.di, '{:s}-run-{:d}'.format(date, j))
-    if not os.path.exists(di):
-        create_directory(di)
-        break
-    j += 1
-with open(os.path.join(di, 'log'), 'w') as logfile:
-    logfile.write(logstr)
-if save_meshes:
-    swp.store_meshes(fpath=di)
-print_output(di)
+logger.log(*unknown, fpath=op.di, save_meshes=save_meshes)
