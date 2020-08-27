@@ -1,4 +1,5 @@
 from thetis import *
+from firedrake.petsc import PETSc
 
 import os
 
