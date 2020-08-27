@@ -47,7 +47,7 @@ parser.add_argument("-element_rtol", help="Relative tolerance for element count 
 parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
 
 # I/O and debugging
-parser.add_argument("-save_plex", help="Save final set of mesh DMPlexes to disk")
+parser.add_argument("-save_meshes", help="Save final set of mesh DMPlexes to disk")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-debug", help="Print all debugging statements")
 parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
@@ -110,7 +110,7 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic'
 }
-save_plex = bool(args.save_plex or False)
+save_meshes = bool(args.save_meshes or False)
 logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
 for key in kwargs:
     logstr += "    {:34s}: {:}\n".format(key, kwargs[key])
@@ -121,7 +121,7 @@ print_output(logstr + 80*'*' + '\n')
 # --- Solve
 
 op = TohokuHazardOptions(**kwargs)
-swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)  # TODO: Option to load plexes
+swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)  # TODO: Option to load meshes
 swp.run_hessian_based()
 
 
@@ -155,6 +155,6 @@ while True:
     j += 1
 with open(os.path.join(di, 'log'), 'w') as logfile:
     logfile.write(logstr)
-if save_plex:
-    swp.store_plexes(di=di)
+if save_meshes:
+    swp.store_meshes(fpath=di)
 print_output(di)

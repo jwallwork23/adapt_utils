@@ -5,6 +5,7 @@ from thetis import *
 import os
 import numpy as np
 
+from ..io import save_mesh, load_mesh
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
@@ -137,6 +138,15 @@ class AdaptiveProblemBase(object):
             # if self.op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO
             #     coords = mesh.coordinates
             #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
+
+    def get_plex(self, i):
+        """
+        :return: DMPlex associated with the ith mesh.
+        """
+        try:
+            return self.meshes[i]._topology_dm
+        except AttributeError:
+            return self.meshes[i]._plex  # Backwards compatability
 
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")
@@ -276,28 +286,27 @@ class AdaptiveProblemBase(object):
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
             f.dat.data[:] = f_int.dat.data
 
-    def store_plexes(self, di=None):
-        """Save meshes to disk using DMPlex format."""
-        from firedrake.petsc import PETSc
+    def save_meshes(self, fname='plex', fpath=None):
+        """
+        Save meshes to disk using DMPlex format in HDF5 files.
 
-        di = di or os.path.join(self.di, self.approach)
-        fname = os.path.join(di, 'plex_{:d}.h5')
+        :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
+        :kwarg fpath: directory in which to save the HDF5 files.
+        """
+        fpath = fpath or os.path.join(self.di, self.approach)
         for i, mesh in enumerate(self.meshes):
-            assert os.path.isdir(di)
-            viewer = PETSc.Viewer().createHDF5(fname.format(i), 'w')
-            try:
-                viewer(mesh._topology_dm)
-            except AttributeError:
-                viewer(mesh._plex)  # backwards compatability
+            save_mesh(mesh, '_'.join([fname, '{:d}.h5'.format(i)]), fpath)
 
-    def load_plexes(self, fname):
-        """Load meshes in DMPlex format."""
-        from firedrake.petsc import PETSc
+    def load_meshes(self, fname='plex', fpath=None):
+        """
+        Load meshes in DMPlex format in HDF5 files.
 
+        :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
+        :kwarg fpath: filepath to where the HDF5 files are to be loaded from.
+        """
+        fpath = fpath or os.path.join(self.di, self.approach)
         for i in range(self.num_meshes):
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile('_'.join([fname, '{:d}.h5'.format(i)]))
-            self.meshes[i] = Mesh(newplex)
+            self.meshes[i] = load_mesh('_'.join([fname, '{:d}.h5'.format(i)]), fpath)
 
     def solve(self, adjoint=False, **kwargs):
         """

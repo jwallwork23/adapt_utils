@@ -24,10 +24,10 @@ parser.add_argument('-offset', help="""
     'Aligned' configuration given by offset=0, 'Offset' configuration given by offset=1.
     (Default 0)""")
 parser.add_argument('-debug', help="Toggle debugging mode (default False)")
-parser.add_argument('-save_plex', help="Save DMPlex to HDF5 (default False)")
+parser.add_argument('-save_mesh', help="Save DMPlex to HDF5 (default False)")
 parser.add_argument('-save_plot', help="Save plots of mesh and initial fluid speed (default False)")
 args = parser.parse_args()
-save_plex = bool(args.save_plex or False)
+save_mesh = bool(args.save_mesh or False)
 
 kwargs = {
     'approach': args.approach or 'fixed_mesh',
@@ -98,10 +98,8 @@ if tp.op.approach == 'fixed_mesh':  # TODO: Use 'uniform' approach?
         plt.savefig('screenshots/fluid_speed_offset{:d}_elem{:d}.pdf'.format(op.offset, tp.mesh.num_cells()), bbox_inches='tight')
 else:
     tp.adaptation_loop()
-    if save_plex:
-        plex = tp.mesh._plex
-        viewer = PETSc.Viewer().createHDF5('{:s}_{:d}.h5'.format(op.approach, op.offset), 'w')
-        viewer(plex)
+    if save_mesh:
+        tp.save_meshes('{:s}_{:d}.h5'.format(op.approach, op.offset), op.di)
 
     # Setup figures
     if save_plot:
