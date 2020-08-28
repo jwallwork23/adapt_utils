@@ -31,4 +31,4 @@ with open(os.path.join(data_dir, "log"), "w+") as logfile:
 
 # Export final state to file to use later as an initial condition
 op.plot_pvd = True
-export_hydrodynamics(*swp.fwd_solutions[0].split(), data_dir, plexname=None, op=op)
+swp.export_state(0, data_dir)

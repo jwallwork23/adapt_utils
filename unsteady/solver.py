@@ -11,6 +11,7 @@ from ..adapt.adaptation import pragmatic_adapt
 from ..adapt.metric import *
 from .base import AdaptiveProblemBase
 from .callback import *
+from ..io import *
 from .swe.utils import *
 
 
@@ -594,6 +595,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.op.sediment_model.ero.dat.data[:] = self.intermediary_ero[i].dat.data
                 self.op.sediment_model.ero_term.dat.data[:] = self.intermediary_ero_term[i].dat.data
                 self.op.sediment_model.depo_term.dat.data[:] = self.intermediary_depo_term[i].dat.data
+
+    # --- I/O
+
+    def export_state(self, i, fpath, plexname=None):
+        op = self.op
+        if op.solve_swe:
+            export_hydrodynamics(*self.fwd_solutions[i].split(), fpath, plexname=plexname, op=op)
+        if op.solve_tracer or op.solve_sediment or op.solve_exner:
+            raise NotImplementedError
+
     # --- Equations
 
     def create_forward_equations(self, i):
