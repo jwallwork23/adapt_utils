@@ -4,7 +4,7 @@ from firedrake.petsc import PETSc
 import datetime
 import os
 
-from adapt_utils.options import Options
+from adapt_utils.unsteady.options import CoupledOptions
 
 
 __all__ = ["save_mesh", "load_mesh", "initialise_bathymetry", "export_bathymetry",
@@ -59,7 +59,7 @@ def initialise_bathymetry(mesh, fpath):
     return f
 
 
-def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=Options()):
+def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=CoupledOptions()):
     """
     Initialise velocity and elevation with results from a previous simulation.
 
@@ -102,7 +102,7 @@ def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=Opt
     return elev_init, uv_init
 
 
-def export_bathymetry(bathymetry, fpath, plexname='myplex', op=Options()):
+def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions()):
     """
     Export bathymetry field to be used in a subsequent simulation.
 
@@ -258,7 +258,7 @@ class TimeDependentAdaptationLogger(OuterLoopLogger):
         self.write(fpath)
 
 
-def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=Options()):
+def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()):
     """
     Export velocity and elevation to be used in a subsequent simulation
 
