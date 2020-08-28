@@ -62,6 +62,8 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
     def add_callbacks(self, i):
         super(AdaptiveTurbineProblem, self).add_callbacks(i)
         di = self.callback_dir
+        if di is None:
+            return
         for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
             self.callbacks[i].add(PowerOutputCallback(self, i, farm_id, callback_dir=di), 'timestep')
 
@@ -69,7 +71,10 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         self.qoi = 0.0
         for i in range(self.num_meshes):
             for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
-                self.qoi += self.callbacks[i]['timestep'][farm_id].time_integrate()
+                tag = 'power_output'
+                if farm_id != 'everywhere':
+                    tag += '_{:d}'.format(farm_id)
+                self.qoi += self.callbacks[i]['timestep'][tag].time_integrate()
         return self.qoi
 
     def quantity_of_interest_form(self, i):

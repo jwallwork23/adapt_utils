@@ -9,12 +9,13 @@ from time import perf_counter
 
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
+from adapt_utils.plotting import *  # NOQA
 
 
 # --- Set parameters
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-approach", help="Mesh adaptation strategy")
+parser.add_argument("-approach", help="Mesh adaptation strategy (default 'fixed_mesh')")
 parser.add_argument("-plot_only", help="If True, the QoI is plotted and no simulations are run")
 args = parser.parse_args()
 
@@ -23,14 +24,9 @@ plot_only = bool(args.plot_only or False)
 
 # Set up parameters
 kwargs = {
+    'approach': approach,
     'plot_pvd': True,
 }
-font = {
-    "family": "DejaVu Sans",
-    "size": 16,
-}
-plt.rc('font', **font)
-plt.rc('text', usetex=True)
 plotting_kwargs = {
     "annotation_clip": False,
     "color": "b",
@@ -39,8 +35,7 @@ plotting_kwargs = {
         "color": "b",
     },
 }
-op = TurbineArrayOptions(approach=approach)
-op.update(kwargs)
+op = TurbineArrayOptions(**kwargs)
 
 
 # --- Run model
