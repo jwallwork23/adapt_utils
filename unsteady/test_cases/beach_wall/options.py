@@ -24,7 +24,6 @@ class BeachOptions(CoupledOptions):
     the effect of tidal currents and waves on the profile shape of intertidal
     mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
     """
-
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh=None, input_dir=None, output_dir=None, **kwargs):
         super(BeachOptions, self).__init__(**kwargs)
 
@@ -50,8 +49,8 @@ class BeachOptions(CoupledOptions):
 
         # Initial
         self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=self.di, op=self)
-        #self.elev_init = Constant(0.0)
-        #self.uv_init = as_vector((10**(-7), 0.0))
+        # self.elev_init = Constant(0.0)
+        # self.uv_init = as_vector((10**(-7), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'

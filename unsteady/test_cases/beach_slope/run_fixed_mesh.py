@@ -44,6 +44,9 @@ kwargs = {
 }
 
 op = BeachOptions(**kwargs)
+if os.getenv('REGRESSION_TEST') is not None:
+    op.dt_per_export = 18
+    op.end_time = op.dt*op.dt_per_export
 swp = AdaptiveProblem(op)
 
 t1 = time.time()
