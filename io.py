@@ -99,7 +99,7 @@ def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=Cou
     if outputdir is not None and op.plot_pvd:
         File(os.path.join(outputdir, "velocity_imported.pvd")).write(uv_init)
         File(os.path.join(outputdir, "elevation_imported.pvd")).write(elev_init)
-    return elev_init, uv_init
+    return elev_init, uv_init  # TODO: Consistent ordering
 
 
 def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions()):
@@ -145,16 +145,16 @@ def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()
         chk.store(uv, name="velocity")
 
     # Export elevation
-    with th.DumbCheckpoint(os.path.join(fpath, "elevation"), mode=FILE_CREATE) as chk:
+    with DumbCheckpoint(os.path.join(fpath, "elevation"), mode=FILE_CREATE) as chk:
         chk.store(elev, name="elevation")
 
     # Plot to .pvd
     if op.plot_pvd:
-        File(os.path.join(outputdir, 'velocityout.pvd')).write(uv)
-        File(os.path.join(outputdir, 'elevationout.pvd')).write(elev)
+        File(os.path.join(fpath, 'velocityout.pvd')).write(uv)
+        File(os.path.join(fpath, 'elevationout.pvd')).write(elev)
 
     # Export mesh
     if plexname is not None:
         mesh = elev.function_space().mesh()
         assert mesh == uv.function_space().mesh()
-        save_mesh(mesh, plexname, outputdir)
+        save_mesh(mesh, plexname, fpath)
