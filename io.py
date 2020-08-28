@@ -103,3 +103,31 @@ def export_bathymetry(bathymetry, fpath, plexname=None, plot_pvd=False):
     # Save mesh to DMPlex format
     if plexname is not None:
         save_mesh(bathymetry.function_space().mesh(), plexname, fpath)
+
+
+def export_hydrodynamics(uv, elev, inputdir, outputdir=None, plexname='myplex'):
+    """
+    Export fields to be used in a subsequent simulation
+    """
+    if not os.path.exists(inputdir):
+        os.makedirs(inputdir)
+    print_output("Exporting fields for subsequent simulation")
+
+    # Export velocity
+    with DumbCheckpoint(os.path.join(inputdir, "velocity"), mode=FILE_CREATE) as chk:
+        chk.store(uv, name="velocity")
+
+    # Export elevation
+    with th.DumbCheckpoint(os.path.join(inputdir, "elevation"), mode=FILE_CREATE) as chk:
+        chk.store(elev, name="elevation")
+
+    if outputdir is not None:
+
+        # Plot to .pvd
+        File(os.path.join(outputdir, 'velocityout.pvd')).write(uv)
+        File(os.path.join(outputdir, 'elevationout.pvd')).write(elev)
+
+        # Export mesh
+        mesh = elev.function_space().mesh()
+        assert mesh == uv.function_space().mesh()
+        save_mesh(mesh, plexname, outputdir)
