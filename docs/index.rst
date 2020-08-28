@@ -24,14 +24,17 @@ The associated equation sets are:
 There is some support for other equation sets, such as 3D advection-diffusion.
 
 
+**Main contents**
+
 .. toctree::
    :maxdepth: 2
 
+   publications
    authors
    contact
 
 
-Indices and tables
+**Indices and tables**
 
 * :ref:`genindex`
 * :ref:`modindex`
