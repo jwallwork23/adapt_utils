@@ -128,7 +128,7 @@ bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bath
 
 fpath = "hydrodynamics_beach_bath_mov_{:d}_{:d}_{:d}_{:d}_{:d}"
 fpath = fpath.format(op.dt_per_export, (int(nx*220), alpha, beta, gamma)
-export_bathymetry(bath, os.path.join("adapt_output", fpath), plex_name='myplex', plot_pvd=True)
+export_bathymetry(bath, os.path.join("adapt_output", fpath), plot_pvd=True)
 
 bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
 

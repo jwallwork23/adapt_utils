@@ -112,4 +112,4 @@ solver_obj.iterate()
 
 uv, elev = solver_obj.fields.solution_2d.split()
 fpath = "hydrodynamics_trench_{:d}".format(res)
-export_hydrodynamics(uv, elev, fpath, outputdir=fpath)
+export_hydrodynamics(uv, elev, fpath)

@@ -6,7 +6,7 @@ import os
 
 
 __all__ = ["save_mesh", "load_mesh", "initialise_bathymetry", "export_bathymetry",
-           "initialise_hydrodynamics", "export_bathymetry",
+           "initialise_hydrodynamics", "export_hydrodynamics",
            "OuterLoopLogger", "TimeDependentAdaptationLogger"]
 
 
@@ -46,6 +46,9 @@ def initialise_bathymetry(mesh, fpath):
     :arg mesh: field will be defined in finite element space on this mesh.
     :arg fpath: directory to read the data from.
     """
+    # TODO: Would be nice to have consistency:
+    #  * here mesh is an arg but below it is read from file
+    #  * here there is no option to plot to .pvd
     fs = FunctionSpace(mesh, "CG", 1)  # TODO: Avoid hard-coding
     with timed_stage('initialising {:s}'.format(name)):
         f = Function(fs, name='bathymetry')
@@ -57,6 +60,10 @@ def initialise_bathymetry(mesh, fpath):
 def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex'):
     """
     Initialise velocity and elevation with results from a previous simulation.
+
+    :arg inputdir: directory to read the data from.
+    :kwarg inputdir: directory to optionally plot the data in .pvd format.
+    :kwarg plexname: file name used for the DMPlex data file.
     """
     with timed_stage('mesh'):
         mesh = load_mesh(plexname, inputdir)
@@ -82,13 +89,14 @@ def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex'):
     return elev_init, uv_init
 
 
-def export_bathymetry(bathymetry, fpath, plexname=None, plot_pvd=False):
+def export_bathymetry(bathymetry, fpath, plexname='myplex', plot_pvd=False):
     """
     Export bathymetry field to be used in a subsequent simulation.
 
     :arg bathymetry: field to be stored.
     :arg fpath: directory to save the data to.
     :kwarg plexname: file name to be used for the DMPlex data file.
+    :kwarg plot_pvd: toggle plotting bathymetry to .pvd.
     """
     if not os.path.exists(fpath):
         os.makedirs(fpath)
@@ -97,7 +105,7 @@ def export_bathymetry(bathymetry, fpath, plexname=None, plot_pvd=False):
     # Create checkpoint to HDF5
     with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_CREATE) as chk:
         chk.store(bathymetry, name='bathymetry')
-    if plot_pvd:
+    if plot_pvd:  # TODO: Pass Options class to get this
         File(os.path.join(fpath, 'bathout.pvd')).write(bathymetry)
 
     # Save mesh to DMPlex format
@@ -237,29 +245,35 @@ class TimeDependentAdaptationLogger(OuterLoopLogger):
         self.write(fpath)
 
 
-def export_hydrodynamics(uv, elev, inputdir, outputdir=None, plexname='myplex'):
+def export_hydrodynamics(uv, elev, fpath, plexname='myplex', plot_pvd=False):
     """
-    Export fields to be used in a subsequent simulation
+    Export velocity and elevation to be used in a subsequent simulation
+
+    :arg uv: velocity field to be stored.
+    :arg elev: elevation field to be stored.
+    :arg fpath: directory to save the data to.
+    :kwarg plexname: file name to be used for the DMPlex data file.
+    :kwarg plot_pvd: toggle plotting fields to .pvd.
     """
-    if not os.path.exists(inputdir):
-        os.makedirs(inputdir)
+    if not os.path.exists(fpath):
+        os.makedirs(fpath)
     print_output("Exporting fields for subsequent simulation")
 
     # Export velocity
-    with DumbCheckpoint(os.path.join(inputdir, "velocity"), mode=FILE_CREATE) as chk:
+    with DumbCheckpoint(os.path.join(fpath, "velocity"), mode=FILE_CREATE) as chk:
         chk.store(uv, name="velocity")
 
     # Export elevation
-    with th.DumbCheckpoint(os.path.join(inputdir, "elevation"), mode=FILE_CREATE) as chk:
+    with th.DumbCheckpoint(os.path.join(fpath, "elevation"), mode=FILE_CREATE) as chk:
         chk.store(elev, name="elevation")
 
-    if outputdir is not None:
-
-        # Plot to .pvd
+    # Plot to .pvd
+    if plot_pvd:  # TODO: Pass Options class to get this
         File(os.path.join(outputdir, 'velocityout.pvd')).write(uv)
         File(os.path.join(outputdir, 'elevationout.pvd')).write(elev)
 
-        # Export mesh
+    # Export mesh
+    if plexname is not None:
         mesh = elev.function_space().mesh()
         assert mesh == uv.function_space().mesh()
         save_mesh(mesh, plexname, outputdir)

@@ -102,7 +102,7 @@ uv, elev = solver_obj.fields.solution_2d.split()
 
 if plot == False:
     fpath = "hydrodynamics_beach_l_sep_nx_{:d}_{:d}".format(nx, ny)
-    export_hydrodynamics(uv, elev, fpath, outputdir=fpath)
+    export_hydrodynamics(uv, elev, fpath)
 else:
     import pylab as plt
 
