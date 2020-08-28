@@ -61,37 +61,42 @@ def initialise_bathymetry(mesh, fpath, outputdir=None, op=CoupledOptions()):
     return bathymetry
 
 
-def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=CoupledOptions()):
+def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), **kwargs):
     """
     Initialise velocity and elevation with results from a previous simulation.
 
     :arg inputdir: directory to read the data from.
     :kwarg inputdir: directory to optionally plot the data in .pvd format.
     :kwarg plexname: file name used for the DMPlex data file.
+    :kwarg variant: relates to distribution of quadrature nodes in an element.
     """
+    plexname = kwargs.get('plexname', 'myplex')
+    variant = kwargs.get('variant', 'equispaced')
+
+    # Get finite element
+    if op.family == 'dg-dg':
+        uv_element = VectorElement("DG", triangle, 1)
+        elev_element = FiniteElement("DG", triangle, 1, variant=variant)
+    elif op.family == 'dg-cg':
+        uv_element = VectorElement("DG", triangle, 1)
+        elev_element = FiniteElement("CG", triangle, 2, variant=variant)
+    elif op.family == 'cg-cg':
+        uv_element = VectorElement("CG", triangle, 2)
+        elev_element = FiniteElement("CG", triangle, 1, variant=variant)
+
+    # Load mesh
     with timed_stage('mesh'):
         mesh = op.default_mesh if plexname is None else load_mesh(plexname, inputdir)
 
-    # Get finite element space
-    if op.family == 'dg-dg':
-        uv_element = ("DG", 1)
-        elev_element = ("DG", 1)
-    elif op.family == 'dg-cg':
-        uv_element = ("DG", 1)
-        elev_element = ("CG", 2)
-    elif op.family == 'cg-cg':
-        uv_element = ("CG", 2)
-        elev_element = ("CG", 1)
-
-    # Velocity
-    U = VectorFunctionSpace(mesh, *uv_element)
+    # Load velocity
+    U = FunctionSpace(mesh, uv_element)
     with timed_stage('initialising velocity'):
         with DumbCheckpoint(os.path.join(inputdir, "velocity"), mode=FILE_READ) as chk:
             uv_init = Function(U, name="velocity")
             chk.load(uv_init)
 
-    # Elevation
-    H = FunctionSpace(mesh, *elev_element)
+    # Load elevation
+    H = FunctionSpace(mesh, elev_element)
     with timed_stage('initialising elevation'):
         with DumbCheckpoint(os.path.join(inputdir, "elevation"), mode=FILE_READ) as chk:
             elev_init = Function(H, name="elevation")

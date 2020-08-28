@@ -601,9 +601,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def export_state(self, i, fpath, plexname=None):
         op = self.op
         if op.solve_swe:
+            op.print_debug("I/O: Exporting hydrodynamics to {:s}...".format(fpath))
             export_hydrodynamics(*self.fwd_solutions[i].split(), fpath, plexname=plexname, op=op)
         if op.solve_tracer or op.solve_sediment or op.solve_exner:
-            raise NotImplementedError
+            raise NotImplementedError  # TODO
+
+    def load_state(self, i, fpath, plexname=None):
+        op = self.op
+        if op.solve_swe:
+            op.print_debug("I/O: Loading hydrodynamics from {:s}...".format(fpath))
+            u_init, eta_init = initialise_hydrodynamics(fpath, outputdir=self.di, plexname=plexname, op=op)
+            u, eta = self.fwd_solutions[i].split()
+            u.assign(u_init)
+            eta.assign(eta_init)
+        if op.solve_tracer or op.solve_sediment or op.solve_exner:
+            raise NotImplementedError  # TODO
 
     # --- Equations
 
