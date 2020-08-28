@@ -227,7 +227,7 @@ class BeachOptions(CoupledOptions):
 
         def update_forcings(t):
             uv, elev = prob.fwd_solutions[0].split()
-            if np.round(t%2.7, 0) == 3:
+            if np.round(t % 2.7, 0) == 3:
                 print(t)
                 print(assemble(elev*dx))
             self.update_boundary_conditions(prob, t=t)

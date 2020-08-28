@@ -179,9 +179,6 @@ class TrenchSedimentOptions(CoupledOptions):
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
 
-    def get_update_forcings(self, prob, i, adjoint):
-        return None
-
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
         #self.eta_tilde_file._topology = None
