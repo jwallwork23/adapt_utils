@@ -47,7 +47,7 @@ class TrenchSlantOptions(CoupledOptions):
         self.stabilisation = 'lax_friedrichs'
 
         # Initial
-        self.elev_init, self.uv_init = initialise_hydrodynamics(input_dir, outputdir=self.di)
+        self.elev_init, self.uv_init = initialise_hydrodynamics(input_dir, outputdir=self.di, op=self)
 
         self.set_up_morph_model(input_dir, self.default_mesh)        
 

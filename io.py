@@ -3,9 +3,11 @@ from firedrake.petsc import PETSc
 
 import os
 
+from adapt_utils.options import Options
+
 
 __all__ = ["save_mesh", "load_mesh", "initialise_bathymetry", "initialise_hydrodynamics",
-           "export_bathymetry", "export hydrodynamics"]
+           "export_bathymetry", "export_hydrodynamics"]
 
 
 def save_mesh(mesh, fname, fpath):
@@ -55,7 +57,7 @@ def initialise_bathymetry(mesh, fpath):
     return f
 
 
-def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex'):
+def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=Options()):
     """
     Initialise velocity and elevation with results from a previous simulation.
 
@@ -66,15 +68,26 @@ def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex'):
     with timed_stage('mesh'):
         mesh = load_mesh(plexname, inputdir)
 
+    # Get finite element space
+    if op.family == 'dg-dg':
+        uv_element = ("DG", 1)
+        elev_element = ("DG", 1)
+    elif op.family == 'dg-cg':
+        uv_element = ("DG", 1)
+        elev_element = ("CG", 2)
+    elif op.family == 'cg-cg':
+        uv_element = ("CG", 2)
+        elev_element = ("CG", 1)
+
     # Velocity
-    U = VectorFunctionSpace(mesh, "DG", 1)  # TODO: Pass Options class to avoid hard-coding
+    U = VectorFunctionSpace(mesh, *uv_element)
     with timed_stage('initialising velocity'):
         with DumbCheckpoint(os.path.join(inputdir, "velocity"), mode=FILE_READ) as chk:
             uv_init = Function(U, name="velocity")
             chk.load(uv_init)
 
     # Elevation
-    H = FunctionSpace(mesh, "DG", 1)  # TODO: Pass Options class to avoid hard-coding
+    H = FunctionSpace(mesh, *elev_element)
     with timed_stage('initialising elevation'):
         with DumbCheckpoint(os.path.join(inputdir, "elevation"), mode=FILE_READ) as chk:
             elev_init = Function(H, name="elevation")
@@ -87,14 +100,14 @@ def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex'):
     return elev_init, uv_init
 
 
-def export_bathymetry(bathymetry, fpath, plexname='myplex', plot_pvd=False):
+def export_bathymetry(bathymetry, fpath, plexname='myplex', op=Options()):
     """
     Export bathymetry field to be used in a subsequent simulation.
 
     :arg bathymetry: field to be stored.
     :arg fpath: directory to save the data to.
     :kwarg plexname: file name to be used for the DMPlex data file.
-    :kwarg plot_pvd: toggle plotting bathymetry to .pvd.
+    :kwarg op: Options parameter class.
     """
     if not os.path.exists(fpath):
         os.makedirs(fpath)
@@ -103,7 +116,7 @@ def export_bathymetry(bathymetry, fpath, plexname='myplex', plot_pvd=False):
     # Create checkpoint to HDF5
     with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_CREATE) as chk:
         chk.store(bathymetry, name='bathymetry')
-    if plot_pvd:  # TODO: Pass Options class to get this
+    if op.plot_pvd:
         File(os.path.join(fpath, 'bathout.pvd')).write(bathymetry)
 
     # Save mesh to DMPlex format
@@ -111,7 +124,7 @@ def export_bathymetry(bathymetry, fpath, plexname='myplex', plot_pvd=False):
         save_mesh(bathymetry.function_space().mesh(), plexname, fpath)
 
 
-def export_hydrodynamics(uv, elev, fpath, plexname='myplex', plot_pvd=False):
+def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=Options()):
     """
     Export velocity and elevation to be used in a subsequent simulation
 
@@ -119,7 +132,7 @@ def export_hydrodynamics(uv, elev, fpath, plexname='myplex', plot_pvd=False):
     :arg elev: elevation field to be stored.
     :arg fpath: directory to save the data to.
     :kwarg plexname: file name to be used for the DMPlex data file.
-    :kwarg plot_pvd: toggle plotting fields to .pvd.
+    :kwarg op: Options parameter class.
     """
     if not os.path.exists(fpath):
         os.makedirs(fpath)
@@ -134,7 +147,7 @@ def export_hydrodynamics(uv, elev, fpath, plexname='myplex', plot_pvd=False):
         chk.store(elev, name="elevation")
 
     # Plot to .pvd
-    if plot_pvd:  # TODO: Pass Options class to get this
+    if op.plot_pvd:
         File(os.path.join(outputdir, 'velocityout.pvd')).write(uv)
         File(os.path.join(outputdir, 'elevationout.pvd')).write(elev)
 
