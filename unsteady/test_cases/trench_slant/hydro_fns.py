@@ -153,26 +153,3 @@ def export_final_state(inputdir, uv, elev):  # TODO: Put into io?
     plex = elev.function_space().mesh()._plex
     viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
     viewer(plex)
-
-
-def initialise_fields(mesh2d, inputdir, outputdir):  # TODO: Put into io?
-    """
-    Initialise simulation with results from a previous simulation
-    """
-    DG_2d = th.FunctionSpace(mesh2d, 'DG', 1)
-    # elevation
-    with th.timed_stage('initialising elevation'):
-        chk = th.DumbCheckpoint(inputdir + "/elevation", mode=th.FILE_READ)
-        elev_init = th.Function(DG_2d, name="elevation")
-        chk.load(elev_init)
-        th.File(outputdir + "/elevation_imported.pvd").write(elev_init)
-        chk.close()
-    # velocity
-    with th.timed_stage('initialising velocity'):
-        chk = th.DumbCheckpoint(inputdir + "/velocity", mode=th.FILE_READ)
-        V = th.VectorFunctionSpace(mesh2d, 'DG', 1)
-        uv_init = th.Function(V, name="velocity")
-        chk.load(uv_init)
-        th.File(outputdir + "/velocity_imported.pvd").write(uv_init)
-        chk.close()
-        return elev_init, uv_init,
