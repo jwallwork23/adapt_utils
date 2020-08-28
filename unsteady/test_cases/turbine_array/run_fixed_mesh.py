@@ -69,7 +69,7 @@ if not plot_only:
 
     # Solve forward problem
     cpu_timestamp = perf_counter()
-    swp.solve_forward(0)
+    swp.solve_forward_step(0)
     cpu_time = perf_counter() - cpu_timestamp
     msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
