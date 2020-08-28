@@ -50,7 +50,7 @@ new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-data = pd.read_csv('experimental_data.csv', header=None)
+data = pd.read_csv(os.path.join(di, 'experimental_data.csv'), header=None)
 
 datathetis = []
 bathymetrythetis1 = []
@@ -61,7 +61,7 @@ for i in np.linspace(0, 15.9, 160):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv('fixed_output/bed_trench_output_uni_c' + str(nx) + '.csv')
+df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_uni_c_{:d}.csv'.format(nx)))
 
 
 datathetis = []
@@ -74,7 +74,7 @@ for i in range(len(data[0].dropna())):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv('fixed_output/bed_trench_outputc' + str(nx) + '.csv')
+df.to_csv(os.path.join(di, 'fixed_output/bed_trench_outputc_{:d}.csv'.format(nx)))
 
 print("L2 norm: ")
 print(np.sqrt(sum(diff_thetis)))
