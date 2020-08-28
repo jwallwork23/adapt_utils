@@ -53,7 +53,7 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
 fpath = "hydrodynamics_trench_slant_bath_new_{:d}".format(nx)
-export_bathymetry(bath, fpath, plex_name='myplex', plot_pvd=True)
+export_bathymetry(bath, fpath, plot_pvd=True)
 
 print("total time: ")
 print(t2-t1)

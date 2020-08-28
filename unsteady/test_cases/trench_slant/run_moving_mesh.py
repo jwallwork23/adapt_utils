@@ -94,7 +94,7 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
 fpath = "hydrodynamics_trench_slant_bath_{:d}_{:d}_{:d}_{:d}"+str(alpha, beta, gamma, nx)
-export_bathymetry(bath, os.path.join("adapt_output", fpath), plexname='myplex', plot_pvd=True)
+export_bathymetry(bath, os.path.join("adapt_output", fpath), plot_pvd=True)
 
 bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 

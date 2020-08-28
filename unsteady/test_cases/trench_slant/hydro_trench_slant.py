@@ -97,4 +97,4 @@ solver_obj.iterate(update_forcings=update_forcings_hydrodynamics)
 
 uv, elev = solver_obj.fields.solution_2d.split()
 fpath = "hydrodynamics_trench_slant_{:d}".format(fac)
-export_hydrodynamics(uv, elev, fpath, outputdir=fpath)
+export_hydrodynamics(uv, elev, fpath)

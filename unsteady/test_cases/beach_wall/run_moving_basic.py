@@ -81,7 +81,7 @@ print(t2-t1)
 # bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
 fpath = "hydrodynamics_beach_bath_new_{:d}_basic".format(int(nx*220))
-export_bathymetry(swp.fwd_solutions_bathymetry[0], fpath, plexname='myplex', plot_pvd=True)
+export_bathymetry(swp.fwd_solutions_bathymetry[0], fpath, plot_pvd=True)
 
 
 xaxisthetis1 = []
