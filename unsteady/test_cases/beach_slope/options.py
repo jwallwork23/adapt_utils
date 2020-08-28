@@ -232,10 +232,6 @@ class BeachOptions(CoupledOptions):
         Initialise simulation with results from a previous simulation
         """
         from firedrake.petsc import PETSc
-        #try:
-        #    import firedrake.cython.dmcommon as dmplex
-        #except:
-        #    import firedrake.dmplex as dmplex  # Older version        
         # mesh
         with timed_stage('mesh'):
             # Load
@@ -250,22 +246,22 @@ class BeachOptions(CoupledOptions):
             chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
             elev_init = Function(DG_2d, name="elevation")
             chk.load(elev_init)
-            #File(outputdir + "/elevation_imported.pvd").write(elev_init)
+            # File(outputdir + "/elevation_imported.pvd").write(elev_init)
             chk.close()
         # velocity
         with timed_stage('initialising velocity'):
             chk = DumbCheckpoint(inputdir + "/velocity" , mode=FILE_READ)
             uv_init = Function(vector_dg, name="velocity")
             chk.load(uv_init)
-            #File(outputdir + "/velocity_imported.pvd").write(uv_init)
+            # File(outputdir + "/velocity_imported.pvd").write(uv_init)
             chk.close()
 
         return  elev_init, uv_init, 
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        #self.eta_tilde_file = File(self.di + "/eta_tilde.pvd").write(eta_tilde)
-        #self.eta_tilde_file._topology = None
+        # self.eta_tilde_file = File(self.di + "/eta_tilde.pvd").write(eta_tilde)
+        # self.eta_tilde_file._topology = None
         if self.plot_timeseries:
             u, eta = prob.fwd_solutions[i].split()
             b = prob.bathymetry[i]
@@ -273,9 +269,9 @@ class BeachOptions(CoupledOptions):
 
         def export_func():
             eta_tilde.project(self.get_eta_tilde(prob, i))
-            #self.eta_tilde_file.write(eta_tilde)
+            # self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
-            #if self.plot_timeseries:
+            # if self.plot_timeseries:
 
                 # Store modified bathymetry timeseries
             #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
