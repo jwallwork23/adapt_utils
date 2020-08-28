@@ -5,6 +5,7 @@ import matplotlib.patches as ptch
 import os
 
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
+from adapt_utils.plotting import *  # NOQA
 
 
 # --- Set parameters
@@ -17,12 +18,6 @@ kwargs = {
         "color": "k",
     },
 }
-font = {
-    "family": "DejaVu Sans",
-    "size": 24,
-}
-plt.rc("font", **font)
-plt.rc("text", usetex=True)
 patch_kwargs = {
     "facecolor": "none",
     "linewidth": 2,
