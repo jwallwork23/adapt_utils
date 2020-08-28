@@ -55,24 +55,25 @@ def initialise_fields(mesh, fpath, fname='bathymetry', name='bathymetry'):
     return f
 
 
-def export_final_state(fpath, f, fname='bathymetry', name='bathymetry', plexname='myplex'):
+def export_bathymetry(bathymetry, fpath, plexname=None, plot_pvd=False):
     """
-    Export fields to be used in a subsequent simulation.
+    Export bathymetry field to be used in a subsequent simulation.
 
+    :arg bathymetry: field to be stored.
     :arg fpath: directory to save the data to.
-    :arg f: field to be stored.
-    :kwarg fname: file name to be used for the data file.
-    :kwarg name: field name to be used in the data file.
     :kwarg plexname: file name to be used for the DMPlex data file.
     """
+    fname = 'bathymetry'  # File name
+    name = 'bathymetry'   # Name used in field metadata
     if not os.path.exists(fpath):
         os.makedirs(fpath)
     print_output("Exporting fields for subsequent simulation")
 
     # Create checkpoint to HDF5
     with DumbCheckpoint(os.path.join(fpath, fname), mode=FILE_CREATE) as chk:
-        chk.store(f, name=name)
-    File(os.path.join(fpath, 'bathout.pvd')).write(f)  # TODO: Remove / make optional
+        chk.store(bathymetry, name=name)
+    if plot_pvd:
+        File(os.path.join(fpath, 'bathout.pvd')).write(bathymetry)
 
     # Save mesh to DMPlex format
     save_mesh(f.function_space().mesh(), plexname, fpath)

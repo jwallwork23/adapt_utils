@@ -8,7 +8,7 @@ import os
 import pandas as pd
 import time
 
-from adapt_utils.io import initialise_fields, export_final_state
+from adapt_utils.io import initialise_fields, export_bathymetry
 from adapt_utils.unsteady.test_cases.trench_slant.options import TrenchSlantOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
@@ -52,7 +52,8 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("hydrodynamics_trench_slant_bath_new_"+str(nx), bath)
+fpath = "hydrodynamics_trench_slant_bath_new_{:d}".format(nx)
+export_bathymetry(bath, fpath, plex_name='myplex', plot_pvd=True)
 
 print("total time: ")
 print(t2-t1)

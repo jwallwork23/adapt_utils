@@ -8,7 +8,7 @@ import pandas as pd
 import time
 
 from adapt_utils.adapt import recovery
-from adapt_utils.io import initialise_fields, export_final_state
+from adapt_utils.io import initialise_fields, export_bathymetry
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
@@ -67,11 +67,12 @@ t2 = time.time()
 
 print(t2-t1)
 
-#new_mesh = RectangleMesh(880, 20, 220, 10)
+# new_mesh = RectangleMesh(880, 20, 220, 10)
 
-#bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
+# bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_test", swp.fwd_solutions_bathymetry[0])
+fpath = "hydrodynamics_beach_bath_new_{:d}_test".format(int(nx*220))
+export_bathymetry(swp.fwd_solutions_bathymetry[0], fpath, plexname='myplex', plot_pvd=True)
 
 """
 xaxisthetis1 = []
