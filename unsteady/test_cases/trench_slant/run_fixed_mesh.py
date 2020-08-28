@@ -6,6 +6,7 @@ import datetime
 import numpy as np
 import os
 import pandas as pd
+import sys
 import time
 
 from adapt_utils.io import initialise_bathymetry, export_bathymetry
@@ -50,6 +51,8 @@ swp = AdaptiveProblem(op)
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
+if os.getenv('REGRESSION_TEST') is not None:
+    sys.exit(0)
 
 new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 

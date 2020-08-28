@@ -58,18 +58,19 @@ swp = AdaptiveProblem(op)
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
+if os.getenv('REGRESSION_TEST') is not None:
+    sys.exit(0)
 
 print(t2-t1)
 
 # fpath = "hydrodynamics_beach_bath_new_{:d}".format(int(nx*220))
 # export_bathymetry(bath, fpath, op=op)
 
-if os.getenv('REGRESSION_TEST') is None:
-    new_mesh = RectangleMesh(880, 20, 220, 10)
+new_mesh = RectangleMesh(880, 20, 220, 10)
 
-    bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
+bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-    bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_beach_bath_new_880')
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_beach_bath_new_880')
 
-    print('L2')
-    print(fire.errornorm(bath, bath_real))
+print('L2')
+print(fire.errornorm(bath, bath_real))
