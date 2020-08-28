@@ -21,8 +21,8 @@ nx = 1
 
 # we have included the hydrodynamics input dir for nx = 1 as an example
 
-inputdir = os.path.join(di, 'hydrodynamics_trench_' + str(nx))
-
+inputdir = os.path.join(di, 'hydrodynamics_trench' + str(nx))
+print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': nx,

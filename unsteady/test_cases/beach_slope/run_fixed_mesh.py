@@ -62,16 +62,7 @@ bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bath
 fpath = "hydrodynamics_beach_bath_fixed_{:d}_{:d}".format(int(nx*220), ny)
 export_bathymetry(bath, os.path.join("fixed_output", fpath), op=op)
 
-xaxisthetis1 = []
-baththetis1 = []
-
-for i in np.linspace(0, 219, 220):
-    xaxisthetis1.append(i)
-    baththetis1.append(-bath.at([i, 5]))
-df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
-df.to_csv("final_result_check_nx" + str(nx) + "_ny" + str(ny) + ".csv", index = False)
-
-bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
+bath_real = initialise_bathymetry(new_mesh, os.path.join(di, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1'))
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
