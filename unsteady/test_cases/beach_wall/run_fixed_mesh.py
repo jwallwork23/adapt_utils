@@ -64,7 +64,7 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
 # fpath = "hydrodynamics_beach_bath_new_{:d}".format(int(nx*220))
-# export_bathymetry(bath, fpath, plot_pvd=True)
+# export_bathymetry(bath, fpath, op=op)
 
 xaxisthetis1 = []
 baththetis1 = []
