@@ -1,5 +1,6 @@
 from thetis import *
 
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -54,12 +55,13 @@ plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 
 # Get fluid speed and elevation in P1 space
 u, eta = swp.fwd_solutions[0].split()
-speed = interpolate(sqrt(dot(u, u)), swp.P1_vec[0])
+speed = interpolate(sqrt(dot(u, u)), swp.P1[0])
 eta_proj = project(eta, swp.P1[0])
 
 # Plot fluid speed
-fig, axes = plt.subplots(figsize=(6, 4))
-cbar = fig.colorbar(tricontourf(speed, axes=axes), ax=axes, levels=50, cmap='coolwarm')
+fig, axes = plt.subplots(figsize=(14, 6))
+cbar = fig.colorbar(tricontourf(speed, axes=axes, levels=50, cmap='coolwarm'), ax=axes)
+cbar.set_label(r"Fluid speed [$\mathrm{m\,s}^{-1}$]")
 axes.set_xlim([-L/2, L/2])
 axes.set_ylim([-W/2, W/2])
 axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
@@ -68,11 +70,11 @@ axes.set_yticks(np.linspace(-W/2, W/2, 5))
 plt.tight_layout()
 for ext in ("png", "pdf"):
     plt.savefig(os.path.join(plot_dir, ".".join(["speed", ext])))
-plt.show()
 
 # Plot elevation
-fig, axes = plt.subplots(figsize=(6, 4))
-cbar = fig.colorbar(tricontourf(eta_proj, axes=axes), ax=axes, levels=50, cmap='coolwarm')
+fig, axes = plt.subplots(figsize=(14, 6))
+cbar = fig.colorbar(tricontourf(eta_proj, axes=axes, levels=50, cmap='coolwarm'), ax=axes)
+cbar.set_label(r"Elevation [$\mathrm m$]")
 axes.set_xlim([-L/2, L/2])
 axes.set_ylim([-W/2, W/2])
 axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
@@ -81,4 +83,3 @@ axes.set_yticks(np.linspace(-W/2, W/2, 5))
 plt.tight_layout()
 for ext in ("png", "pdf"):
     plt.savefig(os.path.join(plot_dir, ".".join(["elevation", ext])))
-plt.show()

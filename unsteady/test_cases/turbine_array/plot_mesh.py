@@ -25,6 +25,7 @@ patch_kwargs = {
 op = TurbineArrayOptions()
 L = op.domain_length
 W = op.domain_width
+l = 15
 
 
 # --- Plot whole mesh
@@ -32,8 +33,8 @@ W = op.domain_width
 fig, axes = plt.subplots(figsize=(12, 6))
 triplot(op.default_mesh, axes=axes, **kwargs)
 axes.legend().remove()
-axes.set_xlim([-L/2, L/2])
-axes.set_ylim([-W/2, W/2])
+axes.set_xlim([-L/2-l, L/2+l])
+axes.set_ylim([-W/2-l, W/2+l])
 axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
 axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$")
 axes.set_yticks(np.linspace(-W/2, W/2, 5))

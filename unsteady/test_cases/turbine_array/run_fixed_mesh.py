@@ -36,6 +36,7 @@ plotting_kwargs = {
         "color": "b",
     },
 }
+plt.rc('font', **{'size': 18})
 op = TurbineArrayOptions(**kwargs)
 
 # Create directories and check if spun-up solution exists
@@ -43,10 +44,14 @@ data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
 ramp_dir = create_directory(os.path.join(data_dir, "ramp"))
 data_dir = create_directory(os.path.join(data_dir, approach))
 spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
-if not spun:
-    op.end_time += op.T_ramp
 sea_water_density = 1030.0
 power_watts = [np.array([]) for i in range(15)]
+if spun:
+    for i, turbine in enumerate(op.farm_ids):
+        fname = os.path.join(ramp_dir, "power_output_{:d}.npy".format(turbine))
+        power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
+else:
+    op.end_time += op.T_ramp
 
 
 # --- Run model
@@ -58,9 +63,6 @@ if not plot_only:
     # Set initial condition
     if spun:
         swp.load_state(0, ramp_dir)
-        for i, turbine in enumerate(op.farm_ids):
-            fname = os.path.join(ramp_dir, "power_output_{:d}.npy".format(turbine))
-            power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
     else:
         swp.set_initial_condition()
     swp.setup_solver_forward(0)
@@ -73,6 +75,8 @@ if not plot_only:
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
     average_power = swp.quantity_of_interest()/op.end_time
     print_output("Average power output of array: {:.1f}W".format(average_power))
+if not spun:
+    op.end_time -= op.T_ramp
 
 # Do not attempt to plot in parallel
 nproc = COMM_WORLD.size
@@ -103,19 +107,20 @@ array_power_kilowatts = array_power_watts/1.0e+03
 
 # Convert to appropriate units and plot
 fig, axes = plt.subplots(figsize=(8, 4))
-time_seconds = np.linspace(0.0, op.end_time, num_timesteps) - op.T_ramp
+time_seconds = np.linspace(-op.T_ramp, op.end_time, num_timesteps)
 time_hours = time_seconds/3600
-time_hours = time_hours[:num_timesteps]
 axes.plot(time_hours, array_power_kilowatts, color="grey")
 axes.set_xlabel("Time [h]")
 axes.set_ylabel("Array power output [kW]")
 r = op.T_ramp/3600
-axes.set_xlim([-r, op.end_time/3600 - r])
+axes.set_xlim([-r, op.end_time/3600])
 
 # Add a dashed line when the ramp period is over
 axes.axvline(0.0, linestyle='--', color="b")
-axes.annotate("", xy=(-r, -25), xytext=(0, -25), **plotting_kwargs)
-axes.annotate("Spin-up period", xy=(-0.8*r, -35), xytext=(-0.8*r, -35), color="b", annotation_clip=False)
+axes.annotate("", xy=(-r, -40), xytext=(0, -40), **plotting_kwargs)
+axes.annotate(
+    "Spin-up period", xy=(-0.8*r, -60), xytext=(-0.8*r, -60), color="b", annotation_clip=False,
+)
 
 # Add second x-axis with non-dimensionalised time
 non_dimensionalise = lambda time: 3600*time/op.T_tide
@@ -140,13 +145,15 @@ for i, (linestyle, colour) in enumerate(zip(["-", "--", ":", "--", "-"], greys))
               label="Column {:d}".format(i+1), linestyle=linestyle, color=colour)
 axes.set_xlabel("Time [h]")
 axes.set_ylabel("Power output [kW]")
-axes.set_xlim([-r, op.end_time/3600 - r])
-axes.legend(loc="upper left")
+axes.set_xlim([-r, op.end_time/3600])
+axes.legend(loc="upper left", fontsize=16)
 
 # Add a dashed line when the ramp period is over
 axes.axvline(0.0, linestyle='--', color="b")
-axes.annotate("", xy=(-r, -6), xytext=(0.0, -6), **plotting_kwargs)
-axes.annotate("Spin-up period", xy=(-0.8*r, -9), xytext=(-0.8*r, -9), color="b", annotation_clip=False)
+axes.annotate("", xy=(-r, -11), xytext=(0.0, -11), **plotting_kwargs)
+axes.annotate(
+    "Spin-up period", xy=(-0.8*r, -17), xytext=(-0.8*r, -17), color="b", annotation_clip=False,
+)
 
 # Add second x-axis with non-dimensionalised time
 secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
