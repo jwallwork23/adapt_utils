@@ -17,7 +17,7 @@ __all__ = ["TrenchSlantOptions"]
 
 class TrenchSlantOptions(CoupledOptions):
 
-    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, output_dir = None, **kwargs):
+    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
         super(TrenchSlantOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), np.int(np.ceil(5*ny)), 16, 1.1)
@@ -47,7 +47,7 @@ class TrenchSlantOptions(CoupledOptions):
         self.stabilisation = 'lax_friedrichs'
 
         # Initial
-        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=self.di, op=self)
+        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
 
         self.set_up_morph_model(input_dir, self.default_mesh)        
 
