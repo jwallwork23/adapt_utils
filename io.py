@@ -41,22 +41,24 @@ def load_mesh(fname, fpath):
     return Mesh(newplex)
 
 
-def initialise_bathymetry(mesh, fpath):
+def initialise_bathymetry(mesh, fpath, outputdir=None, op=CoupledOptions()):
     """
     Initialise bathymetry field with results from a previous simulation.
 
     :arg mesh: field will be defined in finite element space on this mesh.
     :arg fpath: directory to read the data from.
     """
-    # TODO: Would be nice to have consistency:
-    #  * here mesh is an arg but below it is read from file
-    #  * here there is no option to plot to .pvd
-    fs = FunctionSpace(mesh, "CG", 1)  # TODO: Avoid hard-coding
+    # TODO: Would be nice to have consistency: here mesh is an arg but below it is read from file
+    fs = FunctionSpace(mesh, op.bathymetry_family.upper(), 1)
     with timed_stage('initialising bathymetry'):
-        f = Function(fs, name='bathymetry')
+        bathymetry = Function(fs, name='bathymetry')
         with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_READ) as chk:
-            chk.load(f)
-    return f
+            chk.load(bathymetry)
+
+    # Plot to .pvd
+    if outputdir is not None and op.plot_pvd:
+        File(os.path.join(outputdir, "bathymetry_imported.pvd")).write(bathymetry)
+    return bathymetry
 
 
 def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=CoupledOptions()):
@@ -96,7 +98,7 @@ def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=Cou
             chk.load(elev_init)
 
     # Plot to .pvd
-    if outputdir is not None:
+    if outputdir is not None and op.plot_pvd:
         File(os.path.join(outputdir, "velocity_imported.pvd")).write(uv_init)
         File(os.path.join(outputdir, "elevation_imported.pvd")).write(elev_init)
     return elev_init, uv_init
