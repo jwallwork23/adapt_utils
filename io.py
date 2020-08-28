@@ -116,7 +116,7 @@ def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions())
     """
     if not os.path.exists(fpath):
         os.makedirs(fpath)
-    print_output("Exporting fields for subsequent simulation")
+    op.print_debug("I/O: Exporting fields for subsequent simulation")
 
     # Create checkpoint to HDF5
     with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_CREATE) as chk:
@@ -141,7 +141,11 @@ def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()
     """
     if not os.path.exists(fpath):
         os.makedirs(fpath)
-    print_output("Exporting fields for subsequent simulation")
+    op.print_debug("I/O: Exporting fields for subsequent simulation")
+
+    # Check consistency of meshes
+    mesh = elev.function_space().mesh()
+    assert mesh == uv.function_space().mesh()
 
     # Export velocity
     with DumbCheckpoint(os.path.join(fpath, "velocity"), mode=FILE_CREATE) as chk:
@@ -160,6 +164,4 @@ def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()
 
     # Export mesh
     if plexname is not None:
-        mesh = elev.function_space().mesh()
-        assert mesh == uv.function_space().mesh()
         save_mesh(mesh, plexname, fpath)
