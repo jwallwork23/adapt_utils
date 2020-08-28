@@ -99,8 +99,10 @@ def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=Cou
 
     # Plot to .pvd
     if outputdir is not None and op.plot_pvd:
-        File(os.path.join(outputdir, "velocity_imported.pvd")).write(uv_init)
-        File(os.path.join(outputdir, "elevation_imported.pvd")).write(elev_init)
+        uv_proj = project(uv_init, VectorFunctionSpace(mesh, "CG", 1))
+        File(os.path.join(outputdir, "velocity_imported.pvd")).write(uv_proj)
+        elev_proj = project(elev_init, FunctionSpace(mesh, "CG", 1))
+        File(os.path.join(outputdir, "elevation_imported.pvd")).write(elev_proj)
 
     return uv_init, elev_init
 
@@ -285,8 +287,10 @@ def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()
 
     # Plot to .pvd
     if op.plot_pvd:
-        File(os.path.join(fpath, 'velocityout.pvd')).write(uv)
-        File(os.path.join(fpath, 'elevationout.pvd')).write(elev)
+        uv_proj = project(uv, VectorFunctionSpace(mesh, "CG", 1))
+        File(os.path.join(fpath, 'velocityout.pvd')).write(uv_proj)
+        elev_proj = project(elev, FunctionSpace(mesh, "CG", 1))
+        File(os.path.join(fpath, 'elevationout.pvd')).write(elev_proj)
 
     # Export mesh
     if plexname is not None:
