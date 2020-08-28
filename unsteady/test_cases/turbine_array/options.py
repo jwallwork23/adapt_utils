@@ -47,7 +47,7 @@ class TurbineArrayOptions(TurbineOptions):
         self.dt = 3.0
         self.T_tide = 0.1*self.M2_tide_period
         self.T_ramp = 1.0*self.T_tide
-        self.end_time = self.T_ramp + 2.0*self.T_tide
+        self.end_time = 2.0*self.T_tide
         self.dt_per_export = 12
 
         # Tidal farm
