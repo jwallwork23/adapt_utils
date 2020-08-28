@@ -5,7 +5,7 @@ import datetime
 import os
 
 
-__all__ = ["save_mesh", "load_mesh", "initialise_fields", "export_final_state",
+__all__ = ["save_mesh", "load_mesh", "initialise_bathymetry", "export_bathymetry",
            "OuterLoopLogger", "TimeDependentAdaptationLogger"]
 
 
@@ -38,16 +38,18 @@ def load_mesh(fname, fpath):
     return Mesh(newplex)
 
 
-def initialise_fields(mesh, fpath, fname='bathymetry', name='bathymetry'):
+def initialise_bathymetry(mesh, fpath, family='CG', degree=1):
     """
-    Initialise simulation with results from a previous simulation.
+    Initialise bathymetry field with results from a previous simulation.
 
-    :arg mesh: field will be defined in a P1 space on this mesh.
+    :arg mesh: field will be defined in finite element space on this mesh.
     :arg fpath: directory to read the data from.
-    :arg fname: file name (without '.h5' extension).
-    :kwarg name: field name used in the data file.
+    :kwarg family: finite element family to use for bathymetry space.
+    :kwarg degree: finite element degree to use for bathymetry space.
     """
-    fs = FunctionSpace(mesh, 'CG', 1)  # TODO: Have fs as input, rather than mesh
+    fname = 'bathymetry'  # File name
+    name = 'bathymetry'   # Name used in metadata
+    fs = FunctionSpace(mesh, family, degree)
     with timed_stage('initialising {:s}'.format(name)):
         f = Function(fs, name=name)
         with DumbCheckpoint(os.path.join(fpath, fname), mode=FILE_READ) as chk:

@@ -1,6 +1,5 @@
 from thetis import *
 import firedrake as fire
-from firedrake.petsc import PETSc
 
 import datetime
 import numpy as np
@@ -9,7 +8,7 @@ import os
 import time
 
 from adapt_utils.adapt import recovery
-from adapt_utils.io import initialise_fields, export_bathymetry
+from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.test_cases.trench_slant.options import TrenchSlantOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -97,7 +96,7 @@ bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bath
 fpath = "hydrodynamics_trench_slant_bath_{:d}_{:d}_{:d}_{:d}"+str(alpha, beta, gamma, nx)
 export_bathymetry(bath, os.path.join("adapt_output", fpath), plexname='myplex', plot_pvd=True)
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 
 print(nx)
 print(ny)

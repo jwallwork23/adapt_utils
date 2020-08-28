@@ -1,5 +1,4 @@
 from thetis import *
-from firedrake.petsc import PETSc
 import firedrake as fire
 
 import datetime
@@ -8,7 +7,7 @@ import pandas as pd
 import time
 
 from adapt_utils.adapt import recovery
-from adapt_utils.io import initialise_fields, export_bathymetry
+from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
@@ -84,7 +83,7 @@ for i in np.linspace(0, 219, 220):
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
 df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_440')
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_beach_bath_new_440')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
