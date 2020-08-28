@@ -15,14 +15,14 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
 
 
-nx = 0.2
-ny = 0.5
+nx = 0.5
+ny = 1
 
-alpha = 3
-beta = 0
-gamma = 1
+alpha = 5
+beta = 1
+gamma = 0
 
-kappa = 200
+kappa = 80
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -34,8 +34,11 @@ outputdir = os.path.join(di, 'outputs' + st)
 
 # we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
 
-inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220)))
+inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))) + '_10'
 print(inputdir)
+
+tol_value = 1e-3
+
 kwargs = {
     'approach': 'monge_ampere',
     'nx': nx,
@@ -44,7 +47,7 @@ kwargs = {
     'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
-    'r_adapt_rtol': 1.0e-3,
+    'r_adapt_rtol': tol_value,
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
@@ -142,3 +145,7 @@ bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(
 print('subdomain')
 
 print(fire.errornorm(bath_mod, bath_real_mod))
+
+print('tolerance value')
+
+print(tol_value)

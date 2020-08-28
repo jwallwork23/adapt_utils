@@ -376,6 +376,7 @@ class MeshMover():
             if i == 0:
                 initial_norm = residual_l2_norm  # Store to check for divergence
             self.op.print_debug(self.msg.format(i, minmax, residual_l2_norm, equi))
+            import ipdb; ipdb.set_trace()
             if residual_l2_norm < self.op.r_adapt_rtol:
                 print_output("r-adaptation converged in {:2d} iterations.".format(i+1))
                 break

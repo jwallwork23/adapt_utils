@@ -86,12 +86,6 @@ class BeachOptions(CoupledOptions):
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
-        # Timeseries
-        self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
-        tol = 1e-8  # FIXME: Point evaluation hack
-        self.xrange = np.linspace(tol, 16-tol, 20)
-        self.qois = []
-
     def set_up_morph_model(self, mesh = None):
 
         # Physical
