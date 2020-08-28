@@ -50,7 +50,7 @@ def initialise_bathymetry(mesh, fpath):
     #  * here mesh is an arg but below it is read from file
     #  * here there is no option to plot to .pvd
     fs = FunctionSpace(mesh, "CG", 1)  # TODO: Avoid hard-coding
-    with timed_stage('initialising {:s}'.format(name)):
+    with timed_stage('initialising bathymetry'):
         f = Function(fs, name='bathymetry')
         with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_READ) as chk:
             chk.load(f)
