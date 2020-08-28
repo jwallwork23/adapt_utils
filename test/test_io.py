@@ -122,7 +122,7 @@ def test_hydro_io(pair):
     export_hydrodynamics(uv, elev, fpath, plexname=plexname, op=op)
 
     # Read from the file and check consistency
-    elev_new, uv_new = initialise_hydrodynamics(fpath, outputdir=fpath, op=op)  # TODO: Consistent ordering
+    uv_new, elev_new = initialise_hydrodynamics(fpath, outputdir=fpath, op=op)
     assert np.allclose(uv.dat.data, uv_new.dat.data)
     assert np.allclose(elev.dat.data, elev_new.dat.data)
 

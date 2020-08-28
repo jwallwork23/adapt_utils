@@ -99,7 +99,8 @@ def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=Cou
     if outputdir is not None and op.plot_pvd:
         File(os.path.join(outputdir, "velocity_imported.pvd")).write(uv_init)
         File(os.path.join(outputdir, "elevation_imported.pvd")).write(elev_init)
-    return elev_init, uv_init  # TODO: Consistent ordering
+
+    return uv_init, elev_init
 
 
 def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions()):
