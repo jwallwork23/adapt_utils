@@ -27,6 +27,7 @@ There is some support for other equation sets, such as 3D advection-diffusion.
 .. toctree::
    :maxdepth: 2
 
+   authors
    contact
 
 
