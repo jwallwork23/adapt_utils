@@ -39,16 +39,14 @@ def load_mesh(fname, fpath):
     return Mesh(newplex)
 
 
-def initialise_bathymetry(mesh, fpath, family='CG', degree=1):
+def initialise_bathymetry(mesh, fpath):
     """
     Initialise bathymetry field with results from a previous simulation.
 
     :arg mesh: field will be defined in finite element space on this mesh.
     :arg fpath: directory to read the data from.
-    :kwarg family: finite element family to use for bathymetry space.
-    :kwarg degree: finite element degree to use for bathymetry space.
     """
-    fs = FunctionSpace(mesh, family, degree)
+    fs = FunctionSpace(mesh, "CG", 1)  # TODO: Avoid hard-coding
     with timed_stage('initialising {:s}'.format(name)):
         f = Function(fs, name='bathymetry')
         with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_READ) as chk:
