@@ -68,7 +68,7 @@ def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=Cou
     :kwarg plexname: file name used for the DMPlex data file.
     """
     with timed_stage('mesh'):
-        mesh = load_mesh(plexname, inputdir)
+        mesh = op.default_mesh if plexname is None else load_mesh(plexname, inputdir)
 
     # Get finite element space
     if op.family == 'dg-dg':
