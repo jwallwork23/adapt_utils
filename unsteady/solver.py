@@ -1469,13 +1469,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # --- Convergence criteria
 
             # Check QoI convergence
-            qoi = self.quantity_of_interest()
-            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-            self.qois.append(qoi)
-            if len(self.qois) > 1:
-                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    self.print("Converged quantity of interest!")
-                    break
+            if op.qoi_rtol is not None:
+                qoi = self.quantity_of_interest()
+                self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+                self.qois.append(qoi)
+                if len(self.qois) > 1:
+                    if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
+                        self.print("Converged quantity of interest!")
+                        break
 
             # Check maximum number of iterations
             if n == op.num_adapt - 1:

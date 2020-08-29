@@ -183,9 +183,9 @@ class Options(FrozenConfigurable):
     # Adaptation loop
     element_rtol = PositiveFloat(0.005, help="""
         Relative tolerance for convergence in mesh element count""").tag(config=True)
-    qoi_rtol = PositiveFloat(0.005, help="""
+    qoi_rtol = PositiveFloat(0.005, allow_none=True, help="""
         Relative tolerance for convergence in quantity of interest.""").tag(config=True)
-    estimator_rtol = PositiveFloat(0.005, help="""
+    estimator_rtol = PositiveFloat(0.005, allow_none=True, help="""
         Relative tolerance for convergence in error estimator.""").tag(config=True)
     target_base = PositiveFloat(10.0, help="""
         Base for exponential increase/decay of target complexity/error within outer mesh adaptation loop.
