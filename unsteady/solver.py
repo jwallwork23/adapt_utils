@@ -378,7 +378,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
                         alpha = alpha*get_sipg_ratio(nu)*cot_theta
                         sipg = interpolate(alpha, self.P0[i])
-        self.shallow_water_options[i].sipg_parameter = sipg
+                    self.shallow_water_options[i].sipg_parameter = sipg
 
         # Stabilisation
         if self.stabilisation is None:
@@ -412,7 +412,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
                         alpha = alpha*get_sipg_ratio(nu)*cot_theta
                         sipg = interpolate(alpha, self.P0[i])
-        self.tracer_options[i].sipg_parameter = sipg
+                    self.tracer_options[i].sipg_parameter = sipg
+
         # Stabilisation
         if self.stabilisation is None:
             return
