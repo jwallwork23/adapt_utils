@@ -162,6 +162,7 @@ class TohokuOptions(TsunamiOptions):
             # "far_field_gps",
         )
         self.get_gauges()
+        self.num_cells = [15849, 62626, 247970, 988882]
 
     def read_bathymetry_file(self, source='etopo1'):
         self.print_debug("INIT: Reading bathymetry file...")
