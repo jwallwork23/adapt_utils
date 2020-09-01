@@ -6,7 +6,6 @@ import numpy as np
 import os
 import sys
 
-from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 from adapt_utils.plotting import *
 from adapt_utils.norms import vecnorm
 
@@ -16,6 +15,7 @@ from adapt_utils.norms import vecnorm
 parser = argparse.ArgumentParser()
 
 # Inversion
+parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
 parser.add_argument("-levels", help="Number of mesh resolution levels considered (default 3)")
 parser.add_argument("-real_data", help="Toggle whether to use real data (default False)")
 parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data (default False)")
@@ -33,6 +33,7 @@ parser.add_argument("-plot_only", help="Just plot using saved data")
 
 # Parsed arguments
 args = parser.parse_args()
+basis = args.basis
 levels = range(int(args.levels or 3))
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
@@ -58,8 +59,18 @@ if COMM_WORLD.size > 1:
     sys.exit(0)
 
 # Collect initialisation parameters
-kwargs = {'synthetic': not real_data, 'noisy_data': bool(args.noisy_data or False)}
-op = TohokuBoxBasisOptions(level=0, **kwargs)
+kwargs = {'level': 0, 'synthetic': not real_data, 'noisy_data': bool(args.noisy_data or False)}
+if basis == 'box':
+    from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
+    op = TohokuBoxBasisOptions(**kwargs)
+elif basis == 'radial':
+    from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
+    op = TohokuRadialBasisOptions(**kwargs)
+elif basis == 'okada':
+    from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
+    op = TohokuOkadaBasisOptions(**kwargs)
+else:
+    raise ValueError("Basis type '{:s}' not recognised.".format(basis))
 gauges = list(op.gauges.keys())
 
 # Plotting parameters
@@ -69,7 +80,7 @@ fontsize_legend = 18
 kwargs = {'markevery': 5}
 
 # Setup output directories
-dirname = os.path.dirname(__file__)
+dirname = os.path.join(os.path.dirname(__file__), basis)
 di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
 op.di = create_directory(os.path.join(di, 'discrete'))
 plot_dir = create_directory(os.path.join(di, 'plots'))
