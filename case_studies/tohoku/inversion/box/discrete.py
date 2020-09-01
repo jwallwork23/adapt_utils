@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
+from time import perf_counter
 
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
@@ -222,7 +223,9 @@ print_output("Optimisation begin...")
 while (gnorm > gtol) and (iteration < maxiter):
 
     # Take one step of BFGS
+    cpu_timestamp = perf_counter()
     controls, res = minimise_bfgs(Jhat, hess_inv=hess_inv, gtol=gtol, maxiter=1, disp=False)
+    cpu_time = perf_counter() - cpu_timestamp
 
     # Extract data from OptimizeResult object
     m = res.x
@@ -230,7 +233,7 @@ while (gnorm > gtol) and (iteration < maxiter):
     dJdm = res.jac
     gnorm = vecnorm(dJdm, order=np.Inf)
     hess_inv = res.hess_inv
-    print_output("functional {:.8e}  gradient {:.8e}".format(J, gnorm))
+    print_output("functional {:.8e}  gradient {:.8e}  (time {:8.2f})".format(J, gnorm, cpu_time))
 
     # Save progress to NumPy arrays on-the-fly
     control_values_opt.append(m)
