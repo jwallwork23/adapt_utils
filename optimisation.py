@@ -82,11 +82,11 @@ def _minimize_bfgs(fun, x0, args=(), jac=None, hess_inv=None, callback=None, gto
     k = 0
     N = len(x0)
     # NOTE: Here is the modification
+    I = np.eye(N, dtype=int)
     if hess_inv is None:
-        I = np.eye(N, dtype=int)
         Hk = I
     else:
-        Hk = hess
+        Hk = hess_inv
 
     # Sets the initial step guess to dx ~ 1
     old_old_fval = old_fval + np.linalg.norm(gfk) / 2

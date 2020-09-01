@@ -196,8 +196,8 @@ for gauge in gauges:
 
 # Arrays to log progress
 fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
-control_values_opt = [] if not load_data else np.load(fname.format('ctrl'))
-func_values_opt = [] if not load_data else np.load(fname.format('func'))
+control_values_opt = [[m.dat.data[0] for m in op.control_parameters], ] if not load_data else np.load(fname.format('ctrl'))
+func_values_opt = [J, ] if not load_data else np.load(fname.format('func'))
 gradient_values_opt = [] if not load_data else np.load(fname.format('grad'))
 hessian_values_opt = [] if not load_data else np.load(fname.format('hess'))
 
