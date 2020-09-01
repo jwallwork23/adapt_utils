@@ -5,6 +5,7 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import sys
 
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
@@ -62,27 +63,21 @@ if plot_only:
     plot_all = True
 if plot_all:
     plot_pvd = plot_pdf = plot_png = True
-if optimise:
-    assert not plot_only
+extensions = []
+if plot_pdf:
+    extensions.append('pdf')
+if plot_png:
+    extensions.append('png')
+plot_any = len(extensions) > 0
 real_data = bool(args.real_data or False)
 timeseries_type = "timeseries"
 if bool(args.continuous_timeseries or False):
     timeseries_type = "_".join([timeseries_type, "smooth"])
 
 # Do not attempt to plot in parallel
-if COMM_WORLD.size > 1 and (plot_pdf or plot_png):
+if COMM_WORLD.size > 1 and plot_any:
     print_output(120*'*' + "\nWARNING: Plotting turned off when running in parallel.\n" + 120*'*')
     plot_pdf = plot_png = False
-
-
-def savefig(filename):
-    """To avoid duplication."""
-    plt.tight_layout()
-    if plot_pdf:
-        plt.savefig(filename + '.pdf')
-    if plot_png:
-        plt.savefig(filename + '.png')
-
 
 # Collect initialisation parameters
 N = int(args.okada_grid_resolution or 51)
@@ -108,18 +103,13 @@ kwargs = {
 nonlinear = bool(args.nonlinear or False)
 op = TohokuBoxBasisOptions(**kwargs)
 
-# Plotting parameters
-if plot_pdf or plot_png:
-    fontsize = 22
-    fontsize_tick = 18
-    plotting_kwargs = {'markevery': 5}
-
 # Setup output directories
 dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
 op.di = create_directory(os.path.join(di, 'discrete'))
 plot_dir = create_directory(os.path.join(di, 'plots'))
 create_directory(os.path.join(plot_dir, 'discrete'))
+
 
 # --- Synthetic run to get timeseries data
 
@@ -163,107 +153,69 @@ if not real_data:
                 axes.set_xlim(xlim)
                 axes.set_ylim(ylim)
                 axes.axis(False)
-                savefig(os.path.join(plot_dir, 'optimum_{:s}_{:d}'.format(name, level)))
+                fname = 'optimum_{:s}_{:d}'.format(name, level)
+                savefig(fname, fpath=plot_dir, extensions=extensions)
 
         # Synthetic run
-        if not plot_only:
-            print_output("Run forward to get 'data'...")
-            swp.setup_solver_forward_step(0)
-            swp.solve_forward_step(0)
-            for gauge in op.gauges:
-                op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
+        if plot_only:
+            sys.exit(0)
+        print_output("Run forward to get 'data'...")
+        swp.setup_solver_forward(0)
+        swp.solve_forward_step(0)
+        for gauge in op.gauges:
+            op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
+
+
+# --- Optimisation
+
+gauges = list(op.gauges.keys())
 
 # Set zero initial guess for the optimisation  # NOTE: zero gives an error so just choose small
 eps = 1.0e-03
 for control in op.control_parameters:
     control.assign(eps)
 
-# --- Optimisation
+# Solve the forward problem with initial guess
+op.save_timeseries = True
+print_output("Run forward to get timeseries...")
+swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+swp.solve_forward()
+J = op.J
 
-gauges = list(op.gauges.keys())
-if plot_only:
+# Save timeseries
+for gauge in gauges:
+    fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
+    np.save(fname, op.gauges[gauge]['data'])
+    fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
+    np.save(fname, op.gauges[gauge][timeseries_type])
 
-    # Load timeseries
-    for gauge in gauges:
-        fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
-        op.gauges[gauge]['data'] = np.load(fname)
-        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
-        op.gauges[gauge][timeseries_type] = np.load(fname)
-
-else:
-
-    # Solve the forward problem with initial guess
-    op.save_timeseries = True
-    print_output("Run forward to get timeseries...")
-    swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
-    swp.solve_forward()
-    J = op.J
-
-    # Save timeseries
-    for gauge in gauges:
-        fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
-        np.save(fname, op.gauges[gauge]['data'])
-        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
-        np.save(fname, op.gauges[gauge][timeseries_type])
-
-# Plot timeseries
-if plot_pdf or plot_png:
-    N = int(np.ceil(np.sqrt(len(gauges))))
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
-    for i, gauge in enumerate(gauges):
-        T = np.array(op.gauges[gauge]['times'])/60
-        ax = axes[i//N, i % N]
-        ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-        ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' simulated', **plotting_kwargs)
-        ax.legend(loc='best')
-        ax.set_xlabel('Time (min)', fontsize=fontsize)
-        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-        plt.xticks(fontsize=fontsize_tick)
-        plt.yticks(fontsize=fontsize_tick)
-        ax.grid()
-    for i in range(len(gauges), N*N):
-        axes[i//N, i % N].axis(False)
-    plt.tight_layout()
-    savefig(os.path.join(plot_dir, 'timeseries_{:d}'.format(level)))
-
+# Arrays to log progress
 fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
-if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) and not optimise:
+control_values_opt = []
+func_values_opt = []
+gradient_values_opt = []
 
-    # Load trajectory
-    control_values_opt = np.load(fname.format('ctrl', level))
-    func_values_opt = np.load(fname.format('func', level))
-    gradient_values_opt = np.load(fname.format('grad', level))
-    optimised_value = control_values_opt[-1]
 
-else:
+def derivative_cb_post(j, dj, m):
+    control = [mi.dat.data[0] for mi in m]
+    djdm = [dji.dat.data[0] for dji in dj]
+    print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
 
-    # Arrays to log progress
-    control_values_opt = []
-    func_values_opt = []
-    gradient_values_opt = []
+    # Save progress to NumPy arrays on-the-fly
+    control_values_opt.append(control)
+    func_values_opt.append(j)
+    gradient_values_opt.append(djdm)
+    np.save(fname.format('ctrl'), np.array(control_values_opt))
+    np.save(fname.format('func'), np.array(func_values_opt))
+    np.save(fname.format('grad'), np.array(gradient_values_opt))
 
-    def derivative_cb_post(j, dj, m):
-        control = [mi.dat.data[0] for mi in m]
-        djdm = [dji.dat.data[0] for dji in dj]
-        print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
 
-        # Save progress to NumPy arrays on-the-fly
-        control_values_opt.append(control)
-        func_values_opt.append(j)
-        gradient_values_opt.append(djdm)
-        np.save(fname.format('ctrl'), np.array(control_values_opt))
-        np.save(fname.format('func'), np.array(func_values_opt))
-        np.save(fname.format('grad'), np.array(gradient_values_opt))
-
-    # Run BFGS optimisation
-    opt_kwargs = {
-        'maxiter': 1000,
-        'gtol': 1.0e-08,
-    }
-    print_output("Optimisation begin...")
-    controls = [Control(c) for c in op.control_parameters]
-    Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
-    optimised_value = [o.dat.data[0] for o in minimize(Jhat, method='BFGS', options=opt_kwargs)]
+# Run BFGS optimisation
+opt_kwargs = {'maxiter': 1000, 'gtol': 1.0e-08}
+print_output("Optimisation begin...")
+controls = [Control(c) for c in op.control_parameters]
+Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
+optimised_value = [o.dat.data[0] for o in minimize(Jhat, method='BFGS', options=opt_kwargs)]
 
 # Create a new parameter class
 kwargs['control_parameters'] = optimised_value
@@ -277,101 +229,50 @@ for gauge in gauges:
 tape = get_working_tape()
 tape.clear_tape()
 
-
-# --- Plotting
-
-# Plot optimisation progress
-if plot_pdf or plot_png:
-
-    # Plot progress of QoI
-    fig, axes = plt.subplots(figsize=(6, 4))
-    axes.plot(func_values_opt)
-    axes.set_xlabel("Iteration")
-    axes.set_ylabel("Square error")
-    savefig(os.path.join(plot_dir, 'discrete', 'optimisation_progress_J_{:d}'.format(level)))
-
-    # Plot progress of gradient
-    fig, axes = plt.subplots(figsize=(6, 4))
-    axes.semilogy([vecnorm(djdm, order=np.Inf) for djdm in gradient_values_opt])
-    axes.set_xlabel("Iteration")
-    axes.set_ylabel(r"$\ell_\infty$-norm of gradient")
-    savefig(os.path.join(plot_dir, 'discrete', 'optimisation_progress_dJdm_{:d}'.format(level)))
-
-# Plot initial surface
+# Plot optimised source against optimum
 swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=op.debug)
 swp.set_initial_condition()
-
-# Plot optimised source against optimum
-if not real_data:
-    if plot_pdf or plot_png:
-        fig, axes = plt.subplots(ncols=2, figsize=(9, 4))
-        f_opt = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
-        levels = np.linspace(-6, 16, 51)
-        ticks = np.linspace(-5, 15, 9)
-        for f, ax in zip((f_box, f_opt), (axes[0], axes[1])):
-            cbar = fig.colorbar(tricontourf(f, axes=ax, levels=levels, cmap='coolwarm'), ax=ax)
-            cbar.set_ticks(ticks)
-            ax.set_xlim(xlim)
-            ax.set_ylim(ylim)
-            ax.axis(False)
-        axes[0].set_title("Optimum source field")
-        axes[1].set_title("Optimised source field")
-        savefig(os.path.join(plot_dir, 'discrete', 'optimised_source_{:d}'.format(level)))
+plot_dir = os.path.join(plot_dir, 'discrete')
+if not real_data and plot_any:
+    fig, axes = plt.subplots(ncols=2, figsize=(9, 4))
+    f_opt = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
+    levels = np.linspace(-6, 16, 51)
+    ticks = np.linspace(-5, 15, 9)
+    for f, ax in zip((f_box, f_opt), (axes[0], axes[1])):
+        cbar = fig.colorbar(tricontourf(f, axes=ax, levels=levels, cmap='coolwarm'), ax=ax)
+        cbar.set_ticks(ticks)
+        ax.set_xlim(xlim)
+        ax.set_ylim(ylim)
+        ax.axis(False)
+    axes[0].set_title("Optimum source field")
+    axes[1].set_title("Optimised source field")
+    savefig('optimised_source_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
 
 
 # --- Compare timeseries
 
-if plot_only:
+# Run forward again so that we can compare timeseries
+print_output("Run to plot optimised timeseries...")
+swp.setup_solver_forward(0)
+swp.solve_forward_step(0)
+J = swp.quantity_of_interest()
 
-    # Load timeseries
-    for gauge in gauges:
-        fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
-        op_opt.gauges[gauge][timeseries_type] = np.load(fname)
+# Save timeseries
+for gauge in gauges:
+    fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level)]))
+    np.save(fname, op_opt.gauges[gauge][timeseries_type])
 
-else:
+# Compare total variation
+msg = "total variation for gauge {:s}:  before {:.4e}  after {:.4e}  reduction {:.1f}%"
+for tt, cd in zip(('diff', 'diff_smooth'), ('Continuous', 'Discrete')):
+    print_output("\n{:s} form QoI:".format(cd))
+    for gauge in op.gauges:
+        tv = total_variation(op.gauges[gauge][tt])
+        tv_opt = total_variation(op_opt.gauges[gauge][tt])
+        print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
 
-    # Run forward again so that we can compare timeseries
-    print_output("Run to plot optimised timeseries...")
-    swp.setup_solver_forward_step(0)
-    swp.solve_forward_step(0)
-    J = swp.quantity_of_interest()
-
-    # Save timeseries
-    for gauge in gauges:
-        fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level)]))
-        np.save(fname, op_opt.gauges[gauge][timeseries_type])
-
-    # Compare total variation
-    msg = "total variation for gauge {:s}:  before {:.4e}  after {:.4e}  reduction {:.1f}%"
-    for tt, cd in zip(('diff', 'diff_smooth'), ('Continuous', 'Discrete')):
-        print_output("\n{:s} form QoI:".format(cd))
-        for gauge in op.gauges:
-            tv = total_variation(op.gauges[gauge][tt])
-            tv_opt = total_variation(op_opt.gauges[gauge][tt])
-            print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
-
-    # Solve adjoint problem and plot solution fields
-    if plot_pvd:
-        swp.compute_gradient(Control(op_opt.control_parameters[0]))
-        swp.get_solve_blocks()
-        swp.save_adjoint_trajectory()
-
-# Plot timeseries for both initial guess and optimised control
-if plot_pdf or plot_png:
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
-    for i, gauge in enumerate(gauges):
-        T = np.array(op.gauges[gauge]['times'])/60
-        ax = axes[i//N, i % N]
-        ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-        ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' initial guess', **plotting_kwargs)
-        ax.plot(T, op_opt.gauges[gauge][timeseries_type], '--x', label=gauge + ' optimised', **plotting_kwargs)
-        ax.legend(loc='best')
-        ax.set_xlabel('Time (min)', fontsize=fontsize)
-        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-        plt.xticks(fontsize=fontsize_tick)
-        plt.yticks(fontsize=fontsize_tick)
-        ax.grid()
-    for i in range(len(gauges), N*N):
-        axes[i//N, i % N].axis(False)
-    plt.tight_layout()
-    savefig(os.path.join(plot_dir, 'discrete', 'timeseries_optimised_{:d}'.format(level)))
+# Solve adjoint problem and plot solution fields
+if plot_pvd:
+    swp.compute_gradient(Control(op_opt.control_parameters[0]))  # TODO: Use solve_adjoint
+    swp.get_solve_blocks()
+    swp.save_adjoint_trajectory()
