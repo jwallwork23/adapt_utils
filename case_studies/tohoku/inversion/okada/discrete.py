@@ -10,7 +10,7 @@ import scipy
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
-from adapt_utils.misc import taylor_test
+from adapt_utils.optimisation import taylor_test
 from adapt_utils.norms import vecnorm
 
 

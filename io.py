@@ -11,7 +11,7 @@ from adapt_utils.unsteady.options import CoupledOptions
 __all__ = ["save_mesh", "load_mesh", "initialise_field", "export_field",
            "initialise_bathymetry", "export_bathymetry",
            "initialise_hydrodynamics", "export_hydrodynamics",
-           "OuterLoopLogger", "TimeDependentAdaptationLogger"]
+           "OuterLoopLogger", "TimeDependentAdaptationLogger", "readfile", "index_string"]
 
 
 def get_filename(fname, index_str):
@@ -397,3 +397,25 @@ class TimeDependentAdaptationLogger(OuterLoopLogger):
 
         # Write out
         self.write(fpath)
+
+
+def readfile(filename, reverse=False):
+    """
+    Read a file line-by-line.
+
+    :kwarg reverse: read the lines in reverse order.
+    """
+    with open(filename, 'r') as read_obj:
+        lines = read_obj.readlines()
+    lines = [line.strip() for line in lines]
+    if reverse:
+        lines = reversed(lines)
+    return lines
+
+
+def index_string(index, n=5):
+    """
+    :arg index: integer form of index.
+    :return: n-digit string form of index.
+    """
+    return (n - len(str(index)))*'0' + str(index)
