@@ -222,6 +222,7 @@ gnorm = 1.0e+08*gtol  # Some arbitrary value larger than the tolerance
 maxiter = 1000
 hess_inv = None if not load_data else hessian_values_opt[-1]
 print_output("Optimisation begin...")
+msg = "iteration {:2d}  functional {:.8e}  gradient {:.8e}  (time {:8.2f})"
 while (gnorm > gtol) and (iteration < maxiter):
 
     # Take one step of BFGS
@@ -235,7 +236,7 @@ while (gnorm > gtol) and (iteration < maxiter):
     dJdm = res.jac
     gnorm = vecnorm(dJdm, order=np.Inf)
     hess_inv = res.hess_inv
-    print_output("functional {:.8e}  gradient {:.8e}  (time {:8.2f})".format(J, gnorm, cpu_time))
+    print_output(msg.format(iteration, J, gnorm, cpu_time))
 
     # Save progress to NumPy arrays on-the-fly
     control_values_opt.append(m)
