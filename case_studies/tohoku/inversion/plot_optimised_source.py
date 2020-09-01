@@ -9,6 +9,7 @@ import sys
 from adapt_utils.plotting import *
 from adapt_utils.norms import vecnorm
 from adapt_utils.unsteady.solver import AdaptiveProblem
+from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm, utm_to_lonlat
 
 
 # --- Parse arguments
@@ -79,20 +80,44 @@ elif basis == 'okada':
     constructor = TohokuOkadaBasisOptions
 else:
     raise ValueError("Basis type '{:s}' not recognised.".format(basis))
+fontsize = 22
+fontsize_tick = 20
 
 # Load control parameters
 fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 kwargs['control_parameters'] = np.load(fname.format('ctrl', level))[-1]
 op = constructor(**kwargs)
 
-# Plot
+# Plot source over whole domain
 swp = AdaptiveProblem(op)
 swp.set_initial_condition()
 fig, axes = plt.subplots(figsize=(8, 7))
 cbar = fig.colorbar(
     tricontourf(swp.fwd_solutions[0].split()[1], levels=50, cmap='coolwarm', axes=axes),
     ax=axes)
-cbar.set_label(r'Elevation [$\mathrm m$]', size=22)
+cbar.set_label(r'Elevation [$\mathrm m$]', size=fontsize)
 axes.axis(False)
-cbar.ax.tick_params(labelsize=20)
+cbar.ax.tick_params(labelsize=fontsize_tick)
+plt.tight_layout()
 savefig('optimised_source_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+
+# Zoom
+lonlat_corners = [(138, 32), (148, 42), (138, 42)]
+utm_corners = [lonlat_to_utm(*corner, 54) for corner in lonlat_corners]
+xlim = [utm_corners[0][0], utm_corners[1][0]]
+ylim = [utm_corners[0][1], utm_corners[2][1]]
+x = np.linspace(*xlim, 5)
+y = np.linspace(*ylim, 5)
+axes.set_xticks(x)
+axes.set_yticks(y)
+kwargs = dict(northern=True, force_longitude=True)
+xticks = [np.round(xi, 1) for xi in np.linspace(138, 148, 5)]
+yticks = [np.round(yi, 1) for yi in np.linspace(32, 42, 5)]
+axes.set_xticklabels(xticks, fontsize=fontsize_tick)
+axes.set_yticklabels(yticks, fontsize=fontsize_tick)
+axes.set_xlim(xlim)
+axes.set_ylim(ylim)
+axes.set_xlabel("Degrees longitude", fontsize=fontsize)
+axes.set_ylabel("Degrees latitude", fontsize=fontsize)
+axes.axis(True)
+savefig('optimised_source_{:d}_zoom'.format(level), fpath=plot_dir, extensions=extensions)
