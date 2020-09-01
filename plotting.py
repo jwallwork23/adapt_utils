@@ -32,6 +32,8 @@ def savefig(fname, fpath=None, extensions=['pdf', 'png']):
         fname = os.path.join(fpath, fname)
     for extension in extensions:
         plt.savefig('.'.join([fname, extension]))
+    if len(extensions) == 0:
+        plt.show()
 
 
 def connect_bbox(bbox1, bbox2, loc1a, loc2a, loc1b, loc2b, prop_lines, prop_patches=None):

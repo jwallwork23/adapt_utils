@@ -45,9 +45,7 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
-if len(extensions) == 0:
-    print_output("Nothing to plot. Please specify -plot_pdf or -plot_png.")
-    sys.exit(0)
+plot_any = len(extensions) > 0
 real_data = bool(args.real_data or False)
 timeseries_type = "timeseries"
 if bool(args.continuous_timeseries or False):
@@ -59,18 +57,18 @@ if COMM_WORLD.size > 1:
     sys.exit(0)
 
 # Collect initialisation parameters
-kwargs = {'level': 0, 'synthetic': not real_data, 'noisy_data': bool(args.noisy_data or False)}
 if basis == 'box':
     from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
-    op = TohokuBoxBasisOptions(**kwargs)
+    constructor = TohokuBoxBasisOptions
 elif basis == 'radial':
     from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
-    op = TohokuRadialBasisOptions(**kwargs)
+    constructor = TohokuRadialBasisOptions
 elif basis == 'okada':
     from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
-    op = TohokuOkadaBasisOptions(**kwargs)
+    constructor = TohokuOkadaBasisOptions
 else:
     raise ValueError("Basis type '{:s}' not recognised.".format(basis))
+op = constructor(level=0, synthetic=not real_data, noisy_data=bool(args.noisy_data or False))
 gauges = list(op.gauges.keys())
 
 # Plotting parameters
@@ -116,9 +114,6 @@ for level in levels:
 
 
 # --- Optimisation progress
-
-# control_values_opt = np.load(fname.format('ctrl', level))
-# optimised_value = control_values_opt[-1]
 
 # Plot progress of QoI
 fig, axes = plt.subplots(figsize=(6, 4))
