@@ -266,7 +266,7 @@ for gauge in gauges:
 msg = "total variation for gauge {:s}:  before {:.4e}  after {:.4e}  reduction {:.1f}%"
 for tt, cd in zip(('diff', 'diff_smooth'), ('Continuous', 'Discrete')):
     print_output("\n{:s} form QoI:".format(cd))
-    for gauge in op.gauges:
+    for gauge in gauges:
         tv = total_variation(op.gauges[gauge][tt])
         tv_opt = total_variation(op_opt.gauges[gauge][tt])
         print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
