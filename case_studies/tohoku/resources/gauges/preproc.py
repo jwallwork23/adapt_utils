@@ -6,7 +6,7 @@ import os
 import scipy.interpolate as si
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
-from adapt_utils.misc import readfile
+from adapt_utils.io import readfile
 
 
 # Parse arguments
