@@ -9,8 +9,9 @@ import sys
 
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
-from adapt_utils.plotting import *
 from adapt_utils.norms import total_variation, vecnorm
+from adapt_utils.optimisation import minimise_bfgs
+from adapt_utils.plotting import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
@@ -38,6 +39,8 @@ parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
 parser.add_argument("-real_data", help="Toggle whether to use real data")
 parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data")
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
+parser.add_argument("-load_data", help="Toggle whether to continue from a previous run")
+parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
 
 # I/O and debugging
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
@@ -54,6 +57,8 @@ parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 
 args = parser.parse_args()
 level = int(args.level or 0)
 optimise = bool(args.rerun_optimisation or False)
+load_data = bool(args.load_data or False)
+gtol = float(args.gtol or 1.0e-08)
 plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
@@ -193,31 +198,54 @@ for gauge in gauges:
 
 # Arrays to log progress
 fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
-control_values_opt = []
-func_values_opt = []
-gradient_values_opt = []
+control_values_opt = [] if not load_data else np.load(fname.format('ctrl'))
+func_values_opt = [] if not load_data else np.load(fname.format('func'))
+gradient_values_opt = [] if not load_data else np.load(fname.format('grad'))
+hessian_values_opt = [] if not load_data else np.load(fname.format('hess'))
 
+# Create ReducedFunctional
+controls = [Control(c) for c in op.control_parameters]
+Jhat = ReducedFunctional(J, controls)
 
-def derivative_cb_post(j, dj, m):
-    control = [mi.dat.data[0] for mi in m]
-    djdm = [dji.dat.data[0] for dji in dj]
-    print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
+# Run BFGS optimisation
+# =====================
+#
+#   We use a customised version of SciPy's minimize function, hard-coded to use the BFGS method. The
+#   main modification is to allow the user to pass an approximation to the Hessian (inverse), rather
+#   than using the identity matrix every time. This allows us to restart the optimisation after a
+#   crash, because we can stash the Hessian approximation and then read it back in.
+#
+#   Note that the keyword parameter notation is slightly different, too.
+iteration = 0
+gnorm = 1.0e+08*gtol  # Some arbitrary value larger than the tolerance
+maxiter = 1000
+hess_inv = None if not load_data else hessian_values_opt[-1]
+print_output("Optimisation begin...")
+while (gnorm > gtol) and (iteration < maxiter):
+
+    # Take one step of BFGS
+    controls, res = minimise_bfgs(Jhat, hess_inv=hess_inv, gtol=gtol, maxiter=1, disp=False)
+
+    # Extract data from OptimizeResult object
+    m = res.x
+    J = res.fun
+    dJdm = res.jac
+    gnorm = vecnorm(dJdm, order=np.Inf)
+    hess_inv = res.hess_inv
+    print_output("functional {:.8e}  gradient {:.8e}".format(J, gnorm))
 
     # Save progress to NumPy arrays on-the-fly
-    control_values_opt.append(control)
-    func_values_opt.append(j)
-    gradient_values_opt.append(djdm)
+    control_values_opt.append(m)
+    func_values_opt.append(J)
+    gradient_values_opt.append(dJdm)
+    hessian_values_opt.append(hess_inv)
     np.save(fname.format('ctrl'), np.array(control_values_opt))
     np.save(fname.format('func'), np.array(func_values_opt))
     np.save(fname.format('grad'), np.array(gradient_values_opt))
+    np.save(fname.format('hess'), np.array(hessian_values_opt))
+    iteration += 1
+optimised_value = [o.dat.data[0] for o in controls]
 
-
-# Run BFGS optimisation
-opt_kwargs = {'maxiter': 1000, 'gtol': 1.0e-08}
-print_output("Optimisation begin...")
-controls = [Control(c) for c in op.control_parameters]
-Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
-optimised_value = [o.dat.data[0] for o in minimize(Jhat, method='BFGS', options=opt_kwargs)]
 
 # Create a new parameter class
 kwargs['control_parameters'] = optimised_value
