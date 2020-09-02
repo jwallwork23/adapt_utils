@@ -118,7 +118,7 @@ for level in levels:
 # Plot progress of QoI
 fig, axes = plt.subplots(figsize=(6, 4))
 for level in levels:
-    fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+    fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
     func_values_opt = np.load(fname.format('func', level))
     iterations = range(1, len(func_values_opt)+1)
     label = '{:d} elements'.format(op.num_cells[level])
@@ -132,7 +132,7 @@ savefig('optimisation_progress_J', fpath=plot_dir, extensions=extensions)
 # Plot progress of gradient
 fig, axes = plt.subplots(figsize=(6, 4))
 for level in levels:
-    fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+    fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
     gradient_values_opt = np.load(fname.format('grad', level))
     label = '{:d} elements'.format(op.num_cells[level])
     axes.semilogy([vecnorm(djdm, order=np.Inf) for djdm in gradient_values_opt], label=label)
