@@ -322,10 +322,18 @@ class AdaptiveProblemBase(object):
 
     def project_forward_solution(self, i, j):
         """Project forward solution from mesh `i` to mesh `j`."""
+        if self.fwd_solutions[i] is None:
+            raise ValueError("Nothing to project.")
+        elif self.fwd_solutions[j] is None:
+            self.fwd_solutions[j] = Function(self.V[j], name="Forward solution")
         self.project(self.fwd_solutions, i, j)
 
     def project_adjoint_solution(self, i, j):
         """Project adjoint solution from mesh `i` to mesh `j`."""
+        if self.adj_solutions[i] is None:
+            raise ValueError("Nothing to project.")
+        elif self.adj_solutions[j] is None:
+            self.adj_solutions[j] = Function(self.V[j], name="Adjoint solution")
         self.project(self.adj_solutions, i, j)
 
     def project_fields(self, fields, i):
@@ -340,15 +348,15 @@ class AdaptiveProblemBase(object):
         else:
             self.transfer_forward_solution()
 
-    def transfer_forward_solution(self, i):
+    def transfer_forward_solution(self, i, **kwargs):
         if i == 0:
-            self.set_initial_condition()
+            self.set_initial_condition(**kwargs)
         else:
             self.project_forward_solution(i-1, i)
 
-    def transfer_adjoint_solution(self, i):
+    def transfer_adjoint_solution(self, i, **kwargs):
         if i == self.num_meshes - 1:
-            self.set_terminal_condition()
+            self.set_terminal_condition(**kwargs)
         else:
             self.project_adjoint_solution(i+1, i)
 
@@ -427,6 +435,8 @@ class AdaptiveProblemBase(object):
             self.transfer_forward_solution(i)
             self.setup_solver_forward_step(i)
             self.solve_forward_step(i, **kwargs)
+            if self.on_the_fly:
+                self.free_solver_forward_step(i)
 
     def solve_adjoint(self, reverse=True, **kwargs):
         """Solve adjoint problem on the full sequence of meshes."""
@@ -435,6 +445,8 @@ class AdaptiveProblemBase(object):
             self.transfer_adjoint_solution(i)
             self.setup_solver_adjoint_step(i)
             self.solve_adjoint_step(i, **kwargs)
+            if self.on_the_fly:
+                self.free_solver_adjoint_step(i)
 
     def quantity_of_interest(self):
         """Functional of interest which takes the PDE solution as input."""

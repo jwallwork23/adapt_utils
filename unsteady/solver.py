@@ -206,15 +206,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Tracer space(s)
         if self.op.solve_tracer:
             self.Q = [FunctionSpace(mesh, self.finite_element_tracer) for mesh in self.meshes]
-        if self.op.solve_sediment:
+        elif self.op.solve_sediment:  # TODO: What if we want both, in different spaces?
             self.Q = [FunctionSpace(mesh, self.finite_element_sediment) for mesh in self.meshes]
+        else:
+            self.Q = [None for mesh in self.meshes]
 
         # Bathymetry space
         if self.op.solve_exner:
             self.W = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in self.meshes]
+        else:
+            self.W = [None for mesh in self.meshes]
 
         # Record DOFs
-        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]
+        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]  # TODO: other function spaces
 
     def create_intermediary_spaces(self):
         super(AdaptiveProblem, self).create_intermediary_spaces()
@@ -455,12 +459,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.project(self.fwd_solutions, i, j)
         else:
             self.op.set_initial_condition(self, **kwargs)
-        if self.op.solve_tracer:
-            self.project(self.fwd_solutions_tracer, i, j)
-        if self.op.solve_sediment:
-            self.project(self.fwd_solutions_sediment, i, j)
-        if self.op.solve_exner:
-            self.project(self.fwd_solutions_bathymetry, i, j)
+
+        # TODO: Stash the below as metadata
+        fns = (self.fwd_solutions_tracer, self.fwd_solutions_sediment, self.fwd_solutions_bathymetry)
+        flgs = (self.op.solve_tracer, self.op.solve_sediment, self.op.solve_exner)
+        names = ("tracer", "sediment", "bathymetry")
+        spaces = (self.Q, self.Q, self.W)
+
+        # Project between spaces, constructing if necessary
+        for flg, f, name, space in zip(flgs, fns, names, spaces):
+            if flg:
+                if f[i] is None:
+                    raise ValueError("Nothing to project.")
+                elif f[j] is None:
+                    f[j] = Function(space[j], name="Forward {:s} solution".format(name))
+                self.project(f, i, j)
 
     def project_adjoint_solution(self, i, j, **kwargs):
         """
@@ -473,12 +486,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.project(self.adj_solutions, i, j)
         else:
             self.op.set_terminal_condition(self, **kwargs)
-        if self.op.solve_tracer:
-            self.project(self.adj_solutions_tracer, i, j)
-        if self.op.solve_sediment:
-            self.project(self.adj_solutions_sediment, i, j)
-        if self.op.solve_exner:
-            self.project(self.adj_solutions_bathymetry, i, j)
+
+        # TODO: Stash the below as metadata
+        fns = (self.adj_solutions_tracer, self.adj_solutions_sediment, self.adj_solutions_bathymetry)
+        flgs = (self.op.solve_tracer, self.op.solve_sediment, self.op.solve_exner)
+        names = ("tracer", "sediment", "bathymetry")
+        spaces = (self.Q, self.Q, self.W)
+
+        # Project between spaces, constructing if necessary
+        for flg, f, name, space in zip(flgs, fns, names, spaces):
+            if flg:
+                if f[i] is None:
+                    raise ValueError("Nothing to project.")
+                elif f[j] is None:
+                    f[j] = Function(space[j], name="Adjoint {:s} solution".format(name))
+                self.project(f, i, j)
 
     def project_to_intermediary_mesh(self, i):
         super(AdaptiveProblem, self).project_to_intermediary_mesh(i)
