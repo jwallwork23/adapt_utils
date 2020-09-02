@@ -7,7 +7,8 @@ import os
 from adapt_utils.unsteady.options import CoupledOptions
 
 
-__all__ = ["save_mesh", "load_mesh", "initialise_bathymetry", "export_bathymetry",
+__all__ = ["save_mesh", "load_mesh", "export_field",
+           "initialise_bathymetry", "export_bathymetry",
            "initialise_hydrodynamics", "export_hydrodynamics",
            "OuterLoopLogger", "TimeDependentAdaptationLogger"]
 
@@ -118,7 +119,35 @@ def save_mesh(mesh, fname, fpath):
     viewer(plex)
 
 
-def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions()):
+def export_field(f, name, fname, fpath, plexname='myplex', op=CoupledOptions()):
+    """
+    Export some field to be used in a subsequent simulation.
+
+    :arg f: field (Firedrake :class:`Function`) to be stored.
+    :arg name: name used internally for field.
+    :arg fname: filename to save the data to.
+    :arg fpath: directory to save the data to.
+    :kwarg plexname: file name to be used for the DMPlex data file.
+    :kwarg op: Options parameter class.
+    """
+    if not os.path.exists(fpath):
+        os.makedirs(fpath)
+    op.print_debug("I/O: Exporting {:s} for subsequent simulation".format(name))
+
+    # Create checkpoint to HDF5
+    with DumbCheckpoint(os.path.join(fpath, fname), mode=FILE_CREATE) as chk:
+        chk.store(f, name=name)
+
+    # Plot to PVD
+    if op.plot_pvd:
+        File(os.path.join(fpath, '_'.join([name, 'out.pvd']))).write(f)
+
+    # Save mesh to DMPlex format
+    if plexname is not None:
+        save_mesh(f.function_space().mesh(), plexname, fpath)
+
+
+def export_bathymetry(bathymetry, fpath, op=CoupledOptions(), **kwargs):
     """
     Export bathymetry field to be used in a subsequent simulation.
 
@@ -127,19 +156,7 @@ def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions())
     :kwarg plexname: file name to be used for the DMPlex data file.
     :kwarg op: Options parameter class.
     """
-    if not os.path.exists(fpath):
-        os.makedirs(fpath)
-    op.print_debug("I/O: Exporting fields for subsequent simulation")
-
-    # Create checkpoint to HDF5
-    with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_CREATE) as chk:
-        chk.store(bathymetry, name='bathymetry')
-    if op.plot_pvd:
-        File(os.path.join(fpath, 'bathout.pvd')).write(bathymetry)
-
-    # Save mesh to DMPlex format
-    if plexname is not None:
-        save_mesh(bathymetry.function_space().mesh(), plexname, fpath)
+    export_field(bathymetry, 'bathymetry', 'bathymetry', fpath, op=op, **kwargs)
 
 
 def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()):
