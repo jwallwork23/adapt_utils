@@ -46,6 +46,7 @@ class AdaptiveProblemBase(object):
         self.checkpointing = kwargs.get('checkpointing', False)
         self.print_progress = kwargs.get('print_progress', True)
         self.manual = kwargs.get('manual', False)
+        self.on_the_fly = kwargs.get('on_the_fly', False)
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -392,6 +393,18 @@ class AdaptiveProblemBase(object):
         fpath = fpath or os.path.join(self.di, self.approach)
         for i in range(self.num_meshes):
             self.meshes[i] = load_mesh('_'.join([fname, '{:d}.h5'.format(i)]), fpath)
+
+    def setup_solver_forward_step(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def free_solver_forward_step(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def setup_solver_adjoint_step(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def free_solver_adjoint_step(self, i):
+        raise NotImplementedError("To be implemented in derived class")
 
     def solve(self, adjoint=False, **kwargs):
         """

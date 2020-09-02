@@ -1055,6 +1055,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i)
 
+    def free_solver_forward_step(self, i):
+        op.print_debug(op.indent + "FREE: Removing forward timesteppers on mesh {:d}...".format(i))
+        self.free_forward_timesteppers_step(i)
+        op.print_debug(op.indent + "FREE: Removing forward equations on mesh {:d}...".format(i))
+        self.free_forward_equations_step(i)
+
     def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
         Solve forward PDE on mesh `i`.
@@ -1230,6 +1236,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 raise NotImplementedError  # TODO
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
+
+    def free_solver_adjoint_step(self, i):
+        op.print_debug(op.indent + "FREE: Removing adjoint timesteppers on mesh {:d}...".format(i))
+        self.free_adjoint_timesteppers_step(i)
+        op.print_debug(op.indent + "FREE: Removing adjoint equations on mesh {:d}...".format(i))
+        self.free_adjoint_equations_step(i)
 
     def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
