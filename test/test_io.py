@@ -92,8 +92,8 @@ def test_bathymetry_io(family):
     # Clean up
     os.remove(os.path.join(fpath, fname + '.h5'))
     os.remove(os.path.join(fpath, plexname + '.h5'))
-    os.remove(os.path.join(fpath, 'bathout.pvd'))
-    os.remove(os.path.join(fpath, 'bathout_0.vtu'))
+    os.remove(os.path.join(fpath, 'bathymetry_out.pvd'))
+    os.remove(os.path.join(fpath, 'bathymetry_out_0.vtu'))
     os.remove(os.path.join(fpath, 'bathymetry_imported.pvd'))
     os.remove(os.path.join(fpath, 'bathymetry_imported_0.vtu'))
     os.rmdir(fpath)

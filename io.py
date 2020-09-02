@@ -7,7 +7,7 @@ import os
 from adapt_utils.unsteady.options import CoupledOptions
 
 
-__all__ = ["save_mesh", "load_mesh", "export_field",
+__all__ = ["save_mesh", "load_mesh", "initialise_field", "export_field",
            "initialise_bathymetry", "export_bathymetry",
            "initialise_hydrodynamics", "export_hydrodynamics",
            "OuterLoopLogger", "TimeDependentAdaptationLogger"]
@@ -28,7 +28,7 @@ def load_mesh(fname, fpath):
     return Mesh(newplex)
 
 
-def initialise_bathymetry(mesh, fpath, outputdir=None, op=CoupledOptions()):
+def initialise_field(mesh, name, fname, fpath, outputdir=None, op=CoupledOptions()):
     """
     Initialise bathymetry field with results from a previous simulation.
 
@@ -37,15 +37,25 @@ def initialise_bathymetry(mesh, fpath, outputdir=None, op=CoupledOptions()):
     """
     # TODO: Would be nice to have consistency: here mesh is an arg but below it is read from file
     fs = FunctionSpace(mesh, op.bathymetry_family.upper(), 1)
-    with timed_stage('initialising bathymetry'):
-        bathymetry = Function(fs, name='bathymetry')
-        with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_READ) as chk:
-            chk.load(bathymetry)
+    with timed_stage('initialising {:s}'.format(name)):
+        f = Function(fs, name=name)
+        with DumbCheckpoint(os.path.join(fpath, fname), mode=FILE_READ) as chk:
+            chk.load(f)
 
-    # Plot to .pvd
+    # Plot to PVD
     if outputdir is not None and op.plot_pvd:
-        File(os.path.join(outputdir, "bathymetry_imported.pvd")).write(bathymetry)
-    return bathymetry
+        File(os.path.join(outputdir, '_'.join([name, 'imported.pvd']))).write(f)
+    return f
+
+
+def initialise_bathymetry(mesh, fpath, **kwargs):
+    """
+    Initialise bathymetry field with results from a previous simulation.
+
+    :arg mesh: field will be defined in finite element space on this mesh.
+    :arg fpath: directory to read the data from.
+    """
+    return initialise_field(mesh, 'bathymetry', 'bathymetry', fpath, **kwargs)
 
 
 def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), **kwargs):
@@ -147,7 +157,7 @@ def export_field(f, name, fname, fpath, plexname='myplex', op=CoupledOptions()):
         save_mesh(f.function_space().mesh(), plexname, fpath)
 
 
-def export_bathymetry(bathymetry, fpath, op=CoupledOptions(), **kwargs):
+def export_bathymetry(bathymetry, fpath, **kwargs):
     """
     Export bathymetry field to be used in a subsequent simulation.
 
@@ -156,7 +166,7 @@ def export_bathymetry(bathymetry, fpath, op=CoupledOptions(), **kwargs):
     :kwarg plexname: file name to be used for the DMPlex data file.
     :kwarg op: Options parameter class.
     """
-    export_field(bathymetry, 'bathymetry', 'bathymetry', fpath, op=op, **kwargs)
+    export_field(bathymetry, 'bathymetry', 'bathymetry', fpath, **kwargs)
 
 
 def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()):
