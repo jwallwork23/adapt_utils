@@ -25,7 +25,15 @@ class AdaptiveProblemBase(object):
     Whilst this is the case for metric-based mesh adaptation using Pragmatic, mesh movement is
     performed on-the-fly on each mesh in the sequence.
     """
-    def __init__(self, op, meshes=None, nonlinear=True, checkpointing=False, print_progress=True):
+    def __init__(self, op, meshes=None, nonlinear=True, **kwargs):
+        """
+        :arg op: :class:`Options` parameter object.
+        :kwarg meshes: optionally pass a list of meshes to the constructor.
+        :kwarg nonlinear: should the PDE(s) be linearised?
+        :kwarg checkpointing: should checkpointing be used for continuous adjoint solves?
+        :kwarg print_progress: verbose solver output if set to `True`.
+        :kwarg manual: if set to `True`, meshes (and objects built upon them) are not set up.
+        """
         op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
 
         # Read args and kwargs
@@ -33,8 +41,9 @@ class AdaptiveProblemBase(object):
         self.stabilisation = op.stabilisation
         self.approach = op.approach
         self.nonlinear = nonlinear
-        self.checkpointing = checkpointing
-        self.print_progress = print_progress
+        self.checkpointing = kwargs.get('checkpointing', False)
+        self.print_progress = kwargs.get('print_progress', True)
+        manual = kwargs.get('manual', False)
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -53,7 +62,10 @@ class AdaptiveProblemBase(object):
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
-        self.setup_all(meshes)
+        op.print_debug(op.indent + "SETUP: Building meshes...")
+        self.set_meshes(meshes)
+        if not manual:
+            self.setup_all()
         implemented_steppers = {
             'CrankNicolson': CrankNicolson,
             'SteadyState': SteadyState,
@@ -74,27 +86,29 @@ class AdaptiveProblemBase(object):
         self.checkpoint = []
 
         # Storage for diagnostics over mesh adaptation loop
-        self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
-        self.num_vertices = [[mesh.num_vertices() for mesh in self.meshes], ]
-        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]
-        self.indicators = [{} for mesh in self.meshes]
-        self.estimators = [{} for mesh in self.meshes]
+        self.indicators = [{} for i in range(self.num_meshes)]
+        self.estimators = [{} for i in range(self.num_meshes)]
         self.qois = []
         self.st_complexities = [np.nan]
         self.outer_iteration = 0
+
+        # Various empty lists and dicts
+        self.callbacks = [None for i in range(self.num_meshes)]
+        self.equations = [AttrDict() for i in range(self.num_meshes)]
+        self.error_estimators = [AttrDict() for i in range(self.num_meshes)]
+        self.kernels = [None for i in range(self.num_meshes)]
+        self.timesteppers = [AttrDict() for i in range(self.num_meshes)]
 
     def print(self, msg):
         if self.print_progress:
             print_output(msg)
 
-    def setup_all(self, meshes):
+    def setup_all(self):
         """
         Setup everything which isn't explicitly associated with either the forward or adjoint
         problem.
         """
         op = self.op
-        op.print_debug(op.indent + "SETUP: Building meshes...")
-        self.set_meshes(meshes)
         op.print_debug(op.indent + "SETUP: Creating function spaces...")
         self.set_finite_elements()
         self.create_function_spaces()
@@ -112,13 +126,6 @@ class AdaptiveProblemBase(object):
         self.create_outfiles()
         op.print_debug(op.indent + "SETUP: Creating intermediary spaces...")
         self.create_intermediary_spaces()
-
-        # Various empty lists and dicts
-        self.callbacks = [None for mesh in self.meshes]
-        self.equations = [AttrDict() for mesh in self.meshes]
-        self.error_estimators = [AttrDict() for mesh in self.meshes]
-        self.kernels = [None for mesh in self.meshes]
-        self.timesteppers = [AttrDict() for mesh in self.meshes]
 
     def set_meshes(self, meshes):
         """
@@ -138,6 +145,10 @@ class AdaptiveProblemBase(object):
             # if self.op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO
             #     coords = mesh.coordinates
             #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
+
+        # Storage for diagnostics over mesh adaptation loop
+        self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
+        self.num_vertices = [[mesh.num_vertices() for mesh in self.meshes], ]
 
     def get_plex(self, i):
         """
@@ -165,7 +176,9 @@ class AdaptiveProblemBase(object):
         self.intermediary_solutions = [Function(space) for space in spaces]
 
     def create_function_spaces(self):
-        raise NotImplementedError("To be implemented in derived class")
+        if not hasattr(self, 'V'):
+            raise NotImplementedError("To be implemented in derived class")
+        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]
 
     def create_solutions(self):
         raise NotImplementedError("To be implemented in derived class")

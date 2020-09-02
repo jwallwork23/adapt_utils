@@ -198,6 +198,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Bathymetry space
         if self.op.solve_exner:
             self.W = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in self.meshes]
+        super(AdaptiveProblem, self).create_function_spaces()
 
     def create_intermediary_spaces(self):
         super(AdaptiveProblem, self).create_intermediary_spaces()
