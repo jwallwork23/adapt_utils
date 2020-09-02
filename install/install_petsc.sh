@@ -27,7 +27,7 @@ read chk
 
 cd $INSTALL_DIR
 git clone https://gitlab.com/petsc/petsc.git petsc
-mv reconfigure-arch-adapt.py petsc
+mv configure_petsc.py petsc/
 cd petsc
 git remote add firedrake https://github.com/firedrakeproject/petsc.git
 # git fetch firedrake firedrake
@@ -37,8 +37,10 @@ git remote add firedrake https://github.com/firedrakeproject/petsc.git
 # git checkout barral/allinone
 # git merge firedrake
 git fetch firedrake joe/adapt
-git checkout joe/adapt
-python3 reconfigure-arch-adapt.py
+# git checkout joe/adapt
+git checkout firedrake/joe/adapt
+git checkout -b joe/adapt
+./configure_petsc.py
 make PETSC_DIR=$PETSC_DIR PETSC_ARCH=$PETSC_ARCH all
 make PETSC_DIR=$PETSC_DIR PETSC_ARCH=$PETSC_ARCH check
 cd ..
