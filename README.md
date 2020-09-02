@@ -40,7 +40,7 @@ London.
   * Clone this repository and make it accessible to the `$PYTHONPATH` environment variable.
   * Set the `$SOFTWARE` environment variable to where you would like your PETSc and Firedrake installations to exist.
   * Copy the contents of the `install` directory into `$SOFTWARE` and enter that directory.
-  * Call `source install_petsc.sh` and then `source install_firedrake.sh`, modifying these scripts, if desired.
+  * Call `bash install_petsc.sh` and then `bash install_firedrake.sh`, modifying these scripts, if desired. If installing on a fresh Ubuntu OS then you will need to call `bash install_compilers.sh` beforehand.
   * Once you have a working Firedrake installation, get to grips with `adapt_utils` by looking at the test cases in `steady/test_cases` and `unsteady/test_cases`, as well as the notebooks hosted [here][7].
 
 
