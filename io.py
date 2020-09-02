@@ -192,11 +192,12 @@ class OuterLoopLogger(object):
                 break
             j += 1
 
-    def write(self, fpath):
+    def write(self, fpath, save_meshes=False):
         """
         Write the log out to file.
 
         :arg fpath: directory to save log file in.
+        :kwarg save_meshes: toggle whether to save meshes to file in DMPlex format.
         """
         if fpath is None:
             return
@@ -227,7 +228,7 @@ class OuterLoopLogger(object):
             print_output(self.logstr)
 
         # Write out
-        self.write(fpath)
+        self.write(fpath, save_meshes=save_meshes)
 
 
 class TimeDependentAdaptationLogger(OuterLoopLogger):
