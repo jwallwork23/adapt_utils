@@ -57,6 +57,6 @@ python3 firedrake-install --honour-petsc-dir --install thetis --venv-name $FIRED
         # --package-branch firedrake joe/meshadapt
 source $FIREDRAKE_DIR/bin/activate
 
-# Test installation
+# Very basic test of installation
 cd $FIREDRAKE_DIR/src/firedrake
 python3 tests/test_adapt_2d.py

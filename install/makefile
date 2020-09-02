@@ -1,10 +1,13 @@
-all: compilers petsc firedrake
+all: firedrake
 
 compilers:
 	source install_compilers.sh
 
-petsc:
+petsc: compilers
 	source install_petsc.sh
 
-firedrake:
+firedrake: petsc
 	source install_firedrake.sh
+
+basic: compilers
+	source install_firedrake_no_adapt.sh
