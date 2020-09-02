@@ -170,7 +170,7 @@ if not real_data:
         # Synthetic run
         if not plot_only:
             print_output("Run forward to get 'data'...")
-            swp.setup_solver_forward(0)
+            swp.setup_solver_forward_step(0)
             swp.solve_forward_step(0)
             for gauge in op.gauges:
                 op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
@@ -334,7 +334,7 @@ else:
 
     # Run forward again so that we can compare timeseries
     print_output("Run to plot optimised timeseries...")
-    swp.setup_solver_forward(0)
+    swp.setup_solver_forward_step(0)
     swp.solve_forward_step(0)
     J = swp.quantity_of_interest()
 

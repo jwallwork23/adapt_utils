@@ -412,7 +412,7 @@ class AdaptiveProblemBase(object):
         R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
         for i in R:
             self.transfer_forward_solution(i)
-            self.setup_solver_forward(i)
+            self.setup_solver_forward_step(i)
             self.solve_forward_step(i, **kwargs)
 
     def solve_adjoint(self, reverse=True, **kwargs):
@@ -420,7 +420,7 @@ class AdaptiveProblemBase(object):
         R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
         for i in R:
             self.transfer_adjoint_solution(i)
-            self.setup_solver_adjoint(i)
+            self.setup_solver_adjoint_step(i)
             self.solve_adjoint_step(i, **kwargs)
 
     def quantity_of_interest(self):
@@ -662,7 +662,7 @@ class AdaptiveProblemBase(object):
                 self.transfer_forward_solution(i)
 
                 # Setup solver on mesh i
-                self.setup_solver_forward(i)
+                self.setup_solver_forward_step(i)
 
                 if self.outer_iteration < op.num_adapt-1:
 

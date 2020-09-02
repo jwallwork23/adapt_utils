@@ -86,7 +86,7 @@ if not plot_only:
         swp.load_state(0, ramp_dir)
     else:
         swp.set_initial_condition()
-    swp.setup_solver_forward(0)
+    swp.setup_solver_forward_step(0)
 
     # Solve forward problem
     cpu_timestamp = perf_counter()

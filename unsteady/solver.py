@@ -1014,7 +1014,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.callbacks[i].add(ExnerNormCallback(self, i), 'export')
 
-    def setup_solver_forward(self, i):
+    def setup_solver_forward_step(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
         op.print_debug(op.indent + "SETUP: Creating forward equations on mesh {:d}...".format(i))
@@ -1204,7 +1204,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         update_forcings(self.simulation_time + op.dt)
         self.print(80*'=')
 
-    def setup_solver_adjoint(self, i):
+    def setup_solver_adjoint_step(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
         op.print_debug(op.indent + "SETUP: Creating adjoint equations on mesh {:d}...".format(i))
@@ -1431,7 +1431,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
-                self.setup_solver_forward(i)
+                self.setup_solver_forward_step(i)
                 self.solve_forward_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Solve adjoint on current window
@@ -1440,7 +1440,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
 
                 self.transfer_adjoint_solution(i)
-                self.setup_solver_adjoint(i)
+                self.setup_solver_adjoint_step(i)
                 self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Assemble indicators and metrics
@@ -1584,7 +1584,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 # TODO: Need to transfer fwd sol in nonlinear case
                 ep.create_error_estimators_step(i)  # These get passed to the timesteppers under the hood
-                ep.setup_solver_forward(i)
+                ep.setup_solver_forward_step(i)
                 ets = ep.timesteppers[i]['shallow_water']  # TODO: Tracer option
 
                 # --- Solve forward on current window
@@ -1598,7 +1598,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
-                self.setup_solver_forward(i)
+                self.setup_solver_forward_step(i)
                 self.solve_forward_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Solve adjoint on current window
@@ -1607,7 +1607,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
 
                 self.transfer_adjoint_solution(i)
-                self.setup_solver_adjoint(i)
+                self.setup_solver_adjoint_step(i)
                 self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Solve adjoint on current window in enriched space
@@ -1617,7 +1617,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 ep.simulation_time = (i+1)*op.dt*self.dt_per_mesh  # TODO: Shouldn't be needed
                 ep.transfer_adjoint_solution(i)
-                ep.setup_solver_adjoint(i)
+                ep.setup_solver_adjoint_step(i)
                 ep.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
 
                 # --- Assemble indicators and metrics
