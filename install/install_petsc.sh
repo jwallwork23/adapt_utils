@@ -27,7 +27,7 @@ read chk
 
 cd $INSTALL_DIR
 git clone https://gitlab.com/petsc/petsc.git petsc
-mv configure_petsc.py petsc/
+cp configure_petsc.py petsc/
 cd petsc
 git remote add firedrake https://github.com/firedrakeproject/petsc.git
 # git fetch firedrake firedrake
