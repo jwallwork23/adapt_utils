@@ -19,8 +19,14 @@ unset PYTHONPATH
 # Environment variables for MPI
 export MPICC=/usr/bin/mpicc
 export MPICXX=/usr/bin/mpicxx
-export MPIF90=/usr/bin/mpif90
 export MPIEXEC=/usr/bin/mpiexec
+export MPIF90=/usr/bin/mpif90
+for mpi in mpicc mpicxx mpiexec mpif90; do
+	if [ ! -f /usr/bin/$mpi ]; then
+		echo "Cannot find $mpi in /usr/bin."
+		exit 1
+	fi
+done
 
 # Environment variables for Firedrake installation
 export FIREDRAKE_ENV=firedrake-adapt
@@ -32,6 +38,10 @@ echo "MPICXX="$MPICXX
 echo "MPIF90="$MPIF90
 echo "MPIEXEC="$MPIEXEC
 echo "PETSC_DIR="$PETSC_DIR
+if [ ! -f "$PETSC_DIR" ]; then
+    echo "$PETSC_DIR does not exist. Please run install_petsc.sh."
+    exit 1
+fi
 echo "PETSC_ARCH="$PETSC_ARCH
 echo "FIREDRAKE_ENV="$FIREDRAKE_ENV
 echo "FIREDRAKE_DIR="$FIREDRAKE_DIR
