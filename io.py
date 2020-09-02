@@ -134,7 +134,7 @@ def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions())
         File(os.path.join(fpath, 'bathout.pvd')).write(bathymetry)
 
     # Save mesh to DMPlex format
-    save_mesh(f.function_space().mesh(), plexname, fpath)
+    save_mesh(bathymetry.function_space().mesh(), plexname, fpath)
 
 
 class OuterLoopLogger(object):
