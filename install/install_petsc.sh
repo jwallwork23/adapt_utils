@@ -10,6 +10,10 @@
 # ====================================================================== #
 
 # Set environment variables
+if [ ! -f "$SOFTWARE" ]; then
+    echo "SOFTWARE environment variable $SOFTWARE does not exist."
+    exit 1
+fi
 export INSTALL_DIR=$SOFTWARE  # Modify as appropriate
 export PETSC_DIR=$INSTALL_DIR/petsc
 export PETSC_ARCH=arch-adapt
