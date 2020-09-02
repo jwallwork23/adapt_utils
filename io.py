@@ -28,15 +28,15 @@ def load_mesh(fname, fpath):
     return Mesh(newplex)
 
 
-def initialise_field(mesh, name, fname, fpath, outputdir=None, op=CoupledOptions()):
+def initialise_field(fs, name, fname, fpath, outputdir=None, op=CoupledOptions()):
     """
     Initialise bathymetry field with results from a previous simulation.
 
-    :arg mesh: field will be defined in finite element space on this mesh.
+    :arg fs: field will live in this finite element space.
+    :arg name: name used internally for field.
+    :arg fname: file name (without '.h5' extension).
     :arg fpath: directory to read the data from.
     """
-    # TODO: Would be nice to have consistency: here mesh is an arg but below it is read from file
-    fs = FunctionSpace(mesh, op.bathymetry_family.upper(), 1)
     with timed_stage('initialising {:s}'.format(name)):
         f = Function(fs, name=name)
         with DumbCheckpoint(os.path.join(fpath, fname), mode=FILE_READ) as chk:
@@ -48,14 +48,16 @@ def initialise_field(mesh, name, fname, fpath, outputdir=None, op=CoupledOptions
     return f
 
 
-def initialise_bathymetry(mesh, fpath, **kwargs):
+def initialise_bathymetry(mesh, fpath, op=CoupledOptions(), **kwargs):
     """
     Initialise bathymetry field with results from a previous simulation.
 
     :arg mesh: field will be defined in finite element space on this mesh.
     :arg fpath: directory to read the data from.
     """
-    return initialise_field(mesh, 'bathymetry', 'bathymetry', fpath, **kwargs)
+    # TODO: Would be nice to have consistency: here mesh is an arg but below it is read from file
+    fs = FunctionSpace(mesh, op.bathymetry_family.upper(), 1)
+    return initialise_field(fs, 'bathymetry', 'bathymetry', fpath, **kwargs)
 
 
 def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), **kwargs):
@@ -199,10 +201,10 @@ def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()
     if op.plot_pvd:
         uv_proj = Function(VectorFunctionSpace(mesh, "CG", 1), name="Initial velocity")
         uv_proj.project(uv)
-        File(os.path.join(fpath, 'velocityout.pvd')).write(uv_proj)
+        File(os.path.join(fpath, 'velocity_out.pvd')).write(uv_proj)
         elev_proj = Function(FunctionSpace(mesh, "CG", 1), name="Initial elevation")
         elev_proj.project(elev)
-        File(os.path.join(fpath, 'elevationout.pvd')).write(elev_proj)
+        File(os.path.join(fpath, 'elevation_out.pvd')).write(elev_proj)
 
     # Export mesh
     if plexname is not None:

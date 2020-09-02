@@ -129,9 +129,8 @@ def test_hydro_io(pair):
     # Clean up
     for fname in fnames:
         os.remove(os.path.join(fpath, fname + '.h5'))
-        os.remove(os.path.join(fpath, '{:s}out.pvd'.format(fname)))
-        os.remove(os.path.join(fpath, '{:s}out_0.vtu'.format(fname)))
-        os.remove(os.path.join(fpath, '{:s}_imported.pvd'.format(fname)))
-        os.remove(os.path.join(fpath, '{:s}_imported_0.vtu'.format(fname)))
+        for extension in ('.pvd', '_0.vtu'):
+            os.remove(os.path.join(fpath, '{:s}_out{:s}'.format(fname, extension)))
+            os.remove(os.path.join(fpath, '{:s}_imported{:s}'.format(fname, extension)))
     os.remove(os.path.join(fpath, plexname + '.h5'))
     os.rmdir(fpath)
