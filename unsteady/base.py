@@ -187,12 +187,12 @@ class AdaptiveProblemBase(object):
         forward and adjoint solutions.
         """
         for i in range(self.num_meshes):
-            self._create_solutions_step(i)
+            self.create_solutions_step(i)
 
-    def _create_solutions_step(self, i):
+    def create_solutions_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def _free_solutions_step(self, i):
+    def free_solutions_step(self, i):
         self.fwd_solutions[i] = None
         self.adj_solutions[i] = None
 
@@ -209,12 +209,12 @@ class AdaptiveProblemBase(object):
         The bathymetry is defined via a modified version of the `DepthExpression` found Thetis.
         """
         for i in range(self.num_meshes):
-            self._set_fields_step(i, **kwargs)
+            self.set_fields_step(i, **kwargs)
 
-    def _set_fields_step(self, i):
+    def set_fields_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def _free_fields_step(self, i):
+    def free_fields_step(self, i):
         self.fields[i] = AttrDict()
 
     def set_stabilisation(self):
@@ -237,19 +237,25 @@ class AdaptiveProblemBase(object):
     def set_terminal_condition(self):
         self.op.set_terminal_condition(self)
 
-    def create_equations(self, i, adjoint=False):
-        if adjoint:
-            self.create_adjoint_equations(i)
-        else:
-            self.create_forward_equations(i)
+    def create_forward_equations(self):
+        for i in range(self.num_meshes):
+            self.create_forward_equations_step(i)
 
-    def create_forward_equations(self, i):
+    def create_adjoint_equations(self):
+        for i in range(self.num_meshes):
+            self.create_adjoint_equations_step(i)
+
+    def create_forward_equations_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_adjoint_equations(self, i):
+    def create_adjoint_equations_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_error_estimators(self, i):
+    def create_error_estimators(self):
+        for i in range(self.num_meshes):
+            self.create_error_estimators_step(i)
+
+    def create_error_estimators_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
     def create_timesteppers(self, i, adjoint=False):
