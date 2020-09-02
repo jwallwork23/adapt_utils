@@ -363,17 +363,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if hasattr(op, 'sipg_parameter'):
                 sipg = op.sipg_parameter
             if self.shallow_water_options[i].use_automatic_sipg_parameter:
-                for i, mesh in enumerate(self.meshes):
-                    cot_theta = 1.0/tan(self.minimum_angles[i])
+                cot_theta = 1.0/tan(self.minimum_angles[i])
 
-                    # Penalty parameter for shallow water
-                    nu = self.fields[i].horizontal_viscosity
-                    if nu is not None:
-                        p = self.V[i].sub(0).ufl_element().degree()
-                        alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
-                        alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                        sipg = interpolate(alpha, self.P0[i])
-                    self.shallow_water_options[i].sipg_parameter = sipg
+                # Penalty parameter for shallow water
+                nu = self.fields[i].horizontal_viscosity
+                if nu is not None:
+                    p = self.V[i].sub(0).ufl_element().degree()
+                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                    alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                    sipg = interpolate(alpha, self.P0[i])
+                self.shallow_water_options[i].sipg_parameter = sipg
 
         # Stabilisation
         if self.stabilisation is None:
@@ -397,17 +396,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if hasattr(op, 'sipg_parameter_tracer'):
                 sipg = op.sipg_parameter_tracer
             if self.tracer_options[i].use_automatic_sipg_parameter:
-                for i, mesh in enumerate(self.meshes):
-                    cot_theta = 1.0/tan(self.minimum_angles[i])
+                cot_theta = 1.0/tan(self.minimum_angles[i])
 
-                    # Penalty parameter for shallow water
-                    nu = self.fields[i].horizontal_diffusivity
-                    if nu is not None:
-                        p = self.Q[i].ufl_element().degree()
-                        alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
-                        alpha = alpha*get_sipg_ratio(nu)*cot_theta
-                        sipg = interpolate(alpha, self.P0[i])
-                    self.tracer_options[i].sipg_parameter = sipg
+                # Penalty parameter for shallow water
+                nu = self.fields[i].horizontal_diffusivity
+                if nu is not None:
+                    p = self.Q[i].ufl_element().degree()
+                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                    alpha = alpha*get_sipg_ratio(nu)*cot_theta
+                    sipg = interpolate(alpha, self.P0[i])
+                self.tracer_options[i].sipg_parameter = sipg
 
         # Stabilisation
         if self.stabilisation is None:
