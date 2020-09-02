@@ -12,21 +12,7 @@ __all__ = ["save_mesh", "load_mesh", "initialise_bathymetry", "export_bathymetry
            "OuterLoopLogger", "TimeDependentAdaptationLogger"]
 
 
-def save_mesh(mesh, fname, fpath):
-    """
-    :arg mesh: mesh to be saved in DMPlex format.
-    :arg fname: file name (without '.h5' extension).
-    :arg fpath: directory to store the file.
-    """
-    if COMM_WORLD.size > 1:
-        raise IOError("Saving a mesh to HDF5 only works in serial.")
-    try:
-        plex = mesh._topology_dm
-    except AttributeError:
-        plex = mesh._plex  # Backwards compatability
-    viewer = PETSc.Viewer().createHDF5(os.path.join(fpath, fname + '.h5'), 'w')
-    viewer(plex)
-
+# --- Input
 
 def load_mesh(fname, fpath):
     """
@@ -39,7 +25,6 @@ def load_mesh(fname, fpath):
     newplex = PETSc.DMPlex().create()
     newplex.createFromFile(os.path.join(fpath, fname + '.h5'))
     return Mesh(newplex)
-
 
 def initialise_bathymetry(mesh, fpath, outputdir=None, op=CoupledOptions()):
     """
@@ -114,6 +99,24 @@ def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), **kw
     return uv_init, elev_init
 
 
+# --- Output
+
+def save_mesh(mesh, fname, fpath):
+    """
+    :arg mesh: mesh to be saved in DMPlex format.
+    :arg fname: file name (without '.h5' extension).
+    :arg fpath: directory to store the file.
+    """
+    if COMM_WORLD.size > 1:
+        raise IOError("Saving a mesh to HDF5 only works in serial.")
+    try:
+        plex = mesh._topology_dm
+    except AttributeError:
+        plex = mesh._plex  # Backwards compatability
+    viewer = PETSc.Viewer().createHDF5(os.path.join(fpath, fname + '.h5'), 'w')
+    viewer(plex)
+
+
 def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions()):
     """
     Export bathymetry field to be used in a subsequent simulation.
@@ -136,6 +139,48 @@ def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions())
     # Save mesh to DMPlex format
     save_mesh(bathymetry.function_space().mesh(), plexname, fpath)
 
+
+def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()):
+    """
+    Export velocity and elevation to be used in a subsequent simulation
+
+    :arg uv: velocity field to be stored.
+    :arg elev: elevation field to be stored.
+    :arg fpath: directory to save the data to.
+    :kwarg plexname: file name to be used for the DMPlex data file.
+    :kwarg op: Options parameter class.
+    """
+    if not os.path.exists(fpath):
+        os.makedirs(fpath)
+    op.print_debug("I/O: Exporting fields for subsequent simulation")
+
+    # Check consistency of meshes
+    mesh = elev.function_space().mesh()
+    assert mesh == uv.function_space().mesh()
+
+    # Export velocity
+    with DumbCheckpoint(os.path.join(fpath, "velocity"), mode=FILE_CREATE) as chk:
+        chk.store(uv, name="velocity")
+
+    # Export elevation
+    with DumbCheckpoint(os.path.join(fpath, "elevation"), mode=FILE_CREATE) as chk:
+        chk.store(elev, name="elevation")
+
+    # Plot to .pvd
+    if op.plot_pvd:
+        uv_proj = Function(VectorFunctionSpace(mesh, "CG", 1), name="Initial velocity")
+        uv_proj.project(uv)
+        File(os.path.join(fpath, 'velocityout.pvd')).write(uv_proj)
+        elev_proj = Function(FunctionSpace(mesh, "CG", 1), name="Initial elevation")
+        elev_proj.project(elev)
+        File(os.path.join(fpath, 'elevationout.pvd')).write(elev_proj)
+
+    # Export mesh
+    if plexname is not None:
+        save_mesh(mesh, plexname, fpath)
+
+
+# --- Logging
 
 class OuterLoopLogger(object):
     """
@@ -269,43 +314,3 @@ class TimeDependentAdaptationLogger(OuterLoopLogger):
 
         # Write out
         self.write(fpath)
-
-
-def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()):
-    """
-    Export velocity and elevation to be used in a subsequent simulation
-
-    :arg uv: velocity field to be stored.
-    :arg elev: elevation field to be stored.
-    :arg fpath: directory to save the data to.
-    :kwarg plexname: file name to be used for the DMPlex data file.
-    :kwarg op: Options parameter class.
-    """
-    if not os.path.exists(fpath):
-        os.makedirs(fpath)
-    op.print_debug("I/O: Exporting fields for subsequent simulation")
-
-    # Check consistency of meshes
-    mesh = elev.function_space().mesh()
-    assert mesh == uv.function_space().mesh()
-
-    # Export velocity
-    with DumbCheckpoint(os.path.join(fpath, "velocity"), mode=FILE_CREATE) as chk:
-        chk.store(uv, name="velocity")
-
-    # Export elevation
-    with DumbCheckpoint(os.path.join(fpath, "elevation"), mode=FILE_CREATE) as chk:
-        chk.store(elev, name="elevation")
-
-    # Plot to .pvd
-    if op.plot_pvd:
-        uv_proj = Function(VectorFunctionSpace(mesh, "CG", 1), name="Initial velocity")
-        uv_proj.project(uv)
-        File(os.path.join(fpath, 'velocityout.pvd')).write(uv_proj)
-        elev_proj = Function(FunctionSpace(mesh, "CG", 1), name="Initial elevation")
-        elev_proj.project(elev)
-        File(os.path.join(fpath, 'elevationout.pvd')).write(elev_proj)
-
-    # Export mesh
-    if plexname is not None:
-        save_mesh(mesh, plexname, fpath)
