@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.plotting import *
+from adapt_utils.plotting import *  # NOQA
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
 

@@ -6,7 +6,6 @@ import numpy as np
 import os
 from time import perf_counter
 
-from adapt_utils.io import export_hydrodynamics
 from adapt_utils.plotting import *  # NOQA
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
