@@ -90,6 +90,7 @@ def _minimize_bfgs(fun, x0, args=(), jac=None, hess_inv=None, callback=None, gto
 
     # Sets the initial step guess to dx ~ 1
     old_old_fval = old_fval + np.linalg.norm(gfk) / 2
+    fval = old_fval
 
     xk = x0
     if retall:
