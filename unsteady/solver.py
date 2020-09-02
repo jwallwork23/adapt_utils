@@ -81,7 +81,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     op.adjoint_solver_parameters[model]['snes_monitor'] = None
         self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
         self.sediment_options = [AttrDict() for i in range(op.num_meshes)]
-        self.exner_options =[AttrDict() for i in range(op.num_meshes)] 
+        self.exner_options = [AttrDict() for i in range(op.num_meshes)]
         static_options = {
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
             # 'check_tracer_conservation': True,  # TODO
@@ -103,15 +103,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 swo['sipg_parameter_sediment'] = op.sipg_parameter_sediment
 
         # Lists to be populated
-        self.fwd_solutions = [None for i in range(op.num_meshes)]
-        self.adj_solutions = [None for i in range(op.num_meshes)]
         self.fwd_solutions_tracer = [None for i in range(op.num_meshes)]
         self.fwd_solutions_sediment = [None for i in range(op.num_meshes)]
         self.fwd_solutions_bathymetry = [None for i in range(op.num_meshes)]
         self.adj_solutions_tracer = [None for i in range(op.num_meshes)]
         self.depth = [None for i in range(self.num_meshes)]
         self.bathymetry = [None for i in range(self.num_meshes)]
-        self.fields = [AttrDict() for i in range(self.num_meshes)]
         self.inflow = [None for i in range(self.num_meshes)]
         self.minimum_angles = [None for i in range(self.num_meshes)]
 
@@ -268,6 +265,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.fwd_solutions_bathymetry[i] = Function(self.W[i], name="Forward bathymetry solution")
             # self.adj_solutions_bathymetry[i] = Function(self.W[i], name="Adjoint bathymetry solution")
 
+    def _free_solutions_step(self, i):
+        super(AdaptiveProblem, self)._free_solutions_step(i)
+        if self.op.solve_tracer:
+            self.fwd_solutions_tracer[i] = None
+            self.adj_solutions_tracer[i] = None
+        if self.op.solve_sediment:
+            self.fwd_solutions_sediment[i] = None
+            self.adj_solutions_sediment[i] = None
+        if self.op.solve_exner:
+            self.fwd_solutions_bathymetry[i] = None
+            self.adj_solutions_bathymetry[i] = None
+
     def _set_fields_step(self, i, init=False):
 
         # Bathymetry
@@ -319,6 +328,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.op.check_cfl_criterion(self, i, error_factor=None)
             # TODO: parameter for error_factor, defaulted by timestepper choice
             # TODO: allow t-adaptation in a given subinterval
+
+    def _free_fields_step(self, i):
+        super(AdaptiveProblem, self)._free_fields_step(i)
+        self.bathymetry[i] = None
+        self.depth[i] = None
+        self.inflow[i] = None
 
     # --- Stabilisation
 

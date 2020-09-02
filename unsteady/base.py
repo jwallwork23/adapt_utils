@@ -98,6 +98,9 @@ class AdaptiveProblemBase(object):
         self.error_estimators = [AttrDict() for i in range(self.num_meshes)]
         self.kernels = [None for i in range(self.num_meshes)]
         self.timesteppers = [AttrDict() for i in range(self.num_meshes)]
+        self.fwd_solutions = [None for i in range(op.num_meshes)]
+        self.adj_solutions = [None for i in range(op.num_meshes)]
+        self.fields = [AttrDict() for i in range(self.num_meshes)]
 
     def print(self, msg):
         if self.print_progress:
@@ -186,8 +189,12 @@ class AdaptiveProblemBase(object):
         for i in range(self.num_meshes):
             self._create_solutions_step(i)
 
-    def _create_solutions(self, i):
+    def _create_solutions_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
+
+    def _free_solutions_step(self, i):
+        self.fwd_solutions[i] = None
+        self.adj_solutions[i] = None
 
     def set_fields(self, **kwargs):
         """
@@ -204,8 +211,11 @@ class AdaptiveProblemBase(object):
         for i in range(self.num_meshes):
             self._set_fields_step(i, **kwargs)
 
-    def _set_fields(self, i):
+    def _set_fields_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
+
+    def _free_fields_step(self, i):
+        self.fields[i] = AttrDict()
 
     def set_stabilisation(self):
         for i in range(self.num_meshes):
