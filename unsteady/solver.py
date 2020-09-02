@@ -81,7 +81,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     op.adjoint_solver_parameters[model]['snes_monitor'] = None
         self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
         self.sediment_options = [AttrDict() for i in range(op.num_meshes)]
-        self.exner_options = [AttrDict() for i in range(op.num_meshes)]
+        self.exner_options =[AttrDict() for i in range(op.num_meshes)] 
         static_options = {
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
             # 'check_tracer_conservation': True,  # TODO
@@ -101,6 +101,20 @@ class AdaptiveProblem(AdaptiveProblemBase):
             to.update(static_options)
             if hasattr(op, 'sipg_parameter_sediment') and op.sipg_parameter_sediment is not None:
                 swo['sipg_parameter_sediment'] = op.sipg_parameter_sediment
+
+        # Lists to be populated
+        self.fwd_solutions = [None for i in range(op.num_meshes)]
+        self.adj_solutions = [None for i in range(op.num_meshes)]
+        self.fwd_solutions_tracer = [None for i in range(op.num_meshes)]
+        self.fwd_solutions_sediment = [None for i in range(op.num_meshes)]
+        self.fwd_solutions_bathymetry = [None for i in range(op.num_meshes)]
+        self.adj_solutions_tracer = [None for i in range(op.num_meshes)]
+        self.depth = [None for i in range(self.num_meshes)]
+        self.bathymetry = [None for i in range(self.num_meshes)]
+        self.fields = [AttrDict() for i in range(self.num_meshes)]
+        self.inflow = [None for i in range(self.num_meshes)]
+        self.minimum_angles = [None for i in range(self.num_meshes)]
+
         super(AdaptiveProblem, self).__init__(op, nonlinear=nonlinear, **kwargs)
 
     def create_outfiles(self):
@@ -198,7 +212,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Bathymetry space
         if self.op.solve_exner:
             self.W = [FunctionSpace(mesh, self.finite_element_bathymetry) for mesh in self.meshes]
-        super(AdaptiveProblem, self).create_function_spaces()
+
+        # Record DOFs
+        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]
 
     def create_intermediary_spaces(self):
         super(AdaptiveProblem, self).create_intermediary_spaces()
@@ -233,115 +249,74 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_ero_term = [Function(space) for space in space_dg]
                 self.intermediary_depo_term = [Function(space) for space in space_dg]
 
-    def create_solutions(self):
-        """
-        Set up `Function`s in the prognostic spaces to hold forward and adjoint solutions.
-        """
-        self.fwd_solutions = [None for mesh in self.meshes]
-        self.adj_solutions = [None for mesh in self.meshes]
-        self.fwd_solutions_tracer = [None for mesh in self.meshes]
-        self.fwd_solutions_sediment = [None for mesh in self.meshes]
-        self.fwd_solutions_bathymetry = [None for mesh in self.meshes]
-        self.adj_solutions_tracer = [None for mesh in self.meshes]
-        for i, V in enumerate(self.V):
-            self.fwd_solutions[i] = Function(V, name='Forward solution')
-            u, eta = self.fwd_solutions[i].split()
-            u.rename("Fluid velocity")
-            eta.rename("Elevation")
-            self.adj_solutions[i] = Function(V, name='Adjoint solution')
-            z, zeta = self.adj_solutions[i].split()
-            z.rename("Adjoint fluid velocity")
-            zeta.rename("Adjoint elevation")
+    def _create_solutions_step(self, i):
+        self.fwd_solutions[i] = Function(V, name='Forward solution')
+        u, eta = self.fwd_solutions[i].split()
+        u.rename("Fluid velocity")
+        eta.rename("Elevation")
+        self.adj_solutions[i] = Function(V, name='Adjoint solution')
+        z, zeta = self.adj_solutions[i].split()
+        z.rename("Adjoint fluid velocity")
+        zeta.rename("Adjoint elevation")
         if self.op.solve_tracer:
-            self.fwd_solutions_tracer = [Function(Q, name="Forward tracer solution") for Q in self.Q]
-            self.adj_solutions_tracer = [Function(Q, name="Adjoint tracer solution") for Q in self.Q]
+            self.fwd_solutions_tracer[i] = Function(self.Q[i], name="Forward tracer solution")
+            self.adj_solutions_tracer[i] = Function(self.Q[i], name="Adjoint tracer solution")
         if self.op.solve_sediment:
-            self.fwd_solutions_sediment = [Function(Q, name="Forward sediment solution") for Q in self.Q]
-            # self.adj_solutions_sediment = [Function(Q, name="Adjoint sediment solution") for Q in self.Q]
+            self.fwd_solutions_sediment[i] = Function(self.Q[i], name="Forward sediment solution")
+            # self.adj_solutions_sediment[i] = Function(self.Q[i], name="Adjoint sediment solution")
         if self.op.solve_exner:
-            self.fwd_solutions_bathymetry = [Function(W, name="Forward bathymetry solution") for W in self.W]
-            # self.adj_solutions_bathymetry = [Function(W, name="Adjoint bathymetry solution") for W in self.W]
+            self.fwd_solutions_bathymetry[i] = Function(self.W[i], name="Forward bathymetry solution")
+            # self.adj_solutions_bathymetry[i] = Function(self.W[i], name="Adjoint bathymetry solution")
 
-    def set_fields(self, init=False):
-        """
-        Set various fields *on each mesh*, including:
-
-            * viscosity;
-            * diffusivity;
-            * the Coriolis parameter;
-            * drag coefficients;
-            * bed roughness.
-
-        The bathymetry is defined via a modified version of the `DepthExpression` found Thetis.
-        """
+    def _set_fields_step(self, i, init=False):
 
         # Bathymetry
         if self.op.solve_exner:
             if init:
-                for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                    bathymetry.project(self.op.set_bathymetry(self.P1[i]))
-                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-                self.depth = [None for bathymetry in self.fwd_solutions_bathymetry]
-            for i, bathymetry in enumerate(self.fwd_solutions_bathymetry):
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                )
-        elif self.op.solve_sediment:
-            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-            for i, bathymetry in enumerate(self.bathymetry):
-                if init:
-                    self.op.create_sediment_model(self.P1[i].mesh(), bathymetry)
-                    self.depth = [None for bathymetry in self.bathymetry]
-            for i, bathymetry in enumerate(self.bathymetry):
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                )
+                self.fwd_solutions_bathymetry[i].project(self.op.set_bathymetry(self.P1[i]))
+                self.op.create_sediment_model(self.P1[i].mesh(), self.fwd_solutions_bathymetry[i])
+            self.depth[i] = DepthExpression(
+                self.fwd_solutions_bathymetry[i],
+                use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+            )
         else:
-            self.bathymetry = [self.op.set_bathymetry(P1) for P1 in self.P1]
-            self.depth = [None for bathymetry in self.bathymetry]
-            for i, bathymetry in enumerate(self.bathymetry):
-                self.depth[i] = DepthExpression(
-                    bathymetry,
-                    use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
-                    use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
-                    wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
-                )
+            self.bathymetry[i] = self.op.set_bathymetry(self.P1[i])
+            if self.op.solve_sediment and init:
+                self.op.create_sediment_model(self.P1[i].mesh(), self.bathymetry[i])
+            self.depth[i] = DepthExpression(
+                self.bathymetry[i],
+                use_nonlinear_equations=self.shallow_water_options[i].use_nonlinear_equations,
+                use_wetting_and_drying=self.shallow_water_options[i].use_wetting_and_drying,
+                wetting_and_drying_alpha=self.shallow_water_options[i].wetting_and_drying_alpha,
+            )
 
-        self.fields = [AttrDict() for P1 in self.P1]
-        for i, P1 in enumerate(self.P1):
-            self.fields[i].update({
-                'horizontal_viscosity': self.op.set_viscosity(P1),
-                'horizontal_diffusivity': self.op.set_diffusivity(P1),
-                'coriolis_frequency': self.op.set_coriolis(P1),
-                'nikuradse_bed_roughness': self.op.ksp,
-                'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(P1),
-                'manning_drag_coefficient': self.op.set_manning_drag_coefficient(P1),
-                'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(P1)
-            })
+        self.fields[i].update({
+            'horizontal_viscosity': self.op.set_viscosity(self.P1[i]),
+            'horizontal_diffusivity': self.op.set_diffusivity(self.P1[i]),
+            'coriolis_frequency': self.op.set_coriolis(self.P1[i]),
+            'nikuradse_bed_roughness': self.op.ksp,
+            'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(self.P1[i]),
+            'manning_drag_coefficient': self.op.set_manning_drag_coefficient(self.P1[i]),
+            'tracer_advective_velocity_factor': self.op.set_advective_velocity_factor(self.P1[i]),
+        })
         if self.op.solve_tracer:
-            for i, P1DG in enumerate(self.P1DG):
-                self.fields[i].update({
-                    'tracer_source_2d': self.op.set_tracer_source(P1DG),
-                })
+            self.fields[i].update({
+                'tracer_source_2d': self.op.set_tracer_source(self.P1DG[i]),
+            })
         if self.op.solve_sediment or self.op.solve_exner:
-            for i, P1DG in enumerate(self.P1DG):
-                self.fields[i].update({
-                    'sediment_source_2d': self.op.set_sediment_source(P1DG),
-                    'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(P1DG),
-                    'sediment_sink_2d': self.op.set_sediment_sink(P1DG),
-                    'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(P1DG)
-                })
-        self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
+            self.fields[i].update({
+                'sediment_source_2d': self.op.set_sediment_source(self.P1DG[i]),
+                'sediment_depth_integ_source': self.op.set_sediment_depth_integ_source(self.P1DG[i]),
+                'sediment_sink_2d': self.op.set_sediment_sink(self.P1DG[i]),
+                'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(self.P1DG[i]),
+            })
+        self.inflow[i] = self.op.set_inflow(self.P1_vec[i])
 
         # Check CFL criterion
         if self.op.debug and hasattr(self.op, 'check_cfl_criterion'):
-            self.op.check_cfl_criterion(self, error_factor=None)
+            self.op.check_cfl_criterion(self, i, error_factor=None)
             # TODO: parameter for error_factor, defaulted by timestepper choice
             # TODO: allow t-adaptation in a given subinterval
 
@@ -349,10 +324,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def set_stabilisation_step(self, i):
         """ Set stabilisation mode and corresponding parameter on the ith mesh."""
-        self.minimum_angles = [None for mesh in self.meshes]
         if self.op.use_automatic_sipg_parameter:
-            for i, mesh in enumerate(self.meshes):
-                self.minimum_angles[i] = get_minimum_angles_2d(mesh)
+            self.minimum_angles[i] = get_minimum_angles_2d(self.meshes[i])
         if self.op.solve_swe:
             self._set_shallow_water_stabilisation_step(i)
         if self.op.solve_tracer:

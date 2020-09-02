@@ -43,7 +43,7 @@ class AdaptiveProblemBase(object):
         self.nonlinear = nonlinear
         self.checkpointing = kwargs.get('checkpointing', False)
         self.print_progress = kwargs.get('print_progress', True)
-        manual = kwargs.get('manual', False)
+        self.manual = kwargs.get('manual', False)
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -64,7 +64,7 @@ class AdaptiveProblemBase(object):
         # Setup problem
         op.print_debug(op.indent + "SETUP: Building meshes...")
         self.set_meshes(meshes)
-        if not manual:
+        if not self.manual:
             self.setup_all()
         implemented_steppers = {
             'CrankNicolson': CrankNicolson,
@@ -176,14 +176,35 @@ class AdaptiveProblemBase(object):
         self.intermediary_solutions = [Function(space) for space in spaces]
 
     def create_function_spaces(self):
-        if not hasattr(self, 'V'):
-            raise NotImplementedError("To be implemented in derived class")
-        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]
-
-    def create_solutions(self):
         raise NotImplementedError("To be implemented in derived class")
 
-    def set_fields(self):
+    def create_solutions(self):
+        """
+        Set up :class:`Function`s in prognostic spaces defined on each mesh, which will hold
+        forward and adjoint solutions.
+        """
+        for i in range(self.num_meshes):
+            self._create_solutions_step(i)
+
+    def _create_solutions(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def set_fields(self, **kwargs):
+        """
+        Set various fields *on each mesh*, including:
+
+            * viscosity;
+            * diffusivity;
+            * the Coriolis parameter;
+            * drag coefficients;
+            * bed roughness.
+
+        The bathymetry is defined via a modified version of the `DepthExpression` found Thetis.
+        """
+        for i in range(self.num_meshes):
+            self._set_fields_step(i, **kwargs)
+
+    def _set_fields(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
     def set_stabilisation(self):
