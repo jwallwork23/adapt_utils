@@ -2,9 +2,11 @@ from __future__ import absolute_import
 
 from thetis import *
 
-import os
 import numpy as np
+import os
 
+from ..adapt.adaptation import pragmatic_adapt
+from ..adapt.metric import *
 from ..io import save_mesh, load_mesh
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
 
@@ -63,6 +65,8 @@ class AdaptiveProblemBase(object):
 
         # Setup problem
         op.print_debug(op.indent + "SETUP: Building meshes...")
+        self.num_cells = [[], ]
+        self.num_vertices = [[], ]
         self.set_meshes(meshes)
         if not self.manual:
             self.setup_all()
@@ -98,9 +102,12 @@ class AdaptiveProblemBase(object):
         self.error_estimators = [AttrDict() for i in range(self.num_meshes)]
         self.kernels = [None for i in range(self.num_meshes)]
         self.timesteppers = [AttrDict() for i in range(self.num_meshes)]
-        self.fwd_solutions = [None for i in range(op.num_meshes)]
-        self.adj_solutions = [None for i in range(op.num_meshes)]
-        self.fields = [AttrDict() for i in range(self.num_meshes)]
+        if not hasattr(self, 'fwd_solutions'):
+            self.fwd_solutions = [None for i in range(self.num_meshes)]
+        if not hasattr(self, 'adj_solutions'):
+            self.adj_solutions = [None for i in range(self.num_meshes)]
+        if not hasattr(self, 'fields'):
+            self.fields = [AttrDict() for i in range(self.num_meshes)]
 
     def print(self, msg):
         if self.print_progress:
@@ -141,8 +148,9 @@ class AdaptiveProblemBase(object):
         self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
         self.mesh_velocities = [None for i in range(self.num_meshes)]
         msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
-        self.num_cells = [[], ]
-        self.num_vertices = [[], ]
+        if self.num_cells != [[], ]:
+            self.num_cells.append([])
+            self.num_vertices.append([])
         for i, mesh in enumerate(self.meshes):
             bnd_len = compute_boundary_length(mesh)
             mesh.boundary_len = bnd_len
@@ -152,8 +160,8 @@ class AdaptiveProblemBase(object):
             #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
 
             # Store diagnostics for later use over mesh adaptation loop
-            self.num_cells[0].append(mesh.num_cells())
-            self.num_vertices[0].append(mesh.num_vertices())
+            self.num_cells[-1].append(mesh.num_cells())
+            self.num_vertices[-1].append(mesh.num_vertices())
 
     def get_plex(self, i):
         """
@@ -192,7 +200,8 @@ class AdaptiveProblemBase(object):
             self.create_solutions_step(i)
 
     def create_solutions_step(self, i):
-        raise NotImplementedError("To be implemented in derived class")
+        self.fwd_solutions[i] = Function(self.V[i], name='Forward solution')
+        self.adj_solutions[i] = Function(self.V[i], name='Adjoint solution')
 
     def free_solutions_step(self, i):
         """Free the memory associated with forward and adjoint solution tuples on mesh i."""
@@ -594,3 +603,189 @@ class AdaptiveProblemBase(object):
         # Re-interpolate fields
         self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
         self.set_fields()
+
+    # --- Metric based
+
+    def get_hessian_recoverer(self, i, **kwargs):
+        raise NotImplementedError("To be implemented in derived class")
+
+    # TODO: Create and free objects as needed
+    def run_hessian_based(self, **kwargs):
+        """
+        Adaptation loop for Hessian based approach.
+
+        Field for adaptation is specified by `op.adapt_field`.
+
+        Multiple fields can be combined using double-understrokes and either 'avg' for metric
+        average or 'int' for metric intersection. We assume distributivity of intersection over
+        averaging.
+
+        For example, `adapt_field = 'elevation__avg__velocity_x__int__bathymetry'` would imply
+        first intersecting the Hessians recovered from the x-component of velocity and bathymetry
+        and then averaging the result with the Hessian recovered from the elevation.
+
+        Stopping criteria:
+          * iteration count > self.op.num_adapt;
+          * relative change in element count < self.op.element_rtol;
+          * relative change in quantity of interest < self.op.qoi_rtol.
+        """
+        op = self.op
+        if op.adapt_field in ('all_avg', 'all_int'):
+            c = op.adapt_field[-3:]
+            op.adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
+        adapt_fields = ('__int__'.join(op.adapt_field.split('__avg__'))).split('__int__')
+        if op.hessian_time_combination not in ('integrate', 'intersect'):
+            msg = "Hessian time combination method '{:s}' not recognised."
+            raise ValueError(msg.format(op.hessian_time_combination))
+
+        for n in range(op.num_adapt):
+            self.outer_iteration = n
+
+            # Arrays to hold Hessians for each field on each window
+            H_windows = [[Function(P1_ten) for P1_ten in self.P1_ten] for f in adapt_fields]
+
+            if hasattr(self, 'hessian_func'):
+                delattr(self, 'hessian_func')
+            update_forcings = None
+            export_func = None
+            for i in range(self.num_meshes):
+
+                # Transfer the solution from the previous mesh / apply initial condition
+                self.transfer_forward_solution(i)
+
+                if n < op.num_adapt-1:
+
+                    # Create double L2 projection operator which will be repeatedly used
+                    kwargs = {
+                        'enforce_constraints': False,
+                        'normalise': False,
+                        'noscale': True,
+                    }
+                    recoverer = self.get_hessian_recoverer(i, **kwargs)
+
+                    def hessian(sol, adapt_field):
+                        fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
+                        return recoverer.get_hessian_metric(sol, **fields, **kwargs)
+
+                    # Array to hold time-integrated Hessian UFL expression
+                    H_window = [0 for f in adapt_fields]
+
+                    def update_forcings(t):  # TODO: Other timesteppers
+                        """Time-integrate Hessian using Trapezium Rule."""
+                        iteration = int(self.simulation_time/op.dt)
+                        if iteration % op.hessian_timestep_lag != 0:
+                            iteration += 1
+                            return
+                        first_ts = iteration == i*self.dt_per_mesh
+                        final_ts = iteration == (i+1)*self.dt_per_mesh
+                        dt = op.dt*op.hessian_timestep_lag
+                        for j, f in enumerate(adapt_fields):
+                            H = hessian(self.fwd_solutions[i], f)
+                            if f == 'bathymetry':
+                                H_window[j] = H
+                            elif op.hessian_time_combination == 'integrate':
+                                H_window[j] += (0.5 if first_ts or final_ts else 1.0)*dt*H
+                            else:
+                                H_window[j] = H if first_ts else metric_intersection(H, H_window[j])
+
+                    def export_func():
+                        """
+                        Extract time-averaged Hessian.
+
+                        NOTE: We only care about the final export in each mesh iteration
+                        """
+                        if np.allclose(self.simulation_time, (i+1)*op.dt*self.dt_per_mesh):
+                            for j, H in enumerate(H_window):
+                                if op.hessian_time_combination == 'intersect':
+                                    H_window[j] *= op.dt*self.dt_per_mesh
+                                H_windows[j][i].interpolate(H_window[j])
+
+                # Solve step for current mesh iteration
+                self.setup_solver_forward(i)
+                self.solve_forward_step(i, export_func=export_func, update_forcings=update_forcings, plot_pvd=op.plot_pvd)
+
+                # Delete objects to free memory
+                if n < op.num_adapt-1:
+                    del H_window
+                    del recoverer
+
+            # --- Convergence criteria
+
+            # Check QoI convergence
+            if op.qoi_rtol is not None:
+                qoi = self.quantity_of_interest()
+                self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+                self.qois.append(qoi)
+                if len(self.qois) > 1:
+                    if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
+                        self.print("Converged quantity of interest!")
+                        break
+
+            # Check maximum number of iterations
+            if n == op.num_adapt - 1:
+                break
+
+            # --- Time normalise metrics
+
+            for j in range(len(adapt_fields)):
+                space_time_normalise(H_windows[j], op=op)
+
+            # Combine metrics (if appropriate)
+            metrics = [Function(P1_ten, name="Hessian metric") for P1_ten in self.P1_ten]
+            for i in range(self.num_meshes):
+                H_window = [H_windows[j][i] for j in range(len(adapt_fields))]
+                if 'int' in op.adapt_field:
+                    if 'avg' in op.adapt_field:
+                        raise NotImplementedError  # TODO: mixed case
+                    metrics[i].assign(metric_intersection(*H_window))
+                elif 'avg' in op.adapt_field:
+                    metrics[i].assign(metric_average(*H_window))
+                else:
+                    try:
+                        assert len(adapt_fields) == 1
+                    except AssertionError:
+                        msg = "Field for adaptation '{:s}' not recognised"
+                        raise ValueError(msg.format(op.adapt_field))
+                    metrics[i].assign(H_window[0])
+            del H_windows
+
+            # metric_file = File(os.path.join(self.di, 'metric.pvd'))
+            complexities = []
+            for i, M in enumerate(metrics):
+                # metric_file.write(M)
+                complexities.append(metric_complexity(M))
+            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
+
+            # --- Adapt meshes
+
+            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+            for i, M in enumerate(metrics):
+                self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
+                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
+            del metrics
+
+            # ---  Setup for next run / logging
+
+            self.set_meshes(self.meshes)
+            self.setup_all()
+            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
+
+            self.print("\nResulting meshes")
+            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
+            for i, c in enumerate(complexities):
+                self.print(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
+            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
+            self.print(msg.format(
+                self.st_complexities[-1],
+                sum(self.num_vertices[n+1])*self.dt_per_mesh,
+                sum(self.num_cells[n+1])*self.dt_per_mesh,
+            ))
+
+            # Check convergence of *all* element counts
+            converged = True
+            for i, num_cells_ in enumerate(self.num_cells[n-1]):
+                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
+                    converged = False
+            if converged:
+                self.print("Converged number of mesh elements!")
+                break
