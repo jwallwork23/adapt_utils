@@ -47,7 +47,7 @@ class TrenchSlantOptions(CoupledOptions):
         self.stabilisation = 'lax_friedrichs'
 
         # Initial
-        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=self.di, op=self)
+        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
 
         self.set_up_morph_model(input_dir, self.default_mesh)        
 
@@ -178,9 +178,6 @@ class TrenchSlantOptions(CoupledOptions):
 
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
-
-    def get_update_forcings(self, prob, i, adjoint):
-        return None
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")

@@ -26,6 +26,7 @@ def load_mesh(fname, fpath):
     newplex.createFromFile(os.path.join(fpath, fname + '.h5'))
     return Mesh(newplex)
 
+
 def initialise_bathymetry(mesh, fpath, outputdir=None, op=CoupledOptions()):
     """
     Initialise bathymetry field with results from a previous simulation.
@@ -137,7 +138,8 @@ def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions())
         File(os.path.join(fpath, 'bathout.pvd')).write(bathymetry)
 
     # Save mesh to DMPlex format
-    save_mesh(bathymetry.function_space().mesh(), plexname, fpath)
+    if plexname is not None:
+        save_mesh(bathymetry.function_space().mesh(), plexname, fpath)
 
 
 def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()):

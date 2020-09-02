@@ -16,7 +16,7 @@ __all__ = ["TrenchSedimentOptions"]
 
 class TrenchSedimentOptions(CoupledOptions):
 
-    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, output_dir = None, **kwargs):
+    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
         super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
@@ -46,7 +46,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.stabilisation = 'lax_friedrichs'
 
         # Initial
-        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=self.di, op=self)
+        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
 
         self.set_up_morph_model(input_dir, self.default_mesh)        
 
@@ -178,9 +178,6 @@ class TrenchSedimentOptions(CoupledOptions):
 
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
-
-    def get_update_forcings(self, prob, i, adjoint):
-        return None
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")

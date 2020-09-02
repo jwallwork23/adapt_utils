@@ -48,7 +48,7 @@ class BeachOptions(CoupledOptions):
         self.set_up_morph_model(self.default_mesh)
 
         # Initial
-        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=self.di, op=self)
+        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
         # self.elev_init = Constant(0.0)
         # self.uv_init = as_vector((10**(-7), 0.0))
 
@@ -227,7 +227,7 @@ class BeachOptions(CoupledOptions):
 
         def update_forcings(t):
             uv, elev = prob.fwd_solutions[0].split()
-            if np.round(t%2.7, 0) == 3:
+            if np.round(t % 2.7, 0) == 3:
                 print(t)
                 print(assemble(elev*dx))
             self.update_boundary_conditions(prob, t=t)
