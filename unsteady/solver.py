@@ -760,7 +760,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Timestepping
 
-    def create_forward_timesteppers(self, i):
+    def create_forward_timesteppers_step(self, i):
         if i == 0:
             self.simulation_time = 0.0
         if self.op.solve_swe:
@@ -926,7 +926,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         self.timesteppers[i].exner = integrator(*args, **kwargs)
 
-    def create_adjoint_timesteppers(self, i):
+    def create_adjoint_timesteppers_step(self, i):
         if i == self.num_meshes-1:
             self.simulation_time = self.op.end_time
         if self.op.solve_swe:
@@ -1018,7 +1018,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug(op.indent + "SETUP: Creating forward equations on mesh {:d}...".format(i))
         self.create_forward_equations_step(i)
         op.print_debug(op.indent + "SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
-        self.create_timesteppers(i)
+        self.create_forward_timesteppers_step(i)
         bcs = self.boundary_conditions[i]
         if op.solve_swe:
             ts = self.timesteppers[i]['shallow_water']
@@ -1208,7 +1208,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug(op.indent + "SETUP: Creating adjoint equations on mesh {:d}...".format(i))
         self.create_adjoint_equations_step(i)
         op.print_debug(op.indent + "SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
-        self.create_adjoint_timesteppers(i)
+        self.create_adjoint_timesteppers_step(i)
         bcs = self.boundary_conditions[i]
         if op.solve_swe:
             dbcs = []

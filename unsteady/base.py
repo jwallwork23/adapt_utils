@@ -141,6 +141,8 @@ class AdaptiveProblemBase(object):
         self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
         self.mesh_velocities = [None for i in range(self.num_meshes)]
         msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
+        self.num_cells = [[], ]
+        self.num_vertices = [[], ]
         for i, mesh in enumerate(self.meshes):
             bnd_len = compute_boundary_length(mesh)
             mesh.boundary_len = bnd_len
@@ -149,9 +151,9 @@ class AdaptiveProblemBase(object):
             #     coords = mesh.coordinates
             #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
 
-        # Storage for diagnostics over mesh adaptation loop
-        self.num_cells = [[mesh.num_cells() for mesh in self.meshes], ]
-        self.num_vertices = [[mesh.num_vertices() for mesh in self.meshes], ]
+            # Store diagnostics for later use over mesh adaptation loop
+            self.num_cells[0].append(mesh.num_cells())
+            self.num_vertices[0].append(mesh.num_vertices())
 
     def get_plex(self, i):
         """
@@ -193,6 +195,7 @@ class AdaptiveProblemBase(object):
         raise NotImplementedError("To be implemented in derived class")
 
     def free_solutions_step(self, i):
+        """Free the memory associated with forward and adjoint solution tuples on mesh i."""
         self.fwd_solutions[i] = None
         self.adj_solutions[i] = None
 
@@ -215,6 +218,7 @@ class AdaptiveProblemBase(object):
         raise NotImplementedError("To be implemented in derived class")
 
     def free_fields_step(self, i):
+        """Free the memory associated with fields on mesh i."""
         self.fields[i] = AttrDict()
 
     def set_stabilisation(self):
@@ -251,6 +255,14 @@ class AdaptiveProblemBase(object):
     def create_adjoint_equations_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
+    def free_forward_equations_step(self, i):
+        """Free the memory associated with forward equations defined on mesh i."""
+        raise NotImplementedError("To be implemented in derived class")
+
+    def free_adjoint_equations_step(self, i):
+        """Free the memory associated with adjoint equations defined on mesh i."""
+        raise NotImplementedError("To be implemented in derived class")
+
     def create_error_estimators(self):
         for i in range(self.num_meshes):
             self.create_error_estimators_step(i)
@@ -258,16 +270,30 @@ class AdaptiveProblemBase(object):
     def create_error_estimators_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_timesteppers(self, i, adjoint=False):
-        if adjoint:
-            self.create_adjoint_timesteppers(i)
-        else:
-            self.create_forward_timesteppers(i)
-
-    def create_forward_timesteppers(self, i):
+    def free_error_estimators_step(self, i):
+        """Free the memory associated with error estimators defined on mesh i."""
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_adjoint_timesteppers(self, i):
+    def create_forward_timesteppers(self):
+        for i in range(self.num_meshes):
+            self.create_forward_timesteppers_step(i)
+
+    def create_adjoint_timesteppers(self):
+        for i in range(self.num_meshes):
+            self.create_adjoint_timesteppers_step(i)
+
+    def create_forward_timesteppers_step(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def create_adjoint_timesteppers_step(self, i):
+        raise NotImplementedError("To be implemented in derived class")
+
+    def free_forward_timesteppers_step(self, i):
+        """Free the memory associated with forward timesteppers defined on mesh i."""
+        raise NotImplementedError("To be implemented in derived class")
+
+    def free_adjoint_timesteppers_step(self, i):
+        """Free the memory associated with adjoint timesteppers defined on mesh i."""
         raise NotImplementedError("To be implemented in derived class")
 
     def add_callbacks(self, i):
