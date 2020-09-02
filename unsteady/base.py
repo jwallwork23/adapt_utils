@@ -387,9 +387,9 @@ class AdaptiveProblemBase(object):
         :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
         :kwarg fpath: directory in which to save the HDF5 files.
         """
-        fpath = fpath or os.path.join(self.di, self.approach)
+        fpath = fpath or self.di
         for i, mesh in enumerate(self.meshes):
-            save_mesh(mesh, '_'.join([fname, '{:d}.h5'.format(i)]), fpath)
+            save_mesh(mesh, '{:s}_{:d}'.format(fname, i), fpath)
 
     def load_meshes(self, fname='plex', fpath=None):
         """
@@ -398,9 +398,9 @@ class AdaptiveProblemBase(object):
         :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
         :kwarg fpath: filepath to where the HDF5 files are to be loaded from.
         """
-        fpath = fpath or os.path.join(self.di, self.approach)
+        fpath = fpath or self.di
         for i in range(self.num_meshes):
-            self.meshes[i] = load_mesh('_'.join([fname, '{:d}.h5'.format(i)]), fpath)
+            self.meshes[i] = load_mesh('{:s}_{:d}'.format(fname, i), fpath)
 
     def setup_solver_forward_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
@@ -808,6 +808,9 @@ class AdaptiveProblemBase(object):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
                 self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
             metrics = [None for P1_ten in self.P1_ten]
+
+            # Save adapted meshes to file  # TODO: Option to load
+            self.save_meshes()
 
             # ---  Setup for next run / logging
 
