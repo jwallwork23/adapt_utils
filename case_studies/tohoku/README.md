@@ -23,7 +23,6 @@ Includes:
   * `pyadolc` (install as described at https://github.com/b45ch1/pyadolc)
   * `qmesh` (install using `pip`)
   * `utide` (install using `pip`)
-  * `urllib` (install using `pip`)
   * `WIN` (install as described at http://wwweic.eri.u-tokyo.ac.jp/WIN/pub/win/)
 
 [GEBCO]: https://www.gebco.net "GEBCO"
