@@ -1,3 +1,0 @@
-matplotlib
-pytest
-vtk==9.0.1
