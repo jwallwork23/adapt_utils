@@ -748,6 +748,7 @@ class AdaptiveProblemBase(object):
                 self.solve_forward_step(i, **kwargs)
 
                 # Delete objects to free memory
+                self.free_solver_forward_step(i)
                 H_window = None
                 recoverer = None
                 export_func = None

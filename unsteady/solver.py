@@ -699,6 +699,28 @@ class AdaptiveProblem(AdaptiveProblemBase):
             sed_model=self.op.sediment_model,
         )
 
+    def free_forward_equations_step(self, i):
+        if self.op.solve_swe:
+            self.free_forward_shallow_water_equations_step(i)
+        if self.op.solve_tracer:
+            self.free_forward_tracer_equation_step(i)
+        if self.op.solve_sediment:
+            self.free_forward_sediment_equation_step(i)
+        if self.op.solve_exner:
+            self.free_forward_exner_equation_step(i)
+
+    def free_forward_shallow_water_equations_step(self, i):
+        delattr(self.equations[i], 'shallow_water')
+
+    def free_forward_tracer_equation_step(self, i):
+        delattr(self.equations[i], 'tracer')
+
+    def free_forward_sediment_equation_step(self, i):
+        delattr(self.equations[i], 'sediment')
+
+    def free_forward_exner_equation_step(self, i):
+        delattr(self.equations[i], 'exner')
+
     def create_adjoint_equations_step(self, i):
         if self.op.solve_swe:
             self.create_adjoint_shallow_water_equations_step(i)
@@ -739,6 +761,28 @@ class AdaptiveProblem(AdaptiveProblemBase):
         raise NotImplementedError("Continuous adjoint sediment equation not implemented")
 
     def create_adjoint_exner_equation_step(self, i):
+        raise NotImplementedError("Continuous adjoint Exner equation not implemented")
+
+    def free_adjoint_equations_step(self, i):
+        if self.op.solve_swe:
+            self.free_adjoint_shallow_water_equations_step(i)
+        if self.op.solve_tracer:
+            self.free_adjoint_tracer_equation_step(i)
+        if self.op.solve_sediment:
+            self.free_adjoint_sediment_equation_step(i)
+        if self.op.solve_exner:
+            self.free_adjoint_exner_equation_step(i)
+
+    def free_adjoint_shallow_water_equations_step(self, i):
+        delattr(self.equations[i], 'adjoint_shallow_water')
+
+    def free_adjoint_tracer_equation_step(self, i):
+        delattr(self.equations[i], 'adjoint_tracer')
+
+    def free_adjoint_sediment_equation_step(self, i):
+        raise NotImplementedError("Continuous adjoint sediment equation not implemented")
+
+    def free_adjoint_exner_equation_step(self, i):
         raise NotImplementedError("Continuous adjoint Exner equation not implemented")
 
     # --- Error estimators
@@ -950,6 +994,28 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         self.timesteppers[i].exner = integrator(*args, **kwargs)
 
+    def free_forward_timesteppers_step(self, i):
+        if self.op.solve_swe:
+            self.free_forward_shallow_water_timestepper_step(i)
+        if self.op.solve_tracer:
+            self.free_forward_tracer_timestepper_step(i)
+        if self.op.solve_sediment:
+            self.free_forward_sediment_timestepper_step(i)
+        if self.op.solve_exner:
+            self.free_forward_exner_timestepper_step(i)
+
+    def free_forward_shallow_water_timestepper_step(self, i):
+        delattr(self.timesteppers[i], 'shallow_water')
+
+    def free_forward_tracer_timestepper_step(self, i):
+        delattr(self.timesteppers[i], 'tracer')
+
+    def free_forward_sediment_timestepper_step(self, i):
+        delattr(self.timesteppers[i], 'sediment')
+
+    def free_forward_exner_timestepper_step(self, i):
+        delattr(self.timesteppers[i], 'exner')
+
     def create_adjoint_timesteppers_step(self, i):
         if i == self.num_meshes-1:
             self.simulation_time = self.op.end_time
@@ -1015,6 +1081,28 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def create_adjoint_exner_timestepper_step(self, i, integrator):
         raise NotImplementedError("Continuous adjoint Exner timestepping not implemented")
 
+    def free_adjoint_timesteppers_step(self, i):
+        if self.op.solve_swe:
+            self.free_adjoint_shallow_water_timestepper_step(i)
+        if self.op.solve_tracer:
+            self.free_adjoint_tracer_timestepper_step(i)
+        if self.op.solve_sediment:
+            self.free_adjoint_sediment_timestepper_step(i)
+        if self.op.solve_exner:
+            self.free_adjoint_exner_timestepper_step(i)
+
+    def free_adjoint_shallow_water_timestepper_step(self, i):
+        delattr(self.timesteppers[i], 'adjoint_shallow_water')
+
+    def free_adjoint_tracer_timestepper_step(self, i):
+        delattr(self.timesteppers[i], 'adjoint_tracer')
+
+    def free_adjoint_sediment_timestepper_step(self, i):
+        raise NotImplementedError("Continuous adjoint sediment timestepping not implemented")
+
+    def free_adjoint_exner_timestepper_step(self, i):
+        raise NotImplementedError("Continuous adjoint Exner timestepping not implemented")
+
     # --- Solvers
 
     def add_callbacks(self, i):
@@ -1078,6 +1166,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.add_callbacks(i)
 
     def free_solver_forward_step(self, i):
+        op = self.op
         op.print_debug(op.indent + "FREE: Removing forward timesteppers on mesh {:d}...".format(i))
         self.free_forward_timesteppers_step(i)
         op.print_debug(op.indent + "FREE: Removing forward equations on mesh {:d}...".format(i))
@@ -1260,6 +1349,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
 
     def free_solver_adjoint_step(self, i):
+        op = self.op
         op.print_debug(op.indent + "FREE: Removing adjoint timesteppers on mesh {:d}...".format(i))
         self.free_adjoint_timesteppers_step(i)
         op.print_debug(op.indent + "FREE: Removing adjoint equations on mesh {:d}...".format(i))
