@@ -1,18 +1,16 @@
 from thetis import *
 from thetis.configuration import *
-
-from adapt_utils.unsteady.options import CoupledOptions
-from adapt_utils.unsteady.swe.utils import heaviside_approx
 from thetis.options import ModelOptions2d
-from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
 
-import os
-import time
+from adapt_utils.io import initialise_hydrodynamics
+from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
+from adapt_utils.unsteady.swe.utils import heaviside_approx
+
 import datetime
 import numpy as np
-from matplotlib import rc
-
-rc('text', usetex=True)
+import os
+import time
 
 
 __all__ = ["BeachOptions"]
@@ -26,7 +24,6 @@ class BeachOptions(CoupledOptions):
     the effect of tidal currents and waves on the profile shape of intertidal
     mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
     """
-
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh=None, input_dir=None, output_dir=None, **kwargs):
         super(BeachOptions, self).__init__(**kwargs)
 
@@ -51,9 +48,9 @@ class BeachOptions(CoupledOptions):
         self.set_up_morph_model(self.default_mesh)
 
         # Initial
-        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
-        #self.elev_init = Constant(0.0)
-        #self.uv_init = as_vector((10**(-7), 0.0))
+        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
+        # self.elev_init = Constant(0.0)
+        # self.uv_init = as_vector((10**(-7), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'
@@ -230,48 +227,17 @@ class BeachOptions(CoupledOptions):
 
         def update_forcings(t):
             uv, elev = prob.fwd_solutions[0].split()
-            if np.round(t%2.7, 0) == 3:
+            if np.round(t % 2.7, 0) == 3:
                 print(t)
                 print(assemble(elev*dx))
             self.update_boundary_conditions(prob, t=t)
 
         return update_forcings
 
-    def initialise_fields(self, inputdir, outputdir):
-        """
-        Initialise simulation with results from a previous simulation
-        """
-        from firedrake.petsc import PETSc
-        # mesh
-        with timed_stage('mesh'):
-            # Load
-            newplex = PETSc.DMPlex().create()  # TODO: Use functionality in io.py
-            newplex.createFromFile(inputdir + '/myplex.h5')
-            mesh = Mesh(newplex)
-    
-        DG_2d = FunctionSpace(mesh, 'DG', 1)  
-        vector_dg = VectorFunctionSpace(mesh, 'DG', 1)          
-        # elevation
-        with timed_stage('initialising elevation'):
-            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(DG_2d, name="elevation")
-            chk.load(elev_init)
-            #File(outputdir + "/elevation_imported.pvd").write(elev_init)
-            chk.close()
-        # velocity
-        with timed_stage('initialising velocity'):
-            chk = DumbCheckpoint(inputdir + "/velocity" , mode=FILE_READ)
-            uv_init = Function(vector_dg, name="velocity")
-            chk.load(uv_init)
-            #File(outputdir + "/velocity_imported.pvd").write(uv_init)
-            chk.close()
-
-        return  elev_init, uv_init, 
-
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        #self.eta_tilde_file = File(self.di + "/eta_tilde.pvd").write(eta_tilde)
-        #self.eta_tilde_file._topology = None
+        # self.eta_tilde_file = File(self.di + "/eta_tilde.pvd").write(eta_tilde)
+        # self.eta_tilde_file._topology = None
         if self.plot_timeseries:
             u, eta = prob.fwd_solutions[i].split()
             b = prob.bathymetry[i]
@@ -279,13 +245,13 @@ class BeachOptions(CoupledOptions):
 
         def export_func():
             eta_tilde.project(self.get_eta_tilde(prob, i))
-            #self.eta_tilde_file.write(eta_tilde)
+            # self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
-            #if self.plot_timeseries:
+            # if self.plot_timeseries:
 
-                # Store modified bathymetry timeseries
-            #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
-            #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
+                 # Store modified bathymetry timeseries
+            #     wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
+            #     self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
 

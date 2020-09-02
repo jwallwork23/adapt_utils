@@ -3,8 +3,11 @@ from firedrake.petsc import PETSc
 
 import os
 
+from adapt_utils.unsteady.options import CoupledOptions
 
-__all__ = ["save_mesh", "load_mesh", "initialise_fields", "export_final_state"]
+
+__all__ = ["save_mesh", "load_mesh", "initialise_bathymetry", "initialise_hydrodynamics",
+           "export_bathymetry", "export_hydrodynamics"]
 
 
 def save_mesh(mesh, fname, fpath):
@@ -36,41 +39,133 @@ def load_mesh(fname, fpath):
     return Mesh(newplex)
 
 
-def initialise_fields(mesh, fpath, fname='bathymetry', name='bathymetry'):
+def initialise_bathymetry(mesh, fpath, outputdir=None, op=CoupledOptions()):
     """
-    Initialise simulation with results from a previous simulation.
+    Initialise bathymetry field with results from a previous simulation.
 
-    :arg mesh: field will be defined in a P1 space on this mesh.
+    :arg mesh: field will be defined in finite element space on this mesh.
     :arg fpath: directory to read the data from.
-    :arg fname: file name (without '.h5' extension).
-    :kwarg name: field name used in the data file.
     """
-    fs = FunctionSpace(mesh, 'CG', 1)  # TODO: Have fs as input, rather than mesh
-    with timed_stage('initialising {:s}'.format(name)):
-        f = Function(fs, name=name)
-        with DumbCheckpoint(os.path.join(fpath, fname), mode=FILE_READ) as chk:
-            chk.load(f)
-    return f
+    # TODO: Would be nice to have consistency: here mesh is an arg but below it is read from file
+    fs = FunctionSpace(mesh, op.bathymetry_family.upper(), 1)
+    with timed_stage('initialising bathymetry'):
+        bathymetry = Function(fs, name='bathymetry')
+        with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_READ) as chk:
+            chk.load(bathymetry)
+
+    # Plot to .pvd
+    if outputdir is not None and op.plot_pvd:
+        File(os.path.join(outputdir, "bathymetry_imported.pvd")).write(bathymetry)
+    return bathymetry
 
 
-def export_final_state(fpath, f, fname='bathymetry', name='bathymetry', plexname='myplex'):
+def initialise_hydrodynamics(inputdir, outputdir=None, plexname='myplex', op=CoupledOptions()):
     """
-    Export fields to be used in a subsequent simulation.
+    Initialise velocity and elevation with results from a previous simulation.
 
+    :arg inputdir: directory to read the data from.
+    :kwarg inputdir: directory to optionally plot the data in .pvd format.
+    :kwarg plexname: file name used for the DMPlex data file.
+    """
+    with timed_stage('mesh'):
+        mesh = op.default_mesh if plexname is None else load_mesh(plexname, inputdir)
+
+    # Get finite element space
+    if op.family == 'dg-dg':
+        uv_element = ("DG", 1)
+        elev_element = ("DG", 1)
+    elif op.family == 'dg-cg':
+        uv_element = ("DG", 1)
+        elev_element = ("CG", 2)
+    elif op.family == 'cg-cg':
+        uv_element = ("CG", 2)
+        elev_element = ("CG", 1)
+
+    # Velocity
+    U = VectorFunctionSpace(mesh, *uv_element)
+    with timed_stage('initialising velocity'):
+        with DumbCheckpoint(os.path.join(inputdir, "velocity"), mode=FILE_READ) as chk:
+            uv_init = Function(U, name="velocity")
+            chk.load(uv_init)
+
+    # Elevation
+    H = FunctionSpace(mesh, *elev_element)
+    with timed_stage('initialising elevation'):
+        with DumbCheckpoint(os.path.join(inputdir, "elevation"), mode=FILE_READ) as chk:
+            elev_init = Function(H, name="elevation")
+            chk.load(elev_init)
+
+    # Plot to .pvd
+    if outputdir is not None and op.plot_pvd:
+        uv_proj = Function(VectorFunctionSpace(mesh, "CG", 1), name="Initial velocity")
+        uv_proj.project(uv_init)
+        File(os.path.join(outputdir, "velocity_imported.pvd")).write(uv_proj)
+        elev_proj = Function(FunctionSpace(mesh, "CG", 1), name="Initial elevation")
+        elev_proj.project(elev_init)
+        File(os.path.join(outputdir, "elevation_imported.pvd")).write(elev_proj)
+
+    return uv_init, elev_init
+
+
+def export_bathymetry(bathymetry, fpath, plexname='myplex', op=CoupledOptions()):
+    """
+    Export bathymetry field to be used in a subsequent simulation.
+
+    :arg bathymetry: field to be stored.
     :arg fpath: directory to save the data to.
-    :arg f: field to be stored.
-    :kwarg fname: file name to be used for the data file.
-    :kwarg name: field name to be used in the data file.
     :kwarg plexname: file name to be used for the DMPlex data file.
+    :kwarg op: Options parameter class.
     """
     if not os.path.exists(fpath):
         os.makedirs(fpath)
-    print_output("Exporting fields for subsequent simulation")
+    op.print_debug("I/O: Exporting fields for subsequent simulation")
 
     # Create checkpoint to HDF5
-    with DumbCheckpoint(os.path.join(fpath, fname), mode=FILE_CREATE) as chk:
-        chk.store(f, name=name)
-    File(os.path.join(fpath, 'bathout.pvd')).write(f)  # TODO: Remove / make optional
+    with DumbCheckpoint(os.path.join(fpath, 'bathymetry'), mode=FILE_CREATE) as chk:
+        chk.store(bathymetry, name='bathymetry')
+    if op.plot_pvd:
+        File(os.path.join(fpath, 'bathout.pvd')).write(bathymetry)
 
     # Save mesh to DMPlex format
-    save_mesh(f.function_space().mesh(), plexname, fpath)
+    if plexname is not None:
+        save_mesh(bathymetry.function_space().mesh(), plexname, fpath)
+
+
+def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions()):
+    """
+    Export velocity and elevation to be used in a subsequent simulation
+
+    :arg uv: velocity field to be stored.
+    :arg elev: elevation field to be stored.
+    :arg fpath: directory to save the data to.
+    :kwarg plexname: file name to be used for the DMPlex data file.
+    :kwarg op: Options parameter class.
+    """
+    if not os.path.exists(fpath):
+        os.makedirs(fpath)
+    op.print_debug("I/O: Exporting fields for subsequent simulation")
+
+    # Check consistency of meshes
+    mesh = elev.function_space().mesh()
+    assert mesh == uv.function_space().mesh()
+
+    # Export velocity
+    with DumbCheckpoint(os.path.join(fpath, "velocity"), mode=FILE_CREATE) as chk:
+        chk.store(uv, name="velocity")
+
+    # Export elevation
+    with DumbCheckpoint(os.path.join(fpath, "elevation"), mode=FILE_CREATE) as chk:
+        chk.store(elev, name="elevation")
+
+    # Plot to .pvd
+    if op.plot_pvd:
+        uv_proj = Function(VectorFunctionSpace(mesh, "CG", 1), name="Initial velocity")
+        uv_proj.project(uv)
+        File(os.path.join(fpath, 'velocityout.pvd')).write(uv_proj)
+        elev_proj = Function(FunctionSpace(mesh, "CG", 1), name="Initial elevation")
+        elev_proj.project(elev)
+        File(os.path.join(fpath, 'elevationout.pvd')).write(elev_proj)
+
+    # Export mesh
+    if plexname is not None:
+        save_mesh(mesh, plexname, fpath)

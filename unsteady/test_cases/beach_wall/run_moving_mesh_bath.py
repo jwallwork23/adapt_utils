@@ -1,4 +1,3 @@
-from firedrake.petsc import PETSc
 import firedrake as fire
 from thetis import *
 
@@ -9,7 +8,7 @@ import pandas as pd
 import time
 
 from adapt_utils.adapt import recovery
-from adapt_utils.io import initialise_fields, export_final_state
+from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.test_cases.beach_wall.options import BeachOptions
@@ -130,7 +129,8 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output/hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma), bath)
+fpath = "hydrodynamics_beach_bath_new_{:d}_{:d}_{:d}_{:d}".format(nx*220, alpha, beta, gamma)
+export_bathymetry(bath, os.path.join('adapt_output', fpath), op=op)
 
 
 xaxisthetis1 = []
@@ -146,7 +146,7 @@ df_real = pd.read_csv('final_result_nx3_ny1.csv')
 print("Mesh error: ")
 print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_660')
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_beach_bath_new_660')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))

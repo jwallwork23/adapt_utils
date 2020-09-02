@@ -5,16 +5,18 @@ Created on Mon May 25 14:59:04 2020
 
 @author: mc4117
 """
-
 import thetis as th
 import hydro_fns as hydro
 
 import numpy as np
 import os
 
+from adapt_utils.io import export_hydrodynamics
+
+
 plot = False
 
-def boundary_conditions_fn_balzano(bathymetry_2d, flag = None, morfac = 1, t_new = 0, state = 'initial'):
+def boundary_conditions_fn_balzano(bathymetry_2d, flag=None, morfac=1, t_new=0, state='initial'):
     """
     Define boundary conditions for problem
     
@@ -97,7 +99,8 @@ solver_obj.iterate(update_forcings = update_forcings_hydrodynamics)
 uv, elev = solver_obj.fields.solution_2d.split()
 
 if plot == False:
-    hydro.export_final_state("hydrodynamics_beach_l_sep_nx_"+str(nx), uv, elev)
+    fpath = "hydrodynamics_beach_l_sep_nx_{:d}".format(nx)
+    export_hydrodynamics(uv, elev, fpath)
 else:
     import pylab as plt
 
