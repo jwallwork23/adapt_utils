@@ -610,7 +610,8 @@ class AdaptiveProblemBase(object):
         raise NotImplementedError("To be implemented in derived class")
 
     # TODO: Create and free objects as needed
-    def run_hessian_based(self, **kwargs):
+    # TODO: kwargs currently unused
+    def run_hessian_based(self, update_forcings=None, export_func=None, **kwargs):
         """
         Adaptation loop for Hessian based approach.
 
@@ -644,8 +645,8 @@ class AdaptiveProblemBase(object):
         # Loop until we hit the maximum number of iterations, num_adapt
         self.outer_iteration = 0
         while self.outer_iteration < op.num_adapt:
-            export_func = None
-            update_forcings = None
+            export_func_wrapper = None
+            update_forcings_wrapper = None
             if hasattr(self, 'hessian_func'):
                 delattr(self, 'hessian_func')
 
@@ -654,9 +655,14 @@ class AdaptiveProblemBase(object):
 
             # Loop over meshes
             for i in range(self.num_meshes):
+                update_forcings = update_forcings or op.get_update_forcings(self, i, adjoint=False)
+                export_func = export_func or op.get_export_func(self, i)
 
                 # Transfer the solution from the previous mesh / apply initial condition
                 self.transfer_forward_solution(i)
+
+                # Setup solver on mesh i
+                self.setup_solver_forward(i)
 
                 if self.outer_iteration < op.num_adapt-1:
 
@@ -675,10 +681,10 @@ class AdaptiveProblemBase(object):
                     # Array to hold time-integrated Hessian UFL expression
                     H_window = [0 for f in adapt_fields]
 
-                    # TODO: Wrap user-provided update_forcings
                     # TODO: Other timesteppers
-                    def update_forcings(t):
+                    def update_forcings_wrapper(t):
                         """Time-integrate Hessian using Trapezium Rule."""
+                        update_forcings(t)
                         iteration = int(self.simulation_time/op.dt)
                         if iteration % op.hessian_timestep_lag != 0:
                             iteration += 1
@@ -695,13 +701,13 @@ class AdaptiveProblemBase(object):
                             else:
                                 H_window[j] = H if first_ts else metric_intersection(H, H_window[j])
 
-                    # TODO: Wrap user-provided export_func
-                    def export_func():
+                    def export_func_wrapper():
                         """
                         Extract time-averaged Hessian.
 
                         NOTE: We only care about the final export in each mesh iteration
                         """
+                        export_func()
                         if np.allclose(self.simulation_time, (i+1)*op.dt*dt_per_mesh):
                             for j, H in enumerate(H_window):
                                 if op.hessian_time_combination == 'intersect':
@@ -709,12 +715,18 @@ class AdaptiveProblemBase(object):
                                 H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
-                self.setup_solver_forward(i)
-                self.solve_forward_step(i, export_func=export_func, update_forcings=update_forcings, plot_pvd=op.plot_pvd)
+                kwargs = {
+                    'export_func': export_func_wrapper,
+                    'update_forcings': update_forcings_wrapper,
+                    'plot_pvd': op.plot_pvd,
+                }
+                self.solve_forward_step(i, **kwargs)
 
                 # Delete objects to free memory
                 H_window = None
                 recoverer = None
+                export_func = None
+                update_forcings = None
 
             # --- Convergence criteria
 
