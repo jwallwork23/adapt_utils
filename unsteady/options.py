@@ -205,8 +205,9 @@ class CoupledOptions(Options):
             eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
             self.eta_tilde_file._topology = None
 
-            def export_func():
+        def export_func():
+            if self.wetting_and_drying:
                 eta_tilde.project(self.get_eta_tilde(prob, i))
                 self.eta_tilde_file.write(eta_tilde)
 
-            return export_func
+        return export_func
