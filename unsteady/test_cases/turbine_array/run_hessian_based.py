@@ -64,7 +64,7 @@ kwargs = {
     # Mesh adaptation
     'num_meshes': int(args.num_meshes or 4),  # NOTE: Needs to divide 124 = 2 x 2 x 31
     'adapt_field': args.adapt_field or 'speed',
-    'hessian_time_combination': args.time_combine or 'integrate',
+    'hessian_time_combination': args.time_combine or 'intersect',  # FIXME: integrate gives recursion error
     'hessian_timestep_lag': float(args.hessian_lag or 1),
     'normalisation': args.normalisation or 'complexity',
     'norm_order': 1 if p is None else None if p == 'inf' else float(p),
