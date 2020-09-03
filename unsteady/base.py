@@ -674,7 +674,7 @@ class AdaptiveProblemBase(object):
 
     # TODO: Create and free objects as needed
     # TODO: kwargs currently unused
-    def run_hessian_based(self, update_forcings=None, export_func=None, **kwargs):
+    def run_hessian_based(self, update_forcings=None, export_func=None, save_mesh=True, **kwargs):
         """
         Adaptation loop for Hessian based approach.
 
@@ -692,6 +692,10 @@ class AdaptiveProblemBase(object):
           * iteration count > self.op.num_adapt;
           * relative change in element count < self.op.element_rtol;
           * relative change in quantity of interest < self.op.qoi_rtol.
+
+        :kwarg save_mesh: save all adapted meshes to HDF5 after every adaptation step. They will
+            exist in :attr:`di`, with the name 'plex_', followed by the integer specifying the place
+            in the sequence.
         """
         op = self.op
         dt_per_mesh = self.dt_per_mesh
@@ -848,7 +852,8 @@ class AdaptiveProblemBase(object):
             metrics = [None for P1_ten in self.P1_ten]
 
             # Save adapted meshes to file
-            self.save_meshes()
+            if save_mesh:
+                self.save_meshes()
 
             # ---  Setup for next run / logging
 

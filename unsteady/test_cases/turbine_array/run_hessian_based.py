@@ -148,7 +148,7 @@ if not plot_only:
 
     # Solve forward problem
     cpu_timestamp = perf_counter()
-    swp.run_hessian_based()
+    swp.run_hessian_based(save_mesh=True)
     cpu_time = perf_counter() - cpu_timestamp
     msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
