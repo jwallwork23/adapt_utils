@@ -135,7 +135,7 @@ class AdaptiveProblemBase(object):
             assert len(meshes) == self.num_meshes
             self.meshes = meshes
         self.mesh_velocities = [None for i in range(self.num_meshes)]
-        if len(self.num_cells) > 1:
+        if self.num_cells != [[], ]:
             self.num_cells.append([])
             self.num_vertices.append([])
 
@@ -852,23 +852,25 @@ class AdaptiveProblemBase(object):
 
             self.print("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-            num_vertices = self.num_vertices[self.outer_iteration+1]
-            num_cells = self.num_cells[self.outer_iteration+1]
+            num_vertices = self.num_vertices[-1]
+            num_cells = self.num_cells[-1]
             for i, (c, nv, nc) in enumerate(zip(complexities, num_vertices, num_cells)):
                 self.print(msg.format(i, c, nv, nc))
             self.print("  total:            {:8.1f}          {:7d}          {:7d}\n".format(
                 self.st_complexities[-1], sum(num_vertices)*dt_per_mesh, sum(num_cells)*dt_per_mesh,
             ))
 
+            # Increment
+            self.outer_iteration += 1
+
             # Check convergence of *all* element counts
+            if len(self.num_cells) < 3:
+                continue
             converged = True
-            for i, num_cells_ in enumerate(self.num_cells[self.outer_iteration-1]):
-                diff = np.abs(self.num_cells[self.outer_iteration][i] - num_cells_)
+            for i, num_cells_ in enumerate(self.num_cells[-3]):
+                diff = np.abs(self.num_cells[self.outer_iteration][-2] - num_cells_)
                 if diff > op.element_rtol*num_cells_:
                     converged = False
             if converged:
                 self.print("Converged number of mesh elements!")
                 break
-
-            # Increment
-            self.outer_iteration += 1
