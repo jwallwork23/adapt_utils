@@ -36,7 +36,9 @@ class AdaptiveProblemBase(object):
         :kwarg print_progress: verbose solver output if set to `True`.
         :kwarg manual: if set to `True`, meshes (and objects built upon them) are not set up.
         """
-        op.print_debug(op.indent + "{:s} initialisation begin".format(self.__class__.__name__))
+        msg = "{:s} initialisation begin\n".format(self.__class__.__name__)
+        op.print_debug(op.indent + 80*'*' + '\n' + op.indent + msg + 80*'*' + '\n')
+        self.di = create_directory(op.di)
 
         # Read args and kwargs
         self.op = op
@@ -46,7 +48,7 @@ class AdaptiveProblemBase(object):
         self.checkpointing = kwargs.get('checkpointing', False)
         self.print_progress = kwargs.get('print_progress', True)
         self.manual = kwargs.get('manual', False)
-        self.on_the_fly = kwargs.get('on_the_fly', False)
+        self.on_the_fly = kwargs.get('on_the_fly', False)  # TODO
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -65,9 +67,9 @@ class AdaptiveProblemBase(object):
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
-        op.print_debug(op.indent + "SETUP: Building meshes...")
         self.num_cells = [[], ]
         self.num_vertices = [[], ]
+        self.meshes = [None for i in range(self.num_meshes)]
         self.set_meshes(meshes)
         if not self.manual:
             self.setup_all()
@@ -114,30 +116,6 @@ class AdaptiveProblemBase(object):
         if self.print_progress:
             print_output(msg)
 
-    def setup_all(self):
-        """
-        Setup everything which isn't explicitly associated with either the forward or adjoint
-        problem.
-        """
-        op = self.op
-        op.print_debug(op.indent + "SETUP: Creating function spaces...")
-        self.set_finite_elements()
-        self.create_function_spaces()
-        self.jacobian_signs = [interpolate(sign(JacobianDeterminant(mesh)), P0) for mesh, P0 in zip(self.meshes, self.P0)]
-        op.print_debug(op.indent + "SETUP: Creating solutions...")
-        self.create_solutions()
-        op.print_debug(op.indent + "SETUP: Creating fields...")
-        self.set_fields(init=True)
-        op.print_debug(op.indent + "SETUP: Setting stabilisation parameters...")
-        self.set_stabilisation()
-        op.print_debug(op.indent + "SETUP: Setting boundary conditions...")
-        self.set_boundary_conditions()
-        op.print_debug(op.indent + "SETUP: Creating output files...")
-        self.di = create_directory(op.di)
-        self.create_outfiles()
-        op.print_debug(op.indent + "SETUP: Creating intermediary spaces...")
-        self.create_intermediary_spaces()
-
     def set_meshes(self, meshes):
         """
         Build a mesh associated with each mesh.
@@ -146,23 +124,52 @@ class AdaptiveProblemBase(object):
               rather than explicitly copied. This rears its head in :attr:`run_dwr`, where a the
               enriched meshes are built from a single mesh hierarchy.
         """
-        self.meshes = meshes or [self.op.default_mesh for i in range(self.num_meshes)]
+        op = self.op
+        if meshes is None:
+            op.print_debug(op.indent + "SETUP: Setting default meshes...")
+            self.meshes = [op.default_mesh for i in range(self.num_meshes)]
+        elif isinstance(meshes, str):
+            self.load_meshes(fname=meshes)  # TODO: allow fpath
+        elif meshes != self.meshes:
+            op.print_debug(op.indent + "SETUP: Setting user-provided meshes...")
+            assert len(meshes) == self.num_meshes
+            self.meshes = meshes
         self.mesh_velocities = [None for i in range(self.num_meshes)]
-        msg = self.op.indent + "SETUP: Mesh {:d} has {:d} elements"
-        if self.num_cells != [[], ]:
+        if len(self.num_cells) > 1:
             self.num_cells.append([])
             self.num_vertices.append([])
+
+        msg = op.indent + "SETUP: Mesh {:d} has {:d} elements and {:d} vertices"
         for i, mesh in enumerate(self.meshes):
+
+            # Endow mesh with its boundary length
             bnd_len = compute_boundary_length(mesh)
             mesh.boundary_len = bnd_len
-            self.op.print_debug(msg.format(i, mesh.num_cells()))
-            # if self.op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO
+
+            # Print diagnostics / store for later use over mesh adaptation loop
+            num_cells, num_vertices = mesh.num_cells(), mesh.num_vertices()
+            self.op.print_debug(msg.format(i, num_cells, num_vertices))
+            self.num_cells[-1].append(num_cells)
+            self.num_vertices[-1].append(num_vertices)
+
+            # # Create mesh velocity Functions
+            # if op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO
             #     coords = mesh.coordinates
             #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
 
-            # Store diagnostics for later use over mesh adaptation loop
-            self.num_cells[-1].append(mesh.num_cells())
-            self.num_vertices[-1].append(mesh.num_vertices())
+    def setup_all(self):
+        """
+        Setup everything which isn't explicitly associated with either the forward or adjoint
+        problem.
+        """
+        self.set_finite_elements()
+        self.create_function_spaces()
+        self.create_solutions()
+        self.set_fields(init=True)
+        self.set_stabilisation()
+        self.set_boundary_conditions()
+        self.create_outfiles()
+        self.create_intermediary_spaces()
 
     def get_plex(self, i):
         """
@@ -184,19 +191,35 @@ class AdaptiveProblemBase(object):
         """
         if self.op.approach != 'monge_ampere':
             return
+        self.op.print_debug(self.op.indent + "SETUP: Creating intermediary spaces...")
         mesh_copies = [Mesh(mesh.coordinates.copy(deepcopy=True)) for mesh in self.meshes]
         spaces = [FunctionSpace(mesh, self.finite_element) for mesh in mesh_copies]
         self.intermediary_meshes = mesh_copies
         self.intermediary_solutions = [Function(space) for space in spaces]
 
     def create_function_spaces(self):
-        raise NotImplementedError("To be implemented in derived class")
+        """
+        Build various useful finite element spaces.
+
+        NOTE: The prognostic spaces should be created in the inherited class.
+        """
+        self.op.print_debug(self.op.indent + "SETUP: Creating function spaces...")
+        self.P0 = [FunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
+        self.P1 = [FunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
+        self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
+        self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
+
+        # Store mesh orientations
+        self.jacobian_signs = [interpolate(sign(JacobianDeterminant(P0.mesh())), P0) for P0 in self.P0]
 
     def create_solutions(self):
         """
         Set up :class:`Function`s in prognostic spaces defined on each mesh, which will hold
         forward and adjoint solutions.
         """
+        self.op.print_debug(self.op.indent + "SETUP: Creating solutions...")
         for i in range(self.num_meshes):
             self.create_solutions_step(i)
 
@@ -221,6 +244,7 @@ class AdaptiveProblemBase(object):
 
         The bathymetry is defined via a modified version of the `DepthExpression` found Thetis.
         """
+        self.op.print_debug(self.op.indent + "SETUP: Creating fields...")
         for i in range(self.num_meshes):
             self.set_fields_step(i, **kwargs)
 
@@ -232,6 +256,7 @@ class AdaptiveProblemBase(object):
         self.fields[i] = AttrDict()
 
     def set_stabilisation(self):
+        self.op.print_debug(self.op.indent + "SETUP: Setting stabilisation parameters...")
         for i in range(self.num_meshes):
             self.set_stabilisation_step(i)
 
@@ -240,10 +265,15 @@ class AdaptiveProblemBase(object):
 
     def set_boundary_conditions(self):
         """Set boundary conditions *for all models*"""
+        self.op.print_debug(self.op.indent + "SETUP: Setting boundary conditions...")
         self.boundary_conditions = [self.op.set_boundary_conditions(self, i) for i in range(self.num_meshes)]
 
     def create_outfiles(self):
-        raise NotImplementedError("To be implemented in derived class")
+        if not self.op.plot_pvd:
+            return
+        self.op.print_debug(self.op.indent + "SETUP: Creating output files...")
+        self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
+        self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
 
     def set_initial_condition(self):
         self.op.set_initial_condition(self)
@@ -387,6 +417,7 @@ class AdaptiveProblemBase(object):
         :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
         :kwarg fpath: directory in which to save the HDF5 files.
         """
+        self.op.print_debug("I/O: Saving meshes to file...")
         fpath = fpath or self.di
         for i, mesh in enumerate(self.meshes):
             save_mesh(mesh, '{:s}_{:d}'.format(fname, i), fpath)
@@ -398,6 +429,7 @@ class AdaptiveProblemBase(object):
         :kwarg fname: filename of HDF5 files (with an '_<index>' to be appended).
         :kwarg fpath: filepath to where the HDF5 files are to be loaded from.
         """
+        self.op.print_debug("I/O: Loading meshes from file...")
         fpath = fpath or self.di
         for i in range(self.num_meshes):
             self.meshes[i] = load_mesh('{:s}_{:d}'.format(fname, i), fpath)
@@ -809,7 +841,7 @@ class AdaptiveProblemBase(object):
                 self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
             metrics = [None for P1_ten in self.P1_ten]
 
-            # Save adapted meshes to file  # TODO: Option to load
+            # Save adapted meshes to file
             self.save_meshes()
 
             # ---  Setup for next run / logging

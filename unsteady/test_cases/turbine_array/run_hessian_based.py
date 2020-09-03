@@ -28,6 +28,7 @@ parser.add_argument("-h_min", help="Minimum tolerated element size (default 1cm)
 parser.add_argument("-h_max", help="Maximum tolerated element size (default 100m)")
 
 # I/O and debugging
+parser.add_argument("-load_mesh", help="Load meshes from a previous run")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
@@ -43,6 +44,7 @@ p = args.norm_order
 # --- Set parameters
 
 approach = 'hessian'
+load_mesh = None if args.load_mesh is None else 'plex'
 plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
@@ -117,6 +119,14 @@ class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
     """
     def set_initial_condition(self):
         self.load_state(0, ramp_dir)
+        if load_mesh is not None:
+            tmp = self.fwd_solutions[0].copy(deepcopy=True)
+            u_tmp, eta_tmp = tmp.split()
+            self.set_meshes(load_mesh)
+            self.setup_all()
+            u, eta = self.fwd_solutions[0].split()
+            u.project(u_tmp)
+            eta.project(eta_tmp)
 
 
 # --- Run model

@@ -121,8 +121,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if not self.op.plot_pvd:
             return
         if self.op.solve_swe:
-            self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
-            self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
+            super(AdaptiveProblem, self).create_outfiles()
         if self.op.solve_tracer:
             self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
             self.adjoint_tracer_file = File(os.path.join(self.di, 'adjoint_tracer.pvd'))
@@ -145,6 +144,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         For the sediment and Exner models, you are required to use DG and CG,
         respectively.
         """
+        self.op.print_debug(self.op.indent + "SETUP: Creating finite elements...")
         p = self.op.degree
         family = self.op.family
         if family == 'cg-cg':
@@ -190,15 +190,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def create_function_spaces(self):
         """
-        Build finite element spaces `V` and `Q`, for the prognostic solutions of the shallow water
-        and tracer models, along with various other useful spaces.
+        Build finite element spaces for the prognostic solutions of each model, along with various
+        other useful spaces.
+
+        The shallow water space is denoted `V`, the tracer and sediment space is denoted `Q` and the
+        bathymetry space is denoted `W`.
         """
-        self.P0 = [FunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
-        self.P1 = [FunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
-        self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
-        self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
-        self.P1DG = [FunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
-        self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
+        super(AdaptiveProblem, self).create_function_spaces()
 
         # Shallow water space
         self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
