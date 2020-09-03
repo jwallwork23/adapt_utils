@@ -144,7 +144,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         For the sediment and Exner models, you are required to use DG and CG,
         respectively.
         """
-        self.op.print_debug(self.op.indent + "SETUP: Creating finite elements...")
+        self.op.print_debug("SETUP: Creating finite elements...")
         p = self.op.degree
         family = self.op.family
         if family == 'cg-cg':
@@ -1106,7 +1106,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Create a new CallbackManager object on every mesh
         #   NOTE: This overwrites any pre-existing CallbackManagers
-        self.op.print_debug(self.op.indent + "SETUP: Creating CallbackManagers...")
+        self.op.print_debug("SETUP: Creating CallbackManagers...")
         self.callbacks[i] = CallbackManager()
 
         # Add default callbacks
@@ -1123,16 +1123,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def setup_solver_forward_step(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
-        op.print_debug(op.indent + "SETUP: Creating forward equations on mesh {:d}...".format(i))
+        op.print_debug("SETUP: Creating forward equations on mesh {:d}...".format(i))
         self.create_forward_equations_step(i)
-        op.print_debug(op.indent + "SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
+        op.print_debug("SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
         self.create_forward_timesteppers_step(i)
         bcs = self.boundary_conditions[i]
         if op.solve_swe:
             ts = self.timesteppers[i]['shallow_water']
             dbcs = []
             if op.family == 'cg-cg':
-                op.print_debug(op.indent + "SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
+                op.print_debug("SETUP: Applying DirichletBCs on mesh {:d}...".format(i))
                 for j in bcs['shallow_water']:
                     if 'elev' in bcs['shallow_water'][j]:
                         dbcs.append(DirichletBC(self.V[i].sub(1), bcs['shallow_water'][j]['elev'], j))
@@ -1142,7 +1142,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             ts = self.timesteppers[i]['tracer']
             dbcs = []
             if op.tracer_family == 'cg':
-                op.print_debug(op.indent + "SETUP: Applying tracer DirichletBCs on mesh {:d}...".format(i))
+                op.print_debug("SETUP: Applying tracer DirichletBCs on mesh {:d}...".format(i))
                 for j in bcs['tracer']:
                     if 'value' in bcs['tracer'][j]:
                         dbcs.append(DirichletBC(self.Q[i], bcs['tracer'][j]['value'], j))
@@ -1158,14 +1158,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
             dbcs = []
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_exner")
-        op.print_debug(op.indent + "SETUP: Adding callbacks on mesh {:d}...".format(i))
+        op.print_debug("SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i)
 
     def free_solver_forward_step(self, i):
         op = self.op
-        op.print_debug(op.indent + "FREE: Removing forward timesteppers on mesh {:d}...".format(i))
+        op.print_debug("FREE: Removing forward timesteppers on mesh {:d}...".format(i))
         self.free_forward_timesteppers_step(i)
-        op.print_debug(op.indent + "FREE: Removing forward equations on mesh {:d}...".format(i))
+        op.print_debug("FREE: Removing forward equations on mesh {:d}...".format(i))
         self.free_forward_equations_step(i)
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
@@ -1320,16 +1320,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def setup_solver_adjoint_step(self, i):
         """Setup forward solver on mesh `i`."""
         op = self.op
-        op.print_debug(op.indent + "SETUP: Creating adjoint equations on mesh {:d}...".format(i))
+        op.print_debug("SETUP: Creating adjoint equations on mesh {:d}...".format(i))
         self.create_adjoint_equations_step(i)
-        op.print_debug(op.indent + "SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
+        op.print_debug("SETUP: Creating adjoint timesteppers on mesh {:d}...".format(i))
         self.create_adjoint_timesteppers_step(i)
         bcs = self.boundary_conditions[i]
         if op.solve_swe:
             dbcs = []
             ts = self.timesteppers[i]['adjoint_shallow_water']
             if op.family in ('cg-cg', 'dg-cg'):  # NOTE: This is inconsistent with forward
-                op.print_debug(op.indent + "SETUP: Applying adjoint DirichletBCs on mesh {:d}...".format(i))
+                op.print_debug("SETUP: Applying adjoint DirichletBCs on mesh {:d}...".format(i))
                 for j in bcs['shallow_water']:
                     if 'un' not in bcs['shallow_water'][j]:
                         dbcs.append(DirichletBC(self.V[i].sub(1), 0, j))
@@ -1339,16 +1339,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
             ts = self.timesteppers[i]['adjoint_tracer']
             dbcs = []
             if op.family == 'cg':
-                op.print_debug(op.indent + "SETUP: Applying adjoint tracer DirichletBCs on mesh {:d}...".format(i))
+                op.print_debug("SETUP: Applying adjoint tracer DirichletBCs on mesh {:d}...".format(i))
                 raise NotImplementedError  # TODO
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
 
     def free_solver_adjoint_step(self, i):
         op = self.op
-        op.print_debug(op.indent + "FREE: Removing adjoint timesteppers on mesh {:d}...".format(i))
+        op.print_debug("FREE: Removing adjoint timesteppers on mesh {:d}...".format(i))
         self.free_adjoint_timesteppers_step(i)
-        op.print_debug(op.indent + "FREE: Removing adjoint equations on mesh {:d}...".format(i))
+        op.print_debug("FREE: Removing adjoint equations on mesh {:d}...".format(i))
         self.free_adjoint_equations_step(i)
 
     def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):

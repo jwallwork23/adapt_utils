@@ -126,12 +126,12 @@ class AdaptiveProblemBase(object):
         """
         op = self.op
         if meshes is None:
-            op.print_debug(op.indent + "SETUP: Setting default meshes...")
+            op.print_debug("SETUP: Setting default meshes...")
             self.meshes = [op.default_mesh for i in range(self.num_meshes)]
         elif isinstance(meshes, str):
             self.load_meshes(fname=meshes)  # TODO: allow fpath
         elif meshes != self.meshes:
-            op.print_debug(op.indent + "SETUP: Setting user-provided meshes...")
+            op.print_debug("SETUP: Setting user-provided meshes...")
             assert len(meshes) == self.num_meshes
             self.meshes = meshes
         self.mesh_velocities = [None for i in range(self.num_meshes)]
@@ -139,7 +139,7 @@ class AdaptiveProblemBase(object):
             self.num_cells.append([])
             self.num_vertices.append([])
 
-        msg = op.indent + "SETUP: Mesh {:d} has {:d} elements and {:d} vertices"
+        msg = "SETUP: Mesh {:d} has {:d} elements and {:d} vertices"
         for i, mesh in enumerate(self.meshes):
 
             # Endow mesh with its boundary length
@@ -191,7 +191,7 @@ class AdaptiveProblemBase(object):
         """
         if self.op.approach != 'monge_ampere':
             return
-        self.op.print_debug(self.op.indent + "SETUP: Creating intermediary spaces...")
+        self.op.print_debug("SETUP: Creating intermediary spaces...")
         mesh_copies = [Mesh(mesh.coordinates.copy(deepcopy=True)) for mesh in self.meshes]
         spaces = [FunctionSpace(mesh, self.finite_element) for mesh in mesh_copies]
         self.intermediary_meshes = mesh_copies
@@ -203,7 +203,7 @@ class AdaptiveProblemBase(object):
 
         NOTE: The prognostic spaces should be created in the inherited class.
         """
-        self.op.print_debug(self.op.indent + "SETUP: Creating function spaces...")
+        self.op.print_debug("SETUP: Creating function spaces...")
         self.P0 = [FunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
         self.P1 = [FunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
         self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
@@ -219,7 +219,7 @@ class AdaptiveProblemBase(object):
         Set up :class:`Function`s in prognostic spaces defined on each mesh, which will hold
         forward and adjoint solutions.
         """
-        self.op.print_debug(self.op.indent + "SETUP: Creating solutions...")
+        self.op.print_debug("SETUP: Creating solutions...")
         for i in range(self.num_meshes):
             self.create_solutions_step(i)
 
@@ -244,7 +244,7 @@ class AdaptiveProblemBase(object):
 
         The bathymetry is defined via a modified version of the `DepthExpression` found Thetis.
         """
-        self.op.print_debug(self.op.indent + "SETUP: Creating fields...")
+        self.op.print_debug("SETUP: Creating fields...")
         for i in range(self.num_meshes):
             self.set_fields_step(i, **kwargs)
 
@@ -256,7 +256,7 @@ class AdaptiveProblemBase(object):
         self.fields[i] = AttrDict()
 
     def set_stabilisation(self):
-        self.op.print_debug(self.op.indent + "SETUP: Setting stabilisation parameters...")
+        self.op.print_debug("SETUP: Setting stabilisation parameters...")
         for i in range(self.num_meshes):
             self.set_stabilisation_step(i)
 
@@ -265,13 +265,13 @@ class AdaptiveProblemBase(object):
 
     def set_boundary_conditions(self):
         """Set boundary conditions *for all models*"""
-        self.op.print_debug(self.op.indent + "SETUP: Setting boundary conditions...")
+        self.op.print_debug("SETUP: Setting boundary conditions...")
         self.boundary_conditions = [self.op.set_boundary_conditions(self, i) for i in range(self.num_meshes)]
 
     def create_outfiles(self):
         if not self.op.plot_pvd:
             return
-        self.op.print_debug(self.op.indent + "SETUP: Creating output files...")
+        self.op.print_debug("SETUP: Creating output files...")
         self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
         self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
 
