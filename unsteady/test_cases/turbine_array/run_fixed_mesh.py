@@ -15,6 +15,8 @@ from adapt_utils.plotting import *  # NOQA
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
+parser.add_argument("-num_meshes", help="Number of meshes (for debugging)")
+parser.add_argument("-load_mesh", help="Load meshes from a previous run")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
@@ -28,6 +30,7 @@ args = parser.parse_args()
 # --- Set parameters
 
 approach = 'fixed_mesh'
+load_mesh = None if args.load_mesh is None else 'plex'
 plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
@@ -45,6 +48,7 @@ if plot_png:
     extensions.append('png')
 kwargs = {
     'approach': approach,
+    'num_meshes': int(args.num_meshes or 1),
     'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
@@ -75,17 +79,36 @@ else:
     op.end_time += op.T_ramp
 
 
+# --- Create a solver subclass which uses restarts
+
+class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
+    """
+    A simple extension of :class:`AdaptiveTurbineProblem` which loads from restarts, rather than
+    setting initial conditions using the :class:`Options` parameter class.
+    """
+    def set_initial_condition(self):
+        if spun:
+            self.load_state(0, ramp_dir)
+            if load_mesh is not None:
+                tmp = self.fwd_solutions[0].copy(deepcopy=True)
+                u_tmp, eta_tmp = tmp.split()
+                self.set_meshes(load_mesh)
+                self.setup_all()
+                u, eta = self.fwd_solutions[0].split()
+                u.project(u_tmp)
+                eta.project(eta_tmp)
+        else:
+            super(AdaptiveTurbineProblem_with_restarts, self).set_initial_condition()
+
+
 # --- Run model
 
 # Run forward model and save QoI timeseries
 if not plot_only:
-    swp = AdaptiveTurbineProblem(op, callback_dir=data_dir)
+    swp = AdaptiveTurbineProblem_with_restarts(op, callback_dir=data_dir)
 
-    # Set initial condition
-    if spun:
-        swp.load_state(0, ramp_dir)
-    else:
-        swp.set_initial_condition()
+    # Set initial condition and create solver
+    swp.set_initial_condition()
     swp.setup_solver_forward_step(0)
 
     # Solve forward problem
