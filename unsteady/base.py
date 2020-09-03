@@ -100,11 +100,7 @@ class AdaptiveProblemBase(object):
         self.outer_iteration = 0
 
         # Various empty lists and dicts
-        self.callbacks = [None for i in range(self.num_meshes)]
-        self.equations = [AttrDict() for i in range(self.num_meshes)]
-        self.error_estimators = [AttrDict() for i in range(self.num_meshes)]
         self.kernels = [None for i in range(self.num_meshes)]
-        self.timesteppers = [AttrDict() for i in range(self.num_meshes)]
         if not hasattr(self, 'fwd_solutions'):
             self.fwd_solutions = [None for i in range(self.num_meshes)]
         if not hasattr(self, 'adj_solutions'):
@@ -130,6 +126,8 @@ class AdaptiveProblemBase(object):
             self.meshes = [op.default_mesh for i in range(self.num_meshes)]
         elif isinstance(meshes, str):
             self.load_meshes(fname=meshes)  # TODO: allow fpath
+        elif not isinstance(meshes, list):
+            self.meshes = [meshes for i in range(self.num_meshes)]
         elif meshes != self.meshes:
             op.print_debug("SETUP: Setting user-provided meshes...")
             assert len(meshes) == self.num_meshes
@@ -170,6 +168,10 @@ class AdaptiveProblemBase(object):
         self.set_boundary_conditions()
         self.create_outfiles()
         self.create_intermediary_spaces()
+        self.callbacks = [None for i in range(self.num_meshes)]
+        self.equations = [AttrDict() for i in range(self.num_meshes)]
+        self.error_estimators = [AttrDict() for i in range(self.num_meshes)]
+        self.timesteppers = [AttrDict() for i in range(self.num_meshes)]
 
     def get_plex(self, i):
         """
@@ -212,7 +214,9 @@ class AdaptiveProblemBase(object):
         self.P1DG_vec = [VectorFunctionSpace(mesh, "DG", 1) for mesh in self.meshes]
 
         # Store mesh orientations
-        self.jacobian_signs = [interpolate(sign(JacobianDeterminant(P0.mesh())), P0) for P0 in self.P0]
+        self.jacobian_signs = [
+            interpolate(sign(JacobianDeterminant(P0.mesh())), P0) for P0 in self.P0
+        ]
 
     def create_solutions(self):
         """
@@ -266,7 +270,9 @@ class AdaptiveProblemBase(object):
     def set_boundary_conditions(self):
         """Set boundary conditions *for all models*"""
         self.op.print_debug("SETUP: Setting boundary conditions...")
-        self.boundary_conditions = [self.op.set_boundary_conditions(self, i) for i in range(self.num_meshes)]
+        self.boundary_conditions = [
+            self.op.set_boundary_conditions(self, i) for i in range(self.num_meshes)
+        ]
 
     def create_outfiles(self):
         if not self.op.plot_pvd:

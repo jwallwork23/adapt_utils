@@ -12,27 +12,33 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
 
     # --- Setup
 
-    def __init__(self, *args, remove_turbines=False, discrete_turbines=False, callback_dir=None, **kwargs):
+    def __init__(self, *args, remove_turbines=False, callback_dir=None, **kwargs):
         """
         :kwarg remove_turbines: toggle whether turbines are present in the flow or not.
-        :kwarg discrete_turbines: toggle whether to use a discrete or continuous representation
-            for the turbine array.
-        :kwarg thrust_correction: toggle whether to correct the turbine thrust coefficient.
+        :kwarg callback_dir: directory to save power output data to.
         """
         super(AdaptiveTurbineProblem, self).__init__(*args, **kwargs)
         self.callback_dir = callback_dir
-        if remove_turbines:
-            return
-        op = self.op
-        num_turbines = op.num_turbines
+        if not remove_turbines:
+            self.create_tidal_farms(**kwargs)
 
-        # Set up tidal farm object
-        self.farm_options = [TidalTurbineFarmOptions() for mesh in self.meshes]
-        self.turbine_densities = [None for mesh in self.meshes]
-        self.turbine_drag_coefficients = [None for mesh in self.meshes]
-        c_T = op.get_thrust_coefficient(correction=kwargs.get('thrust_correction', True))
+    def create_tidal_farms(self, discrete_turbines=False, thrust_correction=True, smooth_indicators=True):
+        """
+        Create tidal farm objects *on each mesh*.
+
+        :kwarg discrete_turbines: toggle whether to use a discrete or continuous representation
+            for the turbine array.
+        :kwarg thrust_correction: toggle whether to correct the turbine thrust coefficient.
+        :kwarg smooth_indicators: use continuous approximations to discontinuous indicator functions.
+        """
+        op = self.op
+        op.print_debug("SETUP: Creating tidal turbine farms...")
+        num_turbines = op.num_turbines
+        self.farm_options = [TidalTurbineFarmOptions() for i in range(self.num_meshes)]
+        self.turbine_densities = [None for i in range(self.num_meshes)]
+        self.turbine_drag_coefficients = [None for i in range(self.num_meshes)]
+        c_T = op.get_thrust_coefficient(correction=thrust_correction)
         if not discrete_turbines:
-            smooth_indicators = kwargs.get('smooth_indicators', True)
             shape = op.bump if smooth_indicators else op.box
         if hasattr(op, 'turbine_diameter'):
             D = op.turbine_diameter

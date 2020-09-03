@@ -61,7 +61,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         }
         for i, swo in enumerate(self.shallow_water_options):
             swo.update(static_options)
-            swo.tidal_turbine_farms = {}  # TODO
+            swo.tidal_turbine_farms = {}
             if hasattr(op, 'sipg_parameter') and op.sipg_parameter is not None:
                 swo['sipg_parameter'] = op.sipg_parameter
         if not nonlinear:

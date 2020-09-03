@@ -120,10 +120,19 @@ class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
     def set_initial_condition(self):
         self.load_state(0, ramp_dir)
         if load_mesh is not None:
+
+            # Stash loaded state
             tmp = self.fwd_solutions[0].copy(deepcopy=True)
             u_tmp, eta_tmp = tmp.split()
+
+            # Load meshes
+            self.num_cells = [[], ]
+            self.num_vertices = [[], ]
             self.set_meshes(load_mesh)
             self.setup_all()
+            self.create_tidal_farms()
+
+            # Project stashed state
             u, eta = self.fwd_solutions[0].split()
             u.project(u_tmp)
             eta.project(eta_tmp)
