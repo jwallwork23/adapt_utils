@@ -17,7 +17,7 @@ from adapt_utils.plotting import *  # NOQA
 parser = argparse.ArgumentParser()
 
 # Mesh adaptation
-parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
+parser.add_argument("-num_meshes", help="Number of meshes to consider (default 9)")
 parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
 parser.add_argument("-normalisation", help="Normalisation method (default 'complexity')")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t (default 'all_int')")
@@ -64,7 +64,7 @@ kwargs = {
     'approach': approach,
 
     # Mesh adaptation
-    'num_meshes': int(args.num_meshes or 4),  # NOTE: Needs to divide 124 = 2 x 2 x 31
+    'num_meshes': int(args.num_meshes or 9),
     'adapt_field': args.adapt_field or 'speed',
     'hessian_time_combination': args.time_combine or 'intersect',  # FIXME: integrate gives recursion error
     'hessian_timestep_lag': float(args.hessian_lag or 1),

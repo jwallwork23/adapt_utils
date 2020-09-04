@@ -44,11 +44,11 @@ class TurbineArrayOptions(TurbineOptions):
         self.friction_coeff = 0.0025
 
         # Timestepping
-        self.dt = 3.0
+        self.dt = 2
         self.T_tide = 0.1*self.M2_tide_period
         self.T_ramp = 1.0*self.T_tide
         self.end_time = 2.0*self.T_tide
-        self.dt_per_export = 12
+        self.dt_per_export = 31
 
         # Tidal farm
         D = self.turbine_length
