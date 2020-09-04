@@ -413,6 +413,7 @@ class AdaptiveProblemBase(object):
 
         This function is designed for use under Monge-Ampere type mesh movement methods.
         """
+        # TODO: Use par_loop
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
             f.dat.data[:] = f_int.dat.data
 
@@ -649,6 +650,7 @@ class AdaptiveProblemBase(object):
 
         # Update intermediary mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating intermediary mesh coordinates...")
+        # TODO: Use par_loop
         self.intermediary_meshes[i].coordinates.dat.data[:] = self.mesh_movers[i].x.dat.data
 
         # Project a copy of the current solution onto mesh defined on new coordinates
@@ -657,6 +659,7 @@ class AdaptiveProblemBase(object):
 
         # Update physical mesh coordinates
         self.op.print_debug("MESH MOVEMENT: Updating physical mesh coordinates...")
+        # TODO: Use par_loop
         self.meshes[i].coordinates.dat.data[:] = self.intermediary_meshes[i].coordinates.dat.data
 
         # Copy over projected solution data
