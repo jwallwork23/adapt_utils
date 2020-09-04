@@ -31,6 +31,7 @@ echo "MPIF90="$MPIF90
 echo "MPIEXEC="$MPIEXEC
 echo "FIREDRAKE_ENV="$FIREDRAKE_ENV
 echo "FIREDRAKE_DIR="$FIREDRAKE_DIR
+echo "python3="$(which python3)
 echo "Are these settings okay? Press enter to continue."
 read chk
 

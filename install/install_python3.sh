@@ -32,7 +32,7 @@ cd Python-3.7.4
 
 # Configure and install
 ./configure --enable-optimizations
-make -j nproc
+make -j $(nproc)
 sudo make altinstall
 
 # Alias for convenience

@@ -45,6 +45,7 @@ fi
 echo "PETSC_ARCH="$PETSC_ARCH
 echo "FIREDRAKE_ENV="$FIREDRAKE_ENV
 echo "FIREDRAKE_DIR="$FIREDRAKE_DIR
+echo "python3="$(which python3)
 echo "Are these settings okay? Press enter to continue."
 read chk
 
