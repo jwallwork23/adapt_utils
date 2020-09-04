@@ -370,7 +370,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
                     alpha = alpha*get_sipg_ratio(nu)*cot_theta
                     sipg = interpolate(alpha, self.P0[i])
-                self.shallow_water_options[i].sipg_parameter = sipg
+
+            # Set parameter and print to screen
+            self.shallow_water_options[i].sipg_parameter = sipg
+            if isinstance(sipg, Constant):
+                msg = "SETUP: constant SIPG parameter on mesh {:d}: {:.4e}"
+                op.print_debug(msg.format(i, sipg.dat.data[0]))
+            else:
+                msg = "SETUP: variable SIPG parameter on mesh {:d}: min {:.4e} max {:.4e}"
+                with sipg.dat.vec_ro as v:
+                    op.print_debug(msg.format(i, v.min()[1], v.max()[1]))
 
         # Stabilisation
         if self.stabilisation is None:
@@ -396,14 +405,23 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.tracer_options[i].use_automatic_sipg_parameter:
                 cot_theta = 1.0/tan(self.minimum_angles[i])
 
-                # Penalty parameter for shallow water
+                # Penalty parameter for tracers
                 nu = self.fields[i].horizontal_diffusivity
                 if nu is not None:
                     p = self.Q[i].ufl_element().degree()
                     alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
                     alpha = alpha*get_sipg_ratio(nu)*cot_theta
                     sipg = interpolate(alpha, self.P0[i])
-                self.tracer_options[i].sipg_parameter = sipg
+
+            # Set parameter and print to screen
+            self.tracer_options[i].sipg_parameter = sipg
+            if isinstance(sipg, Constant):
+                msg = "SETUP: constant SIPG parameter on mesh {:d}: {:.4e}"
+                op.print_debug(msg.format(i, sipg.dat.data[0]))
+            else:
+                msg = "SETUP: variable SIPG parameter on mesh {:d}: min {:.4e} max {:.4e}"
+                with sipg.dat.vec_ro as v:
+                    op.print_debug(msg.format(i, v.min()[1], v.max()[1]))
 
         # Stabilisation
         if self.stabilisation is None:
