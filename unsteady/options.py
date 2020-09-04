@@ -9,52 +9,91 @@ __all__ = ["CoupledOptions"]
 
 # TODO: Improve doc
 class CoupledOptions(Options):
-    """Parameters for coupled shallow water - tracer transport model."""
+    """
+    Parameters for the coupled system. Selection from the four model components may be achieved using
+    the following flags:
+      * `solve_swe`      - shallow water model (hydrodynamics);
+      * `solve_tracer`   - passive tracer transport model;
+      * `solve_sediment` - sediment model;
+      * `solve_exner`    - Exner equation.
+    """
 
     # Physics
-    base_viscosity = NonNegativeFloat(0.0).tag(config=True)
-    base_diffusivity = NonNegativeFloat(0.0).tag(config=True)
-    base_velocity = [0.0, 0.0]
-    g = FiredrakeScalarExpression(Constant(9.81)).tag(config=True)
-    friction = Unicode(None, allow_none=True).tag(config=True)
-    friction_coeff = NonNegativeFloat(None, allow_none=True).tag(config=True)
-    ksp = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    base_viscosity = NonNegativeFloat(0.0, help="""
+        Non-negative value providing the default constant viscosity field.
+        """).tag(config=True)
+    base_diffusivity = NonNegativeFloat(0.0, help="""
+        Non-negative value providing the default constant diffusivity field.
+        """).tag(config=True)
+    base_velocity = List([0.0, 0.0], help="""
+        Two element list providing the default constant velocity field.
+        """).tag(config=True)
+    g = FiredrakeScalarExpression(Constant(9.81), help="""
+        Non-negative value providing the default constant gravitational acceleration.
+        """).tag(config=True)
+    friction = Unicode(None, allow_none=True, help="""
+        Friction parametrisation for the drag term. Choose from {'nikuradse', 'manning'}.
+        """).tag(config=True)
+    friction_coeff = NonNegativeFloat(None, allow_none=True, help="""
+        Non-negative value providing the default constant drag parameter.
+        """).tag(config=True)
 
     # Common model
-    implicitness_theta = NonNegativeFloat(0.5).tag(config=True)
+    implicitness_theta = NonNegativeFloat(0.5).tag(config=True)  # TODO: help
 
     # Shallow water model
-    solve_swe = Bool(True).tag(config=True)
-    family = Enum(['dg-dg', 'rt-dg', 'dg-cg', 'cg-cg'], default_value='dg-dg').tag(config=True)
-    grad_div_viscosity = Bool(False).tag(config=True)
-    grad_depth_viscosity = Bool(False).tag(config=True)
-    wetting_and_drying = Bool(False).tag(config=True)
-    wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(4.3)).tag(config=True)
+    solve_swe = Bool(True, help="Toggle solving the shallow water model.").tag(config=True)
+    family = Enum(['dg-dg', 'rt-dg', 'dg-cg', 'cg-cg'], default_value='dg-dg').tag(config=True)  # TODO: help
+    grad_div_viscosity = Bool(False).tag(config=True)  # TODO: help
+    grad_depth_viscosity = Bool(False).tag(config=True)  # TODO: help
+    wetting_and_drying = Bool(False).tag(config=True)  # TODO: help
+    wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(4.3)).tag(config=True)  # TODO: help
     lax_friedrichs_velocity_scaling_factor = FiredrakeConstantTraitlet(
         Constant(1.0), help="Scaling factor for Lax Friedrichs stabilisation term in horizontal momentum advection.").tag(config=True)
-    sipg_parameter = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    sipg_parameter = FiredrakeScalarExpression(None, allow_none=True, help="""
+        Optional user-provided symemetric interior penalty parameter for the shallow water model.
+        Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
+        """).tag(config=True)
 
     # Tracer transport model
-    solve_tracer = Bool(False).tag(config=True)
-    solve_sediment = Bool(False).tag(config=True)
-    use_limiter_for_tracers = Bool(True).tag(config=True)
-    use_tracer_conservative_form = Bool(False).tag(config=True)
-    tracer_family = Enum(['dg', 'cg'], default_value='dg').tag(config=True)
-    lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
-    sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
-    sipg_parameter_sediment = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
-    norm_smoother = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
-    tracer_advective_velocity_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
+    solve_tracer = Bool(False, help="Toggle solving the tracer transport model.").tag(config=True)
+    use_limiter_for_tracers = Bool(True, help="""
+        Toggle using vertex-based slope limiters for the tracer transport model.
+        """).tag(config=True)
+    use_tracer_conservative_form = Bool(False, help="""
+        Toggle whether to solve the conservative or non-conservative form of the tracer transport
+        mode.
+        """).tag(config=True)
+    tracer_family = Enum(['dg', 'cg'], default_value='dg', help="""
+        Finite element space to use for the tracer model. Choose from {'cg', 'dg'}.
+        """).tag(config=True)
+    lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
+    sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True, help="""
+        Optional user-provided symemetric interior penalty parameter for the tracer model.
+        Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
+        """).tag(config=True)
+    norm_smoother = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)  # TODO: help
+    tracer_advective_velocity_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
+
+    # Sediment model
+    solve_sediment = Bool(False, help="Toggle solving the sediment model.").tag(config=True)
+    sipg_parameter_sediment = FiredrakeScalarExpression(None, allow_none=True, help="""
+        Optional user-provided symemetric interior penalty parameter for the sediment model.
+        Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
+        """).tag(config=True)
+    ksp = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)  # TODO: help
 
     # Exner transport model
-    solve_exner = Bool(False).tag(config=True)
-    bathymetry_family = Enum(['dg', 'cg'], default_value='cg').tag(config=True)
-    morphological_acceleration_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
-    porosity = FiredrakeScalarExpression(Constant(0.4)).tag(config=True)
+    solve_exner = Bool(False, help="Toggle solving the Exner model.").tag(config=True)
+    bathymetry_family = Enum(['dg', 'cg'], default_value='cg', help="""
+        Finite element space to use for the Exner model. Choose from {'cg', 'dg'}.
+        """).tag(config=True)
+    morphological_acceleration_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
+    porosity = FiredrakeScalarExpression(Constant(0.4)).tag(config=True)  # TODO: help
 
     # Adaptation
-    adapt_field = Unicode('all_avg', help="Adaptation field of interest.").tag(config=True)
-    region_of_interest = List(default_value=[]).tag(config=True)
+    adapt_field = Unicode('all_avg', help="Adaptation field of interest.").tag(config=True)  # TODO: help
+    region_of_interest = List(default_value=[]).tag(config=True)  # TODO: help
 
     def __init__(self, **kwargs):
         self.degree_increase = 0
