@@ -92,8 +92,30 @@ class CoupledOptions(Options):
     porosity = FiredrakeScalarExpression(Constant(0.4)).tag(config=True)  # TODO: help
 
     # Adaptation
-    adapt_field = Unicode('all_avg', help="Adaptation field of interest.").tag(config=True)  # TODO: help
-    region_of_interest = List(default_value=[]).tag(config=True)  # TODO: help
+    adapt_field = Unicode('all_avg', help="""
+        Adaptation field of interest. Commonly used values include individual scalar fields, such as
+        'speed', 'elevation', 'velocity_x', 'velocity_y', 'bathymetry', as well as combined versions,
+        which can be constructed from the individual fields using double underscores with either
+        'avg' or 'int' in the middle. These relate to the way in which the metrics arising from the
+        adaptation fields are to be combined. The former stands for metric averaging and the latter
+        stands for metric intersection.
+
+        e.g. 'elevation__int__speed'.
+
+        The special cases of 'all_avg' and 'all_int' correspond to averaging and intersecting
+        metrics arising from the three primary scalar hydrodynamics fields. That is, the former is
+        equivalent to:
+
+        'elevation__avg__velocity_x__avg__velocity_y'.
+
+        Note that while metric averaging is commutative, metric intersection is not (although the
+        differences due to ordering are negligible in practice).
+        """).tag(config=True)
+    region_of_interest = List(default_value=[], help="""
+       A list of tuples whose first n entries determine a spatial position (in n dimensions) which
+       defines the centre of the region and whose later entries determine the dimensions of the
+       region. For further details, see the :attr:`ball`, :attr:`box`, etc. methods.
+       """).tag(config=True)
 
     def __init__(self, **kwargs):
         self.degree_increase = 0
