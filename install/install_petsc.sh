@@ -10,7 +10,7 @@
 # ====================================================================== #
 
 # Set environment variables
-if [ ! -f "$SOFTWARE" ]; then
+if [ ! -e "$SOFTWARE" ]; then
     echo "SOFTWARE environment variable $SOFTWARE does not exist."
     exit 1
 fi
