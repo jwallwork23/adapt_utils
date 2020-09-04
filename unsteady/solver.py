@@ -374,10 +374,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Set parameter and print to screen
             self.shallow_water_options[i].sipg_parameter = sipg
             if isinstance(sipg, Constant):
-                msg = "SETUP: constant SIPG parameter on mesh {:d}: {:.4e}"
+                msg = "SETUP: constant shallow water SIPG parameter on mesh {:d}: {:.4e}"
                 op.print_debug(msg.format(i, sipg.dat.data[0]))
             else:
-                msg = "SETUP: variable SIPG parameter on mesh {:d}: min {:.4e} max {:.4e}"
+                msg = "SETUP: variable shallow water SIPG parameter on mesh {:d}: min {:.4e} max {:.4e}"
                 with sipg.dat.vec_ro as v:
                     op.print_debug(msg.format(i, v.min()[1], v.max()[1]))
 
@@ -401,8 +401,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         sipg = None
         if family == 'dg':
             if hasattr(op, 'sipg_parameter_tracer'):
-                sipg = op.sipg_parameter_tracer
-            if self.tracer_options[i].use_automatic_sipg_parameter:
+                sipg = op.sipg_parameter_sediment if sediment else op.sipg_parameter_tracer
+            if eq_options[i].use_automatic_sipg_parameter:
                 cot_theta = 1.0/tan(self.minimum_angles[i])
 
                 # Penalty parameter for tracers
@@ -414,14 +414,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     sipg = interpolate(alpha, self.P0[i])
 
             # Set parameter and print to screen
-            self.tracer_options[i].sipg_parameter = sipg
+            eq_options[i].sipg_parameter = sipg
+            model = 'sediment' if sediment else 'tracer'
             if isinstance(sipg, Constant):
-                msg = "SETUP: constant SIPG parameter on mesh {:d}: {:.4e}"
-                op.print_debug(msg.format(i, sipg.dat.data[0]))
+                msg = "SETUP: constant {:s} SIPG parameter on mesh {:d}: {:.4e}"
+                op.print_debug(msg.format(model, i, sipg.dat.data[0]))
             else:
-                msg = "SETUP: variable SIPG parameter on mesh {:d}: min {:.4e} max {:.4e}"
+                msg = "SETUP: variable {:s} SIPG parameter on mesh {:d}: min {:.4e} max {:.4e}"
                 with sipg.dat.vec_ro as v:
-                    op.print_debug(msg.format(i, v.min()[1], v.max()[1]))
+                    op.print_debug(msg.format(model, i, v.min()[1], v.max()[1]))
 
         # Stabilisation
         if self.stabilisation is None:

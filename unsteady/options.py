@@ -42,6 +42,7 @@ class CoupledOptions(Options):
     tracer_family = Enum(['dg', 'cg'], default_value='dg').tag(config=True)
     lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
     sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
+    sipg_parameter_sediment = FiredrakeScalarExpression(None, allow_none=True).tag(config=True)
     norm_smoother = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)
     tracer_advective_velocity_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)
 
