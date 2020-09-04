@@ -38,7 +38,7 @@ echo "MPICXX="$MPICXX
 echo "MPIF90="$MPIF90
 echo "MPIEXEC="$MPIEXEC
 echo "PETSC_DIR="$PETSC_DIR
-if [ ! -f "$PETSC_DIR" ]; then
+if [ ! -e "$PETSC_DIR" ]; then
     echo "$PETSC_DIR does not exist. Please run install_petsc.sh."
     exit 1
 fi
