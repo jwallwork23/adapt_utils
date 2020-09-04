@@ -45,10 +45,10 @@ class AdaptiveProblemBase(object):
         self.stabilisation = op.stabilisation
         self.approach = op.approach
         self.nonlinear = nonlinear
-        self.checkpointing = kwargs.get('checkpointing', False)
-        self.print_progress = kwargs.get('print_progress', True)
-        self.manual = kwargs.get('manual', False)
-        self.on_the_fly = kwargs.get('on_the_fly', False)  # TODO
+        self.checkpointing = kwargs.pop('checkpointing', False)
+        self.print_progress = kwargs.pop('print_progress', True)
+        self.manual = kwargs.pop('manual', False)
+        self.on_the_fly = kwargs.pop('on_the_fly', False)  # TODO
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))

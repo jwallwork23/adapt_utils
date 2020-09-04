@@ -130,7 +130,6 @@ class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
             self.num_vertices = [[], ]
             self.set_meshes(load_mesh)
             self.setup_all()
-            self.create_tidal_farms()
 
             # Project stashed state
             u, eta = self.fwd_solutions[0].split()

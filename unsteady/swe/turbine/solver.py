@@ -9,37 +9,53 @@ __all__ = ["AdaptiveTurbineProblem"]
 
 class AdaptiveTurbineProblem(AdaptiveProblem):
     """General solver object for adaptive tidal turbine problems."""
+    # TODO: doc
 
     # --- Setup
 
-    def __init__(self, *args, remove_turbines=False, callback_dir=None, **kwargs):
+    def __init__(self, *args, **kwargs):
         """
-        :kwarg remove_turbines: toggle whether turbines are present in the flow or not.
-        :kwarg callback_dir: directory to save power output data to.
-        """
-        super(AdaptiveTurbineProblem, self).__init__(*args, **kwargs)
-        self.callback_dir = callback_dir
-        if not remove_turbines:
-            self.create_tidal_farms(**kwargs)
-
-    def create_tidal_farms(self, discrete_turbines=False, thrust_correction=True, smooth_indicators=True):
-        """
-        Create tidal farm objects *on each mesh*.
-
         :kwarg discrete_turbines: toggle whether to use a discrete or continuous representation
             for the turbine array.
         :kwarg thrust_correction: toggle whether to correct the turbine thrust coefficient.
         :kwarg smooth_indicators: use continuous approximations to discontinuous indicator functions.
+        :kwarg remove_turbines: toggle whether turbines are present in the flow or not.
+        :kwarg callback_dir: directory to save power output data to.
         """
+        self.discrete_turbines = kwargs.pop('discrete_turbines', False)
+        self.thrust_correction = kwargs.pop('thrust_correction', True)
+        self.smooth_indicators = kwargs.pop('smooth_indicators', True)
+        self.remove_turbines = kwargs.pop('remove_turbines', False)
+        self.callback_dir = kwargs.pop('callback_dir', None)
+        super(AdaptiveTurbineProblem, self).__init__(*args, **kwargs)
+
+    def setup_all(self):
+        super(AdaptiveTurbineProblem, self).setup_all()
+        self.create_tidal_farms()
+
+    def create_tidal_farms(self):
+        """
+        Create tidal farm objects *on each mesh*.
+
+        If :attr:`discrete_turbines` is set to `True` then turbines are interpreted via cell tags
+        which must be defined on the mesh at the start of the simulation. If set to `False` then
+        turbines are interpreted as a continuous density field. That is, the position of an
+        individual turbine corresponds to a region of high turbine density. This functionality
+        mainly exists to smoothen the fields used in a turbine array optimisation loop. It is no
+        longer needed for mesh adaptation, because Pragmatic now preserves cell tags across a mesh
+        adaptation step.
+        """
+        if self.remove_turbines:
+            return
         op = self.op
         op.print_debug("SETUP: Creating tidal turbine farms...")
         num_turbines = op.num_turbines
         self.farm_options = [TidalTurbineFarmOptions() for i in range(self.num_meshes)]
         self.turbine_densities = [None for i in range(self.num_meshes)]
         self.turbine_drag_coefficients = [None for i in range(self.num_meshes)]
-        c_T = op.get_thrust_coefficient(correction=thrust_correction)
-        if not discrete_turbines:
-            shape = op.bump if smooth_indicators else op.box
+        c_T = op.get_thrust_coefficient(correction=self.thrust_correction)
+        if not self.discrete_turbines:
+            shape = op.bump if self.smooth_indicators else op.box
         if hasattr(op, 'turbine_diameter'):
             D = op.turbine_diameter
             A_T = D**2
@@ -48,7 +64,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
             A_T = op.turbine_length, op.turbine_width
             print_output("#### TODO: Account for non-square turbines")  # TODO
         for i, mesh in enumerate(self.meshes):
-            if discrete_turbines:  # TODO: Use length and width
+            if self.discrete_turbines:  # TODO: Use length and width
                 self.turbine_densities[i] = Constant(1.0/D**2, domain=self.meshes[i])
             else:
                 area = assemble(shape(self.meshes[i])*dx)
@@ -84,5 +100,6 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         return self.qoi
 
     def quantity_of_interest_form(self, i):
+        """Power output quantity of interest expressed as a UFL form."""
         u, eta = split(self.fwd_solutions[i])
         return self.turbine_drag_coefficients[i]*pow(inner(u, u), 1.5)*dx
