@@ -542,65 +542,67 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.intermediary_depo_term[i].project(self.op.sediment_model.depo_term)
 
         def debug(a, b, name):
+            if not self.op.debug:
+                return
             if np.allclose(a, b):
                 print_output("WARNING: Is the intermediary {:s} solution just copied?".format(name))
 
-        if self.op.debug:
-            debug(self.fwd_solutions[i].dat.data[0],
-                  self.intermediary_solutions[i].dat.data[0],
-                  "velocity")
-            debug(self.fwd_solutions[i].dat.data[1],
-                  self.intermediary_solutions[i].dat.data[1],
-                  "elevation")
-            if self.op.solve_tracer:
-                debug(self.fwd_solutions_tracer[i].dat.data,
-                      self.intermediary_solutions_tracer[i].dat.data,
-                      "tracer")
-            if self.op.solve_sediment:
-                debug(self.fwd_solutions_sediment[i].dat.data,
-                      self.intermediary_solutions_sediment[i].dat.data,
-                      "sediment")
-            if self.op.solve_exner:
-                debug(self.fwd_solutions_bathymetry[i].dat.data,
-                      self.intermediary_solutions_bathymetry[i].dat.data,
-                      "bathymetry")
-            if hasattr(self.op, 'sediment_model'):
-                debug(self.op.sediment_model.old_bathymetry_2d.dat.data,
-                      self.intermediary_solutions_old_bathymetry[i].dat.data,
-                      "old_bathymetry")
-                debug(self.op.sediment_model.uv_cg.dat.data,
-                      self.intermediary_solutions_uv_cg[i].dat.data,
-                      "uv_cg")
-                debug(self.op.sediment_model.TOB.dat.data,
-                      self.intermediary_solutions_TOB[i].dat.data,
-                      "TOB")
-                debug(self.op.sediment_model.depth.dat.data,
-                      self.intermediary_solutions_depth[i].dat.data,
-                      "depth")
-                if self.op.suspended:
-                    if self.op.convective_vel_flag:
-                        debug(self.op.sediment_model.corr_factor_model.corr_vel_factor.dat.data,
-                              self.intermediary_corr_vel_factor[i].dat.data,
-                              "corr_vel_factor")
-                    debug(self.op.sediment_model.coeff.dat.data,
-                          self.intermediary_coeff[i].dat.data,
-                          "coeff")
-                    debug(self.op.sediment_model.ceq.dat.data,
-                          self.intermediary_ceq[i].dat.data,
-                          "ceq")
-                    debug(self.op.sediment_model.equiltracer.dat.data,
-                          self.intermediary_equiltracer[i].dat.data,
-                          "equiltracer")
-                    debug(self.op.sediment_model.ero.dat.data,
-                          self.intermediary_ero[i].dat.data,
-                          "ero")
-                    debug(self.op.sediment_model.ero_term.dat.data,
-                          self.intermediary_ero_term[i].dat.data,
-                          "ero_term")
-                    debug(self.op.sediment_model.depo_term.dat.data,
-                          self.intermediary_depo_term[i].dat.data,
-                          "depo_term")
+        debug(self.fwd_solutions[i].dat.data[0],
+              self.intermediary_solutions[i].dat.data[0],
+              "velocity")
+        debug(self.fwd_solutions[i].dat.data[1],
+              self.intermediary_solutions[i].dat.data[1],
+              "elevation")
+        if self.op.solve_tracer:
+            debug(self.fwd_solutions_tracer[i].dat.data,
+                  self.intermediary_solutions_tracer[i].dat.data,
+                  "tracer")
+        if self.op.solve_sediment:
+            debug(self.fwd_solutions_sediment[i].dat.data,
+                  self.intermediary_solutions_sediment[i].dat.data,
+                  "sediment")
+        if self.op.solve_exner:
+            debug(self.fwd_solutions_bathymetry[i].dat.data,
+                  self.intermediary_solutions_bathymetry[i].dat.data,
+                  "bathymetry")
+        if hasattr(self.op, 'sediment_model'):
+            debug(self.op.sediment_model.old_bathymetry_2d.dat.data,
+                  self.intermediary_solutions_old_bathymetry[i].dat.data,
+                  "old_bathymetry")
+            debug(self.op.sediment_model.uv_cg.dat.data,
+                  self.intermediary_solutions_uv_cg[i].dat.data,
+                  "uv_cg")
+            debug(self.op.sediment_model.TOB.dat.data,
+                  self.intermediary_solutions_TOB[i].dat.data,
+                  "TOB")
+            debug(self.op.sediment_model.depth.dat.data,
+                  self.intermediary_solutions_depth[i].dat.data,
+                  "depth")
+            if self.op.suspended:
+                if self.op.convective_vel_flag:
+                    debug(self.op.sediment_model.corr_factor_model.corr_vel_factor.dat.data,
+                          self.intermediary_corr_vel_factor[i].dat.data,
+                          "corr_vel_factor")
+                debug(self.op.sediment_model.coeff.dat.data,
+                      self.intermediary_coeff[i].dat.data,
+                      "coeff")
+                debug(self.op.sediment_model.ceq.dat.data,
+                      self.intermediary_ceq[i].dat.data,
+                      "ceq")
+                debug(self.op.sediment_model.equiltracer.dat.data,
+                      self.intermediary_equiltracer[i].dat.data,
+                      "equiltracer")
+                debug(self.op.sediment_model.ero.dat.data,
+                      self.intermediary_ero[i].dat.data,
+                      "ero")
+                debug(self.op.sediment_model.ero_term.dat.data,
+                      self.intermediary_ero_term[i].dat.data,
+                      "ero_term")
+                debug(self.op.sediment_model.depo_term.dat.data,
+                      self.intermediary_depo_term[i].dat.data,
+                      "depo_term")
 
+    # TODO: Use par_loop
     def copy_data_from_intermediary_mesh(self, i):
         super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
         if self.op.solve_tracer:
