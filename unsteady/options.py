@@ -38,12 +38,8 @@ class CoupledOptions(Options):
         Non-negative value providing the default constant drag parameter.
         """).tag(config=True)
 
-    # Common model
-    implicitness_theta = NonNegativeFloat(0.5).tag(config=True)  # TODO: help
-
     # Shallow water model
     solve_swe = Bool(True, help="Toggle solving the shallow water model.").tag(config=True)
-    family = Enum(['dg-dg', 'rt-dg', 'dg-cg', 'cg-cg'], default_value='dg-dg').tag(config=True)  # TODO: help
     grad_div_viscosity = Bool(False).tag(config=True)  # TODO: help
     grad_depth_viscosity = Bool(False).tag(config=True)  # TODO: help
     wetting_and_drying = Bool(False).tag(config=True)  # TODO: help
@@ -64,8 +60,20 @@ class CoupledOptions(Options):
         Toggle whether to solve the conservative or non-conservative form of the tracer transport
         mode.
         """).tag(config=True)
-    tracer_family = Enum(['dg', 'cg'], default_value='dg', help="""
-        Finite element space to use for the tracer model. Choose from {'cg', 'dg'}.
+    tracer_family = Enum(
+        ['dg', 'cg'],
+        default_value='dg',
+        help="""
+        Finite element pair to use for the tracer transport model. Choose from:
+          'cg': Continuous Galerkin    (Pp);
+          'dg': Discontinuous Galerkin (PpDG),
+        where p is the polynomial order specified by :attr:`degree_tracer`.""").tag(config=True)
+    degree_tracer = NonNegativeInteger(1, help="""
+        Polynomial order for tracer finite element pair :attr:`tracer_family'.
+        """).tag(config=True)
+    degree_increase_tracer = NonNegativeInteger(1, help="""
+        When defining an enriched tracer finite element space, how much should the
+        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)
     lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
     sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True, help="""
@@ -77,6 +85,18 @@ class CoupledOptions(Options):
 
     # Sediment model
     solve_sediment = Bool(False, help="Toggle solving the sediment model.").tag(config=True)
+    sediment_family = Unicode('dg', help="""
+        Finite element pair to use for the sediment transport model. Choose from:
+          'cg': Continuous Galerkin    (Pp);
+          'dg': Discontinuous Galerkin (PpDG),
+        where p is the polynomial order specified by :attr:`degree_sediment`.""").tag(config=True)
+    degree_sediment = NonNegativeInteger(1, help="""
+        Polynomial order for sediment finite element pair :attr:`sediment_family'.
+        """).tag(config=True)
+    degree_increase_sediment = NonNegativeInteger(1, help="""
+        When defining an enriched sediment finite element space, how much should the
+        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+        """).tag(config=True)
     sipg_parameter_sediment = FiredrakeScalarExpression(None, allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the sediment model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
@@ -87,6 +107,9 @@ class CoupledOptions(Options):
     solve_exner = Bool(False, help="Toggle solving the Exner model.").tag(config=True)
     bathymetry_family = Enum(['dg', 'cg'], default_value='cg', help="""
         Finite element space to use for the Exner model. Choose from {'cg', 'dg'}.
+        """).tag(config=True)
+    degree_bathymetry = NonNegativeInteger(1, help="""
+        Polynomial order for tracer finite element pair :attr:`tracer_family'.
         """).tag(config=True)
     morphological_acceleration_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
     porosity = FiredrakeScalarExpression(Constant(0.4)).tag(config=True)  # TODO: help
