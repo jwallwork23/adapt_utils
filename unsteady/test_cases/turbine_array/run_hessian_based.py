@@ -17,7 +17,7 @@ from adapt_utils.plotting import *  # NOQA
 parser = argparse.ArgumentParser()
 
 # Mesh adaptation
-parser.add_argument("-num_meshes", help="Number of meshes to consider (default 9)")
+parser.add_argument("-num_meshes", help="Number of meshes to consider (default 10)")
 parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
 parser.add_argument("-normalisation", help="Normalisation method (default 'complexity')")
 parser.add_argument("-adapt_field", help="Field to construct metric w.r.t (default 'all_int')")
@@ -64,7 +64,7 @@ kwargs = {
     'approach': approach,
 
     # Mesh adaptation
-    'num_meshes': int(args.num_meshes or 9),
+    'num_meshes': int(args.num_meshes or 10),
     'adapt_field': args.adapt_field or 'speed',
     'hessian_time_combination': args.time_combine or 'intersect',  # FIXME: integrate gives recursion error
     'hessian_timestep_lag': float(args.hessian_lag or 1),
@@ -127,7 +127,7 @@ class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
 if not plot_only:
 
     # Instantiate a solver class with restarts
-    swp = AdaptiveTurbineProblem_with_restarts(op, meshes='plex', callback_dir=data_dir)
+    swp = AdaptiveTurbineProblem_with_restarts(op, meshes=load_mesh, callback_dir=data_dir)
 
     # Solve forward problem
     cpu_timestamp = perf_counter()
