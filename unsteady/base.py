@@ -755,7 +755,7 @@ class AdaptiveProblemBase(object):
                     def update_forcings_wrapper(t):
                         """Time-integrate Hessian using Trapezium Rule."""
                         update_forcings(t)
-                        iteration = int(self.simulation_time/op.dt)
+                        iteration = int(np.round(self.simulation_time/op.dt))
                         if iteration % op.hessian_timestep_lag != 0:
                             iteration += 1
                             return
