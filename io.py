@@ -25,7 +25,7 @@ def get_filename(fname, index_str):
 
 # --- Input
 
-def load_mesh(fname, fpath):
+def load_mesh(fname, fpath, delete=False):
     """
     :arg fname: file name (without '.h5' extension).
     :arg fpath: directory where the file is stored.
@@ -35,10 +35,15 @@ def load_mesh(fname, fpath):
         raise IOError("Loading a mesh from HDF5 only works in serial.")
     newplex = PETSc.DMPlex().create()
     newplex.createFromFile(os.path.join(fpath, fname + '.h5'))
+
+    # Optionally delete the HDF5 file
+    if delete:
+        os.remove(os.path.join(fpath, fname) + '.h5')
+
     return Mesh(newplex)
 
 
-def initialise_field(fs, name, fname, fpath, outputdir=None, op=CoupledOptions(), index_str=None):
+def initialise_field(fs, name, fname, fpath, outputdir=None, op=CoupledOptions(), index_str=None, delete=False):
     """
     Initialise bathymetry field with results from a previous simulation.
 
@@ -48,12 +53,17 @@ def initialise_field(fs, name, fname, fpath, outputdir=None, op=CoupledOptions()
     :arg fpath: directory to read the data from.
     :kwarg op: :class:`Options` parameter object.
     :kwarg index_str: optional five digit string.
+    :kwarg delete: toggle deletion of the file.
     """
     fname = get_filename(fname, index_str)
     with timed_stage('initialising {:s}'.format(name)):
         f = Function(fs, name=name)
         with DumbCheckpoint(os.path.join(fpath, fname), mode=FILE_READ) as chk:
             chk.load(f)
+
+    # Optionally delete the HDF5 file
+    if delete:
+        os.remove(os.path.join(fpath, fname) + '.h5')
 
     # Plot to PVD
     if outputdir is not None and op.plot_pvd:
@@ -67,18 +77,21 @@ def initialise_bathymetry(mesh, fpath, op=CoupledOptions(), **kwargs):
 
     :arg mesh: field will be defined in finite element space on this mesh.
     :arg fpath: directory to read the data from.
+    :kwarg op: :class:`Options` parameter object.
     """
     # TODO: Would be nice to have consistency: here mesh is an arg but below it is read from file
     fs = FunctionSpace(mesh, op.bathymetry_family.upper(), 1)
     return initialise_field(fs, 'bathymetry', 'bathymetry', fpath, **kwargs)
 
 
-def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), **kwargs):
+def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), delete=False, **kwargs):
     """
     Initialise velocity and elevation with results from a previous simulation.
 
     :arg inputdir: directory to read the data from.
     :kwarg inputdir: directory to optionally plot the data in .pvd format.
+    :kwarg op: :class:`Options` parameter object.
+    :kwarg delete: toggle deletion of the file.
     :kwarg plexname: file name used for the DMPlex data file.
     :kwarg variant: relates to distribution of quadrature nodes in an element.
     """
@@ -99,7 +112,7 @@ def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), **kw
 
     # Load mesh
     with timed_stage('mesh'):
-        mesh = op.default_mesh if plexname is None else load_mesh(plexname, inputdir)
+        mesh = op.default_mesh if plexname is None else load_mesh(plexname, inputdir, delete=delete)
 
     # Load velocity
     name = "velocity"
@@ -110,6 +123,10 @@ def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), **kw
             uv_init = Function(U, name=name)
             chk.load(uv_init)
 
+    # Optionally delete the velocity HDF5 file
+    if delete:
+        os.remove(os.path.join(inputdir, fname) + '.h5')
+
     # Load elevation
     name = "elevation"
     fname = get_filename(name, index_str)
@@ -118,6 +135,10 @@ def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), **kw
         with DumbCheckpoint(os.path.join(inputdir, fname), mode=FILE_READ) as chk:
             elev_init = Function(H, name=name)
             chk.load(elev_init)
+
+    # Optionally delete the elevation HDF5 file
+    if delete:
+        os.remove(os.path.join(inputdir, fname) + '.h5')
 
     # Plot to .pvd
     if outputdir is not None and op.plot_pvd:
