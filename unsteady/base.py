@@ -672,7 +672,7 @@ class AdaptiveProblemBase(object):
 
     # --- Metric based
 
-    def get_hessian_recoverer(self, i, **kwargs):
+    def get_recovery(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
 
     # TODO: Create and free objects as needed
@@ -742,11 +742,11 @@ class AdaptiveProblemBase(object):
                         'normalise': False,
                         'noscale': True,
                     }
-                    recoverer = self.get_hessian_recoverer(i, **kwargs)
+                    recoverer = self.get_recovery(i, **kwargs)
 
                     def hessian(sol, adapt_field):
                         fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
-                        return recoverer.get_hessian_metric(sol, **fields, **kwargs)
+                        return recoverer.get_metric(sol, **fields, **kwargs)
 
                     # Array to hold time-integrated Hessian UFL expression
                     H_window = [0 for f in adapt_fields]

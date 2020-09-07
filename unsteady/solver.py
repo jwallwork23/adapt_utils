@@ -1494,18 +1494,22 @@ class AdaptiveProblem(AdaptiveProblemBase):
             fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
             self.metrics.append(get_hessian_metric(sol, fields=fields, **kwargs))
 
-    # --- Run scripts
-
-    def get_hessian_recoverer(self, i, **kwargs):
+    def get_recovery(self, i, **kwargs):
         op = self.op
-        if op.solve_swe and not (op.solve_tracer or op.solve_sediment or op.solve_exner):
+        if (not op.solve_swe) or op.solve_tracer or op.solve_sediment or op.solve_exner:
+            raise NotImplementedError  # TODO: allow Hessians of tracer fields, etc.
+        if op.adapt_field == 'vorticity':
+            recoverer = L2ProjectorVorticity(self.V[i], op=op)
+        elif 'vorticity' in op.adapt_field:
+            raise NotImplementedError  # TODO: allow combination of Hessian metrics and vorticity
+        else:
             recoverer = ShallowWaterHessianRecoverer(
                 self.V[i], op=op,
                 constant_fields={'bathymetry': self.bathymetry[i]}, **kwargs,
             )
-        else:
-            raise NotImplementedError  # TODO
         return recoverer
+
+    # --- Run scripts
 
     # TODO: Modify indicator for time interval
     def run_dwp(self, **kwargs):

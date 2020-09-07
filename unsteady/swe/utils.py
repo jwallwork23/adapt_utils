@@ -4,20 +4,23 @@ from firedrake import *
 import thetis.utility as thetis_utils
 
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.recovery import DoubleL2ProjectorHessian
+from adapt_utils.adapt.recovery import DoubleL2ProjectorHessian, L2Projector
 from ..options import CoupledOptions
 from adapt_utils.misc import get_component, get_component_space
 
 
 __all__ = ["get_hessian_metric", "ShallowWaterHessianRecoverer",
-           "vorticity", "speed", "heaviside_approx", "DepthExpression"]
+           "recover_vorticity", "L2ProjectorVorticity",
+           "speed", "heaviside_approx", "DepthExpression"]
 
+
+# --- Hessian
 
 def get_hessian_metric(sol, adapt_field, **kwargs):
     """Recover `adapt_field` Hessian from shallow water solution tuple `sol`."""
     op = kwargs.get('op')
     rec = ShallowWaterHessianRecoverer(sol.function_space(), op=op)
-    return rec.get_hessian_metric(sol, adapt_field, **kwargs)
+    return rec.get_metric(sol, adapt_field, **kwargs)
 
 
 class ShallowWaterHessianRecoverer():
@@ -49,7 +52,7 @@ class ShallowWaterHessianRecoverer():
         # Compute Hessian for constant fields
         self.constant_hessians = {f: steady_metric(constant_fields[f], **kwargs) for f in constant_fields}
 
-    def get_hessian_metric(self, sol, adapt_field=None, fields={}, **kwargs):
+    def get_metric(self, sol, adapt_field=None, fields={}, **kwargs):
         """
         Recover the Hessian of the scalar `adapt_field` related to solution tuple `sol`.
 
@@ -57,8 +60,7 @@ class ShallowWaterHessianRecoverer():
           * 'elevation'  - the free surface elevation;
           * 'velocity_x' - the x-component of velocity;
           * 'velocity_y' - the y-component of velocity;
-          * 'speed'      - the magnitude of velocity;
-          * 'vorticity'  - the fluid vorticity, interpreted as a scalar field.
+          * 'speed'      - the magnitude of velocity.
 
         Currently supported adaptation fields which are constant in time:
           * 'bathymetry' - the fluid depth at rest.
@@ -70,7 +72,7 @@ class ShallowWaterHessianRecoverer():
         kwargs['op'] = op
         adapt_field = adapt_field or op.adapt_field
         u, eta = sol.split()
-        uv_space_fields = {'speed': speed, 'vorticity': vorticity}
+        uv_space_fields = {'speed': speed}
 
         # --- Recover Hessian and construct metric(s)
 
@@ -102,12 +104,61 @@ class ShallowWaterHessianRecoverer():
         return steady_metric(f, projector=proj, **kwargs)
 
 
-def vorticity(sol):
-    """Fluid vorticity, interpreted as a scalar field."""
-    assert sol.function_space().mesh().topological_dimension() == 2
-    uv, elev = sol.split()
-    return curl(uv)
+# --- Vorticity
 
+def recover_vorticity(u, **kwargs):
+    r"""
+    Assuming the velocity field `u` is P1 (piecewise linear and continuous), direct computation of
+    the curl will give a vorticity field which is P0 (piecewise constant and discontinuous). Since
+    we would prefer a smooth gradient, we solve an auxiliary finite element problem in P1 space.
+    This "L2 projection" gradient recovery technique makes use of the Cl\'ement interpolation
+    operator. That `f` is P1 is not actually a requirement.
+
+    :arg u: (vector) P1 velocity field.
+    :kwarg bcs: boundary conditions for L2 projection.
+    :param op: `Options` class object providing min/max cell size values.
+    :return: reconstructed vorticity associated with `u`.
+    """
+    return L2ProjectorVorticity(u.function_space(), **kwargs).project(u)
+
+
+class L2ProjectorVorticity(L2Projector):
+    def __init__(self, *args, **kwargs):
+        super(L2ProjectorVorticity, self).__init__(*args, **kwargs)
+        self.op = kwargs.get('op')
+        self.kwargs['solver_parameters'] = {'ksp_type': 'cg'}
+
+    def setup(self):
+        fs = self.field.function_space()
+        assert self.mesh.topological_dimension() == 2
+        P1 = FunctionSpace(self.mesh, "CG", 1)
+        n = FacetNormal(self.mesh)
+        zeta, φ = TrialFunction(P1), TestFunction(P1)
+        if hasattr(fs, 'shape'):
+            assert fs.shape == (2, ), "Expected fs.shape == (2, ), got {:}.".format(fs.shape)
+            uv = self.field
+        elif hasattr(fs, 'num_sub_spaces'):
+            num_sub_spaces = fs.num_sub_spaces()
+            assert num_sub_spaces == 2, "Expected 2 subspaces, got {:d}.".format(num_sub_spaces)
+            uv, elev = self.field.split()
+        else:
+            raise ValueError("Expected a mixed solution tuple or the velocity component thereof.")
+
+        a = φ*zeta*dx
+        L = (-Dx(φ, 1)*uv[0] + Dx(φ, 0)*uv[1])*dx + (φ*uv[0]*n[1] - φ*uv[1]*n[0])*ds
+        self.l2_projection = Function(P1, name="Recovered vorticity")
+        prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)
+        self.projector = LinearVariationalSolver(prob, **self.kwargs)
+
+    def get_metric(self, sol, **kwargs):
+        kwargs['op'] = self.op
+        assert kwargs.pop('adapt_field') == 'vorticity'
+        kwargs.pop('fields')
+        self.project(sol)
+        return isotropic_metric(self.l2_projection, **kwargs)
+
+
+# --- Misc
 
 def speed(sol):
     """Fluid velocity magnitude, i.e. fluid speed."""

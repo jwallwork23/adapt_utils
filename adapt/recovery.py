@@ -67,7 +67,7 @@ def construct_boundary_hessian(f, **kwargs):
 
 class L2Projector():
 
-    def __init__(self, function_space, bcs=None, op=Options()):
+    def __init__(self, function_space, bcs=None, op=Options(), **kwargs):
         self.field = Function(function_space)
         self.mesh = function_space.mesh()
         self.n = FacetNormal(self.mesh)
