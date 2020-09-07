@@ -115,7 +115,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating bathymetry...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data):
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             bathymetry.dat.data[i] -= self.bathymetry_interpolator(lat, lon)
 
@@ -157,7 +157,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating initial surface...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data):
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             initial_surface.dat.data[i] = self.surface_interpolator(lat, lon)
 
