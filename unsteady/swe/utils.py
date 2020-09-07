@@ -10,7 +10,7 @@ from adapt_utils.misc import get_component, get_component_space
 
 
 __all__ = ["recover_hessian_metric", "ShallowWaterHessianRecoverer",
-           "recover_vorticity_metric", "L2ProjectorVorticity",
+           "recover_vorticity", "recover_vorticity_metric", "L2ProjectorVorticity",
            "speed", "heaviside_approx", "DepthExpression"]
 
 
@@ -111,6 +111,10 @@ class ShallowWaterHessianRecoverer():
 
 # --- Vorticity
 
+def recover_vorticity(u, **kwargs):
+    return L2ProjectorVorticity(u.function_space(), **kwargs).project(u)
+
+
 def recover_vorticity_metric(u, **kwargs):
     r"""
     Assuming the velocity field `u` is P1 (piecewise linear and continuous), direct computation of
@@ -124,7 +128,7 @@ def recover_vorticity_metric(u, **kwargs):
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed vorticity associated with `u`.
     """
-    return L2ProjectorVorticity(u.function_space(), **kwargs).project(u)
+    return isotropic_metric(recover_vorticity(u), **kwargs)
 
 
 class L2ProjectorVorticity(L2Projector):
@@ -150,7 +154,7 @@ class L2ProjectorVorticity(L2Projector):
             raise ValueError("Expected a mixed solution tuple or the velocity component thereof.")
 
         a = φ*zeta*dx
-        L = (-Dx(φ, 1)*uv[0] + Dx(φ, 0)*uv[1])*dx + (φ*uv[0]*n[1] - φ*uv[1]*n[0])*ds
+        L = (Dx(φ, 1)*uv[0] - Dx(φ, 0)*uv[1])*dx + (φ*uv[1]*n[0] - φ*uv[0]*n[1])*ds
         self.l2_projection = Function(P1, name="Recovered vorticity")
         prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)
         self.projector = LinearVariationalSolver(prob, **self.kwargs)

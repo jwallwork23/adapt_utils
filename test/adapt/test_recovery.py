@@ -4,6 +4,7 @@ import pytest
 import numpy as np
 
 from adapt_utils.adapt.recovery import *
+from adapt_utils.unsteady.swe.utils import recover_vorticity
 
 
 def get_mesh(dim, n):
@@ -34,3 +35,26 @@ def test_gradient(dim):
     dfdx[0] = 1
     exact = [dfdx for i in g.dat.data]
     assert np.allclose(g.dat.data, exact)
+
+
+def test_vorticity():
+    r"""
+    Given a velocity field :math:`\mathbf u = (u,v)`, the curl is defined by
+
+  ..math::
+        \mathrm{curl}(\mathbf u) := \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y}.
+
+    For a simple velocity field :math:`\mathbf u = 0.5* (-y, x)` the vorticity should be unity
+    everywhere.
+    """
+    mesh = get_mesh(2, 3)
+    x, y = SpatialCoordinate(mesh)
+    P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+    u, v = -0.5*y, 0.5*x
+    uv = interpolate(as_vector([u, v]), P1_vec)
+    zeta = recover_vorticity(uv)
+
+    dudy, dvdx = -0.5, 0.5
+    curl_uv = dvdx - dudy
+    exact = [curl_uv for i in zeta.dat.data]
+    assert np.allclose(zeta.dat.data, exact)
