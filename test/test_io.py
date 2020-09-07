@@ -80,7 +80,6 @@ def test_bathymetry_io(family):
     b = interpolate(x+1, P1)
 
     # Save it to file
-    fname = 'bathymetry'
     plexname = 'myplex'
     index_str = '00000'
     fpath = create_directory('tmp')

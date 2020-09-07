@@ -25,6 +25,7 @@ def get_mesh(dim, n):
 def dim(request):
     return request.param
 
+
 # @pytest.fixture(params=['parts', 'dL2'])  # FIXME
 @pytest.fixture(params=['dL2'])
 def hessian_recovery(request):
