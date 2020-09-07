@@ -3,13 +3,13 @@ from firedrake import *
 from adapt_utils.options import Options
 
 
-__all__ = ["construct_gradient", "construct_hessian", "construct_boundary_hessian",
+__all__ = ["recover_gradient", "recover_hessian", "recover_boundary_hessian",
            "L2ProjectorGradient", "DoubleL2ProjectorHessian"]
 
 
 # --- Use the following drivers if only doing a single L2 projection on the current mesh
 
-def construct_gradient(f, **kwargs):
+def recover_gradient(f, **kwargs):
     r"""
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
@@ -25,7 +25,7 @@ def construct_gradient(f, **kwargs):
     return L2ProjectorGradient(f.function_space(), **kwargs).project(f)
 
 
-def construct_hessian(f, **kwargs):
+def recover_hessian(f, **kwargs):
     r"""
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all
     second derivative information has been lost. As such, the Hessian of `f` cannot be directly
@@ -48,7 +48,7 @@ def construct_hessian(f, **kwargs):
     return DoubleL2ProjectorHessian(f.function_space(), boundary=False, **kwargs).project(f)
 
 
-def construct_boundary_hessian(f, **kwargs):
+def recover_boundary_hessian(f, **kwargs):
     """
     Recover the Hessian of `f` on the domain boundary. That is, the Hessian in the direction
     tangential to the boundary. In two dimensions this gives a scalar field, whereas in three
@@ -63,7 +63,6 @@ def construct_boundary_hessian(f, **kwargs):
 
 
 # --- Use the following drivers if doing multiple L2 projections on the current mesh
-
 
 class L2Projector():
 

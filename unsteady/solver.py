@@ -1485,14 +1485,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
     # --- Metric
 
     # TODO: Allow Hessian metric for tracer / sediment / Exner
-    def get_hessian_metric(self, adjoint=False, **kwargs):
+    def recover_hessian_metric(self, adjoint=False, **kwargs):
         kwargs.setdefault('normalise', True)
         kwargs['op'] = self.op
         self.metrics = []
         solutions = self.adj_solutions if adjoint else self.fwd_solutions
         for i, sol in enumerate(solutions):
             fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
-            self.metrics.append(get_hessian_metric(sol, fields=fields, **kwargs))
+            self.metrics.append(recover_hessian_metric(sol, fields=fields, **kwargs))
 
     def get_recovery(self, i, **kwargs):
         op = self.op

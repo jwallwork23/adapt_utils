@@ -75,8 +75,8 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = ka
 
     # eta = swp.solution.split()[1]
     b = swp.fwd_solutions_bathymetry[0]
-    bath_gradient = recovery.construct_gradient(b)
-    bath_hess = recovery.construct_hessian(b, op=op)
+    bath_gradient = recovery.recover_gradient(b)
+    bath_hess = recovery.recover_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 
     if max(abs(frob_bath_hess.dat.data[:]))<1e-10:

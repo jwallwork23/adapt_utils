@@ -44,7 +44,7 @@ def test_mesh_movement(sensor, monitor_type, method, plot_mesh=False):
     def frobenius(mesh):
         alpha = 0.01
         P1 = FunctionSpace(mesh, "CG", 1)
-        H = construct_hessian(interpolate(sensor(mesh), P1), op=op)
+        H = recover_hessian(interpolate(sensor(mesh), P1), op=op)
         return 1.0 + alpha*local_frobenius_norm(H, space=P1)
 
     if monitor_type == 'shift_and_scale':

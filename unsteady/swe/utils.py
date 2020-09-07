@@ -9,18 +9,23 @@ from ..options import CoupledOptions
 from adapt_utils.misc import get_component, get_component_space
 
 
-__all__ = ["get_hessian_metric", "ShallowWaterHessianRecoverer",
-           "recover_vorticity", "L2ProjectorVorticity",
+__all__ = ["recover_hessian_metric", "ShallowWaterHessianRecoverer",
+           "recover_vorticity_metric", "L2ProjectorVorticity",
            "speed", "heaviside_approx", "DepthExpression"]
 
 
 # --- Hessian
 
-def get_hessian_metric(sol, adapt_field, **kwargs):
-    """Recover `adapt_field` Hessian from shallow water solution tuple `sol`."""
+def recover_hessian_metric(sol, adapt_field, **kwargs):
+    """
+    Recover the Hessian of some scalar field Hessian from the shallow water solution tuple.
+
+    :arg adapt_field: string defining the field to be recovered.
+    :kwarg op: :class:`Options` parameter object.
+    """
     op = kwargs.get('op')
     rec = ShallowWaterHessianRecoverer(sol.function_space(), op=op)
-    return rec.get_metric(sol, adapt_field, **kwargs)
+    return rec.construct_metric(sol, adapt_field, **kwargs)
 
 
 class ShallowWaterHessianRecoverer():
@@ -52,7 +57,7 @@ class ShallowWaterHessianRecoverer():
         # Compute Hessian for constant fields
         self.constant_hessians = {f: steady_metric(constant_fields[f], **kwargs) for f in constant_fields}
 
-    def get_metric(self, sol, adapt_field=None, fields={}, **kwargs):
+    def construct_metric(self, sol, adapt_field=None, fields={}, **kwargs):
         """
         Recover the Hessian of the scalar `adapt_field` related to solution tuple `sol`.
 
@@ -106,7 +111,7 @@ class ShallowWaterHessianRecoverer():
 
 # --- Vorticity
 
-def recover_vorticity(u, **kwargs):
+def recover_vorticity_metric(u, **kwargs):
     r"""
     Assuming the velocity field `u` is P1 (piecewise linear and continuous), direct computation of
     the curl will give a vorticity field which is P0 (piecewise constant and discontinuous). Since
@@ -150,7 +155,7 @@ class L2ProjectorVorticity(L2Projector):
         prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)
         self.projector = LinearVariationalSolver(prob, **self.kwargs)
 
-    def get_metric(self, sol, **kwargs):
+    def construct_metric(self, sol, **kwargs):
         kwargs['op'] = self.op
         assert kwargs.pop('adapt_field') == 'vorticity'
         kwargs.pop('fields')
@@ -172,6 +177,8 @@ def heaviside_approx(H, alpha):
 
 
 class DepthExpression(thetis_utils.DepthExpression):
-    """Depth expression from Thetis modified to include an approximation to the Heaviside function."""
+    """
+    Depth expression from Thetis modified to include an approximation to the Heaviside function.
+    """
     def heaviside_approx(self, eta):
         return heaviside_approx(self.get_total_depth(eta), self.wetting_and_drying_alpha)

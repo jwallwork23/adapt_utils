@@ -746,7 +746,7 @@ class AdaptiveProblemBase(object):
 
                     def hessian(sol, adapt_field):
                         fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
-                        return recoverer.get_metric(sol, **fields, **kwargs)
+                        return recoverer.construct_metric(sol, **fields, **kwargs)
 
                     # Array to hold time-integrated Hessian UFL expression
                     H_window = [0 for f in adapt_fields]
