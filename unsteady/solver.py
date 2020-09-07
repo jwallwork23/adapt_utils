@@ -373,7 +373,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Set parameter and print to screen
             self.shallow_water_options[i].sipg_parameter = sipg
-            if isinstance(sipg, Constant):
+            if sipg is None:
+                pass
+            elif isinstance(sipg, Constant):
                 msg = "SETUP: constant shallow water SIPG parameter on mesh {:d}: {:.4e}"
                 op.print_debug(msg.format(i, sipg.dat.data[0]))
             else:
@@ -416,7 +418,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Set parameter and print to screen
             eq_options[i].sipg_parameter = sipg
             model = 'sediment' if sediment else 'tracer'
-            if isinstance(sipg, Constant):
+            if sipg is None:
+                pass
+            elif isinstance(sipg, Constant):
                 msg = "SETUP: constant {:s} SIPG parameter on mesh {:d}: {:.4e}"
                 op.print_debug(msg.format(model, i, sipg.dat.data[0]))
             else:
