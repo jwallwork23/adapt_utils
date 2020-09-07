@@ -1,6 +1,7 @@
 from thetis import *
 from firedrake_adjoint import *
 from firedrake.adjoint.blocks import GenericSolveBlock
+import pyadjoint
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
@@ -25,7 +26,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
     def solve_adjoint(self, scaling=1.0):
         """Solve the discrete adjoint problem for some quantity of interest."""
         J = self.quantity_of_interest()
-        return solve_adjoint(J, adj_value=scaling)
+        return pyadjoint.solve_adjoint(J, adj_value=scaling)
 
     def compute_gradient(self, controls, scaling=1.0):
         """Compute the gradient of the quantity of interest with respect to a list of controls."""
