@@ -82,15 +82,16 @@ def test_bathymetry_io(family):
     # Save it to file
     fname = 'bathymetry'
     plexname = 'myplex'
+    index_str = '00000'
     fpath = create_directory('tmp')
-    export_bathymetry(b, fpath, plexname=plexname, op=op)
+    export_bathymetry(b, fpath, plexname=plexname, op=op, index_str=index_str)
 
     # Read from the file and check consistency
-    b_new = initialise_bathymetry(mesh, fpath, outputdir=fpath, op=op)  # TODO: Make consistent by reading from file
+    b_new = initialise_bathymetry(mesh, fpath, outputdir=fpath, op=op, index_str=index_str)  # TODO: Make consistent by reading from file
     assert np.allclose(b.dat.data, b_new.dat.data)
 
     # Clean up
-    os.remove(os.path.join(fpath, fname + '.h5'))
+    os.remove(os.path.join(fpath, fname + '_' + index_str + '.h5'))
     os.remove(os.path.join(fpath, plexname + '.h5'))
     os.remove(os.path.join(fpath, 'bathymetry_out.pvd'))
     os.remove(os.path.join(fpath, 'bathymetry_out_0.vtu'))
@@ -118,17 +119,18 @@ def test_hydro_io(pair):
     # Save them to file
     fnames = ('velocity', 'elevation')
     plexname = 'myplex'
+    index_str = '00000'
     fpath = create_directory('tmp')
-    export_hydrodynamics(uv, elev, fpath, plexname=plexname, op=op)
+    export_hydrodynamics(uv, elev, fpath, plexname=plexname, op=op, index_str=index_str)
 
     # Read from the file and check consistency
-    uv_new, elev_new = initialise_hydrodynamics(fpath, outputdir=fpath, op=op)
+    uv_new, elev_new = initialise_hydrodynamics(fpath, outputdir=fpath, op=op, index_str=index_str)
     assert np.allclose(uv.dat.data, uv_new.dat.data)
     assert np.allclose(elev.dat.data, elev_new.dat.data)
 
     # Clean up
     for fname in fnames:
-        os.remove(os.path.join(fpath, fname + '.h5'))
+        os.remove(os.path.join(fpath, fname + '_' + index_str + '.h5'))
         for extension in ('.pvd', '_0.vtu'):
             os.remove(os.path.join(fpath, '{:s}_out{:s}'.format(fname, extension)))
             os.remove(os.path.join(fpath, '{:s}_imported{:s}'.format(fname, extension)))
