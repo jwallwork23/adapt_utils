@@ -22,6 +22,7 @@ def recover_gradient(f, **kwargs):
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
     """
+    kwargs.setdefault('op', Options())
     return L2ProjectorGradient(f.function_space(), **kwargs).project(f)
 
 
@@ -45,6 +46,7 @@ def recover_hessian(f, **kwargs):
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed Hessian associated with `f`.
     """
+    kwargs.setdefault('op', Options())
     return DoubleL2ProjectorHessian(f.function_space(), boundary=False, **kwargs).project(f)
 
 
@@ -59,6 +61,7 @@ def recover_boundary_hessian(f, **kwargs):
     :param op: `Options` class object providing max cell size value.
     :return: reconstructed boundary Hessian associated with `f`.
     """
+    kwargs.setdefault('op', Options())
     return DoubleL2ProjectorHessian(f.function_space(), boundary=True, **kwargs).project(f)
 
 

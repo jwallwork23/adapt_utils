@@ -23,7 +23,7 @@ def recover_hessian_metric(sol, adapt_field, **kwargs):
     :arg adapt_field: string defining the field to be recovered.
     :kwarg op: :class:`Options` parameter object.
     """
-    op = kwargs.get('op')
+    op = kwargs.get('op', CoupledOptions())
     rec = ShallowWaterHessianRecoverer(sol.function_space(), op=op)
     return rec.construct_metric(sol, adapt_field, **kwargs)
 
