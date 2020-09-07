@@ -631,22 +631,48 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def export_state(self, i, fpath, plexname=None):
         op = self.op
+        kwargs = dict(plexname=plexname, op=op)
         if op.solve_swe:
             op.print_debug("I/O: Exporting hydrodynamics to {:s}...".format(fpath))
-            export_hydrodynamics(*self.fwd_solutions[i].split(), fpath, plexname=plexname, op=op)
-        if op.solve_tracer or op.solve_sediment or op.solve_exner:
-            raise NotImplementedError  # TODO
+            export_hydrodynamics(*self.fwd_solutions[i].split(), fpath, **kwargs)
+        if op.solve_tracer:
+            name = 'tracer'
+            op.print_debug("I/O: Exporting {:s} to {:s}...".format(name, fpath))
+            export_field(self.fwd_solutions_tracer[i], name, name, fpath, **kwargs)
+        if op.solve_sediment:
+            name = 'sediment'
+            op.print_debug("I/O: Exporting {:s} to {:s}...".format(name, fpath))
+            export_field(self.fwd_solutions_sediment[i], name, name, fpath, **kwargs)
+        if op.solve_exner:
+            name = 'bathymetry'
+            op.print_debug("I/O: Exporting {:s} to {:s}...".format(name, fpath))
+            export_field(self.fwd_solutions_bathymetry[i], name, name, fpath, **kwargs)
 
     def load_state(self, i, fpath, plexname=None):
         op = self.op
+        kwargs = dict(outputdir=self.di, op=op)
         if op.solve_swe:
+            kwargs['plexname'] = plexname
             op.print_debug("I/O: Loading hydrodynamics from {:s}...".format(fpath))
-            u_init, eta_init = initialise_hydrodynamics(fpath, outputdir=self.di, plexname=plexname, op=op)
+            u_init, eta_init = initialise_hydrodynamics(fpath, **kwargs)
             u, eta = self.fwd_solutions[i].split()
             u.project(u_init)
             eta.project(eta_init)
-        if op.solve_tracer or op.solve_sediment or op.solve_exner:
-            raise NotImplementedError  # TODO
+        if op.solve_tracer:
+            name = 'tracer'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.Q[i], name, name, fpath)
+            self.fwd_solutions_tracer[i].project(initialise_field(*args, **kwargs))
+        if op.solve_sediment:
+            name = 'sediment'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.Q[i], name, name, fpath)
+            self.fwd_solutions_sediment[i].project(initialise_field(*args, **kwargs))
+        if op.solve_exner:
+            name = 'bathymetry'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.W[i], name, name, fpath)
+            self.fwd_solutions_bathymetry[i].project(initialise_field(*args, **kwargs))
 
     # --- Equations
 
