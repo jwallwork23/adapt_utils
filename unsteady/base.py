@@ -491,27 +491,47 @@ class AdaptiveProblemBase(object):
         """Functional of interest which takes the PDE solution as input."""
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def save_to_checkpoint(self, f, mode='memory'):
-        """Extremely simple checkpointing scheme with a simple stack of copied fields."""
+    def save_to_checkpoint(self, f, mode='memory', i=None, **kwargs):
+        """
+        Extremely simple checkpointing scheme with a simple stack.
+
+        In the case of memory checkpointing, the field to be stored is deep copied and put on top of
+        the stack. For disk checkpointing, it is saved to a HDF5 file using a file extension which
+        is put on top of the stack, for identification purposes.
+        """
         assert mode in ('memory', 'disk')
         if mode == 'memory':
             self.checkpoint.append(f.copy(deepcopy=True))
         else:
-            raise NotImplementedError("Checkpointing to disk not yet implemented.")
-            # TODO: add a string to the stack which provides the (auto generated) file name
+            fpath = kwargs.get('fpath', self.op.di)
+            if i is None:
+                raise ValueError("Please provide mesh number")
+            chk = len(self.checkpoint)
+            self.export_state(i, fpath, index_str=chk)
+            self.checkpoint.append(chk)
         self.op.print_debug("CHECKPOINT SAVE: {:3d} currently stored".format(len(self.checkpoint)))
 
-    def collect_from_checkpoint(self, mode='memory', **kwargs):
+    def collect_from_checkpoint(self, mode='memory', i=None, delete=True):
         """
-        Extremely simple checkpointing scheme which pops off the top of a stack of copied fields.
+        Extremely simple checkpointing scheme which pops off the top of a stack.
+
+        In the case of memory checkpointing, the field is just taken off the top of the stack. For
+        disk checkpointing, it is loaded from a HDF5 file using the file extension which is popped
+        off the top of the stack.
+
+        :kwarg delete: toggle deletion of the checkpoint file.
         """
         assert mode in ('memory', 'disk')
-        if mode == 'disk':
-            # delete = kwargs.get('delete', True)
-            raise NotImplementedError("Checkpointing to disk not yet implemented.")
-            # TODO: pop file name from stack, load file, delete if requested
+        assert len(self.checkpoint) > 0
+        if mode == 'memory':
+            return self.checkpoint.pop(-1)
+        else:
+            fpath = kwargs.get('fpath', self.op.di)
+            if i is None:
+                raise ValueError("Please provide mesh number")
+            chk = self.checkpoint.pop(-1)
+            self.load_state(i, fpath, index_str=chk, delete=delete)
         self.op.print_debug("CHECKPOINT LOAD: {:3d} currently stored".format(len(self.checkpoint)))
-        return self.checkpoint.pop(-1)
 
     def run(self, **kwargs):
         """

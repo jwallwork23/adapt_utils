@@ -629,9 +629,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- I/O
 
-    def export_state(self, i, fpath, plexname=None):
+    def export_state(self, i, fpath, plexname=None, **kwargs):
         op = self.op
-        kwargs = dict(plexname=plexname, op=op)
+        kwargs['plexname'] = plexname
+        kwargs['op'] = op
         if op.solve_swe:
             op.print_debug("I/O: Exporting hydrodynamics to {:s}...".format(fpath))
             export_hydrodynamics(*self.fwd_solutions[i].split(), fpath, **kwargs)
@@ -648,9 +649,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             op.print_debug("I/O: Exporting {:s} to {:s}...".format(name, fpath))
             export_field(self.fwd_solutions_bathymetry[i], name, name, fpath, **kwargs)
 
-    def load_state(self, i, fpath, plexname=None):
+    def load_state(self, i, fpath, plexname=None, **kwargs):
         op = self.op
-        kwargs = dict(outputdir=self.di, op=op)
+        kwargs['outputdir'] = self.di
+        kwargs['op'] = op
         if op.solve_swe:
             kwargs['plexname'] = plexname
             op.print_debug("I/O: Loading hydrodynamics from {:s}...".format(fpath))
