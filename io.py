@@ -25,10 +25,11 @@ def get_filename(fname, index_str):
 
 # --- Input
 
-def load_mesh(fname, fpath, delete=False):
+def load_mesh(fname, fpath='.', delete=False):
     """
     :arg fname: file name (without '.h5' extension).
-    :arg fpath: directory where the file is stored.
+    :kwarg fpath: directory where the file is stored.
+    :kwarg delete: toggle deletion of the file.
     :return: mesh loaded from DMPlex format.
     """
     if COMM_WORLD.size > 1:
@@ -43,18 +44,20 @@ def load_mesh(fname, fpath, delete=False):
     return Mesh(newplex)
 
 
-def initialise_field(fs, name, fname, fpath, outputdir=None, op=CoupledOptions(), index_str=None, delete=False):
+def initialise_field(fs, name, fname, fpath='.', outputdir=None, op=CoupledOptions(), **kwargs):
     """
     Initialise bathymetry field with results from a previous simulation.
 
     :arg fs: field will live in this finite element space.
     :arg name: name used internally for field.
     :arg fname: file name (without '.h5' extension).
-    :arg fpath: directory to read the data from.
+    :kwarg fpath: directory to read the data from.
     :kwarg op: :class:`Options` parameter object.
     :kwarg index_str: optional five digit string.
     :kwarg delete: toggle deletion of the file.
     """
+    delete = kwargs.get('delete', False)
+    index_str = kwargs.get('index_str', None)
     fname = get_filename(fname, index_str)
     with timed_stage('initialising {:s}'.format(name)):
         f = Function(fs, name=name)
@@ -84,12 +87,12 @@ def initialise_bathymetry(mesh, fpath, op=CoupledOptions(), **kwargs):
     return initialise_field(fs, 'bathymetry', 'bathymetry', fpath, **kwargs)
 
 
-def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), delete=False, **kwargs):
+def initialise_hydrodynamics(inputdir='.', outputdir=None, op=CoupledOptions(), **kwargs):
     """
     Initialise velocity and elevation with results from a previous simulation.
 
-    :arg inputdir: directory to read the data from.
-    :kwarg inputdir: directory to optionally plot the data in .pvd format.
+    :kwarg inputdir: directory to read the data from.
+    :kwarg outputdir: directory to optionally plot the data in .pvd format.
     :kwarg op: :class:`Options` parameter object.
     :kwarg delete: toggle deletion of the file.
     :kwarg plexname: file name used for the DMPlex data file.
@@ -97,6 +100,7 @@ def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), dele
     """
     plexname = kwargs.get('plexname', 'myplex')
     variant = kwargs.get('variant', 'equispaced')
+    delete = kwargs.get('delete', False)
     index_str = kwargs.get('index_str', None)
 
     # Get finite element
@@ -154,10 +158,10 @@ def initialise_hydrodynamics(inputdir, outputdir=None, op=CoupledOptions(), dele
 
 # --- Output
 
-def save_mesh(mesh, fname, fpath):
+def save_mesh(mesh, fname, fpath='.'):
     """
     :arg mesh: mesh to be saved in DMPlex format.
-    :arg fname: file name (without '.h5' extension).
+    :kwarg fname: file name (without '.h5' extension).
     :arg fpath: directory to store the file.
     """
     if COMM_WORLD.size > 1:
@@ -170,14 +174,14 @@ def save_mesh(mesh, fname, fpath):
     viewer(plex)
 
 
-def export_field(f, name, fname, fpath, plexname='myplex', op=CoupledOptions(), index_str=None):
+def export_field(f, name, fname, fpath='.', plexname='myplex', op=CoupledOptions(), index_str=None):
     """
     Export some field to be used in a subsequent simulation.
 
     :arg f: field (Firedrake :class:`Function`) to be stored.
     :arg name: name used internally for field.
     :arg fname: filename to save the data to.
-    :arg fpath: directory to save the data to.
+    :kwarg fpath: directory to save the data to.
     :kwarg plexname: file name to be used for the DMPlex data file.
     :kwarg op: :class:`Options` parameter object.
     :kwarg index_str: optional five digit string.
@@ -213,17 +217,18 @@ def export_bathymetry(bathymetry, fpath, **kwargs):
     export_field(bathymetry, 'bathymetry', 'bathymetry', fpath, **kwargs)
 
 
-def export_hydrodynamics(uv, elev, fpath, plexname='myplex', op=CoupledOptions(), index_str=None):
+def export_hydrodynamics(uv, elev, fpath='.', plexname='myplex', op=CoupledOptions(), **kwargs):
     """
     Export velocity and elevation to be used in a subsequent simulation
 
     :arg uv: velocity field to be stored.
     :arg elev: elevation field to be stored.
-    :arg fpath: directory to save the data to.
+    :kwarg fpath: directory to save the data to.
     :kwarg plexname: file name to be used for the DMPlex data file.
     :kwarg op: :class:`Options` parameter object.
     :kwarg index_str: optional five digit string.
     """
+    index_str = kwargs.get('index_str', None)
     if not os.path.exists(fpath):
         os.makedirs(fpath)
     op.print_debug("I/O: Exporting fields for subsequent simulation")
