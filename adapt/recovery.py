@@ -143,9 +143,6 @@ class DoubleL2ProjectorHessian(L2Projector):
                 assert self.dim == 2
             except AssertionError:
                 raise NotImplementedError  # TODO
-        op = kwargs.get('op')
-        self.hessian_recovery = op.hessian_recovery
-        self.h_max = op.h_max
 
     def setup(self):
         if self.boundary:
@@ -159,7 +156,7 @@ class DoubleL2ProjectorHessian(L2Projector):
         P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
 
         # Integration by parts applied to the Hessian definition
-        if self.hessian_recovery == 'parts':
+        if self.op.hessian_recovery == 'parts':
             H, τ = TrialFunction(P1_ten), TestFunction(P1_ten)
             self.l2_projection = Function(P1_ten)
 
@@ -168,7 +165,7 @@ class DoubleL2ProjectorHessian(L2Projector):
             L += dot(grad(self.field), dot(τ, self.n))*ds
 
         # Double L2 projection, using a mixed formulation for the gradient and Hessian
-        elif self.hessian_recovery == 'dL2':
+        elif self.op.hessian_recovery == 'dL2':
             P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
             W = P1_ten*P1_vec
             H, g = TrialFunctions(W)
@@ -196,7 +193,7 @@ class DoubleL2ProjectorHessian(L2Projector):
 
         # Arbitrary value in domain interior
         a = v*Hs*dx
-        L = v*Constant(pow(self.h_max, -2))*dx
+        L = v*Constant(pow(self.op.h_max, -2))*dx
 
         # Hessian on boundary
         if self.bcs is None:
@@ -212,7 +209,7 @@ class DoubleL2ProjectorHessian(L2Projector):
     def project(self, f):
         assert f.function_space() == self.field.function_space()
         self.field.assign(f)
-        if not self.boundary and self.hessian_recovery == 'dL2':
+        if not self.boundary and self.op.hessian_recovery == 'dL2':
             return self._project_interior()
         else:
             return super(DoubleL2ProjectorHessian, self).project(f)

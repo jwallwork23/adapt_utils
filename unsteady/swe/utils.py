@@ -145,7 +145,6 @@ class L2ProjectorVorticity(L2Projector):
 
     def __init__(self, *args, **kwargs):
         super(L2ProjectorVorticity, self).__init__(*args, **kwargs)
-        self.op = kwargs.get('op')
         self.kwargs['solver_parameters'] = {'ksp_type': 'cg'}
 
     def setup(self):
