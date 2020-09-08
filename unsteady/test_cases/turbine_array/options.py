@@ -104,11 +104,12 @@ class TurbineArrayOptions(TurbineOptions):
     def get_update_forcings(self, prob, i, **kwargs):
         tc = Constant(0.0)
         hmax = Constant(self.max_amplitude)
+        offset = self.T_ramp if self.spun else 0.0
 
         def update_forcings(t):
-            tc.assign(t)
-            self.elev_in[i].assign(hmax*cos(self.omega*(tc - self.T_ramp)))
-            self.elev_out[i].assign(hmax*cos(self.omega*(tc - self.T_ramp) + pi))
+            tc.assign(t - offset)
+            self.elev_in[i].assign(hmax*cos(self.omega*tc))
+            self.elev_out[i].assign(hmax*cos(self.omega*tc + pi))
 
         return update_forcings
 
@@ -120,7 +121,5 @@ class TurbineArrayOptions(TurbineOptions):
         u.interpolate(as_vector([1e-8, 0.0]))
 
         # Set the initial surface so that it satisfies the forced boundary conditions
-        hmax = self.max_amplitude
-        init = cos(self.omega*(-self.T_ramp))  # Spin-up isn't necessarily a multiple of tidal cycles
-        X = 2*x/self.domain_length             # Non-dimensionalised x
-        eta.interpolate(-init*hmax*X)
+        X = 2*x/self.domain_length  # Non-dimensionalised x
+        eta.interpolate(-self.max_amplitude*X)
