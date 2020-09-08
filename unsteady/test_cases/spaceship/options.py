@@ -72,9 +72,9 @@ class SpaceshipOptions(TurbineOptions):
         # Solver parameters and discretisation
         self.stabilisation = None
         # self.stabilisation = 'lax_friedrichs'
+        self.use_automatic_sipg_parameter = True
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
-        # self.grad_depth_viscosity = False
         self.family = 'dg-cg'
 
     def set_bathymetry(self, fs):

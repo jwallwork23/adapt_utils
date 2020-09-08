@@ -64,11 +64,12 @@ plotting_kwargs = {
 }
 plt.rc('font', **{'size': 18})
 op = TurbineArrayOptions(**kwargs)
+index_str = index_string(op.num_meshes)
 
 # Create directories and check if spun-up solution exists
 data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
 ramp_dir = create_directory(os.path.join(data_dir, "ramp"))
-data_dir = create_directory(os.path.join(data_dir, approach, index_string(op.num_meshes)))
+data_dir = create_directory(os.path.join(data_dir, approach, index_str))
 spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
 sea_water_density = 1030.0
 power_watts = [np.array([]) for i in range(15)]
@@ -179,7 +180,8 @@ secax.set_xlabel("Time/Tidal period")
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), "plots"))
 plt.tight_layout()
 for ext in extensions:
-    plt.savefig(os.path.join(plot_dir, '_'.join([approach, ".".join(["array_power_output", ext])])))
+    fname = '_'.join([approach, "array_power_output", ".".join([index_str, ext])])
+    plt.savefig(os.path.join(plot_dir, fname))
 
 
 # --- Plot power timeseries of each column of the array
@@ -209,4 +211,5 @@ secax.set_xlabel("Time/Tidal period")
 # Save
 plt.tight_layout()
 for ext in extensions:
-    plt.savefig(os.path.join(plot_dir, '_'.join([approach, ".".join(["columnar_power_output", ext])])))
+    fname = '_'.join([approach, "columnar_power_output", ".".join([index_str, ext])])
+    plt.savefig(os.path.join(plot_dir, fname))

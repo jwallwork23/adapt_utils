@@ -1,10 +1,8 @@
 from thetis import create_directory, print_output
 
 import argparse
-import matplotlib.pyplot as plt
 import numpy as np
 import os
-import sys
 from time import perf_counter
 
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
@@ -111,8 +109,7 @@ if not spun:
 # --- Adjoint solve
 
 swp.checkpointing = True
-for i in reverse(range(swp.num_meshes)):
-
+for i in reversed(range(swp.num_meshes)):
 
     # --- First, solve forward from checkpoint
 
@@ -133,7 +130,6 @@ for i in reverse(range(swp.num_meshes)):
 
     # Free forward solver
     swp.free_solver_forward_step(i)
-
 
     # --- Next, solve adjoint using checkpointed state
 

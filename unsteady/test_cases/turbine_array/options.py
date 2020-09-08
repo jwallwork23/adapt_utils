@@ -46,7 +46,7 @@ class TurbineArrayOptions(TurbineOptions):
         # Timestepping
         self.dt = 2.232
         self.T_tide = 0.1*self.M2_tide_period
-        self.T_ramp = 1.0*self.T_tide
+        self.T_ramp = 1.06*3600
         self.end_time = 2.0*self.T_tide
         self.dt_per_export = 10
 
@@ -73,7 +73,6 @@ class TurbineArrayOptions(TurbineOptions):
         self.stabilisation = 'lax_friedrichs'
         self.use_automatic_sipg_parameter = True
         self.grad_div_viscosity = False
-        # self.grad_depth_viscosity = False  # TODO
         self.grad_depth_viscosity = True
         self.family = 'dg-cg'
 
