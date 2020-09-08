@@ -70,11 +70,10 @@ class TurbineArrayOptions(TurbineOptions):
         self.elev_out = [None for i in range(self.num_meshes)]
 
         # Solver parameters and discretisation
-        # self.stabilisation = None
         self.stabilisation = 'lax_friedrichs'
         self.use_automatic_sipg_parameter = True
-        # self.sipg_parameter = Constant(10.0)
         self.grad_div_viscosity = False
+        # self.grad_depth_viscosity = False  # TODO
         self.grad_depth_viscosity = True
         self.family = 'dg-cg'
 

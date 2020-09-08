@@ -22,9 +22,9 @@ parser.add_argument("-approach", help="Metric construction approach (default 'he
 parser.add_argument("-num_meshes", help="Number of meshes to consider (default 10)")
 parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
 parser.add_argument("-normalisation", help="Normalisation method (default 'complexity')")
-parser.add_argument("-adapt_field", help="Field to construct metric w.r.t (default 'all_int')")
-parser.add_argument("-time_combine", help="Method for time-combining Hessians (default 'integrate')")
-parser.add_argument("-hessian_lag", help="Compute Hessian every n timesteps (default 6)")
+parser.add_argument("-adapt_field", help="Field to construct metric w.r.t (default 'viscosity')")
+parser.add_argument("-time_combine", help="Method for time-combining Hessians (default 'intersect')")
+parser.add_argument("-hessian_lag", help="Compute Hessian every n timesteps (default 1)")
 parser.add_argument("-target", help="Target space-time complexity (default 1.0e+03)")
 parser.add_argument("-h_min", help="Minimum tolerated element size (default 1cm)")
 parser.add_argument("-h_max", help="Maximum tolerated element size (default 100m)")
@@ -69,7 +69,7 @@ kwargs = {
 
     # Mesh adaptation
     'num_meshes': int(args.num_meshes or 10),
-    'adapt_field': args.adapt_field or 'all_int',
+    'adapt_field': args.adapt_field or 'viscosity',
     'hessian_time_combination': args.time_combine or 'intersect',  # FIXME: integrate gives recursion error
     'hessian_timestep_lag': float(args.hessian_lag or 1),
     'normalisation': args.normalisation or 'complexity',
