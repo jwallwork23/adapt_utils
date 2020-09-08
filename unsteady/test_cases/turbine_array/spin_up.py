@@ -20,7 +20,7 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-op = TurbineArrayOptions(approach='fixed_mesh', plot_pvd=False)
+op = TurbineArrayOptions(approach='fixed_mesh', plot_pvd=False, num_meshes=1)
 L = op.domain_length
 W = op.domain_width
 op.end_time = op.T_ramp

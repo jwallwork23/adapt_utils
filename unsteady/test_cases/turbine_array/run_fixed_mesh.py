@@ -9,6 +9,7 @@ from time import perf_counter
 
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
+from adapt_utils.misc import index_string
 from adapt_utils.plotting import *  # NOQA
 
 
@@ -48,7 +49,7 @@ if plot_png:
     extensions.append('png')
 kwargs = {
     'approach': approach,
-    'num_meshes': int(args.num_meshes or 1),  # TODO: USEME
+    'num_meshes': int(args.num_meshes or 1),
     'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
@@ -67,15 +68,16 @@ op = TurbineArrayOptions(**kwargs)
 # Create directories and check if spun-up solution exists
 data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
 ramp_dir = create_directory(os.path.join(data_dir, "ramp"))
-data_dir = create_directory(os.path.join(data_dir, approach))
+data_dir = create_directory(os.path.join(data_dir, approach, index_string(op.num_meshes)))
 spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
 sea_water_density = 1030.0
 power_watts = [np.array([]) for i in range(15)]
 if spun:
     for i, turbine in enumerate(op.farm_ids):
-        fname = os.path.join(ramp_dir, "power_output_{:d}.npy".format(turbine))
+        fname = os.path.join(ramp_dir, "power_output_{:d}_00000.npy".format(turbine))
         power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
 else:
+    print_output("Spin-up data not found. Spinning up now.")
     op.end_time += op.T_ramp
 
 
@@ -107,13 +109,9 @@ class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
 if not plot_only:
     swp = AdaptiveTurbineProblem_with_restarts(op, callback_dir=data_dir)
 
-    # Set initial condition and create solver
-    swp.set_initial_condition()
-    swp.setup_solver_forward_step(0)
-
     # Solve forward problem
     cpu_timestamp = perf_counter()
-    swp.solve_forward_step(0)
+    swp.solve_forward()
     cpu_time = perf_counter() - cpu_timestamp
     msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
@@ -133,10 +131,13 @@ elif not plot_any:
 
 # Adjust timeseries to account for density of water and assemble as an array
 for i, turbine in enumerate(op.farm_ids):
-    fname = os.path.join(data_dir, "power_output_{:d}.npy".format(turbine))
-    if not os.path.exists(fname):
-        raise IOError("Need to run the model in order to get power output timeseries.")
-    power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
+    timeseries = np.array([])
+    for n in range(op.num_meshes):
+        fname = os.path.join(data_dir, "power_output_{:d}_{:s}.npy".format(turbine, index_string(n)))
+        if not os.path.exists(fname):
+            raise IOError("Need to run the model in order to get power output timeseries.")
+        timeseries = np.append(timeseries, np.load(fname))
+    power_watts[i] = np.append(power_watts[i], timeseries*sea_water_density)
 num_timesteps = len(power_watts[0])
 power_watts = np.array(power_watts).reshape((3, 5, num_timesteps))
 

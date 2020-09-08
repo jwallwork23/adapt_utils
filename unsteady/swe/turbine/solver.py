@@ -1,5 +1,6 @@
 from thetis import *
 
+from adapt_utils.misc import index_string
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.swe.turbine.callback import PowerOutputCallback
 
@@ -96,6 +97,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
                 tag = 'power_output'
                 if farm_id != 'everywhere':
                     tag += '_{:d}'.format(farm_id)
+                tag += '_{:5s}'.format(index_string(i))
                 self.qoi += self.callbacks[i]['timestep'][tag].time_integrate()
         return self.qoi
 
