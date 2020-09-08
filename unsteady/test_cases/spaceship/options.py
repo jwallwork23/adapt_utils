@@ -59,9 +59,9 @@ class SpaceshipOptions(TurbineOptions):
         self.use_semi_implicit_linearisation = True
         self.dt = 10.0
         # self.end_time = self.tidal_forcing_end_time
-        self.T_ramp = 2.0*self.T_tide
+        # self.T_ramp = 2.0*self.T_tide
+        self.T_ramp = 20.4*3600.0
         # self.end_time = self.T_ramp + 2.0*self.T_tide
-        # self.end_time = 24*3600.0
         self.end_time = 3*24*3600.0
         self.dt_per_export = 30
 
