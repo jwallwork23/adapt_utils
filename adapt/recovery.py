@@ -68,8 +68,14 @@ def recover_boundary_hessian(f, **kwargs):
 # --- Use the following drivers if doing multiple L2 projections on the current mesh
 
 class L2Projector():
+    """
+    Base class for performing L2 projections.
+
+    Inherited classes must implement the :attr:`setup` method
+    """
 
     def __init__(self, function_space, bcs=None, op=Options(), **kwargs):
+        self.op = op
         self.field = Function(function_space)
         self.mesh = function_space.mesh()
         self.n = FacetNormal(self.mesh)
@@ -79,18 +85,27 @@ class L2Projector():
         }
 
     def setup(self):
-        pass
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def project(self, f):
+        self.op.print_debug("RECOVERY: L2 projecting {:s}...".format(self.name))
         assert f.function_space() == self.field.function_space()
         self.field.assign(f)
         if not hasattr(self, 'projector'):
             self.setup()
+        if not hasattr(self, 'l2_projection'):
+            raise ValueError("`setup` method should define `l2_projection` output field")
         self.projector.solve()
         return self.l2_projection
 
 
 class L2ProjectorGradient(L2Projector):
+    """
+    Class for L2 projecting a scalar field to obtain its gradient in P1 space.
+
+    Note that the field itself need not be continuously differentiable at all.
+    """
+    name = 'gradient'
 
     def setup(self):
         P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
@@ -106,6 +121,17 @@ class L2ProjectorGradient(L2Projector):
 
 
 class DoubleL2ProjectorHessian(L2Projector):
+    """
+    Class for L2 projecting a scalar field to obtain its Hessian in P1 space.
+
+    This can either be achieved by a direct integration by parts, or by a double L2 projection, with
+    the gradient as an intermediate variable. The former approach may be specified by setting
+    `op.hessian_recovery = 'parts'` and the latter by setting `op.hessian_recovery = 'dL2'`. For
+    double L2 projection, a mixed finite element method is used.
+
+    Note that the field itself need not be continuously differentiable at all.
+    """
+    name = 'Hessian'
 
     def __init__(self, *args, boundary=False, **kwargs):
         super(DoubleL2ProjectorHessian, self).__init__(*args, **kwargs)
@@ -123,8 +149,10 @@ class DoubleL2ProjectorHessian(L2Projector):
 
     def setup(self):
         if self.boundary:
+            self.name += ' on domain boundary'
             self._setup_boundary_projector()
         else:
+            self.name += ' on domain interior'
             self._setup_interior_projector()
 
     def _setup_interior_projector(self):
@@ -190,6 +218,7 @@ class DoubleL2ProjectorHessian(L2Projector):
             return super(DoubleL2ProjectorHessian, self).project(f)
 
     def _project_interior(self):
+        self.op.print_debug("RECOVERY: L2 projecting Hessian on domain interior...")
         if not hasattr(self, 'projector'):
             self.setup()
         self.projector.solve()

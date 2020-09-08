@@ -136,6 +136,13 @@ def recover_vorticity_metric(u, **kwargs):
 
 
 class L2ProjectorVorticity(L2Projector):
+    """
+    Class for L2 projecting a vector field to obtain its vorticity in P1 space.
+
+    Note that the field itself need not be continuously differentiable at all.
+    """
+    name = "vorticity"
+
     def __init__(self, *args, **kwargs):
         super(L2ProjectorVorticity, self).__init__(*args, **kwargs)
         self.op = kwargs.get('op')
