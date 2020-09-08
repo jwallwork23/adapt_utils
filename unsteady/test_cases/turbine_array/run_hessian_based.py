@@ -18,6 +18,7 @@ from adapt_utils.plotting import *  # NOQA
 parser = argparse.ArgumentParser()
 
 # Mesh adaptation
+parser.add_argument("-approach", help="Metric construction approach (default 'hessian')")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (default 10)")
 parser.add_argument("-norm_order", help="p for Lp normalisation (default 1)")
 parser.add_argument("-normalisation", help="Normalisation method (default 'complexity')")
@@ -44,7 +45,9 @@ p = args.norm_order
 
 # --- Set parameters
 
-approach = 'hessian'
+approach = args.approach or 'hessian'
+if approach not in ('hessian', 'vorticity'):
+    raise ValueError("Metric construction approach {:s} not recognised.".format(approach))
 load_mesh = None if args.load_mesh is None else 'plex'
 plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)

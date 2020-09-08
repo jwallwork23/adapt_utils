@@ -695,8 +695,7 @@ class AdaptiveProblemBase(object):
     def get_recovery(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
 
-    # TODO: Create and free objects as needed
-    # TODO: kwargs currently unused
+    # NOTE: kwargs currently unused
     def run_hessian_based(self, update_forcings=None, export_func=None, save_mesh=True, **kwargs):
         """
         Adaptation loop for Hessian based approach.

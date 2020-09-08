@@ -1530,10 +1530,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op = self.op
         if (not op.solve_swe) or op.solve_tracer or op.solve_sediment or op.solve_exner:
             raise NotImplementedError  # TODO: allow Hessians of tracer fields, etc.
-        if op.adapt_field == 'vorticity':
+        if op.approach == 'vorticity':
             recoverer = L2ProjectorVorticity(self.V[i], op=op)
-        elif 'vorticity' in op.adapt_field:
-            raise NotImplementedError  # TODO: allow combination of Hessian metrics and vorticity
         else:
             recoverer = ShallowWaterHessianRecoverer(
                 self.V[i], op=op,
@@ -1694,6 +1692,30 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 self.print("Converged number of mesh elements!")
                 break
+
+    def run(self, **kwargs):
+        """
+        Run simulation using mesh adaptation approach specified by `self.approach`.
+
+        For metric-based approaches, a fixed point iteration loop is used.
+        """
+        run_scripts = {
+
+            # Non-adaptive
+            'fixed_mesh': self.solve_forward,
+
+            # Metric-based, no adjoint
+            'hessian': self.run_hessian_based,
+            'vorticity': self.run_hessian_based,  # TODO: Change name and update docs
+
+            # Metric-based with adjoint
+            'dwp': self.run_dwp,
+            'dwr': self.run_dwr,
+        }
+        try:
+            run_scripts[self.approach](**kwargs)
+        except KeyError:
+            raise ValueError("Approach '{:s}' not recognised".format(self.approach))
 
     # TODO: Allow adaptation to tracer / sediment / Exner
     # TODO: Enable move to base class

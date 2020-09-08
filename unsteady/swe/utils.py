@@ -65,7 +65,8 @@ class ShallowWaterHessianRecoverer():
           * 'elevation'  - the free surface elevation;
           * 'velocity_x' - the x-component of velocity;
           * 'velocity_y' - the y-component of velocity;
-          * 'speed'      - the magnitude of velocity.
+          * 'speed'      - the magnitude of velocity;
+          * 'vorticity'  - the curl of the fluid velocity, interpreted as a scalar field.
 
         Currently supported adaptation fields which are constant in time:
           * 'bathymetry' - the fluid depth at rest.
@@ -77,7 +78,10 @@ class ShallowWaterHessianRecoverer():
         kwargs['op'] = op
         adapt_field = adapt_field or op.adapt_field
         u, eta = sol.split()
-        uv_space_fields = {'speed': speed}
+        uv_space_fields = {
+            'speed': speed,
+            'vorticity': recover_vorticity,  # TODO: Keep projector
+        }
 
         # --- Recover Hessian and construct metric(s)
 
