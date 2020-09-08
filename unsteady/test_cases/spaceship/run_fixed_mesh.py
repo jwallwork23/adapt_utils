@@ -89,45 +89,23 @@ else:
     op.end_time += op.T_ramp
 
 
-# --- Create a solver subclass which uses restarts
-
-class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
-    """
-    A simple extension of :class:`AdaptiveTurbineProblem` which loads from restarts, rather than
-    setting initial conditions using the :class:`Options` parameter class.
-    """
-    def set_initial_condition(self):
-        if op.spun:
-            self.load_state(0, ramp_dir)
-            if load_mesh is not None:
-                tmp = self.fwd_solutions[0].copy(deepcopy=True)
-                u_tmp, eta_tmp = tmp.split()
-                self.set_meshes(load_mesh)
-                self.setup_all()
-                u, eta = self.fwd_solutions[0].split()
-                u.project(u_tmp)
-                eta.project(eta_tmp)
-        else:
-            super(AdaptiveTurbineProblem_with_restarts, self).set_initial_condition()
-
-
 # --- Run model
 
 # Create solver object
-tp = AdaptiveTurbineProblem_with_restarts(op, callback_dir=data_dir, discrete_turbines=True)
+swp = AdaptiveTurbineProblem(op, callback_dir=data_dir, ramp_dir=ramp_dir, load_mesh=load_mesh, discrete_turbines=True)
 
 # Plot bathymetry and viscosity
-tp.bathymetry_file.write(tp.bathymetry[0])
-File(os.path.join(op.di, "viscosity.pvd")).write(tp.fields[0].horizontal_viscosity)
+swp.bathymetry_file.write(swp.bathymetry[0])
+File(os.path.join(op.di, "viscosity.pvd")).write(swp.fields[0].horizontal_viscosity)
 
 # Run forward model and save QoI timeseries
 if not plot_only:
     cpu_timestamp = perf_counter()
-    tp.solve_forward()
+    swp.solve_forward()
     cpu_time = perf_counter() - cpu_timestamp
     msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
-    average_power = tp.quantity_of_interest()/op.end_time
+    average_power = swp.quantity_of_interest()/op.end_time
     print_output("Average power output of array: {:.1f}W".format(average_power))
 if not op.spun:
     op.end_time -= op.T_ramp

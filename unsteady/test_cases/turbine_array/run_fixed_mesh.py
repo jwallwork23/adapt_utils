@@ -70,10 +70,10 @@ index_str = index_string(op.num_meshes)
 data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
 ramp_dir = create_directory(os.path.join(data_dir, "ramp"))
 data_dir = create_directory(os.path.join(data_dir, approach, index_str))
-spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
+op.spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
 sea_water_density = 1030.0
 power_watts = [np.array([]) for i in range(15)]
-if spun:
+if op.spun:
     for i, turbine in enumerate(op.farm_ids):
         fname = os.path.join(ramp_dir, "power_output_{:d}_00000.npy".format(turbine))
         power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
@@ -82,33 +82,11 @@ else:
     op.end_time += op.T_ramp
 
 
-# --- Create a solver subclass which uses restarts
-
-class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
-    """
-    A simple extension of :class:`AdaptiveTurbineProblem` which loads from restarts, rather than
-    setting initial conditions using the :class:`Options` parameter class.
-    """
-    def set_initial_condition(self):
-        if spun:
-            self.load_state(0, ramp_dir)
-            if load_mesh is not None:
-                tmp = self.fwd_solutions[0].copy(deepcopy=True)
-                u_tmp, eta_tmp = tmp.split()
-                self.set_meshes(load_mesh)
-                self.setup_all()
-                u, eta = self.fwd_solutions[0].split()
-                u.project(u_tmp)
-                eta.project(eta_tmp)
-        else:
-            super(AdaptiveTurbineProblem_with_restarts, self).set_initial_condition()
-
-
 # --- Run model
 
 # Run forward model and save QoI timeseries
 if not plot_only:
-    swp = AdaptiveTurbineProblem_with_restarts(op, callback_dir=data_dir)
+    swp = AdaptiveTurbineProblem(op, callback_dir=data_dir, ramp_dir=ramp_dir, load_mesh=load_mesh)
 
     # Solve forward problem
     cpu_timestamp = perf_counter()
@@ -118,7 +96,7 @@ if not plot_only:
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
     average_power = swp.quantity_of_interest()/op.end_time
     print_output("Average power output of array: {:.1f}W".format(average_power))
-if not spun:
+if not op.spun:
     op.end_time -= op.T_ramp
 
 # Do not attempt to plot in parallel

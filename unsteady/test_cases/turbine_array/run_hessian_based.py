@@ -104,8 +104,8 @@ op.end_time = op.T_tide  # Only adapt over a single tidal cycle
 data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
 ramp_dir = create_directory(os.path.join(data_dir, "ramp"))
 data_dir = create_directory(os.path.join(data_dir, approach, index_string(op.num_meshes)))
-spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
-if not spun:
+op.spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
+if not op.spun:
     raise ValueError("Please spin up the simulation before applying mesh adaptation.")
 sea_water_density = 1030.0
 power_watts = [np.array([]) for i in range(15)]
@@ -116,22 +116,12 @@ for i, turbine in enumerate(op.farm_ids):
 
 # --- Create a solver subclass which uses restarts
 
-class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
-    """
-    A simple extension of :class:`AdaptiveTurbineProblem` which loads from restarts, rather than
-    setting initial conditions using the :class:`Options` parameter class.
-    """
-    def set_initial_condition(self):
-        self.load_state(0, ramp_dir)
-
 
 # --- Run model
 
 # Run forward model and save QoI timeseries
 if not plot_only:
-
-    # Instantiate a solver class with restarts
-    swp = AdaptiveTurbineProblem_with_restarts(op, meshes=load_mesh, callback_dir=data_dir)
+    swp = AdaptiveTurbineProblem(op, meshes=load_mesh, callback_dir=data_dir, ramp_dir=ramp_dir)
 
     # Solve forward problem
     cpu_timestamp = perf_counter()

@@ -27,7 +27,11 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         self.thrust_correction = kwargs.pop('thrust_correction', True)
         self.smooth_indicators = kwargs.pop('smooth_indicators', True)
         self.remove_turbines = kwargs.pop('remove_turbines', False)
+        self.load_mesh = kwargs.pop('load_mesh', None)
         self.callback_dir = kwargs.pop('callback_dir', None)
+        self.ramp_dir = kwargs.pop('ramp_dir', None)
+        if self.ramp_dir is None and not self.op.spun:
+            raise ValueError("Spin-up data directory not found.")
         super(AdaptiveTurbineProblem, self).__init__(*args, **kwargs)
 
     def setup_all(self):
@@ -105,3 +109,19 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         """Power output quantity of interest expressed as a UFL form."""
         u, eta = split(self.fwd_solutions[i])
         return self.turbine_drag_coefficients[i]*pow(inner(u, u), 1.5)*dx
+
+    # --- Restarts
+
+    def set_initial_condition(self):
+        if self.op.spun:
+            self.load_state(0, self.ramp_dir)
+            if load_mesh is not None:
+                tmp = self.fwd_solutions[0].copy(deepcopy=True)
+                u_tmp, eta_tmp = tmp.split()
+                self.set_meshes(self.load_mesh)
+                self.setup_all()
+                u, eta = self.fwd_solutions[0].split()
+                u.project(u_tmp)
+                eta.project(eta_tmp)
+        else:
+            super(AdaptiveTurbineProblem, self).set_initial_condition()
