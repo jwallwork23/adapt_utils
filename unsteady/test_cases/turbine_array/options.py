@@ -24,7 +24,7 @@ class TurbineArrayOptions(TurbineOptions):
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
-    def __init__(self, **kwargs):
+    def __init__(self, spun=False, **kwargs):
         super(TurbineArrayOptions, self).__init__(**kwargs)
         self.array_ids = np.array([[2, 5, 8, 11, 14],
                                    [3, 6, 9, 12, 15],
@@ -68,6 +68,7 @@ class TurbineArrayOptions(TurbineOptions):
         self.omega = 2*pi/self.T_tide
         self.elev_in = [None for i in range(self.num_meshes)]
         self.elev_out = [None for i in range(self.num_meshes)]
+        self.spun = spun
 
         # Solver parameters and discretisation
         self.stabilisation = 'lax_friedrichs'
@@ -114,5 +115,12 @@ class TurbineArrayOptions(TurbineOptions):
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
         x, y = SpatialCoordinate(prob.meshes[0])
+
+        # Set an arbitrary, small, non-zero velocity which satisfies the free-slip conditions
         u.interpolate(as_vector([1e-8, 0.0]))
-        eta.interpolate(-x/self.domain_length)
+
+        # Set the initial surface so that it satisfies the forced boundary conditions
+        hmax = self.max_amplitude
+        init = cos(self.omega*(-self.T_ramp))  # Spin-up isn't necessarily a multiple of tidal cycles
+        X = 2*x/self.domain_length             # Non-dimensionalised x
+        eta.interpolate(-init*hmax*X)

@@ -29,7 +29,7 @@ class SpaceshipOptions(TurbineOptions):
     # Resources
     resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
 
-    def __init__(self, **kwargs):
+    def __init__(self, spun=False, **kwargs):
         super(SpaceshipOptions, self).__init__(**kwargs)
         self.array_ids = np.array([3, 2])
         self.farm_ids = tuple(self.array_ids)
@@ -52,6 +52,7 @@ class SpaceshipOptions(TurbineOptions):
         # Boundary forcing
         self.interpolate_tidal_forcing()
         self.elev_in = [None for i in range(self.num_meshes)]
+        self.spun = spun
 
         # Timestepping
         self.timestepper = 'PressureProjectionPicard'
@@ -126,6 +127,8 @@ class SpaceshipOptions(TurbineOptions):
 
         def update_forcings(t):
             tau = t - 0.5*self.dt
+            if self.spun:
+                tau -= op.T_ramp
             forcing = float(self.tidal_forcing_interpolator(tau))
             self.elev_in[i].assign(forcing)
             self.print_debug("DEBUG: forcing at time {:.0f} is {:6.4}".format(tau, forcing))

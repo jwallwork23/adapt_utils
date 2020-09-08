@@ -20,20 +20,25 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-op = TurbineArrayOptions(approach='fixed_mesh', plot_pvd=False, num_meshes=1)
+plot_pvd = True
+# plot_pvd = False
+op = TurbineArrayOptions(approach='fixed_mesh', plot_pvd=plot_pvd, num_meshes=1)
 L = op.domain_length
 W = op.domain_width
 op.end_time = op.T_ramp
 plot_only = bool(args.plot_only or False)
 data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data", "ramp"))
+op.di = data_dir
 swp = AdaptiveTurbineProblem(op, callback_dir=data_dir)
 
 
 # --- Run forward model; export solution tuple and QoI timeseries
 
-if not plot_only:
+if plot_only:
+    swp.load_state(0, data_dir)
+else:
     cpu_timestamp = perf_counter()
-    swp.solve()
+    swp.solve_forward()
     cpu_time = perf_counter() - cpu_timestamp
     msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     msg = msg.format(cpu_time, cpu_time/60, cpu_time/3600)
@@ -44,8 +49,6 @@ if not plot_only:
         logfile.write(msg + "\n")
     op.plot_pvd = True
     swp.export_state(0, data_dir)
-else:
-    swp.load_state(0, data_dir)
 
 
 # --- Plot
