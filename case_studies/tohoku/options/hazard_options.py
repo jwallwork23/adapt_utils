@@ -9,12 +9,19 @@ __all__ = ["TohokuHazardOptions"]
 
 class TohokuHazardOptions(TohokuOptions):
     # TODO: doc
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, kernel_shape='gaussian', **kwargs):
         """
         :kwarg radius: distance indicating radii around the locations of interest, thereby
             determining regions of interest for use in hazard assessment QoIs.
         """
         super(TohokuHazardOptions, self).__init__(*args, **kwargs)
+
+        # Choose kernel function type
+        supported_kernels = ('gaussian', 'circular_bump', 'ball')
+        if kernel_shape not in supported_kernels:
+            raise ValueError("Please choose kernel_shape from {:}.".format(supported_kernels))
+        self.kernel_shape = kernel_shape
+        self.kernel_function = self.__getattribute__(kernel_shape)
 
         # Timestepping
         # ============
@@ -56,7 +63,7 @@ class TohokuHazardOptions(TohokuOptions):
           - Fukushima Daiichi;
           - Fukushima Daini.
         """
-        radius = kwargs.get('radius', 50.0e+03)
+        radius = kwargs.get('radius', 100.0e+03)
         locations_of_interest = {
             "Onagawa": {"lonlat": (141.5008, 38.3995)},
             "Tokai": {"lonlat": (140.6067, 36.4664)},
@@ -81,18 +88,32 @@ class TohokuHazardOptions(TohokuOptions):
         self.region_of_interest = [loi[loc]["coords"] + (radius, ) for loc in loi]
 
     def set_qoi_kernel(self, prob, i):
-        # from firedrake import assemble, Constant, Function
-        from firedrake import Constant, Function
+        from firedrake import assemble, Constant, dx, Function
 
-        # b = self.ball(prob.meshes[i], source=False)
-        # b = self.circular_bump(prob.meshes[i], source=False)
-        b = self.gaussian(prob.meshes[i], source=False)
+        # Evaluate kernel function
+        b = self.kernel_function(prob.meshes[i], source=False)
 
-        # TODO: Normalise by area computed on fine reference mesh
-        # area = assemble(b*dx)
-        # area_fine_mesh = ...
-        # rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
-        rescaling = Constant(1.0)
+        # Normalise by area computed on fine reference mesh (if available)
+        locations = list(self.locations_of_interest.keys())
+        r = self.radius
+        if locations == ['Fukushima Daiichi', ] and np.isclose(r, 50e+03):
+            area_fine_mesh = {
+                'ball': 4.07920324e+09,
+                'circular_bump': 3.30611745e+09,
+                'gaussian': 4.18761028e+09,
+            }[self.kernel_shape]
+            area = assemble(b*dx)
+            rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
+        elif locations == ['Fukushima Daiichi', ] and np.isclose(r, 100e+03):
+            area_fine_mesh = {
+                'ball': 1.73829649e+10,
+                'circular_bump': 1.38578518e+10,
+                'gaussian': 1.66879811e+10,
+            }[self.kernel_shape]
+            area = assemble(b*dx)
+            rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
+        else:
+            rescaling = Constant(1.0)
 
         prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
         kernel_u, kernel_eta = prob.kernels[i].split()
