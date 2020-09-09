@@ -61,18 +61,8 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         c_T = op.get_thrust_coefficient(correction=self.thrust_correction)
         if not self.discrete_turbines:
             shape = op.bump if self.smooth_indicators else op.box
-        if hasattr(op, 'turbine_diameter'):
-            D = op.turbine_diameter
-            if hasattr(op, 'turbine_length') and hasattr(op, 'turbine_width'):
-                L, W = op.turbine_length, op.turbine_width
-                assert L*W == D*D
-            else:
-                L = W = D
-        else:
-            assert hasattr(op, 'turbine_length')
-            assert hasattr(op, 'turbine_width')
-            L, W = op.turbine_length, op.turbine_width
-            D = max(L, W)
+        L, W = op.turbine_length, op.turbine_width
+        D = max(L, W)
         A_T = L*W
         for i, mesh in enumerate(self.meshes):
             if self.discrete_turbines:
@@ -82,7 +72,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
                 self.turbine_densities[i] = shape(self.meshes[i], scale=num_turbines/area)
 
             self.farm_options[i].turbine_density = self.turbine_densities[i]
-            self.farm_options[i].turbine_options.diameter = D
+            self.farm_options[i].turbine_options.diameter = D  # TODO: Do not assume circular
             self.farm_options[i].turbine_options.thrust_coefficient = c_T
             self.turbine_drag_coefficients[i] = 0.5*c_T*A_T*self.turbine_densities[i]
 

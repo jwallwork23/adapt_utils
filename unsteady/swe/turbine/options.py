@@ -18,7 +18,8 @@ class TurbineOptions(CoupledOptions):
 
     # Turbine parameters
     turbine_length = PositiveFloat(18.0).tag(config=False)
-    thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)
+    turbine_width = PositiveFloat(18.0).tag(config=False)
+    thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)  # TODO: Check
 
     # --- Setup
 
@@ -52,10 +53,7 @@ class TurbineOptions(CoupledOptions):
         """
         if not correction:
             return self.thrust_coefficient
-        if hasattr(self, 'turbine_diameter'):
-            D = self.turbine_diameter
-        else:
-            D = max(self.turbine_length, self.turbine_width)
+        D = max(self.turbine_length, self.turbine_width)
         A_T = pi*(D/2)**2
         correction = 4/(1 + sqrt(1 - A_T/(self.max_depth*D)))**2
         return self.thrust_coefficient*correction
