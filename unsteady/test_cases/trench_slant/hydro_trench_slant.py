@@ -13,10 +13,6 @@ import pylab as plt
 
 from adapt_utils.io import export_hydrodynamics
 
-
-from adapt_utils.io import export_hydrodynamics
-
-
 timestep = 0.1
 fac = 3
 fac2 = 3
