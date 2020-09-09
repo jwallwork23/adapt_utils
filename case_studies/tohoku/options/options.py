@@ -103,7 +103,7 @@ class TohokuOptions(TsunamiOptions):
 
         # Stabilisation
         self.use_automatic_sipg_parameter = not np.isclose(self.base_viscosity, 0.0)
-        self.sipg_parameter = kwargs.get('sipg_paramter', None)
+        self.sipg_parameter = kwargs.get('sipg_parameter', None)
 
         # Timestepping
         # ============

@@ -26,12 +26,16 @@ parser.add_argument("-stabilisation", help="Stabilisation method to use (default
 
 # QoI
 parser.add_argument("-start_time", help="""
-    Start time of period of interest in seconds (default zero)""")
+    Start time of period of interest in seconds (default zero).
+    """)
 parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
     """)
 parser.add_argument("-radius", help="Radius of interest (default 100km)")
+parser.add_argument("-kernel_shape", help="""
+    Choose kernel shape from {'gaussian', 'circular_bump', 'ball'}.
+    """)
 
 # I/O and debugging
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
@@ -95,6 +99,7 @@ kwargs = {
     'start_time': float(args.start_time or 0.0),
     'radius': radius,
     'locations': locations,
+    'kernel_shape': args.kernel_shape or 'gaussian',
 
     # I/O and debugging
     'plot_pvd': plot_pvd,
@@ -104,26 +109,33 @@ kwargs = {
 op = TohokuHazardOptions(**kwargs)
 data_dir = create_directory(os.path.join(op.di, 'data'))
 plot_dir = create_directory(os.path.join(op.di, 'plots'))
+op.di = create_directory(os.path.join(op.di, op.kernel_shape))
 
 
 # --- Solve
 
+swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
+if plot_pvd:
+    kernel_file = File(os.path.join(op.di, 'kernel.pvd'))
+    for i, P1 in enumerate(swp.P1):
+        swp.get_qoi_kernels(i)
+        k_u, k_eta = swp.kernels[i].split()
+        kernel = Function(P1, name="QoI kernel")
+        kernel.project(k_eta)
+        kernel_file._topology = None
+        kernel_file.write(kernel)
+        msg = "level {:d}  mesh {:d}  kernel volume {:.8e}"
+        print_output(msg.format(op.level, i, assemble(k_eta*dx)))
+
+exit(0)  # TODO: TEMP
+
+# Load or generate QoI timeseries
 fname = 'qoi_timeseries'
 if plot_only:
     qoi_timeseries = np.load(os.path.join(data_dir, fname + '.npy'))
 else:
-    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
-    if plot_pvd:
-        kernel_file = File(os.path.join(op.di, 'kernel.pvd'))
-        for i, P1 in enumerate(swp.P1):
-            swp.get_qoi_kernels(i)
-            k_u, k_eta = swp.kernels[i].split()
-            kernel = Function(P1, name="QoI kernel")
-            kernel.project(k_eta)
-            kernel_file._topology = None
-            kernel_file.write(kernel)
     swp.solve_forward()
-    print_output("Quantity of interest: {:.4e}".format(swp.quantity_of_interest()))
+    print_output("Quantity of interest: {:.8e}".format(swp.quantity_of_interest()))
     qoi_timeseries = np.array(swp.qoi_timeseries)
     np.save(os.path.join(data_dir, fname), qoi_timeseries)
 
