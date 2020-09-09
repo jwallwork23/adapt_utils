@@ -6,7 +6,6 @@ import numpy as np
 import os
 from time import perf_counter
 
-from adapt_utils.io import index_string
 from adapt_utils.plotting import *
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
@@ -42,7 +41,6 @@ if plot_pdf:
 if plot_png:
     extensions.append('png')
 op = TurbineArrayOptions(approach=approach, plot_pvd=plot_pvd)
-index_str = index_string(op.num_meshes)
 L = op.domain_length
 W = op.domain_width
 op.end_time = op.T_ramp
@@ -105,7 +103,7 @@ array_power_kilowatts = array_power_watts/1.0e+03
 # --- Plot power timeseries of whole array
 
 # Convert to appropriate units and plot
-fig, axes = plt.subplots(figsize=(8, 4))
+fig, axes = plt.subplots(figsize=(8, 3))
 time_seconds = np.linspace(0, op.T_ramp, num_timesteps)
 time_hours = time_seconds/3600
 axes.plot(time_hours, array_power_kilowatts, color="grey")
@@ -120,28 +118,28 @@ secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalis
 secax.set_xlabel("Time/Tidal period")
 
 # Save
-savefig('_'.join([approach, "array_power_output", index_str]), plot_dir, extensions=extensions)
+savefig('_'.join([approach, "array_power_output_ramp"]), plot_dir, extensions=extensions)
 
 
 # --- Plot power timeseries of each column of the array
 
 # Convert to appropriate units and plot
-fig, axes = plt.subplots(figsize=(8, 4))
+fig, axes = plt.subplots(figsize=(8, 3))
 greys = ['k', 'dimgrey', 'grey', 'darkgrey', 'silver', 'lightgrey']
 for i, (linestyle, colour) in enumerate(zip(["-", "--", ":", "--", "-"], greys)):
     axes.plot(time_hours, columnar_power_kilowatts[i, :],
-              label="Column {:d}".format(i+1), linestyle=linestyle, color=colour)
+              label="{:d}".format(i+1), linestyle=linestyle, color=colour)
 axes.set_xlabel("Time [h]")
 axes.set_ylabel("Power output [kW]")
-axes.set_xlim([0, op.T_ramp/3600])
-axes.legend(loc="upper left", fontsize=16)
+axes.set_xlim([0.5*op.T_ramp/3600, op.T_ramp/3600])
+axes.legend(bbox_to_anchor=(1.05, 1.2), fontsize=16)
 
 # Add second x-axis with non-dimensionalised time
 secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
 secax.set_xlabel("Time/Tidal period")
 
 # Save
-savefig('_'.join([approach, "columnar_power_output", index_str]), plot_dir, extensions=extensions)
+savefig('_'.join([approach, "columnar_power_output_ramp"]), plot_dir, extensions=extensions)
 
 
 # --- Plot the spun-up hydrodynamics
