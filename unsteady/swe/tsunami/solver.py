@@ -1,3 +1,4 @@
+from adapt_utils.io import index_string
 from adapt_utils.unsteady.callback import QoICallback
 # from adapt_utils.unsteady.callback import QoICallback, GaugeCallback
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -32,7 +33,9 @@ class AdaptiveTsunamiProblem(AdaptiveProblem):
     def get_qoi_timeseries(self):
         self.qoi_timeseries = []
         for c in self.callbacks:
-            self.qoi_timeseries.extend(c['timestep']['qoi'].timeseries)
+            for i in range(self.num_meshes):
+                tag = 'qoi_{:5s}'.format(index_string(i))
+                self.qoi_timeseries.extend(c['timestep'][tag].timeseries)
         return self.qoi_timeseries
 
     def quantity_of_interest(self):
