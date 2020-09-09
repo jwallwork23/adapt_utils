@@ -39,6 +39,7 @@ class TurbineArrayOptions(TurbineOptions):
 
         # Physics
         self.base_viscosity = 3.0
+        # self.base_viscosity = 1.0
         self.base_bathymetry = 50.0
         self.max_depth = 50.0
         self.friction_coeff = 0.0025
