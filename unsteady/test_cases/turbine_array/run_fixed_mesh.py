@@ -8,7 +8,7 @@ import sys
 from time import perf_counter
 
 from adapt_utils.io import index_string
-from adapt_utils.plotting import *  # NOQA
+from adapt_utils.plotting import *
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
@@ -54,15 +54,6 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-plotting_kwargs = {
-    "annotation_clip": False,
-    "color": "b",
-    "arrowprops": {
-        "arrowstyle": "<->",
-        "color": "b",
-    },
-}
-plt.rc('font', **{'size': 18})
 op = TurbineArrayOptions(**kwargs)
 index_str = index_string(op.num_meshes)
 
@@ -71,15 +62,8 @@ data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
 ramp_dir = create_directory(os.path.join(data_dir, "ramp"))
 data_dir = create_directory(os.path.join(data_dir, approach, index_str))
 op.spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
-sea_water_density = 1030.0
-power_watts = [np.array([]) for i in range(15)]
-if op.spun:
-    for i, turbine in enumerate(op.farm_ids):
-        fname = os.path.join(ramp_dir, "power_output_{:d}_00000.npy".format(turbine))
-        power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
-else:
-    print_output("Spin-up data not found. Spinning up now.")
-    op.end_time += op.T_ramp
+if not op.spun:
+    raise ValueError("Spin-up data not found.")
 
 
 # --- Run model
@@ -95,8 +79,6 @@ if not plot_only:
     msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
     print_output("Average power output of array: {:.1f}W".format(swp.average_power_output()))
-if not op.spun:
-    op.end_time -= op.T_ramp
 
 # Do not attempt to plot in parallel
 nproc = COMM_WORLD.size
@@ -106,8 +88,11 @@ if nproc > 1:
     sys.exit(0)
 elif not plot_any:
     sys.exit(0)
+plt.rc('font', **{'size': 18})
 
 # Adjust timeseries to account for density of water and assemble as an array
+sea_water_density = 1030.0
+power_watts = [np.array([]) for i in range(15)]
 for i, turbine in enumerate(op.farm_ids):
     timeseries = np.array([])
     for n in range(op.num_meshes):
@@ -140,13 +125,6 @@ axes.set_ylabel("Array power output [kW]")
 r = op.T_ramp/3600
 axes.set_xlim([-r, op.end_time/3600])
 
-# Add a dashed line when the ramp period is over
-axes.axvline(0.0, linestyle='--', color="b")
-axes.annotate("", xy=(-r, -40), xytext=(0, -40), **plotting_kwargs)
-axes.annotate(
-    "Spin-up period", xy=(-0.8*r, -60), xytext=(-0.8*r, -60), color="b", annotation_clip=False,
-)
-
 # Add second x-axis with non-dimensionalised time
 non_dimensionalise = lambda time: 3600*time/op.T_tide
 dimensionalise = lambda time: 3600*time*op.T_tide
@@ -155,10 +133,7 @@ secax.set_xlabel("Time/Tidal period")
 
 # Save
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), "plots"))
-plt.tight_layout()
-for ext in extensions:
-    fname = '_'.join([approach, "array_power_output", ".".join([index_str, ext])])
-    plt.savefig(os.path.join(plot_dir, fname))
+savefig('_'.join([approach, "array_power_output", index_str]), plot_dir, extensions=extensions)
 
 
 # --- Plot power timeseries of each column of the array
@@ -174,19 +149,9 @@ axes.set_ylabel("Power output [kW]")
 axes.set_xlim([-r, op.end_time/3600])
 axes.legend(loc="upper left", fontsize=16)
 
-# Add a dashed line when the ramp period is over
-axes.axvline(0.0, linestyle='--', color="b")
-axes.annotate("", xy=(-r, -11), xytext=(0.0, -11), **plotting_kwargs)
-axes.annotate(
-    "Spin-up period", xy=(-0.8*r, -17), xytext=(-0.8*r, -17), color="b", annotation_clip=False,
-)
-
 # Add second x-axis with non-dimensionalised time
 secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
 secax.set_xlabel("Time/Tidal period")
 
 # Save
-plt.tight_layout()
-for ext in extensions:
-    fname = '_'.join([approach, "columnar_power_output", ".".join([index_str, ext])])
-    plt.savefig(os.path.join(plot_dir, fname))
+savefig('_'.join([approach, "columnar_power_output", index_str]), plot_dir, extensions=extensions)

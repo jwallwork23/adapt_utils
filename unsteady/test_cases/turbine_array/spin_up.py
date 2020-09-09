@@ -6,7 +6,8 @@ import numpy as np
 import os
 from time import perf_counter
 
-from adapt_utils.plotting import *  # NOQA
+from adapt_utils.io import index_string
+from adapt_utils.plotting import *
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
@@ -14,21 +15,41 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-plot_only", help="If True, the QoI is plotted and no simulations are run")
+parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
+parser.add_argument("-plot_png", help="Toggle plotting to .png")
+parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
+parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
+parser.add_argument("-plot_only", help="Just plot using saved data")
 args = parser.parse_args()
 
 
 # --- Set parameters
 
-plot_pvd = True
-# plot_pvd = False
-op = TurbineArrayOptions(approach='fixed_mesh', plot_pvd=plot_pvd, num_meshes=1)
+approach = 'fixed_mesh'
+plot_pvd = bool(args.plot_pvd or False)
+plot_pdf = bool(args.plot_pdf or False)
+plot_png = bool(args.plot_png or False)
+plot_all = bool(args.plot_all or False)
+plot_only = bool(args.plot_only or False)
+if plot_only:
+    plot_all = True
+if plot_all:
+    plot_pvd = plot_pdf = plot_png = True
+plot_any = plot_pdf or plot_png
+extensions = []
+if plot_pdf:
+    extensions.append('pdf')
+if plot_png:
+    extensions.append('png')
+op = TurbineArrayOptions(approach=approach, plot_pvd=plot_pvd)
+index_str = index_string(op.num_meshes)
 L = op.domain_length
 W = op.domain_width
 op.end_time = op.T_ramp
 plot_only = bool(args.plot_only or False)
 ramp_dir = create_directory(os.path.join(os.path.dirname(__file__), "data", "ramp"))
 op.di = ramp_dir
+plot_dir = create_directory(os.path.join(ramp_dir, "plots"))
 swp = AdaptiveTurbineProblem(op, callback_dir=ramp_dir, ramp_dir=ramp_dir)
 
 
@@ -49,10 +70,81 @@ else:
     op.plot_pvd = True
     swp.export_state(0, ramp_dir)
 
+# Do not attempt to plot in parallel
+nproc = COMM_WORLD.size
+if nproc > 1:
+    msg = "Will not attempt to plot with {:d} processors. Run again in serial flagging -plot_only."
+    print_output(msg.format(nproc))
+    sys.exit(0)
+elif not plot_any:
+    sys.exit(0)
+plt.rc('font', **{'size': 18})
 
-# --- Plot
+# Load power output data
+op.spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
+sea_water_density = 1030.0
+power_watts = [np.array([]) for i in range(15)]
+if op.spun:
+    for i, turbine in enumerate(op.farm_ids):
+        fname = os.path.join(ramp_dir, "power_output_{:d}_00000.npy".format(turbine))
+        power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
+else:
+    raise ValueError("Spin-up data not found.")
+num_timesteps = len(power_watts[0])
+power_watts = np.array(power_watts).reshape((3, 5, num_timesteps))
 
-plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
+# Get columnwise power
+columnar_power_watts = np.sum(power_watts, axis=0)
+columnar_power_kilowatts = columnar_power_watts/1.0e+03
+
+# Get total power
+array_power_watts = np.sum(columnar_power_watts, axis=0)
+array_power_kilowatts = array_power_watts/1.0e+03
+
+
+# --- Plot power timeseries of whole array
+
+# Convert to appropriate units and plot
+fig, axes = plt.subplots(figsize=(8, 4))
+time_seconds = np.linspace(0, op.T_ramp, num_timesteps)
+time_hours = time_seconds/3600
+axes.plot(time_hours, array_power_kilowatts, color="grey")
+axes.set_xlabel("Time [h]")
+axes.set_ylabel("Array power output [kW]")
+axes.set_xlim([0, op.T_ramp/3600])
+
+# Add second x-axis with non-dimensionalised time
+non_dimensionalise = lambda time: 3600*time/op.T_tide
+dimensionalise = lambda time: 3600*time*op.T_tide
+secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
+secax.set_xlabel("Time/Tidal period")
+
+# Save
+savefig('_'.join([approach, "array_power_output", index_str]), plot_dir, extensions=extensions)
+
+
+# --- Plot power timeseries of each column of the array
+
+# Convert to appropriate units and plot
+fig, axes = plt.subplots(figsize=(8, 4))
+greys = ['k', 'dimgrey', 'grey', 'darkgrey', 'silver', 'lightgrey']
+for i, (linestyle, colour) in enumerate(zip(["-", "--", ":", "--", "-"], greys)):
+    axes.plot(time_hours, columnar_power_kilowatts[i, :],
+              label="Column {:d}".format(i+1), linestyle=linestyle, color=colour)
+axes.set_xlabel("Time [h]")
+axes.set_ylabel("Power output [kW]")
+axes.set_xlim([0, op.T_ramp/3600])
+axes.legend(loc="upper left", fontsize=16)
+
+# Add second x-axis with non-dimensionalised time
+secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
+secax.set_xlabel("Time/Tidal period")
+
+# Save
+savefig('_'.join([approach, "columnar_power_output", index_str]), plot_dir, extensions=extensions)
+
+
+# --- Plot the spun-up hydrodynamics
 
 # Get fluid speed and elevation in P1 space
 u, eta = swp.fwd_solutions[0].split()
@@ -61,26 +153,22 @@ eta_proj = project(eta, swp.P1[0])
 
 # Plot fluid speed
 fig, axes = plt.subplots(figsize=(14, 6))
-cbar = fig.colorbar(tricontourf(speed, axes=axes, levels=50, cmap='coolwarm'), ax=axes)
+cbar = fig.colorbar(tricontourf(speed, axes=axes, levels=200, cmap='coolwarm'), ax=axes)
 cbar.set_label(r"Fluid speed [$\mathrm{m\,s}^{-1}$]")
 axes.set_xlim([-L/2, L/2])
 axes.set_ylim([-W/2, W/2])
 axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
 axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$")
 axes.set_yticks(np.linspace(-W/2, W/2, 5))
-plt.tight_layout()
-for ext in ("png", "pdf"):
-    plt.savefig(os.path.join(plot_dir, ".".join(["speed", ext])))
+savefig("speed", plot_dir, extensions=extensions)
 
 # Plot elevation
 fig, axes = plt.subplots(figsize=(14, 6))
-cbar = fig.colorbar(tricontourf(eta_proj, axes=axes, levels=50, cmap='coolwarm'), ax=axes)
+cbar = fig.colorbar(tricontourf(eta_proj, axes=axes, levels=200, cmap='coolwarm'), ax=axes)
 cbar.set_label(r"Elevation [$\mathrm m$]")
 axes.set_xlim([-L/2, L/2])
 axes.set_ylim([-W/2, W/2])
 axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
 axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$")
 axes.set_yticks(np.linspace(-W/2, W/2, 5))
-plt.tight_layout()
-for ext in ("png", "pdf"):
-    plt.savefig(os.path.join(plot_dir, ".".join(["elevation", ext])))
+savefig("elevation", plot_dir, extensions=extensions)
