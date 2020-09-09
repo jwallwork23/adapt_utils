@@ -92,7 +92,7 @@ else:
 # --- Run model
 
 # Create solver object
-swp = AdaptiveTurbineProblem(op, callback_dir=data_dir, ramp_dir=ramp_dir, load_mesh=load_mesh, discrete_turbines=True)
+swp = AdaptiveTurbineProblem(op, callback_dir=data_dir, ramp_dir=ramp_dir, load_mesh=load_mesh)
 
 # Plot bathymetry and viscosity
 swp.bathymetry_file.write(swp.bathymetry[0])
