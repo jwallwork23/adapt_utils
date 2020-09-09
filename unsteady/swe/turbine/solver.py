@@ -115,7 +115,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
     def set_initial_condition(self):
         if self.op.spun:
             self.load_state(0, self.ramp_dir)
-            if load_mesh is not None:
+            if self.load_mesh is not None:
                 tmp = self.fwd_solutions[0].copy(deepcopy=True)
                 u_tmp, eta_tmp = tmp.split()
                 self.set_meshes(self.load_mesh)
