@@ -7,7 +7,7 @@ import os
 import sys
 from time import perf_counter
 
-from adapt_utils.io import index_string
+from adapt_utils.io import get_date, index_string
 from adapt_utils.plotting import *
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
@@ -18,6 +18,7 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 parser = argparse.ArgumentParser()
 parser.add_argument("-num_meshes", help="Number of meshes (for debugging)")
 parser.add_argument("-load_mesh", help="Load meshes from a previous run")
+parser.add_argument("-end_time", help="End time of simulation in seconds")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
@@ -54,8 +55,11 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
+if args.end_time is not None:
+    kwargs['end_time'] = float(args.end_time)
 op = TurbineArrayOptions(**kwargs)
 index_str = index_string(op.num_meshes)
+sea_water_density = 1030.0
 
 # Create directories and check if spun-up solution exists
 data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
@@ -76,9 +80,16 @@ if not plot_only:
     cpu_timestamp = perf_counter()
     swp.solve_forward()
     cpu_time = perf_counter() - cpu_timestamp
-    msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
-    print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
-    print_output("Average power output of array: {:.1f}W".format(swp.average_power_output()))
+    logstr = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours\n"
+    logstr = logstr.format(cpu_time, cpu_time/60, cpu_time/3600)
+    energy_output = sea_water_density*swp.energy_output()
+    logstr += "Total energy output of array: {:.1f}J\n".format(energy_output) 
+    average_power_output = energy_output/op.end_time
+    logstr += "Average power output of array: {:.1f}W".format(average_power_output)
+    print_output(logstr)
+    # TODO: Peak power output
+    with open(os.path.join(op.di, 'log_{:s}'.format(get_date())), 'w+') as logfile:
+        logfile.write(logstr)
 
 # Do not attempt to plot in parallel
 nproc = COMM_WORLD.size
@@ -91,7 +102,6 @@ elif not plot_any:
 plt.rc('font', **{'size': 18})
 
 # Adjust timeseries to account for density of water and assemble as an array
-sea_water_density = 1030.0
 power_watts = [np.array([]) for i in range(15)]
 for i, turbine in enumerate(op.farm_ids):
     timeseries = np.array([])

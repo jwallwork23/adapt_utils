@@ -91,28 +91,17 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
             self.callbacks[i].add(PowerOutputCallback(self, i, farm_id, callback_dir=di), 'timestep')
 
-    def quantity_of_interest(self):
-        self.qoi = 0.0
+    def energy_output(self):
+        """Compute the total energy output over the entire simulation."""
+        energy = 0.0
         for i in range(self.num_meshes):
             for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
                 tag = 'power_output'
                 if farm_id != 'everywhere':
                     tag += '_{:d}'.format(farm_id)
                 tag += '_{:5s}'.format(index_string(i))
-                self.qoi += self.callbacks[i]['timestep'][tag].time_integrate()
-        return self.qoi
-
-    def quantity_of_interest_form(self, i):
-        """Power output quantity of interest expressed as a UFL form."""
-        u, eta = split(self.fwd_solutions[i])
-        return self.turbine_drag_coefficients[i]*pow(inner(u, u), 1.5)*dx
-
-    def get_qoi_timeseries(self):
-        raise NotImplementedError  # TODO
-
-    def energy_output(self):
-        """Compute the total energy output over the entire simulation."""
-        return self.quantity_of_interest()
+                energy += self.callbacks[i]['timestep'][tag].time_integrate()
+        return energy
 
     def average_power_output(self):
         """Compute the average power output over the entire simulation."""
@@ -124,6 +113,19 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         i = np.argmax(self.qoi_timeseries)
         times = np.linspace(0, self.op.end_time, len(self.qoi_timeseries))
         return self.qoi_timeseries[i], times[i]
+
+    def quantity_of_interest(self):
+        """By default, the QoI is set to the average power output over the entire simulation."""
+        self.qoi = self.energy_output()/self.op.end_time
+        return self.qoi
+
+    def quantity_of_interest_form(self, i):
+        """Power output quantity of interest expressed as a UFL form."""
+        u, eta = split(self.fwd_solutions[i])
+        return self.turbine_drag_coefficients[i]*pow(inner(u, u), 1.5)*dx
+
+    def get_qoi_timeseries(self):
+        raise NotImplementedError  # TODO
 
     # --- Restarts
 
