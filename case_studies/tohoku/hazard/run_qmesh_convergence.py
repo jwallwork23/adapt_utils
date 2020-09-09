@@ -3,7 +3,7 @@ from thetis import print_output, create_directory
 import argparse
 import os
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
 from adapt_utils.io import OuterLoopLogger
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
@@ -17,7 +17,7 @@ parser.add_argument("-end_time", help="End time of simulation in seconds (defaul
 parser.add_argument("-num_meshes", help="Number of meshes to consider (for testing, default 1)")
 
 # Solver
-parser.add_argument("-family", help="Element family for mixed FE space (default 'dg-cg')")
+parser.add_argument("-family", help="Element family for mixed FE space (default 'cg-cg')")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
 parser.add_argument("-stabilisation", help="Stabilisation method to use (default None)")
 
@@ -74,6 +74,7 @@ kwargs = {
 
     # I/O and debugging
     'debug': bool(args.debug or False),
+    'debug_mode': args.debug_mode or 'basic',
 }
 levels = int(args.levels or 4)
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh'))
@@ -87,7 +88,8 @@ for level in range(levels):
     print_output("Running qmesh convergence on level {:d}".format(level))
 
     # Set parameters
-    op = TohokuOptions(level=level, **kwargs)
+    kwargs['level'] = level
+    op = TohokuHazardOptions(**kwargs)
 
     # Solve
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)

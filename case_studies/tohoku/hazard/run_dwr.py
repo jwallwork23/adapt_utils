@@ -18,7 +18,7 @@ parser.add_argument("-level", help="(Integer) resolution for initial mesh (defau
 parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
 
 # Solver
-parser.add_argument("-family", help="Element family for mixed FE space")
+parser.add_argument("-family", help="Element family for mixed FE space (default cg-cg)")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
 parser.add_argument("-stabilisation", help="Stabilisation method to use (default None)")
 
