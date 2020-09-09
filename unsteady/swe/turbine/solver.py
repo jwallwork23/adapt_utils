@@ -91,8 +91,23 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
             self.callbacks[i].add(PowerOutputCallback(self, i, farm_id, callback_dir=di), 'timestep')
 
-    def load_power_output_timeseries(self):
-        raise NotImplementedError  # TODO: Load from .npy
+    def load_power_output_timeseries(self, di=None):
+        """
+        Load power output timeseries data stored in directory `di` into the :attr:`timeseries`
+        attributes of the :attr:`callbacks`.
+        """
+        di = di or self.callback_dir
+        power_watts = [np.array([]) for i in range(self.num_turbines)]
+        for farm_id in self.op.farm_ids:
+            timeseries = np.array([])
+            for i in range(self.op.num_meshes):
+                tag = 'power_output'
+                if farm_id != 'everywhere':
+                    tag += '_{:d}'.format(farm_id)
+                fname = os.path.join(di, tag + '_{:5s}.npy'.format(index_string(i)))
+                if not os.path.exists(fname):
+                    raise IOError("Need to run the model in order to get power output timeseries.")
+                self.callbacks[i]['timestep'][tag].timeseries = np.load(fname)
 
     def energy_output(self):
         """
@@ -106,7 +121,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
                     tag += '_{:d}'.format(farm_id)
                 tag += '_{:5s}'.format(index_string(i))
                 energy += self.callbacks[i]['timestep'][tag].time_integrate()
-        return energy
+        return energy*self.op.sea_water_density
 
     def average_power_output(self):
         """
@@ -125,7 +140,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
                 tag += '_{:d}'.format(farm_id)
             tag += '_{:5s}'.format(index_string(i))
             timeseries = np.append(timeseries, self.callbacks[i]['timestep'][tag].timeseries)
-        return timeseries
+        return timeseries*self.op.sea_water_density
 
     def get_power_output_timeseries(self):
         """

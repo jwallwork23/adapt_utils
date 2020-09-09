@@ -21,6 +21,9 @@ class TurbineOptions(CoupledOptions):
     turbine_width = PositiveFloat(18.0).tag(config=False)
     thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)  # TODO: Check
 
+    # Physics
+    sea_water_density = PositiveFloat(1030.0).tag(config=True)
+
     # --- Setup
 
     def __init__(self, **kwargs):
