@@ -197,10 +197,16 @@ for gauge in gauges:
 
 # Arrays to log progress
 fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
-control_values_opt = [[m.dat.data[0] for m in op.control_parameters], ] if not load_data else np.load(fname.format('ctrl'))
-func_values_opt = [J, ] if not load_data else np.load(fname.format('func'))
-gradient_values_opt = [] if not load_data else np.load(fname.format('grad'))
-hessian_values_opt = [] if not load_data else np.load(fname.format('hess'))
+if load_data:
+    control_values_opt = np.load(fname.format('ctrl'))
+    func_values_opt = np.load(fname.format('func'))
+    gradient_values_opt = np.load(fname.format('grad'))
+    hessian_values_opt = np.load(fname.format('hess'))
+else:
+    control_values_opt = np.array([[m.dat.data[0] for m in op.control_parameters], ])
+    func_values_opt = np.array([J, ])
+    gradient_values_opt = np.array([])
+    hessian_values_opt = np.array([])
 
 # Create ReducedFunctional
 controls = [Control(c) for c in op.control_parameters]
@@ -237,10 +243,10 @@ while (gnorm > gtol) and (iteration < maxiter):
     print_output(msg.format(iteration, J, gnorm, cpu_time))
 
     # Save progress to NumPy arrays on-the-fly
-    control_values_opt.append(m)
-    func_values_opt.append(J)
-    gradient_values_opt.append(dJdm)
-    hessian_values_opt.append(hess_inv)
+    control_values_opt = np.append(control_values_opt, m)
+    func_values_opt = np.append(func_values_opt, J)
+    gradient_values_opt = np.append(gradient_values_opt, dJdm)
+    hessian_values_opt = np.append(hessian_values_opt, hess_inv)
     np.save(fname.format('ctrl'), np.array(control_values_opt))
     np.save(fname.format('func'), np.array(func_values_opt))
     np.save(fname.format('grad'), np.array(gradient_values_opt))
