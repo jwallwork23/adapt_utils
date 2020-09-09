@@ -14,7 +14,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
 
     # --- Setup
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, op, **kwargs):
         """
         :kwarg discrete_turbines: toggle whether to use a discrete or continuous representation
             for the turbine array.
@@ -30,9 +30,9 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         self.load_mesh = kwargs.pop('load_mesh', None)
         self.callback_dir = kwargs.pop('callback_dir', None)
         self.ramp_dir = kwargs.pop('ramp_dir', None)
-        if self.ramp_dir is None and not self.op.spun:
+        if self.ramp_dir is None and not op.spun:
             raise ValueError("Spin-up data directory not found.")
-        super(AdaptiveTurbineProblem, self).__init__(*args, **kwargs)
+        super(AdaptiveTurbineProblem, self).__init__(op, **kwargs)
 
     def setup_all(self):
         super(AdaptiveTurbineProblem, self).setup_all()
