@@ -1,6 +1,6 @@
 from thetis import *
 
-from adapt_utils.misc import index_string
+from adapt_utils.io import index_string
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.swe.turbine.callback import PowerOutputCallback
 

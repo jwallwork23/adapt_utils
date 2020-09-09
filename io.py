@@ -4,7 +4,6 @@ from firedrake.petsc import PETSc
 import datetime
 import os
 
-from adapt_utils.misc import index_string
 from adapt_utils.unsteady.options import CoupledOptions
 
 

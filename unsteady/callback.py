@@ -3,7 +3,7 @@ from thetis import *
 import numpy as np
 import os
 
-from adapt_utils.misc import index_string
+from adapt_utils.io import index_string
 
 
 __all__ = ["VelocityNormCallback", "ElevationNormCallback", "TracerNormCallback",
