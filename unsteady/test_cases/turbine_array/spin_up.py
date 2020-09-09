@@ -27,15 +27,15 @@ L = op.domain_length
 W = op.domain_width
 op.end_time = op.T_ramp
 plot_only = bool(args.plot_only or False)
-data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data", "ramp"))
-op.di = data_dir
-swp = AdaptiveTurbineProblem(op, callback_dir=data_dir)
+ramp_dir = create_directory(os.path.join(os.path.dirname(__file__), "data", "ramp"))
+op.di = ramp_dir
+swp = AdaptiveTurbineProblem(op, callback_dir=ramp_dir, ramp_dir=ramp_dir)
 
 
 # --- Run forward model; export solution tuple and QoI timeseries
 
 if plot_only:
-    swp.load_state(0, data_dir)
+    swp.load_state(0, ramp_dir)
 else:
     cpu_timestamp = perf_counter()
     swp.solve_forward()
@@ -45,10 +45,10 @@ else:
     average_power = swp.quantity_of_interest()/op.end_time
     msg += "\nAverage power output of array: {:.1f}W".format(average_power)
     print_output(msg)
-    with open(os.path.join(data_dir, "log"), "w+") as logfile:
+    with open(os.path.join(ramp_dir, "log"), "w+") as logfile:
         logfile.write(msg + "\n")
     op.plot_pvd = True
-    swp.export_state(0, data_dir)
+    swp.export_state(0, ramp_dir)
 
 
 # --- Plot
