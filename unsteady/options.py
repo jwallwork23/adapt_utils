@@ -50,6 +50,7 @@ class CoupledOptions(Options):
         Optional user-provided symemetric interior penalty parameter for the shallow water model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
+    recover_vorticity = Bool(False).tag(config=True)  # TODO: help
 
     # Tracer transport model
     solve_tracer = Bool(False, help="Toggle solving the tracer transport model.").tag(config=True)

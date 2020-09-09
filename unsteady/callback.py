@@ -8,7 +8,8 @@ from adapt_utils.unsteady.swe.utils import L2ProjectorVorticity
 
 
 __all__ = ["VelocityNormCallback", "ElevationNormCallback", "TracerNormCallback",
-           "SedimentNormCallback", "ExnerNormCallback", "QoICallback", "GaugeCallback"]
+           "SedimentNormCallback", "ExnerNormCallback", "VorticityNormCallback",
+           "QoICallback", "GaugeCallback"]
 
 
 class TimeseriesCallback(object):
@@ -91,6 +92,23 @@ class ExnerNormCallback(TimeseriesCallback):
         self.label = "bathymetry norm"
         b = prob.fwd_solutions_bathymetry[i]
         super(ExnerNormCallback, self).__init__(prob, lambda t: norm(b), i, "bathymetry_norm")
+
+
+class VorticityNormCallback(TimeseriesCallback):
+    """Callback for evaluating the L2 norm of the fluid vorticity at each timestep/export."""
+    def __init__(self, prob, i):
+        self.label = "vorticity norm"
+        rec = L2ProjectorVorticity(prob.V[i], op=prob.op)
+        prob.vorticity[i] = Function(prob.P1[i], name="Vorticity")
+
+        def vorticity(t):
+            prob.vorticity[i].assign(rec.project(prob.fwd_solutions[i]))
+            if prob.op.plot_pvd:
+                prob.vorticity_file._topology = None
+                prob.vorticity_file.write(prob.vorticity[i])
+            return norm(prob.vorticity[i])
+
+        super(VorticityNormCallback, self).__init__(prob, vorticity, i, "vorticity_norm")
 
 
 class QoICallback(TimeseriesCallback):

@@ -127,6 +127,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.adjoint_tracer_file = File(os.path.join(self.di, 'adjoint_tracer.pvd'))
         if self.op.solve_sediment:
             self.sediment_file = File(os.path.join(self.di, 'sediment.pvd'))
+        if self.op.recover_vorticity:
+            self.vorticity_file = File(os.path.join(self.di, 'vorticity.pvd'))
         if self.op.plot_bathymetry or self.op.solve_exner:
             self.exner_file = File(os.path.join(self.di, 'modified_bathymetry.pvd'))
 
@@ -1172,6 +1174,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.callbacks[i].add(SedimentNormCallback(self, i), 'export')
         if self.op.solve_exner:
             self.callbacks[i].add(ExnerNormCallback(self, i), 'export')
+        if self.op.recover_vorticity:
+            if not hasattr(self, 'vorticity'):
+                self.vorticity = [None for mesh in self.meshes]
+            self.callbacks[i].add(VorticityNormCallback(self, i), 'export')
 
     def setup_solver_forward_step(self, i):
         """Setup forward solver on mesh `i`."""
@@ -1530,7 +1536,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op = self.op
         if (not op.solve_swe) or op.solve_tracer or op.solve_sediment or op.solve_exner:
             raise NotImplementedError  # TODO: allow Hessians of tracer fields, etc.
-        if op.approach == 'vorticity':
+        if op.approach == 'vorticity':  # TODO: Use recoverer stashed in callback
             recoverer = L2ProjectorVorticity(self.V[i], op=op)
         else:
             recoverer = ShallowWaterHessianRecoverer(
