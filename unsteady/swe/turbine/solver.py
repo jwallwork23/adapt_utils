@@ -72,7 +72,8 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
                 self.turbine_densities[i] = shape(self.meshes[i], scale=num_turbines/area)
 
             self.farm_options[i].turbine_density = self.turbine_densities[i]
-            self.farm_options[i].turbine_options.diameter = D  # TODO: Do not assume circular
+            self.farm_options[i].turbine_options.diameter = D
+            self.farm_options[i].turbine_options.area = A_T
             self.farm_options[i].turbine_options.thrust_coefficient = c_T
             self.turbine_drag_coefficients[i] = 0.5*c_T*A_T*self.turbine_densities[i]
 
