@@ -23,7 +23,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         :kwarg remove_turbines: toggle whether turbines are present in the flow or not.
         :kwarg callback_dir: directory to save power output data to.
         """
-        self.discrete_turbines = kwargs.pop('discrete_turbines', False)
+        self.discrete_turbines = kwargs.pop('discrete_turbines', True)
         self.thrust_correction = kwargs.pop('thrust_correction', True)
         self.smooth_indicators = kwargs.pop('smooth_indicators', True)
         self.remove_turbines = kwargs.pop('remove_turbines', False)
@@ -63,14 +63,20 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
             shape = op.bump if self.smooth_indicators else op.box
         if hasattr(op, 'turbine_diameter'):
             D = op.turbine_diameter
-            A_T = D**2
+            if hasattr(op, 'turbine_length') and hasattr(op, 'turbine_width'):
+                L, W = op.turbine_length, op.turbine_width
+                assert L*W == D*D
+            else:
+                L = W = D
         else:
-            D = max(op.turbine_length, op.turbine_width)
-            A_T = op.turbine_length, op.turbine_width
-            print_output("#### TODO: Account for non-square turbines")  # TODO
+            assert hasattr(op, 'turbine_length')
+            assert hasattr(op, 'turbine_width')
+            L, W = op.turbine_length, op.turbine_width
+            D = max(L, W)
+        A_T = L*W
         for i, mesh in enumerate(self.meshes):
-            if self.discrete_turbines:  # TODO: Use length and width
-                self.turbine_densities[i] = Constant(1.0/D**2, domain=self.meshes[i])
+            if self.discrete_turbines:
+                self.turbine_densities[i] = Constant(1.0/A_T, domain=self.meshes[i])
             else:
                 area = assemble(shape(self.meshes[i])*dx)
                 self.turbine_densities[i] = shape(self.meshes[i], scale=num_turbines/area)
