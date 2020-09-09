@@ -7,9 +7,8 @@ import os
 import sys
 
 from adapt_utils.plotting import *
-from adapt_utils.norms import vecnorm
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm, utm_to_lonlat
+from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 
 # --- Parse arguments
@@ -67,7 +66,7 @@ plot_dir = create_directory(os.path.join(di, 'plots', 'discrete'))
 kwargs = {
     'level': level,
     'synthetic': not real_data,
-    'noisy_data':bool(args.noisy_data or False),
+    'noisy_data': bool(args.noisy_data or False),
 }
 if basis == 'box':
     from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions

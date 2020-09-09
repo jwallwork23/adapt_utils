@@ -4,8 +4,7 @@ from pyadjoint.reduced_functional_numpy import ReducedFunctionalNumPy
 
 import numpy as np
 from scipy.optimize import OptimizeResult
-from scipy.optimize.optimize import _prepare_scalar_function, _line_search_wolfe12, \
-        _LineSearchError, _status_message, _epsilon
+from scipy.optimize.optimize import _prepare_scalar_function, _line_search_wolfe12, _LineSearchError, _status_message, _epsilon
 
 from adapt_utils.misc import prod
 from adapt_utils.norms import vecnorm
@@ -14,7 +13,8 @@ from adapt_utils.norms import vecnorm
 __all__ = ["minimise_bfgs", "taylor_test", "StagnationError"]
 
 
-def _minimize_bfgs(fun, x0, args=(), jac=None, hess_inv=None, callback=None, gtol=1e-5, norm=np.Inf,
+def _minimize_bfgs(
+        fun, x0, args=(), jac=None, hess_inv=None, callback=None, gtol=1e-5, norm=np.Inf,
         epsilon=_epsilon, maxiter=None, disp=False, retall=False, finite_diff_rel_step=None):
     """
     Minimization of scalar function of one or more variables using the
@@ -50,7 +50,6 @@ def _minimize_bfgs(fun, x0, args=(), jac=None, hess_inv=None, callback=None, gto
         the sign of `h` is ignored. If None (default) then step is selected
         automatically.
     """
-    fprime=jac
     eps = epsilon
     return_all = retall
 
@@ -100,9 +99,9 @@ def _minimize_bfgs(fun, x0, args=(), jac=None, hess_inv=None, callback=None, gto
     while (gnorm > gtol) and (k < maxiter):
         pk = -np.dot(Hk, gfk)
         try:
-            alpha_k, fc, gc, old_fval, old_old_fval, gfkp1 = \
-                     _line_search_wolfe12(f, myfprime, xk, pk, gfk,
-                                          old_fval, old_old_fval, amin=1e-100, amax=1e100)
+            alpha_k, fc, gc, old_fval, old_old_fval, gfkp1 = _line_search_wolfe12(
+                f, myfprime, xk, pk, gfk, old_fval, old_old_fval, amin=1e-100, amax=1e100
+            )
         except _LineSearchError:
             # Line search failed to find a better solution.
             warnflag = 2

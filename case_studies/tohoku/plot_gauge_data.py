@@ -3,7 +3,7 @@ import numpy as np
 import os
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
-from adapt_utils.plotting import *
+from adapt_utils.plotting import *  # NOQA
 
 
 # Plotting parameters
