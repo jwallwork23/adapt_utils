@@ -183,7 +183,7 @@ def reduced_functional(m):
     swp.source_control = Control(swp.fwd_solutions[0])
 
     # Run forward with zero initial guess
-    swp.setup_solver_forward(0)
+    swp.setup_solver_forward_step(0)
     swp.solve_forward_step(0)
     J = op.J
     J_progress.append(J)

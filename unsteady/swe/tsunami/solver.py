@@ -1,10 +1,5 @@
-from thetis import PointNotInDomainError, print_output
-
-import numpy as np
-import os
-import h5py
-
-from adapt_utils.unsteady.callback import *
+from adapt_utils.unsteady.callback import QoICallback
+# from adapt_utils.unsteady.callback import QoICallback, GaugeCallback
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 

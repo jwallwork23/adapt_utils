@@ -29,7 +29,7 @@ class SpaceshipOptions(TurbineOptions):
     # Resources
     resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
 
-    def __init__(self, **kwargs):
+    def __init__(self, spun=False, **kwargs):
         super(SpaceshipOptions, self).__init__(**kwargs)
         self.array_ids = np.array([3, 2])
         self.farm_ids = tuple(self.array_ids)
@@ -52,6 +52,7 @@ class SpaceshipOptions(TurbineOptions):
         # Boundary forcing
         self.interpolate_tidal_forcing()
         self.elev_in = [None for i in range(self.num_meshes)]
+        self.spun = spun
 
         # Timestepping
         self.timestepper = 'PressureProjectionPicard'
@@ -59,9 +60,8 @@ class SpaceshipOptions(TurbineOptions):
         self.use_semi_implicit_linearisation = True
         self.dt = 10.0
         # self.end_time = self.tidal_forcing_end_time
-        self.T_ramp = 2.0*self.T_tide
-        # self.end_time = self.T_ramp + 2.0*self.T_tide
-        # self.end_time = 24*3600.0
+        # self.T_ramp = 2.0*self.T_tide
+        self.T_ramp = 20.4*3600.0
         self.end_time = 3*24*3600.0
         self.dt_per_export = 30
 
@@ -72,9 +72,9 @@ class SpaceshipOptions(TurbineOptions):
         # Solver parameters and discretisation
         self.stabilisation = None
         # self.stabilisation = 'lax_friedrichs'
+        self.use_automatic_sipg_parameter = True
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
-        # self.grad_depth_viscosity = False
         self.family = 'dg-cg'
 
     def set_bathymetry(self, fs):
@@ -127,6 +127,8 @@ class SpaceshipOptions(TurbineOptions):
 
         def update_forcings(t):
             tau = t - 0.5*self.dt
+            if self.spun:
+                tau -= op.T_ramp
             forcing = float(self.tidal_forcing_interpolator(tau))
             self.elev_in[i].assign(forcing)
             self.print_debug("DEBUG: forcing at time {:.0f} is {:6.4}".format(tau, forcing))

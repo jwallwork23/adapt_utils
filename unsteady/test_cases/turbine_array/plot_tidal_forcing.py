@@ -4,16 +4,12 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
+from adapt_utils.plotting import *  # NOQA
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
 
 # Set parameters
-font = {
-    "family": "DejaVu Sans",
-    "size": 16,
-}
-plt.rc('font', **font)
-plt.rc('text', usetex=True)
+plt.rc('font', **{'size': 16})
 plotting_kwargs = {
     "annotation_clip": False,
     "color": "b",

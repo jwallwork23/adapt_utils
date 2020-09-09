@@ -30,3 +30,7 @@ test_adjoint:
 	@echo "Running tests for adjoint examples..."
 	@pytest test/test_adjoint.py
 	@echo "PASS"
+
+clean:
+	@echo "Cleaning test directory..."
+	@cd test && rm -rf tmp/ && rm -rf outputs/

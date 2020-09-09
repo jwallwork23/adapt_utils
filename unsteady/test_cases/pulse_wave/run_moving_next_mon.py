@@ -56,7 +56,7 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     #abs_hor_vel_norm = Function(elev.function_space()).project(abs(abs_horizontal_velocity - np.mean(abs_horizontal_velocity.dat.data[:])))
     abs_hor_vel_norm = Function(elev.function_space()).project(abs_horizontal_velocity)
 
-    uv_gradient = recovery.construct_gradient(horizontal_velocity)
+    uv_gradient = recovery.recover_gradient(horizontal_velocity)
     frob_uv_hess = Function(elev.function_space()).project(local_norm(uv_gradient))
 
     if max(abs(frob_uv_hess.dat.data[:])) < 1e-10:

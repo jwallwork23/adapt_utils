@@ -1,14 +1,39 @@
 from thetis import *
 
+import argparse
 import matplotlib.pyplot as plt
 import matplotlib.patches as ptch
 import os
 
+from adapt_utils.io import load_mesh
+from adapt_utils.plotting import *  # NOQA
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
+
+
+# --- Parse arguments
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-load_mesh", help="Mesh number to load from a previous run")
+parser.add_argument("-fpath", help="Filepath for loading meshes")
+parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
+parser.add_argument("-plot_png", help="Toggle plotting to .png")
+parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
+args = parser.parse_args()
 
 
 # --- Set parameters
 
+plot_pdf = bool(args.plot_pdf or False)
+plot_png = bool(args.plot_png or False)
+plot_all = bool(args.plot_all or False)
+if plot_all:
+    plot_pvd = plot_pdf = plot_png = True
+plot_any = plot_pdf or plot_png
+extensions = []
+if plot_pdf:
+    extensions.append('pdf')
+if plot_png:
+    extensions.append('png')
 kwargs = {
     "interior_kw": {
         "linewidth": 0.1,
@@ -17,12 +42,6 @@ kwargs = {
         "color": "k",
     },
 }
-font = {
-    "family": "DejaVu Sans",
-    "size": 24,
-}
-plt.rc("font", **font)
-plt.rc("text", usetex=True)
 patch_kwargs = {
     "facecolor": "none",
     "linewidth": 2,
@@ -30,15 +49,34 @@ patch_kwargs = {
 op = TurbineArrayOptions()
 L = op.domain_length
 W = op.domain_width
+l = 15
+
+
+# --- Get mesh
+
+fname = None if args.load_mesh is None else "plex_{:s}".format(args.load_mesh)
+fpath = args.fpath
+if fname is not None:
+    if fpath is None:
+        raise ValueError("Please provide a directory to load the mesh from.")
+    mesh = load_mesh(fname, fpath)
+    fname = "mesh_{:s}".format(args.load_mesh)
+    zoom_lim = ([-775, 775], [-260, 260])
+    zoom_ticks = (np.linspace(-750, 750, 7), np.linspace(-225, 225, 7))
+else:
+    mesh = op.default_mesh
+    fname = "mesh"
+    zoom_lim = ([-625, 625], [-210, 210])
+    zoom_ticks = (np.linspace(-600, 600, 7), np.linspace(-200, 200, 9))
 
 
 # --- Plot whole mesh
 
 fig, axes = plt.subplots(figsize=(12, 6))
-triplot(op.default_mesh, axes=axes, **kwargs)
+triplot(mesh, axes=axes, **kwargs)
 axes.legend().remove()
-axes.set_xlim([-L/2, L/2])
-axes.set_ylim([-W/2, W/2])
+axes.set_xlim([-L/2-l, L/2+l])
+axes.set_ylim([-W/2-l, W/2+l])
 axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
 axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$")
 axes.set_yticks(np.linspace(-W/2, W/2, 5))
@@ -51,18 +89,18 @@ for i, loc in enumerate(op.region_of_interest):
     axes.add_patch(ptch.Rectangle(centre, loc[2], loc[3], **patch_kwargs))
 
 # Save
-di = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
-for ext in ("png", "pdf"):
-    plt.savefig(os.path.join(di, ".".join(["mesh", ext])))
+di = fpath or create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
+for ext in extensions:
+    plt.savefig(os.path.join(di, ".".join([fname, ext])))
 
 
 # --- Zoom in on array region
 
-z = 6
-axes.set_xlim([-L/z, L/z])
-axes.set_ylim([-W/z, W/z])
-axes.set_yticks(np.linspace(-150, 150, 7))
+axes.set_xlim(zoom_lim[0])
+axes.set_ylim(zoom_lim[1])
+axes.set_xticks(zoom_ticks[0])
+axes.set_yticks(zoom_ticks[1])
 
 # Save
-for ext in ("png", "pdf"):
-    plt.savefig(os.path.join(di, ".".join(["mesh_zoom", ext])))
+for ext in extensions:
+    plt.savefig(os.path.join(di, ".".join([fname + "_zoom", ext])))

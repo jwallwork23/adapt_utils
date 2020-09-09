@@ -69,7 +69,6 @@ print(t2-t1)
 new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
-
 bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_beach_bath_new_880')
 
 print('L2')

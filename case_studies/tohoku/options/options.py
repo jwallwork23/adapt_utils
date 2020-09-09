@@ -521,7 +521,7 @@ class TohokuOptions(TsunamiOptions):
           * Assumes the forward model has been initialised but not taken any iterations.
           * Assumes a linear relationship between control parameters and source.
         """
-        from adapt_utils.adapt.recovery import construct_gradient
+        from adapt_utils.adapt.recovery import recover_gradient
 
         # Set regularisation parameter
         if np.isclose(self.regularisation, 0.0):
@@ -530,7 +530,7 @@ class TohokuOptions(TsunamiOptions):
 
         # Recover gradient of initial surface using L2 projection
         u0, eta0 = prob.fwd_solutions[0].split()
-        deta0dx = construct_gradient(eta0, op=self)
+        deta0dx = recover_gradient(eta0, op=self)
 
         # Compute regularisation term
         R = assemble(0.5*alpha*inner(deta0dx, deta0dx)*dx)
@@ -540,7 +540,7 @@ class TohokuOptions(TsunamiOptions):
         # Compute components of gradient of regularisation term
         self.regularisation_term_gradients = []
         for i in range(len(self.basis_functions)):
-            dphidx = construct_gradient(self.basis_functions[i].split()[1], op=self)
+            dphidx = recover_gradient(self.basis_functions[i].split()[1], op=self)
             dRdm = assemble(alpha*inner(dphidx, deta0dx)*dx)
             if len(self.basis_functions) == 1:
                 print_output("Gradient of regularisation term = {:.4e}".format(dRdm))

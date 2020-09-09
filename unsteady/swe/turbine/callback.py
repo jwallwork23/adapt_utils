@@ -21,7 +21,6 @@ class PowerOutputCallback(TimeseriesCallback):
         :arg i: mesh index.
         :arg farm_id: label used to indicate tidal farm.
         """
-        self.name = "power output {:}".format(farm_id)
         u, eta = split(prob.fwd_solutions[i])
         dt = prob.op.dt
 
@@ -32,7 +31,11 @@ class PowerOutputCallback(TimeseriesCallback):
         # Power output functional
         power_output = lambda t: self.farm.evaluate_timestep()[0]
 
-        label = "power_output"
-        if farm_id != "everywhere":
-            label += "_{:}".format(farm_id)
-        super(PowerOutputCallback, self).__init__(prob, power_output, i, label, **kwargs)
+        name = "power_output"
+        if farm_id == "everywhere":
+            self.label = "array"
+        else:
+            self.label = "turbine {:2d}".format(farm_id)
+            name += "_{:}".format(farm_id)
+        self.label += " power output"
+        super(PowerOutputCallback, self).__init__(prob, power_output, i, name, **kwargs)

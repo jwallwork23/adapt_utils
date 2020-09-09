@@ -4,7 +4,8 @@ from .misc import *  # NOQA
 from .norms import *  # NOQA
 
 # Base classes
-from .options import *  # NOQA
+from .unsteady.options import *  # NOQA
+from .unsteady.solver import *  # NOQA
 
 # Mesh adaptation
 from .adapt.adaptation import *  # NOQA

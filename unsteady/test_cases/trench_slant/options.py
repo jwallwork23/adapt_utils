@@ -85,9 +85,9 @@ class TrenchSlantOptions(CoupledOptions):
         self.convective_vel_flag = True
         self.bedload = True
 
-        #if not hasattr(self, 'bathymetry') or self.bathymetry is None:
-        #    self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
-        #    self.bathymetry = self.set_bathymetry(self.P1)
+        # if not hasattr(self, 'bathymetry') or self.bathymetry is None:
+        #     self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
+        #     self.bathymetry = self.set_bathymetry(self.P1)
 
 
     def create_sediment_model(self, mesh, bathymetry):
@@ -174,14 +174,14 @@ class TrenchSlantOptions(CoupledOptions):
             return Constant(1.0)
 
     def set_initial_condition_sediment(self, prob):
-        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0)) #self.sediment_model.equiltracer)
+        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0)) # self.sediment_model.equiltracer)
 
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        #self.eta_tilde_file._topology = None
+        # self.eta_tilde_file._topology = None
         if self.plot_timeseries:
             u, eta = prob.fwd_solutions[i].split()
             b = prob.bathymetry[i]
@@ -189,12 +189,12 @@ class TrenchSlantOptions(CoupledOptions):
 
         def export_func():
             eta_tilde.project(self.get_eta_tilde(prob, i))
-            #self.eta_tilde_file.write(eta_tilde)
+            # self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
-            #if self.plot_timeseries:
+            # if self.plot_timeseries:
 
-                # Store modified bathymetry timeseries
-            #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
-            #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
+                 # Store modified bathymetry timeseries
+            #     wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
+            #     self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
