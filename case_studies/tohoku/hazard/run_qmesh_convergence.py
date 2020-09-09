@@ -92,7 +92,7 @@ for level in range(levels):
     op = TohokuHazardOptions(**kwargs)
 
     # Solve
-    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
+    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)
     swp.solve_forward()
     qoi = swp.quantity_of_interest()
     print_output("Quantity of interest: {:.4e}".format(qoi))
