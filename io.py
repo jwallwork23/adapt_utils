@@ -284,9 +284,6 @@ class OuterLoopLogger(object):
         # Create a log string
         self.logstr = self.divider + 33*' ' + 'PARAMETERS\n' + self.divider
 
-        # Check we have a time-dependent adaptive run
-        assert prob.op.approach != 'fixed_mesh'
-
         # Log known parameters
         for key in known:
             self.logstr += self.msg.format(key, known[key])
