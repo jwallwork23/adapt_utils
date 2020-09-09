@@ -91,11 +91,16 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
             self.callbacks[i].add(PowerOutputCallback(self, i, farm_id, callback_dir=di), 'timestep')
 
+    def load_power_output_timeseries(self):
+        raise NotImplementedError  # TODO: Load from .npy
+
     def energy_output(self):
-        """Compute the total energy output over the entire simulation."""
+        """
+        :returns: the total energy output over the entire simulation.
+        """
         energy = 0.0
         for i in range(self.num_meshes):
-            for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
+            for farm_id in self.op.farm_ids:
                 tag = 'power_output'
                 if farm_id != 'everywhere':
                     tag += '_{:d}'.format(farm_id)
@@ -104,15 +109,41 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         return energy
 
     def average_power_output(self):
-        """Compute the average power output over the entire simulation."""
+        """
+        :returns: the average power output over the entire simulation.
+        """
         return self.energy_output()/self.op.end_time
 
+    def get_turbine_power_output_timeseries(self, farm_id):
+        """
+        :returns: the power output timeseries for a single turbine, with tag `farm_id`.
+        """
+        timeseries = np.array([])
+        for i in range(self.num_meshes):
+            tag = 'power_output'
+            if farm_id != 'everywhere':
+                tag += '_{:d}'.format(farm_id)
+            tag += '_{:5s}'.format(index_string(i))
+            timeseries = np.append(timeseries, self.callbacks[i]['timestep'][tag].timeseries)
+        return timeseries
+
+    def get_power_output_timeseries(self):
+        """
+        :returns: the power output timeseries for the entire array.
+        """
+        all_timeseries = []
+        for farm_id in self.op.farm_ids:
+            all_timeseries.append(get_turbine_power_output_timeseries(farm_id))
+        return sum(all_timeseries)
+
     def peak_power_output(self):
-        """Compute the peak power output over the entire simulation."""
-        self.get_qoi_timeseries()
+        """
+        :returns: the peak power output over the entire simulation.
+        """
+        timeseries = self.get_power_output_timeseries()
         i = np.argmax(self.qoi_timeseries)
-        times = np.linspace(0, self.op.end_time, len(self.qoi_timeseries))
-        return self.qoi_timeseries[i], times[i]
+        times = np.linspace(0, self.op.end_time, len(timeseries))
+        return timeseries[i], times[i]
 
     def quantity_of_interest(self):
         """By default, the QoI is set to the average power output over the entire simulation."""
@@ -123,9 +154,6 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         """Power output quantity of interest expressed as a UFL form."""
         u, eta = split(self.fwd_solutions[i])
         return self.turbine_drag_coefficients[i]*pow(inner(u, u), 1.5)*dx
-
-    def get_qoi_timeseries(self):
-        raise NotImplementedError  # TODO
 
     # --- Restarts
 
