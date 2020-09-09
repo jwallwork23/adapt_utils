@@ -2,8 +2,9 @@ from __future__ import absolute_import
 
 from .misc import *  # NOQA
 from .norms import *  # NOQA
+from .plotting import *  # NOQA
 
-# Base classes
+# Utils for coupled solver
 from .unsteady.options import *  # NOQA
 from .unsteady.solver import *  # NOQA
 
