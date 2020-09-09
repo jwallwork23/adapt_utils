@@ -107,6 +107,24 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         u, eta = split(self.fwd_solutions[i])
         return self.turbine_drag_coefficients[i]*pow(inner(u, u), 1.5)*dx
 
+    def get_qoi_timeseries(self):
+        raise NotImplementedError  # TODO
+
+    def energy_output(self):
+        """Compute the total energy output over the entire simulation."""
+        return self.quantity_of_interest()
+
+    def average_power_output(self):
+        """Compute the average power output over the entire simulation."""
+        return self.energy_output()/self.op.end_time
+
+    def peak_power_output(self):
+        """Compute the peak power output over the entire simulation."""
+        self.get_qoi_timeseries()
+        i = np.argmax(self.qoi_timeseries)
+        times = np.linspace(0, self.op.end_time, len(self.qoi_timeseries))
+        return self.qoi_timeseries[i], times[i]
+
     # --- Restarts
 
     def set_initial_condition(self):

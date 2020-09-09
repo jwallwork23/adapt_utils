@@ -42,8 +42,7 @@ else:
     cpu_time = perf_counter() - cpu_timestamp
     msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     msg = msg.format(cpu_time, cpu_time/60, cpu_time/3600)
-    average_power = swp.quantity_of_interest()/op.end_time
-    msg += "\nAverage power output of array: {:.1f}W".format(average_power)
+    msg += "\nAverage power output of array: {:.1f}W".format(swp.average_power_output())
     print_output(msg)
     with open(os.path.join(ramp_dir, "log"), "w+") as logfile:
         logfile.write(msg + "\n")
