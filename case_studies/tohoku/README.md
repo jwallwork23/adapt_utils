@@ -18,11 +18,7 @@ Includes:
 ## Additional software dependencies
 
   * `clawpack` (install as described at https://www.clawpack.org/installing.html and set the `$CLAW` environment variable to the root directory)
-  * `netCDF4` (install using `pip`)
-  * `pandas` (install using `pip`)
   * `pyadolc` (install as described at https://github.com/b45ch1/pyadolc)
-  * `qmesh` (install using `pip`)
-  * `utide` (install using `pip`)
   * `WIN` (install as described at http://wwweic.eri.u-tokyo.ac.jp/WIN/pub/win/)
 
 [GEBCO]: https://www.gebco.net "GEBCO"
