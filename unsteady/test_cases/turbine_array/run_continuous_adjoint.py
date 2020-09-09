@@ -50,32 +50,10 @@ else:
     op.end_time += op.T_ramp
 
 
-# --- Create a solver subclass which uses restarts
-
-class AdaptiveTurbineProblem_with_restarts(AdaptiveTurbineProblem):
-    """
-    A simple extension of :class:`AdaptiveTurbineProblem` which loads from restarts, rather than
-    setting initial conditions using the :class:`Options` parameter class.
-    """
-    def set_initial_condition(self):
-        if spun:
-            self.load_state(0, ramp_dir)
-            if load_mesh is not None:
-                tmp = self.fwd_solutions[0].copy(deepcopy=True)
-                u_tmp, eta_tmp = tmp.split()
-                self.set_meshes(load_mesh)
-                self.setup_all()
-                u, eta = self.fwd_solutions[0].split()
-                u.project(u_tmp)
-                eta.project(eta_tmp)
-        else:
-            super(AdaptiveTurbineProblem_with_restarts, self).set_initial_condition()
-
-
 # --- Forward solve
 
 # Run forward model and save QoI timeseries
-swp = AdaptiveTurbineProblem_with_restarts(op, callback_dir=data_dir, checkpointing=False)
+swp = AdaptiveTurbineProblem(op, callback_dir=data_dir, ramp_dir=ramp_dir, load_mesh=load_mesh, checkpointing=False)
 
 for i in range(swp.num_meshes):
 
@@ -96,7 +74,7 @@ for i in range(swp.num_meshes):
     cpu_time = perf_counter() - cpu_timestamp
     msg = "CPU time for forward solve {:d}: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     print_output(msg.format(i, cpu_time, cpu_time/60, cpu_time/3600))
-    average_power = swp.quantity_of_interest()/op.end_time
+    average_power = swp.quantity_of_interest()
     print_output("Average power output of array: {:.1f}W".format(average_power))
 
     # Free forward solver
@@ -125,7 +103,7 @@ for i in reversed(range(swp.num_meshes)):
     cpu_time = perf_counter() - cpu_timestamp
     msg = "CPU time for forward solve {:d}: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     print_output(msg.format(i, cpu_time, cpu_time/60, cpu_time/3600))
-    average_power = swp.quantity_of_interest()/op.end_time
+    average_power = swp.quantity_of_interest()
     print_output("Average power output of array: {:.1f}W".format(average_power))
 
     # Free forward solver
