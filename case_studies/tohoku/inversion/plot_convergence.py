@@ -94,32 +94,34 @@ create_directory(os.path.join(plot_dir, 'discrete'))
 
 # --- Plot timeseries under initial guess
 
-if plot_timeseries:
-    print_output("Plotting initial timeseries against gauge data...")
-    N = int(np.ceil(np.sqrt(len(gauges))))
-    for level in levels:
-        fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(24, 20))
-        for i, gauge in enumerate(gauges):
-            fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
-            op.gauges[gauge]['data'] = np.load(fname)
-            fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
-            op.gauges[gauge]['init'] = np.load(fname)
-
-            T = np.array(op.gauges[gauge]['times'])/60
-            T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
-            ax = axes[i//N, i % N]
-            ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
-            ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' init.', **kwargs)
-            ax.legend(loc='best', fontsize=fontsize_legend)
-            ax.set_xlabel('Time (min)', fontsize=fontsize)
-            ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-            ax.xaxis.set_tick_params(labelsize=fontsize_tick)
-            ax.yaxis.set_tick_params(labelsize=fontsize_tick)
-            ax.grid()
-        for i in range(len(gauges), N*N):
-            axes[i//N, i % N].axis(False)
-        plt.tight_layout()
-        savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+# if plot_timeseries:
+#     print_output("Plotting initial timeseries against gauge data...")
+#     N = int(np.ceil(np.sqrt(len(gauges))))
+#     for level in levels:
+#         fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
+#         for i, gauge in enumerate(gauges):
+#             fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
+#             op.gauges[gauge]['data'] = np.load(fname)
+#             fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
+#             op.gauges[gauge]['init'] = np.load(fname)
+#
+#             T = np.array(op.gauges[gauge]['times'])/60
+#             T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
+#             ax = axes[i//N, i % N]
+#             ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
+#             ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' init.', **kwargs)
+#             ax.legend(loc='best', fontsize=fontsize_legend)
+#             if i//N == 3:
+#                 ax.set_xlabel('Time (min)', fontsize=fontsize)
+#             if i % N == 0:
+#                 ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+#             ax.xaxis.set_tick_params(labelsize=fontsize_tick)
+#             ax.yaxis.set_tick_params(labelsize=fontsize_tick)
+#             ax.grid()
+#         for i in range(len(gauges), N*N):
+#             axes[i//N, i % N].axis(False)
+#         plt.tight_layout()
+#         savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
 
 
 # --- Optimisation progress
@@ -171,9 +173,12 @@ if not plot_timeseries:
 print_output("Plotting timeseries for optimised run...")
 msg = "Cannot plot timeseries for optimised controls on mesh {:d} because the data don't exist."
 for level in levels:
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(24, 20))
+    N = int(np.ceil(np.sqrt(len(gauges))))
+    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
     plotted = False
     for i, gauge in enumerate(gauges):
+        fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
+        op.gauges[gauge]['data'] = np.load(fname)
         fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
         if not os.path.isfile(fname):
             print_output(msg.format(level))
@@ -183,15 +188,22 @@ for level in levels:
         T = np.array(op.gauges[gauge]['times'])/60
         TT = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
         ax = axes[i//N, i % N]
-        ax.plot(TT, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
-        ax.plot(TT, op.gauges[gauge]['init'], '--x', label=gauge + ' init.', **kwargs)
+        # ax.plot(TT, op.gauges[gauge]['data'], '-', label=gauge + ' data', **kwargs)
+        ax.plot(TT, op.gauges[gauge]['data'], '-', **kwargs)
+        # ax.plot(TT, op.gauges[gauge]['init'], '-', label=gauge + ' init.', **kwargs)
         TT = np.linspace(T[0], T[-1], len(op.gauges[gauge]['opt']))
-        ax.plot(TT, op.gauges[gauge]['opt'], '--x', label=gauge + ' opt.', **kwargs)
-        ax.legend(loc='best')
-        ax.set_xlabel('Time (min)', fontsize=fontsize)
-        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+        # ax.plot(TT, op.gauges[gauge]['opt'], '-', label=gauge + ' opt.', **kwargs)
+        ax.plot(TT, op.gauges[gauge]['opt'], '-', label=gauge, **kwargs)
+        ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_tick)
+        if i//N == 3:
+            ax.set_xlabel('Time (min)', fontsize=fontsize)
+        if i % N == 0:
+            ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         ax.xaxis.set_tick_params(labelsize=fontsize_tick)
         ax.yaxis.set_tick_params(labelsize=fontsize_tick)
+        t0 = op.gauges[gauge]["arrival_time"]/60
+        tf = op.gauges[gauge]["departure_time"]/60
+        ax.set_xlim([t0, tf])
         ax.grid()
         plotted = True
     if not plotted:
