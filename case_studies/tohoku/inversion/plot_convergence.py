@@ -132,8 +132,8 @@ for level in levels:
 axes.set_xticks([1, 10, 100])
 axes.set_yticks([1e4, 2e4, 1e5])
 for axis in (axes.xaxis, axes.yaxis):
-    axis.grid(True, which='minor')
-    axis.grid(True, which='major')
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Square error")
 plot_dir = os.path.join(plot_dir, 'discrete')
@@ -150,10 +150,10 @@ for level in levels:
     its = range(1, len(gradient_values_opt)+1)
     axes.loglog(its, [vecnorm(djdm, order=np.Inf) for djdm in gradient_values_opt], label=label)
 axes.set_xticks([1, 10, 100])
-axes.set_yticks([2e3, 8e3])
+axes.set_yticks([2e3, 7e3])
 for axis in (axes.xaxis, axes.yaxis):
-    axis.grid(True, which='minor')
-    axis.grid(True, which='major')
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Iteration")
 axes.set_ylabel(r"$\ell_\infty$-norm of gradient")
 axes.legend(loc='best', fontsize=fontsize_legend)
@@ -168,6 +168,7 @@ print_output("Plotting timeseries for optimised run...")
 msg = "Cannot plot timeseries for optimised controls on mesh {:d} because the data don't exist."
 for level in levels:
     fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(24, 20))
+    plotted = False
     for i, gauge in enumerate(gauges):
         fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
         if not os.path.isfile(fname):
@@ -188,6 +189,9 @@ for level in levels:
         ax.xaxis.set_tick_params(labelsize=fontsize_tick)
         ax.yaxis.set_tick_params(labelsize=fontsize_tick)
         ax.grid()
+        plotted = True
+    if not plotted:
+        continue
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
