@@ -257,7 +257,7 @@ if not real_data and plot_any:
 
 # Run forward again so that we can compare timeseries
 print_output("Run to plot optimised timeseries...")
-swp.setup_solver_forward(0)
+swp.setup_solver_forward_step(0)
 swp.solve_forward_step(0)
 J = swp.quantity_of_interest()
 
