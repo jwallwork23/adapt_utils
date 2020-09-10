@@ -312,7 +312,7 @@ class TsunamiOptions(CoupledOptions):
                     sampled_times.append(0.5*(time + time_prev))
                     sampled_data.append(np.mean(running))
                     time_prev = time
-                    running = []
+                    running = [dat, ]
 
         # Construct interpolant
         kwargs.setdefault('bounds_error', False)
@@ -328,6 +328,17 @@ class TsunamiOptions(CoupledOptions):
         raise NotImplementedError
 
     def check_cfl_criterion(self, prob, i, error_factor=None):
+        r"""
+        Check whether the CFL criterion is met under the current discretisation, using the minimum
+        mesh element size and the timestep. Fluid speed is taken to be the celerity,
+        :math:`\sqrt{gb_{\max}}`, where :math:`b_{\max}` is the maximum water depth.
+
+        :arg prob: the :class:`AdaptiveTsunamiProblem` object.
+        :arg i: mesh number from sequence.
+        :kwarg error_factor: optionally raise an error if the CFL criterion is not met.
+        """
+        if error_factor is None and not self.op.debug:
+            return
         self.print_debug("INIT: Computing CFL number on mesh {:d}...".format(i))
         b = prob.bathymetry[i].vector().gather().max()
         g = self.g.values()[0]
