@@ -129,9 +129,11 @@ create_directory(os.path.join(plot_dir, 'discrete'))
 # Plot progress of QoI
 print_output("Plotting progress of QoI...")
 fig, axes = plt.subplots(figsize=(8, 6))
+qois = []
 for level in levels:
     fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
     func_values_opt = np.load(fname.format('func', level))
+    qois.append(func_values_opt[-1])
     its = range(1, len(func_values_opt)+1)
     label = '{:d} elements'.format(op.num_cells[level])
     axes.loglog(its, func_values_opt, label=label)
@@ -145,6 +147,18 @@ axes.set_ylabel("Square timeseries error QoI")
 plot_dir = os.path.join(plot_dir, 'discrete')
 axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_J', fpath=plot_dir, extensions=extensions)
+
+# Plot final QoI values  # TODO: Plot all basis functions in the same figure
+print_output("Plotting final QoI values...")
+fig, axes = plt.subplots(figsize=(8, 6))
+axes.semilogx(op.num_cells[:len(qois)], qois, '-x')
+axes.set_xticks([1e4, 1e5])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
+axes.set_xlabel("Mesh element count")
+axes.set_ylabel("Square timeseries error QoI")
+savefig('converged_J', fpath=plot_dir, extensions=extensions)
 
 # Plot progress of gradient
 print_output("Plotting progress of gradient norm...")
