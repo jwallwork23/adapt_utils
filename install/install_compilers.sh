@@ -23,6 +23,9 @@ sudo apt install -y mpich
 sudo apt install -y zlib1g zlib1g-dev
 sudo apt install -y libblas-dev liblapack-dev
 
+# Misc
+# sudo apt install -y texlive-full
+
 # Environment variables for MPI
 export MPICC=/usr/bin/mpicc
 export MPICXX=/usr/bin/mpicxx

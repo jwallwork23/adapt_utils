@@ -20,7 +20,6 @@ parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radia
 parser.add_argument("-level", help="Mesh resolution level (default 0)")
 parser.add_argument("-real_data", help="Toggle whether to use real data (default False)")
 parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data (default False)")
-parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
 
 # I/O
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
@@ -48,9 +47,6 @@ if plot_png:
     extensions.append('png')
 plot_any = len(extensions) > 0
 real_data = bool(args.real_data or False)
-timeseries_type = "timeseries"
-if bool(args.continuous_timeseries or False):
-    timeseries_type = "_".join([timeseries_type, "smooth"])
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1:

@@ -22,6 +22,7 @@ parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data (de
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
 
 # I/O
+parser.add_argument("-extension", help="Extension for output directory, to follow realistic or synthetic")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
@@ -82,7 +83,10 @@ kwargs = {'markevery': 5}
 
 # Setup output directories
 dirname = os.path.join(os.path.dirname(__file__), basis)
-di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
+di = 'realistic' if real_data else 'synthetic'
+if args.extension is not None:
+    di = '_'.join([di, args.extension])
+di = create_directory(os.path.join(dirname, 'outputs', di))
 op.di = create_directory(os.path.join(di, 'discrete'))
 plot_dir = create_directory(os.path.join(di, 'plots'))
 create_directory(os.path.join(plot_dir, 'discrete'))

@@ -195,31 +195,34 @@ for gauge in gauges:
     fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
     np.save(fname, op.gauges[gauge][timeseries_type])
 
-# Arrays to log progress
+# Run optimisation / load optimised controls
 fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
-control_values_opt = [[m.dat.data[0] for m in op.control_parameters], ]
-func_values_opt = [J, ]
-gradient_values_opt = []
+if optimise:
+    control_values_opt = [[m.dat.data[0] for m in op.control_parameters], ]
+    func_values_opt = [J, ]
+    gradient_values_opt = []
 
 
-def derivative_cb_post(j, dj, m):
-    control = [mi.dat.data[0] for mi in m]
-    djdm = [dji.dat.data[0] for dji in dj]
-    print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
-    control_values_opt.append(control)
-    func_values_opt.append(j)
-    gradient_values_opt.append(djdm)
-    np.save(fname.format('ctrl'), np.array(control_values_opt))
-    np.save(fname.format('func'), np.array(func_values_opt))
-    np.save(fname.format('grad'), np.array(gradient_values_opt))
+    def derivative_cb_post(j, dj, m):
+        control = [mi.dat.data[0] for mi in m]
+        djdm = [dji.dat.data[0] for dji in dj]
+        print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
+        control_values_opt.append(control)
+        func_values_opt.append(j)
+        gradient_values_opt.append(djdm)
+        np.save(fname.format('ctrl'), np.array(control_values_opt))
+        np.save(fname.format('func'), np.array(func_values_opt))
+        np.save(fname.format('grad'), np.array(gradient_values_opt))
 
 
-# Run BFGS optimisation
-opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
-print_output("Optimisation begin...")
-controls = [Control(c) for c in op.control_parameters]
-Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
-optimised_value = [o.dat.data[0] for o in minimize(Jhat, method='BFGS', options=opt_kwargs)]
+    # Run BFGS optimisation
+    opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
+    print_output("Optimisation begin...")
+    controls = [Control(c) for c in op.control_parameters]
+    Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
+    optimised_value = [o.dat.data[0] for o in minimize(Jhat, method='BFGS', options=opt_kwargs)]
+else:
+    optimised_value = np.load(fname.format('ctrl'))[-1]
 
 # Create a new parameter class
 kwargs['control_parameters'] = optimised_value
