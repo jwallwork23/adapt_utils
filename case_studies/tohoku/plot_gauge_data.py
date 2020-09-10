@@ -48,23 +48,22 @@ for smoothed in (True, False):
     fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
     for i, gauge in enumerate(gauges):
         ax = axes[i//N, i % N]
-        ax.plot(time_minutes, op.gauges[gauge]['data'], '--x', label=gauge, **plotting_kwargs)
-        leg = ax.legend(handlelength=0, fontsize=fontsize_tick)
+        plotting_kwargs['color'] = op.gauges[gauge]['colour']
+        ax.plot(time_minutes, op.gauges[gauge]['data'], '-', label=gauge, **plotting_kwargs)
+        leg = ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_tick)
         for item in leg.legendHandles:
             item.set_visible(False)
         if i//N == 3:
             ax.set_xlabel(r'Time [$\mathrm{min}$]', fontsize=fontsize)
         if i % N == 0:
             ax.set_ylabel(r'Elevation [$\mathrm m$]', fontsize=fontsize)
-        t0 = op.gauges[gauge]["arrival_time"]/60
-        tf = op.gauges[gauge]["departure_time"]/60
-        ax.set_xlim([t0, tf])
         ax.tick_params(axis='x', labelsize=fontsize_tick)
         ax.tick_params(axis='y', labelsize=fontsize_tick)
         ax.set_xticks(ax.get_xticks().tolist())
         ax.set_xticklabels(["{:.1f}".format(tick) for tick in ax.get_xticks()])
-        ax.set_yticks(ax.get_yticks().tolist())
-        ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
+        t0 = op.gauges[gauge]["arrival_time"]/60
+        tf = op.gauges[gauge]["departure_time"]/60
+        ax.set_xlim([t0, tf])
         ax.grid()
     for i in range(num_gauges, N*N):
         axes[i//N, i % N].axis(False)

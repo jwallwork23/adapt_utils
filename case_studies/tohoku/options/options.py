@@ -126,6 +126,7 @@ class TohokuOptions(TsunamiOptions):
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
             "sample": 60,
+            "colour": "C0",
         }
         self.mid_field_pressure_gauges = {
             "gauges": ("KPG1", "KPG2", "21418"),
@@ -133,6 +134,7 @@ class TohokuOptions(TsunamiOptions):
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
             "sample": 60,
+            "colour": "C0",
         }
         self.southern_pressure_gauges = {
             "gauges": ("MPG1", "MPG2"),
@@ -140,6 +142,7 @@ class TohokuOptions(TsunamiOptions):
             "departure_time": self.end_time,
             "weight": Constant(1.0),
             "sample": 1,
+            "colour": "C0",
         }
         self.far_field_pressure_gauges = {
             "gauges": ("21401", "21413", "21419"),
@@ -147,6 +150,7 @@ class TohokuOptions(TsunamiOptions):
             "departure_time": self.end_time,
             "weight": Constant(1.0),
             "sample": 1,
+            "colour": "C0",
         }
         self.near_field_gps_gauges = {
             "gauges": ("801", "802", "803", "804", "806", "807"),
@@ -154,6 +158,7 @@ class TohokuOptions(TsunamiOptions):
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
             "sample": 1,
+            "colour": "C0",
         }
         self.far_field_gps_gauges = {
             "gauges": ("811", "812", "813", "815"),
@@ -161,6 +166,7 @@ class TohokuOptions(TsunamiOptions):
             "departure_time": self.end_time,
             "weight": Constant(1.0),
             "sample": 1,
+            "colour": "C0",
         }
         self.gauge_classifications_to_consider = (
             "near_field_pressure",
@@ -325,6 +331,9 @@ class TohokuOptions(TsunamiOptions):
 
                 # Optional sampling of gauge data
                 self.gauges[gauge]["sample"] = gauge_class_obj["sample"]
+
+                # Colours
+                self.gauges[gauge]["colour"] = gauge_class_obj["colour"]
 
             # Note gauges to consider
             if "pressure" in gauge_class:
