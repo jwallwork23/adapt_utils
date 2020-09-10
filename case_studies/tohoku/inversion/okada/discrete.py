@@ -88,6 +88,11 @@ def savefig(filename):
 
 
 # Collect initialisation parameters
+nonlinear = bool(args.nonlinear or False)
+family = args.family or 'dg-cg'
+stabilisation = args.stabilisation or 'lax_friedrichs'
+if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
+    stabilisation = None
 N = int(args.okada_grid_resolution or 51)
 active_controls = ('slip', 'rake')
 tape_tag = 0
@@ -98,8 +103,8 @@ kwargs = {
     'okada_grid_resolution': N,
 
     # Model
-    'family': args.family or 'dg-cg',
-    'stabilisation': args.stabilisation,
+    'family': family,
+    'stabilisation': stabilisation,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Inversion
@@ -114,7 +119,6 @@ kwargs = {
     'debug_mode': args.debug_mode or 'basic',
 
 }
-nonlinear = bool(args.nonlinear or False)
 op = TohokuOkadaBasisOptions(**kwargs)
 op.active_controls = active_controls
 num_subfaults = len(op.subfaults)

@@ -135,7 +135,7 @@ for axis in (axes.xaxis, axes.yaxis):
     axis.grid(True, which='minor', color='lightgrey')
     axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Iteration")
-axes.set_ylabel("Square error")
+axes.set_ylabel("Square timeseries error QoI")
 plot_dir = os.path.join(plot_dir, 'discrete')
 axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_J', fpath=plot_dir, extensions=extensions)

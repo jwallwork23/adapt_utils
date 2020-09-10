@@ -82,14 +82,19 @@ if COMM_WORLD.size > 1 and plot_any:
     plot_pdf = plot_png = False
 
 # Collect initialisation parameters
+nonlinear = bool(args.nonlinear or False)
+family = args.family or 'dg-cg'
+stabilisation = args.stabilisation or 'lax_friedrichs'
+if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
+    stabilisation = None
 N = int(args.okada_grid_resolution or 51)
 kwargs = {
     'level': level,
     'save_timeseries': True,
 
     # Spatial discretisation
-    'family': args.family or 'dg-cg',
-    'stabilisation': args.stabilisation,
+    'family': family,
+    'stabilisation': stabilisation,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Inversion
@@ -102,7 +107,6 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-nonlinear = bool(args.nonlinear or False)
 op = TohokuBoxBasisOptions(**kwargs)
 
 # Setup output directories
