@@ -30,8 +30,6 @@ plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
 plot_all = bool(args.plot_all or False)
 plot_only = bool(args.plot_only or False)
-if plot_only:
-    plot_all = True
 if plot_all:
     plot_pvd = plot_pdf = plot_png = True
 plot_any = plot_pdf or plot_png
@@ -74,8 +72,6 @@ if nproc > 1:
     msg = "Will not attempt to plot with {:d} processors. Run again in serial flagging -plot_only."
     print_output(msg.format(nproc))
     sys.exit(0)
-elif not plot_any:
-    sys.exit(0)
 plt.rc('font', **{'size': 18})
 
 # Load power output data
@@ -103,7 +99,7 @@ array_power_kilowatts = array_power_watts/1.0e+03
 # --- Plot power timeseries of whole array
 
 # Convert to appropriate units and plot
-fig, axes = plt.subplots(figsize=(8, 3))
+fig, axes = plt.subplots(figsize=(8, 3.5))
 time_seconds = np.linspace(0, op.T_ramp, num_timesteps)
 time_hours = time_seconds/3600
 axes.plot(time_hours, array_power_kilowatts, color="grey")
@@ -118,13 +114,13 @@ secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalis
 secax.set_xlabel("Time/Tidal period")
 
 # Save
-savefig('_'.join([approach, "array_power_output_ramp"]), plot_dir, extensions=extensions)
+savefig("array_power_output_ramp", plot_dir, extensions=extensions)
 
 
 # --- Plot power timeseries of each column of the array
 
 # Convert to appropriate units and plot
-fig, axes = plt.subplots(figsize=(8, 3))
+fig, axes = plt.subplots(figsize=(8, 3.5))
 greys = ['k', 'dimgrey', 'grey', 'darkgrey', 'silver', 'lightgrey']
 for i, (linestyle, colour) in enumerate(zip(["-", "--", ":", "--", "-"], greys)):
     axes.plot(time_hours, columnar_power_kilowatts[i, :],
@@ -139,7 +135,7 @@ secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalis
 secax.set_xlabel("Time/Tidal period")
 
 # Save
-savefig('_'.join([approach, "columnar_power_output_ramp"]), plot_dir, extensions=extensions)
+savefig("columnar_power_output_ramp", plot_dir, extensions=extensions)
 
 
 # --- Plot the spun-up hydrodynamics
@@ -150,23 +146,35 @@ speed = interpolate(sqrt(dot(u, u)), swp.P1[0])
 eta_proj = project(eta, swp.P1[0])
 
 # Plot fluid speed
-fig, axes = plt.subplots(figsize=(14, 6))
-cbar = fig.colorbar(tricontourf(speed, axes=axes, levels=200, cmap='coolwarm'), ax=axes)
-cbar.set_label(r"Fluid speed [$\mathrm{m\,s}^{-1}$]")
+fig, axes = plt.subplots(figsize=(10, 6))
+levels = np.linspace(0.0, 1.25, 201)
+im = tricontourf(speed, axes=axes, levels=levels, cmap='coolwarm')
+cbar = fig.colorbar(im, ax=axes, orientation="horizontal", pad=0.2)
+cbar.set_label(r"Fluid speed [$\mathrm{m\,s}^{-1}$]", fontsize=24)
+cbar.set_ticks([0, 0.25, 0.5, 0.75, 1.0, 1.25])
+cbar.ax.tick_params(labelsize=22)
 axes.set_xlim([-L/2, L/2])
 axes.set_ylim([-W/2, W/2])
-axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
-axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$")
+axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$", fontsize=26)
+axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$", fontsize=26)
+for axis in (axes.xaxis, axes.yaxis):
+    axis.set_tick_params(labelsize=22)
 axes.set_yticks(np.linspace(-W/2, W/2, 5))
 savefig("speed", plot_dir, extensions=extensions)
 
 # Plot elevation
-fig, axes = plt.subplots(figsize=(14, 6))
-cbar = fig.colorbar(tricontourf(eta_proj, axes=axes, levels=200, cmap='coolwarm'), ax=axes)
-cbar.set_label(r"Elevation [$\mathrm m$]")
+fig, axes = plt.subplots(figsize=(10, 6))
+levels = np.linspace(-0.5, 0.5, 201)
+im = tricontourf(eta_proj, axes=axes, levels=levels, cmap='coolwarm')
+cbar = fig.colorbar(im, ax=axes, orientation="horizontal", pad=0.2)
+cbar.set_label(r"Elevation [$\mathrm m$]", fontsize=24)
+cbar.set_ticks([-0.5, -0.25, 0.0, 0.25, 0.5])
+cbar.ax.tick_params(labelsize=22)
 axes.set_xlim([-L/2, L/2])
 axes.set_ylim([-W/2, W/2])
-axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
-axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$")
+axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$", fontsize=26)
+axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$", fontsize=26)
+for axis in (axes.xaxis, axes.yaxis):
+    axis.set_tick_params(labelsize=22)
 axes.set_yticks(np.linspace(-W/2, W/2, 5))
 savefig("elevation", plot_dir, extensions=extensions)
