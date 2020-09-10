@@ -26,7 +26,7 @@ parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
-parser.add_argument("-plot_only", help="Just plot using saved data")
+parser.add_argument("-plot_convergence_only", help="Only plot convergence curves (not timeseries)")
 
 
 # --- Set parameters
@@ -45,7 +45,10 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
-plot_any = len(extensions) > 0
+if len(extensions) == 0:
+    print_output("Nothing to plot.")
+    sys.exit(0)
+plot_timeseries = not bool(args.plot_convergence_only or False)
 real_data = bool(args.real_data or False)
 timeseries_type = "timeseries"
 if bool(args.continuous_timeseries or False):
@@ -53,7 +56,7 @@ if bool(args.continuous_timeseries or False):
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1:
-    print_output('Will not attempt to plot in parallel.')
+    print_output("Will not attempt to plot in parallel.")
     sys.exit(0)
 
 # Collect initialisation parameters
@@ -87,42 +90,50 @@ create_directory(os.path.join(plot_dir, 'discrete'))
 
 # --- Plot timeseries under initial guess
 
-N = int(np.ceil(np.sqrt(len(gauges))))
-for level in levels:
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
-    for i, gauge in enumerate(gauges):
-        fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
-        op.gauges[gauge]['data'] = np.load(fname)
-        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
-        op.gauges[gauge]['init'] = np.load(fname)
+if plot_timeseries:
+    print_output("Plotting initial timeseries against gauge data...")
+    N = int(np.ceil(np.sqrt(len(gauges))))
+    for level in levels:
+        fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(24, 20))
+        for i, gauge in enumerate(gauges):
+            fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
+            op.gauges[gauge]['data'] = np.load(fname)
+            fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
+            op.gauges[gauge]['init'] = np.load(fname)
 
-        T = np.array(op.gauges[gauge]['times'])/60
-        T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
-        ax = axes[i//N, i % N]
-        ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
-        ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' initial guess', **kwargs)
-        ax.legend(loc='best')
-        ax.set_xlabel('Time (min)', fontsize=fontsize)
-        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-        plt.xticks(fontsize=fontsize_tick)
-        plt.yticks(fontsize=fontsize_tick)
-        ax.grid()
-    for i in range(len(gauges), N*N):
-        axes[i//N, i % N].axis(False)
-    plt.tight_layout()
-    savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+            T = np.array(op.gauges[gauge]['times'])/60
+            T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
+            ax = axes[i//N, i % N]
+            ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
+            ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' init.', **kwargs)
+            ax.legend(loc='best', fontsize=fontsize_legend)
+            ax.set_xlabel('Time (min)', fontsize=fontsize)
+            ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+            ax.xaxis.set_tick_params(labelsize=fontsize_tick)
+            ax.yaxis.set_tick_params(labelsize=fontsize_tick)
+            ax.grid()
+        for i in range(len(gauges), N*N):
+            axes[i//N, i % N].axis(False)
+        plt.tight_layout()
+        savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
 
 
 # --- Optimisation progress
 
 # Plot progress of QoI
-fig, axes = plt.subplots(figsize=(6, 4))
+print_output("Plotting progress of QoI...")
+fig, axes = plt.subplots(figsize=(8, 6))
 for level in levels:
     fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
     func_values_opt = np.load(fname.format('func', level))
-    iterations = range(1, len(func_values_opt)+1)
+    its = range(1, len(func_values_opt)+1)
     label = '{:d} elements'.format(op.num_cells[level])
-    axes.semilogx(iterations, func_values_opt, label=label)
+    axes.loglog(its, func_values_opt, label=label)
+axes.set_xticks([1, 10, 100])
+axes.set_yticks([1e4, 2e4, 1e5])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor')
+    axis.grid(True, which='major')
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Square error")
 plot_dir = os.path.join(plot_dir, 'discrete')
@@ -130,42 +141,52 @@ axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_J', fpath=plot_dir, extensions=extensions)
 
 # Plot progress of gradient
-fig, axes = plt.subplots(figsize=(6, 4))
+print_output("Plotting progress of gradient norm...")
+fig, axes = plt.subplots(figsize=(8, 6))
 for level in levels:
     fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
     gradient_values_opt = np.load(fname.format('grad', level))
     label = '{:d} elements'.format(op.num_cells[level])
-    axes.semilogy([vecnorm(djdm, order=np.Inf) for djdm in gradient_values_opt], label=label)
+    its = range(1, len(gradient_values_opt)+1)
+    axes.loglog(its, [vecnorm(djdm, order=np.Inf) for djdm in gradient_values_opt], label=label)
+axes.set_xticks([1, 10, 100])
+axes.set_yticks([2e3, 8e3])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor')
+    axis.grid(True, which='major')
 axes.set_xlabel("Iteration")
 axes.set_ylabel(r"$\ell_\infty$-norm of gradient")
 axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_dJdm', fpath=plot_dir, extensions=extensions)
+if not plot_timeseries:
+    sys.exit(0)
 
 
 # --- Timeseries for optimised run
 
+print_output("Plotting timeseries for optimised run...")
 msg = "Cannot plot timeseries for optimised controls on mesh {:d} because the data don't exist."
 for level in levels:
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
+    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(24, 20))
     for i, gauge in enumerate(gauges):
         fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
         if not os.path.isfile(fname):
             print_output(msg.format(level))
-            sys.exit(0)
+            break
         op.gauges[gauge]['opt'] = np.load(fname)
 
         T = np.array(op.gauges[gauge]['times'])/60
         TT = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
         ax = axes[i//N, i % N]
         ax.plot(TT, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
-        ax.plot(TT, op.gauges[gauge]['init'], '--x', label=gauge + ' initial guess', **kwargs)
+        ax.plot(TT, op.gauges[gauge]['init'], '--x', label=gauge + ' init.', **kwargs)
         TT = np.linspace(T[0], T[-1], len(op.gauges[gauge]['opt']))
-        ax.plot(TT, op.gauges[gauge]['opt'], '--x', label=gauge + ' optimised', **kwargs)
+        ax.plot(TT, op.gauges[gauge]['opt'], '--x', label=gauge + ' opt.', **kwargs)
         ax.legend(loc='best')
         ax.set_xlabel('Time (min)', fontsize=fontsize)
         ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-        plt.xticks(fontsize=fontsize_tick)
-        plt.yticks(fontsize=fontsize_tick)
+        ax.xaxis.set_tick_params(labelsize=fontsize_tick)
+        ax.yaxis.set_tick_params(labelsize=fontsize_tick)
         ax.grid()
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
