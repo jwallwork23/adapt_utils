@@ -16,6 +16,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
     """
     def __init__(self, *args, **kwargs):
         super(AdaptiveDiscreteAdjointProblem, self).__init__(*args, **kwargs)
+        op = self.op
         self.tape = get_working_tape()
         if self.num_meshes > 1:
             raise NotImplementedError  # TODO: Allow multiple meshes
