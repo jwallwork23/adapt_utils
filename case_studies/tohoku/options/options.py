@@ -19,9 +19,10 @@ class TohokuOptions(TsunamiOptions):
     There are timeseries data associated with a number of pressure and GPS gauges available, both
     for source inversion experiments and also for validating model runs. There are five gauge
     classifications ('near_field_pressure', 'mid_field_pressure', 'far_field_pressure',
-    'near_field_gps', 'far_field_gps'), each of which has at least two gauges associated. The
-    arrival times, departure times, weighting and sampling frequency for each classification are
-    customisable, as are the choices of gauges / gauge classifications to include or ignore.
+    'southern_pressure', 'near_field_gps', 'far_field_gps'), each of which has at least two gauges
+    associated. The arrival times, departure times, weighting and sampling frequency for each
+    classification are customisable, as are the choices of gauges / gauge classifications to
+    include or ignore.
 
     After modifying the details as desired, call :attr:`get_gauges` to pass the data into the
     :attr:`gauges` dictionary appropriately. Only gauges contained in that dictionary will be used
@@ -128,13 +129,20 @@ class TohokuOptions(TsunamiOptions):
         }
         self.mid_field_pressure_gauges = {
             "gauges": ("KPG1", "KPG2", "21418"),
-            "arrival_time": 15*60.0,
+            "arrival_time": 10*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
             "sample": 60,
         }
+        self.southern_pressure_gauges = {
+            "gauges": ("MPG1", "MPG2"),
+            "arrival_time": 80*60.0,
+            "departure_time": self.end_time,
+            "weight": Constant(1.0),
+            "sample": 1,
+        }
         self.far_field_pressure_gauges = {
-            "gauges": ("21401", "21413", "21419", "MPG1", "MPG2"),
+            "gauges": ("21401", "21413", "21419"),
             "arrival_time": 50*60.0,
             "departure_time": self.end_time,
             "weight": Constant(1.0),
@@ -142,7 +150,7 @@ class TohokuOptions(TsunamiOptions):
         }
         self.near_field_gps_gauges = {
             "gauges": ("801", "802", "803", "804", "806", "807"),
-            "arrival_time": 5*60.0,
+            "arrival_time": 0*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
             "sample": 1,
@@ -158,6 +166,7 @@ class TohokuOptions(TsunamiOptions):
             "near_field_pressure",
             "mid_field_pressure",
             "far_field_pressure",
+            "southern_pressure",
             "near_field_gps",
             # "far_field_gps",
         )

@@ -45,11 +45,15 @@ for smoothed in (True, False):
 
     # Plot timeseries data
     N = int(np.ceil(np.sqrt(num_gauges)))
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(16, 12))
+    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(18, 13))
     for i, gauge in enumerate(gauges):
         ax = axes[i//N, i % N]
         ax.plot(time_minutes, op.gauges[gauge]['data'], '--x', label=gauge, **plotting_kwargs)
-        ax.legend(loc='best', fontsize=fontsize_tick)
+        # ax.legend(loc='best', fontsize=fontsize_tick)
+        # leg = ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_tick)
+        leg = ax.legend(handlelength=0, fontsize=fontsize_tick)
+        for item in leg.legendHandles:
+            item.set_visible(False)
         ax.set_xlabel(r'Time [$\mathrm{min}$]', fontsize=fontsize)
         ax.set_ylabel(r'Elevation [$\mathrm m$]', fontsize=fontsize)
         t0 = op.gauges[gauge]["arrival_time"]/60
