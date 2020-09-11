@@ -1264,11 +1264,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
         export_func = export_func or self.op.get_export_func(self, i)
-        # if i == 0:
-        if export_func is not None:
-            export_func()
-        self.callbacks[i].evaluate(mode='export')
-        self.callbacks[i].evaluate(mode='timestep')
+        if i == 0:
+            if export_func is not None:
+                export_func()
+            self.callbacks[i].evaluate(mode='export')
+            self.callbacks[i].evaluate(mode='timestep')
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
