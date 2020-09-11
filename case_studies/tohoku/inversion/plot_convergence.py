@@ -17,17 +17,26 @@ parser = argparse.ArgumentParser()
 # Inversion
 parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
 parser.add_argument("-levels", help="Number of mesh resolution levels considered (default 3)")
-parser.add_argument("-real_data", help="Toggle whether to use real data (default False)")
-parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data (default False)")
+parser.add_argument("-real_data", help="""
+    Toggle whether to use real data (default False). If True then the default directory name will be
+    'realistic', otherwise it will be 'synthetic'.
+    """)
+parser.add_argument("-noisy_data", help="""
+    Toggle whether to consider timeseries data which has *not* been sampled (default False).
+    """)
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
 
 # I/O
-parser.add_argument("-extension", help="Extension for output directory, to follow realistic or synthetic")
+parser.add_argument("-extension", help="""
+    Extension for output directory. The directory name will have the form
+        realistic_<ext> or synthetic_<ext>,
+    depending on whether the -real_data flag is used.
+    """)
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
-parser.add_argument("-plot_convergence_only", help="Only plot convergence curves (not timeseries)")
+parser.add_argument("-plot_initial_guess", help="Plot initial guess timeseries")
 
 
 # --- Set parameters
@@ -49,7 +58,7 @@ if plot_png:
 if len(extensions) == 0:
     print_output("Nothing to plot.")
     sys.exit(0)
-plot_timeseries = not bool(args.plot_convergence_only or False)
+plot_init = not bool(args.plot_initial_guess or False)
 real_data = bool(args.real_data or False)
 timeseries_type = "timeseries"
 if bool(args.continuous_timeseries or False):
@@ -86,42 +95,47 @@ dirname = os.path.join(os.path.dirname(__file__), basis)
 di = 'realistic' if real_data else 'synthetic'
 if args.extension is not None:
     di = '_'.join([di, args.extension])
-di = create_directory(os.path.join(dirname, 'outputs', di))
-op.di = create_directory(os.path.join(di, 'discrete'))
-plot_dir = create_directory(os.path.join(di, 'plots'))
-create_directory(os.path.join(plot_dir, 'discrete'))
+plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots', di, basis))
+di = os.path.join(dirname, 'outputs', di)
+op.di = os.path.join(di, 'discrete')
+for fpath in (di, op.di):
+    if not os.path.exists(fpath):
+        raise IOError("Filepath {:s} does not exist.".format(fpath))
+# plot_dir = create_directory(os.path.join(di, 'plots'))
 
 
 # --- Plot timeseries under initial guess
 
-# if plot_timeseries:
-#     print_output("Plotting initial timeseries against gauge data...")
-#     N = int(np.ceil(np.sqrt(len(gauges))))
-#     for level in levels:
-#         fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
-#         for i, gauge in enumerate(gauges):
-#             fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
-#             op.gauges[gauge]['data'] = np.load(fname)
-#             fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
-#             op.gauges[gauge]['init'] = np.load(fname)
-#
-#             T = np.array(op.gauges[gauge]['times'])/60
-#             T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
-#             ax = axes[i//N, i % N]
-#             ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
-#             ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' init.', **kwargs)
-#             ax.legend(loc='best', fontsize=fontsize_legend)
-#             if i//N == 3:
-#                 ax.set_xlabel('Time (min)', fontsize=fontsize)
-#             if i % N == 0:
-#                 ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-#             ax.xaxis.set_tick_params(labelsize=fontsize_tick)
-#             ax.yaxis.set_tick_params(labelsize=fontsize_tick)
-#             ax.grid()
-#         for i in range(len(gauges), N*N):
-#             axes[i//N, i % N].axis(False)
-#         plt.tight_layout()
-#         savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+if plot_init:
+    print_output("Plotting initial timeseries against gauge data...")
+    N = int(np.ceil(np.sqrt(len(gauges))))
+    for level in levels:
+        fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
+        for i, gauge in enumerate(gauges):
+            fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
+            op.gauges[gauge]['data'] = np.load(fname)
+            fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
+            op.gauges[gauge]['init'] = np.load(fname)
+
+            T = np.array(op.gauges[gauge]['times'])/60
+            T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
+            ax = axes[i//N, i % N]
+            ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
+            ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' init.', **kwargs)
+            ax.legend(loc='best', fontsize=fontsize_legend)
+            if i//N == 3:
+                ax.set_xlabel('Time (min)', fontsize=fontsize)
+            if i % N == 0:
+                ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+            ax.xaxis.set_tick_params(labelsize=fontsize_tick)
+            ax.yaxis.set_tick_params(labelsize=fontsize_tick)
+            ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
+            ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
+            ax.grid()
+        for i in range(len(gauges), N*N):
+            axes[i//N, i % N].axis(False)
+        plt.tight_layout()
+        savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
 
 
 # --- Optimisation progress
@@ -144,7 +158,7 @@ for axis in (axes.xaxis, axes.yaxis):
     axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Square timeseries error QoI")
-plot_dir = os.path.join(plot_dir, 'discrete')
+# plot_dir = os.path.join(plot_dir, 'discrete')
 axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_J', fpath=plot_dir, extensions=extensions)
 
@@ -178,8 +192,6 @@ axes.set_xlabel("Iteration")
 axes.set_ylabel(r"$\ell_\infty$-norm of gradient")
 axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_dJdm', fpath=plot_dir, extensions=extensions)
-if not plot_timeseries:
-    sys.exit(0)
 
 
 # --- Timeseries for optimised run
@@ -215,6 +227,8 @@ for level in levels:
             ax.set_ylabel('Elevation (m)', fontsize=fontsize)
         ax.xaxis.set_tick_params(labelsize=fontsize_tick)
         ax.yaxis.set_tick_params(labelsize=fontsize_tick)
+        ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
+        ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
         t0 = op.gauges[gauge]["arrival_time"]/60
         tf = op.gauges[gauge]["departure_time"]/60
         ax.set_xlim([t0, tf])
