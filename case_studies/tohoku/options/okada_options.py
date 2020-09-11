@@ -431,9 +431,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
     # --- Projection and interpolation into Okada basis
 
     def project(self, prob, source):
-        raise NotImplementedError("""
-            Projection not implemented in Okada bases (and it probably isn't what you want anyway).
-            Use interpolate instead.""")
+        raise NotImplementedError  # TODO: Newton method
 
     def interpolate(self, prob, source, tag=0):
         r"""

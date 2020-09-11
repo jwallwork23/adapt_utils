@@ -150,7 +150,7 @@ class TohokuRadialBasisOptions(TohokuOptions):
         N = self.nx*self.ny
 
         # Assemble mass matrix
-        self.print_debug("INTERPOLATION: Assembling mass matrix...")
+        self.print_debug("PROJECTION: Assembling mass matrix...")
         A = np.zeros((N, N))
         for i in range(N):
             for j in range(i+1):
@@ -160,15 +160,15 @@ class TohokuRadialBasisOptions(TohokuOptions):
                 A[i, j] = A[j, i]
 
         # Assemble RHS
-        self.print_debug("INTERPOLATION: Assembling RHS...")
+        self.print_debug("PROJECTION: Assembling RHS...")
         b = np.array([assemble(phi[i]*source*dx) for i in range(N)])
 
         # Create solution vector and solve
-        self.print_debug("INTERPOLATION: Solving linear system...")
+        self.print_debug("PROJECTION: Solving linear system...")
         m = np.linalg.solve(A, b)
 
         # Assign values
-        self.print_debug("INTERPOLATION: Assigning values...")
+        self.print_debug("PROJECTION: Assigning values...")
         for i, mi in enumerate(m):
             self.control_parameters[i].assign(mi)
 
