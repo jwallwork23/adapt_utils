@@ -140,8 +140,7 @@ else:
         # f_src = op_src.set_initial_condition(swp)
 
         # Create Radial parameter object
-        kwargs_src = {}
-        kwargs_src.update(kwargs)
+        kwargs_src = kwargs.copy()
         kwargs_src['control_parameters'] = [6.0, ]
         kwargs_src['nx'] = 1
         kwargs_src['ny'] = 1
