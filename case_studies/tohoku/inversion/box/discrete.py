@@ -5,6 +5,7 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+import sys
 
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 # from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
@@ -42,6 +43,7 @@ parser.add_argument("-zero_initial_guess", help="""
     Toggle between a zero initial guess and a static interpretation of the dynamic source generated
     in [Shao et al. 2012].
     """)
+parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial guess (default 6.0)")
 
 # I/O and debugging
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
@@ -89,7 +91,6 @@ family = args.family or 'dg-cg'
 stabilisation = args.stabilisation or 'lax_friedrichs'
 if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
-# N = int(args.okada_grid_resolution or 51)
 zero_init = bool(args.zero_initial_guess or False)
 kwargs = {
     'level': level,
@@ -132,17 +133,17 @@ else:
         print_output("Projecting initial guess...")
 
         # Create Okada parameter object
-        # kwargs_src = {"okada_grid_resolution": N}
-        # kwargs_src.update(kwargs)
+        # kwargs_src = kwargs.copy()
+        # kwargs_src['okada_grid_resolution'] = int(args.okada_grid_resolution or 51)
         # op_src = TohokuOkadaBasisOptions(mesh=op.default_mesh, **kwargs_src)
         # swp = AdaptiveProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
         # f_src = op_src.set_initial_condition(swp)
 
         # Create Radial parameter object
         kwargs_src = kwargs.copy()
-        kwargs_src['control_parameters'] = [6.0, ]
-        kwargs_src['nx'] = 1
-        kwargs_src['ny'] = 1
+        gaussian_scaling = float(args.gaussian_scaling or 6.0)
+        kwargs_src['control_parameters'] = [gaussian_scaling, ]
+        kwargs_src['nx'], kwargs_src['ny'] = 1, 1
         op_src = TohokuRadialBasisOptions(mesh=op.default_mesh, **kwargs_src)
         swp = AdaptiveProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
         swp.set_initial_condition()
@@ -157,8 +158,8 @@ else:
         if plot_any:
             # levels = np.linspace(-6, 16, 51)
             # ticks = np.linspace(-5, 15, 9)
-            levels = np.linspace(-0.5, 6.5, 51)
-            ticks = np.linspace(0, 6, 7)
+            levels = np.linspace(-0.1*gaussian_scaling, 1.1*gaussian_scaling, 51)
+            ticks = np.linspace(0, gaussian_scaling, 5)
 
             # Project into P1 for plotting
             swp.set_initial_condition()
@@ -171,16 +172,16 @@ else:
             xlim = [utm_corners[0][0], utm_corners[1][0]]
             ylim = [utm_corners[0][1], utm_corners[2][1]]
 
-            # Plot initial guess in both (original) Okada basis and also in (projected) box basis
-            for f, name in zip((f_src, f_box), ('source', 'box')):
-                fig, axes = plt.subplots(figsize=(4.5, 4))
-                cbar = fig.colorbar(tricontourf(f, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
-                cbar.set_ticks(ticks)
-                axes.set_xlim(xlim)
-                axes.set_ylim(ylim)
-                axes.axis(False)
-                fname = 'initial_guess_{:s}_{:d}'.format(name, level)
-                savefig(fname, fpath=plot_dir, extensions=extensions)
+            # Plot initial guess
+            fig, axes = plt.subplots(figsize=(4.5, 4))
+            cbar = fig.colorbar(tricontourf(f_box, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
+            cbar.set_ticks(ticks)
+            axes.set_xlim(xlim)
+            axes.set_ylim(ylim)
+            axes.axis(False)
+            savefig('initial_guess_box_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+if plot_only:
+    sys.exit(0)
 
 
 # --- Optimisation
