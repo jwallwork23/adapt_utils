@@ -102,18 +102,32 @@ if plot_init:
     print_output("Plotting initial timeseries against gauge data...")
     N = int(np.ceil(np.sqrt(len(gauges))))
     for level in levels:
+        mse = 0.0
         fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
         for i, gauge in enumerate(gauges):
+
+            # Load data
             fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
             op.gauges[gauge]['data'] = np.load(fname)
             fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
             op.gauges[gauge]['init'] = np.load(fname)
 
+            # Check errors
+            data = np.array(op.gauges[gauge]['data'])
+            init = np.array(op.gauges[gauge]['init'])
+            n = len(data)
+            init_error = (init - data)**2
+            error = init_error.sum()/n
+            msg = "{:5s} level {:d} initial mean square error: {:.4e}"
+            print_output(msg.format(gauge, level, error))
+            mse += error
+
+            # Plot timeseries
             T = np.array(op.gauges[gauge]['times'])/60
-            T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
+            T = np.linspace(T[0], T[-1], n)
             ax = axes[i//N, i % N]
-            ax.plot(T, op.gauges[gauge]['data'], '-', **kwargs)
-            ax.plot(T, op.gauges[gauge]['init'], '-', label=gauge, **kwargs)
+            ax.plot(T, data, '-', **kwargs)
+            ax.plot(T, init, '-', label=gauge, **kwargs)
             ax.legend(loc='best', fontsize=fontsize_legend)
             ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
             if i//N == 3:
@@ -125,6 +139,7 @@ if plot_init:
             ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
             ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
             ax.grid()
+        print_output("Level {:d} overall initial mean square error: {:.4e}".format(level, mse))
         for i in range(len(gauges), N*N):
             axes[i//N, i % N].axis(False)
         plt.tight_layout()
@@ -154,7 +169,7 @@ axes.set_ylabel("Square timeseries error QoI")
 axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_J', fpath=plot_dir, extensions=extensions)
 
-# Plot final QoI values  # TODO: Plot all basis functions in the same figure
+# Plot final QoI values
 print_output("Plotting final QoI values...")
 fig, axes = plt.subplots(figsize=(8, 6))
 axes.semilogx(op.num_cells[:len(qois)], qois, '-x')
@@ -194,21 +209,35 @@ for level in levels:
     N = int(np.ceil(np.sqrt(len(gauges))))
     fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
     plotted = False
+    mse = 0.0
     for i, gauge in enumerate(gauges):
-        fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
-        op.gauges[gauge]['data'] = np.load(fname)
+
+        # Load data
+        if 'data' not in op.gauges[gauge] or op.gauges[gauge]['data'] == []:
+            fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
+            op.gauges[gauge]['data'] = np.load(fname)
         fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
         if not os.path.isfile(fname):
             print_output(msg.format(level))
             break
         op.gauges[gauge]['opt'] = np.load(fname)
 
+        # Check errors
+        data = np.array(op.gauges[gauge]['data'])
+        opt = np.array(op.gauges[gauge]['opt'])
+        n = len(data)
+        init_error = (opt - data)**2
+        error = init_error.sum()/n
+        msg = "{:5s} level {:d} optimised mean square error: {:.4e}"
+        print_output(msg.format(gauge, level, error))
+        mse += error
+
+        # Plot timeseries
         T = np.array(op.gauges[gauge]['times'])/60
+        T = np.linspace(T[0], T[-1], n)
         ax = axes[i//N, i % N]
-        data = op.gauges[gauge]['data']
-        ax.plot(np.linspace(T[0], T[-1], len(data)), data, '-', **kwargs)
-        opt = op.gauges[gauge]['opt']
-        ax.plot(np.linspace(T[0], T[-1], len(opt)), opt, '-', label=gauge, **kwargs)
+        ax.plot(T, data, '-', **kwargs)
+        ax.plot(T, opt, '-', label=gauge, **kwargs)
         ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
         if i//N == 3:
             ax.set_xlabel('Time (min)', fontsize=fontsize)
@@ -225,6 +254,7 @@ for level in levels:
         plotted = True
     if not plotted:
         continue
+    print_output("Level {:d} overall optimised mean square error: {:.4e}".format(level, mse))
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
