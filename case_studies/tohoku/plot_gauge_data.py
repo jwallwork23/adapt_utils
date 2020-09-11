@@ -1,3 +1,5 @@
+from thetis import create_directory
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -15,9 +17,7 @@ plotting_kwargs = {
 
 # Create output directories
 dirname = os.path.dirname(__file__)
-di = os.path.join(dirname, 'outputs')
-if not os.path.exists(di):
-    os.makedirs(di)
+di = create_directory(os.path.join(dirname, 'plots'))
 
 # Instantiate TohokuOptions object and setup interpolator
 op = TohokuOptions()

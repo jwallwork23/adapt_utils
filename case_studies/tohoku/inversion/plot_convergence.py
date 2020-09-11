@@ -58,7 +58,7 @@ if plot_png:
 if len(extensions) == 0:
     print_output("Nothing to plot.")
     sys.exit(0)
-plot_init = not bool(args.plot_initial_guess or False)
+plot_init = bool(args.plot_initial_guess or False)
 real_data = bool(args.real_data or False)
 timeseries_type = "timeseries"
 if bool(args.continuous_timeseries or False):
