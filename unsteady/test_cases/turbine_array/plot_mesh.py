@@ -70,6 +70,30 @@ else:
     zoom_ticks = (np.linspace(-600, 600, 7), np.linspace(-200, 200, 9))
 
 
+# --- Get mesh stats
+
+stats = """
+Mesh stats
+==========
+Element count:  {:9d}
+Vertex count:   {:9d}
+Min. cell size: {:9.4f} m
+Max. cell size: {:9.4f} m
+Min. angle:     {:9.4f} degrees
+"""
+cell_sizes = project(CellSize(mesh), FunctionSpace(mesh, "DG", 0))
+with cell_sizes.dat.vec_ro as cs:
+    with get_minimum_angles_2d(mesh).dat.vec_ro as ma:
+        stats = stats.format(
+            mesh.num_cells(), mesh.num_vertices(), cs.min()[1], cs.max()[1], ma.min()[1],
+        )
+print_output(stats)
+di = fpath or create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
+if args.load_mesh is not None:
+    with open(os.path.join(di, 'log_{:s}'.format(args.load_mesh)), 'w+') as log:
+        log.write(stats)
+
+
 # --- Plot whole mesh
 
 fig, axes = plt.subplots(figsize=(12, 6))
@@ -81,17 +105,11 @@ axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$")
 axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$")
 axes.set_yticks(np.linspace(-W/2, W/2, 5))
 plt.tight_layout()
-
-# Annotate turbines
 for i, loc in enumerate(op.region_of_interest):
     patch_kwargs["edgecolor"] = "C{:d}".format(i // 3)
     centre = (loc[0]-loc[2]/2, loc[1]-loc[3]/2)
     axes.add_patch(ptch.Rectangle(centre, loc[2], loc[3], **patch_kwargs))
-
-# Save
-di = fpath or create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
-for ext in extensions:
-    plt.savefig(os.path.join(di, ".".join([fname, ext])))
+savefig(fname, di, extensions=extensions)
 
 
 # --- Zoom in on array region
@@ -100,7 +118,4 @@ axes.set_xlim(zoom_lim[0])
 axes.set_ylim(zoom_lim[1])
 axes.set_xticks(zoom_ticks[0])
 axes.set_yticks(zoom_ticks[1])
-
-# Save
-for ext in extensions:
-    plt.savefig(os.path.join(di, ".".join([fname + "_zoom", ext])))
+savefig(fname + "_zoom", di, extensions=extensions)
