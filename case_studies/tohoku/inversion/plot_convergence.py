@@ -94,7 +94,6 @@ op.di = os.path.join(di, 'discrete')
 for fpath in (di, op.di):
     if not os.path.exists(fpath):
         raise IOError("Filepath {:s} does not exist.".format(fpath))
-# plot_dir = create_directory(os.path.join(di, 'plots'))
 
 
 # --- Plot timeseries under initial guess
@@ -113,9 +112,10 @@ if plot_init:
             T = np.array(op.gauges[gauge]['times'])/60
             T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
             ax = axes[i//N, i % N]
-            ax.plot(T, op.gauges[gauge]['data'], '-x', label=gauge + ' data', **kwargs)
-            ax.plot(T, op.gauges[gauge]['init'], '-x', label=gauge + ' init.', **kwargs)
+            ax.plot(T, op.gauges[gauge]['data'], '-', **kwargs)
+            ax.plot(T, op.gauges[gauge]['init'], '-', label=gauge, **kwargs)
             ax.legend(loc='best', fontsize=fontsize_legend)
+            ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
             if i//N == 3:
                 ax.set_xlabel('Time (min)', fontsize=fontsize)
             if i % N == 0:
@@ -151,7 +151,6 @@ for axis in (axes.xaxis, axes.yaxis):
     axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Square timeseries error QoI")
-# plot_dir = os.path.join(plot_dir, 'discrete')
 axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_J', fpath=plot_dir, extensions=extensions)
 
@@ -205,15 +204,12 @@ for level in levels:
         op.gauges[gauge]['opt'] = np.load(fname)
 
         T = np.array(op.gauges[gauge]['times'])/60
-        TT = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
         ax = axes[i//N, i % N]
-        # ax.plot(TT, op.gauges[gauge]['data'], '-', label=gauge + ' data', **kwargs)
-        ax.plot(TT, op.gauges[gauge]['data'], '-', **kwargs)
-        # ax.plot(TT, op.gauges[gauge]['init'], '-', label=gauge + ' init.', **kwargs)
-        TT = np.linspace(T[0], T[-1], len(op.gauges[gauge]['opt']))
-        # ax.plot(TT, op.gauges[gauge]['opt'], '-', label=gauge + ' opt.', **kwargs)
-        ax.plot(TT, op.gauges[gauge]['opt'], '-', label=gauge, **kwargs)
-        ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_tick)
+        data = op.gauges[gauge]['data']
+        ax.plot(np.linspace(T[0], T[-1], len(data)), data, '-', **kwargs)
+        opt = op.gauges[gauge]['opt']
+        ax.plot(np.linspace(T[0], T[-1], len(opt)), opt, '-', label=gauge, **kwargs)
+        ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
         if i//N == 3:
             ax.set_xlabel('Time (min)', fontsize=fontsize)
         if i % N == 0:

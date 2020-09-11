@@ -5,7 +5,6 @@ import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import sys
 
 # from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
@@ -210,7 +209,6 @@ if optimise:
     func_values_opt = [J, ]
     gradient_values_opt = []
 
-
     def derivative_cb_post(j, dj, m):
         control = [mi.dat.data[0] for mi in m]
         djdm = [dji.dat.data[0] for dji in dj]
@@ -221,7 +219,6 @@ if optimise:
         np.save(fname.format('ctrl'), np.array(control_values_opt))
         np.save(fname.format('func'), np.array(func_values_opt))
         np.save(fname.format('grad'), np.array(gradient_values_opt))
-
 
     # Run BFGS optimisation
     opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
