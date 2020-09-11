@@ -17,10 +17,6 @@ parser = argparse.ArgumentParser()
 # Inversion
 parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
 parser.add_argument("-levels", help="Number of mesh resolution levels considered (default 3)")
-parser.add_argument("-real_data", help="""
-    Toggle whether to use real data (default False). If True then the default directory name will be
-    'realistic', otherwise it will be 'synthetic'.
-    """)
 parser.add_argument("-noisy_data", help="""
     Toggle whether to consider timeseries data which has *not* been sampled (default False).
     """)
@@ -28,9 +24,7 @@ parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuou
 
 # I/O
 parser.add_argument("-extension", help="""
-    Extension for output directory. The directory name will have the form
-        realistic_<ext> or synthetic_<ext>,
-    depending on whether the -real_data flag is used.
+    Extension for output directory. The directory name will have the form realistic_<ext>.
     """)
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
@@ -59,7 +53,6 @@ if len(extensions) == 0:
     print_output("Nothing to plot.")
     sys.exit(0)
 plot_init = bool(args.plot_initial_guess or False)
-real_data = bool(args.real_data or False)
 timeseries_type = "timeseries"
 if bool(args.continuous_timeseries or False):
     timeseries_type = "_".join([timeseries_type, "smooth"])
@@ -81,7 +74,7 @@ elif basis == 'okada':
     constructor = TohokuOkadaBasisOptions
 else:
     raise ValueError("Basis type '{:s}' not recognised.".format(basis))
-op = constructor(level=0, synthetic=not real_data, noisy_data=bool(args.noisy_data or False))
+op = constructor(level=0, synthetic=False, noisy_data=bool(args.noisy_data or False))
 gauges = list(op.gauges.keys())
 
 # Plotting parameters
@@ -92,7 +85,7 @@ kwargs = {'markevery': 5}
 
 # Setup output directories
 dirname = os.path.join(os.path.dirname(__file__), basis)
-di = 'realistic' if real_data else 'synthetic'
+di = 'realistic'
 if args.extension is not None:
     di = '_'.join([di, args.extension])
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots', di, basis))
@@ -120,8 +113,8 @@ if plot_init:
             T = np.array(op.gauges[gauge]['times'])/60
             T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
             ax = axes[i//N, i % N]
-            ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
-            ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' init.', **kwargs)
+            ax.plot(T, op.gauges[gauge]['data'], '-x', label=gauge + ' data', **kwargs)
+            ax.plot(T, op.gauges[gauge]['init'], '-x', label=gauge + ' init.', **kwargs)
             ax.legend(loc='best', fontsize=fontsize_legend)
             if i//N == 3:
                 ax.set_xlabel('Time (min)', fontsize=fontsize)
