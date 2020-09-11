@@ -35,10 +35,13 @@ parser.add_argument("-nonlinear", help="Toggle nonlinear model")
 
 # Inversion
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
-parser.add_argument("-real_data", help="Toggle whether to use real data")
 parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data")
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
 parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
+parser.add_argument("-zero_initial_guess", help="""
+    Toggle between a zero initial guess and a static interpretation of the dynamic source generated
+    in [Shao et al. 2012].
+    """)
 
 # I/O and debugging
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
@@ -71,7 +74,6 @@ if plot_pdf:
 if plot_png:
     extensions.append('png')
 plot_any = len(extensions) > 0
-real_data = bool(args.real_data or False)
 timeseries_type = "timeseries"
 if bool(args.continuous_timeseries or False):
     timeseries_type = "_".join([timeseries_type, "smooth"])
@@ -88,6 +90,7 @@ stabilisation = args.stabilisation or 'lax_friedrichs'
 if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
 N = int(args.okada_grid_resolution or 51)
+zero_init = bool(args.zero_initial_guess or False)
 kwargs = {
     'level': level,
     'nx': 13,
@@ -100,7 +103,7 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Inversion
-    'synthetic': not real_data,
+    'synthetic': False,
     'qoi_scaling': 1.0,
     'noisy_data': bool(args.noisy_data or False),
 
@@ -113,17 +116,22 @@ op = TohokuRadialBasisOptions(**kwargs)
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
-di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
+di = create_directory(os.path.join(dirname, 'outputs', 'realistic'))
 op.di = create_directory(os.path.join(di, 'discrete'))
 plot_dir = create_directory(os.path.join(di, 'plots'))
 create_directory(os.path.join(plot_dir, 'discrete'))
 
 
-# --- Synthetic run to get timeseries data
+# --- Set initial guess
 
-if not real_data:
+if zero_init:
+    print_output("Setting (near) zero initial guess...")
+    eps = 1.0e-03  # zero gives an error so just choose small
+    for control in op.control_parameters:
+        control.assign(eps)
+else:
     with stop_annotating():
-        print_output("Projecting optimal solution...")
+        print_output("Projecting initial guess...")
 
         # Create Okada parameter class and set the default initial conditionm
         kwargs_okada = {"okada_grid_resolution": N}
@@ -133,18 +141,18 @@ if not real_data:
         swp = AdaptiveProblem(op_okada, nonlinear=nonlinear, print_progress=op.debug)
         f_okada = op_okada.set_initial_condition(swp)
 
-        # Construct 'optimal' control vector by projection
+        # Project into radial basis
         swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
         op.project(swp, f_okada)
         # op.interpolate(swp, f_okada)
-        swp.set_initial_condition()
 
-        # Plot optimum solution
+        # Plot
         if plot_pdf or plot_png:
             levels = np.linspace(-6, 16, 51)
             ticks = np.linspace(-5, 15, 9)
 
             # Project into P1 for plotting
+            swp.set_initial_condition()
             f_radial = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
 
             # Get corners of zoom
@@ -153,7 +161,7 @@ if not real_data:
             xlim = [utm_corners[0][0], utm_corners[1][0]]
             ylim = [utm_corners[0][1], utm_corners[2][1]]
 
-            # Plot optimum in both (original) Okada basis and also in (projected) box basis
+            # Plot initial guess in both (original) Okada basis and also in (projected) radial basis
             for f, name in zip((f_okada, f_radial), ('okada', 'radial')):
                 fig, axes = plt.subplots(figsize=(4.5, 4))
                 cbar = fig.colorbar(tricontourf(f, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
@@ -161,27 +169,11 @@ if not real_data:
                 axes.set_xlim(xlim)
                 axes.set_ylim(ylim)
                 axes.axis(False)
-                fname = 'optimum_{:s}_{:d}'.format(name, level)
+                fname = 'initial_guess_{:s}_{:d}'.format(name, level)
                 savefig(fname, fpath=plot_dir, extensions=extensions)
-
-        # Synthetic run
-        if plot_only:
-            sys.exit(0)
-        print_output("Run forward to get 'data'...")
-        swp.setup_solver_forward(0)
-        swp.solve_forward_step(0)
-        for gauge in op.gauges:
-            op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
 
 
 # --- Optimisation
-
-gauges = list(op.gauges.keys())
-
-# Set zero initial guess for the optimisation  # NOTE: zero gives an error so just choose small
-eps = 1.0e-03
-for control in op.control_parameters:
-    control.assign(eps)
 
 # Solve the forward problem with initial guess
 op.save_timeseries = True
@@ -191,6 +183,7 @@ swp.solve_forward()
 J = op.J
 
 # Save timeseries
+gauges = list(op.gauges.keys())
 for gauge in gauges:
     fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
     np.save(fname, op.gauges[gauge]['data'])
@@ -238,32 +231,13 @@ for gauge in gauges:
 tape = get_working_tape()
 tape.clear_tape()
 
-# Plot optimised source against optimum
-swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=op.debug)
-swp.set_initial_condition()
-plot_dir = os.path.join(plot_dir, 'discrete')
-if not real_data and plot_any:
-    fig, axes = plt.subplots(ncols=2, figsize=(9, 4))
-    f_opt = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
-    levels = np.linspace(-6, 16, 51)
-    ticks = np.linspace(-5, 15, 9)
-    for f, ax in zip((f_radial, f_opt), (axes[0], axes[1])):
-        cbar = fig.colorbar(tricontourf(f, axes=ax, levels=levels, cmap='coolwarm'), ax=ax)
-        cbar.set_ticks(ticks)
-        ax.set_xlim(xlim)
-        ax.set_ylim(ylim)
-        ax.axis(False)
-    axes[0].set_title("Optimum source field")
-    axes[1].set_title("Optimised source field")
-    savefig('optimised_source_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
-
 
 # --- Compare timeseries
 
 # Run forward again so that we can compare timeseries
 print_output("Run to plot optimised timeseries...")
-swp.setup_solver_forward_step(0)
-swp.solve_forward_step(0)
+swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=op.debug)
+swp.solve_forward()
 J = swp.quantity_of_interest()
 
 # Save timeseries
