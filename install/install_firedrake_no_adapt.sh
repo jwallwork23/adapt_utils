@@ -45,7 +45,3 @@ source $FIREDRAKE_DIR/bin/activate
 cd $FIREDRAKE_DIR/src/firedrake/demos
 make
 python3 helmholtz/helmholtz.py
-
-# Install pip dependencies for adapt_utils
-python3 -m pip install matplotlib netCDF4 numpy pandas scipy utide
-# python3 -m pip install jupyter qmesh

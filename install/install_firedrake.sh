@@ -61,7 +61,3 @@ source $FIREDRAKE_DIR/bin/activate
 # Very basic test of installation
 cd $FIREDRAKE_DIR/src/firedrake
 python3 tests/test_adapt_2d.py
-
-# Install pip dependencies for adapt_utils
-python3 -m pip install matplotlib netCDF4 numpy pandas scipy utide
-# python3 -m pip install jupyter qmesh
