@@ -38,5 +38,12 @@ export CLAW_SRC=$VIRTUAL_ENV/src/clawpack_src
 python3 -m pip install --src=$CLAW_SRC -e git+https://github.com/clawpack/clawpack.git@v5.7.0#egg=clawpack-v5.7.0
 export CLAW=$CLAW_SRC/clawpack-v5-7-0
 
+# Basic test of installation
+if [ ! -e "$CLAW" ]; then
+    echo "CLAW environment variable $CLAW does not exist."
+    exit 1
+fi
+python3 -c "import clawpack"
+
 # Install PyADOL-C
 # TODO
