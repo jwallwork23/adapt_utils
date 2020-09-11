@@ -7,8 +7,9 @@ import numpy as np
 import os
 import sys
 
-from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
+# from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
+from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.norms import total_variation, vecnorm
 from adapt_utils.plotting import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -28,7 +29,7 @@ parser = argparse.ArgumentParser()
 
 # Model
 parser.add_argument("-level", help="Mesh resolution level")
-parser.add_argument("-okada_grid_resolution", help="Mesh resolution level for the Okada grid")
+# parser.add_argument("-okada_grid_resolution", help="Mesh resolution level for the Okada grid")
 parser.add_argument("-family", help="Finite element pair")
 parser.add_argument("-stabilisation", help="Stabilisation approach")
 parser.add_argument("-nonlinear", help="Toggle nonlinear model")
@@ -89,7 +90,7 @@ family = args.family or 'dg-cg'
 stabilisation = args.stabilisation or 'lax_friedrichs'
 if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
-N = int(args.okada_grid_resolution or 51)
+# N = int(args.okada_grid_resolution or 51)
 zero_init = bool(args.zero_initial_guess or False)
 kwargs = {
     'level': level,
@@ -131,25 +132,39 @@ else:
     with stop_annotating():
         print_output("Projecting initial guess...")
 
-        # Create Okada parameter class and set the default initial conditionm
-        kwargs_okada = {"okada_grid_resolution": N}
-        kwargs_okada.update(kwargs)
-        op_okada = TohokuOkadaBasisOptions(mesh=op.default_mesh, **kwargs_okada)
-        swp = AdaptiveProblem(op_okada, nonlinear=nonlinear, print_progress=op.debug)
-        f_okada = op_okada.set_initial_condition(swp)
+        # Create Okada parameter object
+        # kwargs_src = {"okada_grid_resolution": N}
+        # kwargs_src.update(kwargs)
+        # op_src = TohokuOkadaBasisOptions(mesh=op.default_mesh, **kwargs_src)
+        # swp = AdaptiveProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
+        # f_src = op_src.set_initial_condition(swp)
+
+        # Create Radial parameter object
+        kwargs_src = {}
+        kwargs_src.update(kwargs)
+        kwargs_src['control_parameters'] = [6.0, ]
+        kwargs_src['nx'] = 1
+        kwargs_src['ny'] = 1
+        op_src = TohokuRadialBasisOptions(mesh=op.default_mesh, **kwargs_src)
+        swp = AdaptiveProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
+        swp.set_initial_condition()
+        f_src = swp.fwd_solutions[0].split()[1]
 
         # Project into box basis
         swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
-        op.project(swp, f_okada)
-        # op.interpolate(swp, f_okada)
+        op.project(swp, f_src)
+        # op.interpolate(swp, f_src)
 
         # Plot
         if plot_any:
-            levels = np.linspace(-6, 16, 51)
-            ticks = np.linspace(-5, 15, 9)
+            # levels = np.linspace(-6, 16, 51)
+            # ticks = np.linspace(-5, 15, 9)
+            levels = np.linspace(-0.5, 6.5, 51)
+            ticks = np.linspace(0, 6, 7)
 
             # Project into P1 for plotting
             swp.set_initial_condition()
+            f_src = project(f_src, swp.P1[0])
             f_box = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
 
             # Get corners of zoom
@@ -159,7 +174,7 @@ else:
             ylim = [utm_corners[0][1], utm_corners[2][1]]
 
             # Plot initial guess in both (original) Okada basis and also in (projected) box basis
-            for f, name in zip((f_okada, f_box), ('okada', 'box')):
+            for f, name in zip((f_src, f_box), ('source', 'box')):
                 fig, axes = plt.subplots(figsize=(4.5, 4))
                 cbar = fig.colorbar(tricontourf(f, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
                 cbar.set_ticks(ticks)
