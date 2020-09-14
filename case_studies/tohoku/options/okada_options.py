@@ -1,3 +1,5 @@
+from firedrake import PointNotInDomainError
+
 import numpy as np
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
@@ -59,6 +61,8 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         self.ly = kwargs.get('okada_grid_length_lat', 10)
         self.xmin = kwargs.get('okada_grid_lon_min', 138)
         self.ymin = kwargs.get('okada_grid_lat_min', 32)
+        self.xmax = kwargs.get('okada_grid_lon_max', self.xmin + self.lx)
+        self.ymax = kwargs.get('okada_grid_lat_max', self.ymin + self.ly)
         self.subfaults = []
         self.get_subfaults()
         self.all_controls = (
@@ -168,16 +172,24 @@ class TohokuOkadaBasisOptions(TohokuOptions):
 
         # Create a lon-lat grid upon which to represent the source
         if self.N is not None:
-            x = np.linspace(self.xmin, self.xmin + self.lx, self.N)
-            y = np.linspace(self.ymin, self.ymin + self.ly, self.N)
-            coords = (x, y)
+            x = np.linspace(self.xmin, self.xmax, self.N)
+            y = np.linspace(self.ymin, self.ymax, self.N)
+            self.coords = (x, y)
         else:
             if not hasattr(self, 'lonlat_mesh'):
                 self.get_lonlat_mesh()
-            coords = (self.lonlat_mesh.coordinates.dat.data, )
+            self.indices = []
+            self.coords = []
+            for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
+                if (self.xmin < xy[0] < self.xmax) and (self.ymin < xy[1] < self.ymax):
+                    self.indices.append(i)
+                    self.coords.append(xy)
+            if len(self.coords) == 0:
+                raise PointNotInDomainError("Source region does not lie in domain.")
+            self.coords = (np.array(self.coords), )
 
         # Create fault
-        self.fault = Fault(*coords, subfaults=self.subfaults)
+        self.fault = Fault(*self.coords, subfaults=self.subfaults)
 
     def set_initial_condition(self, prob, annotate_source=False, **kwargs):
         """
@@ -199,17 +211,20 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         # Create fault topography
         self.create_topography(annotate=annotate_source, **kwargs)
 
-        # Interpolate it using SciPy
-        surf = firedrake.Function(prob.P1[0])
-        if not hasattr(self, 'lonlat_mesh'):
-            self.get_lonlat_mesh()
-        surf.dat.data[:] = griddata(
-            (self.fault.dtopo.X, self.fault.dtopo.Y),
-            self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape),
-            self.lonlat_mesh.coordinates.dat.data,
-            method='linear',
-            fill_value=0.0,
-        )
+        if self.N is not None:  # Interpolate it using SciPy
+            # TODO: Revert to RectangularBivariateSpline
+            if not hasattr(self, 'lonlat_mesh'):
+                self.get_lonlat_mesh()
+            surf.dat.data[:] = griddata(
+                (self.fault.dtopo.X, self.fault.dtopo.Y),
+                self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape),
+                self.coords,
+                method='linear',
+                fill_value=0.0,
+            )
+        else:  # Just insert the data at the appropriate nodes, assuming zero elsewhere
+            surf = firedrake.Function(prob.P1[0])
+            surf.dat.data[self.indices] = self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape)
 
         # Assume zero initial velocity and interpolate into the elevation space
         u, eta = prob.fwd_solutions[0].split()
