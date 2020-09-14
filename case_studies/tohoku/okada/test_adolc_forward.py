@@ -59,7 +59,7 @@ F = np.sum(F, axis=0)
 dFdm = dFdm.reshape(190, N, 4)
 
 if plot_png:
-    from thetis import create_directory, tricontourf
+    from thetis import create_directory
     import os
     import matplotlib.pyplot as plt
     from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm

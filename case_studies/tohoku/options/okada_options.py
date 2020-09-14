@@ -212,7 +212,6 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         self.create_topography(annotate=annotate_source, **kwargs)
 
         if self.N is not None:  # Interpolate it using SciPy
-            # TODO: Revert to RectangularBivariateSpline
             if not hasattr(self, 'lonlat_mesh'):
                 self.get_lonlat_mesh()
             surf.dat.data[:] = griddata(
