@@ -167,11 +167,13 @@ class TohokuOkadaBasisOptions(TohokuOptions):
             self.subfaults.append(subfault)
 
         # Create a lon-lat grid upon which to represent the source
-        x = np.linspace(self.xmin, self.xmin + self.lx, self.N)
-        y = np.linspace(self.ymin, self.ymin + self.ly, self.N)
+        # x = np.linspace(self.xmin, self.xmin + self.lx, self.N)
+        # y = np.linspace(self.ymin, self.ymin + self.ly, self.N)
 
         # Create fault
-        self.fault = Fault(x, y, subfaults=self.subfaults)
+        if not hasattr(self, 'lonlat_mesh'):
+            self.get_lonlat_mesh()
+        self.fault = Fault(self.lonlat_mesh.coordinates.dat.data, subfaults=self.subfaults)
 
     def set_initial_condition(self, prob, annotate_source=False, **kwargs):
         """
@@ -187,21 +189,23 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         :kwarg annotate_source: toggle annotation of the rupture process using pyadolc.
         :kwarg tag: non-negative integer label for tape.
         """
-        from scipy.interpolate import interp2d
+        from scipy.interpolate import griddata
         import firedrake
 
         # Create fault topography
         self.create_topography(annotate=annotate_source, **kwargs)
 
         # Interpolate it using SciPy
-        surf_interp = interp2d(self.fault.dtopo.x, self.fault.dtopo.y, self.fault.dtopo.dZ)
-
-        # Evaluate the interpolant at the mesh vertices
         surf = firedrake.Function(prob.P1[0])
         if not hasattr(self, 'lonlat_mesh'):
             self.get_lonlat_mesh()
-        for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
-            surf.dat.data[i] = surf_interp(*xy)
+        surf.dat.data[:] = griddata(
+            (self.fault.dtopo.X, self.fault.dtopo.Y),
+            self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape),
+            self.lonlat_mesh.coordinates.dat.data,
+            method='linear',
+            fill_value=0.0,
+        )
 
         # Assume zero initial velocity and interpolate into the elevation space
         u, eta = prob.fwd_solutions[0].split()

@@ -28,7 +28,7 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
         self.dtopo = DTopography()
         if len(args) == 1:
             coordinates = args[0]
-            self.dtopo.X, self.dtopo.Y = coordinates[:][0], coordinates[:][1]
+            self.dtopo.X, self.dtopo.Y = coordinates[:, 0], coordinates[:, 1]
         elif len(args) == 2:
             self.dtopo.x, self.dtopo.y = args
             self.dtopo.X, self.dtopo.Y = numpy.meshgrid(self.dtopo.x, self.dtopo.y)
@@ -57,7 +57,7 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
             dz = adolc.adouble(dz)
         for k, subfault in enumerate(self.subfaults):
             subfault.okada()
-            dz += subfault.dtopo.dZ[0, :, :]
+            dz += subfault.dtopo.dZ[0, :, :].reshape(dz.shape)
             if k % 10 == 0 and verbose:
                 print(msg.format(k+1, num_subfaults, clock() - tic))
                 tic = clock()
