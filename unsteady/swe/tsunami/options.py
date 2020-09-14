@@ -337,7 +337,7 @@ class TsunamiOptions(CoupledOptions):
         :arg i: mesh number from sequence.
         :kwarg error_factor: optionally raise an error if the CFL criterion is not met.
         """
-        if error_factor is None and not self.op.debug:
+        if error_factor is None and not self.debug:
             return
         self.print_debug("INIT: Computing CFL number on mesh {:d}...".format(i))
         b = prob.bathymetry[i].vector().gather().max()

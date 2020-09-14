@@ -54,7 +54,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         super(TohokuOkadaBasisOptions, self).__init__(**kwargs)
         self.control_parameters = kwargs.get('control_parameters')
         self.coordinate_specification = kwargs.get('coordinate_specification', 'centroid')
-        self.N = kwargs.get('okada_grid_resolution', 101)
+        self.N = kwargs.get('okada_grid_resolution', None)
         self.lx = kwargs.get('okada_grid_length_lon', 10)
         self.ly = kwargs.get('okada_grid_length_lat', 10)
         self.xmin = kwargs.get('okada_grid_lon_min', 138)
@@ -167,13 +167,17 @@ class TohokuOkadaBasisOptions(TohokuOptions):
             self.subfaults.append(subfault)
 
         # Create a lon-lat grid upon which to represent the source
-        # x = np.linspace(self.xmin, self.xmin + self.lx, self.N)
-        # y = np.linspace(self.ymin, self.ymin + self.ly, self.N)
+        if self.N is not None:
+            x = np.linspace(self.xmin, self.xmin + self.lx, self.N)
+            y = np.linspace(self.ymin, self.ymin + self.ly, self.N)
+            coords = (x, y)
+        else:
+            if not hasattr(self, 'lonlat_mesh'):
+                self.get_lonlat_mesh()
+            coords = (self.lonlat_mesh.coordinates.dat.data, )
 
         # Create fault
-        if not hasattr(self, 'lonlat_mesh'):
-            self.get_lonlat_mesh()
-        self.fault = Fault(self.lonlat_mesh.coordinates.dat.data, subfaults=self.subfaults)
+        self.fault = Fault(*coords, subfaults=self.subfaults)
 
     def set_initial_condition(self, prob, annotate_source=False, **kwargs):
         """
@@ -366,6 +370,8 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         import firedrake
         from firedrake.projection import SupermeshProjector
 
+        assert self.N is not None
+
         # Create a Firedrake mesh associated with the (uniform) Okada grid.
         self.okada_mesh = firedrake.SquareMesh(self.N-1, self.N-1, self.lx, self.ly)
         self.okada_mesh.coordinates.dat.data[:] += [self.xmin, self.ymin]
@@ -401,6 +407,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         """
         if not hasattr(self, 'source_okada'):
             self.get_interpolation_operators()
+        assert self.N is not None
         assert arr.shape == (self.N, self.N)
         for k in range(self.N*self.N):
             self.source_okada.dat.data[k] = arr[self._y_locations[k], self._x_locations[k]]
