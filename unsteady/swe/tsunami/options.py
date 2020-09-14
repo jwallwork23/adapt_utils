@@ -92,8 +92,9 @@ class TsunamiOptions(CoupledOptions):
     def lonlat_mesh(self):
         if self.coordinate_system == 'lonlat':
             return self.default_mesh
-        elif not hasattr(self, '_lonlat_mesh'):
-            self.get_lonlat_mesh()
+        # elif not hasattr(self, '_lonlat_mesh'):
+        #     self.get_lonlat_mesh()
+        self.get_lonlat_mesh()
         return self._lonlat_mesh
 
     def set_bathymetry(self, fs=None, northern=True, force_longitude=True, **kwargs):
@@ -132,7 +133,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating bathymetry...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):  # TODO: Use lonlat_mesh
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):  # TODO: Use lonlat_mesh?
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             bathymetry.dat.data[i] -= self.bathymetry_interpolator(lat, lon)
 
@@ -174,7 +175,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating initial surface...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):  # TODO: use lonlat_mesh
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):  # TODO: use lonlat_mesh?
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             initial_surface.dat.data[i] = self.surface_interpolator(lat, lon)
 
