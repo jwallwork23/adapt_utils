@@ -173,14 +173,23 @@ class AdaptiveProblemBase(object):
         self.error_estimators = [AttrDict() for i in range(self.num_meshes)]
         self.timesteppers = [AttrDict() for i in range(self.num_meshes)]
 
-    def get_plex(self, i):
+    def get_plexes(self):
         """
         :return: DMPlex associated with the ith mesh.
         """
-        try:
-            return self.meshes[i]._topology_dm
-        except AttributeError:
-            return self.meshes[i]._plex  # Backwards compatability
+        if hasattr(self, '_plexes') and self._plexes != []:
+            return
+        self._plexes = []
+        for mesh in self.meshes:
+            try:
+                self._plexes.append(mesh._topology_dm)
+            except AttributeError:
+                self._plexes.append(mesh._plex_)  # Backwards compatability
+
+    @property
+    def plexes(self):
+        self.get_plexes()
+        return self._plexes
 
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")

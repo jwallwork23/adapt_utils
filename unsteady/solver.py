@@ -1777,7 +1777,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 fwd_solutions_step_old = []
                 adj_solutions_step = []
                 enriched_adj_solutions_step = []
-                tm = dmhooks.get_transfer_manager(self.get_plex(i))
+                tm = dmhooks.get_transfer_manager(self.plexes[i])
 
                 # --- Setup forward solver for enriched problem
 
