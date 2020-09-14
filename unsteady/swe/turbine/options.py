@@ -67,14 +67,20 @@ class TurbineOptions(CoupledOptions):
         """
         if bathymetry is not None:
             if isinstance(bathymetry, Constant):
-                self.max_depth = bathymetry.values()[0]
+                self._max_depth = bathymetry.values()[0]
             elif isinstance(bathymetry, Function):
-                self.max_depth = bathymetry.vector().gather().max()
+                self._max_depth = bathymetry.vector().gather().max()
             else:
                 raise ValueError("Bathymetry format cannot be understood.")
         else:
             assert hasattr(self, 'base_bathymetry')
-            self.max_depth = self.base_bathymetry
+            self._max_depth = self.base_bathymetry
+
+    @property
+    def max_depth(self):
+        if not hasattr(self, '_max_depth'):
+            self.get_max_depth()
+        return self._max_depth
 
     # --- Tidal forcing
 

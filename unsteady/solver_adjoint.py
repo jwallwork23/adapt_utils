@@ -50,7 +50,13 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         blocks = self.tape.get_blocks()
         if len(blocks) == 0:
             raise ValueError("Tape is empty!")
-        self.solve_blocks = [block for block in blocks if isinstance(block, GenericSolveBlock) and block.adj_sol is not None]
+        self._solve_blocks = [block for block in blocks if isinstance(block, GenericSolveBlock) and block.adj_sol is not None]
+
+    @property
+    def solve_blocks(self):
+        if not hasattr(self, '_solve_blocks'):
+            self.get_solve_blocks()
+        return self._solve_blocks
 
     def extract_adjoint_solution(self, solve_step):
         """
@@ -67,8 +73,6 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             else:
                 msg = "{:2d} {:s}  ADJOINT EXTRACT mesh {:2d}/{:2d}  time {:8.2f}"
                 self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, time))
-        if not hasattr(self, 'solve_blocks'):
-            self.get_solve_blocks()
         adj_sol = self.solve_blocks[solve_step].adj_sol
 
         # Extract adjoint solution and insert it into the appropriate solution field
@@ -83,7 +87,6 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
 
     def save_adjoint_trajectory(self):
         """Save the entire adjoint solution trajectory to .vtu, backwards in time."""
-        self.get_solve_blocks()
         if self.op.solve_swe:
             self._save_adjoint_trajectory_shallow_water()
         elif self.op.solve_tracer:
