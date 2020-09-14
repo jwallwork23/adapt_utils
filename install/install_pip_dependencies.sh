@@ -44,6 +44,3 @@ if [ ! -e "$CLAW" ]; then
     exit 1
 fi
 python3 -c "import clawpack"
-
-# Install PyADOL-C
-# TODO
