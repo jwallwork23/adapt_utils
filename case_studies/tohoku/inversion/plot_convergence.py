@@ -12,7 +12,14 @@ from adapt_utils.norms import vecnorm
 
 # --- Parse arguments
 
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(prog="run_convergence", description="""
+    Given tsunami source inversion run output, generate a variety of plots:
+      (a) timeseries due to initial guess vs. gauge data;
+      (b) progress of the QoI during the optimisation, as a function of iteration count;
+      (c) convergence curve of final 'optimised' QoI values, as a function of mesh element count;
+      (d) progress of the QoI gradient during the optimisation, as a function of iteration count;
+      (e) timeseries due to converged control parameters vs. gauge data.
+    """)
 
 # Inversion
 parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
@@ -28,7 +35,6 @@ parser.add_argument("-extension", help="""
     """)
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
-parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
 parser.add_argument("-plot_initial_guess", help="Plot initial guess timeseries")
 
@@ -43,7 +49,7 @@ plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
 plot_all = bool(args.plot_all or False)
 if plot_all:
-    plot_pvd = plot_pdf = plot_png = True
+    plot_pdf = plot_png = True
 extensions = []
 if plot_pdf:
     extensions.append('pdf')
@@ -221,22 +227,27 @@ for level in levels:
             print_output(msg.format(level))
             break
         op.gauges[gauge]['opt'] = np.load(fname)
-
-        # Check errors
         data = np.array(op.gauges[gauge]['data'])
         opt = np.array(op.gauges[gauge]['opt'])
-        n = len(data)
-        init_error = (opt - data)**2
-        error = init_error.sum()/n
-        msg = "{:5s} level {:d} optimised mean square error: {:.4e}"
-        print_output(msg.format(gauge, level, error))
-        mse += error
-
-        # Plot timeseries
+        n = len(opt)
         T = np.array(op.gauges[gauge]['times'])/60
         T = np.linspace(T[0], T[-1], n)
+
+        # Check errors
+        if len(data) == n:
+            init_error = (opt - data)**2
+            error = init_error.sum()/n
+            msg = "{:5s} level {:d} optimised mean square error: {:.4e}"
+            print_output(msg.format(gauge, level, error))
+            mse += error
+        else:
+            print_output("#### FIXME: cannot check errors")
+
+        # Plot timeseries
         ax = axes[i//N, i % N]
+        T = np.linspace(T[0], T[-1], len(data))
         ax.plot(T, data, '-', **kwargs)
+        T = np.linspace(T[0], T[-1], len(opt))
         ax.plot(T, opt, '-', label=gauge, **kwargs)
         ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
         if i//N == 3:
