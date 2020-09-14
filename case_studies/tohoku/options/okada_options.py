@@ -1,5 +1,3 @@
-from firedrake import PointNotInDomainError
-
 import numpy as np
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
@@ -176,8 +174,6 @@ class TohokuOkadaBasisOptions(TohokuOptions):
             y = np.linspace(self.ymin, self.ymax, self.N)
             self.coords = (x, y)
         else:
-            if not hasattr(self, 'lonlat_mesh'):
-                self.get_lonlat_mesh()
             self.indices = []
             self.coords = []
             for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
@@ -185,7 +181,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
                     self.indices.append(i)
                     self.coords.append(xy)
             if len(self.coords) == 0:
-                raise PointNotInDomainError("Source region does not lie in domain.")
+                raise ValueError("Source region does not lie in domain.")
             self.coords = (np.array(self.coords), )
 
         # Create fault
@@ -212,8 +208,6 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         self.create_topography(annotate=annotate_source, **kwargs)
 
         if self.N is not None:  # Interpolate it using SciPy
-            if not hasattr(self, 'lonlat_mesh'):
-                self.get_lonlat_mesh()
             surf.dat.data[:] = griddata(
                 (self.fault.dtopo.X, self.fault.dtopo.Y),
                 self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape),
@@ -387,6 +381,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
 
     # --- Interpolation between Okada grid and computational mesh
 
+    # TODO: No longer needed
     def get_interpolation_operators(self):
         """
         Establish the mapping between Okada grid
@@ -402,8 +397,6 @@ class TohokuOkadaBasisOptions(TohokuOptions):
 
         # Create function spaces associated with both the Okada and longitude-latitude meshes
         self.P1_okada = firedrake.FunctionSpace(self.okada_mesh, "CG", 1)
-        if not hasattr(self, 'lonlat_mesh'):
-            self.get_lonlat_mesh()
         self.P1_lonlat = firedrake.FunctionSpace(self.lonlat_mesh, "CG", 1)
 
         # Establish an index mapping between the logical x- and y- directions and the vertex
@@ -424,6 +417,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         P1 = firedrake.FunctionSpace(self.default_mesh, "CG", 1)
         self.target_utm = firedrake.Function(P1, name="Interpolation target on UTM mesh")
 
+    # TODO: No longer needed
     def _field_from_array(self, arr):
         """
         Insert an array `arr` from the Okada model into the source field defined on the Firedrake
@@ -436,6 +430,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         for k in range(self.N*self.N):
             self.source_okada.dat.data[k] = arr[self._y_locations[k], self._x_locations[k]]
 
+    # TODO: No longer needed
     def interpolate_okada_array(self, arr):
         """
         Given an array `arr` obtained from the Okada model, interpolate it onto the Firedrake mesh
@@ -493,7 +488,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         """
         # from adapt_utils.norms import vecnorm
 
-        self._data_to_interpolate = source  # TODO: Probably needs discretising on Okada grid
+        # self._data_to_interpolate = source  # TODO: Probably needs discretising on Okada grid
         self.create_topography(annotate=True, interpolate=True, tag=tag)
-        self.get_seed_matrices()
+        # self.get_seed_matrices()
         raise NotImplementedError  # TODO: Copy over from notebook

@@ -20,7 +20,7 @@ class TsunamiOptions(CoupledOptions):
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
     bathymetry_cap = NonNegativeFloat(30.0, allow_none=True, help="Minimum depth").tag(config=True)
 
-    def __init__(self, regularisation=0.0, **kwargs):
+    def __init__(self, regularisation=0.0, coordinate_system='utm', **kwargs):
         """
         kwarg regularisation: non-negative constant parameter used for Tikhonov regularisation
             methods for the quantity of interest.
@@ -29,6 +29,9 @@ class TsunamiOptions(CoupledOptions):
         self.solve_swe = True
         self.solve_tracer = False
         self.force_zone_number = kwargs.get('force_zone_number', False)
+        if not coordinate_system in ('utm', 'lonlat'):
+            raise NotImplementedError("Coordinate system '{:s}' not recognised.".format(coordinate_system))
+        self.coordinate_system = coordinate_system
         self.gauges = {}
         self.locations_of_interest = {}
 
@@ -58,12 +61,19 @@ class TsunamiOptions(CoupledOptions):
         Given a mesh in longitude-latitude coordinates, establish a corresponding mesh in UTM
         coordinates using the conversion code in `adapt_utils.unsteady.swe.tsunami.conversion`.
         """
-        assert hasattr(self, 'lonlat_mesh')
         zone = self.force_zone_number
-        self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
-        lon, lat = SpatialCoordinate(self.default_mesh)
+        self._utm_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
+        lon, lat = SpatialCoordinate(self._utm_mesh)
         x, y = lonlat_to_utm(lon, lat, zone)
-        self.default_mesh.coordinates.interpolate(as_vector([x, y]))
+        self._utm_mesh.coordinates.interpolate(as_vector([x, y]))
+
+    @property
+    def utm_mesh(self):
+        if self.coordinate_system == 'utm':
+            return self.default_mesh
+        elif not hasattr(self, '_utm_mesh'):
+            self.get_utm_mesh()
+        return self._utm_mesh
 
     def get_lonlat_mesh(self, northern=True):
         """
@@ -72,12 +82,19 @@ class TsunamiOptions(CoupledOptions):
 
         :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
         """
-        assert hasattr(self, 'default_mesh')
         zone = self.force_zone_number
-        self.lonlat_mesh = Mesh(Function(self.default_mesh.coordinates))
-        x, y = SpatialCoordinate(self.lonlat_mesh)
+        self._lonlat_mesh = Mesh(Function(self.utm_mesh.coordinates))
+        x, y = SpatialCoordinate(self._lonlat_mesh)
         lon, lat = utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)
-        self.lonlat_mesh.coordinates.interpolate(as_vector([lon, lat]))
+        self._lonlat_mesh.coordinates.interpolate(as_vector([lon, lat]))
+
+    @property
+    def lonlat_mesh(self):
+        if self.coordinate_system == 'lonlat':
+            return self.default_mesh
+        elif not hasattr(self, '_lonlat_mesh'):
+            self.get_lonlat_mesh()
+        return self._lonlat_mesh
 
     def set_bathymetry(self, fs=None, northern=True, force_longitude=True, **kwargs):
         """
@@ -115,7 +132,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating bathymetry...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):  # TODO: Use lonlat_mesh
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             bathymetry.dat.data[i] -= self.bathymetry_interpolator(lat, lon)
 
@@ -157,7 +174,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating initial surface...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):  # TODO: use lonlat_mesh
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             initial_surface.dat.data[i] = self.surface_interpolator(lat, lon)
 
@@ -255,8 +272,6 @@ class TsunamiOptions(CoupledOptions):
         try:
             self.default_mesh.coordinates.at(point)
         except PointNotInDomainError:
-            if not hasattr(self, 'lonlat_mesh'):
-                self.get_lonlat_mesh()
             self.lonlat_mesh.coordinates.at(point)
 
     def extract_data(self, gauge):
