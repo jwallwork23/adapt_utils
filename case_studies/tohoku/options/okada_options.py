@@ -356,8 +356,13 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         controls = self.control_parameters
         num_subfaults = len(self.subfaults)
         X = [controls[control][i] for i in range(num_subfaults) for control in self.active_controls]
-        self.input_vector = np.array(X)
-        return self.input_vector
+        self._input_vector = np.array(X)
+
+    @property
+    def input_vector(self):
+        if not hasattr(self, '_input_vector'):
+            self.get_input_vector()
+        return self._input_vector
 
     def get_seed_matrices(self):
         """
@@ -373,8 +378,13 @@ class TohokuOkadaBasisOptions(TohokuOptions):
             self.get_input_vector()
         n = len(self.active_controls)
         S = [[1 if i % n == j else 0 for j in range(n)] for i in range(len(self.input_vector))]
-        self.seed_matrices = np.array(S)
-        return self.seed_matrices
+        self._seed_matrices = np.array(S)
+
+    @property
+    def seed_matrices(self):
+        if not hasattr(self, '_seed_matrices'):
+            self.get_seed_matrices()
+        return self._seed_matrices
 
     # --- Interpolation between Okada grid and computational mesh
 
