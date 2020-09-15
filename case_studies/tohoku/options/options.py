@@ -371,6 +371,14 @@ class TohokuOptions(TsunamiOptions):
                 self.print_debug("NOTE: Gauge {:5s} is not in the domain; removing it".format(gauge))
                 self.gauges.pop(gauge)
 
+        # Normalise QoI by total measured gauge time
+        factor = 0.0
+        for gauge in self.gauges:
+            factor += self.gauges[gauge]["departure_time"] - self.gauges[gauge]["arrival_time"]
+        self.print_debug("INIT: QoI normalisation factor (in time): {:.4e}".format(1/factor))
+        self.qoi_scaling /= factor
+        self.print_debug("INIT: overall QoI normalisation factor: {:.4e}".format(self.qoi_scaling))
+
     def _get_update_forcings_forward(self, prob, i):  # TODO: Use QoICallback
         from adapt_utils.misc import ellipse
 
