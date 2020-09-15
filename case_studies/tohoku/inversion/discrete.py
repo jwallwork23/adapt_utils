@@ -1,12 +1,12 @@
 from thetis import *
 from firedrake_adjoint import *
 
-import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 
+from adapt_utils.argparse import ArgumentParser
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
@@ -25,15 +25,11 @@ class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
 
 # --- Parse arguments
 
-parser = argparse.ArgumentParser()
+parser = ArgumentParser(basis=True, plotting=True, shallow_water=True)
 
-# Model
-parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
+# Resolution
 parser.add_argument("-level", help="Mesh resolution level")
 # parser.add_argument("-okada_grid_resolution", help="Mesh resolution level for the Okada grid")
-parser.add_argument("-family", help="Finite element pair")
-parser.add_argument("-stabilisation", help="Stabilisation approach")
-parser.add_argument("-nonlinear", help="Toggle nonlinear model")
 
 # Inversion
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
@@ -46,14 +42,6 @@ parser.add_argument("-zero_initial_guess", help="""
     """)
 parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial guess (default 6.0)")
 
-# I/O and debugging
-parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
-parser.add_argument("-plot_png", help="Toggle plotting to .png")
-parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
-parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
-parser.add_argument("-plot_only", help="Just plot using saved data")
-parser.add_argument("-debug", help="Toggle debugging")
-parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
 
 # --- Set parameters
 
