@@ -33,24 +33,42 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             raise NotImplementedError("Haven't accounted for coupled model yet.")
 
     def clear_tape(self):
+        """
+        Strip all blocks from pyadjoint's tape, along with their associated data.
+        """
         self.tape.clear_tape()
 
     def solve_adjoint(self, scaling=1.0):
-        """Solve the discrete adjoint problem for some quantity of interest."""
+        """
+        Solve the discrete adjoint problem for some quantity of interest.
+        """
         J = self.quantity_of_interest()
         return pyadjoint.solve_adjoint(J, adj_value=scaling)
 
     def compute_gradient(self, controls, scaling=1.0):
-        """Compute the gradient of the quantity of interest with respect to a list of controls."""
+        """
+        Compute the gradient of the quantity of interest with respect to a list of controls.
+        """
         J = self.quantity_of_interest()
         return compute_gradient(J, controls, adj_value=scaling)
 
+    def check_solve_block(self, block):
+        """
+        Check that `block` corresponds to a finite element/nonlinear/linear solve.
+        """
+        assert hasattr(block, 'adj_sol')
+        out = isinstance(block, GenericSolveBlock)
+        out &= block.adj_sol
+        return out
+
     def get_solve_blocks(self):
-        """Extract all tape blocks which are subclasses of :class:`GenericSolveBlock`."""
+        """
+        Extract all tape blocks which are subclasses of :class:`GenericSolveBlock`.
+        """
         blocks = self.tape.get_blocks()
         if len(blocks) == 0:
             raise ValueError("Tape is empty!")
-        self._solve_blocks = [block for block in blocks if isinstance(block, GenericSolveBlock) and block.adj_sol is not None]
+        self._solve_blocks = [block for block in blocks if self.check_solve_block(block)]
 
     @property
     def solve_blocks(self):
@@ -86,7 +104,9 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             self.adj_solutions_bathymetry[i].assign(adj_sol)
 
     def save_adjoint_trajectory(self):
-        """Save the entire adjoint solution trajectory to .vtu, backwards in time."""
+        """
+        Save the entire adjoint solution trajectory to .vtu, backwards in time.
+        """
         if self.op.solve_swe:
             self._save_adjoint_trajectory_shallow_water()
         elif self.op.solve_tracer:
