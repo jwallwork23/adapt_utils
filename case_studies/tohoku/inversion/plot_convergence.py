@@ -1,41 +1,34 @@
 from thetis import COMM_WORLD, create_directory, print_output
 
-import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 
+from adapt_utils.argparse import ArgumentParser
 from adapt_utils.plotting import *
 from adapt_utils.norms import vecnorm
 
 
 # --- Parse arguments
 
-parser = argparse.ArgumentParser(prog="run_convergence", description="""
-    Given tsunami source inversion run output, generate a variety of plots:
-      (a) timeseries due to initial guess vs. gauge data;
-      (b) progress of the QoI during the optimisation, as a function of iteration count;
-      (c) convergence curve of final 'optimised' QoI values, as a function of mesh element count;
-      (d) progress of the QoI gradient during the optimisation, as a function of iteration count;
-      (e) timeseries due to converged control parameters vs. gauge data.
-    """)
-
-# Inversion
-parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
+parser = ArgumentParser(
+    prog="run_convergence",
+    description="""
+        Given tsunami source inversion run output, generate a variety of plots:
+          (a) timeseries due to initial guess vs. gauge data;
+          (b) progress of the QoI during the optimisation, as a function of iteration count;
+          (c) convergence curve of final 'optimised' QoI values, as a function of mesh element count;
+          (d) progress of the QoI gradient during the optimisation, as a function of iteration count;
+          (e) timeseries due to converged control parameters vs. gauge data.
+        """,
+    basis=True,
+    plotting=True)
 parser.add_argument("-levels", help="Number of mesh resolution levels considered (default 3)")
 parser.add_argument("-noisy_data", help="""
     Toggle whether to consider timeseries data which has *not* been sampled (default False).
     """)
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
-
-# I/O
-parser.add_argument("-extension", help="""
-    Extension for output directory. The directory name will have the form realistic_<ext>.
-    """)
-parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
-parser.add_argument("-plot_png", help="Toggle plotting to .png")
-parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
 parser.add_argument("-plot_initial_guess", help="Plot initial guess timeseries")
 
 
@@ -219,9 +212,8 @@ for level in levels:
     for i, gauge in enumerate(gauges):
 
         # Load data
-        if 'data' not in op.gauges[gauge] or op.gauges[gauge]['data'] == []:
-            fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
-            op.gauges[gauge]['data'] = np.load(fname)
+        fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
+        op.gauges[gauge]['data'] = np.load(fname)
         fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
         if not os.path.isfile(fname):
             print_output(msg.format(level))

@@ -10,6 +10,7 @@ class ArgumentParser(argparse.ArgumentParser):
     def __init__(self, *args, **kwargs):
         self.kwargs = {
             'basis': kwargs.pop('basis', False),
+            'bases': kwargs.pop('bases', False),
             'plotting': kwargs.pop('plotting', False),
             'shallow_water': kwargs.pop('shallow_water', False),
         }
@@ -36,6 +37,12 @@ class ArgumentParser(argparse.ArgumentParser):
     @property
     def args(self):
         return self.parse_args()
+
+    def add_bases_args(self):
+        self.add_argument("bases", help="""
+            Basis types for inversion, chosen from {'box', 'radial', 'okada'} and separated by
+            commas.
+            """)
 
     def add_basis_args(self):
         self.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
