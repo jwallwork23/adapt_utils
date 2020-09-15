@@ -47,6 +47,7 @@ parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial gues
 
 # Parsed arguments
 args = parser.parse_args()
+basis = args.basis
 level = int(args.level or 0)
 optimise = bool(args.rerun_optimisation or False)
 gtol = float(args.gtol or 1.0e-08)
