@@ -1,11 +1,11 @@
 from thetis import COMM_WORLD, create_directory, print_output, tricontourf
 
-import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 
+from adapt_utils.argparse import ArgumentParser
 from adapt_utils.plotting import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
@@ -13,20 +13,13 @@ from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 # --- Parse arguments
 
-parser = argparse.ArgumentParser()
-
-# Inversion
-parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
+parser = ArgumentParser(
+    prog="plot_optimised_source",
+    basis=True,
+    plotting=True,
+)
 parser.add_argument("-level", help="Mesh resolution level (default 0)")
-parser.add_argument("-real_data", help="Toggle whether to use real data (default False)")
 parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data (default False)")
-
-# I/O
-parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
-parser.add_argument("-plot_png", help="Toggle plotting to .png")
-parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
-parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
-parser.add_argument("-plot_only", help="Just plot using saved data")
 
 
 # --- Set parameters
@@ -46,7 +39,6 @@ if plot_pdf:
 if plot_png:
     extensions.append('png')
 plot_any = len(extensions) > 0
-real_data = bool(args.real_data or False)
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1:
@@ -54,14 +46,15 @@ if COMM_WORLD.size > 1:
     sys.exit(0)
 
 # Setup output directories
-dirname = os.path.join(os.path.dirname(__file__), basis)
-di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
-plot_dir = create_directory(os.path.join(di, 'plots', 'discrete'))
+dirname = os.path.join(os.path.dirname(__file__))
+extension = lambda fpath: fpath if args.extension is None else '_'.join([fpath, args.extension])
+data_dir = create_directory(os.path.join(dirname, basis, 'outputs', extension('realistic')))
+plot_dir = create_directory(os.path.join(dirname, 'plots', extension('realistic'), basis))
 
 # Collect initialisation parameters
 kwargs = {
     'level': level,
-    'synthetic': not real_data,
+    'synthetic': False,
     'noisy_data': bool(args.noisy_data or False),
 }
 if basis == 'box':
@@ -79,7 +72,7 @@ fontsize = 22
 fontsize_tick = 20
 
 # Load control parameters
-fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+fname = os.path.join(data_dir, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 kwargs['control_parameters'] = np.load(fname.format('ctrl', level))[-1]
 op = constructor(**kwargs)
 

@@ -61,6 +61,7 @@ kwargs = {'markevery': 5}
 dirname = os.path.dirname(__file__)
 extension = lambda fpath: fpath if args.extension is None else '_'.join([fpath, args.extension])
 plot_dir = create_directory(os.path.join(dirname, 'plots', extension('realistic')))
+data_dir = os.path.join(dirname, '{:s}', 'outputs', extension('realistic'), 'discrete')
 
 
 # --- Create Options parameter objects
@@ -94,7 +95,7 @@ for basis in bases:
     gauges = list(op.gauges.keys())
 
     # Get data directory
-    op.di = os.path.join(dirname, basis, 'outputs', extension('realistic'), 'discrete')
+    op.di = data_dir.format(basis)
     if not os.path.exists(op.di):
         raise IOError("Filepath {:s} does not exist.".format(fpath))
 

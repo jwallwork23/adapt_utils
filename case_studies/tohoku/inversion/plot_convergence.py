@@ -219,7 +219,7 @@ for level in range(levels):
         print_output(msg.format(gauge, level, mse))
         mean_square_errors[level] += mse
 
-        # Compute discrete QoI
+        # Compute discrete QoI  # FIXME
         for q, sq_err in enumerate(square_error):
             wq = 0.5 if q in (0, n-1) else 1.0  # TODO: Other integrators than trapezium
             discrete_qois[level] += wq*dt*sq_err
