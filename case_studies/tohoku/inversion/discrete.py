@@ -8,7 +8,7 @@ import os
 import sys
 
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
-# from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
+from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.norms import total_variation, vecnorm
 from adapt_utils.plotting import *
@@ -28,6 +28,7 @@ class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
 parser = argparse.ArgumentParser()
 
 # Model
+parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
 parser.add_argument("-level", help="Mesh resolution level")
 # parser.add_argument("-okada_grid_resolution", help="Mesh resolution level for the Okada grid")
 parser.add_argument("-family", help="Finite element pair")
@@ -111,11 +112,23 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-op = TohokuBoxBasisOptions(**kwargs)
+
+# Construct Options parameter class
+if basis == 'box':
+    options_constructor = TohokuBoxBasisOptions
+elif basis == 'radial':
+    options_constructor = TohokuRadialBasisOptions
+elif basis == 'okada':
+    options_constructor = TohokuOkadaBasisOptions
+    raise NotImplementedError  # TODO: Hook up Okada reduced functional and gradient
+else:
+    raise ValueError("Basis type '{:s}' not recognised.".format(basis))
+op = options_constructor(**kwargs)
+gauges = list(op.gauges.keys())
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
-di = create_directory(os.path.join(dirname, 'outputs', 'realistic'))
+di = create_directory(os.path.join(dirname, basis, 'outputs', 'realistic'))
 op.di = create_directory(os.path.join(di, 'discrete'))
 plot_dir = create_directory(os.path.join(di, 'plots'))
 create_directory(os.path.join(plot_dir, 'discrete'))
@@ -149,7 +162,7 @@ else:
         swp.set_initial_condition()
         f_src = swp.fwd_solutions[0].split()[1]
 
-        # Project into box basis
+        # Project into chosen basis
         swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
         op.project(swp, f_src)
         # op.interpolate(swp, f_src)
@@ -164,7 +177,7 @@ else:
             # Project into P1 for plotting
             swp.set_initial_condition()
             f_src = project(f_src, swp.P1[0])
-            f_box = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
+            f = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
 
             # Get corners of zoom
             lonlat_corners = [(138, 32), (148, 42), (138, 42)]
@@ -174,12 +187,13 @@ else:
 
             # Plot initial guess
             fig, axes = plt.subplots(figsize=(4.5, 4))
-            cbar = fig.colorbar(tricontourf(f_box, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
+            cbar = fig.colorbar(tricontourf(f, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
             cbar.set_ticks(ticks)
             axes.set_xlim(xlim)
             axes.set_ylim(ylim)
             axes.axis(False)
-            savefig('initial_guess_box_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+            fname = 'initial_guess_{:s}_{:d}'.format(basis, level)
+            savefig(fname, fpath=plot_dir, extensions=extensions)
 if plot_only:
     sys.exit(0)
 
@@ -194,7 +208,6 @@ swp.solve_forward()
 J = op.J
 
 # Save timeseries
-gauges = list(op.gauges.keys())
 for gauge in gauges:
     fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
     np.save(fname, op.gauges[gauge]['data'])
@@ -202,7 +215,7 @@ for gauge in gauges:
     np.save(fname, op.gauges[gauge][timeseries_type])
 
 # Run optimisation / load optimised controls
-fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if optimise:
     control_values_opt = [[m.dat.data[0] for m in op.control_parameters], ]
     func_values_opt = [J, ]
@@ -228,28 +241,22 @@ if optimise:
 else:
     optimised_value = np.load(fname.format('ctrl'))[-1]
 
-# Create a new parameter class
-kwargs['control_parameters'] = optimised_value
-kwargs['plot_pvd'] = plot_pvd
-op_opt = TohokuBoxBasisOptions(**kwargs)
-gauges = list(op_opt.gauges.keys())
-for gauge in gauges:
-    op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
-
-# Clear tape
-tape = get_working_tape()
-tape.clear_tape()
-
 
 # --- Compare timeseries
 
-# Run forward again so that we can compare timeseries
+# Create a new parameter class
+kwargs['control_parameters'] = optimised_value
+kwargs['plot_pvd'] = plot_pvd
+op_opt = options_constructor(**kwargs)
+for gauge in gauges:
+    op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
+
+# Run forward again and save timeseries
 print_output("Run to plot optimised timeseries...")
+get_working_tape().clear_tape()
 swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=op.debug)
 swp.solve_forward()
 J = swp.quantity_of_interest()
-
-# Save timeseries
 for gauge in gauges:
     fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level)]))
     np.save(fname, op_opt.gauges[gauge][timeseries_type])
@@ -265,6 +272,5 @@ for tt, cd in zip(('diff', 'diff_smooth'), ('Continuous', 'Discrete')):
 
 # Solve adjoint problem and plot solution fields
 if plot_pvd:
-    swp.compute_gradient(Control(op_opt.control_parameters[0]))  # TODO: Use solve_adjoint
-    swp.get_solve_blocks()
+    swp.solve_adjoint()
     swp.save_adjoint_trajectory()
