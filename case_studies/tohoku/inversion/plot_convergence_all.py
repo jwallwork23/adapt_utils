@@ -109,19 +109,17 @@ for axis in (axes.xaxis, axes.yaxis):
     axis.grid(True, which='minor', color='lightgrey')
     axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Mesh element count")
-axes.set_ylabel("Square timeseries error QoI")
+axes.set_ylabel("Continuous QoI")
 axes.legend()
 savefig('converged_J', fpath=plot_dir, extensions=extensions)
 
 
-# --- Plot mean square errors
+# --- Plot all mean square error convergence curves on the same axis
 
 fig, axes = plt.subplots(figsize=(8, 6))
 for basis in bases:
     op = options[basis]['op']
     label = options[basis]['label']
-
-    # Load data
     fname = 'mean_square_errors_{:s}_{:s}.npy'
     fname = os.path.join(dirname, basis, 'outputs', extension('realistic'), fname)
     try:
@@ -133,8 +131,6 @@ for basis in bases:
         msg += ". Run the `plot_convergence.py` script first."
         print_output(msg.format(basis, args.extension))
         continue
-
-    # Plot
     axes.semilogx(op.num_cells[:len(mses)], mses, '-x', label=label)
 axes.set_xticks([1e4, 1e5])
 for axis in (axes.xaxis, axes.yaxis):
@@ -144,3 +140,31 @@ axes.set_xlabel("Mesh element count")
 axes.set_ylabel("Mean square error")
 axes.legend()
 savefig('converged_mse', fpath=plot_dir, extensions=extensions)
+
+
+# --- Plot all discrete QoI convergence curves on the same axis
+
+fig, axes = plt.subplots(figsize=(8, 6))
+for basis in bases:
+    op = options[basis]['op']
+    label = options[basis]['label']
+    fname = 'discrete_qois_{:s}_{:s}.npy'
+    fname = os.path.join(dirname, basis, 'outputs', extension('realistic'), fname)
+    try:
+        mses = np.load(fname.format(basis, ''.join([str(level) for level in range(levels)])))
+    except IOError:
+        msg = "Cannot plot discrete QoI data for '{:s}' basis".format(basis)
+        if args.extension is not None:
+            msg += " with extension '{:s}'".format(args.extension)
+        msg += ". Run the `plot_convergence.py` script first."
+        print_output(msg.format(basis, args.extension))
+        continue
+    axes.semilogx(op.num_cells[:len(mses)], mses, '-x', label=label)
+axes.set_xticks([1e4, 1e5])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
+axes.set_xlabel("Mesh element count")
+axes.set_ylabel("Discrete QoI")
+axes.legend()
+savefig('converged_discrete_qoi', fpath=plot_dir, extensions=extensions)

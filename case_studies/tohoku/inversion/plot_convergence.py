@@ -190,6 +190,7 @@ savefig('optimisation_progress_dJdm', fpath=plot_dir, extensions=extensions)
 print_output("Plotting timeseries for optimised run...")
 msg = "Cannot plot timeseries for optimised controls on mesh {:d} because the data don't exist."
 mean_square_errors = np.zeros(levels)
+discrete_qois = np.zeros(levels)
 for level in range(levels):
     N = int(np.ceil(np.sqrt(len(gauges))))
     fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
@@ -207,15 +208,24 @@ for level in range(levels):
         data = np.array(op.gauges[gauge]['data'])
         opt = np.array(op.gauges[gauge]['opt'])
         n = len(opt)
-        T = np.array(op.gauges[gauge]['times'])/60
-        T = np.linspace(T[0], T[-1], n)
+        T = op.gauges[gauge]['times']
+        dt = T[1] - T[0]
+        T = np.linspace(T[0]/60, T[-1]/60, n)
 
-        # Check errors
-        init_error = (opt - data)**2
-        error = init_error.sum()/n
+        # Compute mean square errors
+        square_error = (opt - data)**2
+        mse = square_error.sum()/n
         msg = "{:5s} level {:d} optimised mean square error: {:.4e}"
-        print_output(msg.format(gauge, level, error))
-        mean_square_errors[level] += error
+        print_output(msg.format(gauge, level, mse))
+        mean_square_errors[level] += mse
+
+        # Compute discrete QoI
+        for q, sq_err in enumerate(square_error):
+            wq = 0.5 if q in (0, n-1) else 1.0  # TODO: Other integrators than trapezium
+            discrete_qois[level] += wq*dt*sq_err
+
+        # Compute total variation
+        # TODO
 
         # Plot timeseries
         ax = axes[i//N, i % N]
@@ -246,6 +256,8 @@ for level in range(levels):
     plt.tight_layout()
     savefig('timeseries_optimised_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
 
-# Store mean square errors
+# Store errors
 fname = os.path.join(di, 'mean_square_errors_{:s}_{:s}.npy')
 np.save(fname.format(basis, ''.join([str(level) for level in range(levels)])), mean_square_errors)
+fname = os.path.join(di, 'discrete_qois_{:s}_{:s}.npy')
+np.save(fname.format(basis, ''.join([str(level) for level in range(levels)])), discrete_qois)
