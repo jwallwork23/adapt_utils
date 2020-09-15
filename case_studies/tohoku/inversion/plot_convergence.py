@@ -7,7 +7,7 @@ import sys
 
 from adapt_utils.argparse import ArgumentParser
 from adapt_utils.plotting import *
-from adapt_utils.norms import vecnorm
+from adapt_utils.norms import lp_norm, vecnorm
 
 
 # --- Parse arguments
@@ -177,14 +177,30 @@ for level in range(levels):
     its = range(1, len(gradient_values_opt)+1)
     axes.loglog(its, [vecnorm(djdm, order=np.Inf) for djdm in gradient_values_opt], label=label)
 axes.set_xticks([1, 10, 100])
-axes.set_yticks([2e3, 7e3])
+# axes.set_yticks([2e3, 7e3])
 for axis in (axes.xaxis, axes.yaxis):
     axis.grid(True, which='minor', color='lightgrey')
     axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Iteration")
 axes.set_ylabel(r"$\ell_\infty$-norm of gradient")
 axes.legend(loc='best', fontsize=fontsize_legend)
-savefig('optimisation_progress_dJdm', fpath=plot_dir, extensions=extensions)
+savefig('optimisation_progress_dJdm_linf', fpath=plot_dir, extensions=extensions)
+fig, axes = plt.subplots(figsize=(8, 6))
+for level in range(levels):
+    fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+    gradient_values_opt = np.load(fname.format('grad', level))
+    label = '{:d} elements'.format(op.num_cells[level])
+    its = range(1, len(gradient_values_opt)+1)
+    axes.loglog(its, [lp_norm(djdm, p='l2') for djdm in gradient_values_opt], label=label)
+axes.set_xticks([1, 10, 100])
+# axes.set_yticks([2e3, 7e3])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
+axes.set_xlabel("Iteration")
+axes.set_ylabel(r"$\ell_2$-norm of gradient")
+axes.legend(loc='best', fontsize=fontsize_legend)
+savefig('optimisation_progress_dJdm_l2', fpath=plot_dir, extensions=extensions)
 
 # Plot timeseries for optimised run
 print_output("Plotting timeseries for optimised run...")
