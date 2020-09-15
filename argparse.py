@@ -8,19 +8,20 @@ __all__ = ["ArgumentParser"]
 class ArgumentParser(argparse.ArgumentParser):
     # TODO: Doc
     def __init__(self, *args, **kwargs):
+        self.kwargs = {
+            'basis': kwargs.pop('basis', False),
+            'plotting': kwargs.pop('plotting', False),
+            'shallow_water': kwargs.pop('shallow_water', False),
+        }
         super(ArgumentParser, self).__init__(*args, **kwargs)
+        for arg in self.kwargs:
+            if self.kwargs[arg]:
+                self.__getattribute__('add_{:s}_args'.format(arg))()
 
-        # Args
-        if kwargs.get('basis', False):
-            self.add_basis_args()
-
-        # Kwargs
-        if kwargs.get('plotting', False):
-            self.add_plotting_args()
-        if kwargs.get('shallow_water', False):
-            self.add_shallow_water_args()
-
-        # Flags for any Firedrake script
+        # I/O
+        self.add_argument("-extension", help="""
+            Extension for output directory. The directory name will have the form outputs_<ext>.
+            """)
         self.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 
         # Debugging
