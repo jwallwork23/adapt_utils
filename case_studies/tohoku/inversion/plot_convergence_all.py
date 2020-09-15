@@ -23,7 +23,7 @@ parser = ArgumentParser(
 parser.add_argument("-levels", help="Number of mesh resolution levels considered (default 3)")
 parser.add_argument("-noisy_data", help="""
     Toggle whether to consider timeseries data which has *not* been sampled (default False).
-    """)
+    """)  # TODO
 
 
 # --- Set parameters
@@ -31,7 +31,7 @@ parser.add_argument("-noisy_data", help="""
 # Parsed arguments
 args = parser.parse_args()
 bases = args.bases.split(',')
-levels = range(int(args.levels or 3))
+levels = int(args.levels or 3)
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
 plot_all = bool(args.plot_all or False)
@@ -57,42 +57,49 @@ fontsize_tick = 18
 fontsize_legend = 18
 kwargs = {'markevery': 5}
 
+# Paths
+dirname = os.path.dirname(__file__)
+extension = lambda fpath: fpath if args.extension is None else '_'.join([fpath, args.extension])
+plot_dir = create_directory(os.path.join(dirname, 'plots', extension('realistic')))
+
+
+# --- Create Options parameter objects
+
+options = {basis: {} for basis in bases}
+kwargs = dict(level=0, noisy_data=bool(args.noisy_data or False))
+for basis in bases:
+    if basis == 'box':
+        from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
+        options[basis]['op'] = TohokuBoxBasisOptions(**kwargs)
+        options[basis]['label'] = 'Piecewise constant'
+    elif basis == 'radial':
+        from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
+        options[basis]['op'] = TohokuRadialBasisOptions(**kwargs)
+        options[basis]['label'] = 'Radial'
+    elif basis == 'okada':
+        from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
+        options[basis]['op'] = TohokuOkadaBasisOptions(**kwargs)
+        options[basis]['label'] = 'Okada'
+    else:
+        raise ValueError("Basis type '{:s}' not recognised.".format(basis))
+
 
 # --- Plot all QoI convergence curves on the same axis
 
 qois = {basis: [] for basis in bases}
 fig, axes = plt.subplots(figsize=(8, 6))
 for basis in bases:
-
-    # Collect initialisation parameters
-    if basis == 'box':
-        from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
-        constructor = TohokuBoxBasisOptions
-        label = 'Piecewise constant'
-    elif basis == 'radial':
-        from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
-        constructor = TohokuRadialBasisOptions
-        label = 'Radial'
-    elif basis == 'okada':
-        from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
-        constructor = TohokuOkadaBasisOptions
-        label = 'Okada'
-    else:
-        raise ValueError("Basis type '{:s}' not recognised.".format(basis))
-    op = constructor(level=0, synthetic=False, noisy_data=bool(args.noisy_data or False))
+    op = options[basis]['op']
+    label = options[basis]['label']
     gauges = list(op.gauges.keys())
 
     # Get data directory
-    dirname = os.path.join(os.path.dirname(__file__), basis)
-    di = 'realistic'
-    if args.extension is not None:
-        di = '_'.join([di, args.extension])
-    op.di = os.path.join(dirname, 'outputs', di, 'discrete')
+    op.di = os.path.join(dirname, basis, 'outputs', extension('realistic'), 'discrete')
     if not os.path.exists(op.di):
         raise IOError("Filepath {:s} does not exist.".format(fpath))
 
     # Load data for current basis and plot
-    for level in levels:
+    for level in range(levels):
         fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
         func_values_opt = np.load(fname.format('func', level))
         qois[basis].append(func_values_opt[-1])
@@ -104,8 +111,36 @@ for axis in (axes.xaxis, axes.yaxis):
 axes.set_xlabel("Mesh element count")
 axes.set_ylabel("Square timeseries error QoI")
 axes.legend()
-di = 'realistic'
-if args.extension is not None:
-    di = '_'.join([di, args.extension])
-plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots', di))
 savefig('converged_J', fpath=plot_dir, extensions=extensions)
+
+
+# --- Plot mean square errors
+
+fig, axes = plt.subplots(figsize=(8, 6))
+for basis in bases:
+    op = options[basis]['op']
+    label = options[basis]['label']
+
+    # Load data
+    fname = 'mean_square_errors_{:s}_{:s}.npy'
+    fname = os.path.join(dirname, basis, 'outputs', extension('realistic'), fname)
+    try:
+        mses = np.load(fname.format(basis, ''.join([str(level) for level in range(levels)])))
+    except IOError:
+        msg = "Cannot plot mean square error data for '{:s}' basis".format(basis)
+        if args.extension is not None:
+            msg += " with extension '{:s}'".format(args.extension)
+        msg += ". Run the `plot_convergence.py` script first."
+        print_output(msg.format(basis, args.extension))
+        continue
+
+    # Plot
+    axes.semilogx(op.num_cells[:len(mses)], mses, '-x', label=label)
+axes.set_xticks([1e4, 1e5])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
+axes.set_xlabel("Mesh element count")
+axes.set_ylabel("Mean square error")
+axes.legend()
+savefig('converged_mse', fpath=plot_dir, extensions=extensions)

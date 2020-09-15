@@ -21,6 +21,7 @@ parser = ArgumentParser(
           (c) convergence curve of final 'optimised' QoI values, as a function of mesh element count;
           (d) progress of the QoI gradient during the optimisation, as a function of iteration count;
           (e) timeseries due to converged control parameters vs. gauge data.
+        In addition, the script computes mean square errors from the stored timeseries data.
         """,
     basis=True,
     plotting=True)
@@ -37,7 +38,7 @@ parser.add_argument("-plot_initial_guess", help="Plot initial guess timeseries")
 # Parsed arguments
 args = parser.parse_args()
 basis = args.basis
-levels = range(int(args.levels or 3))
+levels = int(args.levels or 3)
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
 plot_all = bool(args.plot_all or False)
@@ -94,14 +95,11 @@ for fpath in (di, op.di):
     if not os.path.exists(fpath):
         raise IOError("Filepath {:s} does not exist.".format(fpath))
 
-
-# --- Plot timeseries under initial guess
-
+# Plot timeseries under initial guess
 if plot_init:
     print_output("Plotting initial timeseries against gauge data...")
     N = int(np.ceil(np.sqrt(len(gauges))))
-    for level in levels:
-        mse = 0.0
+    for level in range(levels):
         fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
         for i, gauge in enumerate(gauges):
 
@@ -110,16 +108,9 @@ if plot_init:
             op.gauges[gauge]['data'] = np.load(fname)
             fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
             op.gauges[gauge]['init'] = np.load(fname)
-
-            # Check errors
             data = np.array(op.gauges[gauge]['data'])
             init = np.array(op.gauges[gauge]['init'])
             n = len(data)
-            init_error = (init - data)**2
-            error = init_error.sum()/n
-            msg = "{:5s} level {:d} initial mean square error: {:.4e}"
-            print_output(msg.format(gauge, level, error))
-            mse += error
 
             # Plot timeseries
             T = np.array(op.gauges[gauge]['times'])/60
@@ -138,20 +129,16 @@ if plot_init:
             ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
             ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
             ax.grid()
-        print_output("Level {:d} overall initial mean square error: {:.4e}".format(level, mse))
         for i in range(len(gauges), N*N):
             axes[i//N, i % N].axis(False)
         plt.tight_layout()
         savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
 
-
-# --- Optimisation progress
-
 # Plot progress of QoI
 print_output("Plotting progress of QoI...")
 fig, axes = plt.subplots(figsize=(8, 6))
 qois = []
-for level in levels:
+for level in range(levels):
     fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
     func_values_opt = np.load(fname.format('func', level))
     qois.append(func_values_opt[-1])
@@ -183,7 +170,7 @@ savefig('converged_J', fpath=plot_dir, extensions=extensions)
 # Plot progress of gradient
 print_output("Plotting progress of gradient norm...")
 fig, axes = plt.subplots(figsize=(8, 6))
-for level in levels:
+for level in range(levels):
     fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
     gradient_values_opt = np.load(fname.format('grad', level))
     label = '{:d} elements'.format(op.num_cells[level])
@@ -199,16 +186,14 @@ axes.set_ylabel(r"$\ell_\infty$-norm of gradient")
 axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_dJdm', fpath=plot_dir, extensions=extensions)
 
-
-# --- Timeseries for optimised run
-
+# Plot timeseries for optimised run
 print_output("Plotting timeseries for optimised run...")
 msg = "Cannot plot timeseries for optimised controls on mesh {:d} because the data don't exist."
-for level in levels:
+mean_square_errors = np.zeros(levels)
+for level in range(levels):
     N = int(np.ceil(np.sqrt(len(gauges))))
     fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
     plotted = False
-    mse = 0.0
     for i, gauge in enumerate(gauges):
 
         # Load data
@@ -226,14 +211,11 @@ for level in levels:
         T = np.linspace(T[0], T[-1], n)
 
         # Check errors
-        if len(data) == n:
-            init_error = (opt - data)**2
-            error = init_error.sum()/n
-            msg = "{:5s} level {:d} optimised mean square error: {:.4e}"
-            print_output(msg.format(gauge, level, error))
-            mse += error
-        else:
-            print_output("#### FIXME: cannot check errors")
+        init_error = (opt - data)**2
+        error = init_error.sum()/n
+        msg = "{:5s} level {:d} optimised mean square error: {:.4e}"
+        print_output(msg.format(gauge, level, error))
+        mean_square_errors[level] += error
 
         # Plot timeseries
         ax = axes[i//N, i % N]
@@ -257,8 +239,13 @@ for level in levels:
         plotted = True
     if not plotted:
         continue
-    print_output("Level {:d} overall optimised mean square error: {:.4e}".format(level, mse))
+    msg = "Level {:d} overall optimised mean square error: {:.4e}"
+    print_output(msg.format(level, mean_square_errors[level]))
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
     savefig('timeseries_optimised_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+
+# Store mean square errors
+fname = os.path.join(di, 'mean_square_errors_{:s}_{:s}.npy')
+np.save(fname.format(basis, ''.join([str(level) for level in range(levels)])), mean_square_errors)
