@@ -208,9 +208,9 @@ for level in range(levels):
         data = np.array(op.gauges[gauge]['data'])
         opt = np.array(op.gauges[gauge]['opt'])
         n = len(opt)
+        assert len(data) == n
         T = op.gauges[gauge]['times']
-        dt = T[1] - T[0]
-        T = np.linspace(T[0]/60, T[-1]/60, n)
+        T = np.linspace(T[0], T[-1], n)
 
         # Compute mean square errors
         square_error = (opt - data)**2
@@ -219,7 +219,9 @@ for level in range(levels):
         print_output(msg.format(gauge, level, mse))
         mean_square_errors[level] += mse
 
-        # Compute discrete QoI  # FIXME
+        # Compute discrete QoI
+        square_error *= 0.5
+        dt = T[1] - T[0]
         for q, sq_err in enumerate(square_error):
             wq = 0.5 if q in (0, n-1) else 1.0  # TODO: Other integrators than trapezium
             discrete_qois[level] += wq*dt*sq_err
@@ -229,9 +231,8 @@ for level in range(levels):
 
         # Plot timeseries
         ax = axes[i//N, i % N]
-        T = np.linspace(T[0], T[-1], len(data))
+        T /= 60
         ax.plot(T, data, '-', **kwargs)
-        T = np.linspace(T[0], T[-1], len(opt))
         ax.plot(T, opt, '-', label=gauge, **kwargs)
         ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
         if i//N == 3:
@@ -251,6 +252,8 @@ for level in range(levels):
         continue
     msg = "Level {:d} overall optimised mean square error: {:.4e}"
     print_output(msg.format(level, mean_square_errors[level]))
+    msg = "Level {:d} discrete QoI: {:.4e}"
+    print_output(msg.format(level, discrete_qois[level]))
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
