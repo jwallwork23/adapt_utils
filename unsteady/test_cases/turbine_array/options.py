@@ -90,7 +90,7 @@ class TurbineArrayOptions(TurbineOptions):
             eps = 20.0
             return interpolate(self.base_viscosity + exp(ramp*(x - xmax + eps)), fs)
         else:
-            return Constant(self.base_viscosity)
+            return super(TurbineArrayOptions, self).set_viscosity(fs)
 
     def set_boundary_conditions(self, prob, i):
         self.elev_in[i] = Function(prob.V[i].sub(1))

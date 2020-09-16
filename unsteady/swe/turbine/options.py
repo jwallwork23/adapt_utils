@@ -38,6 +38,16 @@ class TurbineOptions(CoupledOptions):
         self.T_tide = self.M2_tide_period
         self.dt_per_export = 10
 
+    def set_viscosity(self, fs):
+        """
+        If a target mesh Reynolds number is provided, set the viscosity in order to match it.
+        Otherwise, use the constant base viscosity.
+        """
+        if self.target_mesh_reynolds_number is None:
+            return super(TurbineOptions, self).set_viscosity(fs)
+        else:
+            return self.enforce_mesh_reynolds_number(fs)
+
     def set_quadratic_drag_coefficient(self, fs):
         """Constant background (quadratic) drag is set using :attr:`friction_coeff`."""
         return Constant(self.friction_coeff)

@@ -32,7 +32,7 @@ swp.set_initial_condition()
 u, eta = swp.fwd_solutions[0].split()
 
 # Enforce maximum mesh Reynolds number and plot
-nu = op.enforce_mesh_reynolds_number(mesh=mesh, index=0)
+nu = swp.fields[0].horizontal_viscosity
 nu_min = nu.vector().gather().min()
 nu_max = nu.vector().gather().max()
 fig, axes = plt.subplots(figsize=(12, 6))
@@ -44,5 +44,5 @@ tc = tricontourf(
 )
 cbar = fig.colorbar(tc, ax=axes, orientation="horizontal", pad=0.2)
 cbar.set_label(r"(Kinematic) viscosity [$\mathrm m^2\,\mathrm s^{-1}$]")
-cbar.set_ticks([nu_min, nu_max])
+cbar.set_ticks([1.0e-03, 1.0e-02])
 plt.show()
