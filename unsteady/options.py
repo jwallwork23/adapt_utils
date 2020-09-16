@@ -332,8 +332,9 @@ class CoupledOptions(Options):
         stats = MeshStats(self, mesh)  # TODO: Build into solver
 
         # Compute elementwise mesh Reynolds number
-        Re_h = interpolate(stats.dx*sqrt(dot(u, u))/nu, nu.function_space())
-        # Re_h = interpolate(stats.dx*sqrt(dot(u, u))/nu, stats._P0)
+        Re_h = Function(nu.function_space(), name="Reynolds number")
+        # Re_h = Function(stats._P0, name="Reynolds number")
+        Re_h.interpolate(stats.dx*sqrt(dot(u, u))/nu)
         Re_h_vec = Re_h.vector().gather()
         Re_h_min = Re_h_vec.min()
         Re_h_max = Re_h_vec.max()
