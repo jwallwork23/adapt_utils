@@ -304,11 +304,18 @@ class CoupledOptions(Options):
 
         return export_func
 
-    def check_mesh_reynolds_number(self, u, nu, mesh=None, index=None):
+    def check_mesh_reynolds_number(self, characteristic_velocity, nu, mesh=None, index=None):
+        """
+        Compute the mesh Reynolds number using provided characteristic velocity, viscosity field
+        and mesh.
+        """
         if nu is None:
             Re_h = None
             self.print_debug("INIT: Cannot compute mesh Reynolds number for inviscid problems")
             return
+        u = characteristic_velocity or self.characteristic_velocity
+        if u is None:
+            raise ValueError("Cannot enforce mesh Reynolds number without characteristic velocity!")
         if index is None:
             self.print_debug("INIT: Computing mesh Reynolds number...")
         else:
@@ -335,12 +342,11 @@ class CoupledOptions(Options):
         self.print_debug(msg.format(Re_h_min, lg(Re_h_min), Re_h_max, lg(Re_h_max)))
         return Re_h, Re_h_min, Re_h_max
 
-    def enforce_mesh_reynolds_number(self, characteristic_velocity=None, mesh=None, index=None):
+    def enforce_mesh_reynolds_number(self, fs, characteristic_velocity=None, index=None):
         """
         Enforce the mesh Reynolds number specified by :attr:`target_mesh_reynolds_number`.
         Also needs a characteristic velocity (either passed as a keyword argument, or read from
-        :attr:`characteristic_velocity`) and a mesh (either passed as a keyword argument, or
-        extracted from the velocity).
+        :attr:`characteristic_velocity`) and a :class:`FunctionSpace`.
 
         A minimum tolerated viscosity may be enforced using :attr:`min_viscosity`.
         """
@@ -359,16 +365,11 @@ class CoupledOptions(Options):
             self.print_debug(msg.format(Re_h, nu_min, index))
 
         # Get local mesh element size
-        if mesh is None:
-            if isinstance(u, Function):
-                mesh = u.function_space().mesh()
-            else:
-                raise ValueError("Cannot enforce mesh Reynolds number without a mesh!")
-        stats = MeshStats(self, mesh)  # TODO: Build into solver
+        stats = MeshStats(self, fs.mesh())  # TODO: Build into solver
 
         # Compute viscosity which yields target mesh Reynolds number
         expr = stats.dx*sqrt(dot(u, u))/Re_h
-        return interpolate(max_value(expr, nu_min), stats._P0)
+        return interpolate(max_value(expr, nu_min), fs)
 
 
 class ReynoldsNumberArray(object):
