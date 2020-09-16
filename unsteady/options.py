@@ -1,6 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
+from adapt_utils.mesh import MeshStats
 from adapt_utils.options import Options
 
 
@@ -316,20 +317,17 @@ class CoupledOptions(Options):
                 mesh = nu.function_space().mesh()
             else:
                 raise ValueError("Cannot compute mesh Reynolds number without a mesh!")
-        P0 = FunctionSpace(mesh, "DG", 0)
-        dx = interpolate(CellDiameter(mesh), P0)
-        dx_min = dx.vector().gather().min()
-        dx_max = dx.vector().gather().max()
+        stats = MeshStats(self, mesh)
 
         # Compute elementwise mesh Reynolds number
-        Re_h = interpolate(dx*sqrt(dot(u, u))/nu, P0)
+        Re_h = interpolate(stats.dx*sqrt(dot(u, u))/nu, stats._P0)
         Re_h_min = Re_h.vector().gather().min()
         Re_h_max = Re_h.vector().gather().max()
 
         # Print to screen and return
         lg = lambda x: '<' if x < 1 else '>'
         msg = "INIT:   min(dx)   = {:11.4e}       max(dx)   = {:11.4e}"
-        self.print_debug(msg.format(dx_min, dx_max))
+        self.print_debug(msg.format(stats.dx_min, stats.dx_max))
         msg = "INIT:   min(Re_h) = {:11.4e} {:1s} 1   max(Re_h) = {:11.4e} {:1s} 1"
         self.print_debug(msg.format(Re_h_min, lg(Re_h_min), Re_h_max, lg(Re_h_max)))
         return Re_h, Re_h_min, Re_h_max

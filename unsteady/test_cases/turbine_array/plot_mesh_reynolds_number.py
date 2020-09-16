@@ -12,6 +12,8 @@ op.spun = True
 swp = AdaptiveTurbineProblem(op, ramp_dir='data/ramp')
 swp.set_initial_condition()
 
+Re = swp.reynolds_number[0]
+
 # Plot fluid speed
 fig, axes = plt.subplots(figsize=(12, 6))
 tc = tricontourf(swp.fwd_solutions[0].split()[0], axes=axes, levels=50, cmap='coolwarm')
