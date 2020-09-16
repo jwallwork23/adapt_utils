@@ -8,7 +8,7 @@ import sys
 from time import perf_counter
 
 from adapt_utils.io import index_string
-from adapt_utils.plotting import *  # NOQA
+from adapt_utils.plotting import *
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
@@ -34,6 +34,7 @@ parser.add_argument("-h_min", help="Minimum tolerated element size (default 1cm)
 parser.add_argument("-h_max", help="Maximum tolerated element size (default 100m)")
 
 # I/O and debugging
+parser.add_argument("-extension", help="Optional extension for output directory")
 parser.add_argument("-load_mesh", help="Load meshes from a previous run")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
@@ -72,7 +73,7 @@ kwargs = {
     'approach': approach,
 
     # Physics
-    'target_mesh_reynolds_number': float(args.reynolds_number),
+    'target_mesh_reynolds_number': None if args.reynolds_number is None else float(args.reynolds_number),
     'min_viscosity': float(args.min_viscosity or 0.0),
 
     # Mesh adaptation
@@ -109,27 +110,22 @@ op = TurbineArrayOptions(**kwargs)
 op.end_time = op.T_tide  # Only adapt over a single tidal cycle
 
 # Create directories and check if spun-up solution exists
-data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
-ramp_dir = create_directory(os.path.join(data_dir, "ramp"))
-data_dir = create_directory(os.path.join(data_dir, approach, index_string(op.num_meshes)))
+ramp_dir = create_directory(os.path.join(os.path.dirname(__file__), "data", "ramp"))
+op.di = create_directory(os.path.join(os.path.dirname(__file__), "outputs", approach))
+if args.extension is not None:
+    op.di = "_".join([op.di, args.extension])
+op.di = create_directory(os.path.join(op.di, "power_output"))
 op.spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
-if not op.spun:
-    raise ValueError("Please spin up the simulation before applying mesh adaptation.")
 sea_water_density = 1030.0
-power_watts = [np.array([]) for i in range(15)]
-for i, turbine in enumerate(op.farm_ids):
-    fname = os.path.join(ramp_dir, "power_output_{:d}_00000.npy".format(turbine))
-    power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
-
-
-# --- Create a solver subclass which uses restarts
 
 
 # --- Run model
 
 # Run forward model and save QoI timeseries
 if not plot_only:
-    swp = AdaptiveTurbineProblem(op, meshes=load_mesh, callback_dir=data_dir, ramp_dir=ramp_dir)
+    if not op.spun:
+        raise ValueError("Please spin up the simulation before applying mesh adaptation.")
+    swp = AdaptiveTurbineProblem(op, meshes=load_mesh, callback_dir=op.di, ramp_dir=ramp_dir)
 
     # Solve forward problem
     cpu_timestamp = perf_counter()
@@ -147,12 +143,14 @@ if nproc > 1:
     sys.exit(0)
 elif not plot_any:
     sys.exit(0)
+plt.rc('font', **{'size': 18})
 
 # Adjust timeseries to account for density of water and assemble as an array
+power_watts = [np.array([]) for i in range(15)]
 for i, turbine in enumerate(op.farm_ids):
     timeseries = np.array([])
     for n in range(op.num_meshes):
-        fname = os.path.join(data_dir, "power_output_{:d}_{:s}.npy".format(turbine, index_string(n)))
+        fname = os.path.join(op.di, "power_output_{:d}_{:s}.npy".format(turbine, index_string(n)))
         if not os.path.exists(fname):
             raise IOError("Need to run the model in order to get power output timeseries.")
         timeseries = np.append(timeseries, np.load(fname))
@@ -172,21 +170,13 @@ array_power_kilowatts = array_power_watts/1.0e+03
 # --- Plot power timeseries of whole array
 
 # Convert to appropriate units and plot
-fig, axes = plt.subplots(figsize=(8, 4))
-time_seconds = np.linspace(-op.T_ramp, op.end_time, num_timesteps)
+fig, axes = plt.subplots(figsize=(6, 4))
+time_seconds = np.linspace(0, op.end_time, num_timesteps)
 time_hours = time_seconds/3600
 axes.plot(time_hours, array_power_kilowatts, color="grey")
 axes.set_xlabel("Time [h]")
 axes.set_ylabel("Array power output [kW]")
-r = op.T_ramp/3600
-axes.set_xlim([-r, op.end_time/3600])
-
-# Add a dashed line when the ramp period is over
-axes.axvline(0.0, linestyle='--', color="b")
-axes.annotate("", xy=(-r, -40), xytext=(0, -40), **plotting_kwargs)
-axes.annotate(
-    "Spin-up period", xy=(-0.8*r, -60), xytext=(-0.8*r, -60), color="b", annotation_clip=False,
-)
+axes.set_xlim([0, op.end_time/3600])
 
 # Add second x-axis with non-dimensionalised time
 non_dimensionalise = lambda time: 3600*time/op.T_tide
@@ -196,36 +186,28 @@ secax.set_xlabel("Time/Tidal period")
 
 # Save
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), "plots"))
-plt.tight_layout()
-for ext in extensions:
-    plt.savefig(os.path.join(plot_dir, '_'.join([approach, ".".join(["array_power_output", ext])])))
+fname = approach
+if args.extension is not None:
+    fname = '_'.join([fname, args.extension])
+savefig('_'.join([fname, "array_power_output"]), plot_dir, extensions=extensions)
 
 
 # --- Plot power timeseries of each column of the array
 
 # Convert to appropriate units and plot
-fig, axes = plt.subplots(figsize=(8, 4))
+fig, axes = plt.subplots(figsize=(6, 4))
 greys = ['k', 'dimgrey', 'grey', 'darkgrey', 'silver', 'lightgrey']
 for i, (linestyle, colour) in enumerate(zip(["-", "--", ":", "--", "-"], greys)):
     axes.plot(time_hours, columnar_power_kilowatts[i, :],
-              label="Column {:d}".format(i+1), linestyle=linestyle, color=colour)
+              label="{:d}".format(i+1), linestyle=linestyle, color=colour)
 axes.set_xlabel("Time [h]")
 axes.set_ylabel("Power output [kW]")
-axes.set_xlim([-r, op.end_time/3600])
-axes.legend(loc="upper left", fontsize=16)
-
-# Add a dashed line when the ramp period is over
-axes.axvline(0.0, linestyle='--', color="b")
-axes.annotate("", xy=(-r, -11), xytext=(0.0, -11), **plotting_kwargs)
-axes.annotate(
-    "Spin-up period", xy=(-0.8*r, -17), xytext=(-0.8*r, -17), color="b", annotation_clip=False,
-)
+axes.set_xlim([0, op.end_time/3600])
+axes.legend(bbox_to_anchor=(1.25, 0.9), handlelength=1, fontsize=16)
 
 # Add second x-axis with non-dimensionalised time
 secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
 secax.set_xlabel("Time/Tidal period")
 
 # Save
-plt.tight_layout()
-for ext in extensions:
-    plt.savefig(os.path.join(plot_dir, '_'.join([approach, ".".join(["columnar_power_output", ext])])))
+savefig('_'.join([fname, "columnar_power_output"]), plot_dir, extensions=extensions)
