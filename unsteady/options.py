@@ -335,7 +335,7 @@ class CoupledOptions(Options):
         fs = nu.function_space() if isinstance(nu, Function) else FunctionSpace(mesh, "CG", 1)
         # fs = stats._P0
         Re_h = Function(fs, name="Reynolds number")
-        Re_h.interpolate(stats.dx*sqrt(dot(u, u))/nu)
+        Re_h.project(stats.dx*sqrt(dot(u, u))/nu)
         Re_h_vec = Re_h.vector().gather()
         Re_h_min = Re_h_vec.min()
         Re_h_max = Re_h_vec.max()
@@ -377,8 +377,8 @@ class CoupledOptions(Options):
         stats = MeshStats(self, fs.mesh())  # TODO: Build into solver
 
         # Compute viscosity which yields target mesh Reynolds number
-        expr = stats.dx*sqrt(dot(u, u))/Re_h
-        nu = interpolate(max_value(expr, nu_min), fs)
+        nu = Function(fs, name="Horizontal viscosity")
+        nu.project(max_value(stats.dx*sqrt(dot(u, u))/Re_h, nu_min))
         nu_min = nu.vector().gather().min()
         nu_max = nu.vector().gather().max()
         self.print_debug("INIT:   min(nu) = {:11.4e}   max(nu) = {:11.4e}".format(nu_min, nu_max))
