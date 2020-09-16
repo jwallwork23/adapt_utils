@@ -34,9 +34,10 @@ class MeshStats(object):
             self.boundary_length = sum(self.boundary_lengths[tag] for tag in self.boundary_markers)
         elif self.dim != 3:
             raise ValueError("Mesh of dimension {:d} not supported.".format(self.dim))
-        op.print_debug(self.__call__())
+        op.print_debug(self.summary)
 
-    def __call__(self):
+    @property
+    def summary(self):
         msg = "\n" + 35*"*" + "\n" + 10*" " + "MESH STATISTICS\n" + 35*"*" + "\n"
         msg += "MESH: num cells       = {:11d}\n".format(self.num_cells)
         msg += "MESH: num edges       = {:11d}\n".format(self.num_edges)
@@ -58,6 +59,8 @@ class MeshStats(object):
         self.dx_max = self.dx.vector().gather().max()
 
     def get_element_volumes(self):
+        if self.dim == 3:
+            raise NotImplementedError  # TODO
         self.volume = Function(self._P0, name="Element volume")
         get_horizontal_elem_size_2d(self.volume)
         self.volume_min = self.volume.vector().gather().min()
