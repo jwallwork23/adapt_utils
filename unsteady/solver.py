@@ -458,7 +458,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.op.set_initial_condition_bathymetry(self)
 
     def compute_mesh_reynolds_number(self, i):
-        u, eta = self.fwd_solutions[i].split()
+        # u, eta = self.fwd_solutions[i].split()
+        u = self.op.characteristic_velocity
         nu = self.fields[i].horizontal_viscosity
         self.reynolds_number[i] = (u, nu)
 
@@ -470,6 +471,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.reynolds_number[i] is None:
             self.compute_mesh_reynolds_number(i)
         Re = self.reynolds_number[i]
+        Re_vec = Re.vector().gather()
+        kwargs.setdefault('levels', np.linspace(0.99*Re_vec.min(), 1.01*Re_vec.max(), 50))
+        kwargs.setdefault('cmap', 'coolwarm')
         return tricontourf(Re, axes=axes, **kwargs)
 
     def transfer_forward_solution(self, i, **kwargs):
