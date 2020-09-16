@@ -4,7 +4,7 @@ from thetis.configuration import *
 from adapt_utils.options import Options
 
 
-__all__ = ["CoupledOptions"]
+__all__ = ["CoupledOptions", "ReynoldsNumberArray"]
 
 
 # TODO: Improve doc
@@ -298,15 +298,15 @@ class CoupledOptions(Options):
 
         return export_func
 
-    def check_mesh_reynolds_number(self, u, nu, mesh=None, mesh_index=None):
+    def check_mesh_reynolds_number(self, u, nu, mesh=None, index=None):
         if nu is None:
-            self._Re_h = None
+            Re_h = None
             self.print_debug("INIT: Cannot compute mesh Reynolds number for inviscid problems")
             return
-        if mesh_index is None:
+        if index is None:
             self.print_debug("INIT: Computing mesh Reynolds number...")
         else:
-            self.print_debug("INIT: Computing Reynolds number on mesh {:d}...".format(mesh_index))
+            self.print_debug("INIT: Computing Reynolds number on mesh {:d}...".format(index))
 
         # Get local mesh element size
         if mesh is None:
@@ -322,17 +322,45 @@ class CoupledOptions(Options):
         dx_max = dx.vector().gather().max()
 
         # Compute elementwise mesh Reynolds number
-        self._Re_h = interpolate(dx*sqrt(dot(u, u))/nu, P0)
-        Re_h_min = self._Re_h.vector().gather().min()
-        Re_h_max = self._Re_h.vector().gather().max()
+        Re_h = interpolate(dx*sqrt(dot(u, u))/nu, P0)
+        Re_h_min = Re_h.vector().gather().min()
+        Re_h_max = Re_h.vector().gather().max()
 
-        # Print to screen
+        # Print to screen and return
         lg = lambda x: '<' if x < 1 else '>'
         msg = "INIT:   min(dx)   = {:11.4e}       max(dx)   = {:11.4e}"
         self.print_debug(msg.format(dx_min, dx_max))
         msg = "INIT:   min(Re_h) = {:11.4e} {:1s} 1   max(Re_h) = {:11.4e} {:1s} 1"
         self.print_debug(msg.format(Re_h_min, lg(Re_h_min), Re_h_max, lg(Re_h_max)))
+        return Re_h, Re_h_min, Re_h_max
 
-    @property
-    def reynolds_number(self):
-        return self._Re_h
+
+class ReynoldsNumberArray(object):
+    """
+    Custom array object to hold values of the Renolds number on a sequence of meshes. Value
+    assignment to key `i` has been overriden to take a (velocity, viscosity) tuple, which will be
+    used to compute the Reynolds number on the ith mesh.
+    """
+    def __init__(self, meshes, op):
+        self._meshes = meshes
+        self._data = [None for mesh in self._meshes]
+        self._min = [None for mesh in self._meshes]
+        self._max = [None for mesh in self._meshes]
+        self._op = op
+
+    def __getitem__(self, i):
+        return self._data[i]
+
+    def __setitem__(self, i, value):
+        (u, nu) = value
+        mesh = self._meshes[i]
+        Re_h, Re_h_min, Re_h_max = self._op.check_mesh_reynolds_number(u, nu, mesh=mesh, index=i)
+        self._data[i] = Re_h
+        self._min[i] = Re_h_min
+        self._max[i] = Re_h_max
+
+    def min(self, i):
+        return self._min[i]
+
+    def max(self, i):
+        return self._max[i]

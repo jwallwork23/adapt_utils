@@ -12,6 +12,7 @@ from ..adapt.metric import *
 from .base import AdaptiveProblemBase
 from .callback import *
 from ..io import *
+from .options import ReynoldsNumberArray
 from .swe.utils import *
 
 
@@ -116,6 +117,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.minimum_angles = [None for i in range(op.num_meshes)]
 
         super(AdaptiveProblem, self).__init__(op, nonlinear=nonlinear, **kwargs)
+
+        # Custom arrays
+        self.reynolds_number = ReynoldsNumberArray(self.meshes, op)
 
     def create_outfiles(self):
         if not self.op.plot_pvd:
@@ -453,17 +457,27 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.op.set_initial_condition_bathymetry(self)
 
-    def check_mesh_reynolds_number(self, i):
+    def compute_mesh_reynolds_number(self, i):
         u, eta = self.fwd_solutions[i].split()
         nu = self.fields[i].horizontal_viscosity
-        self.op.check_mesh_reynolds_number(u, nu, mesh=self.meshes[i], mesh_index=i)
+        self.reynolds_number[i] = (u, nu)
+
+    def plot_mesh_reynolds_number(self, i, axes=None, **kwargs):
+        import matplotlib.pyplot as plt
+
+        if axes is None:
+            fig, axes = plt.subplots()
+        if self.reynolds_number[i] is None:
+            self.compute_mesh_reynolds_number(i)
+        Re = self.reynolds_number[i]
+        return tricontourf(Re, axes=axes, **kwargs)
 
     def transfer_forward_solution(self, i, **kwargs):
         super(AdaptiveProblem, self).transfer_forward_solution(i, **kwargs)
 
         # Check Reynolds and CFL numbers
         if self.op.debug:
-            self.check_mesh_reynolds_number(i)
+            self.compute_mesh_reynolds_number(i)
             if hasattr(self.op, 'check_cfl_criterion'):
                 self.op.check_cfl_criterion(self, i, error_factor=None)
                 # TODO: parameter for error_factor, defaulted by timestepper choice
