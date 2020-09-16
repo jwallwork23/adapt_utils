@@ -23,6 +23,9 @@ class CoupledOptions(Options):
     base_viscosity = NonNegativeFloat(0.0, help="""
         Non-negative value providing the default constant viscosity field.
         """).tag(config=True)
+    min_viscosity = NonNegativeFloat(0.0, help="""
+        Non-negative value providing the minimum tolerated viscosity.
+        """).tag(config=True)
     base_diffusivity = NonNegativeFloat(0.0, help="""
         Non-negative value providing the default constant diffusivity field.
         """).tag(config=True)
@@ -52,6 +55,8 @@ class CoupledOptions(Options):
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
     recover_vorticity = Bool(False).tag(config=True)  # TODO: help
+    target_mesh_reynolds_number = PositiveFloat(None, allow_none=True).tag(config=True)  # TODO: help
+    characteristic_velocity = FiredrakeVectorExpression(None, allow_none=True)  # TODO: help
 
     # Tracer transport model
     solve_tracer = Bool(False, help="Toggle solving the tracer transport model.").tag(config=True)
@@ -330,12 +335,28 @@ class CoupledOptions(Options):
         self.print_debug(msg.format(Re_h_min, lg(Re_h_min), Re_h_max, lg(Re_h_max)))
         return Re_h, Re_h_min, Re_h_max
 
-    def enforce_mesh_reynolds_number(self, Re_h, u, mesh=None, index=None, min_viscosity=0):
+    def enforce_mesh_reynolds_number(self, characteristic_velocity=None, mesh=None, index=None):
+        """
+        Enforce the mesh Reynolds number specified by :attr:`target_mesh_reynolds_number`.
+        Also needs a characteristic velocity (either passed as a keyword argument, or read from
+        :attr:`characteristic_velocity`) and a mesh (either passed as a keyword argument, or
+        extracted from the velocity).
+
+        A minimum tolerated viscosity may be enforced using :attr:`min_viscosity`.
+        """
+        Re_h = self.target_mesh_reynolds_number
+        if Re_h is None:
+            raise ValueError("Cannot enforce mesh Reynolds number for inviscid problems!")
+        nu_min = self.min_viscosity
+        u = characteristic_velocity or self.characteristic_velocity
+        if u is None:
+            raise ValueError("Cannot enforce mesh Reynolds number without characteristic velocity!")
         if index is None:
-            self.print_debug("INIT: Enforcing mesh Reynolds number {:.4e}...")
+            msg = "INIT: Enforcing mesh Reynolds number {:.4e} (min viscosity {:.4e})..."
+            self.print_debug(msg.format(Re_h, nu_min))
         else:
-            msg = "INIT: Enforcing Reynolds number {:.4e} on mesh {:d}..."
-            self.print_debug(msg.format(Re_h, index))
+            msg = "INIT: Enforcing Reynolds number {:.4e} (min viscosity {:.4e}) on mesh {:d}..."
+            self.print_debug(msg.format(Re_h, nu_min, index))
 
         # Get local mesh element size
         if mesh is None:
@@ -347,7 +368,7 @@ class CoupledOptions(Options):
 
         # Compute viscosity which yields target mesh Reynolds number
         expr = stats.dx*sqrt(dot(u, u))/Re_h
-        return interpolate(max_value(expr, min_viscosity), stats._P0)
+        return interpolate(max_value(expr, nu_min), stats._P0)
 
 
 class ReynoldsNumberArray(object):

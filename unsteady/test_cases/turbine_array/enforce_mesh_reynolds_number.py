@@ -15,19 +15,24 @@ parser = argparse.ArgumentParser()
 parser.add_argument("Re", help="Target Reynolds number.")
 parser.add_argument("-min_viscosity", help="Minimum tolerated viscosity (default 0).")
 args = parser.parse_args()
-Re = float(args.Re)
-nu_min = float(args.min_viscosity or 0.0)
+
+kwargs = {
+    'target_mesh_reynolds_number': float(args.Re),
+    'min_viscosity': float(args.min_viscosity or 0.0),
+    'characteristic_velocity': Constant(as_vector([1.5, 0.0])),
+    'spun': True,
+    'debug': True,
+}
 
 # Setup problem
-op = TurbineArrayOptions(debug=True)
-op.spun = True
+op = TurbineArrayOptions(**kwargs)
 swp = AdaptiveTurbineProblem(op, ramp_dir='data/ramp')
 mesh = swp.meshes[0]
 swp.set_initial_condition()
 u, eta = swp.fwd_solutions[0].split()
 
 # Enforce maximum mesh Reynolds number and plot
-nu = op.enforce_mesh_reynolds_number(Re, u, mesh=mesh, index=0, min_viscosity=nu_min)
+nu = op.enforce_mesh_reynolds_number(mesh=mesh, index=0)
 nu_min = nu.vector().gather().min()
 nu_max = nu.vector().gather().max()
 fig, axes = plt.subplots(figsize=(12, 6))
