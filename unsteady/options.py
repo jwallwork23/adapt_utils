@@ -326,8 +326,6 @@ class CoupledOptions(Options):
 
         # Print to screen and return
         lg = lambda x: '<' if x < 1 else '>'
-        msg = "INIT:   min(dx)   = {:11.4e}       max(dx)   = {:11.4e}"
-        self.print_debug(msg.format(stats.dx_min, stats.dx_max))
         msg = "INIT:   min(Re_h) = {:11.4e} {:1s} 1   max(Re_h) = {:11.4e} {:1s} 1"
         self.print_debug(msg.format(Re_h_min, lg(Re_h_min), Re_h_max, lg(Re_h_max)))
         return Re_h, Re_h_min, Re_h_max
