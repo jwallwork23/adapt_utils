@@ -317,7 +317,7 @@ class CoupledOptions(Options):
                 mesh = nu.function_space().mesh()
             else:
                 raise ValueError("Cannot compute mesh Reynolds number without a mesh!")
-        stats = MeshStats(self, mesh)
+        stats = MeshStats(self, mesh)  # TODO: Build into solver
 
         # Compute elementwise mesh Reynolds number
         Re_h = interpolate(stats.dx*sqrt(dot(u, u))/nu, stats._P0)
@@ -329,6 +329,25 @@ class CoupledOptions(Options):
         msg = "INIT:   min(Re_h) = {:11.4e} {:1s} 1   max(Re_h) = {:11.4e} {:1s} 1"
         self.print_debug(msg.format(Re_h_min, lg(Re_h_min), Re_h_max, lg(Re_h_max)))
         return Re_h, Re_h_min, Re_h_max
+
+    def enforce_mesh_reynolds_number(self, Re_h, u, mesh=None, index=None, min_viscosity=0):
+        if index is None:
+            self.print_debug("INIT: Enforcing mesh Reynolds number {:.4e}...")
+        else:
+            msg = "INIT: Enforcing Reynolds number {:.4e} on mesh {:d}..."
+            self.print_debug(msg.format(Re_h, index))
+
+        # Get local mesh element size
+        if mesh is None:
+            if isinstance(u, Function):
+                mesh = u.function_space().mesh()
+            else:
+                raise ValueError("Cannot enforce mesh Reynolds number without a mesh!")
+        stats = MeshStats(self, mesh)  # TODO: Build into solver
+
+        # Compute viscosity which yields target mesh Reynolds number
+        expr = stats.dx*sqrt(dot(u, u))/Re_h
+        return interpolate(max_value(expr, min_viscosity), stats._P0)
 
 
 class ReynoldsNumberArray(object):
