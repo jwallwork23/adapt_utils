@@ -329,12 +329,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             })
         self.inflow[i] = self.op.set_inflow(self.P1_vec[i])
 
-        # Check CFL criterion
-        if self.op.debug and hasattr(self.op, 'check_cfl_criterion'):
-            self.op.check_cfl_criterion(self, i, error_factor=None)
-            # TODO: parameter for error_factor, defaulted by timestepper choice
-            # TODO: allow t-adaptation in a given subinterval
-
     def free_fields_step(self, i):
         super(AdaptiveProblem, self).free_fields_step(i)
         self.bathymetry[i] = None
@@ -458,6 +452,22 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.op.set_initial_condition_sediment(self)
         if self.op.solve_exner:
             self.op.set_initial_condition_bathymetry(self)
+
+    def check_mesh_reynolds_number(self, i):
+        u, eta = self.fwd_solutions[i].split()
+        nu = self.fields[i].horizontal_viscosity
+        self.op.check_mesh_reynolds_number(u, nu, mesh=self.meshes[i], mesh_index=i)
+
+    def transfer_forward_solution(self, i, **kwargs):
+        super(AdaptiveProblem, self).transfer_forward_solution(i, **kwargs)
+
+        # Check Reynolds and CFL numbers
+        if self.op.debug:
+            self.check_mesh_reynolds_number(i)
+            if hasattr(self.op, 'check_cfl_criterion'):
+                self.op.check_cfl_criterion(self, i, error_factor=None)
+                # TODO: parameter for error_factor, defaulted by timestepper choice
+                # TODO: allow t-adaptation on subinterval
 
     def set_terminal_condition(self, **kwargs):
         """Apply terminal condition(s) for adjoint solution(s) on terminal mesh."""
