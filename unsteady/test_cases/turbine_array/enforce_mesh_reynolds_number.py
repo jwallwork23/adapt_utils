@@ -44,4 +44,10 @@ tc = tricontourf(
 cbar = fig.colorbar(tc, ax=axes, orientation="horizontal", pad=0.2)
 cbar.set_label(r"(Kinematic) viscosity [$\mathrm m^2\,\mathrm s^{-1}$]")
 cbar.set_ticks([1.0e-03, 1.0e-02])
+
+# Plot mesh Reynolds number
+fig, axes = plt.subplots(figsize=(12, 6))
+tc = swp.plot_mesh_reynolds_number(0, axes=axes)
+cbar = fig.colorbar(tc, ax=axes)
+cbar.set_label("Mesh Reynolds number")
 plt.show()

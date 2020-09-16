@@ -332,14 +332,21 @@ class CoupledOptions(Options):
         stats = MeshStats(self, mesh)  # TODO: Build into solver
 
         # Compute elementwise mesh Reynolds number
-        Re_h = interpolate(stats.dx*sqrt(dot(u, u))/nu, stats._P0)
-        Re_h_min = Re_h.vector().gather().min()
-        Re_h_max = Re_h.vector().gather().max()
+        Re_h = interpolate(stats.dx*sqrt(dot(u, u))/nu, nu.function_space())
+        # Re_h = interpolate(stats.dx*sqrt(dot(u, u))/nu, stats._P0)
+        Re_h_vec = Re_h.vector().gather()
+        Re_h_min = Re_h_vec.min()
+        Re_h_max = Re_h_vec.max()
+        Re_h_mean = np.mean(Re_h_vec)
 
         # Print to screen and return
         lg = lambda x: '<' if x < 1 else '>'
-        msg = "INIT:   min(Re_h) = {:11.4e} {:1s} 1   max(Re_h) = {:11.4e} {:1s} 1"
-        self.print_debug(msg.format(Re_h_min, lg(Re_h_min), Re_h_max, lg(Re_h_max)))
+        msg = "INIT:   min(Re_h)  = {:11.4e} {:1s} 1"
+        self.print_debug(msg.format(Re_h_min, lg(Re_h_min)))
+        msg = "INIT:   max(Re_h)  = {:11.4e} {:1s} 1"
+        self.print_debug(msg.format(Re_h_max, lg(Re_h_max)))
+        msg = "INIT:   mean(Re_h) = {:11.4e} {:1s} 1"
+        self.print_debug(msg.format(Re_h_mean, lg(Re_h_mean)))
         return Re_h, Re_h_min, Re_h_max
 
     def enforce_mesh_reynolds_number(self, fs, characteristic_velocity=None, index=None):
@@ -369,7 +376,11 @@ class CoupledOptions(Options):
 
         # Compute viscosity which yields target mesh Reynolds number
         expr = stats.dx*sqrt(dot(u, u))/Re_h
-        return interpolate(max_value(expr, nu_min), fs)
+        nu = interpolate(max_value(expr, nu_min), fs)
+        nu_min = nu.vector().gather().min()
+        nu_max = nu.vector().gather().max()
+        self.print_debug("INIT:   min(nu) = {:11.4e}   max(nu) = {:11.4e}".format(nu_min, nu_max))
+        return nu
 
 
 class ReynoldsNumberArray(object):
