@@ -19,7 +19,6 @@ args = parser.parse_args()
 kwargs = {
     'target_mesh_reynolds_number': float(args.Re),
     'min_viscosity': float(args.min_viscosity or 0.0),
-    'characteristic_velocity': Constant(as_vector([1.5, 0.0])),
     'spun': True,
     'debug': True,
 }

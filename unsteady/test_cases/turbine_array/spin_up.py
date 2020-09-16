@@ -14,6 +14,8 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
+parser.add_argument("-reynolds_number", help="Target mesh Reynolds number")
+parser.add_argument("-min_viscosity", help="Minimum tolerated viscosity (default 0).")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
@@ -38,7 +40,13 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
-op = TurbineArrayOptions(approach=approach, plot_pvd=plot_pvd)
+kwargs = {
+    'approach': approach,
+    'target_mesh_reynolds_number': float(args.reynolds_number),
+    'min_viscosity': float(args.min_viscosity or 0.0),
+    'plot_pvd': plot_pvd,
+}
+op = TurbineArrayOptions(**kwargs)
 L = op.domain_length
 W = op.domain_width
 op.end_time = op.T_ramp

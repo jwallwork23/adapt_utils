@@ -24,6 +24,11 @@ class TurbineArrayOptions(TurbineOptions):
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
+    # Characteristics
+    characteristic_velocity = FiredrakeVectorExpression(
+        Constant(as_vector([1.5, 0.0]))
+    ).tag(config=False)
+
     def __init__(self, spun=False, **kwargs):
         super(TurbineArrayOptions, self).__init__(**kwargs)
         self.array_ids = np.array([[2, 5, 8, 11, 14],

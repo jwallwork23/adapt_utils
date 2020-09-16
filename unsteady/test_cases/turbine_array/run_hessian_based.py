@@ -17,6 +17,10 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 
 parser = argparse.ArgumentParser()
 
+# Physics
+parser.add_argument("-reynolds_number", help="Target mesh Reynolds number")
+parser.add_argument("-min_viscosity", help="Minimum tolerated viscosity (default 0).")
+
 # Mesh adaptation
 parser.add_argument("-approach", help="Metric construction approach (default 'hessian')")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (default 10)")
@@ -66,6 +70,10 @@ if plot_png:
     extensions.append('png')
 kwargs = {
     'approach': approach,
+
+    # Physics
+    'target_mesh_reynolds_number': float(args.reynolds_number),
+    'min_viscosity': float(args.min_viscosity or 0.0),
 
     # Mesh adaptation
     'num_meshes': int(args.num_meshes or 10),

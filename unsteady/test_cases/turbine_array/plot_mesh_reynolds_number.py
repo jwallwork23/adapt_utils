@@ -1,8 +1,6 @@
 from firedrake import *
 
-import matplotlib.colors as colors
 import matplotlib.pyplot as plt
-import numpy as np
 
 from adapt_utils.plotting import *
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions

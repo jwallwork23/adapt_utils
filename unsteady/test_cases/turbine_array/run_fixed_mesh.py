@@ -19,6 +19,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-num_meshes", help="Number of meshes (for debugging)")
 parser.add_argument("-load_mesh", help="Load meshes from a previous run")
 parser.add_argument("-end_time", help="End time of simulation in seconds")
+parser.add_argument("-reynolds_number", help="Target mesh Reynolds number")
+parser.add_argument("-min_viscosity", help="Minimum tolerated viscosity (default 0).")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
@@ -51,6 +53,8 @@ if plot_png:
 kwargs = {
     'approach': approach,
     'num_meshes': int(args.num_meshes or 1),
+    'target_mesh_reynolds_number': float(args.reynolds_number),
+    'min_viscosity': float(args.min_viscosity or 0.0),
     'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
@@ -83,7 +87,7 @@ if not plot_only:
     logstr = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours\n"
     logstr = logstr.format(cpu_time, cpu_time/60, cpu_time/3600)
     energy_output = sea_water_density*swp.energy_output()
-    logstr += "Total energy output of array: {:.1f}J\n".format(energy_output) 
+    logstr += "Total energy output of array: {:.1f}J\n".format(energy_output)
     average_power_output = energy_output/op.end_time
     logstr += "Average power output of array: {:.1f}W".format(average_power_output)
     print_output(logstr)
