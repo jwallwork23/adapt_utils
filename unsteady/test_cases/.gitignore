@@ -21,6 +21,7 @@ rossby_wave/outputs/
 rossby_wave/screenshots/
 rossby_wave/videos/
 rossby_wave/__pycache__/
+spaceship/data/
 spaceship/output*
 spaceship/screenshots/
 spaceship/videos/
