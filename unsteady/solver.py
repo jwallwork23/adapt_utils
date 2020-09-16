@@ -126,8 +126,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             return
         if self.op.solve_swe:
             super(AdaptiveProblem, self).create_outfiles()
-            if self.op.target_mesh_reynolds_number is not None:
-                self.reynolds_number_file = File(os.path.join(self.di, 'reynolds_number.pvd'))
         if self.op.solve_tracer:
             self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
             self.adjoint_tracer_file = File(os.path.join(self.di, 'adjoint_tracer.pvd'))
@@ -465,6 +463,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         nu = self.fields[i].horizontal_viscosity
         self.reynolds_number[i] = (u, nu)
         if self.op.plot_pvd:
+            if not hasattr(self, 'reynolds_number_file'):
+                self.reynolds_number_file = File(os.path.join(self.di, 'reynolds_number.pvd'))
             self.reynolds_number_file._topology = None
             self.reynolds_number_file.write(self.reynolds_number[i])
 
