@@ -113,7 +113,7 @@ class TurbineArrayOptions(TurbineOptions):
         offset = self.T_ramp if self.spun else 0.0
 
         def update_forcings(t):
-            tc.assign(t - offset)
+            tc.assign(t + offset)
             self.elev_in[i].assign(hmax*cos(self.omega*tc))
             self.elev_out[i].assign(hmax*cos(self.omega*tc + pi))
 
