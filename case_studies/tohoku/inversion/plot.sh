@@ -19,7 +19,7 @@ ext=$1
 
 # Plot QoI convergence and compute other errors
 for basis in box radial; do
-	python3 plot_convergence.py $basis -plot_all 1 -extension $ext
+	python3 plot_convergence.py $basis -plot_all 1 -plot_initial_guess 1 -extension $ext
 done
 
 # Compare convergence curves

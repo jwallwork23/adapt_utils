@@ -29,16 +29,15 @@ parser = ArgumentParser(basis=True, plotting=True, shallow_water=True)
 
 # Resolution
 parser.add_argument("-level", help="Mesh resolution level")
-# parser.add_argument("-okada_grid_resolution", help="Mesh resolution level for the Okada grid")
 
 # Inversion
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
+parser.add_argument("-taylor_test", help="Toggle Taylor testing")
 parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data")
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
 parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
 parser.add_argument("-zero_initial_guess", help="""
-    Toggle between a zero initial guess and a static interpretation of the dynamic source generated
-    in [Shao et al. 2012].
+    Toggle between a zero initial guess and scaled Gaussian.
     """)
 parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial guess (default 6.0)")
 
@@ -126,63 +125,49 @@ create_directory(os.path.join(plot_dir, 'discrete'))
 # --- Set initial guess
 
 if zero_init:
-    print_output("Setting (near) zero initial guess...")
     eps = 1.0e-03  # zero gives an error so just choose small
-    for control in op.control_parameters:
-        control.assign(eps)
+    kwargs['control_parameters'] = eps*np.ones(len(op.control_parameters))
 else:
-    with stop_annotating():
-        print_output("Projecting initial guess...")
+    print_output("Projecting initial guess...")
 
-        # Create Okada parameter object
-        # kwargs_src = kwargs.copy()
-        # kwargs_src['okada_grid_resolution'] = int(args.okada_grid_resolution or 51)
-        # op_src = TohokuOkadaBasisOptions(mesh=op.default_mesh, **kwargs_src)
-        # swp = AdaptiveProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
-        # f_src = op_src.set_initial_condition(swp)
+    # Create Radial parameter object
+    kwargs_src = kwargs.copy()
+    gaussian_scaling = float(args.gaussian_scaling or 6.0)
+    kwargs_src['control_parameters'] = [gaussian_scaling, ]
+    kwargs_src['nx'], kwargs_src['ny'] = 1, 1
+    op_src = TohokuRadialBasisOptions(mesh=op.default_mesh, **kwargs_src)
+    swp = AdaptiveProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
+    swp.set_initial_condition()
+    f_src = swp.fwd_solutions[0].split()[1]
 
-        # Create Radial parameter object
-        kwargs_src = kwargs.copy()
-        gaussian_scaling = float(args.gaussian_scaling or 6.0)
-        kwargs_src['control_parameters'] = [gaussian_scaling, ]
-        kwargs_src['nx'], kwargs_src['ny'] = 1, 1
-        op_src = TohokuRadialBasisOptions(mesh=op.default_mesh, **kwargs_src)
-        swp = AdaptiveProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
+    # Project into chosen basis
+    swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+    op.project(swp, f_src)
+    kwargs['control_parameters'] = [m.dat.data[0] for m in op.control_parameters]
+
+    # Plot
+    if plot_any:
+        levels = np.linspace(-0.1*gaussian_scaling, 1.1*gaussian_scaling, 51)
+        ticks = np.linspace(0, gaussian_scaling, 5)
+
+        # Project into P1 for plotting
         swp.set_initial_condition()
-        f_src = swp.fwd_solutions[0].split()[1]
+        f_src = project(f_src, swp.P1[0])
+        f = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
 
-        # Project into chosen basis
-        swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
-        op.project(swp, f_src)
-        # op.interpolate(swp, f_src)
+        # Get corners of zoom
+        lonlat_corners = [(138, 32), (148, 42), (138, 42)]
+        utm_corners = [lonlat_to_utm(*corner, 54) for corner in lonlat_corners]
 
-        # Plot
-        if plot_any:
-            # levels = np.linspace(-6, 16, 51)
-            # ticks = np.linspace(-5, 15, 9)
-            levels = np.linspace(-0.1*gaussian_scaling, 1.1*gaussian_scaling, 51)
-            ticks = np.linspace(0, gaussian_scaling, 5)
-
-            # Project into P1 for plotting
-            swp.set_initial_condition()
-            f_src = project(f_src, swp.P1[0])
-            f = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
-
-            # Get corners of zoom
-            lonlat_corners = [(138, 32), (148, 42), (138, 42)]
-            utm_corners = [lonlat_to_utm(*corner, 54) for corner in lonlat_corners]
-            xlim = [utm_corners[0][0], utm_corners[1][0]]
-            ylim = [utm_corners[0][1], utm_corners[2][1]]
-
-            # Plot initial guess
-            fig, axes = plt.subplots(figsize=(4.5, 4))
-            cbar = fig.colorbar(tricontourf(f, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
-            cbar.set_ticks(ticks)
-            axes.set_xlim(xlim)
-            axes.set_ylim(ylim)
-            axes.axis(False)
-            fname = 'initial_guess_{:s}_{:d}'.format(basis, level)
-            savefig(fname, fpath=plot_dir, extensions=extensions)
+        # Plot initial guess
+        fig, axes = plt.subplots(figsize=(4.5, 4))
+        cbar = fig.colorbar(tricontourf(f, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
+        cbar.set_ticks(ticks)
+        axes.set_xlim([utm_corners[0][0], utm_corners[1][0]])
+        axes.set_ylim([utm_corners[0][1], utm_corners[2][1]])
+        axes.axis(False)
+        fname = 'initial_guess_{:s}_{:d}'.format(basis, level)
+        savefig(fname, fpath=plot_dir, extensions=extensions)
 if plot_only:
     sys.exit(0)
 
@@ -191,10 +176,31 @@ if plot_only:
 
 # Solve the forward problem with initial guess
 op.save_timeseries = True
+print_output("Clearing tape...")
+get_working_tape().clear_tape()
+print_output("Setting initial guess...")
+op = options_constructor(**kwargs)
+controls = [Control(m) for m in op.control_parameters]
 print_output("Run forward to get timeseries...")
 swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.solve_forward()
-J = op.J
+J = swp.quantity_of_interest()
+
+# Taylor test
+if bool(args.taylor_test or False):
+    print_output("Taylor test begin...")
+    Jhat = ReducedFunctional(J, controls)
+    c = [Function(m) for m in op.control_parameters]
+    for ci in c:
+        ci.dat.data[0] = np.random.random()
+    dc = [Function(m) for m in op.control_parameters]
+    for dci in dc:
+        dci.dat.data[0] = np.random.random()
+    minconv = taylor_test(Jhat, c, dc)
+    if not minconv > 1.90:
+        raise ConvergenceError("Taylor test failed! Convergence ratio {:.2f} < 2.".format(minconv))
+    print_output("Taylor test passed!")
+    sys.exit(0)
 
 # Save timeseries
 for gauge in gauges:
@@ -211,7 +217,7 @@ if optimise:
     gradient_values_opt = []
 
     def derivative_cb_post(j, dj, m):
-        control = [mi.dat.data[0] for mi in m]
+        control = [m.dat.data[0] for mi in m]
         djdm = [dji.dat.data[0] for dji in dj]
         print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
         control_values_opt.append(control)
@@ -224,9 +230,8 @@ if optimise:
     # Run BFGS optimisation
     opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
     print_output("Optimisation begin...")
-    controls = [Control(c) for c in op.control_parameters]
     Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
-    optimised_value = [o.dat.data[0] for o in minimize(Jhat, method='BFGS', options=opt_kwargs)]
+    optimised_value = [m.dat.data[0] for m in minimize(Jhat, method='BFGS', options=opt_kwargs)]
 else:
     optimised_value = np.load(fname.format('ctrl'))[-1]
 
@@ -241,8 +246,9 @@ for gauge in gauges:
     op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
 
 # Run forward again and save timeseries
-print_output("Run to plot optimised timeseries...")
+print_output("Clearing tape...")
 get_working_tape().clear_tape()
+print_output("Run to plot optimised timeseries...")
 swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=op.debug)
 swp.solve_forward()
 J = swp.quantity_of_interest()
