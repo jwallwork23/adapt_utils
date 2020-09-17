@@ -42,7 +42,7 @@ if plot_png:
     extensions.append('png')
 kwargs = {
     'approach': approach,
-    'target_mesh_reynolds_number': float(args.reynolds_number),
+    'target_mesh_reynolds_number': None if args.reynolds_number is None else float(args.reynolds_number),
     'min_viscosity': float(args.min_viscosity or 0.0),
     'plot_pvd': plot_pvd,
 }
@@ -154,34 +154,32 @@ speed = interpolate(sqrt(dot(u, u)), swp.P1[0])
 eta_proj = project(eta, swp.P1[0])
 
 # Plot fluid speed
-fig, axes = plt.subplots(figsize=(10, 6))
+fig, axes = plt.subplots(figsize=(10, 5))
 levels = np.linspace(0.0, 1.25, 201)
 im = tricontourf(speed, axes=axes, levels=levels, cmap='coolwarm')
-cbar = fig.colorbar(im, ax=axes, orientation="horizontal", pad=0.2)
+cbar = fig.colorbar(im, ax=axes, orientation="horizontal", pad=0.04, aspect=40)
 cbar.set_label(r"Fluid speed [$\mathrm{m\,s}^{-1}$]", fontsize=24)
 cbar.set_ticks([0, 0.25, 0.5, 0.75, 1.0, 1.25])
 cbar.ax.tick_params(labelsize=22)
 axes.set_xlim([-L/2, L/2])
 axes.set_ylim([-W/2, W/2])
-axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$", fontsize=26)
-axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$", fontsize=26)
+axes.xaxis.tick_top()
 for axis in (axes.xaxis, axes.yaxis):
     axis.set_tick_params(labelsize=22)
 axes.set_yticks(np.linspace(-W/2, W/2, 5))
 savefig("speed", plot_dir, extensions=extensions)
 
 # Plot elevation
-fig, axes = plt.subplots(figsize=(10, 6))
+fig, axes = plt.subplots(figsize=(10, 5))
 levels = np.linspace(-0.5, 0.5, 201)
 im = tricontourf(eta_proj, axes=axes, levels=levels, cmap='coolwarm')
-cbar = fig.colorbar(im, ax=axes, orientation="horizontal", pad=0.2)
+cbar = fig.colorbar(im, ax=axes, orientation="horizontal", pad=0.04, aspect=40)
 cbar.set_label(r"Elevation [$\mathrm m$]", fontsize=24)
 cbar.set_ticks([-0.5, -0.25, 0.0, 0.25, 0.5])
 cbar.ax.tick_params(labelsize=22)
 axes.set_xlim([-L/2, L/2])
 axes.set_ylim([-W/2, W/2])
-axes.set_xlabel(r"$x$-coordinate $[\mathrm m]$", fontsize=26)
-axes.set_ylabel(r"$y$-coordinate $[\mathrm m]$", fontsize=26)
+axes.xaxis.tick_top()
 for axis in (axes.xaxis, axes.yaxis):
     axis.set_tick_params(labelsize=22)
 axes.set_yticks(np.linspace(-W/2, W/2, 5))
