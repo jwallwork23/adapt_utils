@@ -72,11 +72,12 @@ index_str = index_string(op.num_meshes)
 sea_water_density = 1030.0
 
 # Create directories and check if spun-up solution exists
-ramp_dir = create_directory(os.path.join(os.path.dirname(__file__), "data", "ramp"))
+ramp_dir = os.path.join(os.path.dirname(__file__), "data", "ramp")
+if args.extension is not None:
+    ramp_dir = "_".join([ramp_dir, args.extension])
 op.di = create_directory(os.path.join(os.path.dirname(__file__), "outputs", approach))
 if args.extension is not None:
     op.di = "_".join([op.di, args.extension])
-op.di = create_directory(os.path.join(op.di, "power_output"))
 op.spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
 
 
