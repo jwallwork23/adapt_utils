@@ -12,13 +12,14 @@ from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBas
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.norms import total_variation, vecnorm
 from adapt_utils.plotting import *
-from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 
 class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
-    """The subclass exists to pass the QoI as required."""
+    """
+    The subclass exists to pass the QoI as required.
+    """
     def quantity_of_interest(self):
         return self.op.J
 
@@ -136,12 +137,12 @@ else:
     kwargs_src['control_parameters'] = [gaussian_scaling, ]
     kwargs_src['nx'], kwargs_src['ny'] = 1, 1
     op_src = TohokuRadialBasisOptions(mesh=op.default_mesh, **kwargs_src)
-    swp = AdaptiveProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
+    swp = DiscreteAdjointTsunamiProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
     swp.set_initial_condition()
     f_src = swp.fwd_solutions[0].split()[1]
 
     # Project into chosen basis
-    swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+    swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
     op.project(swp, f_src)
     kwargs['control_parameters'] = [m.dat.data[0] for m in op.control_parameters]
 
@@ -182,7 +183,7 @@ print_output("Setting initial guess...")
 op = options_constructor(**kwargs)
 controls = [Control(m) for m in op.control_parameters]
 print_output("Run forward to get timeseries...")
-swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.solve_forward()
 J = swp.quantity_of_interest()
 
