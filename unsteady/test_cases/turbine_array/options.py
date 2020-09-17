@@ -45,7 +45,6 @@ class TurbineArrayOptions(TurbineOptions):
 
         # Physics
         self.base_viscosity = 3.0
-        # self.base_viscosity = 1.0
         self.base_bathymetry = 50.0
         self.max_depth = 50.0
         self.friction_coeff = 0.0025
@@ -54,10 +53,7 @@ class TurbineArrayOptions(TurbineOptions):
         # Timestepping
         self.dt = 2.232
         self.T_tide = 0.1*self.M2_tide_period
-        # self.T_ramp = 1.06*3600
-        self.T_ramp = 5*self.T_tide
-        # self.T_ramp = self.T_tide
-        # self.end_time = 3*self.T_tide
+        self.T_ramp = 3.825*self.T_tide
         self.end_time = self.T_tide
         self.dt_per_export = 10
 
@@ -124,6 +120,7 @@ class TurbineArrayOptions(TurbineOptions):
         return update_forcings
 
     def set_initial_condition(self, prob):
+        assert not self.spun
         u, eta = prob.fwd_solutions[0].split()
         x, y = SpatialCoordinate(prob.meshes[0])
 
