@@ -24,10 +24,11 @@ class TurbineArrayOptions(TurbineOptions):
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
-    # Characteristics
+    # Physics
     characteristic_velocity = FiredrakeVectorExpression(
         Constant(as_vector([1.5, 0.0]))
     ).tag(config=False)
+    thrust_coefficient = NonNegativeFloat(24.0).tag(config=True)  # NOTE: Gets halved
 
     def __init__(self, spun=False, **kwargs):
         super(TurbineArrayOptions, self).__init__(**kwargs)
