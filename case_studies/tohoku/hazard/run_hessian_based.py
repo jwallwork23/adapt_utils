@@ -39,7 +39,7 @@ parser.add_argument("-locations", help="""
 parser.add_argument("-radius", help="Radius of interest (default 100km)")
 
 # Outer loop
-parser.add_argument("-num_adapt", help="Maximum number of adaptation loop iterations (default 35)")
+parser.add_argument("-max_adapt", help="Maximum number of adaptation loop iterations (default 35)")
 parser.add_argument("-element_rtol", help="Relative tolerance for element count (default 0.005)")
 parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
 
@@ -100,7 +100,7 @@ kwargs = {
     # Outer loop
     'element_rtol': float(args.element_rtol or 0.005),
     'qoi_rtol': float(args.qoi_rtol or 0.005),
-    'num_adapt': int(args.num_adapt or 35),
+    'max_adapt': int(args.max_adapt or 35),
 
     # I/O and debugging
     'plot_pvd': plot_pvd,

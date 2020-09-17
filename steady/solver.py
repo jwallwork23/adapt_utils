@@ -858,7 +858,7 @@ class SteadyProblem():
         self.set_stabilisation()
         self.boundary_conditions = self.op.set_boundary_conditions(self.V)
 
-    def initialise_mesh(self, approach='hessian', adapt_field=None, num_adapt=None, alpha=1.0, beta=1.0):
+    def initialise_mesh(self, approach='hessian', adapt_field=None, max_adapt=None, alpha=1.0, beta=1.0):
         """
         Repeatedly apply mesh adaptation in order to give a suitable initial mesh. A common usage
         is when bathymetry is interpolated from raw data and we want its anisotropy to align with
@@ -869,11 +869,11 @@ class SteadyProblem():
         :kwarg approach: choose from 'monge_ampere', 'hessian' and 'isotropic'.
         :kwarg adapt_field: field for adaptation, chosen from the solver fields, optionally appended
                             with '_frobenius', for use in the Monge-Ampere case.
-        :kwarg num_adapt: number of mesh adaptation steps.
+        :kwarg max_adapt: number of mesh adaptation steps.
         :kwargs alpha, beta: tuning parameters for Monge-Ampere monitor function.
         """
         self.op.adapt_field = adapt_field or self.op.adapt_field
-        num_adapt = num_adapt or self.op.num_adapt
+        max_adapt = max_adapt or self.op.max_adapt
         if approach == 'monge_ampere':  # FIXME: Need adjust scaling (h_max) for realistic problems
             if self.op.adapt_field in self.fields:
                 def monitor(mesh):
@@ -894,7 +894,7 @@ class SteadyProblem():
             else:
                 raise ValueError
             self.monitor_function = monitor
-            self.op.num_adapt = 1
+            self.op.max_adapt = 1
         elif approach == 'isotropic':
             if self.op.adapt_field in self.fields:
                 f = self.fields[self.op.adapt_field]
@@ -903,7 +903,7 @@ class SteadyProblem():
                 raise ValueError
         elif approach != 'hessian':
             raise ValueError("Mesh initialisation requires 'approach' in ('hessian', 'monge_ampere', 'isotropic')")
-        for i in range(num_adapt):
+        for i in range(max_adapt):
             if approach != 'isotropic':
                 self.indicate_error(approach=approach)
             self.adapt_mesh(approach=approach)
@@ -915,7 +915,7 @@ class SteadyProblem():
           * Relative difference in quantity of interest < `self.op.qoi_rtol`;
           * Relative difference in number of mesh elements < `self.op.element_rtol`;
           * Relative difference in error estimator < `self.op.estimator_rtol`;
-          * Maximum iterations `self.op.num_adapt`.
+          * Maximum iterations `self.op.max_adapt`.
 
         Error estimator, QoI, element count and vertex count are stored, unless the maximum
         iteration count is reached, or the element count goes below 200.
@@ -924,7 +924,7 @@ class SteadyProblem():
         qoi_old = np.finfo(float).min
         num_cells_old = np.iinfo(int).min
         estimator_old = np.finfo(float).min
-        for i in range(op.num_adapt):
+        for i in range(op.max_adapt):
             if outer_iteration is None:
                 print_output("\n  '{:s}' adaptation loop, iteration {:d}.".format(self.approach, i+1))
             else:
@@ -958,7 +958,7 @@ class SteadyProblem():
             if i > 0 and np.abs(num_cells - num_cells_old) < op.element_rtol*num_cells_old:
                 print_output("Converged number of mesh elements!")
                 break
-            if i == op.num_adapt-1 or num_cells < 200:
+            if i == op.max_adapt-1 or num_cells < 200:
                 print_output("Adaptation loop failed to converge in {:d} iterations".format(i+1))
                 return
             qoi_old = qoi

@@ -1606,7 +1606,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
         """
         op = self.op
-        for n in range(op.num_adapt):
+        for n in range(op.max_adapt):
             self.outer_iteration = n
 
             # --- Solve forward to get checkpoints
@@ -1626,7 +1626,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     break
 
             # Check maximum number of iterations
-            if n == op.num_adapt - 1:
+            if n == op.max_adapt - 1:
                 break
 
             # --- Loop over mesh windows *in reverse*
@@ -1761,7 +1761,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
-        for n in range(op.num_adapt):
+        for n in range(op.max_adapt):
             self.outer_iteration = n
 
             # --- Solve forward to get checkpoints
@@ -1781,7 +1781,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     break
 
             # Check maximum number of iterations
-            if n == op.num_adapt - 1:
+            if n == op.max_adapt - 1:
                 break
 
             # --- Setup problem on enriched space
