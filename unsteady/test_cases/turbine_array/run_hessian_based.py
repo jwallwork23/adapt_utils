@@ -90,7 +90,7 @@ kwargs = {
     # Outer loop
     'element_rtol': 0.005,
     'qoi_rtol': 0.005,
-    'num_adapt': 35,
+    'max_adapt': 35,
 
     # I/O and debugging
     'plot_pvd': plot_pvd,

@@ -64,7 +64,7 @@ class TelemacOptions(TracerOptions):
         self.degree_increase = 1
 
         # Mesh optimisation
-        self.num_adapt = 35
+        self.max_adapt = 35
         self.element_rtol = 0.002
 
     def set_default_mesh(self, n=0):

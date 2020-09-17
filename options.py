@@ -93,7 +93,6 @@ class Options(FrozenConfigurable):
     # --- Adaptation
 
     approach = Unicode('fixed_mesh', help="Mesh adaptive approach.").tag(config=True)
-    num_adapt = NonNegativeInteger(4, help="Number of mesh adaptations per remesh.").tag(config=True)
 
     # Metric based
     rescaling = PositiveFloat(0.85, help="""
@@ -154,6 +153,12 @@ class Options(FrozenConfigurable):
     estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)  # TODO: unused in unsteady
 
     # Adaptation loop
+    min_adapt = NonNegativeInteger(0, help="""
+        Minimum number of mesh adaptations in outer loop.
+        """).tag(config=True)
+    max_adapt = NonNegativeInteger(4, help="""
+        Maximum number of mesh adaptations in outer loop.
+        """).tag(config=True)
     element_rtol = PositiveFloat(0.005, help="""
         Relative tolerance for convergence in mesh element count""").tag(config=True)
     qoi_rtol = PositiveFloat(0.005, allow_none=True, help="""

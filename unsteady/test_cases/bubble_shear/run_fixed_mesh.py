@@ -10,7 +10,6 @@ from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", help="Resolution of initial mesh.")
-parser.add_argument("-num_adapt", help="Number of initial mesh adaptations.")
 parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")

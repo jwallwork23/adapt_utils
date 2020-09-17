@@ -44,7 +44,7 @@ kwargs = {
 
     # Optimisation parameters
     'element_rtol': 0.001,
-    'num_adapt': 35,
+    'max_adapt': 35,
 
 }
 level = int(args.level or 0)

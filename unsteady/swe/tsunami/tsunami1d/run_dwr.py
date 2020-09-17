@@ -32,7 +32,7 @@ op = Tsunami1dOptions(debug=debug, nx=n, dt=dt, approach=approach, plot_pvd=plot
 op.h_min = 100.0/L
 op.h_max = 100.0e+3/L
 op.target = 10000.0
-op.num_adapt = 1
+op.max_adapt = 1
 # op.norm_order = 1
 # op.normalisation = 'error'
 

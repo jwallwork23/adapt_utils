@@ -30,7 +30,7 @@ parser.add_argument("-h_min", help="Minimum tolerated element size (default 100m
 parser.add_argument("-h_max", help="Maximum tolerated element size (default 1000km)")
 
 # Outer loop
-parser.add_argument("-num_adapt", help="Maximum number of adaptation loop iterations (default 35)")
+parser.add_argument("-max_adapt", help="Maximum number of adaptation loop iterations (default 35)")
 parser.add_argument("-element_rtol", help="Relative tolerance for element count (default 0.005)")
 parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
 
@@ -112,7 +112,7 @@ kwargs = {
     # Outer loop
     'element_rtol': float(args.element_rtol or 0.005),
     'qoi_rtol': float(args.qoi_rtol or 0.005),
-    'num_adapt': int(args.num_adapt or 5),  # As recommended in [Belme et al. 2012]
+    'max_adapt': int(args.max_adapt or 5),  # As recommended in [Belme et al. 2012]
 
     # Misc
     'plot_pvd': True,

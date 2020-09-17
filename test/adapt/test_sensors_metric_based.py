@@ -43,7 +43,7 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False):
         'approach': 'hessian',
         'h_min': 1.0e-06,
         'h_max': 1.0e-01,
-        'num_adapt': 4,
+        'max_adapt': 4,
         'normalisation': normalisation,
         'norm_order': norm_order,
         'target': 100.0 if normalisation == 'complexity' else 10.0

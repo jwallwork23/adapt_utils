@@ -711,7 +711,7 @@ class AdaptiveProblemBase(object):
         and then averaging the result with the Hessian recovered from the elevation.
 
         Stopping criteria:
-          * iteration count > self.op.num_adapt;
+          * iteration count > self.op.max_adapt;
           * relative change in element count < self.op.element_rtol;
           * relative change in quantity of interest < self.op.qoi_rtol.
 
@@ -731,9 +731,10 @@ class AdaptiveProblemBase(object):
             msg = "Hessian time combination method '{:s}' not recognised."
             raise ValueError(msg.format(op.hessian_time_combination))
 
-        # Loop until we hit the maximum number of iterations, num_adapt
+        # Loop until we hit the maximum number of iterations, max_adapt
         self.outer_iteration = 0
-        while self.outer_iteration < op.num_adapt:
+        assert op.min_adapt < op.max_adapt
+        while self.outer_iteration < op.max_adapt:
             export_func_wrapper = None
             update_forcings_wrapper = None
             if hasattr(self, 'hessian_func'):
@@ -753,7 +754,7 @@ class AdaptiveProblemBase(object):
                 # Setup solver on mesh i
                 self.setup_solver_forward_step(i)
 
-                if self.outer_iteration < op.num_adapt-1:
+                if self.outer_iteration < op.max_adapt-1:
 
                     # Create double L2 projection operator which will be repeatedly used
                     kwargs = {
@@ -825,13 +826,13 @@ class AdaptiveProblemBase(object):
                 qoi = self.quantity_of_interest()
                 self.print("Quantity of interest {:d}: {:.4e}".format(self.outer_iteration+1, qoi))
                 self.qois.append(qoi)
-                if len(self.qois) > 1:
+                if len(self.qois) > 1 and self.outer_iteration > op.min_adapt:
                     if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
                         self.print("Converged quantity of interest!")
                         break
 
             # Check maximum number of iterations
-            if self.outer_iteration == op.num_adapt-1:
+            if self.outer_iteration == op.max_adapt-1:
                 break
 
             # --- Time normalise metrics
@@ -897,7 +898,7 @@ class AdaptiveProblemBase(object):
             self.outer_iteration += 1
 
             # Check convergence of *all* element counts
-            if len(self.num_cells) < 3:
+            if len(self.num_cells) < 3 or self.outer_iteration <= op.min_adapt:
                 continue
             converged = True
             for i, num_cells_ in enumerate(self.num_cells[-3]):
