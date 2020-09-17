@@ -66,6 +66,7 @@ class TurbineOptions(CoupledOptions):
         """
         if not correction:
             return self.thrust_coefficient
+        # TODO: Modify for rectangular turbines?
         D = max(self.turbine_length, self.turbine_width)
         A_T = pi*(D/2)**2
         correction = 4/(1 + sqrt(1 - A_T/(self.max_depth*D)))**2
