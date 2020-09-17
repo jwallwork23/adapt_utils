@@ -16,6 +16,7 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 parser = argparse.ArgumentParser()
 parser.add_argument("-reynolds_number", help="Target mesh Reynolds number")
 parser.add_argument("-min_viscosity", help="Minimum tolerated viscosity (default 0).")
+parser.add_argument("-extension", help="Optional extension for output directory")
 parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
 parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
@@ -32,6 +33,8 @@ plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
 plot_all = bool(args.plot_all or False)
 plot_only = bool(args.plot_only or False)
+if plot_only:
+    plot_all = True
 if plot_all:
     plot_pvd = plot_pdf = plot_png = True
 plot_any = plot_pdf or plot_png
@@ -51,16 +54,17 @@ L = op.domain_length
 W = op.domain_width
 op.end_time = op.T_ramp
 plot_only = bool(args.plot_only or False)
-ramp_dir = create_directory(os.path.join(os.path.dirname(__file__), "data", "ramp"))
-op.di = ramp_dir
-plot_dir = create_directory(os.path.join(ramp_dir, "plots"))
-swp = AdaptiveTurbineProblem(op, callback_dir=ramp_dir, ramp_dir=ramp_dir)
+op.di = os.path.join(os.path.dirname(__file__), "data", "ramp")
+if args.extension is not None:
+    op.di = "_".join([op.di, args.extension])
+plot_dir = create_directory(os.path.join(op.di, "plots"))
+swp = AdaptiveTurbineProblem(op, callback_dir=op.di, ramp_dir=op.di)
 
 
 # --- Run forward model; export solution tuple and QoI timeseries
 
 if plot_only:
-    swp.load_state(0, ramp_dir)
+    swp.load_state(0, op.di)
 else:
     cpu_timestamp = perf_counter()
     swp.solve_forward()
@@ -69,10 +73,10 @@ else:
     msg = msg.format(cpu_time, cpu_time/60, cpu_time/3600)
     msg += "\nAverage power output of array: {:.1f}W".format(swp.average_power_output())
     print_output(msg)
-    with open(os.path.join(ramp_dir, "log"), "w+") as logfile:
+    with open(os.path.join(op.di, "log"), "w+") as logfile:
         logfile.write(msg + "\n")
     op.plot_pvd = True
-    swp.export_state(0, ramp_dir)
+    swp.export_state(0, op.di)
 
 # Do not attempt to plot in parallel
 nproc = COMM_WORLD.size
@@ -83,12 +87,12 @@ if nproc > 1:
 plt.rc('font', **{'size': 18})
 
 # Load power output data
-op.spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
+op.spun = np.all([os.path.isfile(os.path.join(op.di, f + ".h5")) for f in ('velocity', 'elevation')])
 sea_water_density = 1030.0
 power_watts = [np.array([]) for i in range(15)]
 if op.spun:
     for i, turbine in enumerate(op.farm_ids):
-        fname = os.path.join(ramp_dir, "power_output_{:d}_00000.npy".format(turbine))
+        fname = os.path.join(op.di, "power_output_{:d}_00000.npy".format(turbine))
         power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
 else:
     raise ValueError("Spin-up data not found.")
