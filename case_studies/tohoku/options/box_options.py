@@ -1,12 +1,12 @@
 import thetis
 import numpy as np
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 
 
 __all__ = ["TohokuBoxBasisOptions"]
 
 
-class TohokuBoxBasisOptions(TohokuOptions):
+class TohokuBoxBasisOptions(TohokuInversionOptions):
     """
     Initialise the free surface with an initial condition consisting of an array of rectangular
     indicator functions, each scaled by a control parameter. Setups of this type have been used by

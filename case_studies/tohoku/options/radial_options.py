@@ -3,14 +3,14 @@ import thetis
 import numpy as np
 import scipy
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.norms import vecnorm
 
 
 __all__ = ["TohokuRadialBasisOptions"]
 
 
-class TohokuRadialBasisOptions(TohokuOptions):
+class TohokuRadialBasisOptions(TohokuInversionOptions):
     """
     Initialise the free surface with an initial condition consisting of an array of radial basis
     functions, each scaled by a control parameter. The setup with a 13 x 10 array was presented in

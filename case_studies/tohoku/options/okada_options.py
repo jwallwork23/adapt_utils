@@ -1,12 +1,12 @@
 import numpy as np
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 
 
 __all__ = ["TohokuOkadaBasisOptions"]
 
 
-class TohokuOkadaBasisOptions(TohokuOptions):
+class TohokuOkadaBasisOptions(TohokuInversionOptions):
     """
     Initialise the free surface with an initial condition generated using Okada functions.
 
@@ -207,6 +207,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         # Create fault topography
         self.create_topography(annotate=annotate_source, **kwargs)
 
+        surf = firedrake.Function(prob.P1[0])
         if self.N is not None:  # Interpolate it using SciPy
             surf.dat.data[:] = griddata(
                 (self.fault.dtopo.X, self.fault.dtopo.Y),
@@ -216,7 +217,6 @@ class TohokuOkadaBasisOptions(TohokuOptions):
                 fill_value=0.0,
             )
         else:  # Just insert the data at the appropriate nodes, assuming zero elsewhere
-            surf = firedrake.Function(prob.P1[0])
             surf.dat.data[self.indices] = self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape)
 
         # Assume zero initial velocity and interpolate into the elevation space

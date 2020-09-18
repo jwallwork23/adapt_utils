@@ -100,23 +100,6 @@ class TohokuHazardOptions(TohokuOptions):
         kernel_eta.rename("QoI kernel (elevation component)")
         kernel_eta.interpolate(rescaling*b)
 
-    def _get_update_forcings_forward(self, prob, i):
-
-        def update_forcings(t):
-            return
-
-        return update_forcings
-
-    def _get_update_forcings_adjoint(self, prob, i):
-
-        def update_forcings(t):
-            return
-
-        return update_forcings
-
-    def get_regularisation_term(self, prob):
-        raise NotImplementedError
-
     def annotate_plot(self, axes, coords="utm", fontsize=12):
         """
         Annotate `axes` in coordinate system `coords` with all locations of interest.
