@@ -33,7 +33,6 @@ parser.add_argument("-level", help="Mesh resolution level")
 
 # Inversion
 parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
-parser.add_argument("-taylor_test", help="Toggle Taylor testing")
 parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data")
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
 parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
@@ -41,6 +40,10 @@ parser.add_argument("-zero_initial_guess", help="""
     Toggle between a zero initial guess and scaled Gaussian.
     """)
 parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial guess (default 6.0)")
+
+# Testing
+parser.add_argument("-end_time", help="End time of simulation (to shorten Taylor test)")
+parser.add_argument("-taylor_test", help="Toggle Taylor testing")
 
 
 # --- Set parameters
@@ -75,6 +78,15 @@ if COMM_WORLD.size > 1 and plot_any:
     print_output(120*'*' + "\nWARNING: Plotting turned off when running in parallel.\n" + 120*'*')
     plot_pdf = plot_png = False
 
+# Setup output directories
+dirname = os.path.dirname(__file__)
+di = create_directory(os.path.join(dirname, basis, 'outputs', 'realistic'))
+if args.extension is not None:
+    di = '_'.join([di, args.extension])
+di = create_directory(os.path.join(di, 'discrete'))
+plot_dir = create_directory(os.path.join(di, 'plots'))
+create_directory(os.path.join(plot_dir, 'discrete'))
+
 # Collect initialisation parameters
 nonlinear = bool(args.nonlinear or False)
 family = args.family or 'dg-cg'
@@ -100,7 +112,10 @@ kwargs = {
     'plot_pvd': False,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
+    'di': di,
 }
+if args.end_time is not None:
+    kwargs['end_time'] = float(args.end_time)
 
 # Construct Options parameter class
 if basis == 'box':
@@ -114,13 +129,6 @@ else:
     raise ValueError("Basis type '{:s}' not recognised.".format(basis))
 op = options_constructor(**kwargs)
 gauges = list(op.gauges.keys())
-
-# Setup output directories
-dirname = os.path.dirname(__file__)
-di = create_directory(os.path.join(dirname, basis, 'outputs', 'realistic'))
-op.di = create_directory(os.path.join(di, 'discrete'))
-plot_dir = create_directory(os.path.join(di, 'plots'))
-create_directory(os.path.join(plot_dir, 'discrete'))
 
 
 # --- Set initial guess
@@ -177,30 +185,62 @@ if plot_only:
 
 # Solve the forward problem with initial guess
 op.save_timeseries = True
-print_output("Clearing tape...")
-get_working_tape().clear_tape()
-print_output("Setting initial guess...")
 op = options_constructor(**kwargs)
-controls = [Control(m) for m in op.control_parameters]
 print_output("Run forward to get timeseries...")
 swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+print_output("Clearing tape...")
+swp.clear_tape()
+print_output("Setting initial guess...")
+op.assign_control_parameters(kwargs['control_parameters'])
+controls = [Control(m) for m in op.control_parameters]
 swp.solve_forward()
 J = swp.quantity_of_interest()
 
 # Taylor test
 if bool(args.taylor_test or False):
-    print_output("Taylor test begin...")
     Jhat = ReducedFunctional(J, controls)
-    c = [Function(m) for m in op.control_parameters]
-    for ci in c:
-        ci.dat.data[0] = np.random.random()
+
+    def get_controls(mode):
+        """
+        Get control parameter values assuming one of three modes:
+
+          'init' - control parameters are set to the initial guess;
+          'random' - control parameters are set randomly with a Normal distribution;
+          'optimised' - optimal control parameters from a previous run are used.
+        """
+        c = [Function(m) for m in op.control_parameters]
+        if mode == 'init':
+            pass
+        elif mode == 'random':
+            for ci in c:
+                ci.dat.data[0] = 10.0*np.random.random()
+        elif mode == 'optimised':
+            fname = os.path.join(op.di, 'optimisation_progress_ctrl_{:d}.npy'.format(level))
+            try:
+                c_dat = np.load(fname)[-1]
+            except IOError:
+                print_output("Skipping Taylor test at optimised controls because no data found.")
+                sys.exit(0)
+            for i, ci in enumerate(c):
+                ci.dat.data[0] = c_dat[i]
+        else:
+            raise ValueError("Taylor test mode '{:s}' not recognised.".format(mode))
+        return c
+
+    # Random search direction
     dc = [Function(m) for m in op.control_parameters]
     for dci in dc:
-        dci.dat.data[0] = np.random.random()
-    minconv = taylor_test(Jhat, c, dc)
-    if not minconv > 1.90:
-        raise ConvergenceError("Taylor test failed! Convergence ratio {:.2f} < 2.".format(minconv))
-    print_output("Taylor test passed!")
+        dci.dat.data[0] = 10.0*np.random.random()
+
+    # Run tests
+    for mode in ("init", "random", "optimised"):
+        print_output("Taylor test '{:s}' begin...".format(mode))
+        minconv = taylor_test(Jhat, get_controls(mode), dc)
+        if minconv > 1.90:
+            print_output("Taylor test '{:s}' passed!".format(mode))
+        else:
+            msg = "Taylor test '{:s}' failed! Convergence ratio {:.2f} < 2."
+            raise ConvergenceError(msg.format(mode, minconv))
     sys.exit(0)
 
 # Save timeseries

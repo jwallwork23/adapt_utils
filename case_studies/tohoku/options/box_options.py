@@ -120,10 +120,16 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         """
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
+        eps = 1.0e-06
         for i, bf in enumerate(self.basis_functions):
             psi, phi = bf.split()
             mass = thetis.assemble(phi*source*thetis.dx)
-            self.control_parameters[i].assign(mass/thetis.assemble(phi*thetis.dx))
+            w = thetis.assemble(phi*thetis.dx)
+            if np.isclose(w, 0.0):
+                thetis.print_output("WARNING: basis function {:d} has zero mass!".format(i))
+                self.control_parameters[i].assign(eps)  # FIXME: Why can't I assign zero?
+            else:
+                self.control_parameters[i].assign(mass/w)
 
     def interpolate(self, prob, source):
         """

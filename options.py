@@ -173,7 +173,7 @@ class Options(FrozenConfigurable):
         Number of iterations in outer adaptation loop.""").tag(config=True)
     indent = Unicode('', help="Indent used in nested print statements.").tag(config=True)
 
-    def __init__(self, mesh=None, fpath=None, **kwargs):
+    def __init__(self, mesh=None, fpath=None, di=None, **kwargs):
         """
         Upon initialising the class, any kwargs will be added and a output directory path will be
         created as determined by :attr:`approach` as `outputs/<approach>/`.
@@ -184,8 +184,8 @@ class Options(FrozenConfigurable):
         """
         self.default_mesh = mesh
         self.update(kwargs)
-        self.di = os.path.join('outputs', self.approach)
-        if fpath is not None:
+        self.di = di or os.path.join('outputs', self.approach)
+        if fpath is not None:  # TODO: Needed?
             self.di = os.path.join(self.di, fpath)
         self.di = create_directory(self.di)
         if self.debug:
