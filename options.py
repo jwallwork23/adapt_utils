@@ -82,10 +82,16 @@ class Options(FrozenConfigurable):
 
     # Outputs
     debug = Bool(False, help="Toggle debugging for more verbose screen output.").tag(config=True)
-    debug_mode = Enum(
-        ['basic', 'full'],
-        default_value='basic',
-        help="""Choose debugging mode from {'basic', 'full'}.""").tag(config=True)
+    debug_mode = Enum(['basic', 'full', 'light'], default_value='basic', help="""
+        Choose debugging mode from {'basic', 'full', 'light'}.
+
+        'basic' mode prints all adapt_utils debugging statements with the 'basic' tag, as well
+            as 'INFO' level PyOP2 output.
+        'full' mode prints all adapt_utils debugging statements with the 'full' tag, as well
+            as 'DEBUG' level PyOP2 output.
+        'light' mode prints all adapt_utils debugging statements with the 'basic' tag and no PyOP2
+            output.
+        """).tag(config=True)
     plot_pvd = Bool(True, help="Toggle saving fields to .pvd and .vtu.").tag(config=True)
     plot_bathymetry = Bool(False, help="Toggle plotting bathymetry to .pvd and .vtu.").tag(config=True)
     save_hdf5 = Bool(False, help="Toggle saving fields to HDF5.").tag(config=True)
@@ -185,7 +191,7 @@ class Options(FrozenConfigurable):
         if self.debug:
             if self.debug_mode == 'basic':
                 set_log_level(INFO)
-            else:
+            elif self.debug_mode == 'full':
                 set_log_level(DEBUG)
 
         # Extract the default PressureProjectionPicard parameters
@@ -273,7 +279,7 @@ class Options(FrozenConfigurable):
         """
         if not self.debug:
             return
-        if mode == 'full' and self.debug_mode == 'basic':
+        if mode == 'full' and self.debug_mode in ('basic', 'light'):
             return
         print_output(self.indent + msg)
 

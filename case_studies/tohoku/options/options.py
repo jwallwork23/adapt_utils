@@ -668,15 +668,16 @@ class TohokuOptions(TsunamiOptions):
         assert not np.any(np.isnan(anomaly))
 
         # Apply de-tiding algorithm to anomaly
+        verbose = self.debug and self.debug_mode == 'full'
         kwargs = {
             'method': 'ols',     # ordinary least squares
             'conf_int': 'none',  # linearised confidence intervals
             'lat': np.array([self.gauges[gauge]["lonlat"][1], ]),
-            'verbose': self.debug,
+            'verbose': verbose,
         }
         self.print_debug("INIT: Applying UTide de-tiding algorithm to gauge {:s}...".format(gauge))
         sol = utide.solve(time_str, anomaly, **kwargs)
-        tide = utide.reconstruct(time_str, sol, verbose=self.debug)
+        tide = utide.reconstruct(time_str, sol, verbose=verbose)
 
         # Subtract de-tided component
         detided = anomaly - np.array(tide.h).reshape(anomaly.shape)
