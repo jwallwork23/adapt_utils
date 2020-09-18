@@ -258,7 +258,7 @@ if optimise:
     gradient_values_opt = []
 
     def derivative_cb_post(j, dj, m):
-        control = [m.dat.data[0] for mi in m]
+        control = [mi.dat.data[0] for mi in m]
         djdm = [dji.dat.data[0] for dji in dj]
         print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
         control_values_opt.append(control)
@@ -272,7 +272,8 @@ if optimise:
     opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
     print_output("Optimisation begin...")
     Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
-    optimised_value = [m.dat.data[0] for m in minimize(Jhat, method='BFGS', options=opt_kwargs)]
+    optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs)
+    optimised_value = [m.dat.data[0] for m in optimised_value]
 else:
     optimised_value = np.load(fname.format('ctrl'))[-1]
 
