@@ -10,7 +10,7 @@ from adapt_utils.argparse import ArgumentParser
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
-from adapt_utils.norms import total_variation, vecnorm
+from adapt_utils.norms import vecnorm
 from adapt_utils.plotting import *
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
@@ -215,7 +215,7 @@ if bool(args.taylor_test or False):
             for ci in c:
                 ci.dat.data[0] = 10.0*np.random.random()
         elif mode == 'optimised':
-            fname = os.path.join(op.di, 'optimisation_progress_ctrl_{:d}.npy'.format(level))
+            fname = os.path.join(di, 'optimisation_progress_ctrl_{:d}.npy'.format(level))
             try:
                 c_dat = np.load(fname)[-1]
             except IOError:
@@ -251,7 +251,7 @@ for gauge in gauges:
     np.save(fname, op.gauges[gauge][timeseries_type])
 
 # Run optimisation / load optimised controls
-fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+fname = os.path.join(di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if optimise:
     control_values_opt = [[m.dat.data[0] for m in op.control_parameters], ]
     func_values_opt = [J, ]
@@ -279,32 +279,21 @@ else:
 
 # --- Compare timeseries
 
-# Create a new parameter class
-kwargs['control_parameters'] = optimised_value
-kwargs['plot_pvd'] = plot_pvd
-op_opt = options_constructor(**kwargs)
-for gauge in gauges:
-    op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
-
-# Run forward again and save timeseries
+# Run forward again using the optimised control parameters
+op.plot_pvd = plot_pvd
+swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 print_output("Clearing tape...")
 get_working_tape().clear_tape()
+print_output("Assigning optimised control parameters...")
+op.assign_control_parameters(optimised_value)
 print_output("Run to plot optimised timeseries...")
-swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=op.debug)
 swp.solve_forward()
 J = swp.quantity_of_interest()
-for gauge in gauges:
-    fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level)]))
-    np.save(fname, op_opt.gauges[gauge][timeseries_type])
 
-# Compare total variation
-msg = "total variation for gauge {:s}:  before {:.4e}  after {:.4e}  reduction {:.1f}%"
-for tt, cd in zip(('diff', 'diff_smooth'), ('Continuous', 'Discrete')):
-    print_output("\n{:s} form QoI:".format(cd))
-    for gauge in gauges:
-        tv = total_variation(op.gauges[gauge][tt])
-        tv_opt = total_variation(op_opt.gauges[gauge][tt])
-        print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
+# Save timeseries to file
+for gauge in gauges:
+    fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
+    np.save(fname, op.gauges[gauge][timeseries_type])
 
 # Solve adjoint problem and plot solution fields
 if plot_pvd:
