@@ -47,6 +47,10 @@ class TohokuBoxBasisOptions(TohokuOptions):
         self.radius_y = kwargs.get('radius_y', 0.5*240.0e+03/self.ny)
 
         # Parametrisation of source basis
+        self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
+        self.assign_control_parameters(control_parameters)
+
+    def assign_control_parameters(self, control_parameters):
         self.print_debug("INIT: Assigning control parameter values...")
         R = thetis.FunctionSpace(self.default_mesh, "R", 0)
         self.control_parameters = []
@@ -54,7 +58,6 @@ class TohokuBoxBasisOptions(TohokuOptions):
             control = thetis.Function(R, name="Control parameter {:d}".format(i))
             control.assign(control_parameters[i])
             self.control_parameters.append(control)
-        self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
 
     def get_basis_functions(self, fs):
         """

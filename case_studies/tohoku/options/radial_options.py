@@ -60,6 +60,10 @@ class TohokuRadialBasisOptions(TohokuOptions):
         # Parametrisation of source basis
         self.radius_x = kwargs.get('radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
         self.radius_y = kwargs.get('radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
+        self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
+        self.assign_control_parameters(control_parameters)
+
+    def assign_control_parameters(self, control_parameters):
         self.print_debug("INIT: Assigning control parameter values...")
         R = thetis.FunctionSpace(self.default_mesh, "R", 0)
         self.control_parameters = []
@@ -67,7 +71,6 @@ class TohokuRadialBasisOptions(TohokuOptions):
             control = thetis.Function(R, name="Control parameter {:d}".format(i))
             control.assign(control_parameters[i])
             self.control_parameters.append(control)
-        self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
 
     def get_basis_functions(self, fs):  # TODO: Implement radial basis functions other than Gaussians
         """
