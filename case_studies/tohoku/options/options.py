@@ -114,28 +114,6 @@ class TohokuOptions(TsunamiOptions):
         nc.close()
         return lon, lat, elev
 
-    # TODO: Needed?
-    def _get_update_forcings_forward(self, prob, i):
-
-        def update_forcings(t):
-            return
-
-        return update_forcings
-
-    # TODO: Needed?
-    def _get_update_forcings_adjoint(self, prob, i):
-
-        def update_forcings(t):
-            return
-
-        return update_forcings
-
-    def get_update_forcings(self, prob, i, adjoint=False):
-        if adjoint:
-            return self._get_update_forcings_adjoint(prob, i)
-        else:
-            return self._get_update_forcings_forward(prob, i)
-
     def set_boundary_conditions(self, prob, i):
         ocean_tag = 100
         coast_tag = 200
@@ -591,6 +569,12 @@ class TohokuInversionOptions(TohokuOptions):
             self.regularisation_term_gradients.append(dRdm)
 
         return R
+
+    def get_update_forcings(self, prob, i, adjoint=False):
+        if adjoint:
+            return self._get_update_forcings_adjoint(prob, i)
+        else:
+            return self._get_update_forcings_forward(prob, i)
 
     def _get_update_forcings_forward(self, prob, i):  # TODO: Use QoICallback
         from adapt_utils.misc import ellipse
