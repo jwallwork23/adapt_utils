@@ -123,7 +123,7 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         overlap.
         """
         cache_dir = create_directory(os.path.join(os.path.dirname(__file__), '.cache'))
-        fname = os.path.join(cache_dir, 'mass_matrix_box.npy')
+        fname = os.path.join(cache_dir, 'mass_matrix_box_{:d}.npy'.format(self.level))
 
         # Get basis functions
         if not hasattr(self, 'basis_functions'):

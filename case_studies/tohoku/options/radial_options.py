@@ -147,6 +147,8 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
 
         For ease, we simply assemble the mass matrix and RHS vector and solve using NumPy's `solve`.
         """
+        cache_dir = create_directory(os.path.join(os.path.dirname(__file__), '.cache'))
+        fname = os.path.join(cache_dir, 'mass_matrix_radial_{:d}.npy'.format(self.level))
 
         # Get basis functions
         if not hasattr(self, 'basis_functions'):
@@ -155,16 +157,20 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         N = self.nx*self.ny
 
         # Assemble mass matrix  # TODO: Cache it
-        self.print_debug("PROJECTION: Assembling mass matrix...")
-        A = np.zeros((N, N))
-        for i in range(N):
-            for j in range(i+1):
-                A[i, j] = assemble(phi[i]*phi[j]*dx)
-                if i == j and np.isclose(A[i, j], 0.0):
-                    print_output("WARNING: Diagonal entry {:d} of mass matrix is zero".format(i))
-        for i in range(N):
-            for j in range(i+1, N):
-                A[i, j] = A[j, i]
+        if os.path.isfile(fname):
+            self.print_debug("PROJECTION: Loading mass matrix from cache...")
+            A = np.load(fname)
+        else:
+            self.print_debug("PROJECTION: Assembling mass matrix...")
+            A = np.zeros((N, N))
+            for i in range(N):
+                for j in range(i+1):
+                    A[i, j] = assemble(phi[i]*phi[j]*dx)
+            for i in range(N):
+                for j in range(i+1, N):
+                    A[i, j] = A[j, i]
+            self.print_debug("PROJECTION: Cacheing mass matrix...")
+            np.save(fname, A)
 
         # Assemble RHS
         self.print_debug("PROJECTION: Assembling RHS...")
