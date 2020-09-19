@@ -108,8 +108,7 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         self.print_debug("INIT: Assembling initial surface...")
         q = prob.fwd_solutions[0]
         q.assign(0.0)
-        controls = self.control_parameters
-        for coeff, bf in zip(controls, self.basis_functions):
+        for coeff, bf in zip(self.control_parameters, self.basis_functions):
             q.assign(q + thetis.project(coeff*bf, prob.V[0]))
 
         # Subtract initial surface from the bathymetry field
