@@ -227,6 +227,9 @@ if bool(args.taylor_test or False):
             raise ValueError("Taylor test mode '{:s}' not recognised.".format(mode))
         return c
 
+    # Ensure consistency of tests
+    np.random.seed(0)
+
     # Random search direction
     dc = [Function(m) for m in op.control_parameters]
     for dci in dc:

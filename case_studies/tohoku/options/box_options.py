@@ -1,4 +1,4 @@
-import thetis
+from thetis import *
 from pyadjoint.tape import no_annotations
 
 import numpy as np
@@ -59,10 +59,10 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         of floats, `control_values`.
         """
         self.print_debug("INIT: Assigning control parameter values...")
-        R = thetis.FunctionSpace(self.default_mesh, "R", 0)  # TODO: Don't use default mesh
+        R = FunctionSpace(self.default_mesh, "R", 0)  # TODO: Don't use default mesh
         self.control_parameters = []
         for i, control_value in enumerate(control_values):
-            control = thetis.Function(R, name="Control parameter {:d}".format(i))
+            control = Function(R, name="Control parameter {:d}".format(i))
             control.assign(control_value)
             self.control_parameters.append(control)
 
@@ -84,7 +84,7 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         X = np.linspace((1 - nx)*rx, (nx - 1)*rx, nx)
         Y = np.linspace((1 - ny)*ry, (ny - 1)*ry, ny)
         self.print_debug("INIT: Assembling rotated array of indicator functions...")
-        self.basis_functions = [thetis.Function(fs) for i in range(N)]
+        self.basis_functions = [Function(fs) for i in range(N)]
         R = rotation_matrix(-angle)
         self._array = []
         for j, y in enumerate(Y):
@@ -109,11 +109,12 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         q = prob.fwd_solutions[0]
         q.assign(0.0)
         for coeff, bf in zip(self.control_parameters, self.basis_functions):
-            q.assign(q + thetis.project(coeff*bf, prob.V[0]))
+            q.assign(q + project(coeff*bf, prob.V[0]))
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
 
+    @no_annotations
     def project(self, prob, source):
         """
         Project a source field into the box basis using a simple L2 projection.
@@ -121,19 +122,36 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         Note that the approach relies on the fact that the supports of the basis functions do not
         overlap.
         """
+
+        # Get basis functions
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
-        eps = 1.0e-06
-        for i, bf in enumerate(self.basis_functions):
-            psi, phi = bf.split()
-            mass = thetis.assemble(phi*source*thetis.dx)
-            w = thetis.assemble(phi*thetis.dx)
-            if np.isclose(w, 0.0):
-                thetis.print_output("WARNING: basis function {:d} has zero mass!".format(i))
-                self.control_parameters[i].assign(eps)  # FIXME: Why can't I assign zero?
-            else:
-                self.control_parameters[i].assign(mass/w)
+        phi = [bf.split()[1] for bf in self.basis_functions]
+        N = self.nx*self.ny
 
+        # Assemble mass matrix  # TODO: Cache it
+        self.print_debug("PROJECTION: Assembling mass matrix...")
+        A = np.array([assemble(phi[i]*phi[i]*dx) for i in range(N)])
+        eps = 1.0e-06
+        for i, Ai in enumerate(A):
+            if np.isclose(Ai, 0.0):
+                print_output("WARNING: basis function {:d} has zero mass!".format(i))
+                self.control_parameters[i].assign(eps)  # FIXME: Why can't I assign zero?
+
+        # Assemble RHS
+        self.print_debug("PROJECTION: Assembling RHS...")
+        b = np.array([assemble(phi[i]*source*dx) for i in range(N)])
+
+        # Project
+        self.print_debug("PROJECTION: Solving linear system...")
+        m = b/A
+
+        # Assign values
+        self.print_debug("PROJECTION: Assigning values...")
+        for i, mi in enumerate(m):
+            self.control_parameters[i].assign(mi)
+
+    @no_annotations
     def interpolate(self, prob, source):
         """
         Interpolate a source field into the box basis using point evaluation.

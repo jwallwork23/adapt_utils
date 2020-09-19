@@ -1,4 +1,4 @@
-import thetis
+from thetis import *
 from pyadjoint.tape import no_annotations
 
 import numpy as np
@@ -70,10 +70,10 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         of floats, `control_values`.
         """
         self.print_debug("INIT: Assigning control parameter values...")
-        R = thetis.FunctionSpace(self.default_mesh, "R", 0)  # TODO: Don't use default mesh
+        R = FunctionSpace(self.default_mesh, "R", 0)  # TODO: Don't use default mesh
         self.control_parameters = []
         for i, control_value in enumerate(control_values):
-            control = thetis.Function(R, name="Control parameter {:d}".format(i))
+            control = Function(R, name="Control parameter {:d}".format(i))
             control.assign(control_value)
             self.control_parameters.append(control)
 
@@ -98,7 +98,7 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
 
         # Assemble array
         self.print_debug("INIT: Assembling rotated radial basis function array...")
-        self.basis_functions = [thetis.Function(fs) for i in range(N)]
+        self.basis_functions = [Function(fs) for i in range(N)]
         R = rotation_matrix(-angle)
         self._array = []
         for j, y in enumerate(Y):
@@ -123,11 +123,12 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         q = prob.fwd_solutions[0]
         q.assign(0.0)
         for coeff, bf in zip(self.control_parameters, self.basis_functions):
-            q.assign(q + thetis.project(coeff*bf, prob.V[0]))
+            q.assign(q + project(coeff*bf, prob.V[0]))
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
 
+    @no_annotations
     def project(self, prob, source):
         r"""
         Project a source field into the box basis. This involves solving an auxiliary linear system.
@@ -146,7 +147,6 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
 
         For ease, we simply assemble the mass matrix and RHS vector and solve using NumPy's `solve`.
         """
-        from thetis import assemble, dx
 
         # Get basis functions
         if not hasattr(self, 'basis_functions'):
@@ -154,12 +154,14 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         phi = [bf.split()[1] for bf in self.basis_functions]
         N = self.nx*self.ny
 
-        # Assemble mass matrix
+        # Assemble mass matrix  # TODO: Cache it
         self.print_debug("PROJECTION: Assembling mass matrix...")
         A = np.zeros((N, N))
         for i in range(N):
             for j in range(i+1):
                 A[i, j] = assemble(phi[i]*phi[j]*dx)
+                if i == j and np.isclose(A[i, j], 0.0):
+                    print_output("WARNING: Diagonal entry {:d} of mass matrix is zero".format(i))
         for i in range(N):
             for j in range(i+1, N):
                 A[i, j] = A[j, i]
@@ -168,7 +170,7 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         self.print_debug("PROJECTION: Assembling RHS...")
         b = np.array([assemble(phi[i]*source*dx) for i in range(N)])
 
-        # Create solution vector and solve
+        # Project
         self.print_debug("PROJECTION: Solving linear system...")
         m = np.linalg.solve(A, b)
 
@@ -177,6 +179,7 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         for i, mi in enumerate(m):
             self.control_parameters[i].assign(mi)
 
+    @no_annotations
     def interpolate(self, prob, source):
         r"""
         Interpolate a source field into the radial basis using point evaluation.
