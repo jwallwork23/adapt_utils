@@ -1,5 +1,8 @@
 import thetis
+from pyadjoint.tape import no_annotations
+
 import numpy as np
+
 from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 
 
@@ -56,13 +59,14 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         of floats, `control_values`.
         """
         self.print_debug("INIT: Assigning control parameter values...")
-        R = thetis.FunctionSpace(self.default_mesh, "R", 0)
+        R = thetis.FunctionSpace(self.default_mesh, "R", 0)  # TODO: Don't use default mesh
         self.control_parameters = []
         for i, control_value in enumerate(control_values):
             control = thetis.Function(R, name="Control parameter {:d}".format(i))
             control.assign(control_value)
             self.control_parameters.append(control)
 
+    @no_annotations
     def get_basis_functions(self, fs):
         """
         Assemble an array of piecewise constant indicator functions, rotated by specified angle.
@@ -90,23 +94,23 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
                 self._array.append([x_rot, y_rot])
                 phi.interpolate(box([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
 
-    def set_initial_condition(self, prob, sum_pad=100):
+    def set_initial_condition(self, prob):
         """
+        Project from the piecewise constant basis into the prognostic space used within the tsunami
+        propagation model.
+
         :arg prob: the :class:`AdaptiveProblem` object to which the initial condition is assigned.
-        :kwarg sum_pad: when summing terms to assemble the initial surface, the calculation is split
-            up for large arrays in order to avoid the UFL recursion limit. That is, every `sum_pad`
-            terms are summed separately.
         """
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
 
         # Assemble initial surface
         self.print_debug("INIT: Assembling initial surface...")
-        prob.fwd_solutions[0].assign(0.0)
+        q = prob.fwd_solutions[0]
+        q.assign(0.0)
         controls = self.control_parameters
-        for n in range(0, self.nx*self.ny, sum_pad):
-            expr = sum(m*g for m, g in zip(controls[n:n+sum_pad], self.basis_functions[n:n+sum_pad]))
-            prob.fwd_solutions[0].assign(prob.fwd_solutions[0] + thetis.project(expr, prob.V[0]))
+        for coeff, bf in zip(controls, self.basis_functions):
+            q.assign(q + thetis.project(coeff*bf, prob.V[0]))
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
