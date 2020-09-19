@@ -122,25 +122,27 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         Note that the approach relies on the fact that the supports of the basis functions do not
         overlap.
         """
+        cache_dir = create_directory(os.path.join(os.path.dirname(__file__), '.cache'))
+        fname = os.path.join(cache_dir, 'mass_matrix_box.npy')
 
         # Get basis functions
         if not hasattr(self, 'basis_functions'):
             self.get_basis_functions(prob.V[0])
-        phi = [bf.split()[1] for bf in self.basis_functions]
-        N = self.nx*self.ny
+        basis_functions = [bf.split()[1] for bf in self.basis_functions]
 
-        # Assemble mass matrix  # TODO: Cache it
-        self.print_debug("PROJECTION: Assembling mass matrix...")
-        A = np.array([assemble(phi[i]*phi[i]*dx) for i in range(N)])
-        eps = 1.0e-06
-        for i, Ai in enumerate(A):
-            if np.isclose(Ai, 0.0):
-                print_output("WARNING: basis function {:d} has zero mass!".format(i))
-                self.control_parameters[i].assign(eps)  # FIXME: Why can't I assign zero?
+        # Assemble mass matrix
+        if os.path.isfile(fname):
+            self.print_debug("PROJECTION: Loading mass matrix from cache...")
+            A = np.load(fname)
+        else:
+            self.print_debug("PROJECTION: Assembling mass matrix...")
+            A = np.array([assemble(phi*phi*dx) for phi in basis_functions])
+            self.print_debug("PROJECTION: Cacheing mass matrix...")
+            np.save(fname, A)
 
         # Assemble RHS
         self.print_debug("PROJECTION: Assembling RHS...")
-        b = np.array([assemble(phi[i]*source*dx) for i in range(N)])
+        b = np.array([assemble(phi*source*dx) for phi in basis_functions])
 
         # Project
         self.print_debug("PROJECTION: Solving linear system...")
