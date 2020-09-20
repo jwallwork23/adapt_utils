@@ -70,9 +70,9 @@ if plot_pdf:
 if plot_png:
     extensions.append('png')
 plot_any = len(extensions) > 0
-timeseries_type = "timeseries"
+timeseries_type = 'timeseries'
 if bool(args.continuous_timeseries or False):
-    timeseries_type = "_".join([timeseries_type, "smooth"])
+    timeseries_type = '_'.join([timeseries_type, 'smooth'])
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1 and plot_any:
@@ -191,7 +191,7 @@ if plot_only:
 
 # --- Tracing
 
-# Solve the forward problem with initial guess
+# Set initial guess
 op = options_constructor(**kwargs)
 swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 print_output("Clearing tape...")
@@ -200,14 +200,16 @@ print_output("Setting initial guess...")
 op.assign_control_parameters(kwargs['control_parameters'], swp.meshes[0])
 controls = [Control(m) for m in op.control_parameters]
 print_output("Run forward to get timeseries...")
+
+# Solve forward problem
 swp.solve_forward()
 J = swp.quantity_of_interest()
 
 # Save timeseries
 for gauge in gauges:
-    fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
+    fname = os.path.join(di, '{:s}_data_{:d}'.format(gauge, level))
     np.save(fname, op.gauges[gauge]['data'])
-    fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
+    fname = os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries_type, level))
     np.save(fname, op.gauges[gauge][timeseries_type])
 
 
@@ -280,6 +282,8 @@ if optimise:
         control = [mi.dat.data[0] for mi in m]
         djdm = [dji.dat.data[0] for dji in dj]
         print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
+
+        # Save progress to NumPy arrays on-the-fly
         control_values_opt.append(control)
         func_values_opt.append(j)
         gradient_values_opt.append(djdm)
@@ -303,7 +307,7 @@ else:
 op.plot_pvd = plot_pvd
 swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 print_output("Clearing tape...")
-get_working_tape().clear_tape()
+swp.clear_tape()
 print_output("Assigning optimised control parameters...")
 op.assign_control_parameters(optimised_value)
 print_output("Run to plot optimised timeseries...")
@@ -312,7 +316,7 @@ J = swp.quantity_of_interest()
 
 # Save timeseries to file
 for gauge in gauges:
-    fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
+    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
     np.save(fname, op.gauges[gauge][timeseries_type])
 
 # Solve adjoint problem and plot solution fields
