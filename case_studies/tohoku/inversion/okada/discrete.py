@@ -14,12 +14,6 @@ from adapt_utils.optimisation import taylor_test
 from adapt_utils.norms import vecnorm
 
 
-class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
-    """The subclass exists to pass the QoI as required."""
-    def quantity_of_interest(self):
-        return self.op.J
-
-
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
@@ -167,7 +161,7 @@ m_init = np.array(m_init)
 J_progress = []
 
 # Create discrete adjoint solver object for the optimisation
-swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear)
 
 
 def reduced_functional(m):

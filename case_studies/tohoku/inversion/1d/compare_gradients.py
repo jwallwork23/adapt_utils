@@ -68,15 +68,9 @@ with stop_annotating():
 
 # --- Discrete adjoint
 
-class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
-    """The subclass exists to pass the QoI as required."""
-    def quantity_of_interest(self):
-        return self.op.J
-
-
 # Solve the forward problem with 'suboptimal' control parameter m = 10
 op.control_parameters[0].assign(kwargs['control_parameters'][0], annotate=False)
-swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, checkpointing=False)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, checkpointing=False)
 swp.solve_forward()
 J = op.J
 print_output("Mean square error QoI = {:.4e}".format(J))

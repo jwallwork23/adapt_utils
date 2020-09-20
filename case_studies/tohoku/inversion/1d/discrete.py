@@ -24,14 +24,6 @@ from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialB
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
 
-class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
-    """
-    The subclass exists to pass the QoI as required.
-    """
-    def quantity_of_interest(self):
-        return self.op.J
-
-
 # --- Parse arguments
 
 parser = ArgumentParser(shallow_water=True)
@@ -113,7 +105,7 @@ try:
 except AssertionError:
     print_output("Run forward to get 'data'...")
     with stop_annotating():
-        swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)
+        swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
         control_value = [float(args.optimal_control or 5.0), ]
         op.assign_control_parameters(control_value, mesh=swp.meshes[0])
         swp.solve_forward()
@@ -131,7 +123,7 @@ if recompute:
     msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
     func_values = np.zeros(n)
     with stop_annotating():
-        swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)
+        swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
         for i, m in enumerate(control_values):
             op.assign_control_parameters(m, mesh=swp.meshes[0])
             swp.solve_forward()
@@ -144,7 +136,7 @@ if recompute:
 
 # Set initial guess
 op.save_timeseries = True
-swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
 print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Setting initial guess...")
@@ -215,7 +207,7 @@ if taylor:
 
 # --- Optimisation
 
-fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+fname = os.path.join(di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) and not optimise:
 
     # Load trajectory
@@ -227,7 +219,7 @@ if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')
 else:
 
     # Arrays to log progress
-    control_values_opt = [op.control_parameters[0], ]
+    control_values_opt = [op.control_parameters[0].dat.data[0], ]
     func_values_opt = [J, ]
     gradient_values_opt = []
 
@@ -252,7 +244,7 @@ else:
 
 # Run forward again so that we can compare timeseries
 op.plot_pvd = plot_pvd
-swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=False)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
 print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Assigning optimised control parameters...")
@@ -264,7 +256,7 @@ J = swp.quantity_of_interest()
 # Save timeseries to file
 for gauge in gauges:
     fname = os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries_type, level))
-    np.save(fname, op_opt.gauges[gauge][timeseries_type])
+    np.save(fname, op.gauges[gauge][timeseries_type])
 
 # Solve adjoint problem and plot solution fields
 if plot_pvd:

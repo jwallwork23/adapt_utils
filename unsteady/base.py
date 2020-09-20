@@ -497,8 +497,13 @@ class AdaptiveProblemBase(object):
                 self.free_solver_adjoint_step(i)
 
     def quantity_of_interest(self):
-        """Functional of interest which takes the PDE solution as input."""
-        raise NotImplementedError("Should be implemented in derived class.")
+        """
+        Default quantity of interest.
+
+        Should be implemented in derived class.
+        """
+        assert hasattr(self.op, 'J')
+        return self.op.J
 
     def save_to_checkpoint(self, f, mode='memory', i=None, **kwargs):
         """

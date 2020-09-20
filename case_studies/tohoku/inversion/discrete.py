@@ -17,14 +17,6 @@ from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 
-class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
-    """
-    The subclass exists to pass the QoI as required.
-    """
-    def quantity_of_interest(self):
-        return self.op.J
-
-
 # --- Parse arguments
 
 parser = ArgumentParser(basis=True, plotting=True, shallow_water=True)
@@ -153,12 +145,12 @@ with stop_annotating():
         kwargs_src['control_parameters'] = [gaussian_scaling, ]
         kwargs_src['nx'], kwargs_src['ny'] = 1, 1
         op_src = TohokuRadialBasisOptions(mesh=op.default_mesh, **kwargs_src)
-        swp = DiscreteAdjointTsunamiProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
+        swp = AdaptiveDiscreteAdjointProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
         swp.set_initial_condition()
         f_src = swp.fwd_solutions[0].split()[1]
 
         # Project into chosen basis
-        swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+        swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
         op.project(swp, f_src)
         kwargs['control_parameters'] = [m.dat.data[0] for m in op.control_parameters]
 
@@ -193,7 +185,7 @@ if plot_only:
 
 # Set initial guess
 op = options_constructor(**kwargs)
-swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Setting initial guess...")
@@ -305,7 +297,7 @@ else:
 
 # Run forward again using the optimised control parameters
 op.plot_pvd = plot_pvd
-swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Assigning optimised control parameters...")
