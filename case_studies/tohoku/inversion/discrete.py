@@ -293,7 +293,7 @@ else:
     optimised_value = np.load(fname.format('ctrl'))[-1]
 
 
-# --- Compare timeseries
+# --- Run with optimised controls
 
 # Run forward again using the optimised control parameters
 op.plot_pvd = plot_pvd

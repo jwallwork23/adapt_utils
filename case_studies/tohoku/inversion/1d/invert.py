@@ -17,6 +17,7 @@ from firedrake_adjoint import *
 
 import numpy as np
 import os
+import scipy
 import sys
 
 from adapt_utils.argparse import ArgumentParser
@@ -26,7 +27,7 @@ from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
 # --- Parse arguments
 
-parser = ArgumentParser(shallow_water=True)
+parser = ArgumentParser(adjoint=True, shallow_water=True)
 
 # Resolution
 parser.add_argument("-level", help="Mesh resolution level")
@@ -38,6 +39,7 @@ parser.add_argument("-initial_guess", help="Initial guess for control parameter"
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries data")
 parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
+parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
 
 # Testing
 parser.add_argument("-end_time", help="End time of simulation (to shorten Taylor test)")
@@ -62,7 +64,8 @@ dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
 if args.extension is not None:
     di = '_'.join([di, args.extension])
-di = create_directory(os.path.join(di, 'discrete'))
+if args.adjoint is None or args.adjoint not in ('discrete', 'continuous'):
+    raise ValueError
 
 # Collect initialisation parameters
 nonlinear = bool(args.nonlinear or False)
@@ -86,6 +89,7 @@ kwargs = {
     'qoi_scaling': 1.0,
     'nx': 1,
     'ny': 1,
+    'regularisation': float(args.regularisation or 0.0),
 
     # Misc
     'plot_pvd': False,
@@ -153,12 +157,34 @@ J = swp.quantity_of_interest()
 for gauge in gauges:
     fname = os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries_type, level))
     np.save(fname, op.gauges[gauge][timeseries_type])
+di = create_directory(os.path.join(di, args.adjoint))
+
+# Define reduced functional and gradient functions
+if args.adjoint == 'discrete':
+    Jhat = ReducedFunctional(J, control)
+    gradient = None
+else:
+    swp.checkpointing = True
+
+    def Jhat(m):
+        op.assign_control_parameters(m)
+        swp.solve_forward()
+        return swp.quantity_of_interest()
+
+    def gradient(m):
+        if len(swp.checkpoint) == 0:
+            J = Jhat(m)
+        swp.solve_adjoint()
+        g = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)  # TODO: No minus sign?
+        if use_regularisation:
+            g += op.regularisation_term_gradients[0]
+        print_output("control = {:8.6e}  functional = {:8.6e}  gradient = {:8.6e}".format(m[0], J, g))
+        return np.array([g, ])
 
 
 # --- Taylor test
 
 if taylor:
-    Jhat = ReducedFunctional(J, control)
 
     def get_control(mode):
         """
@@ -223,24 +249,50 @@ else:
     func_values_opt = [J, ]
     gradient_values_opt = []
 
-    def derivative_cb_post(j, dj, m):
-        control = m.dat.data[0]
-        djdm = dj.dat.data[0]
-        print_output("control {:.8e}  functional {:.8e}  gradient {:.8e}".format(control, j, djdm))
-
-        # Save progress to NumPy arrays on-the-fly
-        control_values_opt.append(control)
-        func_values_opt.append(j)
-        gradient_values_opt.append(djdm)
-        np.save(fname.format('ctrl'), np.array(control_values_opt))
-        np.save(fname.format('func'), np.array(func_values_opt))
-        np.save(fname.format('grad'), np.array(gradient_values_opt))
-
-    # Run BFGS optimisation
     opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
     print_output("Optimisation begin...")
-    Jhat = ReducedFunctional(J, control, derivative_cb_post=derivative_cb_post)
-    optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs).dat.data
+    if args.adjoint == 'discrete':
+
+        def derivative_cb_post(j, dj, m):
+            control = m.dat.data[0]
+            djdm = dj.dat.data[0]
+            print_output("control {:.8e}  functional {:.8e}  gradient {:.8e}".format(control, j, djdm))
+
+            # Save progress to NumPy arrays on-the-fly
+            control_values_opt.append(control)
+            func_values_opt.append(j)
+            gradient_values_opt.append(djdm)
+            np.save(fname.format('ctrl'), np.array(control_values_opt))
+            np.save(fname.format('func'), np.array(func_values_opt))
+            np.save(fname.format('grad'), np.array(gradient_values_opt))
+
+        # Run BFGS optimisation
+        Jhat_save_data = ReducedFunctional(J, control, derivative_cb_post=derivative_cb_post)
+        optimised_value = minimize(Jhat_save_data, method='BFGS', options=opt_kwargs).dat.data
+
+    else:
+
+        def Jhat_save_data(m):
+            J = Jhat(m)
+            control_values_opt.append(m[0])
+            np.save(fname.format('ctrl'), np.array(control_values_opt))
+            func_values_opt.append(J)
+            np.save(fname.format('func'), np.array(func_values_opt))
+            return J
+
+        def gradient_save_data(m):
+            g = gradient(m)
+            gradient_values_opt.append(g[0])
+            np.save(fname.format('grad'), np.array(gradient_values_opt))
+            return g
+
+        opt_kwargs['fprime'] = gradient_save_data
+        opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
+        m_init = op.control_parameters[0].dat.data
+        optimised_value = scipy.optimize.fmin_bfgs(Jhat_save_data, m_init, **opt_kwargs)
+
+
+# --- Run with optimised controls
 
 # Run forward again so that we can compare timeseries
 op.plot_pvd = plot_pvd
