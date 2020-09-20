@@ -47,30 +47,35 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         self.nx = kwargs.get('nx', 13)
         self.ny = kwargs.get('ny', 10)
         N_b = self.nx*self.ny
-        control_parameters = kwargs.get('control_parameters', 10.0*np.random.rand(N_b))
-        N_c = len(control_parameters)
-        if N_c != N_b:
-            raise ValueError("{:d} controls inconsistent with {:d} basis functions".format(N_c, N_b))
 
         # Parametrisation of source region
-        self.centre_x = kwargs.get('centre_x', 0.7e+06)
-        self.centre_y = kwargs.get('centre_y', 4.2e+06)
-        self.extent_x = kwargs.get('extent_x', 560.0e+03)
-        self.extent_y = kwargs.get('extent_y', 240.0e+03)
+        # ================================
+        #  These parameters define the geometry of the basis array. Note that if any of the values
+        #  vary from the defaults then the cache is marked as dirty and the projection mass matrix
+        #  will be re-assembled.
+        self.centre_x = self.extract(kwargs, 'centre_x', 0.7e+06)
+        self.centre_y = self.extract(kwargs, 'centre_y', 4.2e+06)
+        self.extent_x = self.extract(kwargs, 'extent_x', 560.0e+03)
+        self.extent_y = self.extract(kwargs, 'extent_y', 240.0e+03)
+        self.radius_x = self.extract(kwargs, 'radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
+        self.radius_y = self.extract(kwargs, 'radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
+        self.strike_angle = self.extract(kwargs, 'strike_angle', 7*np.pi/12)
 
-        # Parametrisation of source basis
-        self.radius_x = kwargs.get('radius_x', 96e+03 if self.nx == 1 else 48.0e+03)
-        self.radius_y = kwargs.get('radius_y', 48e+03 if self.ny == 1 else 24.0e+03)
-        self.strike_angle = kwargs.get('strike_angle', 7*np.pi/12)
-        self.assign_control_parameters(control_parameters)
+        # Set control parameters (if provided)
+        control_parameters = kwargs.get('control_parameters', 10.0*np.random.rand(N_b))
+        if control_parameters is not None:
+            if len(control_parameters) != N_b:
+                msg = "{:d} controls inconsistent with {:d} basis functions"
+                raise ValueError(msg.format(len(control_parameters), N_b))
+            self.assign_control_parameters(control_parameters)
 
-    def assign_control_parameters(self, control_values):
+    def assign_control_parameters(self, control_values, mesh=None):
         """
         Create a list of control parameters defined in the R space and assign values from the list
         of floats, `control_values`.
         """
         self.print_debug("INIT: Assigning control parameter values...")
-        R = FunctionSpace(self.default_mesh, "R", 0)  # TODO: Don't use default mesh
+        R = FunctionSpace(mesh or self.default_mesh, "R", 0)
         self.control_parameters = []
         for i, control_value in enumerate(control_values):
             control = Function(R, name="Control parameter {:d}".format(i))
@@ -148,7 +153,8 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         For ease, we simply assemble the mass matrix and RHS vector and solve using NumPy's `solve`.
         """
         cache_dir = create_directory(os.path.join(os.path.dirname(__file__), '.cache'))
-        fname = os.path.join(cache_dir, 'mass_matrix_radial_{:d}.npy'.format(self.level))
+        fname = os.path.join(cache_dir, 'mass_matrix_radial_{:d}_{:d}x{:d}.npy')
+        fname = fname.format(self.level, self.nx, self.ny)
 
         # Get basis functions
         if not hasattr(self, 'basis_functions'):
@@ -156,8 +162,8 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         phi = [bf.split()[1] for bf in self.basis_functions]
         N = self.nx*self.ny
 
-        # Assemble mass matrix  # TODO: Cache it
-        if os.path.isfile(fname):
+        # Assemble mass matrix
+        if os.path.isfile(fname) and not self.dirty_cache:
             self.print_debug("PROJECTION: Loading mass matrix from cache...")
             A = np.load(fname)
         else:
@@ -181,9 +187,7 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         m = np.linalg.solve(A, b)
 
         # Assign values
-        self.print_debug("PROJECTION: Assigning values...")
-        for i, mi in enumerate(m):
-            self.control_parameters[i].assign(mi)
+        self.assign_control_parameters(m, prob.meshes[0])
 
     @no_annotations
     def interpolate(self, prob, source):
@@ -247,6 +251,4 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         m_opt = scipy.optimize.fmin_bfgs(J, m_init, **opt_kwargs)
 
         # Assign values
-        self.print_debug("INTERPOLATION: Assigning values...")
-        for i, mi in enumerate(m_opt):
-            self.control_parameters[i].assign(mi)
+        self.assign_control_parameters(m, prob.meshes[0])

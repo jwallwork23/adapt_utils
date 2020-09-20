@@ -182,6 +182,7 @@ class Options(FrozenConfigurable):
             the subclass.
         :fpath: optional extension to the usual `outputs/<approach>/` output directory path.
         """
+        self.dirty_cache = False
         self.default_mesh = mesh
         self.update(kwargs)
         self.di = di or os.path.join('outputs', self.approach)
@@ -205,6 +206,21 @@ class Options(FrozenConfigurable):
         self.element_rtol = tol
         self.qoi_rtol = tol
         self.estimator_rtol = tol
+
+    def extract(self, parameters, key, default):
+        """
+        Extract value `key` from a dictionary `parameters` with default value `default`. If the
+        value is not set to the default then the cache is marked as dirty.
+        """
+        value = parameters.get(key)
+        if value is None:
+            return default
+        elif np.isclose(value, default):
+            return default
+        else:
+            self.print_debug("CACHEING: Modified {:s} parameter dirtied cache".format(key))
+            self.dirty_cache = True
+            return value
 
     # TODO: Collapse indicators to one function and include type in RoI and source specifications
 
