@@ -97,10 +97,12 @@ kwargs = {
     'debug_mode': args.debug_mode or 'basic',
     'di': di,
 }
+use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 op = TohokuRadialBasisOptions(**kwargs)
 gauges = list(op.gauges.keys())
 
-# Synthetic run
+# --- Synthetic run
+
 try:
     fnames = [os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level)) for gauge in gauges]
     assert np.all([os.path.isfile(fname) for fname in fnames])
@@ -118,12 +120,16 @@ except AssertionError:
         fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
         np.save(fname, op.gauges[gauge]['data'])
 
-# Explore parameter space
+
+# --- Explore parameter spaces
+
 n = 8
 op.save_timeseries = False
 control_values = [[m, ] for m in np.linspace(0.5, 7.5, n)]
-if recompute:
-    fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
+
+# Unregularised parameter space
+fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
+if recompute or not os.path.isfile(fname):
     msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
     func_values = np.zeros(n)
     with stop_annotating():
@@ -134,6 +140,20 @@ if recompute:
             func_values[i] = swp.quantity_of_interest()
             print_output(msg.format(i, m[0], func_values[i]))
     np.save(fname, func_values)
+
+# Regularised parameter space
+fname = os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level))
+if use_regularisation and (recompute or os.path.isfile(fname)):
+    msg = "{:2d}: control value {:.4e}  regularised functional value {:.4e}"
+    func_values_reg = np.zeros(n)
+    with stop_annotating():
+        swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
+        for i, m in enumerate(control_values):
+            op.assign_control_parameters(m, mesh=swp.meshes[0])
+            swp.solve_forward()
+            func_values_reg[i] = swp.quantity_of_interest()
+            print_output(msg.format(i, m[0], func_values_reg[i]))
+    np.save(fname, func_values_reg)
 
 
 # --- Tracing
@@ -162,7 +182,6 @@ di = create_directory(os.path.join(di, args.adjoint))
 # Define reduced functional and gradient functions
 if args.adjoint == 'discrete':
     Jhat = ReducedFunctional(J, control)
-    gradient = None
 else:
     swp.checkpointing = True
 
@@ -233,7 +252,10 @@ if taylor:
 
 # --- Optimisation
 
-fname = os.path.join(di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+fname = os.path.join(di, 'optimisation_progress_{:s}')
+if use_regularisation:
+    fname = '_'.join([fname, 'reg'])
+fname += '_{:d}.npy'.format(level)
 if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) and not optimise:
 
     # Load trajectory
