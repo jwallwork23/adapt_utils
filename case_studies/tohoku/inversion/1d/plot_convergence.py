@@ -12,8 +12,7 @@ parameter is m = 5. We apply PDE constrained optimisation with an initial guess 
 
 In this script, we use the discrete adjoint approach to approximate the gradient of J w.r.t. m.
 """
-from thetis import *
-from firedrake_adjoint import *
+from thetis import COMM_WORLD, create_directory, print_output
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -29,15 +28,8 @@ from adapt_utils.plotting import *
 # --- Parse arguments
 
 parser = ArgumentParser(plotting=True)
-
-# Resolution
 parser.add_argument("-level", help="Mesh resolution level")
-
-# Inversion
-parser.add_argument("-initial_guess", help="Initial guess for control parameter")
-parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries data")
-parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
 
 
 # --- Set parameters
@@ -45,9 +37,6 @@ parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
 # Parsed arguments
 args = parser.parse_args()
 level = int(args.level or 0)
-recompute = bool(args.recompute_parameter_space or False)
-optimise = bool(args.rerun_optimisation or False)
-gtol = float(args.gtol or 1.0e-08)
 plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
@@ -66,11 +55,9 @@ plot_any = len(extensions) > 0
 if not plot_any:
     print_output("Nothing to plot.")
     sys.exit(0)
-if optimise or recompute:
-    assert not plot_only
-timeseries_type = "timeseries"
+timeseries_type = 'timeseries'
 if bool(args.continuous_timeseries or False):
-    timeseries_type = "_".join([timeseries_type, "smooth"])
+    timeseries_type = '_'.join([timeseries_type, 'smooth'])
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1 and plot_any:
@@ -82,7 +69,6 @@ dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
 if args.extension is not None:
     di = '_'.join([di, args.extension])
-di = create_directory(os.path.join(di, 'discrete'))
 plot_dir = create_directory(os.path.join(di, 'plots'))
 create_directory(os.path.join(plot_dir, 'discrete'))
 
@@ -92,7 +78,6 @@ kwargs = {
     'save_timeseries': True,
 
     # Optimisation
-    'control_parameters': [float(args.initial_guess or 7.5), ],
     'synthetic': True,
     'qoi_scaling': 1.0,
     'nx': 1,
@@ -111,11 +96,11 @@ fontsize = 22
 fontsize_tick = 18
 plotting_kwargs = {'markevery': 5}
 
-# Explore parameter space
+# Plot parameter space
 n = 8
-control_values = [[m, ] for m in np.linspace(0.5, 7.5, n)]
+control_values = np.linspace(0.5, 7.5, n)
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
-func_values = np.save(fname)
+func_values = np.load(fname)
 print_output("Explore parameter space...")
 fig, axes = plt.subplots(figsize=(8, 8))
 axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8, markevery=10)
@@ -126,22 +111,19 @@ plt.yticks(fontsize=fontsize_tick)
 axes.grid()
 savefig('parameter_space_{:d}'.format(level), plot_dir, extensions=extensions)
 
-
-# --- Tracing
-
 # Plot timeseries
 for gauge in gauges:
-    fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
-    op.gauges[gauge][timeseries_type] = np.load(fname)
+    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
+    op.gauges[gauge]['init'] = np.load(fname)
     fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
-    op.gauges[gauge][data] = np.load(fname)
+    op.gauges[gauge]['data'] = np.load(fname)
 N = int(np.ceil(np.sqrt(len(gauges))))
 fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
 for i, gauge in enumerate(gauges):
     T = np.array(op.gauges[gauge]['times'])/60
     ax = axes[i//N, i % N]
     ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-    ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' simulated', **plotting_kwargs)
+    ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' simulated', **plotting_kwargs)
     ax.legend(loc='upper left')
     ax.set_xlabel('Time (min)', fontsize=fontsize)
     ax.set_ylabel('Elevation (m)', fontsize=fontsize)
@@ -152,21 +134,14 @@ for i in range(len(gauges), N*N):
     axes[i//N, i % N].axis(False)
 savefig('timeseries_{:d}'.format(level), plot_dir, extensions=extensions)
 
+# --- Plot optimisation progress
 
-# --- Optimisation
-
-fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
-if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) and not optimise:
-
-    # Load trajectory
-    control_values_opt = np.load(fname.format('ctrl', level))
-    func_values_opt = np.load(fname.format('func', level))
-    gradient_values_opt = np.load(fname.format('grad', level))
-    optimised_value = control_values_opt[-1]
-
-func_values = np.load(fname)
-for i, m in enumerate(control_values):
-    print_output(msg.format(i, m[0], func_values[i]))
+# Load trajectory
+fname = os.path.join(di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+control_values_opt = np.load(fname.format('ctrl', level))
+func_values_opt = np.load(fname.format('func', level))
+gradient_values_opt = np.load(fname.format('grad', level))
+optimised_value = control_values_opt[-1]
 
 # Fit a quadratic to the first three points and find its root
 assert len(control_values[::3]) == 3
@@ -205,26 +180,18 @@ axes.annotate(
     xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
 fname = 'optimisation_progress_{:d}'.format(level)
-savefig(os.path.join(plot_dir, 'discrete'), extensions=extensions)
-
-# Create a new parameter class
-kwargs['control_parameters'] = [optimised_value, ]
-kwargs['plot_pvd'] = plot_pvd
-op_opt = TohokuRadialBasisOptions(**kwargs)
-
-# Load timeseries
-for gauge in gauges:
-    fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
-    op_opt.gauges[gauge][timeseries_type] = np.load(fname)
+savefig('discrete', plot_dir, extensions=extensions)
 
 # Plot timeseries for both initial guess and optimised control
+for gauge in gauges:
+    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
+    op.gauges[gauge]['opt'] = np.load(fname)
 fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
 for i, gauge in enumerate(gauges):
     T = np.array(op.gauges[gauge]['times'])/60
     ax = axes[i//N, i % N]
     ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-    ax.plot(T, op.gauges[gauge][timeseries_type], '--x', label=gauge + ' initial guess', **plotting_kwargs)
-    ax.plot(T, op_opt.gauges[gauge][timeseries_type], '--x', label=gauge + ' optimised', **plotting_kwargs)
+    ax.plot(T, op.gauges[gauge]['opt'], '--x', label=gauge + ' optimised', **plotting_kwargs)
     ax.legend(loc='upper left')
     ax.set_xlabel('Time (min)', fontsize=fontsize)
     ax.set_ylabel('Elevation (m)', fontsize=fontsize)
