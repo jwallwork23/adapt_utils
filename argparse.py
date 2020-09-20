@@ -9,6 +9,7 @@ class ArgumentParser(argparse.ArgumentParser):
     # TODO: Doc
     def __init__(self, *args, **kwargs):
         self.kwargs = {
+            'adjoint': kwargs.pop('adjoint', False),
             'basis': kwargs.pop('basis', False),
             'bases': kwargs.pop('bases', False),
             'plotting': kwargs.pop('plotting', False),
@@ -37,6 +38,11 @@ class ArgumentParser(argparse.ArgumentParser):
     @property
     def args(self):
         return self.parse_args()
+
+    def add_adjoint_args(self):
+        self.add_argument("adjoint", help="""
+            Choose adjoint approach from {'discrete', 'continuous'}.
+            """)
 
     def add_bases_args(self):
         self.add_argument("bases", help="""

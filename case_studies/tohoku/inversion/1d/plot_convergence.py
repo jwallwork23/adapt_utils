@@ -1,17 +1,4 @@
-"""
-Invert for an initial condition defined over a (Gaussian) radial basis with a single basis function.
-If we have N_g gauges and N_T timesteps then we have N_g*N_T data points we would like to fit using
-a least squares fit. If N_g = 15 and N_T = 288 (as below) then we have 4320 data points.
-Compared with the single control parameter, this implies a massively overconstrained problem!
-
-[In practice the number of data points is smaller because we do not try to fit the gauge data in
-the period before the tsunami wave arrives.]
-
-A 'synthetic' tsunami is generated from an initial condition given by the 'optimal' scaling
-parameter is m = 5. We apply PDE constrained optimisation with an initial guess m = 10.
-
-In this script, we use the discrete adjoint approach to approximate the gradient of J w.r.t. m.
-"""
+# TODO: doc
 from thetis import COMM_WORLD, create_directory, print_output
 
 import matplotlib.pyplot as plt
@@ -27,7 +14,7 @@ from adapt_utils.plotting import *
 
 # --- Parse arguments
 
-parser = ArgumentParser(plotting=True)
+parser = ArgumentParser(adjoint=True, plotting=True)
 parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries data")
 
@@ -66,11 +53,12 @@ if COMM_WORLD.size > 1 and plot_any:
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
-di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
+if args.adjoint is None or args.adjoint not in ('discrete', 'continuous'):
+    raise ValueError
+di = create_directory(os.path.join(dirname, 'outputs', 'synthetic', args.adjoint))
 if args.extension is not None:
     di = '_'.join([di, args.extension])
 plot_dir = create_directory(os.path.join(di, 'plots'))
-create_directory(os.path.join(plot_dir, 'discrete'))
 
 # Collect initialisation parameters
 kwargs = {
@@ -101,7 +89,6 @@ n = 8
 control_values = np.linspace(0.5, 7.5, n)
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
 func_values = np.load(fname)
-print_output("Explore parameter space...")
 fig, axes = plt.subplots(figsize=(8, 8))
 axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8, markevery=10)
 axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
@@ -163,7 +150,7 @@ params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress', }
 axes.plot(control_values_opt, func_values_opt, 'o', **params)
 delta_m = 0.25
 params = {'linewidth': 3, 'markersize': 8, 'color': 'C2', }
-for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
+for m, f, g in zip(control_values_opt[1:], func_values_opt[1:], gradient_values_opt):
     x = np.array([m - delta_m, m + delta_m])
     axes.plot(x, g*(x-m) + f, '-', **params)
 params['label'] = 'Computed gradient'
@@ -180,7 +167,7 @@ axes.annotate(
     xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
 )
 fname = 'optimisation_progress_{:d}'.format(level)
-savefig('discrete', plot_dir, extensions=extensions)
+savefig(fname, plot_dir, extensions=extensions)
 
 # Plot timeseries for both initial guess and optimised control
 for gauge in gauges:
@@ -201,4 +188,4 @@ for i, gauge in enumerate(gauges):
 for i in range(len(gauges), N*N):
     axes[i//N, i % N].axis(False)
 fname = 'timeseries_optimised_{:d}'.format(level)
-savefig(fname, os.path.join(plot_dir, 'discrete'), extensions=extensions)
+savefig(fname, plot_dir, extensions=extensions)
