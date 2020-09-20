@@ -7,57 +7,54 @@ Compared with the single control parameter, this implies a massively overconstra
 [In practice the number of data points is smaller because we do not try to fit the gauge data in
 the period before the tsunami wave arrives.]
 
-This script allows for two modes, determined by the `real_data` argument.
-
-* `real_data == True`: gauge data are used.
-* `real_data == False`: a 'synthetic' tsunami is generated from an initial condition given by the
-  'optimal' scaling parameter is m = 5.
-
-In each case, we apply PDE constrained optimisation with an initial guess m = 10.
+A 'synthetic' tsunami is generated from an initial condition given by the 'optimal' scaling
+parameter is m = 5. We apply PDE constrained optimisation with an initial guess m = 10.
 
 In this script, we use the discrete adjoint approach to approximate the gradient of J w.r.t. m.
 """
 from thetis import *
 from firedrake_adjoint import *
 
-import argparse
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy
 import os
+import scipy
+import sys
 
-from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
+from adapt_utils.argparse import ArgumentParser
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
-from adapt_utils.norms import total_variation
 from adapt_utils.optimisation import StagnationError
 from adapt_utils.plotting import *
+from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
+
+
+class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
+    """
+    The subclass exists to pass the QoI as required.
+    """
+    def quantity_of_interest(self):
+        return self.op.J
 
 
 # --- Parse arguments
 
-parser = argparse.ArgumentParser()
+parser = ArgumentParser(plotting=True, shallow_water=True)
 
-# Model
+# Resolution
 parser.add_argument("-level", help="Mesh resolution level")
-parser.add_argument("-family", help="Finite element pair")
-parser.add_argument("-stabilisation", help="Stabilisation approach")
-parser.add_argument("-nonlinear", help="Toggle nonlinear model")
 
 # Inversion
+parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
+parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
-parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
-parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
-parser.add_argument("-real_data", help="Toggle whether to use real data")
-parser.add_argument("-smooth_timeseries", help="Toggle discrete or smoothed timeseries data")
+parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries data")
+parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
 
-# I/O and debugging
-parser.add_argument("-plot_only", help="Just plot parameter space, optimisation progress and timeseries")
-parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
-parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
-parser.add_argument("-debug", help="Toggle debugging")
-parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
+# Testing
+parser.add_argument("-end_time", help="End time of simulation (to shorten Taylor test)")
+parser.add_argument("-taylor_test", help="Toggle Taylor testing")
+
 
 # --- Set parameters
 
@@ -66,32 +63,61 @@ args = parser.parse_args()
 level = int(args.level or 0)
 recompute = bool(args.recompute_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
+gtol = float(args.gtol or 1.0e-08)
 plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)
+plot_png = bool(args.plot_png or False)
+plot_all = bool(args.plot_all or False)
 plot_only = bool(args.plot_only or False)
 if plot_only:
-    plot_pdf = True
+    plot_all = True
+if plot_all:
+    plot_pvd = plot_pdf = plot_png = True
+extensions = []
+if plot_pdf:
+    extensions.append('pdf')
+if plot_png:
+    extensions.append('png')
+plot_any = len(extensions) > 0
 if optimise or recompute:
     assert not plot_only
-real_data = bool(args.real_data or False)
-if args.optimal_control is not None:
-    assert not real_data
-use_smoothed_timeseries = bool(args.smooth_timeseries or False)
 timeseries_type = "timeseries"
-if use_smoothed_timeseries:
+if bool(args.continuous_timeseries or False):
     timeseries_type = "_".join([timeseries_type, "smooth"])
+
+# Do not attempt to plot in parallel
+if COMM_WORLD.size > 1 and plot_any:
+    print_output(120*'*' + "\nWARNING: Plotting turned off when running in parallel.\n" + 120*'*')
+    plot_pdf = plot_png = False
+
+# Setup output directories
+dirname = os.path.dirname(__file__)
+di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
+if args.extension is not None:
+    di = '_'.join([di, args.extension])
+di = create_directory(os.path.join(di, 'discrete'))
+plot_dir = create_directory(os.path.join(di, 'plots'))
+create_directory(os.path.join(plot_dir, 'discrete'))
+
+# Collect initialisation parameters
+nonlinear = bool(args.nonlinear or False)
+family = args.family or 'dg-cg'
+stabilisation = args.stabilisation or 'lax_friedrichs'
+if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
+    stabilisation = None
+taylor = bool(args.taylor_test or False)
 kwargs = {
     'level': level,
     'save_timeseries': True,
 
     # Spatial discretisation
-    'family': args.family or 'dg-cg',
-    'stabilisation': args.stabilisation,
+    'family': family,
+    'stabilisation': stabilisation,
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
     'control_parameters': [float(args.initial_guess or 7.5), ],
-    'synthetic': not real_data,
+    'synthetic': True,
     'qoi_scaling': 1.0,
     'nx': 1,
     'ny': 1,
@@ -100,100 +126,95 @@ kwargs = {
     'plot_pvd': False,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
+    'di': di,
 }
-nonlinear = bool(args.nonlinear or False)
 op = TohokuRadialBasisOptions(**kwargs)
+gauges = list(op.gauges.keys())
 
-# Plotting parameters
+# Plotting parameters  # TODO: Move elsewhere
 fontsize = 22
 fontsize_tick = 18
 plotting_kwargs = {'markevery': 5}
 
-# Setup output directories
-dirname = os.path.dirname(__file__)
-di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
-op.di = create_directory(os.path.join(di, 'discrete'))
-plot_dir = create_directory(os.path.join(di, 'plots'))
-create_directory(os.path.join(plot_dir, 'discrete'))
-
 # Synthetic run
-if not real_data:
-    if not plot_only:
-        print_output("Run forward to get 'data'...")
-        with stop_annotating():
-            op.control_parameters[0].assign(float(args.optimal_control or 5.0))
-            swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
-            swp.solve_forward()
-            for gauge in op.gauges:
-                op.gauges[gauge]["data"] = op.gauges[gauge][timeseries_type]
+try:
+    fnames = [os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level)) for gauge in gauges]
+    assert np.all([os.path.isfile(fname) for fname in fnames])
+    for fname, gauge in zip(fnames, gauges):
+        op.gauges[gauge]['data'] = np.load(fname)
+except AssertionError:
+    print_output("Run forward to get 'data'...")
+    with stop_annotating():
+        swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)
+        control_value = [float(args.optimal_control or 5.0), ]
+        op.assign_control_parameters(control_value, mesh=swp.meshes[0])
+        swp.solve_forward()
+    for gauge in gauges:
+        op.gauges[gauge]['data'] = op.gauges[gauge][timeseries_type]
+        fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
+        np.save(fname, op.gauges[gauge]['data'])
 
 # Explore parameter space
 n = 8
 op.save_timeseries = False
-control_values = np.linspace(0.5, 7.5, n)
+control_values = [[m, ] for m in np.linspace(0.5, 7.5, n)]
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
-recompute |= not os.path.exists(fname)
 msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
-with stop_annotating():
-    if recompute:
+if recompute:
+    with stop_annotating():
         func_values = np.zeros(n)
-        swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
+        swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)
         for i, m in enumerate(control_values):
-            op.control_parameters[0].assign(m)
-            swp.set_initial_condition()
+            op.assign_control_parameters(m, mesh=swp.meshes[0])
             swp.solve_forward()
-            func_values[i] = op.J
-            print_output(msg.format(i, m, func_values[i]))
-    else:
-        func_values = np.load(fname)
-        for i, m in enumerate(control_values):
-            print_output(msg.format(i, m, func_values[i]))
-    np.save(fname, func_values)
-    op.control_parameters[0].assign(float(args.initial_guess or 7.5))
+            func_values[i] = swp.quantity_of_interest()
+            print_output(msg.format(i, m[0], func_values[i]))
+        np.save(fname, func_values)
+    if plot_any:  # TODO: Move elsewhere
+        print_output("Explore parameter space...")
+        fig, axes = plt.subplots(figsize=(8, 8))
+        axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8, markevery=10)
+        axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
+        axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
+        plt.xticks(fontsize=fontsize_tick)
+        plt.yticks(fontsize=fontsize_tick)
+        axes.grid()
+        savefig('parameter_space_{:d}'.format(level), plot_dir, extensions=extensions)
 
-# Plot parameter space
-if recompute and plot_pdf:
-    print_output("Explore parameter space...")
-    fig, axes = plt.subplots(figsize=(8, 8))
-    axes.plot(control_values, func_values, '--x', linewidth=2, markersize=8, markevery=10)
-    axes.set_xlabel("Basis function coefficient", fontsize=fontsize)
-    axes.set_ylabel("Mean square error quantity of interest", fontsize=fontsize)
-    plt.xticks(fontsize=fontsize_tick)
-    plt.yticks(fontsize=fontsize_tick)
-    plt.tight_layout()
-    axes.grid()
-    plt.savefig(os.path.join(plot_dir, 'parameter_space_{:d}.pdf'.format(level)))
 
-# --- Optimisation
+# --- Tracing
 
-gauges = list(op.gauges.keys())
 if plot_only:
 
-    # Load timeseries
+    # Load timeseries  # TODO: Move elsewhere
     for gauge in gauges:
-        fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
-        op.gauges[gauge]['data'] = np.load(fname)
         fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
         op.gauges[gauge][timeseries_type] = np.load(fname)
 
 else:
-
-    # Solve the forward problem with some initial guess
     op.save_timeseries = True
+    swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)
+
+    # Set initial guess
+    print_output("Clearing tape...")
+    get_working_tape().clear_tape()
+    print_output("Setting initial guess...")
+    control_value = [float(args.initial_guess or 7.5), ]
+    op.assign_control_parameters(control_value, mesh=swp.meshes[0])
+    control = Control(op.control_parameters[0])
+
+    # Solve the forward problem
     print_output("Run forward to get timeseries...")
-    swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
     swp.solve_forward()
-    J = op.J
+    J = swp.quantity_of_interest()
 
     # Save timeseries
     for gauge in gauges:
-        fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
-        np.save(fname, op.gauges[gauge]['data'])
         fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
         np.save(fname, op.gauges[gauge][timeseries_type])
 
-# Plot timeseries
-if plot_pdf:
+# Plot timeseries  # TODO: Move elsewhere
+if plot_any:
     N = int(np.ceil(np.sqrt(len(gauges))))
     fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
     for i, gauge in enumerate(gauges):
@@ -209,8 +230,60 @@ if plot_pdf:
         ax.grid()
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
-    plt.tight_layout()
-    plt.savefig(os.path.join(plot_dir, 'timeseries_{:d}.pdf'.format(level)))
+    savefig('timeseries_{:d}'.format(level), plot_dir, extensions=extensions)
+
+
+# --- Taylor test
+
+if taylor:
+    Jhat = ReducedFunctional(J, control)
+
+    def get_control(mode):
+        """
+        Get control parameter values assuming one of three modes:
+
+          'init' - control parameter is set to the initial guess;
+          'random' - control parameter is set randomly with a Normal distribution;
+          'optimised' - optimal control parameter from a previous run is used.
+        """
+        c = Function(op.control_parameters[0])
+        if mode == 'init':
+            pass
+        elif mode == 'random':
+            c.dat.data[0] += np.random.random() - 0.5
+        elif mode == 'optimised':
+            fname = os.path.join(di, 'optimisation_progress_ctrl_{:d}.npy'.format(level))
+            try:
+                c_dat = np.load(fname)[-1]
+            except FileNotFoundError:
+                msg = "Skipping Taylor test at optimised control because no data found."
+                print_output(msg)
+                sys.exit(0)
+            c.dat.data[0] = c_dat[0]
+        else:
+            raise ValueError("Taylor test mode '{:s}' not recognised.".format(mode))
+        return c
+
+    # Ensure consistency of tests
+    np.random.seed(0)
+
+    # Random search direction
+    dc = Function(op.control_parameters[0])
+    dc.dat.data[0] = np.random.random() - 0.5
+
+    # Run tests
+    for mode in ("init", "random", "optimised"):
+        print_output("Taylor test '{:s}' begin...".format(mode))
+        minconv = taylor_test(Jhat, get_control(mode), dc)
+        if minconv > 1.90:
+            print_output("Taylor test '{:s}' passed!".format(mode))
+        else:
+            msg = "Taylor test '{:s}' failed! Convergence ratio {:.2f} < 2."
+            raise ConvergenceError(msg.format(mode, minconv))
+    sys.exit(0)
+
+
+# --- Optimisation
 
 fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) and not optimise:
@@ -249,7 +322,7 @@ else:
     # Run BFGS optimisation
     opt_kwargs = {
         'maxiter': 100,
-        'gtol': 1.0e-08,
+        'gtol': gtol,
     }
     print_output("Optimisation begin...")
     Jhat = ReducedFunctional(J, Control(op.control_parameters[0]), derivative_cb_post=derivative_cb_post)
@@ -259,7 +332,10 @@ else:
         optimised_value = control_values_opt[-1]
         print_output("StagnationError: Stagnation of objective functional")
 
-if plot_pdf:
+if plot_any:  # TODO: Move elsewhere
+    func_values = np.load(fname)
+    for i, m in enumerate(control_values):
+        print_output(msg.format(i, m[0], func_values[i]))
 
     # Fit a quadratic to the first three points and find its root
     assert len(control_values[::3]) == 3
@@ -291,14 +367,14 @@ if plot_pdf:
     plt.xticks(fontsize=fontsize_tick)
     plt.yticks(fontsize=fontsize_tick)
     plt.xlim([0, 8])
-    plt.tight_layout()
     axes.grid()
     plt.legend(fontsize=fontsize)
     axes.annotate(
         r'$m = {:.4f}$'.format(control_values_opt[-1]),
         xy=(q_min+2, func_values_opt[-1]), color='C1', fontsize=fontsize
     )
-    plt.savefig(os.path.join(plot_dir, 'discrete', 'optimisation_progress_{:d}.pdf'.format(level)))
+    fname = 'optimisation_progress_{:d}'.format(level)
+    savefig(os.path.join(plot_dir, 'discrete'), extensions=extensions)
 
 # Create a new parameter class
 kwargs['control_parameters'] = [optimised_value, ]
@@ -309,22 +385,14 @@ if plot_only:
 
     # Load timeseries
     for gauge in gauges:
-        fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
+        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
         op_opt.gauges[gauge][timeseries_type] = np.load(fname)
 
 else:
-    tape = get_working_tape()
-    tape.clear_tape()
-
-    class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
-        """The subclass exists to pass the QoI as required."""
-        def quantity_of_interest(self):
-            return self.op.J
+    get_working_tape().clear_tape()
 
     # Run forward again so that we can compare timeseries
-    gauges = list(op_opt.gauges.keys())
-    for gauge in gauges:
-        op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
+    op_opt.gauges[gauge]["data"] = op.gauges[gauge]["data"]
     print_output("Run to plot optimised timeseries...")
     swp = DiscreteAdjointTsunamiProblem(op_opt, nonlinear=nonlinear, print_progress=False)
     swp.solve_forward()
@@ -332,30 +400,17 @@ else:
 
     # Save timeseries
     for gauge in gauges:
-        fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level)]))
+        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
         np.save(fname, op_opt.gauges[gauge][timeseries_type])
-
-    # Compare total variation
-    msg = "total variation for gauge {:s}: before {:.4e}  after {:.4e} reduction  {:.1f}%"
-    print_output("\nContinuous form QoI:")
-    for gauge in op.gauges:
-        tv = total_variation(op.gauges[gauge]['diff_smooth'])
-        tv_opt = total_variation(op_opt.gauges[gauge]['diff_smooth'])
-        print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
-    print_output("\nDiscrete form QoI:")
-    for gauge in op.gauges:
-        tv = total_variation(op.gauges[gauge]['diff'])
-        tv_opt = total_variation(op_opt.gauges[gauge]['diff'])
-        print_output(msg.format(gauge, tv, tv_opt, 100*(1-tv_opt/tv)))
 
     # Solve adjoint problem and plot solution fields
     if plot_pvd:
-        swp.compute_gradient(Control(op_opt.control_parameters[0]))
+        swp.solve_adjoint()
         swp.get_solve_blocks()
         swp.save_adjoint_trajectory()
 
 # Plot timeseries for both initial guess and optimised control
-if plot_pdf:
+if plot_any:  # TODO: Move elsewhere
     fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
     for i, gauge in enumerate(gauges):
         T = np.array(op.gauges[gauge]['times'])/60
@@ -371,5 +426,5 @@ if plot_pdf:
         ax.grid()
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
-    plt.tight_layout()
-    plt.savefig(os.path.join(plot_dir, 'discrete', 'timeseries_optimised_{:d}.pdf'.format(level)))
+    fname = 'timeseries_optimised_{:d}'.format(level)
+    savefig(fname, os.path.join(plot_dir, 'discrete'), extensions=extensions)

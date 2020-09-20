@@ -1,3 +1,4 @@
+# TODO: doc
 from thetis import *
 from firedrake_adjoint import *
 
@@ -124,7 +125,7 @@ if basis == '1d':
     kwargs['nx'] = 1
     kwargs['ny'] = 1
     options_constructor = TohokuRadialBasisOptions
-    gaussian_scaling = float(args.gaussian_scaling or 10.0)
+    gaussian_scaling = float(args.gaussian_scaling or 7.5)
 elif basis == 'box':
     options_constructor = TohokuBoxBasisOptions
 elif basis == 'radial':
@@ -191,25 +192,23 @@ if plot_only:
 # --- Tracing
 
 # Solve the forward problem with initial guess
-op.save_timeseries = not taylor
 op = options_constructor(**kwargs)
-print_output("Run forward to get timeseries...")
 swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Setting initial guess...")
 op.assign_control_parameters(kwargs['control_parameters'], swp.meshes[0])
 controls = [Control(m) for m in op.control_parameters]
+print_output("Run forward to get timeseries...")
 swp.solve_forward()
 J = swp.quantity_of_interest()
 
 # Save timeseries
-if op.save_timeseries:
-    for gauge in gauges:
-        fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
-        np.save(fname, op.gauges[gauge]['data'])
-        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
-        np.save(fname, op.gauges[gauge][timeseries_type])
+for gauge in gauges:
+    fname = os.path.join(di, '_'.join([gauge, 'data', str(level)]))
+    np.save(fname, op.gauges[gauge]['data'])
+    fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
+    np.save(fname, op.gauges[gauge][timeseries_type])
 
 
 # --- Taylor test
@@ -235,8 +234,12 @@ if taylor:
             fname = os.path.join(di, 'optimisation_progress_ctrl_{:d}.npy'.format(level))
             try:
                 c_dat = np.load(fname)[-1]
-            except IOError:
-                print_output("Skipping Taylor test at optimised controls because no data found.")
+                reason = "data of wrong length ({:s} vs. {:s})".format(len(c_dat), len(c))
+                assert len(c_dat) == len(c)
+                reason = "no data found"
+            except FileNotFoundError:
+                msg = "Skipping Taylor test at optimised controls because {:s}.".format(reason)
+                print_output(msg)
                 sys.exit(0)
             for i, ci in enumerate(c):
                 ci.dat.data[0] = c_dat[i]
@@ -308,10 +311,9 @@ swp.solve_forward()
 J = swp.quantity_of_interest()
 
 # Save timeseries to file
-if op.save_timeseries:
-    for gauge in gauges:
-        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
-        np.save(fname, op.gauges[gauge][timeseries_type])
+for gauge in gauges:
+    fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level)]))
+    np.save(fname, op.gauges[gauge][timeseries_type])
 
 # Solve adjoint problem and plot solution fields
 if plot_pvd:

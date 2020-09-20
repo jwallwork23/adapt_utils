@@ -245,7 +245,7 @@ class TohokuInversionOptions(TohokuOptions):
         # Gauge classifications
         self.near_field_pressure_gauges = {
             "gauges": ("P02", "P06"),
-            "arrival_time": 0.0,
+            "arrival_time": 0*60.0,
             "departure_time": 60*60.0,
             "weight": Constant(1.0),
             "sample": 60,
