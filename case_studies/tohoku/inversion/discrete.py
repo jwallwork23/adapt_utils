@@ -1,4 +1,3 @@
-# TODO: doc
 from thetis import *
 from firedrake_adjoint import *
 
@@ -19,24 +18,19 @@ from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 # --- Parse arguments
 
-parser = ArgumentParser(basis=True, plotting=True, shallow_water=True)
-
-# Resolution
-parser.add_argument("-level", help="Mesh resolution level")
-
-# Inversion
-parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
+parser = ArgumentParser(
+    prog="discrete",
+    description="TODO",  # TODO
+    basis=True,
+    optimisation=True,
+    plotting=True,
+    shallow_water=True,
+)
 parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data")
-parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
-parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
 parser.add_argument("-zero_initial_guess", help="""
     Toggle between a zero initial guess and scaled Gaussian.
     """)
 parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial guess (default 6.0)")
-
-# Testing
-parser.add_argument("-end_time", help="End time of simulation (to shorten Taylor test)")
-parser.add_argument("-taylor_test", help="Toggle Taylor testing")
 
 
 # --- Set parameters

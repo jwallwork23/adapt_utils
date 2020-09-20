@@ -1,17 +1,3 @@
-"""
-Invert for an initial condition defined over a (Gaussian) radial basis with a single basis function.
-If we have N_g gauges and N_T timesteps then we have N_g*N_T data points we would like to fit using
-a least squares fit. If N_g = 15 and N_T = 288 (as below) then we have 4320 data points.
-Compared with the single control parameter, this implies a massively overconstrained problem!
-
-[In practice the number of data points is smaller because we do not try to fit the gauge data in
-the period before the tsunami wave arrives.]
-
-A 'synthetic' tsunami is generated from an initial condition given by the 'optimal' scaling
-parameter is m = 5. We apply PDE constrained optimisation with an initial guess m = 10.
-
-In this script, we use the discrete adjoint approach to approximate the gradient of J w.r.t. m.
-"""
 from thetis import *
 from firedrake_adjoint import *
 
@@ -27,23 +13,29 @@ from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
 # --- Parse arguments
 
-parser = ArgumentParser(adjoint=True, shallow_water=True)
+parser = ArgumentParser(
+    prog="invert",
+    description="""
+            Invert for an initial condition defined over a (Gaussian) radial basis with a single
+            basis function. If we have N_g gauges and N_T timesteps then we have N_g*N_T data
+            points we would like to fit using a least squares fit. Compared with the single control
+            parameter, this implies a massively overconstrained problem!
 
-# Resolution
-parser.add_argument("-level", help="Mesh resolution level")
+            A 'synthetic' tsunami is generated from an initial condition given by the 'optimal'
+            scaling parameter is m = 5. We apply PDE constrained optimisation with an initial guess
+            m = 10.
 
-# Inversion
-parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
+            The gradient of J w.r.t. m is computed using either a discrete or continuous adjoint
+            approach.
+        """,
+    adjoint=True,
+    optimisation=True,
+    shallow_water=True,
+)
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
-parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries data")
-parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
 parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
-
-# Testing
-parser.add_argument("-end_time", help="End time of simulation (to shorten Taylor test)")
-parser.add_argument("-taylor_test", help="Toggle Taylor testing")
 
 
 # --- Set parameters

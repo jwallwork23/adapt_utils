@@ -1,4 +1,3 @@
-# TODO: doc
 from thetis import COMM_WORLD, create_directory, print_output
 
 import matplotlib.pyplot as plt
@@ -14,7 +13,17 @@ from adapt_utils.plotting import *
 
 # --- Parse arguments
 
-parser = ArgumentParser(adjoint=True, plotting=True)
+parser = ArgumentParser(
+    prog="run_convergence",
+    description="""
+        Given tsunami source inversion run output, generate a variety of plots:
+          (a) timeseries due to initial guess vs. synthetic data;
+          (b) progress of the QoI during the optimisation, along with the approximate gradients;
+          (c) timeseries due to converged control parameters vs. synthetic data.
+        """,
+    adjoint=True,
+    plotting=True,
+)
 parser.add_argument("-level", help="Mesh resolution level")
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries data")
 parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
@@ -168,7 +177,7 @@ if use_regularisation:
 # Plot progress of optimisation routine
 fig, axes = plt.subplots(figsize=(8, 8))
 params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'markevery': 10}
-params['label'] = r'$\alpha=0.00$' if use_regularisation else  r'Parameter space'
+params['label'] = r'$\alpha=0.00$' if use_regularisation else r'Parameter space'
 x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
 axes.plot(x, q(x), '--x', **params)
 params = {'markersize': 14, 'color': 'C0', 'label': r'$m^\star = {:.4f}$'.format(q_min)}

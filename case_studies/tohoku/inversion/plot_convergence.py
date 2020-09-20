@@ -24,7 +24,8 @@ parser = ArgumentParser(
         In addition, the script computes mean square errors from the stored timeseries data.
         """,
     basis=True,
-    plotting=True)
+    plotting=True,
+)
 parser.add_argument("-levels", help="Number of mesh resolution levels considered (default 3)")
 parser.add_argument("-noisy_data", help="""
     Toggle whether to consider timeseries data which has *not* been sampled (default False).

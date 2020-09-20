@@ -15,6 +15,7 @@ class ArgumentParser(argparse.ArgumentParser):
             'plotting': kwargs.pop('plotting', False),
             'shallow_water': kwargs.pop('shallow_water', False),
         }
+        self.kwargs['equation'] = 'shallow_water' in self.kwargs  # TODO: tracer, etc.
         super(ArgumentParser, self).__init__(*args, **kwargs)
         for arg in self.kwargs:
             if self.kwargs[arg]:
@@ -58,6 +59,18 @@ class ArgumentParser(argparse.ArgumentParser):
         if basis not in ('box', 'radial', 'okada'):
             raise ValueError("Basis type '{:s}' not recognised.".format(basis))
         return basis
+
+    def add_equation_args(self):
+        parser.add_argument("-end_time", help="End time of simulation")
+        parser.add_argument("-level", help="Mesh resolution level")
+
+    def add_optimisation_args(self):
+        parser.add_argument("-continuous_timeseries", help="""
+            Toggle discrete or continuous timeseries data
+            """)
+        parser.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
+        parser.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
+        parser.add_argument("-taylor_test", help="Toggle Taylor testing")
 
     def add_plotting_args(self):
         self.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
