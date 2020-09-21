@@ -48,9 +48,9 @@ recompute = bool(args.recompute_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
 gtol = float(args.gtol or 1.0e-04)
 plot_pvd = bool(args.plot_pvd or False)
-timeseries_type = 'timeseries'
+timeseries = 'timeseries'
 if bool(args.continuous_timeseries or False):
-    timeseries_type = '_'.join([timeseries_type, 'smooth'])
+    timeseries = '_'.join([timeseries, 'smooth'])
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
@@ -100,11 +100,14 @@ op = TohokuRadialBasisOptions(**kwargs)
 op.dirty_cache = bool(args.dirty_cache or False)
 gauges = list(op.gauges.keys())
 
+
 # --- Synthetic run
 
+# Solve the forward problem / load data
+fnames = [os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level)) for gauge in gauges]
 try:
-    fnames = [os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level)) for gauge in gauges]
     assert np.all([os.path.isfile(fname) for fname in fnames])
+    print_output("Loading timeseries data...")
     for fname, gauge in zip(fnames, gauges):
         op.gauges[gauge]['data'] = np.load(fname)
 except AssertionError:
@@ -114,9 +117,8 @@ except AssertionError:
         control_value = [float(args.optimal_control or 5.0)]
         op.assign_control_parameters(control_value, mesh=swp.meshes[0])
         swp.solve_forward()
-    for gauge in gauges:
-        op.gauges[gauge]['data'] = op.gauges[gauge][timeseries_type]
-        fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
+    for gauge, fname in zip(gauges, fnames):
+        op.gauges[gauge]['data'] = op.gauges[gauge][timeseries]
         np.save(fname, op.gauges[gauge]['data'])
 
 
@@ -166,44 +168,60 @@ control_value = [float(args.initial_guess or 7.5)]
 op.assign_control_parameters(control_value, mesh=swp.meshes[0])
 control = Control(op.control_parameters[0])
 
-# Solve the forward problem
-print_output("Run forward to get timeseries...")
-swp.solve_forward()
-J = swp.quantity_of_interest()
-
-# Save timeseries
-for gauge in gauges:
-    fname = os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries_type, level))
-    np.save(fname, op.gauges[gauge][timeseries_type])
+# Solve the forward problem / load data
+fname = '{:s}_{:s}_{:d}.npy'
+fnames = [os.path.join(di, fname.format(gauge, timeseries, level)) for gauge in gauges]
+try:
+    assert args.adjoint == 'continuous'
+    assert np.all([os.path.isfile(fname) for fname in fnames])
+    print_output("Loading initial timeseries...")
+    for fname, gauge in zip(fnames, gauges):
+        op.gauges[gauge][timeseries] = np.load(fname)
+except AssertionError:
+    print_output("Run forward to get initial timeseries...")
+    swp.solve_forward()
+    J = swp.quantity_of_interest()
+    for gauge, fname in zip(gauges, fnames):
+        np.save(fname, op.gauges[gauge][timeseries])
 di = create_directory(os.path.join(di, args.adjoint))
 
 # Define reduced functional and gradient functions
 if args.adjoint == 'discrete':
     Jhat = ReducedFunctional(J, control)
+    gradient = None
 else:
-    swp.checkpointing = True
 
     def Jhat(m):
         """
         Reduced functional for continuous adjoint inversion.
         """
-        op.assign_control_parameters(m)
-        swp.solve_forward()
+        try:
+            op.assign_control_parameters(m)
+        except Exception:
+            op.assign_control_parameters([m])
+        kwargs = {}
+        if swp.checkpointing:
+            kwargs['checkpointing_mode'] = 'disk'
+        swp.solve_forward(**kwargs)
         return swp.quantity_of_interest()
 
     def gradient(m):
         """
         Gradient of reduced functional for continuous adjoint inversion.
         """
+        swp.checkpointing = True
         J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
-        swp.solve_adjoint()
+        swp.solve_adjoint(checkpointing_mode='disk')
         g = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradients[0]
         msg = "control = {:15.8e}  functional = {:15.8e}  gradient = {:15.8e}"
-        print_output(msg.format(m[0], J, g))
+        try:
+            print_output(msg.format(m[0], J, g))
+        except Exception:
+            print_output(msg.format(m.dat.data[0], J, g))
+        swp.checkpointing = False
         return np.array([g])
-
 
 # --- Taylor test
 
@@ -221,6 +239,7 @@ if taylor:
         if mode == 'init':
             pass
         elif mode == 'random':
+            np.random.seed(0)  # Ensure consistency of tests
             c.dat.data[0] += np.random.random() - 0.5
         elif mode == 'optimised':
             fname = os.path.join(di, 'optimisation_progress_ctrl_{:d}.npy'.format(level))
@@ -235,9 +254,6 @@ if taylor:
             raise ValueError("Taylor test mode '{:s}' not recognised.".format(mode))
         return c
 
-    # Ensure consistency of tests
-    np.random.seed(0)
-
     # Increasing search direction of length 0.1
     dc = Function(op.control_parameters[0])
     dc.assign(0.1)
@@ -245,7 +261,9 @@ if taylor:
     # Run tests
     for mode in ("init", "random", "optimised"):
         print_output("Taylor test '{:s}' begin...".format(mode))
-        minconv = taylor_test(Jhat, get_control(mode), dc)
+        c = get_control(mode)
+        dJdm = None if args.adjoint == 'discrete' else gradient(c)
+        minconv = taylor_test(Jhat, c, dc, dJdm=dJdm)
         if minconv > 1.90:
             print_output("Taylor test '{:s}' passed!".format(mode))
         else:
@@ -344,8 +362,8 @@ swp.solve_forward()
 
 # Save timeseries to file
 for gauge in gauges:
-    fname = os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries_type, level))
-    np.save(fname, op.gauges[gauge][timeseries_type])
+    fname = os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries, level))
+    np.save(fname, op.gauges[gauge][timeseries])
 
 # Solve adjoint problem and plot solution fields
 if plot_pvd:
