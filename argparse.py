@@ -94,10 +94,11 @@ class ArgumentParser(argparse.ArgumentParser):
         """
         Add parameters to do with optimisation.
         """
+        self.add_argument("-checkpointing_mode", help="Checkpointing mode, from {'memory', 'disk'}.")
         self.add_argument("-continuous_timeseries", help="""
             Toggle discrete or continuous timeseries data
             """)
-        self.add_argument("-gtol", help="Gradient tolerance (default 1.0e-08)")
+        self.add_argument("-gtol", help="Gradient tolerance")
         self.add_argument("-rerun_optimisation", help="Rerun optimisation routine")
         self.add_argument("-taylor_test", help="Toggle Taylor testing")
 

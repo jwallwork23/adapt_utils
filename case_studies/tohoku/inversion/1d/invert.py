@@ -72,6 +72,7 @@ stabilisation = args.stabilisation or 'lax_friedrichs'
 if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
 taylor = bool(args.taylor_test or False)
+chk = args.checkpointing_mode or 'disk'
 kwargs = {
     'level': level,
     'save_timeseries': True,
@@ -201,19 +202,15 @@ else:
             op.assign_control_parameters(m)
         except Exception:
             op.assign_control_parameters([m])
-        kwargs = {}
-        if swp.checkpointing:
-            kwargs['checkpointing_mode'] = 'disk'
-        swp.solve_forward(**kwargs)
+        swp.solve_forward(checkpointing_mode=chk)
         return swp.quantity_of_interest()
 
     def gradient(m):
         """
         Gradient of reduced functional for continuous adjoint inversion.
         """
-        swp.checkpointing = True
         J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
-        swp.solve_adjoint(checkpointing_mode='disk')
+        swp.solve_adjoint(checkpointing_mode=chk)
         g = assemble(inner(op.basis_function, swp.adj_solution)*dx)  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradients[0]
@@ -222,7 +219,6 @@ else:
             print_output(msg.format(m[0], J, g))
         except Exception:
             print_output(msg.format(m.dat.data[0], J, g))
-        swp.checkpointing = False
         return np.array([g])
 
 # --- Taylor test
@@ -264,7 +260,9 @@ if taylor:
     for mode in ("init", "random", "optimised"):
         print_output("Taylor test '{:s}' begin...".format(mode))
         c = get_control(mode)
+        swp.checkpointing = True
         dJdm = None if args.adjoint == 'discrete' else gradient(c)
+        swp.checkpointing = False
         minconv = taylor_test(Jhat, c, dc, dJdm=dJdm)
         if minconv > 1.90:
             print_output("Taylor test '{:s}' passed!".format(mode))
@@ -280,17 +278,7 @@ fname = os.path.join(di, 'optimisation_progress_{:s}')
 if use_regularisation:
     fname = '_'.join([fname, 'reg'])
 fname += '_{:d}.npy'.format(level)
-if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')]) and not optimise:
-
-    # Load trajectory
-    control_values_opt = np.load(fname.format('ctrl', level))
-    func_values_opt = np.load(fname.format('func', level))
-    gradient_values_opt = np.load(fname.format('grad', level))
-    optimised_value = np.array([control_values_opt[-1]])
-
-else:
-
-    # Arrays to log progress
+if optimise:
     control_values_opt = []
     func_values_opt = []
     gradient_values_opt = []
@@ -305,7 +293,7 @@ else:
             """
             control = m.dat.data[0]
             djdm = dj.dat.data[0]
-            msg = "control {:15.6e}  functional {:15.6e}  gradient {:15.8e}"
+            msg = "control {:15.8e}  functional {:15.8e}  gradient {:15.8e}"
             print_output(msg.format(control, j, djdm))
 
             # Save progress to NumPy arrays on-the-fly
@@ -319,8 +307,8 @@ else:
         # Run BFGS optimisation
         Jhat_save_data = ReducedFunctional(J, control, derivative_cb_post=derivative_cb_post)
         optimised_value = minimize(Jhat_save_data, method='BFGS', options=opt_kwargs).dat.data
-
     else:
+        swp.checkpointing = True
 
         def Jhat_save_data(m):
             """
@@ -348,6 +336,8 @@ else:
         opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
         m_init = op.control_parameter.dat.data
         optimised_value = scipy.optimize.fmin_bfgs(Jhat_save_data, m_init, **opt_kwargs)
+else:
+    optimised_value = np.array([np.load(fname.format('ctrl'))[-1]])
 
 
 # --- Run with optimised controls

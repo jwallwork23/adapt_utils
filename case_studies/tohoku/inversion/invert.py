@@ -4,7 +4,7 @@ from firedrake_adjoint import *
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-# import scipy
+import scipy
 import sys
 
 from adapt_utils.argparse import ArgumentParser
@@ -48,20 +48,18 @@ parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial gues
 # --- Set parameters
 
 # Parsed arguments
-args = parser.parse_args()
 basis = args.basis
 level = int(args.level or 0)
 optimise = bool(args.rerun_optimisation or False)
 gtol = float(args.gtol or 1.0e-04)
 plot_pvd = bool(args.plot_pvd or False)
 plot = parser.plotting_args()
-timeseries_type = 'timeseries'
+timeseries = 'timeseries'
 if bool(args.continuous_timeseries or False):
-    timeseries_type = '_'.join([timeseries_type, 'smooth'])
+    timeseries = '_'.join([timeseries, 'smooth'])
 if args.adjoint == 'continuous':
     problem_constructor = AdaptiveProblem
     stop_annotating()
-    raise NotImplementedError  # TODO
 elif args.adjoint == 'discrete':
     problem_constructor = AdaptiveDiscreteAdjointProblem
 else:
@@ -89,6 +87,7 @@ if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
 zero_init = bool(args.zero_initial_guess or False)
 taylor = bool(args.taylor_test or False)
+chk = args.checkpointing_mode or 'disk'
 kwargs = {
     'level': level,
     'save_timeseries': True,
@@ -188,7 +187,6 @@ if plot.only:
 # Set initial guess
 op = options_constructor(**kwargs)
 swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
-print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Setting initial guess...")
 op.assign_control_parameters(kwargs['control_parameters'], swp.meshes[0])
@@ -203,14 +201,45 @@ J = swp.quantity_of_interest()
 for gauge in gauges:
     fname = os.path.join(di, '{:s}_data_{:d}'.format(gauge, level))
     np.save(fname, op.gauges[gauge]['data'])
-    fname = os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries_type, level))
-    np.save(fname, op.gauges[gauge][timeseries_type])
+    fname = os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries, level))
+    np.save(fname, op.gauges[gauge][timeseries])
+
+# Define reduced functional and gradient functions
+if args.adjoint == 'discrete':
+    Jhat = ReducedFunctional(J, controls)
+    gradient = None
+else:
+
+    def Jhat(m):
+        """
+        Reduced functional for continuous adjoint inversion.
+        """
+        try:
+            op.assign_control_parameters(m)
+        except Exception:
+            op.assign_control_parameters([m])
+        swp.solve_forward(checkpointing_mode=chk)
+        return swp.quantity_of_interest()
+
+    def gradient(m):
+        """
+        Gradient of reduced functional for continuous adjoint inversion.
+        """
+        J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
+        swp.solve_adjoint(checkpointing_mode=chk)
+        g = np.array([
+            assemble(inner(bf, adj)*dx) for bf, adj in zip(op.basis_functions, swp.adj_solutions)
+        ])  # TODO: No minus sign?
+        if use_regularisation:
+            g += op.regularisation_term_gradient
+        msg = " functional = {:15.8e}  gradient = {:15.8e}"
+        print_output(msg.format(J, vecnorm(g, order=np.Inf)))
+        return g
 
 
 # --- Taylor test
 
 if taylor:
-    Jhat = ReducedFunctional(J, controls)
 
     def get_controls(mode):
         """
@@ -254,7 +283,11 @@ if taylor:
     # Run tests
     for mode in ("init", "random", "optimised"):
         print_output("Taylor test '{:s}' begin...".format(mode))
-        minconv = taylor_test(Jhat, get_controls(mode), dc)
+        c = get_controls(mode)
+        swp.checkpointing = True
+        dJdm = None if args.adjoint == 'discrete' else gradient(c)
+        swp.checkpointing = False
+        minconv = taylor_test(Jhat, c, dc)
         if minconv > 1.90:
             print_output("Taylor test '{:s}' passed!".format(mode))
         else:
@@ -265,32 +298,66 @@ if taylor:
 
 # --- Optimisation
 
-# Run optimisation / load optimised controls
 fname = os.path.join(di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if optimise:
     control_values_opt = []
     func_values_opt = []
     gradient_values_opt = []
 
-    def derivative_cb_post(j, dj, m):
-        control = [mi.dat.data[0] for mi in m]
-        djdm = [dji.dat.data[0] for dji in dj]
-        print_output("functional {:.8e}  gradient {:.8e}".format(j, vecnorm(djdm, order=np.Inf)))
-
-        # Save progress to NumPy arrays on-the-fly
-        control_values_opt.append(control)
-        func_values_opt.append(j)
-        gradient_values_opt.append(djdm)
-        np.save(fname.format('ctrl'), np.array(control_values_opt))
-        np.save(fname.format('func'), np.array(func_values_opt))
-        np.save(fname.format('grad'), np.array(gradient_values_opt))
-
-    # Run BFGS optimisation
     opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
     print_output("Optimisation begin...")
-    Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
-    optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs)
-    optimised_value = [m.dat.data[0] for m in optimised_value]
+    if args.adjoint == 'discrete':
+
+        def derivative_cb_post(j, dj, m):
+            """
+            Callback for saving progress data to file during discrete adjoint inversion.
+            """
+            control = [mi.dat.data[0] for mi in m]
+            djdm = [dji.dat.data[0] for dji in dj]
+            msg = "functional {:15.8e}  gradient {:15.8e}"
+            print_output(msg.format(j, vecnorm(djdm, order=np.Inf)))
+
+            # Save progress to NumPy arrays on-the-fly
+            control_values_opt.append(control)
+            func_values_opt.append(j)
+            gradient_values_opt.append(djdm)
+            np.save(fname.format('ctrl'), np.array(control_values_opt))
+            np.save(fname.format('func'), np.array(func_values_opt))
+            np.save(fname.format('grad'), np.array(gradient_values_opt))
+
+        # Run BFGS optimisation
+        Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
+        optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs)
+        optimised_value = [m.dat.data[0] for m in optimised_value]
+    else:
+        swp.checkpointing = True
+
+        def Jhat_save_data(m):
+            """
+            Reduced functional for the continuous adjoint approach which saves progress data to
+            file during the inversion.
+            """
+            J = Jhat(m)
+            control_values_opt.append(m)
+            np.save(fname.format('ctrl'), np.array(control_values_opt))
+            func_values_opt.append(J)
+            np.save(fname.format('func'), np.array(func_values_opt))
+            return J
+
+        def gradient_save_data(m):
+            """
+            Gradient of the reduced functional for the continuous adjoint approach which saves
+            progress data to file during the inversion.
+            """
+            g = gradient(m)
+            gradient_values_opt.append(g)
+            np.save(fname.format('grad'), np.array(gradient_values_opt))
+            return g
+
+        opt_kwargs['fprime'] = gradient_save_data
+        opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
+        m_init = op.control_parameter.dat.data
+        optimised_value = scipy.optimize.fmin_bfgs(Jhat_save_data, m_init, **opt_kwargs)
 else:
     optimised_value = np.load(fname.format('ctrl'))[-1]
 
@@ -299,19 +366,18 @@ else:
 
 # Run forward again using the optimised control parameters
 op.plot_pvd = plot_pvd
+op.di = di
 swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
-print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Assigning optimised control parameters...")
 op.assign_control_parameters(optimised_value)
 print_output("Run to plot optimised timeseries...")
 swp.solve_forward()
-J = swp.quantity_of_interest()
 
 # Save timeseries to file
 for gauge in gauges:
-    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
-    np.save(fname, op.gauges[gauge][timeseries_type])
+    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries, level))
+    np.save(fname, op.gauges[gauge][timeseries])
 
 # Solve adjoint problem and plot solution fields
 if plot_pvd:
