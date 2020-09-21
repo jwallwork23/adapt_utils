@@ -143,7 +143,7 @@ control_values = np.linspace(0.5, 7.5, n)
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
 if recompute or not os.path.isfile(fname):
     msg = "({:2d}, {:2d}): control values ({:.4e}, {:.4e})  functional value {:.4e}"
-    func_values = np.zeros(n, n)
+    func_values = np.zeros((n, n))
     with stop_annotating():
         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
         for i, m1 in enumerate(control_values):
@@ -151,23 +151,23 @@ if recompute or not os.path.isfile(fname):
                 op.assign_control_parameters([m1, m2], mesh=swp.meshes[0])
                 swp.solve_forward()
                 func_values[i, j] = swp.quantity_of_interest()
-                print_output(msg.format(i, j, m1, m2, func_values[i]))
+                print_output(msg.format(i, j, m1, m2, func_values[i, j]))
     np.save(fname, func_values)
 
-# TODO
-# # Regularised parameter space
-# fname = os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level))
-# if use_regularisation and (recompute or os.path.isfile(fname)):
-#     msg = "{:2d}: control value {:.4e}  regularised functional value {:.4e}"
-#     func_values_reg = np.zeros(n)
-#     with stop_annotating():
-#         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
-#         for i, m in enumerate(control_values):
-#             op.assign_control_parameters(m, mesh=swp.meshes[0])
-#             swp.solve_forward()
-#             func_values_reg[i] = swp.quantity_of_interest()
-#             print_output(msg.format(i, m[0], func_values_reg[i]))
-#     np.save(fname, func_values_reg)
+# Regularised parameter space
+fname = os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level))
+if use_regularisation and (recompute or os.path.isfile(fname)):
+    msg = "({:2d}, {:2d}): control value ({:.4e}, {:.4e})  regularised functional value {:.4e}"
+    func_values_reg = np.zeros((n, n))
+    with stop_annotating():
+        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
+        for i, m1 in enumerate(control_values):
+            for j, m2 in enumerate(control_values):
+                op.assign_control_parameters([m1, m2], mesh=swp.meshes[0])
+                swp.solve_forward()
+                func_values_reg[i, j] = swp.quantity_of_interest()
+                print_output(msg.format(i, j, m1, m2, func_values_reg[i, j]))
+    np.save(fname, func_values_reg)
 
 
 # --- Tracing
