@@ -46,7 +46,7 @@ args = parser.parse_args()
 level = int(args.level or 0)
 recompute = bool(args.recompute_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
-gtol = float(args.gtol or 1.0e-08)
+gtol = float(args.gtol or 1.0e-04)
 plot_pvd = bool(args.plot_pvd or False)
 timeseries_type = 'timeseries'
 if bool(args.continuous_timeseries or False):

@@ -19,7 +19,7 @@ matplotlib.rcParams['font.family'] = 'STIXGeneral'
 matplotlib.rcParams['font.size'] = 24
 
 
-def savefig(fname, fpath=None, extensions=['pdf', 'png']):
+def savefig(*args, extensions=['pdf', 'png']):
     """
     Save current matplotlib.pyplot figure to file.
 
@@ -27,9 +27,10 @@ def savefig(fname, fpath=None, extensions=['pdf', 'png']):
     :kwarg path: (optional) path to file.
     :kwarg extensions: a list of strings corresponding to the file extensions to be used.
     """
+    fname = args[0]
+    fpath = '.' if len(args) == 1 else os.path.join(*args[1:])
+    fname = os.path.join(fpath, fname)
     plt.tight_layout()
-    if fpath is not None:
-        fname = os.path.join(fpath, fname)
     for extension in extensions:
         plt.savefig('.'.join([fname, extension]))
     if len(extensions) == 0:
