@@ -502,13 +502,16 @@ class AdaptiveProblemBase(object):
         assert hasattr(self.op, 'J')
         return self.op.J
 
-    def save_to_checkpoint(self, f, mode='memory', i=None, **kwargs):
+    def save_to_checkpoint(self, i, f, mode='memory', **kwargs):
         """
         Extremely simple checkpointing scheme with a simple stack.
 
         In the case of memory checkpointing, the field to be stored is deep copied and put on top of
         the stack. For disk checkpointing, it is saved to a HDF5 file using a file extension which
         is put on top of the stack, for identification purposes.
+
+        :kwarg mode: toggle whether to save checkpoints in memory or on disk.
+        :kwarg fpath: filepath to checkpoint stored on disk.
         """
         assert mode in ('memory', 'disk')
         if mode == 'memory':
@@ -522,7 +525,7 @@ class AdaptiveProblemBase(object):
             self.checkpoint.append(chk)
         self.op.print_debug("CHECKPOINT SAVE: {:3d} currently stored".format(len(self.checkpoint)))
 
-    def collect_from_checkpoint(self, mode='memory', i=None, delete=True):
+    def collect_from_checkpoint(self, i, mode='memory', delete=True, **kwargs):
         """
         Extremely simple checkpointing scheme which pops off the top of a stack.
 
@@ -530,7 +533,9 @@ class AdaptiveProblemBase(object):
         disk checkpointing, it is loaded from a HDF5 file using the file extension which is popped
         off the top of the stack.
 
+        :kwarg mode: toggle whether to save checkpoints in memory or on disk.
         :kwarg delete: toggle deletion of the checkpoint file.
+        :kwarg fpath: filepath to checkpoint stored on disk.
         """
         assert mode in ('memory', 'disk')
         assert len(self.checkpoint) > 0
@@ -538,8 +543,6 @@ class AdaptiveProblemBase(object):
             return self.checkpoint.pop(-1)
         else:
             fpath = kwargs.get('fpath', self.op.di)
-            if i is None:
-                raise ValueError("Please provide mesh number")
             chk = self.checkpoint.pop(-1)
             self.load_state(i, fpath, index_str=chk, delete=delete)
         self.op.print_debug("CHECKPOINT LOAD: {:3d} currently stored".format(len(self.checkpoint)))

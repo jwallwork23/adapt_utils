@@ -657,6 +657,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op = self.op
         kwargs['outputdir'] = self.di
         kwargs['op'] = op
+        if op.solve_exner:
+            name = 'bathymetry'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.W[i], name, name, fpath)
+            self.fwd_solutions_bathymetry[i].project(initialise_field(*args, **kwargs))
+        if op.solve_sediment:
+            name = 'sediment'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.Q[i], name, name, fpath)
+            self.fwd_solutions_sediment[i].project(initialise_field(*args, **kwargs))
+        if op.solve_tracer:
+            name = 'tracer'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.Q[i], name, name, fpath)
+            self.fwd_solutions_tracer[i].project(initialise_field(*args, **kwargs))
         if op.solve_swe:
             kwargs['plexname'] = plexname
             op.print_debug("I/O: Loading hydrodynamics from {:s}...".format(fpath))
@@ -664,21 +679,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             u, eta = self.fwd_solutions[i].split()
             u.project(u_init)
             eta.project(eta_init)
-        if op.solve_tracer:
-            name = 'tracer'
-            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
-            args = (self.Q[i], name, name, fpath)
-            self.fwd_solutions_tracer[i].project(initialise_field(*args, **kwargs))
-        if op.solve_sediment:
-            name = 'sediment'
-            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
-            args = (self.Q[i], name, name, fpath)
-            self.fwd_solutions_sediment[i].project(initialise_field(*args, **kwargs))
-        if op.solve_exner:
-            name = 'bathymetry'
-            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
-            args = (self.W[i], name, name, fpath)
-            self.fwd_solutions_bathymetry[i].project(initialise_field(*args, **kwargs))
 
     # --- Equations
 
@@ -1329,13 +1329,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.checkpointing:
                 mode = kwargs.get('checkpointing_mode', 'memory')
                 if op.solve_swe:
-                    self.save_to_checkpoint(self.fwd_solutions[i], mode=mode)
+                    self.save_to_checkpoint(i, self.fwd_solutions[i], mode=mode)
                 if op.solve_tracer:
-                    self.save_to_checkpoint(self.fwd_solutions_tracer[i], mode=mode)
+                    self.save_to_checkpoint(i, self.fwd_solutions_tracer[i], mode=mode)
                 if op.solve_sediment:
-                    self.save_to_checkpoint(self.fwd_solutions_sediment[i], mode=mode)
+                    self.save_to_checkpoint(i, self.fwd_solutions_sediment[i], mode=mode)
                 if op.solve_exner:
-                    self.save_to_checkpoint(self.fwd_solutions_bathymetry[i], mode=mode)
+                    self.save_to_checkpoint(i, self.fwd_solutions_bathymetry[i], mode=mode)
                 # TODO: Checkpoint mesh if moving
 
             # Export
@@ -1470,17 +1470,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
 
             # Collect forward solution from checkpoint and free associated memory
-            #   NOTE: We need collect the checkpoints from the stack in reverse order
             if self.checkpointing:
                 mode = kwargs.get('checkpointing_mode', 'memory')
-                if op.solve_exner:
-                    self.fwd_solutions_bathymetry[i].assign(self.collect_from_checkpoint(), mode=mode)
-                if op.solve_sediment:
-                    self.fwd_solutions_sediment[i].assign(self.collect_from_checkpoint(), mode=mode)
-                if op.solve_tracer:
-                    self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint(), mode=mode)
-                if op.solve_swe:
-                    self.fwd_solutions[i].assign(self.collect_from_checkpoint(), mode=mode)
+                if mode == 'disk':
+                    self.collect_from_checkpoint(i, mode=mode)
+                else:
+                    if op.solve_exner:
+                        self.fwd_solutions_bathymetry[i].assign(self.collect_from_checkpoint(i, mode=mode))
+                    if op.solve_sediment:
+                        self.fwd_solutions_sediment[i].assign(self.collect_from_checkpoint(i, mode=mode))
+                    if op.solve_tracer:
+                        self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint(i, mode=mode))
+                    if op.solve_swe:
+                        self.fwd_solutions[i].assign(self.collect_from_checkpoint(i, mode=mode))
 
             # Solve adjoint PDE(s)
             if op.solve_swe:
