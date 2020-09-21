@@ -28,17 +28,7 @@ parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data (de
 args = parser.parse_args()
 basis = args.basis
 level = int(args.level or 0)
-plot_pdf = bool(args.plot_pdf or False)
-plot_png = bool(args.plot_png or False)
-plot_all = bool(args.plot_all or False)
-if plot_all:
-    plot_pvd = plot_pdf = plot_png = True
-extensions = []
-if plot_pdf:
-    extensions.append('pdf')
-if plot_png:
-    extensions.append('png')
-plot_any = len(extensions) > 0
+plot = parser.plotting_args()
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1:
@@ -87,7 +77,7 @@ cbar.set_label(r'Elevation [$\mathrm m$]', size=fontsize)
 axes.axis(False)
 cbar.ax.tick_params(labelsize=fontsize_tick)
 plt.tight_layout()
-savefig('optimised_source_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+savefig('optimised_source_{:d}'.format(level), fpath=plot_dir, extensions=plot.extensions)
 
 # Zoom
 lonlat_corners = [(138, 32), (148, 42), (138, 42)]
@@ -108,4 +98,4 @@ axes.set_ylim(ylim)
 axes.set_xlabel("Degrees longitude", fontsize=fontsize)
 axes.set_ylabel("Degrees latitude", fontsize=fontsize)
 axes.axis(True)
-savefig('optimised_source_{:d}_zoom'.format(level), fpath=plot_dir, extensions=extensions)
+savefig('optimised_source_{:d}_zoom'.format(level), fpath=plot_dir, extensions=plot.extensions)

@@ -32,17 +32,8 @@ parser.add_argument("-noisy_data", help="""
 args = parser.parse_args()
 bases = args.bases.split(',')
 levels = int(args.levels or 3)
-plot_pdf = bool(args.plot_pdf or False)
-plot_png = bool(args.plot_png or False)
-plot_all = bool(args.plot_all or False)
-if plot_all:
-    plot_pdf = plot_png = True
-extensions = []
-if plot_pdf:
-    extensions.append('pdf')
-if plot_png:
-    extensions.append('png')
-if len(extensions) == 0 or len(bases) == 0:
+plot = parser.plotting_args()
+if len(plot.extensions) == 0 or len(bases) == 0:
     print_output("Nothing to plot.")
     sys.exit(0)
 
@@ -112,7 +103,7 @@ for axis in (axes.xaxis, axes.yaxis):
 axes.set_xlabel("Mesh element count")
 axes.set_ylabel("Continuous QoI")
 axes.legend()
-savefig('converged_J', fpath=plot_dir, extensions=extensions)
+savefig('converged_J', fpath=plot_dir, extensions=plot.extensions)
 
 
 # --- Plot all mean square error convergence curves on the same axis
@@ -140,7 +131,7 @@ for axis in (axes.xaxis, axes.yaxis):
 axes.set_xlabel("Mesh element count")
 axes.set_ylabel("Mean square error")
 axes.legend()
-savefig('converged_mse', fpath=plot_dir, extensions=extensions)
+savefig('converged_mse', fpath=plot_dir, extensions=plot.extensions)
 
 
 # --- Plot all discrete QoI convergence curves on the same axis
@@ -168,4 +159,4 @@ for axis in (axes.xaxis, axes.yaxis):
 axes.set_xlabel("Mesh element count")
 axes.set_ylabel("Discrete QoI")
 axes.legend()
-savefig('converged_discrete_qoi', fpath=plot_dir, extensions=extensions)
+savefig('converged_discrete_qoi', fpath=plot_dir, extensions=plot.extensions)

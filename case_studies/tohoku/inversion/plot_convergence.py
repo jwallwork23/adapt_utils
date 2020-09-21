@@ -40,17 +40,8 @@ parser.add_argument("-plot_initial_guess", help="Plot initial guess timeseries")
 args = parser.parse_args()
 basis = args.basis
 levels = int(args.levels or 3)
-plot_pdf = bool(args.plot_pdf or False)
-plot_png = bool(args.plot_png or False)
-plot_all = bool(args.plot_all or False)
-if plot_all:
-    plot_pdf = plot_png = True
-extensions = []
-if plot_pdf:
-    extensions.append('pdf')
-if plot_png:
-    extensions.append('png')
-if len(extensions) == 0:
+plot = parser.plotting_args()
+if len(plot.extensions) == 0:
     print_output("Nothing to plot.")
     sys.exit(0)
 plot_init = bool(args.plot_initial_guess or False)
@@ -131,7 +122,7 @@ if plot_init:
             ax.grid()
         for i in range(len(gauges), N*N):
             axes[i//N, i % N].axis(False)
-        savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+        savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=plot.extensions)
 
 # Plot progress of QoI
 print_output("Plotting progress of QoI...")
@@ -152,7 +143,7 @@ for axis in (axes.xaxis, axes.yaxis):
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Square timeseries error QoI")
 axes.legend(loc='best', fontsize=fontsize_legend)
-savefig('optimisation_progress_J', fpath=plot_dir, extensions=extensions)
+savefig('optimisation_progress_J', fpath=plot_dir, extensions=plot.extensions)
 
 # Plot final QoI values
 print_output("Plotting final QoI values...")
@@ -164,7 +155,7 @@ for axis in (axes.xaxis, axes.yaxis):
     axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Mesh element count")
 axes.set_ylabel("Square timeseries error QoI")
-savefig('converged_J', fpath=plot_dir, extensions=extensions)
+savefig('converged_J', fpath=plot_dir, extensions=plot.extensions)
 
 # Plot progress of gradient
 print_output("Plotting progress of gradient norm...")
@@ -183,7 +174,7 @@ for axis in (axes.xaxis, axes.yaxis):
 axes.set_xlabel("Iteration")
 axes.set_ylabel(r"$\ell_\infty$-norm of gradient")
 axes.legend(loc='best', fontsize=fontsize_legend)
-savefig('optimisation_progress_dJdm_linf', fpath=plot_dir, extensions=extensions)
+savefig('optimisation_progress_dJdm_linf', fpath=plot_dir, extensions=plot.extensions)
 fig, axes = plt.subplots(figsize=(8, 6))
 for level in range(levels):
     fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
@@ -199,7 +190,7 @@ for axis in (axes.xaxis, axes.yaxis):
 axes.set_xlabel("Iteration")
 axes.set_ylabel(r"$\ell_2$-norm of gradient")
 axes.legend(loc='best', fontsize=fontsize_legend)
-savefig('optimisation_progress_dJdm_l2', fpath=plot_dir, extensions=extensions)
+savefig('optimisation_progress_dJdm_l2', fpath=plot_dir, extensions=plot.extensions)
 
 # Plot timeseries for optimised run
 print_output("Plotting timeseries for optimised run...")
@@ -271,7 +262,7 @@ for level in range(levels):
     print_output(msg.format(level, discrete_qois[level]))
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
-    savefig('timeseries_optimised_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+    savefig('timeseries_optimised_{:d}'.format(level), fpath=plot_dir, extensions=plot.extensions)
 
 # Store errors
 fname = os.path.join(di, 'mean_square_errors_{:s}_{:s}.npy')

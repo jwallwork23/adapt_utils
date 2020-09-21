@@ -1,3 +1,5 @@
+from thetis import AttrDict
+
 import argparse
 
 
@@ -6,9 +8,28 @@ __all__ = ["ArgumentParser"]
 
 # TODO: Integrate into Options parameter classes - these define the defaults
 class ArgumentParser(argparse.ArgumentParser):
-    # TODO: Doc
+    """
+    Custom argument parsing class for use in `adapt_utils`.
+
+    There are various pre-defined arguments, which may be selected as keyword arguments when
+    instantiating the object.
+
+    :kwarg adjoint: positional argument for 'discrete' vs 'continuous'.
+    :kwarg basis: positional argument for 'box' vs 'radial' vs 'okada'.
+    :kwarg basis: positional argument for a combination of the above.
+    :kwarg optimisation: keyword arguments to do with gradient-based optimisation.
+    :kwarg plotting: keyword arguments to do with plotting via `matplotlib`.
+    :kwarg shallow_water: keyword arguments to do with solving the shallow water equations.
+    """
     def __init__(self, *args, **kwargs):
-        common_kwargs = ('adjoint', 'bases', 'basis', 'optimisation', 'plotting', 'shallow_water')
+        common_kwargs = (
+            'adjoint',
+            'bases',
+            'basis',
+            'optimisation',
+            'plotting',
+            'shallow_water',
+        )
         self.kwargs = {kwarg: kwargs.pop(kwarg, False) for kwarg in common_kwargs}
         self.kwargs['equation'] = self.kwargs['shallow_water']  # TODO: or tracer or sediment, etc.
         super(ArgumentParser, self).__init__(*args, **kwargs)
@@ -20,9 +41,6 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument("-extension", help="""
             Extension for output directory. The directory name will have the form outputs_<ext>.
             """)
-
-        # Cacheing
-        self.add_argument("-dirty_cache", help="Dirty the cache to force compilations")
 
         # Debugging
         self.add_argument("-debug", help="Toggle debugging")
@@ -41,6 +59,9 @@ class ArgumentParser(argparse.ArgumentParser):
         return self.parse_args()
 
     def add_adjoint_args(self):
+        """
+        Add a parameter to toggle between discrete and continuous adjoint.
+        """
         self.add_argument("adjoint", help="""
             Choose adjoint approach from {'discrete', 'continuous'}.
             """)
@@ -101,12 +122,20 @@ class ArgumentParser(argparse.ArgumentParser):
             plot_all = True
         if plot_all:
             plot_pdf = plot_png = True
-        return {
-            'plot_pdf': plot_pdf,
-            'plot_png': plot_png,
-            'plot_all': plot_all,
-            'plot_only': plot_only,
-        }
+        extensions = []
+        if plot_pdf:
+            extensions.append('pdf')
+        if plot_png:
+            extensions.append('png')
+        plot_any = len(extensions) > 0
+        return AttrDict({
+            'all': plot_all,
+            'any': plot_any,
+            'pdf': plot_pdf,
+            'png': plot_png,
+            'only': plot_only,
+            'extensions': extensions,
+        })
 
     def add_shallow_water_args(self):
         """
@@ -120,6 +149,7 @@ class ArgumentParser(argparse.ArgumentParser):
         """
         Add parameters to do with solving any equation set.
         """
+        self.add_argument("-dirty_cache", help="Dirty the cache to force compilations")
         self.add_argument("-end_time", help="End time of simulation")
         self.add_argument("-level", help="Mesh resolution level")
         self.add_argument("-plot_pvd", help="Toggle plotting to .pvd")

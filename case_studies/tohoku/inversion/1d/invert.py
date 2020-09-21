@@ -51,12 +51,6 @@ plot_pvd = bool(args.plot_pvd or False)
 timeseries = 'timeseries'
 if bool(args.continuous_timeseries or False):
     timeseries = '_'.join([timeseries, 'smooth'])
-
-# Setup output directories
-dirname = os.path.dirname(__file__)
-di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
-if args.extension is not None:
-    di = '_'.join([di, args.extension])
 if args.adjoint == 'continuous':
     problem_constructor = AdaptiveProblem
     stop_annotating()
@@ -64,6 +58,12 @@ elif args.adjoint == 'discrete':
     problem_constructor = AdaptiveDiscreteAdjointProblem
 else:
     raise ValueError
+
+# Setup output directories
+dirname = os.path.dirname(__file__)
+di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
+if args.extension is not None:
+    di = '_'.join([di, args.extension])
 
 # Collect initialisation parameters
 nonlinear = bool(args.nonlinear or False)
@@ -95,6 +95,8 @@ kwargs = {
     'debug_mode': args.debug_mode or 'basic',
     'di': di,
 }
+if args.end_time is not None:
+    kwargs['end_time'] = float(args.end_time)
 use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 op = TohokuRadialBasisOptions(**kwargs)
 op.dirty_cache = bool(args.dirty_cache or False)

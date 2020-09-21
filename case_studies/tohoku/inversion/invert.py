@@ -54,20 +54,7 @@ level = int(args.level or 0)
 optimise = bool(args.rerun_optimisation or False)
 gtol = float(args.gtol or 1.0e-04)
 plot_pvd = bool(args.plot_pvd or False)
-plot_pdf = bool(args.plot_pdf or False)
-plot_png = bool(args.plot_png or False)
-plot_all = bool(args.plot_all or False)
-plot_only = bool(args.plot_only or False)
-if plot_only:
-    plot_all = True
-if plot_all:
-    plot_pvd = plot_pdf = plot_png = True
-extensions = []
-if plot_pdf:
-    extensions.append('pdf')
-if plot_png:
-    extensions.append('png')
-plot_any = len(extensions) > 0
+plot = parser.plotting_args()
 timeseries_type = 'timeseries'
 if bool(args.continuous_timeseries or False):
     timeseries_type = '_'.join([timeseries_type, 'smooth'])
@@ -81,9 +68,9 @@ else:
     raise ValueError
 
 # Do not attempt to plot in parallel
-if COMM_WORLD.size > 1 and plot_any:
+if COMM_WORLD.size > 1 and plot['any']:
     print_output(120*'*' + "\nWARNING: Plotting turned off when running in parallel.\n" + 120*'*')
-    plot_pdf = plot_png = False
+    plot.pdf = plot.png = False
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
@@ -142,6 +129,7 @@ elif basis == 'okada':
 else:
     raise ValueError("Basis type '{:s}' not recognised.".format(basis))
 op = options_constructor(**kwargs)
+op.dirty_cache = bool(args.dirty_cache or False)
 gauges = list(op.gauges.keys())
 
 
@@ -169,7 +157,7 @@ with stop_annotating():
         kwargs['control_parameters'] = [m.dat.data[0] for m in op.control_parameters]
 
         # Plot
-        if plot_any:
+        if plot.any:
             levels = np.linspace(-0.1*gaussian_scaling, 1.1*gaussian_scaling, 51)
             ticks = np.linspace(0, gaussian_scaling, 5)
 
@@ -190,8 +178,8 @@ with stop_annotating():
             axes.set_ylim([utm_corners[0][1], utm_corners[2][1]])
             axes.axis(False)
             fname = 'initial_guess_{:s}_{:d}'.format(basis, level)
-            savefig(fname, fpath=plot_dir, extensions=extensions)
-if plot_only:
+            savefig(fname, fpath=plot_dir, extensions=plot.extensions)
+if plot.only:
     sys.exit(0)
 
 

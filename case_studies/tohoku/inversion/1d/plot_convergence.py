@@ -34,21 +34,8 @@ parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisati
 # Parsed arguments
 args = parser.parse_args()
 level = int(args.level or 0)
-plot_pdf = bool(args.plot_pdf or False)
-plot_png = bool(args.plot_png or False)
-plot_all = bool(args.plot_all or False)
-plot_only = bool(args.plot_only or False)
-if plot_only:
-    plot_all = True
-if plot_all:
-    plot_pdf = plot_png = True
-extensions = []
-if plot_pdf:
-    extensions.append('pdf')
-if plot_png:
-    extensions.append('png')
-plot_any = len(extensions) > 0
-if not plot_any:
+plot = parser.plotting_args()
+if not plot.any:
     print_output("Nothing to plot.")
     sys.exit(0)
 timeseries_type = 'timeseries'
@@ -56,9 +43,9 @@ if bool(args.continuous_timeseries or False):
     timeseries_type = '_'.join([timeseries_type, 'smooth'])
 
 # Do not attempt to plot in parallel
-if COMM_WORLD.size > 1 and plot_any:
+if COMM_WORLD.size > 1 and plot.any:
     print_output(120*'*' + "\nWARNING: Plotting turned off when running in parallel.\n" + 120*'*')
-    plot_pdf = plot_png = False
+    plot.pdf = plot.png = False
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
@@ -130,7 +117,7 @@ for i, gauge in enumerate(gauges):
     ax.grid()
 for i in range(len(gauges), N*N):
     axes[i//N, i % N].axis(False)
-savefig('timeseries_{:d}'.format(level), plot_dir, extensions=extensions)
+savefig('timeseries_{:d}'.format(level), plot_dir, extensions=plot.extensions)
 
 # After optimisation
 msg = "Cannot plot timeseries for optimised controls on mesh {:d} because the data don't exist."
@@ -172,7 +159,7 @@ if plotted:
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     fname = 'timeseries_optimised_{:d}'.format(level)
-    savefig(fname, plot_dir, args.adjoint, extensions=extensions)
+    savefig(fname, plot_dir, args.adjoint, extensions=plot.extensions)
 
 
 # --- Plot optimisation progress
@@ -217,7 +204,7 @@ axes.grid()
 fname = 'parameter_space'
 if use_regularisation:
     fname += '_reg'
-savefig('{:s}_{:d}'.format(fname, level), plot_dir, extensions=extensions)
+savefig('{:s}_{:d}'.format(fname, level), plot_dir, extensions=plot.extensions)
 
 # Load trajectory
 fname = os.path.join(di, args.adjoint, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
@@ -259,4 +246,4 @@ axes.annotate(
 fname = 'optimisation_progress'
 if use_regularisation:
     fname += '_reg'
-savefig(fname + '_{:d}'.format(level), plot_dir, args.adjoint, extensions=extensions)
+savefig(fname + '_{:d}'.format(level), plot_dir, args.adjoint, extensions=plot.extensions)
