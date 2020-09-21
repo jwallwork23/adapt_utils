@@ -24,7 +24,7 @@ parser = ArgumentParser(
 
             A 'synthetic' tsunami is generated from an initial condition given by the 'optimal'
             scaling parameter is m = 5. We apply PDE constrained optimisation with an initial guess
-            m = 10.
+            m = 10 and the objective of minimising the square gauge timeseries error, J.
 
             The gradient of J w.r.t. m is computed using either a discrete or continuous adjoint
             approach.
@@ -166,7 +166,7 @@ swp.clear_tape()
 print_output("Setting initial guess...")
 control_value = [float(args.initial_guess or 7.5)]
 op.assign_control_parameters(control_value, mesh=swp.meshes[0])
-control = Control(op.control_parameters[0])
+control = Control(op.control_parameter)
 
 # Solve the forward problem / load data
 fname = '{:s}_{:s}_{:d}.npy'
@@ -235,12 +235,12 @@ if taylor:
           'random' - control parameter is set randomly with a Normal distribution;
           'optimised' - optimal control parameter from a previous run is used.
         """
-        c = Function(op.control_parameters[0])
+        c = Function(op.control_parameter)
         if mode == 'init':
             pass
         elif mode == 'random':
-            np.random.seed(0)  # Ensure consistency of tests
-            c.dat.data[0] += np.random.random() - 0.5
+            np.random.seed(0)                      # Ensure consistency of tests
+            c.dat.data[0] = 10*np.random.random()  # Random number between 0 and 10
         elif mode == 'optimised':
             fname = os.path.join(di, 'optimisation_progress_ctrl_{:d}.npy'.format(level))
             try:
@@ -255,7 +255,7 @@ if taylor:
         return c
 
     # Increasing search direction of length 0.1
-    dc = Function(op.control_parameters[0])
+    dc = Function(op.control_parameter)
     dc.assign(0.1)
 
     # Run tests
@@ -344,7 +344,7 @@ else:
 
         opt_kwargs['fprime'] = gradient_save_data
         opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
-        m_init = op.control_parameters[0].dat.data
+        m_init = op.control_parameter.dat.data
         optimised_value = scipy.optimize.fmin_bfgs(Jhat_save_data, m_init, **opt_kwargs)
 
 

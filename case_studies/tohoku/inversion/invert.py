@@ -4,6 +4,7 @@ from firedrake_adjoint import *
 import matplotlib.pyplot as plt
 import numpy as np
 import os
+# import scipy
 import sys
 
 from adapt_utils.argparse import ArgumentParser
@@ -12,6 +13,7 @@ from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBas
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.norms import vecnorm
 from adapt_utils.plotting import *
+from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
@@ -19,8 +21,18 @@ from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 # --- Parse arguments
 
 parser = ArgumentParser(
-    prog="discrete",
-    description="TODO",  # TODO
+    prog="invert",
+    description="""
+            Invert for an initial condition defined in some basis over an array. The array types
+            include piecewise constants ('box'), (Gaussian) radial basis functions ('radial') and
+            Okada functions ('okada').
+
+            GPS and pressure gauge data are obtained from post-processed versions of observations.
+
+            The gradient of the square gauge timeseries misfit w.r.t. the basis coefficients is
+            computed using either a discrete or continuous adjoint approach.
+            """,
+    adjoint=True,
     basis=True,
     optimisation=True,
     plotting=True,
@@ -59,6 +71,14 @@ plot_any = len(extensions) > 0
 timeseries_type = 'timeseries'
 if bool(args.continuous_timeseries or False):
     timeseries_type = '_'.join([timeseries_type, 'smooth'])
+if args.adjoint == 'continuous':
+    problem_constructor = AdaptiveProblem
+    stop_annotating()
+    raise NotImplementedError  # TODO
+elif args.adjoint == 'discrete':
+    problem_constructor = AdaptiveDiscreteAdjointProblem
+else:
+    raise ValueError
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1 and plot_any:
@@ -70,9 +90,9 @@ dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, basis, 'outputs', 'realistic'))
 if args.extension is not None:
     di = '_'.join([di, args.extension])
-di = create_directory(os.path.join(di, 'discrete'))
+di = create_directory(os.path.join(di, args.adjoint))
 plot_dir = create_directory(os.path.join(di, 'plots'))
-create_directory(os.path.join(plot_dir, 'discrete'))
+create_directory(os.path.join(plot_dir, args.adjoint))
 
 # Collect initialisation parameters
 nonlinear = bool(args.nonlinear or False)
@@ -139,12 +159,12 @@ with stop_annotating():
         kwargs_src['control_parameters'] = [gaussian_scaling]
         kwargs_src['nx'], kwargs_src['ny'] = 1, 1
         op_src = TohokuRadialBasisOptions(mesh=op.default_mesh, **kwargs_src)
-        swp = AdaptiveDiscreteAdjointProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
+        swp = problem_constructor(op_src, nonlinear=nonlinear, print_progress=op.debug)
         swp.set_initial_condition()
         f_src = swp.fwd_solutions[0].split()[1]
 
         # Project into chosen basis
-        swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
         op.project(swp, f_src)
         kwargs['control_parameters'] = [m.dat.data[0] for m in op.control_parameters]
 
@@ -179,7 +199,7 @@ if plot_only:
 
 # Set initial guess
 op = options_constructor(**kwargs)
-swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
 print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Setting initial guess...")
@@ -291,7 +311,7 @@ else:
 
 # Run forward again using the optimised control parameters
 op.plot_pvd = plot_pvd
-swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
 print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Assigning optimised control parameters...")
