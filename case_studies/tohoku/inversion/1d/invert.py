@@ -60,7 +60,7 @@ if args.extension is not None:
 if args.adjoint == 'continuous':
     problem_constructor = AdaptiveProblem
     stop_annotating()
-elif args.adjoint == 'continuous':
+elif args.adjoint == 'discrete':
     problem_constructor = AdaptiveDiscreteAdjointProblem
 else:
     raise ValueError

@@ -299,9 +299,9 @@ class TohokuInversionOptions(TohokuOptions):
             "near_field_gps",
             # "far_field_gps",
         )
-        self.get_gauges()
+        self.get_gauges(normalise_in_time=kwargs.get('normalise_in_time', False))
 
-    def get_gauges(self):
+    def get_gauges(self, normalise_in_time=False):
         """
         Collect gauge data, categorise and check coordinates lie within the domain.
 
@@ -465,11 +465,12 @@ class TohokuInversionOptions(TohokuOptions):
                 self.gauges.pop(gauge)
 
         # Normalise QoI by total measured gauge time
-        factor = 0.0
-        for gauge in self.gauges:
-            factor += self.gauges[gauge]["departure_time"] - self.gauges[gauge]["arrival_time"]
-        self.print_debug("INIT: QoI normalisation factor (in time): {:.4e}".format(1/factor))
-        self.qoi_scaling /= factor
+        if normalise_in_time:
+            factor = 0.0
+            for gauge in self.gauges:
+                factor += self.gauges[gauge]["departure_time"] - self.gauges[gauge]["arrival_time"]
+            self.print_debug("INIT: QoI normalisation factor (in time): {:.4e}".format(1/factor))
+            self.qoi_scaling /= factor
         self.print_debug("INIT: overall QoI normalisation factor: {:.4e}".format(self.qoi_scaling))
 
     def detide(self, gauge):
