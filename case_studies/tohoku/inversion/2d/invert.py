@@ -6,7 +6,7 @@ import scipy
 import sys
 
 from adapt_utils.argparse import ArgumentParser
-from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
+from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 
 
 # --- Parse arguments
@@ -14,14 +14,13 @@ from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialB
 parser = ArgumentParser(
     prog="invert",
     description="""
-            Invert for an initial condition defined over a (Gaussian) radial basis with a single
-            basis function. If we have N_g gauges and N_T timesteps then we have N_g*N_T data
-            points we would like to fit using a least squares fit. Compared with the single control
-            parameter, this implies a massively overconstrained problem!
+            Invert for an initial condition defined over a piecewise constant basis with two
+            basis functions.
 
             A 'synthetic' tsunami is generated from an initial condition given by the 'optimal'
-            scaling parameter is m = 5. We apply PDE constrained optimisation with an initial guess
-            m = 7.5 and the objective of minimising the square gauge timeseries error, J.
+            scaling parameter is m = (5, 5). We apply PDE constrained optimisation with an initial
+            guess m = (2.5, 7.5) and the objective of minimising the square gauge timeseries error,
+            J.
 
             The gradient of J w.r.t. m is computed using either a discrete or continuous adjoint
             approach.
@@ -77,6 +76,12 @@ if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
 taylor = bool(args.taylor_test or False)
 chk = args.checkpointing_mode or 'disk'
+init = [2.5, 7.5]
+if args.initial_guess is not None:
+    init = [float(ig) for ig in args.initial_guess.split(',')]
+opt = [5.0, 5.0]
+if args.optimal_control is not None:
+    opt = [float(oc) for oc in args.optimal_control.split(',')]
 kwargs = {
     'level': level,
     'save_timeseries': True,
@@ -87,10 +92,10 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
-    'control_parameters': [float(args.initial_guess or 7.5)],
+    'control_parameters': init,
     'synthetic': True,
     'qoi_scaling': 1.0,
-    'nx': 1,
+    'nx': 2,
     'ny': 1,
     'regularisation': float(args.regularisation or 0.0),
 
@@ -103,7 +108,7 @@ kwargs = {
 if args.end_time is not None:
     kwargs['end_time'] = float(args.end_time)
 use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
-op = TohokuRadialBasisOptions(**kwargs)
+op = TohokuBoxBasisOptions(**kwargs)
 op.dirty_cache = bool(args.dirty_cache or False)
 gauges = list(op.gauges.keys())
 
@@ -121,8 +126,7 @@ except AssertionError:
     print_output("Run forward to get 'data'...")
     with stop_annotating():
         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
-        control_value = [float(args.optimal_control or 5.0)]
-        op.assign_control_parameters(control_value, mesh=swp.meshes[0])
+        op.assign_control_parameters(opt, mesh=swp.meshes[0])
         swp.solve_forward()
     for gauge, fname in zip(gauges, fnames):
         op.gauges[gauge]['data'] = op.gauges[gauge][timeseries]
@@ -133,35 +137,37 @@ except AssertionError:
 
 n = 8
 op.save_timeseries = False
-control_values = [[m] for m in np.linspace(0.5, 7.5, n)]
+control_values = np.linspace(0.5, 7.5, n)
 
 # Unregularised parameter space
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
 if recompute or not os.path.isfile(fname):
-    msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
-    func_values = np.zeros(n)
+    msg = "({:2d}, {:2d}): control values ({:.4e}, {:.4e})  functional value {:.4e}"
+    func_values = np.zeros(n, n)
     with stop_annotating():
         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
-        for i, m in enumerate(control_values):
-            op.assign_control_parameters(m, mesh=swp.meshes[0])
-            swp.solve_forward()
-            func_values[i] = swp.quantity_of_interest()
-            print_output(msg.format(i, m[0], func_values[i]))
+        for i, m1 in enumerate(control_values):
+            for j, m2 in enumerate(control_values):
+                op.assign_control_parameters([m1, m2], mesh=swp.meshes[0])
+                swp.solve_forward()
+                func_values[i, j] = swp.quantity_of_interest()
+                print_output(msg.format(i, j, m1, m2, func_values[i]))
     np.save(fname, func_values)
 
-# Regularised parameter space
-fname = os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level))
-if use_regularisation and (recompute or os.path.isfile(fname)):
-    msg = "{:2d}: control value {:.4e}  regularised functional value {:.4e}"
-    func_values_reg = np.zeros(n)
-    with stop_annotating():
-        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
-        for i, m in enumerate(control_values):
-            op.assign_control_parameters(m, mesh=swp.meshes[0])
-            swp.solve_forward()
-            func_values_reg[i] = swp.quantity_of_interest()
-            print_output(msg.format(i, m[0], func_values_reg[i]))
-    np.save(fname, func_values_reg)
+# TODO
+# # Regularised parameter space
+# fname = os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level))
+# if use_regularisation and (recompute or os.path.isfile(fname)):
+#     msg = "{:2d}: control value {:.4e}  regularised functional value {:.4e}"
+#     func_values_reg = np.zeros(n)
+#     with stop_annotating():
+#         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
+#         for i, m in enumerate(control_values):
+#             op.assign_control_parameters(m, mesh=swp.meshes[0])
+#             swp.solve_forward()
+#             func_values_reg[i] = swp.quantity_of_interest()
+#             print_output(msg.format(i, m[0], func_values_reg[i]))
+#     np.save(fname, func_values_reg)
 
 
 # --- Tracing
@@ -171,9 +177,8 @@ op.save_timeseries = True
 swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
 swp.clear_tape()
 print_output("Setting initial guess...")
-control_value = [float(args.initial_guess or 7.5)]
-op.assign_control_parameters(control_value, mesh=swp.meshes[0])
-control = Control(op.control_parameter)
+op.assign_control_parameters(init, mesh=swp.meshes[0])
+control = [Control(m) for m in op.control_parameters]
 
 # Solve the forward problem / load data
 fname = '{:s}_{:s}_{:d}.npy'
@@ -202,10 +207,7 @@ else:
         """
         Reduced functional for continuous adjoint inversion.
         """
-        try:
-            op.assign_control_parameters(m)
-        except Exception:
-            op.assign_control_parameters([m])
+        op.assign_control_parameters(m)
         swp.solve_forward(checkpointing_mode=chk)
         return swp.quantity_of_interest()
 
@@ -218,11 +220,11 @@ else:
         g = assemble(inner(op.basis_function, swp.adj_solution)*dx)  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradients[0]
-        msg = "control = {:15.8e}  functional = {:15.8e}  gradient = {:15.8e}"
+        msg = "control = ({:15.8e}, {:15.8e})  functional = {:15.8e}  gradient = ({:15.8e}, {:15.8e})"
         try:
-            print_output(msg.format(m[0], J, g))
+            print_output(msg.format(*m, J, *g))
         except Exception:
-            print_output(msg.format(m.dat.data[0], J, g))
+            print_output(msg.format(*m.dat.data, J, *g))
         return np.array([g])
 
 # --- Taylor test
@@ -237,7 +239,7 @@ if taylor:
           'random' - control parameter is set randomly with a Normal distribution;
           'optimised' - optimal control parameter from a previous run is used.
         """
-        c = Function(op.control_parameter)
+        c = np.array([Function(m) for m in op.control_parameter])
         if mode == 'init':
             pass
         elif mode == 'random':
@@ -257,7 +259,7 @@ if taylor:
         return c
 
     # Increasing search direction of length 0.1
-    dc = Function(op.control_parameter)
+    dc = np.array([Function(m) for m in op.control_parameter])
     dc.assign(0.1)
 
     # Run tests
@@ -295,10 +297,10 @@ if optimise:
             """
             Callback for saving progress data to file during discrete adjoint inversion.
             """
-            control = m.dat.data[0]
-            djdm = dj.dat.data[0]
-            msg = "control {:15.8e}  functional {:15.8e}  gradient {:15.8e}"
-            print_output(msg.format(control, j, djdm))
+            control = m.dat.data
+            djdm = dj.dat.data
+            msg = "control ({:15.8e}, {:15.8e})  functional {:15.8e}  gradient ({:15.8e}, {:15.8e})"
+            print_output(msg.format(*control, j, *djdm))
 
             # Save progress to NumPy arrays on-the-fly
             control_values_opt.append(control)
@@ -320,7 +322,7 @@ if optimise:
             file during the inversion.
             """
             J = Jhat(m)
-            control_values_opt.append(m[0])
+            control_values_opt.append(m)
             np.save(fname.format('ctrl'), np.array(control_values_opt))
             func_values_opt.append(J)
             np.save(fname.format('func'), np.array(func_values_opt))
@@ -332,13 +334,13 @@ if optimise:
             progress data to file during the inversion.
             """
             g = gradient(m)
-            gradient_values_opt.append(g[0])
+            gradient_values_opt.append(g)
             np.save(fname.format('grad'), np.array(gradient_values_opt))
             return g
 
         opt_kwargs['fprime'] = gradient_save_data
         opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
-        m_init = op.control_parameter.dat.data
+        m_init = [m.dat.data[0] for m in op.control_parameters]
         optimised_value = scipy.optimize.fmin_bfgs(Jhat_save_data, m_init, **opt_kwargs)
 else:
     optimised_value = np.array([np.load(fname.format('ctrl'))[-1]])
