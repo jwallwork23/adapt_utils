@@ -76,7 +76,7 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Optimisation
-    'control_parameters': [float(args.initial_guess or 7.5), ],
+    'control_parameters': [float(args.initial_guess or 7.5)],
     'synthetic': True,
     'qoi_scaling': 1.0,
     'nx': 1,
@@ -91,6 +91,7 @@ kwargs = {
 }
 use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 op = TohokuRadialBasisOptions(**kwargs)
+op.dirty_cache = bool(args.dirty_cache or False)
 gauges = list(op.gauges.keys())
 
 # --- Synthetic run
@@ -104,7 +105,7 @@ except AssertionError:
     print_output("Run forward to get 'data'...")
     with stop_annotating():
         swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
-        control_value = [float(args.optimal_control or 5.0), ]
+        control_value = [float(args.optimal_control or 5.0)]
         op.assign_control_parameters(control_value, mesh=swp.meshes[0])
         swp.solve_forward()
     for gauge in gauges:
@@ -117,7 +118,7 @@ except AssertionError:
 
 n = 8
 op.save_timeseries = False
-control_values = [[m, ] for m in np.linspace(0.5, 7.5, n)]
+control_values = [[m] for m in np.linspace(0.5, 7.5, n)]
 
 # Unregularised parameter space
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
@@ -156,7 +157,7 @@ swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=Fal
 print_output("Clearing tape...")
 swp.clear_tape()
 print_output("Setting initial guess...")
-control_value = [float(args.initial_guess or 7.5), ]
+control_value = [float(args.initial_guess or 7.5)]
 op.assign_control_parameters(control_value, mesh=swp.meshes[0])
 control = Control(op.control_parameters[0])
 
@@ -178,19 +179,25 @@ else:
     swp.checkpointing = True
 
     def Jhat(m):
+        """
+        Reduced functional for continuous adjoint inversion.
+        """
         op.assign_control_parameters(m)
         swp.solve_forward()
         return swp.quantity_of_interest()
 
     def gradient(m):
-        if len(swp.checkpoint) == 0:
-            J = Jhat(m)
+        """
+        Gradient of reduced functional for continuous adjoint inversion.
+        """
+        J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
         swp.solve_adjoint()
         g = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradients[0]
-        print_output("control = {:8.6e}  functional = {:8.6e}  gradient = {:8.6e}".format(m[0], J, g))
-        return np.array([g, ])
+        msg = "control = {:15.8e}  functional = {:15.8e}  gradient = {:15.8e}"
+        print_output(msg.format(m[0], J, g))
+        return np.array([g])
 
 
 # --- Taylor test
@@ -254,13 +261,13 @@ if np.all([os.path.exists(fname.format(ext)) for ext in ('ctrl', 'func', 'grad')
     control_values_opt = np.load(fname.format('ctrl', level))
     func_values_opt = np.load(fname.format('func', level))
     gradient_values_opt = np.load(fname.format('grad', level))
-    optimised_value = control_values_opt[-1]
+    optimised_value = np.array([control_values_opt[-1]])
 
 else:
 
     # Arrays to log progress
-    control_values_opt = [op.control_parameters[0].dat.data[0], ]
-    func_values_opt = [J, ]
+    control_values_opt = []
+    func_values_opt = []
     gradient_values_opt = []
 
     opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
@@ -268,9 +275,13 @@ else:
     if args.adjoint == 'discrete':
 
         def derivative_cb_post(j, dj, m):
+            """
+            Callback for saving progress data to file during discrete adjoint inversion.
+            """
             control = m.dat.data[0]
             djdm = dj.dat.data[0]
-            print_output("control {:.8e}  functional {:.8e}  gradient {:.8e}".format(control, j, djdm))
+            msg = "control {:15.6e}  functional {:15.6e}  gradient {:15.8e}"
+            print_output(msg.format(control, j, djdm))
 
             # Save progress to NumPy arrays on-the-fly
             control_values_opt.append(control)
@@ -287,6 +298,10 @@ else:
     else:
 
         def Jhat_save_data(m):
+            """
+            Reduced functional for the continuous adjoint approach which saves progress data to
+            file during the inversion.
+            """
             J = Jhat(m)
             control_values_opt.append(m[0])
             np.save(fname.format('ctrl'), np.array(control_values_opt))
@@ -295,6 +310,10 @@ else:
             return J
 
         def gradient_save_data(m):
+            """
+            Gradient of the reduced functional for the continuous adjoint approach which saves
+            progress data to file during the inversion.
+            """
             g = gradient(m)
             gradient_values_opt.append(g[0])
             np.save(fname.format('grad'), np.array(gradient_values_opt))

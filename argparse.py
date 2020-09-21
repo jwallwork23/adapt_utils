@@ -20,7 +20,9 @@ class ArgumentParser(argparse.ArgumentParser):
         self.add_argument("-extension", help="""
             Extension for output directory. The directory name will have the form outputs_<ext>.
             """)
-        self.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
+
+        # Cacheing
+        self.add_argument("-dirty_cache", help="Dirty the cache to force compilations")
 
         # Debugging
         self.add_argument("-debug", help="Toggle debugging")
@@ -120,3 +122,4 @@ class ArgumentParser(argparse.ArgumentParser):
         """
         self.add_argument("-end_time", help="End time of simulation")
         self.add_argument("-level", help="Mesh resolution level")
+        self.add_argument("-plot_pvd", help="Toggle plotting to .pvd")

@@ -65,7 +65,7 @@ if COMM_WORLD.size > 1 and plot_any:
 dirname = os.path.dirname(__file__)
 if args.adjoint is None or args.adjoint not in ('discrete', 'continuous'):
     raise ValueError
-di = create_directory(os.path.join(dirname, 'outputs', 'synthetic', args.adjoint))
+di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
 if args.extension is not None:
     di = '_'.join([di, args.extension])
 plot_dir = create_directory(os.path.join(di, 'plots'))
@@ -146,6 +146,8 @@ for i, gauge in enumerate(gauges):
 for i in range(len(gauges), N*N):
     axes[i//N, i % N].axis(False)
 savefig('timeseries_{:d}'.format(level), plot_dir, extensions=extensions)
+di = os.path.join(di, args.adjoint)
+plot_dir = create_directory(os.path.join(plot_dir, args.adjoint))
 
 # --- Plot optimisation progress
 
