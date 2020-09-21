@@ -113,6 +113,10 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
                 self._array.append([x_rot, y_rot])
                 phi.interpolate(gaussian([(x_rot, y_rot, rx, ry)], fs.mesh(), rotation=angle))
 
+    @property
+    def basis_function(self):
+        return self.basis_functions[0]
+
     def set_initial_condition(self, prob):
         """
         Project from the radial basis into the prognostic space used within the tsunami propagation

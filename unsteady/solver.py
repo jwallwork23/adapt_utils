@@ -269,6 +269,30 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.fwd_solutions_bathymetry[i] = Function(self.W[i], name="Forward bathymetry solution")
             # self.adj_solutions_bathymetry[i] = Function(self.W[i], name="Adjoint bathymetry solution")
 
+    @property
+    def fwd_solution_tracer(self):
+        return self.fwd_solutions_tracer[0]
+
+    @property
+    def adj_solution_tracer(self):
+        return self.adj_solutions_tracer[0]
+
+    @property
+    def fwd_solution_sediment(self):
+        return self.fwd_solutions_sediment[0]
+
+    @property
+    def adj_solution_sediment(self):
+        return self.adj_solutions_sediment[0]
+
+    @property
+    def fwd_solution_bathymetry(self):
+        return self.fwd_solutions_bathymetry[0]
+
+    @property
+    def adj_solution_bathymetry(self):
+        return self.adj_solutions_bathymetry[0]
+
     def free_solutions_step(self, i):
         super(AdaptiveProblem, self).free_solutions_step(i)
         if self.op.solve_tracer:

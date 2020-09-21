@@ -212,7 +212,7 @@ else:
         swp.checkpointing = True
         J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
         swp.solve_adjoint(checkpointing_mode='disk')
-        g = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)  # TODO: No minus sign?
+        g = assemble(inner(op.basis_function, swp.adj_solution)*dx)  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradients[0]
         msg = "control = {:15.8e}  functional = {:15.8e}  gradient = {:15.8e}"

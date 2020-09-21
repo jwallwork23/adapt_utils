@@ -107,6 +107,14 @@ class AdaptiveProblemBase(object):
         if not hasattr(self, 'fields'):
             self.fields = [AttrDict() for i in range(self.num_meshes)]
 
+    @property
+    def fwd_solution(self):
+        return self.fwd_solutions[0]
+
+    @property
+    def adj_solution(self):
+        return self.adj_solutions[0]
+
     def print(self, msg):
         if self.print_progress:
             print_output(msg)
