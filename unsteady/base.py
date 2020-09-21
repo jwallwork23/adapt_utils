@@ -48,7 +48,6 @@ class AdaptiveProblemBase(object):
         self.checkpointing = kwargs.pop('checkpointing', False)
         self.print_progress = kwargs.pop('print_progress', True)
         self.manual = kwargs.pop('manual', False)
-        self.on_the_fly = kwargs.pop('on_the_fly', False)  # TODO
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -483,8 +482,7 @@ class AdaptiveProblemBase(object):
             self.transfer_forward_solution(i)
             self.setup_solver_forward_step(i)
             self.solve_forward_step(i, **kwargs)
-            if self.on_the_fly:
-                self.free_solver_forward_step(i)
+            self.free_solver_forward_step(i)
 
     def solve_adjoint(self, reverse=True, **kwargs):
         """Solve adjoint problem on the full sequence of meshes."""
@@ -493,8 +491,7 @@ class AdaptiveProblemBase(object):
             self.transfer_adjoint_solution(i)
             self.setup_solver_adjoint_step(i)
             self.solve_adjoint_step(i, **kwargs)
-            if self.on_the_fly:
-                self.free_solver_adjoint_step(i)
+            self.free_solver_adjoint_step(i)
 
     def quantity_of_interest(self):
         """

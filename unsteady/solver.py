@@ -1221,13 +1221,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug("FREE: Removing forward equations on mesh {:d}...".format(i))
         self.free_forward_equations_step(i)
 
-    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
+    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, **kwargs):
         """
         Solve forward PDE on mesh `i`.
 
         :kwarg update_forcings: a function which takes simulation time as an argument and is
             evaluated at the start of every timestep.
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
+        :kwarg checkpointing_mode: choose between 'memory' and 'disk'.
         """
         op = self.op
         plot_pvd &= op.plot_pvd
@@ -1326,14 +1327,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Save to checkpoint
             if self.checkpointing:
+                mode = kwargs.get('checkpointing_mode', 'memory')
                 if op.solve_swe:
-                    self.save_to_checkpoint(self.fwd_solutions[i])
+                    self.save_to_checkpoint(self.fwd_solutions[i], mode=mode)
                 if op.solve_tracer:
-                    self.save_to_checkpoint(self.fwd_solutions_tracer[i])
+                    self.save_to_checkpoint(self.fwd_solutions_tracer[i], mode=mode)
                 if op.solve_sediment:
-                    self.save_to_checkpoint(self.fwd_solutions_sediment[i])
+                    self.save_to_checkpoint(self.fwd_solutions_sediment[i], mode=mode)
                 if op.solve_exner:
-                    self.save_to_checkpoint(self.fwd_solutions_bathymetry[i])
+                    self.save_to_checkpoint(self.fwd_solutions_bathymetry[i], mode=mode)
                 # TODO: Checkpoint mesh if moving
 
             # Export
@@ -1404,13 +1406,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug("FREE: Removing adjoint equations on mesh {:d}...".format(i))
         self.free_adjoint_equations_step(i)
 
-    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
+    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, **kwargs):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.
 
         :kwarg update_forcings: a function which takes simulation time as an argument and is
             evaluated at the start of every timestep.
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
+        :kwarg checkpointing_mode: choose between 'memory' and 'disk'.
         """
         op = self.op
         plot_pvd &= op.plot_pvd
@@ -1469,14 +1472,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Collect forward solution from checkpoint and free associated memory
             #   NOTE: We need collect the checkpoints from the stack in reverse order
             if self.checkpointing:
+                mode = kwargs.get('checkpointing_mode', 'memory')
                 if op.solve_exner:
-                    self.fwd_solutions_bathymetry[i].assign(self.collect_from_checkpoint())
+                    self.fwd_solutions_bathymetry[i].assign(self.collect_from_checkpoint(), mode=mode)
                 if op.solve_sediment:
-                    self.fwd_solutions_sediment[i].assign(self.collect_from_checkpoint())
+                    self.fwd_solutions_sediment[i].assign(self.collect_from_checkpoint(), mode=mode)
                 if op.solve_tracer:
-                    self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint())
+                    self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint(), mode=mode)
                 if op.solve_swe:
-                    self.fwd_solutions[i].assign(self.collect_from_checkpoint())
+                    self.fwd_solutions[i].assign(self.collect_from_checkpoint(), mode=mode)
 
             # Solve adjoint PDE(s)
             if op.solve_swe:
