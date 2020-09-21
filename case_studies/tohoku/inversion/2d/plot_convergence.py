@@ -173,32 +173,33 @@ if use_regularisation:
     func_values_reg = np.load(os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level)))
 
 # Fit a cubic
-q = scipy.interpolate.interp2d(control_values, control_values, func_values, kind='cubic')
-# TODO: Check it is actually a quadratic
+q = scipy.interpolate.interp2d(xc, yc, func_values, kind='cubic')
+# TODO: Check it is actually a quadratic - third derivatives should be zero everywhere
 # TODO: Find root
 
 # Fit quadratic to regularised functional values
 if use_regularisation:
-    q_reg = scipy.interpolate.interp2d(control_values, control_values, func_values_reg, kind='cubic')
+    q_reg = scipy.interpolate.interp2d(xc, yc, func_values_reg, kind='cubic')
 
 # Evaluate interpolant and its gradient
-xf = yf = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
+xf = yf = np.linspace(xc[0], xc[-1], 10*n)
 Xf, Yf = np.meshgrid(xf, yf)
-Q = q(Xf, Yf)
-dQ = np.zeros((n, n, 2))
-for i, xi in enumerate(xc)
+Q = q(xf, yf)
+dQx = np.zeros((n, n))
+dQy = np.zeros((n, n))
+for i, xi in enumerate(xc):
     for j, yj in enumerate(yc):
-        dQ[i, j, 0] = Q(xc, yc, dx=1)
-        dQ[i, j, 1] = Q(xc, yc, dy=1)
+        dQx[i, j] = q(xi, yj, dx=1)
+        dQy[i, j] = q(xi, yj, dy=1)
 
 # Plot parameter space
 fig, axes = plt.subplots(figsize=(8, 8))
-params = {}  # TODO
+params = {'cmap': 'coolwarm', 'levels': 50}
 # params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'markevery': 10}
 # params['label'] = r'$\alpha=0.00$' if use_regularisation else r'Parameter space'
 axes.contourf(Xf, Yf, Q, **params)
 params = {}  # TODO
-axes.quiver(Xc, Yc, dQ, **params)
+axes.quiver(Xc, Yc, dQx, dQy, **params)
 axes.set_xlabel(r"First basis function coefficient, $m_1$", fontsize=fontsize)
 axes.set_ylabel(r"Second basis function coefficient, $m_2$", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
