@@ -8,6 +8,7 @@ import sys
 
 from adapt_utils.argparse import ArgumentParser
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
+from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
 
@@ -56,7 +57,12 @@ dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
 if args.extension is not None:
     di = '_'.join([di, args.extension])
-if args.adjoint is None or args.adjoint not in ('discrete', 'continuous'):
+if args.adjoint == 'continuous':
+    problem_constructor = AdaptiveProblem
+    stop_annotating()
+elif args.adjoint == 'continuous':
+    problem_constructor = AdaptiveDiscreteAdjointProblem
+else:
     raise ValueError
 
 # Collect initialisation parameters
@@ -104,7 +110,7 @@ try:
 except AssertionError:
     print_output("Run forward to get 'data'...")
     with stop_annotating():
-        swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
+        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
         control_value = [float(args.optimal_control or 5.0)]
         op.assign_control_parameters(control_value, mesh=swp.meshes[0])
         swp.solve_forward()
@@ -126,7 +132,7 @@ if recompute or not os.path.isfile(fname):
     msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
     func_values = np.zeros(n)
     with stop_annotating():
-        swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
+        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
         for i, m in enumerate(control_values):
             op.assign_control_parameters(m, mesh=swp.meshes[0])
             swp.solve_forward()
@@ -140,7 +146,7 @@ if use_regularisation and (recompute or os.path.isfile(fname)):
     msg = "{:2d}: control value {:.4e}  regularised functional value {:.4e}"
     func_values_reg = np.zeros(n)
     with stop_annotating():
-        swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
+        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
         for i, m in enumerate(control_values):
             op.assign_control_parameters(m, mesh=swp.meshes[0])
             swp.solve_forward()
@@ -153,8 +159,7 @@ if use_regularisation and (recompute or os.path.isfile(fname)):
 
 # Set initial guess
 op.save_timeseries = True
-swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
-print_output("Clearing tape...")
+swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
 swp.clear_tape()
 print_output("Setting initial guess...")
 control_value = [float(args.initial_guess or 7.5)]
@@ -329,14 +334,13 @@ else:
 
 # Run forward again so that we can compare timeseries
 op.plot_pvd = plot_pvd
-swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=False)
-print_output("Clearing tape...")
+op.di = di
+swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
 swp.clear_tape()
 print_output("Assigning optimised control parameters...")
 op.assign_control_parameters(optimised_value)
 print_output("Run to plot optimised timeseries...")
 swp.solve_forward()
-J = swp.quantity_of_interest()
 
 # Save timeseries to file
 for gauge in gauges:

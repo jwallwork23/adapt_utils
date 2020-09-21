@@ -36,6 +36,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         """
         Strip all blocks from pyadjoint's tape, along with their associated data.
         """
+        print_output("Clearing tape...")
         self.tape.clear_tape()
 
     def solve_adjoint(self, scaling=1.0):
