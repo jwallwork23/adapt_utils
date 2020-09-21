@@ -29,8 +29,9 @@ class TsunamiOptions(CoupledOptions):
         self.solve_swe = True
         self.solve_tracer = False
         self.force_zone_number = kwargs.get('force_zone_number', False)
-        if not coordinate_system in ('utm', 'lonlat'):
-            raise NotImplementedError("Coordinate system '{:s}' not recognised.".format(coordinate_system))
+        if coordinate_system not in ('utm', 'lonlat'):
+            msg = "Coordinate system '{:s}' not recognised.".format(coordinate_system)
+            raise NotImplementedError(msg)
         self.coordinate_system = coordinate_system
         self.gauges = {}
         self.locations_of_interest = {}

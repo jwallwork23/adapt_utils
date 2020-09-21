@@ -259,4 +259,4 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         m_opt = scipy.optimize.fmin_bfgs(J, m_init, **opt_kwargs)
 
         # Assign values
-        self.assign_control_parameters(m, prob.meshes[0])
+        self.assign_control_parameters(m_opt, prob.meshes[0])

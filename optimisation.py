@@ -8,7 +8,7 @@ from adapt_utils.misc import prod
 __all__ = ["taylor_test", "StagnationError"]
 
 
-def taylor_test(function, gradient, m, verbose=False, ratio_tol=3.95):
+def taylor_test(function, gradient, m, delta_m=None, verbose=False, ratio_tol=3.95):
     """
     Apply a 'Taylor test' to verify that the provided `gradient` function is a consistent
     approximation to the provided `function` at point `m`. This is done by choosing a random search
@@ -18,13 +18,14 @@ def taylor_test(function, gradient, m, verbose=False, ratio_tol=3.95):
     :arg function: a scalar valued function with a single vector argument.
     :arg gradient: proposed gradient of above function, to be tested.
     :arg m: vector at which to perform the test.
+    :arg delta_m: search direction in which to perform the test.
     :kwarg verbose: toggle printing to screen.
     :kwarg ratio_tol: value which must be exceeded for convergence.
     """
     if verbose:
         print_output(24*"=" + "TAYLOR TEST" + 24*"=")
     m = np.array(m).reshape((prod(np.shape(m)), ))
-    delta_m = np.random.normal(loc=0.0, scale=1.0, size=m.shape)
+    delta_m = delta_m or np.random.normal(loc=0.0, scale=1.0, size=m.shape)
 
     # Evaluate the reduced functional and gradient at the specified control value
     Jm = function(m)

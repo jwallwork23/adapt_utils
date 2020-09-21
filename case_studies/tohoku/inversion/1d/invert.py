@@ -1,5 +1,4 @@
 from thetis import *
-from firedrake_adjoint import *
 
 import numpy as np
 import os
@@ -8,8 +7,6 @@ import sys
 
 from adapt_utils.argparse import ArgumentParser
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
-from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
 
 # --- Parse arguments
@@ -39,10 +36,24 @@ parser.add_argument("-optimal_control", help="Artificially choose an optimum to 
 parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
 
 
+# --- Imports relevant to adjoint mode
+
+args = parser.args
+if args.adjoint == 'continuous':
+    from adapt_utils.pyadjoint_dummy import *
+    from adapt_utils.unsteady.solver import AdaptiveProblem
+    problem_constructor = AdaptiveProblem
+elif args.adjoint == 'discrete':
+    from firedrake_adjoint import *
+    from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
+    problem_constructor = AdaptiveDiscreteAdjointProblem
+else:
+    raise ValueError("Adjoint mode '{:}' not recognised.".format(args.adjoint))
+
+
 # --- Set parameters
 
 # Parsed arguments
-args = parser.parse_args()
 level = int(args.level or 0)
 recompute = bool(args.recompute_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
@@ -51,13 +62,6 @@ plot_pvd = bool(args.plot_pvd or False)
 timeseries = 'timeseries'
 if bool(args.continuous_timeseries or False):
     timeseries = '_'.join([timeseries, 'smooth'])
-if args.adjoint == 'continuous':
-    problem_constructor = AdaptiveProblem
-    stop_annotating()
-elif args.adjoint == 'discrete':
-    problem_constructor = AdaptiveDiscreteAdjointProblem
-else:
-    raise ValueError
 
 # Setup output directories
 dirname = os.path.dirname(__file__)

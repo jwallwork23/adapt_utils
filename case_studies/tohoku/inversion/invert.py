@@ -1,5 +1,4 @@
 from thetis import *
-from firedrake_adjoint import *
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -13,8 +12,6 @@ from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBas
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.norms import vecnorm
 from adapt_utils.plotting import *
-from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 
@@ -43,6 +40,22 @@ parser.add_argument("-zero_initial_guess", help="""
     Toggle between a zero initial guess and scaled Gaussian.
     """)
 parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial guess (default 6.0)")
+parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
+
+
+# --- Imports relevant to adjoint mode
+
+args = parser.args
+if args.adjoint == 'continuous':
+    from adapt_utils.pyadjoint_dummy import *
+    from adapt_utils.unsteady.solver import AdaptiveProblem
+    problem_constructor = AdaptiveProblem
+elif args.adjoint == 'discrete':
+    from firedrake_adjoint import *
+    from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
+    problem_constructor = AdaptiveDiscreteAdjointProblem
+else:
+    raise ValueError("Adjoint mode '{:}' not recognised.".format(args.adjoint))
 
 
 # --- Set parameters
@@ -57,13 +70,6 @@ plot = parser.plotting_args()
 timeseries = 'timeseries'
 if bool(args.continuous_timeseries or False):
     timeseries = '_'.join([timeseries, 'smooth'])
-if args.adjoint == 'continuous':
-    problem_constructor = AdaptiveProblem
-    stop_annotating()
-elif args.adjoint == 'discrete':
-    problem_constructor = AdaptiveDiscreteAdjointProblem
-else:
-    raise ValueError
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1 and plot['any']:
@@ -101,6 +107,7 @@ kwargs = {
     'synthetic': False,
     'qoi_scaling': 1.0,
     'noisy_data': bool(args.noisy_data or False),
+    'regularisation': float(args.regularisation or 0.0),
 
     # I/O and debugging
     'plot_pvd': False,
@@ -110,6 +117,7 @@ kwargs = {
 }
 if args.end_time is not None:
     kwargs['end_time'] = float(args.end_time)
+use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 
 # Construct Options parameter class
 gaussian_scaling = float(args.gaussian_scaling or 6.0)
@@ -235,7 +243,7 @@ else:
         J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
         swp.solve_adjoint(checkpointing_mode=chk)
         g = np.array([
-            assemble(inner(bf, adj)*dx) for bf, adj in zip(op.basis_functions, swp.adj_solutions)
+            assemble(inner(bf, swp.adj_solution)*dx) for bf in op.basis_functions
         ])  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradient
@@ -363,7 +371,7 @@ if optimise:
 
         opt_kwargs['fprime'] = gradient_save_data
         opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
-        m_init = op.control_parameter.dat.data
+        m_init = [m.dat.data[0] for m in op.control_parameters]
         optimised_value = scipy.optimize.fmin_bfgs(Jhat_save_data, m_init, **opt_kwargs)
 else:
     optimised_value = np.load(fname.format('ctrl'))[-1]
