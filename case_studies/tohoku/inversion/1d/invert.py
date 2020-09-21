@@ -178,7 +178,7 @@ try:
     assert args.adjoint == 'continuous'
     assert np.all([os.path.isfile(fname) for fname in fnames])
     print_output("Loading initial timeseries...")
-    for fname, gauge in zip(fnames, gauges):
+    for gauge, fname in zip(gauges, fnames):
         op.gauges[gauge][timeseries] = np.load(fname)
 except AssertionError:
     print_output("Run forward to get initial timeseries...")

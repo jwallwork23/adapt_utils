@@ -191,18 +191,25 @@ swp.clear_tape()
 print_output("Setting initial guess...")
 op.assign_control_parameters(kwargs['control_parameters'], swp.meshes[0])
 controls = [Control(m) for m in op.control_parameters]
-print_output("Run forward to get timeseries...")
 
-# Solve forward problem
-swp.solve_forward()
-J = swp.quantity_of_interest()
-
-# Save timeseries
-for gauge in gauges:
-    fname = os.path.join(di, '{:s}_data_{:d}'.format(gauge, level))
-    np.save(fname, op.gauges[gauge]['data'])
-    fname = os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries, level))
-    np.save(fname, op.gauges[gauge][timeseries])
+# Solve the forward problem / load data
+fnames = [os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries, level)) for gauge in gauges]
+fnames_data = [os.path.join(di, '{:s}_data_{:d}'.format(gauge, level)) for gauge in gauges]
+try:
+    assert args.adjoint == 'continuous'
+    assert np.all([os.path.isfile(fname) for fname in fnames])
+    assert np.all([os.path.isfile(fname) for fname in fnames_data])
+    print_output("Loading initial timeseries...")
+    for gauge, fname, fname_data in zip(gauges, fnames, fnames_data):
+        op.gauges[gauge][timeseries] = np.load(fname)
+        op.gauges[gauge]['data'] = np.load(fname_data)
+except AssertionError:
+    print_output("Run forward to get initial timeseries...")
+    swp.solve_forward()
+    J = swp.quantity_of_interest()
+    for gauge, fname, fname_data in zip(gauges, fnames, fnames_data):
+        np.save(fname, op.gauges[gauge][timeseries])
+        np.save(fname_data, op.gauges[gauge]['data'])
 
 # Define reduced functional and gradient functions
 if args.adjoint == 'discrete':
