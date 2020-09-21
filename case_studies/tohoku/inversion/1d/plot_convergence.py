@@ -93,55 +93,86 @@ gauges = list(op.gauges.keys())
 # Plotting parameters
 fontsize = 22
 fontsize_tick = 18
-plotting_kwargs = {'markevery': 5}
+fontsize_legend = 18
+kwargs = {'markevery': 5}
 
 
 # --- Plot timeseries
 
 # Before optimisation
-for gauge in gauges:
-    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
-    op.gauges[gauge]['init'] = np.load(fname)
-    fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
-    op.gauges[gauge]['data'] = np.load(fname)
 N = int(np.ceil(np.sqrt(len(gauges))))
 fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
 for i, gauge in enumerate(gauges):
+
+    # Load data
+    fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
+    op.gauges[gauge]['data'] = np.load(fname)
+    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
+    op.gauges[gauge]['init'] = np.load(fname)
+    data = np.array(op.gauges[gauge]['data'])
+    init = np.array(op.gauges[gauge]['init'])
+    n = len(data)
+
     T = np.array(op.gauges[gauge]['times'])/60
+    T = np.linspace(T[0], T[-1], n)
     ax = axes[i//N, i % N]
-    ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-    ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' simulated', **plotting_kwargs)
-    ax.legend(loc='upper left')
-    ax.set_xlabel('Time (min)', fontsize=fontsize)
-    ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+    ax.plot(T, data, '-', **kwargs)
+    ax.plot(T, init, '-', label=gauge, **kwargs)
+    ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
+    if i//N == 3:
+        ax.set_xlabel('Time (min)', fontsize=fontsize)
+    if i % N == 0:
+        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
     plt.xticks(fontsize=fontsize_tick)
     plt.yticks(fontsize=fontsize_tick)
+    ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
+    ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
     ax.grid()
 for i in range(len(gauges), N*N):
     axes[i//N, i % N].axis(False)
 savefig('timeseries_{:d}'.format(level), plot_dir, extensions=extensions)
-di = os.path.join(di, args.adjoint)
 
 # After optimisation
-for gauge in gauges:
-    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
-    op.gauges[gauge]['opt'] = np.load(fname)
+msg = "Cannot plot timeseries for optimised controls on mesh {:d} because the data don't exist."
 fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
+plotted = False
 for i, gauge in enumerate(gauges):
+
+    # Load data
+    fname = os.path.join(op.di, args.adjoint, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
+    if not os.path.isfile(fname):
+        print_output(msg.format(level))
+        break
+    op.gauges[gauge]['opt'] = np.load(fname)
+    data = np.array(op.gauges[gauge]['data'])
+    opt = np.array(op.gauges[gauge]['opt'])
+    n = len(opt)
+    assert len(data) == n
+
     T = np.array(op.gauges[gauge]['times'])/60
+    T = np.linspace(T[0], T[-1], n)
     ax = axes[i//N, i % N]
-    ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **plotting_kwargs)
-    ax.plot(T, op.gauges[gauge]['opt'], '--x', label=gauge + ' optimised', **plotting_kwargs)
-    ax.legend(loc='upper left')
-    ax.set_xlabel('Time (min)', fontsize=fontsize)
-    ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+    ax.plot(T, data, '-', **kwargs)
+    ax.plot(T, opt, '-', label=gauge, **kwargs)
+    ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
+    if i//N == 3:
+        ax.set_xlabel('Time (min)', fontsize=fontsize)
+    if i % N == 0:
+        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
     plt.xticks(fontsize=fontsize_tick)
     plt.yticks(fontsize=fontsize_tick)
+    ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
+    ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
+    t0 = op.gauges[gauge]["arrival_time"]/60
+    tf = op.gauges[gauge]["departure_time"]/60
+    ax.set_xlim([t0, tf])
     ax.grid()
-for i in range(len(gauges), N*N):
-    axes[i//N, i % N].axis(False)
-fname = 'timeseries_optimised_{:d}'.format(level)
-savefig(fname, plot_dir, args.adjoint, extensions=extensions)
+    plotted = True
+if plotted:
+    for i in range(len(gauges), N*N):
+        axes[i//N, i % N].axis(False)
+    fname = 'timeseries_optimised_{:d}'.format(level)
+    savefig(fname, plot_dir, args.adjoint, extensions=extensions)
 
 
 # --- Plot optimisation progress
@@ -189,7 +220,7 @@ if use_regularisation:
 savefig('{:s}_{:d}'.format(fname, level), plot_dir, extensions=extensions)
 
 # Load trajectory
-fname = os.path.join(di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+fname = os.path.join(di, args.adjoint, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 control_values_opt = np.load(fname.format('ctrl', level))
 func_values_opt = np.load(fname.format('func', level))
 gradient_values_opt = np.load(fname.format('grad', level))

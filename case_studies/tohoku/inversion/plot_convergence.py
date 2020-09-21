@@ -54,9 +54,9 @@ if len(extensions) == 0:
     print_output("Nothing to plot.")
     sys.exit(0)
 plot_init = bool(args.plot_initial_guess or False)
-timeseries_type = "timeseries"
+timeseries_type = 'timeseries'
 if bool(args.continuous_timeseries or False):
-    timeseries_type = "_".join([timeseries_type, "smooth"])
+    timeseries_type = '_'.join([timeseries_type, 'smooth'])
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1:
@@ -105,9 +105,9 @@ if plot_init:
         for i, gauge in enumerate(gauges):
 
             # Load data
-            fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
+            fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
             op.gauges[gauge]['data'] = np.load(fname)
-            fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
+            fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
             op.gauges[gauge]['init'] = np.load(fname)
             data = np.array(op.gauges[gauge]['data'])
             init = np.array(op.gauges[gauge]['init'])
@@ -119,7 +119,6 @@ if plot_init:
             ax = axes[i//N, i % N]
             ax.plot(T, data, '-', **kwargs)
             ax.plot(T, init, '-', label=gauge, **kwargs)
-            ax.legend(loc='best', fontsize=fontsize_legend)
             ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
             if i//N == 3:
                 ax.set_xlabel('Time (min)', fontsize=fontsize)
@@ -132,7 +131,6 @@ if plot_init:
             ax.grid()
         for i in range(len(gauges), N*N):
             axes[i//N, i % N].axis(False)
-        plt.tight_layout()
         savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
 
 # Plot progress of QoI
@@ -215,9 +213,9 @@ for level in range(levels):
     for i, gauge in enumerate(gauges):
 
         # Load data
-        fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
+        fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
         op.gauges[gauge]['data'] = np.load(fname)
-        fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
+        fname = os.path.join(op.di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
         if not os.path.isfile(fname):
             print_output(msg.format(level))
             break
@@ -273,7 +271,6 @@ for level in range(levels):
     print_output(msg.format(level, discrete_qois[level]))
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
-    plt.tight_layout()
     savefig('timeseries_optimised_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
 
 # Store errors

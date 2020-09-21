@@ -89,7 +89,7 @@ kwargs = {
     'ny': 1,
     'regularisation': float(args.regularisation or 0.0),
 
-    # Misc
+    # I/O and debugging
     'plot_pvd': False,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
@@ -238,9 +238,9 @@ if taylor:
     # Ensure consistency of tests
     np.random.seed(0)
 
-    # Random search direction
+    # Increasing search direction of length 0.1
     dc = Function(op.control_parameters[0])
-    dc.dat.data[0] = np.random.random() - 0.5
+    dc.assign(0.1)
 
     # Run tests
     for mode in ("init", "random", "optimised"):
