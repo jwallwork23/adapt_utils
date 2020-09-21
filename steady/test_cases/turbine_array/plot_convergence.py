@@ -66,7 +66,7 @@ for offset in (0, 1):
                 ax.semilogx(dofs, qois, **kwargs)
     plt.grid(True)
     xlim = ax.get_xlim()
-    hlines = [exact, ]
+    hlines = [exact]
     if not loglog:
         if errorline > 1e-3:
             hlines.append((1.0 + errorline/100)*exact)

@@ -114,8 +114,8 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         if fields_old.get('diffusivity_h') is None:
             return 0
         diffusivity_h = fields_old['diffusivity_h']
-        diff_tensor = as_matrix([[diffusivity_h, 0, ],
-                                 [0, diffusivity_h, ]])
+        diff_tensor = as_matrix([[diffusivity_h, 0],
+                                 [0, diffusivity_h]])
 
         return self.p0test*arg*div(dot(diff_tensor, grad(solution)))*self.dx
 
@@ -123,8 +123,8 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         if fields_old.get('diffusivity_h') is None:
             return 0
         diffusivity_h = fields_old['diffusivity_h']
-        diff_tensor = as_matrix([[diffusivity_h, 0, ],
-                                 [0, diffusivity_h, ]])
+        diff_tensor = as_matrix([[diffusivity_h, 0],
+                                 [0, diffusivity_h]])
 
         flux_terms = 0
         if self.horizontal_dg:
@@ -146,8 +146,8 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         if fields_old.get('diffusivity_h') is None:
             return 0
         diffusivity_h = fields_old['diffusivity_h']
-        diff_tensor = as_matrix([[diffusivity_h, 0, ],
-                                 [0, diffusivity_h, ]])
+        diff_tensor = as_matrix([[diffusivity_h, 0],
+                                 [0, diffusivity_h]])
 
         flux_terms = 0
 

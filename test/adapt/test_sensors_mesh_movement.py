@@ -30,7 +30,7 @@ def monitor_type(request):
     return request.param
 
 
-@pytest.fixture(params=['quasi_newton', ])
+@pytest.fixture(params=['quasi_newton'])
 def method(request):
     return request.param
 

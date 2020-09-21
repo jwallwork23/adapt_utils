@@ -141,5 +141,5 @@ class SubFault(clawpack.geoclaw.dtopotools.SubFault):
         dtopo.X = X
         dtopo.Y = Y
         dtopo.dZ = numpy.array(dz, ndmin=3)
-        dtopo.times = [0.0, ]
+        dtopo.times = [0.0]
         self.dtopo = dtopo

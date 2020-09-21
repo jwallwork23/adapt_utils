@@ -68,9 +68,9 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0), ])/L
+            grad_x = lambda F: as_vector([F.dx(0)])/L
             ddt = lambda F: F.dx(1)/T
-            n = as_vector([self.n[0], ])
+            n = as_vector([self.n[0]])
         elif self.dim == 3:
             grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
             perp = lambda F: as_vector([-F[1], F[0]])
@@ -125,7 +125,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0), ])/L
+            grad_x = lambda F: as_vector([F.dx(0)])/L
             ddt = lambda F: F.dx(1)/T
         elif self.dim == 3:
             grad_x = lambda F: as_vector([F.dx(0), F.dx(1)])/L
@@ -178,7 +178,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0), ])/L
+            grad_x = lambda F: as_vector([F.dx(0)])/L
             ddt = lambda F: F.dx(1)/T
             div_x = lambda F: F[0].dx(0)
         elif self.dim == 3:
@@ -208,7 +208,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Normal vector
         if self.dim == 2:
-            n = as_vector([tpe.n[0], ])
+            n = as_vector([tpe.n[0]])
         elif self.dim == 3:
             n = as_vector([tpe.n[0], tpe.n[1]])
         else:
@@ -243,7 +243,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Operators
         if self.dim == 2:
-            grad_x = lambda F: as_vector([F.dx(0), ])/L
+            grad_x = lambda F: as_vector([F.dx(0)])/L
             ddt = lambda F: F.dx(1)/T
             div_x = lambda F: F[0].dx(0)
         elif self.dim == 3:
@@ -274,7 +274,7 @@ class SpaceTimeShallowWaterProblem(SteadyProblem):
 
         # Normal vector
         if self.dim == 2:
-            n = as_vector([tpe.n[0], ])
+            n = as_vector([tpe.n[0]])
         elif self.dim == 3:
             n = as_vector([tpe.n[0], tpe.n[1]])
         else:

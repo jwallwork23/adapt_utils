@@ -97,7 +97,7 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
                 psi, phi = self.basis_functions[i + j*nx].split()
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
                 self._array.append([x_rot, y_rot])
-                phi.interpolate(box([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
+                phi.interpolate(box([(x_rot, y_rot, rx, ry)], fs.mesh(), rotation=angle))
 
     def set_initial_condition(self, prob):
         """

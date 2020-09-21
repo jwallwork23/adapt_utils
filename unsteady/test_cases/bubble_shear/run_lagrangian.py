@@ -62,7 +62,7 @@ def monitor(mesh):
 
 mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
 mesh_mover.adapt()
-tp.__init__(op, meshes=[Mesh(mesh_mover.x), ])
+tp.__init__(op, meshes=[Mesh(mesh_mover.x)])
 
 
 # --- Solve the tracer transport problem

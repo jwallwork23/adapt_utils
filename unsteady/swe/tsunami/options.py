@@ -328,7 +328,7 @@ class TsunamiOptions(CoupledOptions):
                     sampled_times.append(0.5*(time + time_prev))
                     sampled_data.append(np.mean(running))
                     time_prev = time
-                    running = [dat, ]
+                    running = [dat]
 
         # Construct interpolant
         kwargs.setdefault('bounds_error', False)

@@ -28,7 +28,7 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # the problem is inviscid
 
     # Adjoint
-    'control_parameters': [10.0, ],
+    'control_parameters': [10.0],
     'optimal_value': 5.0,
     'synthetic': True,
     # 'qoi_scaling': 1.0e-12,

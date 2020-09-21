@@ -98,8 +98,8 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         angle = self.strike_angle              # Angle by which to rotate axis / basis array
 
         # Setup array coordinates
-        X = np.array([0.0, ]) if nx == 1 else np.linspace(-0.5*dx, 0.5*dx, nx)
-        Y = np.array([0.0, ]) if ny == 1 else np.linspace(-0.5*dy, 0.5*dy, ny)
+        X = np.array([0.0]) if nx == 1 else np.linspace(-0.5*dx, 0.5*dx, nx)
+        Y = np.array([0.0]) if ny == 1 else np.linspace(-0.5*dy, 0.5*dy, ny)
 
         # Assemble array
         self.print_debug("INIT: Assembling rotated radial basis function array...")
@@ -111,7 +111,7 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
                 psi, phi = self.basis_functions[i + j*nx].split()
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
                 self._array.append([x_rot, y_rot])
-                phi.interpolate(gaussian([(x_rot, y_rot, rx, ry), ], fs.mesh(), rotation=angle))
+                phi.interpolate(gaussian([(x_rot, y_rot, rx, ry)], fs.mesh(), rotation=angle))
 
     def set_initial_condition(self, prob):
         """

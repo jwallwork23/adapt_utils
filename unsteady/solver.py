@@ -216,7 +216,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.W = [None for mesh in self.meshes]
 
         # Record DOFs
-        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]  # TODO: other function spaces
+        self.dofs = [[np.array(V.dof_count).sum() for V in self.V]]  # TODO: other function spaces
 
     def create_intermediary_spaces(self):
         super(AdaptiveProblem, self).create_intermediary_spaces()

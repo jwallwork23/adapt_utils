@@ -89,7 +89,7 @@ if monitor is not None:
     mesh_mover.adapt()
     mesh = Mesh(mesh_mover.x)
     op.__init__(mesh=mesh, **kwargs)
-    swp.__init__(op, meshes=[mesh, ])
+    swp.__init__(op, meshes=[mesh])
 
 # Apply constant mesh velocity  # FIXME
 if ale:

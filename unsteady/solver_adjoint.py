@@ -124,7 +124,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         proj_eta.rename("Projected discrete adjoint elevation")
         iterator = list(range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export))
         if 0 not in iterator:
-            iterator.extend([0, ])
+            iterator.extend([0])
         for j in iterator:
             self.extract_adjoint_solution(j)
             if self.op.plot_pvd:
@@ -136,7 +136,7 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         proj = Function(self.P1[i], name="Projected discrete adjoint tracer")
         iterator = list(range(len(self.solve_blocks)-1, -1, -self.op.dt_per_export))
         if 0 not in iterator:
-            iterator.extend([0, ])
+            iterator.extend([0])
         for j in iterator:
             self.extract_adjoint_solution(j)
             if self.op.plot_pvd:

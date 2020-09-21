@@ -67,8 +67,8 @@ class AdaptiveProblemBase(object):
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
-        self.num_cells = [[], ]
-        self.num_vertices = [[], ]
+        self.num_cells = [[]]
+        self.num_vertices = [[]]
         self.meshes = [None for i in range(self.num_meshes)]
         self.set_meshes(meshes)
         if not self.manual:
@@ -133,7 +133,7 @@ class AdaptiveProblemBase(object):
             assert len(meshes) == self.num_meshes
             self.meshes = meshes
         self.mesh_velocities = [None for i in range(self.num_meshes)]
-        if self.num_cells != [[], ]:
+        if self.num_cells != [[]]:
             self.num_cells.append([])
             self.num_vertices.append([])
 

@@ -65,7 +65,7 @@ if plot_png:
 if plot_only:
     assert len(extensions) > 0
 if args.locations is None:  # TODO: Parse as list
-    locations = ['Fukushima Daiichi', ]
+    locations = ['Fukushima Daiichi']
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)

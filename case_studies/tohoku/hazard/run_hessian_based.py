@@ -57,7 +57,7 @@ p = args.norm_order
 
 plot_pvd = bool(args.plot_pvd or False)
 if args.locations is None:
-    locations = ['Fukushima Daiichi', ]
+    locations = ['Fukushima Daiichi']
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)

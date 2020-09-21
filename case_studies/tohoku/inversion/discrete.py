@@ -136,7 +136,7 @@ with stop_annotating():
 
         # Create Radial parameter object
         kwargs_src = kwargs.copy()
-        kwargs_src['control_parameters'] = [gaussian_scaling, ]
+        kwargs_src['control_parameters'] = [gaussian_scaling]
         kwargs_src['nx'], kwargs_src['ny'] = 1, 1
         op_src = TohokuRadialBasisOptions(mesh=op.default_mesh, **kwargs_src)
         swp = AdaptiveDiscreteAdjointProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
@@ -260,8 +260,8 @@ if taylor:
 # Run optimisation / load optimised controls
 fname = os.path.join(di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if optimise:
-    control_values_opt = [[m.dat.data[0] for m in op.control_parameters], ]
-    func_values_opt = [J, ]
+    control_values_opt = []
+    func_values_opt = []
     gradient_values_opt = []
 
     def derivative_cb_post(j, dj, m):

@@ -71,7 +71,7 @@ if plot_pdf:
 if plot_png:
     extensions.append('png')
 if args.locations is None:
-    locations = ['Fukushima Daiichi', ]
+    locations = ['Fukushima Daiichi']
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)

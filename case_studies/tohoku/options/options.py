@@ -520,7 +520,7 @@ class TohokuInversionOptions(TohokuOptions):
         kwargs = {
             'method': 'ols',     # ordinary least squares
             'conf_int': 'none',  # linearised confidence intervals
-            'lat': np.array([self.gauges[gauge]["lonlat"][1], ]),
+            'lat': np.array([self.gauges[gauge]["lonlat"][1]]),
             'verbose': verbose,
         }
         self.print_debug("INIT: Applying UTide de-tiding algorithm to gauge {:s}...".format(gauge))
@@ -615,7 +615,7 @@ class TohokuInversionOptions(TohokuOptions):
 
             # Assemble an area-normalised indicator function
             x, y = gauge_dat["coords"]
-            disc = ellipse([(x, y, radius,), ], mesh)
+            disc = ellipse([(x, y, radius)], mesh)
             area = assemble(disc*dx, annotate=False)
             gauge_dat["indicator"] = interpolate(disc/area, prob.P0[i])
             I = gauge_dat["indicator"]

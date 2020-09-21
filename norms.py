@@ -10,7 +10,7 @@ __all__ = ["lp_norm", "total_variation", "vecnorm", "timeseries_error",
 
 def _split_by_nan(f):
     """Split a list containing NaNs into separate lists."""
-    f_split = [[], ]
+    f_split = [[]]
     nan_slots = []
     for i, fi in enumerate(f):
         if np.isnan(fi):
@@ -100,7 +100,7 @@ def timeseries_error(f, g=None, relative=False, norm_type='tv'):
 
     # Error
     assert n == len(g)
-    g_split = [[], ]
+    g_split = [[]]
     for i in range(n):
         if i in nan_slots:
             if len(g_split[-1]) > 0:
