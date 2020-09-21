@@ -53,7 +53,7 @@ class TurbineArrayOptions(TurbineOptions):
         # Timestepping
         self.dt = 2.232
         self.T_tide = 0.1*self.M2_tide_period
-        self.T_ramp = 3.825*self.T_tide
+        self.T_ramp = 3.855*self.T_tide
         self.end_time = self.T_tide
         self.dt_per_export = 10
 
