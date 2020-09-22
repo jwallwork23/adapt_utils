@@ -196,6 +196,7 @@ except AssertionError:
     for gauge, fname in zip(gauges, fnames):
         np.save(fname, op.gauges[gauge][timeseries])
 di = create_directory(os.path.join(di, args.adjoint))
+op.get_basis_functions(swp.V[0])
 
 # Define reduced functional and gradient functions
 if args.adjoint == 'discrete':
@@ -217,7 +218,10 @@ else:
         """
         J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
         swp.solve_adjoint(checkpointing_mode=chk)
-        g = assemble(inner(op.basis_function, swp.adj_solution)*dx)  # TODO: No minus sign?
+        g = np.array([
+            assemble(inner(op.basis_functions[0], swp.adj_solution)*dx),
+            assemble(inner(op.basis_functions[1], swp.adj_solution)*dx),
+        ])  # TODO: No minus sign?
         if use_regularisation:
             g += op.regularisation_term_gradients[0]
         msg = "control = ({:15.8e}, {:15.8e})  functional = {:15.8e}  gradient = ({:15.8e}, {:15.8e})"
@@ -225,7 +229,7 @@ else:
             print_output(msg.format(*m, J, *g))
         except Exception:
             print_output(msg.format(*m.dat.data, J, *g))
-        return np.array([g])
+        return g
 
 # --- Taylor test
 
@@ -297,8 +301,8 @@ if optimise:
             """
             Callback for saving progress data to file during discrete adjoint inversion.
             """
-            control = m.dat.data
-            djdm = dj.dat.data
+            control = [mi.dat.data[0] for mi in m]
+            djdm = [dji.dat.data[0] for dji in dj]
             msg = "control ({:15.8e}, {:15.8e})  functional {:15.8e}  gradient ({:15.8e}, {:15.8e})"
             print_output(msg.format(*control, j, *djdm))
 
