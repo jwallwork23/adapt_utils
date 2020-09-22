@@ -145,7 +145,7 @@ gauges = list(op.gauges.keys())
 with stop_annotating():
     if zero_init:
         eps = 1.0e-03  # zero gives an error so just choose small
-        kwargs['control_parameters'] = eps*np.ones(len(op.control_parameters))
+        kwargs['control_parameters'] = eps*np.ones(op.nx*op.ny)
     else:
         print_output("Projecting initial guess...")
 
@@ -170,7 +170,6 @@ with stop_annotating():
 
             # Project into P1 for plotting
             swp.set_initial_condition()
-            f_src = project(f_src, swp.P1[0])
             f = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
 
             # Get corners of zoom

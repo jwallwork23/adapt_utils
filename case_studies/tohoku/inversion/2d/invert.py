@@ -102,6 +102,8 @@ kwargs = {
     'qoi_scaling': 1.0,
     'nx': 2,
     'ny': 1,
+    'radius_x': 96.0e+03,
+    'radius_y': 48.0e+03,
     'regularisation': float(args.regularisation or 0.0),
 
     # I/O and debugging
