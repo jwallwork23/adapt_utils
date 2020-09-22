@@ -125,7 +125,7 @@ stop_annotating()
 
 # --- Continuous adjoint
 
-# Solve the forward problem with 'suboptimal' control parameter m = 10, checkpointing state
+# Solve the forward problem with 'suboptimal' control parameter m = 7.5, checkpointing state
 op.di = create_directory(os.path.join(di, 'continuous'))
 swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=True, print_progress=False)
 swp.solve_forward()
@@ -149,7 +149,6 @@ if fd:
     g_fd_ = None
     op.save_timeseries = False
     while not converged:
-        swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
         op.assign_control_parameters([kwargs['control_parameters'][0] + epsilon])
         swp.solve_forward(plot_pvd=False)
         J_step = swp.quantity_of_interest()
@@ -173,6 +172,6 @@ if fd:
 logstr += "discrete gradient: {:.4e}\n".format(g_discrete)
 logstr += "continuous gradient: {:.4e}\n".format(g_continuous)
 print_output(logstr)
-fname = os.path.join(di, "gradient_at_{:d}_level{:d}.log")
+fname = os.path.join(di, "gradient_at_{:.1f}_level{:d}.log")
 with open(fname.format(int(kwargs['control_parameters'][0]), level), 'w') as logfile:
     logfile.write(logstr)
