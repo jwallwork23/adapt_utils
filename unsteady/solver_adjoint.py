@@ -57,9 +57,13 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         """
         Check that `block` corresponds to a finite element/nonlinear/linear solve.
         """
-        assert hasattr(block, 'adj_sol')
-        out = isinstance(block, GenericSolveBlock)
-        out &= block.adj_sol
+        out = True
+        if not isinstance(block, GenericSolveBlock):
+            out = False
+        elif not hasattr(block, 'adj_sol'):
+            out = False
+        elif block.adj_sol is None:
+            out = False
         return out
 
     def get_solve_blocks(self):
