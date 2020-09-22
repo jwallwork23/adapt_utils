@@ -1,5 +1,6 @@
 from thetis import *
 
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import scipy
@@ -7,6 +8,8 @@ import sys
 
 from adapt_utils.argparse import ArgumentParser
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
+from adapt_utils.plotting import *
+from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 
 # --- Parse arguments
@@ -27,6 +30,7 @@ parser = ArgumentParser(
         """,
     adjoint=True,
     optimisation=True,
+    plotting=True,
     shallow_water=True,
 )
 parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
@@ -57,6 +61,7 @@ level = int(args.level or 0)
 recompute = bool(args.recompute_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
 gtol = float(args.gtol or 1.0e-04)
+plot = parser.plotting_args()
 plot_pvd = bool(args.plot_pvd or False)
 timeseries = 'timeseries'
 if bool(args.continuous_timeseries or False):
@@ -111,6 +116,36 @@ use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 op = TohokuBoxBasisOptions(**kwargs)
 op.dirty_cache = bool(args.dirty_cache or False)
 gauges = list(op.gauges.keys())
+
+
+# --- Plot initial guess
+
+if plot.any:
+    with stop_annotating():
+        levels = np.linspace(-0.5, 8.5, 51)
+        ticks = np.linspace(0, 7.5, 4)
+
+        # Project into P1 for plotting
+        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
+        op.assign_control_parameters(init, mesh=swp.meshes[0])
+        swp.set_initial_condition()
+        f = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
+
+        # Get corners of zoom
+        lonlat_corners = [(138, 32), (148, 42), (138, 42)]
+        utm_corners = [lonlat_to_utm(*corner, 54) for corner in lonlat_corners]
+
+        # Plot initial guess
+        fig, axes = plt.subplots(figsize=(4.5, 4))
+        cbar = fig.colorbar(tricontourf(f, axes=axes, levels=levels, cmap='coolwarm'), ax=axes)
+        cbar.set_ticks(ticks)
+        axes.set_xlim([utm_corners[0][0], utm_corners[1][0]])
+        axes.set_ylim([utm_corners[0][1], utm_corners[2][1]])
+        axes.axis(False)
+        plot_dir = create_directory(os.path.join(di, 'plots'))
+        savefig('initial_guess_{:d}'.format(level), plot_dir, extensions=plot.extensions)
+if plot.only:
+    sys.exit(0)
 
 
 # --- Synthetic run
@@ -346,8 +381,9 @@ if optimise:
         opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
         m_init = [m.dat.data[0] for m in op.control_parameters]
         optimised_value = scipy.optimize.fmin_bfgs(Jhat_save_data, m_init, **opt_kwargs)
+        # optimised_value = scipy.optimize.fmin_cg(Jhat_save_data, m_init, **opt_kwargs)
 else:
-    optimised_value = np.array([np.load(fname.format('ctrl'))[-1]])
+    optimised_value = np.load(fname.format('ctrl'))[-1]
 
 
 # --- Run with optimised controls
