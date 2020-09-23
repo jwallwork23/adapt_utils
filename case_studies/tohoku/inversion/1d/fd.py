@@ -66,12 +66,11 @@ try:
         op.gauges[gauge]['data'] = np.load(fname)
 except AssertionError:
     print_output("Run forward to get 'data'...")
-    with stop_annotating():
-        swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
-        op.assign_control_parameters([5.0], mesh=swp.meshes[0])
-        swp.solve_forward()
+    swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
+    op.assign_control_parameters([5.0], mesh=swp.meshes[0])
+    swp.solve_forward()
     for gauge, fname in zip(gauges, fnames):
-        op.gauges[gauge]['data'] = op.gauges[gauge][timeseries]
+        op.gauges[gauge]['data'] = op.gauges[gauge]['timeseries']
         np.save(fname, op.gauges[gauge]['data'])
 
 # Solve the forward problem with 'suboptimal' control parameter m = 10, checkpointing state

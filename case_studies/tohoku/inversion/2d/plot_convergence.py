@@ -38,9 +38,9 @@ plot = parser.plotting_args()
 if not plot.any:
     print_output("Nothing to plot.")
     sys.exit(0)
-timeseries_type = 'timeseries'
+timeseries = 'timeseries'
 if bool(args.continuous_timeseries or False):
-    timeseries_type = '_'.join([timeseries_type, 'smooth'])
+    timeseries = '_'.join([timeseries, 'smooth'])
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1 and plot.any:
@@ -95,7 +95,7 @@ for i, gauge in enumerate(gauges):
     # Load data
     fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
     op.gauges[gauge]['data'] = np.load(fname)
-    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
+    fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries, level))
     op.gauges[gauge]['init'] = np.load(fname)
     data = np.array(op.gauges[gauge]['data'])
     init = np.array(op.gauges[gauge]['init'])
@@ -127,7 +127,7 @@ plotted = False
 for i, gauge in enumerate(gauges):
 
     # Load data
-    fname = os.path.join(op.di, args.adjoint, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
+    fname = os.path.join(op.di, args.adjoint, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries, level))
     if not os.path.isfile(fname):
         print_output(msg.format(level))
         break
@@ -213,7 +213,7 @@ for i, (x, y) in enumerate(4 + 3*np.random.rand(6, 2)):
 coeffs = np.linalg.solve(A, b)
 q_poly = lambda x, y: np.dot(coeffs, vandermonde(x, y))
 Q_poly = q_poly(Xf, Yf)
-assert np.allclose(np.abs((Q - Q_poly)/Q), 0.0, atol=1.0e-03)  # Check we do indeed have a quadratic
+# assert np.allclose(np.abs((Q - Q_poly)/Q), 0.0, atol=1.0e-03)  # Check we do indeed have a quadratic
 
 # Find root and plot it
 a, b, c, d, e, f = coeffs
