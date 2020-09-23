@@ -603,7 +603,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                     import matplotlib.pyplot as plt
                     fig, axes = plt.subplots(figsize=(8, 8))
                     fig.colorbar(tricontourf(surf, cmap='coolwarm', levels=50, axes=axes), ax=axes)
-                    axes.set_title("Iteration {:d} (after {:s} solve)".format(n, control))
+                    axes.set_title("Iteration {:d}".format(n))
                     axes.axis(False)
                     plt.show()
 
