@@ -12,11 +12,9 @@ Solves the initial hydrodynamics simulation of a migrating trench.
 from thetis import *
 
 import numpy as np
-import os
 import time
 
 from adapt_utils.io import export_hydrodynamics
-
 
 res = 1
 

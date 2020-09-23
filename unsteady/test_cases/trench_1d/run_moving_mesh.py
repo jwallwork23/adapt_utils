@@ -46,8 +46,8 @@ kwargs = {
 op = TrenchSedimentOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
+
 
 def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
     """
@@ -57,25 +57,16 @@ def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
-    # eta = swp.solution.split()[1]
     b = swp.fwd_solutions_bathymetry[0]
-    # bath_gradient = recovery.recover_gradient(b)
     bath_hess = recovery.recover_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
     frob_bath_norm = Function(b.function_space()).project(frob_bath_hess/max(frob_bath_hess.dat.data[:]))
     norm_two_proj = project(frob_bath_norm, P1)
 
-    H = Function(P1)
-    tau = TestFunction(P1)
-    n = FacetNormal(mesh)
-
     mon_init = project(Constant(1.0) + alpha * norm_two_proj, P1)
-    #K = 10*(0.2**2)/4
-    #a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
-    #a -= inner(tau, mon_init)*dx
-    #solve(a == 0, H)
 
     return mon_init
+
 
 swp.set_monitor_functions(gradient_interface_monitor)
 
@@ -125,8 +116,3 @@ print(t2-t1)
 df_real = pd.read_csv('fixed_output/bed_trench_output_uni_4.csv')
 print("Mesh error: ")
 print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
-#f = open("adapt_output/output_frob_norm_" + str(nx) + '_' + str(alpha) + '.txt', "w+")
-#f.write(str(np.sqrt(sum(diff_thetis))))
-#f.write("\n")
-#f.write(str(t2-t1))
-#f.close()

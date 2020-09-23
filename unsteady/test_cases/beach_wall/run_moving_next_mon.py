@@ -9,7 +9,7 @@ import time
 
 from adapt_utils.adapt import recovery
 from adapt_utils.io import initialise_bathymetry, export_bathymetry
-from adapt_utils.norms import local_frobenius_norm, local_norm
+from adapt_utils.norms import local_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_wall.options import BeachOptions
 
@@ -21,7 +21,7 @@ alpha = 1
 beta = 1
 gamma = 0
 
-kappa = 100 # 12.5
+kappa = 100
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -56,7 +56,8 @@ assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
+
+def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
     P1 = FunctionSpace(mesh, "CG", 1)
 
     uv, elev = swp.fwd_solutions[0].split()
@@ -72,7 +73,7 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
     else:
         div_uv_star = Function(elev.function_space()).project(frob_uv_hess/max(frob_uv_hess.dat.data[:]))
 
-    if max(abs_horizontal_velocity.dat.data[:])<1e-4:
+    if max(abs_horizontal_velocity.dat.data[:]) < 1e-4:
         abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm)
     else:
         abs_uv_star = Function(elev.function_space()).project(abs_hor_vel_norm/max(abs_hor_vel_norm.dat.data[:]))
@@ -90,6 +91,7 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
 
     return H
 
+
 swp.set_monitor_functions(velocity_monitor)
 
 t1 = time.time()
@@ -105,15 +107,14 @@ bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bath
 fpath = "hydrodynamics_beach_bath_new_{:d}_{:d}_{:d}_{:d}".format(int(nx*220), alpha, beta, gamma)
 export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
 
-
 xaxisthetis1 = []
 baththetis1 = []
 
 for i in np.linspace(0, 219, 220):
     xaxisthetis1.append(i)
     baththetis1.append(-bath.at([i, 5]))
-df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
-df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
+df = pd.concat([pd.DataFrame(xaxisthetis1, columns=['x']), pd.DataFrame(baththetis1, columns=['bath'])], axis=1)
+df.to_csv("final_result_nx" + str(nx) + "_" + str(alpha) + '_' + str(beta) + '_' + str(gamma) + ".csv", index=False)
 
 bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_beach_bath_new_440')
 

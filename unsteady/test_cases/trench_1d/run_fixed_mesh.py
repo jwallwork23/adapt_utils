@@ -83,4 +83,3 @@ print(np.sqrt(sum(diff_thetis)))
 print(nx)
 print("total time: ")
 print(t2-t1)
-

@@ -2,12 +2,10 @@ from thetis import *
 import firedrake as fire
 
 import datetime
-import numpy as np
 import os
-import pandas as pd
 import time
 
-from adapt_utils.io import initialise_bathymetry, export_bathymetry
+from adapt_utils.io import initialise_bathymetry
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_wall.options import BeachOptions
 

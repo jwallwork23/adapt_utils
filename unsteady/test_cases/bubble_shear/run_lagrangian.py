@@ -53,10 +53,12 @@ tp = AdaptiveProblem(op)
 alpha = 10.0   # Parameter controlling significance of refined region
 eps = 1.0e-03  # Parameter controlling width of refined region
 
+
 def monitor(mesh):
     x, y = SpatialCoordinate(mesh)
     x0, y0, r = op.source_loc[0]
     return conditional(le(abs((x-x0)**2 + (y-y0)**2 - r**2), eps), alpha, 1.0)
+
 
 mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
 mesh_mover.adapt()
