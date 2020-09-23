@@ -18,42 +18,15 @@ class Options(FrozenConfigurable):
         ['dg-dg', 'dg-cg', 'cg-cg'],
         default_value='dg-dg',
         help="""
-        Mixed finite element pair to use for the shallow water system. Choose from:
+        Mixed finite element pair to use for the hydrodynamics system. Choose from:
           'cg-cg': Taylor-Hood                    (P2-P1);
           'dg-dg': Equal order DG                 (PpDG-PpDG);
           'dg-cg': Mixed continuous-discontinuous (P1DG-P2),
         where p is the polynomial order specified by :attr:`degree`.""").tag(config=True)
-    tracer_family = Enum(
-        ['dg', 'cg'],
-        default_value='dg',
-        help="""
-        Finite element pair to use for the tracer transport model. Choose from:
-          'cg': Continuous Galerkin    (Pp);
-          'dg': Discontinuous Galerkin (PpDG),
-        where p is the polynomial order specified by :attr:`degree_tracer`.""").tag(config=True)
-    sediment_family = Unicode('dg', help="""
-        Finite element pair to use for the sediment transport model. Choose from:
-          'cg': Continuous Galerkin    (Pp);
-          'dg': Discontinuous Galerkin (PpDG),
-        where p is the polynomial order specified by :attr:`degree_sediment`.""").tag(config=True)
     degree = NonNegativeInteger(1, help="""
-        Polynomial order for shallow water finite element pair :attr:`family'.""").tag(config=True)
-    degree_tracer = NonNegativeInteger(1, help="""
-        Polynomial order for tracer finite element pair :attr:`tracer_family'.""").tag(config=True)
-    degree_bathymetry = NonNegativeInteger(1, help="""
-        Polynomial order for tracer finite element pair :attr:`tracer_family'.""").tag(config=True)
-    degree_sediment = NonNegativeInteger(1, help="""
-        Polynomial order for sediment finite element pair :attr:`sediment_family'.""").tag(config=True)
+        Polynomial order for hydrodynamics finite element pair :attr:`family'.""").tag(config=True)
     degree_increase = NonNegativeInteger(0, help="""
-        When defining an enriched shallow water finite element space, how much should the
-        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
-        """).tag(config=True)
-    degree_increase_tracer = NonNegativeInteger(1, help="""
-        When defining an enriched tracer finite element space, how much should the
-        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
-        """).tag(config=True)
-    degree_increase_sediment = NonNegativeInteger(1, help="""
-        When defining an enriched sediment finite element space, how much should the
+        When defining an enriched hydrodynamics finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)
     periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
@@ -183,9 +156,9 @@ class Options(FrozenConfigurable):
     # Adaptation loop
     element_rtol = PositiveFloat(0.005, help="""
         Relative tolerance for convergence in mesh element count""").tag(config=True)
-    qoi_rtol = PositiveFloat(0.005, help="""
+    qoi_rtol = PositiveFloat(0.005, allow_none=True, help="""
         Relative tolerance for convergence in quantity of interest.""").tag(config=True)
-    estimator_rtol = PositiveFloat(0.005, help="""
+    estimator_rtol = PositiveFloat(0.005, allow_none=True, help="""
         Relative tolerance for convergence in error estimator.""").tag(config=True)
     target_base = PositiveFloat(10.0, help="""
         Base for exponential increase/decay of target complexity/error within outer mesh adaptation loop.
@@ -302,7 +275,7 @@ class Options(FrozenConfigurable):
             return
         if mode == 'full' and self.debug_mode == 'basic':
             return
-        print_output(msg)
+        print_output(self.indent + msg)
 
     # TODO: USEME
     def get_mesh_velocity(self):

@@ -1,68 +1,18 @@
 from thetis import *
 
-import os
-import sys
-import math
 import fnmatch
+import math
 import numpy as np
+import os
 
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["taylor_test", "StagnationError", "prod", "combine", "rotation_matrix", "rotate",
+__all__ = ["prod", "combine", "rotation_matrix", "rotate",
            "box", "ellipse", "bump", "circular_bump", "gaussian", "cg2dg", "copy_mesh",
            "get_finite_element", "get_component_space", "get_component", "get_boundary_nodes",
-           "is_symmetric", "is_pos_def", "is_spd", "check_spd", "readfile", "num_days",
-           "find", "knownargs2dict", "unknownargs2dict", "index_string"]
-
-
-# --- Optimisation
-
-def taylor_test(function, gradient, m, verbose=False, ratio_tol=3.95):
-    """
-    Apply a 'Taylor test' to verify that the provided `gradient` function is a consistent approximation
-    to the provided `function` at point `m`. This is done by choosing a random search direction and
-    constructing a sequence of finite difference approximations. If the gradient is consistent then the
-    associated Taylor remainder will decrease quadratically.
-
-    :arg function: a scalar valued function with a single vector argument.
-    :arg gradient: proposed gradient of above function, to be tested.
-    :arg m: vector at which to perform the test.
-    :kwarg verbose: toggle printing to screen.
-    :kwarg ratio_tol: value which must be exceeded for convergence.
-    """
-    if verbose:
-        print_output(24*"=" + "TAYLOR TEST" + 24*"=")
-    m = np.array(m).reshape((prod(np.shape(m)), ))
-    delta_m = np.random.normal(loc=0.0, scale=1.0, size=m.shape)
-
-    # Evaluate the reduced functional and gradient at the specified control value
-    Jm = function(m)
-    dJdm = gradient(m).reshape(m.shape)
-
-    # Check that the Taylor remainders decrease quadratically
-    remainders = np.zeros(3)
-    for i in range(3):
-        h = pow(0.5, i)
-        if verbose:
-            print_output("h = {:.4e}".format(h))
-        J_step = function(m + h*delta_m)
-        remainders[i] = np.abs(J_step - Jm - h*np.dot(dJdm, delta_m))
-        if verbose:
-            print_output("Taylor remainder = {:.4e}".format(remainders[i]))
-        if i > 0:
-            ratio = remainders[i-1]/remainders[i]
-            try:
-                assert ratio > ratio_tol
-            except AssertionError:
-                msg = "Taylor remainders do not decrease quadratically (ratio {:.4e} < {:.4e})"
-                raise ConvergenceError(msg.format(ratio, ratio_tol))
-    if verbose:
-        print_output(20*"=" + "TAYLOR TEST PASSED!" + 20*"=")
-
-
-class StagnationError(Exception):
-    """Error raised when an optimisation routine stagnates."""
+           "is_symmetric", "is_pos_def", "is_spd", "check_spd", "num_days",
+           "find", "knownargs2dict", "unknownargs2dict"]
 
 
 # --- UFL
@@ -416,22 +366,6 @@ def check_spd(M):
     print_output("PASS: Matrix is indeed positive-definite")
 
 
-# --- I/O
-
-def readfile(filename, reverse=False):
-    """
-    Read a file line-by-line.
-
-    :kwarg reverse: read the lines in reverse order.
-    """
-    with open(filename, 'r') as read_obj:
-        lines = read_obj.readlines()
-    lines = [line.strip() for line in lines]
-    if reverse:
-        lines = reversed(lines)
-    return lines
-
-
 # --- Non-Firedrake specific
 
 def num_days(month, year):
@@ -442,14 +376,6 @@ def num_days(month, year):
         return 31
     elif month == 2:
         return 29 if year % 4 == 0 else 28
-
-
-def index_string(index, n=5):
-    """
-    :arg index: integer form of index.
-    :return: n-digit string form of index.
-    """
-    return (n - len(str(index)))*'0' + str(index)
 
 
 def find(pattern, path):

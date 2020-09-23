@@ -3,7 +3,7 @@ from firedrake import *
 import numpy as np
 
 from adapt_utils.options import Options
-from adapt_utils.adapt.recovery import construct_hessian, construct_boundary_hessian
+from adapt_utils.adapt.recovery import recover_hessian, recover_boundary_hessian
 from adapt_utils.adapt.kernels import *
 
 
@@ -46,7 +46,7 @@ def steady_metric(f=None, H=None, projector=None, **kwargs):
         except AssertionError:
             raise ValueError("Please supply either field for recovery, or Hessian thereof.")
     elif H is None:
-        H = construct_hessian(f, op=op) if projector is None else projector.project(f)
+        H = recover_hessian(f, op=op) if projector is None else projector.project(f)
     V = H.function_space()
     mesh = V.mesh()
     dim = mesh.topological_dimension()
@@ -323,7 +323,6 @@ def cell_size_metric(mesh, op=Options()):
 
 # --- Metric combination methods
 
-
 def metric_intersection(*metrics, **kwargs):
     r"""
     Intersect a metric field, i.e. intersect (globally) over all local metrics.
@@ -387,7 +386,6 @@ def combine_metrics(*metrics, average=True):
 
 # --- Work in progress
 
-
 class SteadyHessianMetric():
     # TODO: doc
     def __init__(self, f, projector=None, op=Options()):
@@ -407,7 +405,7 @@ class SteadyHessianMetric():
         if self.fs.ufl_element().value_shape() == (self.dim, self.dim):
             self.M = f
         else:
-            self.M = construct_hessian(f, op=op) if projector is None else projector.project(f)
+            self.M = recover_hessian(f, op=op) if projector is None else projector.project(f)
 
     def complexity(self):
         """
@@ -489,9 +487,9 @@ def metric_with_boundary(f=None, H=None, h=None, mesh=None, degree=1, op=Options
             raise ValueError("Please supply either field for recovery, or Hessians thereof.")
     else:
         mesh = mesh or f.function_space().mesh()
-        H = H or construct_hessian(f, op=op)
+        H = H or recover_hessian(f, op=op)
         if h is None:
-            h = construct_boundary_hessian(f, op=op)
+            h = recover_boundary_hessian(f, op=op)
             h.interpolate(abs(h))
     V = h.function_space()
     V_ten = H.function_space()

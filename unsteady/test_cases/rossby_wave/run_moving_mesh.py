@@ -5,7 +5,7 @@ import os
 
 from adapt_utils.adapt.metric import metric_intersection
 from adapt_utils.adapt.r import MeshMover
-from adapt_utils.adapt.recovery import construct_hessian
+from adapt_utils.adapt.recovery import recover_hessian
 from adapt_utils.norms import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.rossby_wave.monitors import *
@@ -111,7 +111,7 @@ def elevation_norm_monitor(mesh, alpha=40.0, norm_type='H1'):
     P1DG = FunctionSpace(mesh, "DG", 1)
     eta = project(swp.fwd_solutions[0].split()[1], P1DG)
     if norm_type == 'hessian_frobenius':
-        H = construct_hessian(eta, op=op)
+        H = recover_hessian(eta, op=op)
         return 1.0 + alpha*local_frobenius_norm(H)
     else:
         return 1.0 + alpha*local_norm(eta, norm_type=norm_type)
@@ -126,8 +126,8 @@ def velocity_norm_monitor(mesh, alpha=40.0, norm_type='HDiv'):
     P1DG_vec = VectorFunctionSpace(mesh, "DG", 1)
     u = project(swp.fwd_solutions[0].split()[0], P1DG_vec)
     if norm_type == 'hessian_frobenius':
-        H1 = construct_hessian(u[0], op=op)
-        H2 = construct_hessian(u[1], op=op)
+        H1 = recover_hessian(u[0], op=op)
+        H2 = recover_hessian(u[1], op=op)
         return 1.0 + alpha*local_frobenius_norm(metric_intersection(H1, H2))
     else:
         return 1.0 + alpha*local_norm(u, norm_type=norm_type)

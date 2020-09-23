@@ -8,7 +8,8 @@ The user should specify the filename using the -fname flag, which defaults to 'f
 import argparse
 import os
 
-from adapt_utils.misc import readfile, num_days, index_string
+from adapt_utils.io import index_string, readfile
+from adapt_utils.misc import num_days
 
 
 # Parse arguments

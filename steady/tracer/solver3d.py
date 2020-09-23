@@ -3,7 +3,7 @@ from firedrake import *
 from adapt_utils.tracer.solver2d import SteadyTracerProblem2d
 from adapt_utils.adapt.metric import steady_metric, combine_metrics
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
-from adapt_utils.adapt.recovery import construct_gradient
+from adapt_utils.adapt.recovery import recover_gradient
 
 
 __all__ = ["SteadyTracerProblem3d"]
@@ -27,7 +27,7 @@ class SteadyTracerProblem3d(SteadyTracerProblem2d):
     def get_loseille_metric(self, adjoint=False, relax=True):
         adj = self.get_solution(not adjoint)
         sol = self.get_solution(adjoint)
-        adj_diff = interpolate(abs(construct_gradient(adj)), self.P1_vec)
+        adj_diff = interpolate(abs(recover_gradient(adj)), self.P1_vec)
         adj_diff.rename("Gradient of adjoint solution")
         adj_diff_x = interpolate(adj_diff[0], self.P1)
         adj_diff_x.rename("x-derivative of adjoint solution")

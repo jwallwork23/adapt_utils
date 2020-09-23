@@ -127,12 +127,11 @@ class TohokuHazardOptions(TohokuOptions):
         """
         if coords not in ("lonlat", "utm"):
             raise ValueError("Coordinate system {:s} not recognised.".format(coords))
-        dat = self.gauges if gauges else self.locations_of_interest
         offset = 40.0e+03
-        for loc in dat:
-            x, y = np.copy(dat[loc][coords])
+        for loc in self.locations_of_interest:
+            x, y = np.copy(self.locations_of_interest[loc][coords])
             kwargs = {
-                "xy": dat[loc][coords],
+                "xy": self.locations_of_interest[loc][coords],
                 "color": "indigo",
                 "ha": "right",
                 "va": "center",
@@ -144,5 +143,5 @@ class TohokuHazardOptions(TohokuOptions):
                 loc = "Fukushima"
             x += offset
             kwargs["xytext"] = (x, y)
-            axes.plot(*dat[loc][coords], 'x', color=kwargs["color"])
+            axes.plot(*self.locations_of_interest[loc][coords], 'x', color=kwargs["color"])
             axes.annotate(loc, **kwargs)

@@ -3,7 +3,7 @@ from thetis import *
 import datetime
 import time
 
-from adapt_utils.io import export_final_state
+from adapt_utils.io import export_bathymetry
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
 
@@ -62,4 +62,5 @@ t2 = time.time()
 
 print(t2-t1)
 
-export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220))+"_test", swp.fwd_solutions_bathymetry[0])
+fpath = "hydrodynamics_beach_bath_new_{:d}_test".format(int(nx*220))
+export_bathymetry(swp.fwd_solutions_bathymetry[0], fpath, op=op)

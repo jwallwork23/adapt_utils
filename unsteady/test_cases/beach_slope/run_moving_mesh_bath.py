@@ -6,7 +6,7 @@ import os
 import time
 
 from adapt_utils.adapt import recovery
-from adapt_utils.io import initialise_fields, export_final_state
+from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
@@ -69,8 +69,8 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kapp
     P1 = FunctionSpace(mesh, "CG", 1)
 
     b = swp.fwd_solutions_bathymetry[0]
-    bath_gradient = recovery.construct_gradient(b)
-    bath_hess = recovery.construct_hessian(b, op=op)
+    bath_gradient = recovery.recover_gradient(b)
+    bath_hess = recovery.recover_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 
     if max(abs(frob_bath_hess.dat.data[:])) < 1e-10:
@@ -112,9 +112,11 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output/hydrodynamics_beach_bath_mov_" + str(op.dt_per_export) + "_" + str(int(nx*220)) + "_" + str(alpha) + '_' + str(beta) + '_' + str(gamma), bath)
+fpath = "hydrodynamics_beach_bath_mov_{:d}_{:d}_{:d}_{:d}_{:d}"
+fpath = fpath.format(op.dt_per_export, (int(nx*220), alpha, beta, gamma)
+export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
 
-bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
+bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))

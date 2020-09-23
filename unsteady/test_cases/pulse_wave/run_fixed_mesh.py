@@ -7,7 +7,7 @@ import numpy as np
 import sys
 import time
 
-from adapt_utils.io import initialise_fields, export_final_state
+from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.pulse_wave.options import BeachOptions
 
@@ -55,7 +55,8 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("hydrodynamics_beach_bath_new_"+str(int(nx*220)), bath)
+fpath = "hydrodynamics_beach_bath_new_{:d}".format(int(nx*220))
+export_bathymetry(bath, fpath, op=op)
 
 xaxisthetis1 = []
 baththetis1 = []
@@ -66,7 +67,7 @@ for i in np.linspace(0, 219, 220):
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns=['x']), pd.DataFrame(baththetis1, columns=['bath'])], axis=1)
 df.to_csv("final_result_check_nx" + str(nx) + "_ny" + str(ny) + ".csv", index=False)
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_beach_bath_new_880')
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_beach_bath_new_880')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))

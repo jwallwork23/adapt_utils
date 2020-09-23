@@ -16,8 +16,8 @@ import shutil
 
 examples = [
     'unsteady/test_cases/solid_body_rotation/run_adjoint.py',
-    'case_studies/tohoku/compare_gradients.py',
-    # 'case_studies/tohoku/run_continuous_adjoint.py',  # TODO: update
+    # 'case_studies/tohoku/inversion/1d/compare_gradients.py',  # TODO: update
+    # 'case_studies/tohoku/hazard/run_continuous_adjoint.py',  # TODO: update
 ]
 
 cwd = os.path.abspath(os.path.dirname(__file__))

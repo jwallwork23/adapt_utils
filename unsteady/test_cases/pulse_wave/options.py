@@ -223,38 +223,6 @@ class BeachOptions(CoupledOptions):
 
         return update_forcings
 
-    def initialise_fields(self, inputdir, outputdir):
-        """
-        Initialise simulation with results from a previous simulation
-        """
-        from firedrake.petsc import PETSc
-
-        # mesh
-        with timed_stage('mesh'):
-            # Load
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile(inputdir + '/myplex.h5')
-            mesh = Mesh(newplex)
-
-        DG_2d = FunctionSpace(mesh, 'DG', 1)
-        vector_dg = VectorFunctionSpace(mesh, 'DG', 1)
-        # elevation
-        with timed_stage('initialising elevation'):
-            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(DG_2d, name="elevation")
-            chk.load(elev_init)
-            # File(outputdir + "/elevation_imported.pvd").write(elev_init)
-            chk.close()
-        # velocity
-        with timed_stage('initialising velocity'):
-            chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_READ)
-            uv_init = Function(vector_dg, name="velocity")
-            chk.load(uv_init)
-            # File(outputdir + "/velocity_imported.pvd").write(uv_init)
-            chk.close()
-
-        return elev_init, uv_init
-
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
         # self.eta_tilde_file = File(self.di + "/eta_tilde.pvd").write(eta_tilde)

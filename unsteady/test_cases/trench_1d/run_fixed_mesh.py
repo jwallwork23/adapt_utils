@@ -3,6 +3,7 @@ from thetis import *
 import datetime
 import os
 import pandas as pd
+import sys
 import time
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -21,8 +22,8 @@ nx = 1
 
 # we have included the hydrodynamics input dir for nx = 1 as an example
 
-inputdir = os.path.join(di, 'hydrodynamics_trench_' + str(nx))
-
+inputdir = os.path.join(di, 'hydrodynamics_trench' + str(nx))
+print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': nx,
@@ -37,17 +38,21 @@ kwargs = {
 }
 
 op = TrenchSedimentOptions(**kwargs)
+if os.getenv('REGRESSION_TEST') is not None:
+    op.end_time = op.dt*op.dt_per_export
 swp = AdaptiveProblem(op)
 
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
+if os.getenv('REGRESSION_TEST') is not None:
+    sys.exit(0)
 
 new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-data = pd.read_csv('experimental_data.csv', header=None)
+data = pd.read_csv(os.path.join(di, 'experimental_data.csv'), header=None)
 
 datathetis = []
 bathymetrythetis1 = []
@@ -58,7 +63,7 @@ for i in np.linspace(0, 15.9, 160):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv('fixed_output/bed_trench_output_uni_c' + str(nx) + '.csv')
+df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_uni_c_{:d}.csv'.format(nx)))
 
 
 datathetis = []
@@ -71,7 +76,7 @@ for i in range(len(data[0].dropna())):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv('fixed_output/bed_trench_outputc' + str(nx) + '.csv')
+df.to_csv(os.path.join(di, 'fixed_output/bed_trench_outputc_{:d}.csv'.format(nx)))
 
 print("L2 norm: ")
 print(np.sqrt(sum(diff_thetis)))

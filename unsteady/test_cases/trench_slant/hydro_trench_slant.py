@@ -11,6 +11,8 @@ import hydro_fns as hydro
 import numpy as np
 import pylab as plt
 
+from adapt_utils.io import export_hydrodynamics
+
 timestep = 0.1
 fac = 3
 fac2 = 3
@@ -90,4 +92,5 @@ solver_obj.iterate(update_forcings=update_forcings_hydrodynamics)
 
 
 uv, elev = solver_obj.fields.solution_2d.split()
-hydro.export_final_state("hydrodynamics_trench_slant_"+str(fac), uv, elev)
+fpath = "hydrodynamics_trench_slant_{:d}".format(fac)
+export_hydrodynamics(uv, elev, fpath)

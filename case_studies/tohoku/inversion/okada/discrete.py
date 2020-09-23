@@ -10,7 +10,7 @@ import scipy
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
-from adapt_utils.misc import taylor_test
+from adapt_utils.optimisation import taylor_test
 from adapt_utils.norms import vecnorm
 
 
@@ -183,7 +183,7 @@ def reduced_functional(m):
     swp.source_control = Control(swp.fwd_solutions[0])
 
     # Run forward with zero initial guess
-    swp.setup_solver_forward(0)
+    swp.setup_solver_forward_step(0)
     swp.solve_forward_step(0)
     J = op.J
     J_progress.append(J)

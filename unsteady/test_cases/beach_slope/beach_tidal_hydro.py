@@ -13,6 +13,8 @@ import hydro_fns as hydro
 
 import numpy as np
 
+from adapt_utils.io import export_hydrodynamics
+
 plot = False
 
 
@@ -97,7 +99,8 @@ solver_obj.iterate(update_forcings=update_forcings_hydrodynamics)
 uv, elev = solver_obj.fields.solution_2d.split()
 
 if plot is False:
-    hydro.export_final_state("hydrodynamics_beach_l_sep_nx_"+str(nx) + '_' + str(ny), uv, elev)
+    fpath = "hydrodynamics_beach_l_sep_nx_{:d}_{:d}".format(nx, ny)
+    export_hydrodynamics(uv, elev, fpath)
 else:
     import pylab as plt
 

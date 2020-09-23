@@ -10,6 +10,10 @@
 # ====================================================================== #
 
 # Set environment variables
+if [ ! -e "$SOFTWARE" ]; then
+    echo "SOFTWARE environment variable $SOFTWARE does not exist."
+    exit 1
+fi
 export INSTALL_DIR=$SOFTWARE  # Modify as appropriate
 export PETSC_DIR=$INSTALL_DIR/petsc
 export PETSC_ARCH=arch-adapt
@@ -23,7 +27,7 @@ read chk
 
 cd $INSTALL_DIR
 git clone https://gitlab.com/petsc/petsc.git petsc
-mv reconfigure-arch-adapt.py petsc
+cp configure_petsc.py petsc/
 cd petsc
 git remote add firedrake https://github.com/firedrakeproject/petsc.git
 # git fetch firedrake firedrake
@@ -33,8 +37,10 @@ git remote add firedrake https://github.com/firedrakeproject/petsc.git
 # git checkout barral/allinone
 # git merge firedrake
 git fetch firedrake joe/adapt
-git checkout joe/adapt
-python3 reconfigure-arch-adapt.py
+# git checkout joe/adapt
+git checkout firedrake/joe/adapt
+git checkout -b joe/adapt
+./configure_petsc.py
 make PETSC_DIR=$PETSC_DIR PETSC_ARCH=$PETSC_ARCH all
 make PETSC_DIR=$PETSC_DIR PETSC_ARCH=$PETSC_ARCH check
 cd ..

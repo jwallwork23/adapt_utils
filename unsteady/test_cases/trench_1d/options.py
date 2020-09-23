@@ -1,16 +1,12 @@
 from thetis import *
 from thetis.configuration import *
-
-from adapt_utils.unsteady.options import CoupledOptions
 from thetis.options import ModelOptions2d
+
+from adapt_utils.io import initialise_hydrodynamics
+from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
 
 import numpy as np
-import matplotlib
-
-matplotlib.rc('text', usetex=True)
-matplotlib.rc('font', family='serif')
-
 
 __all__ = ["TrenchSedimentOptions"]
 
@@ -47,7 +43,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.stabilisation = 'lax_friedrichs'
 
         # Initial
-        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
+        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
 
         self.set_up_morph_model(input_dir, self.default_mesh)
 
@@ -170,9 +166,6 @@ class TrenchSedimentOptions(CoupledOptions):
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
 
-    def get_update_forcings(self, prob, i, adjoint):
-        return None
-
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
 
@@ -181,38 +174,3 @@ class TrenchSedimentOptions(CoupledOptions):
             u, eta = prob.fwd_solutions[i].split()
 
         return export_func
-
-    def initialise_fields(self, inputdir, outputdir):
-        """
-        Initialise simulation with results from a previous simulation
-        """
-        from firedrake.petsc import PETSc
-
-        try:
-            import firedrake.cython.dmcommon as dmplex
-        except:
-            import firedrake.dmplex as dmplex  # Older version
-        # mesh
-        with timed_stage('mesh'):
-            # Load
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile(inputdir + '/myplex.h5')
-            mesh = Mesh(newplex)
-
-        DG_2d = FunctionSpace(mesh, "DG", 1)
-        # elevation
-        with timed_stage('initialising elevation'):
-            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(DG_2d, name="elevation")
-            chk.load(elev_init)
-            File(outputdir + "/elevation_imported.pvd").write(elev_init)
-            chk.close()
-        # velocity
-        with timed_stage('initialising velocity'):
-            chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_READ)
-            V = VectorFunctionSpace(mesh, "DG", 1)
-            uv_init = Function(V, name="velocity")
-            chk.load(uv_init)
-            File(outputdir + "/velocity_imported.pvd").write(uv_init)
-            chk.close()
-        return elev_init, uv_init,

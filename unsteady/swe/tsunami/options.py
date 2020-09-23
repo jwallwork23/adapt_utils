@@ -115,7 +115,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating bathymetry...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data):
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             bathymetry.dat.data[i] -= self.bathymetry_interpolator(lat, lon)
 
@@ -157,7 +157,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating initial surface...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data):
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             initial_surface.dat.data[i] = self.surface_interpolator(lat, lon)
 
@@ -327,19 +327,18 @@ class TsunamiOptions(CoupledOptions):
         """To be implemented in subclass."""
         raise NotImplementedError
 
-    def check_cfl_criterion(self, prob, error_factor=None):
-        for i, (mesh, P0, bathymetry) in enumerate(zip(prob.meshes, prob.P0, prob.bathymetry)):
-            self.print_debug("INIT: Computing CFL number on mesh {:d}...".format(i))
-            b = bathymetry.vector().gather().max()
-            g = self.g.values()[0]
-            celerity = np.sqrt(g*b)
-            dx = interpolate(CellDiameter(mesh), P0).vector().gather().min()
-            cfl = celerity*self.dt/dx
-            msg = "INIT:   dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
-            self.print_debug(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
-            if error_factor is not None and cfl >= error_factor:
-                if np.isclose(error_factor, 1.0):
-                    raise ValueError("CFL criterion not met! (CFL number {:.4e})".format(cfl))
-                else:
-                    msg = "Relaxed CFL criterion not met! (CFL number {:.4e} > {:.4e})"
-                    raise ValueError(msg.format(cfl, error_factor))
+    def check_cfl_criterion(self, prob, i, error_factor=None):
+        self.print_debug("INIT: Computing CFL number on mesh {:d}...".format(i))
+        b = prob.bathymetry[i].vector().gather().max()
+        g = self.g.values()[0]
+        celerity = np.sqrt(g*b)
+        dx = interpolate(CellDiameter(prob.meshes[i]), prob.P0[i]).vector().gather().min()
+        cfl = celerity*self.dt/dx
+        msg = "INIT:   dx = {:.4e}  dt = {:.4e}  CFL number = {:.4e} {:1s} 1"
+        self.print_debug(msg.format(dx, self.dt, cfl, '<' if cfl < 1 else '>'))
+        if error_factor is not None and cfl >= error_factor:
+            if np.isclose(error_factor, 1.0):
+                raise ValueError("CFL criterion not met! (CFL number {:.4e})".format(cfl))
+            else:
+                msg = "Relaxed CFL criterion not met! (CFL number {:.4e} > {:.4e})"
+                raise ValueError(msg.format(cfl, error_factor))

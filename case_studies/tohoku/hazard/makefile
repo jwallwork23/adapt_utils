@@ -25,37 +25,37 @@ qmesh: qmesh_linear qmesh_nonlinear
 
 fixed_mesh:
 	@echo "Solving Tohoku tsunami problem on a fixed mesh..."
-	@python3 run_fixed_mesh.py
-#
+	@python3 run_fixed_mesh.py -plot_pvd 1
+
 #  NOTE: We specify different gradation parameters for different boundary segments:
-#    * Artificial open ocean (tag 100): 100 km;
+#    * Artificial open ocean (tag 100): 20 km;
 #    * Coast outside of Fukushima (tag 200): 10 km;
 #    * Coast around Fukushima (tag 300): 5 km.
-#
+
 #  NOTE: The -dm_plex_remesh_bd option can deform the domain boundary, which is why we specify a
 #    gradation for the open ocean boundary. Instead of applying it here, we use it in the mesh
 #    postprocessing (see `mesh` above).
 
 hessian:
 	@echo "Solving Tohoku tsunami problem using anisotropic 'hessian' adaptation..."
-	@python3 run_hessian_based.py \
-		-dm_plex_prescribed_boundary_labels 200,300 \
-		-dm_plex_prescribed_boundary_sizes 10e3,5e3
+	@python3 run_hessian_based.py -plot_pvd 1 \
+		-dm_plex_prescribed_boundary_labels 100,200,300 \
+		-dm_plex_prescribed_boundary_sizes 20e3,10e3,5e3
 
 dwp:
 	@echo "Solving Tohoku tsunami problem using isotropic 'dual weighted primal' adaptation..."
-	@python3 run_dwp.py \
-		-dm_plex_prescribed_boundary_labels 200,300 \
-		-dm_plex_prescribed_boundary_sizes 10e3,5e3
-# @python3 run_dwp.py \
-#	  -dm_plex_prescribed_boundary_labels 100,200,300
+	@python3 run_dwp.py -plot_pvd 1 \
+		-dm_plex_prescribed_boundary_labels 100,200,300 \
+		-dm_plex_prescribed_boundary_sizes 20e3,10e3,5e3
+# @python3 run_dwp.py -plot_pvd 1 \
+#	  -dm_plex_prescribed_boundary_labels 100,200,300 \
 #	  -dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3
 
 dwr:
 	@echo "Solving Tohoku tsunami problem using isotropic 'dual weighted residual' adaptation..."
-	@python3 run_dwr.py \
-		-dm_plex_prescribed_boundary_labels 200,300 \
-		-dm_plex_prescribed_boundary_sizes 10e3,5e3
+	@python3 run_dwr.py -plot_pvd 1 \
+		-dm_plex_prescribed_boundary_labels 100,200,300 \
+		-dm_plex_prescribed_boundary_sizes 20e3,10e3,5e3
 
 # Cleanup
 

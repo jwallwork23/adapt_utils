@@ -3,6 +3,8 @@ from thetis import *
 import numpy as np
 import os
 
+from adapt_utils.io import index_string
+
 
 __all__ = ["VelocityNormCallback", "ElevationNormCallback", "TracerNormCallback",
            "SedimentNormCallback", "ExnerNormCallback", "QoICallback", "GaugeCallback"]
@@ -22,10 +24,12 @@ class TimeseriesCallback(object):
         :kwarg callback_dir: if provided, timeseries is saved to that location every export.
         """
         self.prob = prob
-        self.name = name
         self.func = func
+        self.name = '_'.join([name, index_string(i)])
         self.timeseries = []
-        self.msg = "    {:16s}".format(self.name) + " at time {:6.1f} = {:11.4e}"
+        if not hasattr(self, 'label'):
+            self.label = self.name
+        self.msg = "    {:24s}".format(self.label) + " at time {:6.1f} = {:11.4e}"
         self.callback_dir = callback_dir
 
     def evaluate(self, **kwargs):
@@ -51,7 +55,7 @@ class TimeseriesCallback(object):
 class VelocityNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the velocity field at each timestep/export."""
     def __init__(self, prob, i):
-        self.name = "velocity norm"
+        self.label = "velocity norm"
         u, eta = prob.fwd_solutions[i].split()
         super(VelocityNormCallback, self).__init__(prob, lambda t: norm(u), i, "velocity_norm")
 
@@ -59,7 +63,7 @@ class VelocityNormCallback(TimeseriesCallback):
 class ElevationNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the elevation field at each timestep/export."""
     def __init__(self, prob, i):
-        self.name = "elevation norm"
+        self.label = "elevation norm"
         u, eta = prob.fwd_solutions[i].split()
         super(ElevationNormCallback, self).__init__(prob, lambda t: norm(eta), i, "elevation_norm")
 
@@ -67,7 +71,7 @@ class ElevationNormCallback(TimeseriesCallback):
 class TracerNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the tracer concentration at each timestep/export."""
     def __init__(self, prob, i):
-        self.name = "tracer norm"
+        self.label = "tracer norm"
         c = prob.fwd_solutions_tracer[i]
         super(TracerNormCallback, self).__init__(prob, lambda t: norm(c), i, "tracer_norm")
 
@@ -75,7 +79,7 @@ class TracerNormCallback(TimeseriesCallback):
 class SedimentNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the sediment at each timestep/export."""
     def __init__(self, prob, i):
-        self.name = "sediment norm"
+        self.label = "sediment norm"
         s = prob.fwd_solutions_sediment[i]
         super(SedimentNormCallback, self).__init__(prob, lambda t: norm(s), i, "sediment_norm")
 
@@ -83,7 +87,7 @@ class SedimentNormCallback(TimeseriesCallback):
 class ExnerNormCallback(TimeseriesCallback):
     """Callback for evaluating the L2 norm of the modified bathymetry at each timestep/export."""
     def __init__(self, prob, i):
-        self.name = "bathymetry norm"
+        self.label = "bathymetry norm"
         b = prob.fwd_solutions_bathymetry[i]
         super(ExnerNormCallback, self).__init__(prob, lambda t: norm(b), i, "bathymetry_norm")
 
@@ -104,7 +108,7 @@ class QoICallback(TimeseriesCallback):
         :arg prob: :class:`AdaptiveProblem` object.
         :arg i: mesh index.
         """
-        self.name = "QoI"
+        self.label = "quantity of interest"
         ks = prob.kernels[i]  # Kernel in space
         kt = Constant(0.0)    # Kernel in time
         sol = prob.fwd_solutions[i]
@@ -128,7 +132,7 @@ class GaugeCallback(TimeseriesCallback):
         :arg i: mesh index.
         :arg gauge: name of gauge to be evaluated.
         """
-        self.name = gauge
+        self.label = "gauge {:s}".format(gauge)
         u, eta = prob.fwd_solutions[i].split()
         gauge_location = prob.op.gauges[gauge]["coords"]
 

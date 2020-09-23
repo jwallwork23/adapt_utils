@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.plotting import *
+from adapt_utils.plotting import *  # NOQA
 
 
 # --- Parse arguments

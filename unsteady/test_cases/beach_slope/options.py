@@ -1,15 +1,12 @@
 from thetis import *
 from thetis.configuration import *
-
-from adapt_utils.unsteady.options import CoupledOptions
 from thetis.options import ModelOptions2d
+
+from adapt_utils.io import initialise_hydrodynamics
+from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
 
 import numpy as np
-from matplotlib import rc
-
-rc('text', usetex=True)
-
 
 __all__ = ["BeachOptions"]
 
@@ -24,7 +21,6 @@ class BeachOptions(CoupledOptions):
     """
 
     def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh=None, input_dir=None, output_dir=None, **kwargs):
-
         super(BeachOptions, self).__init__(**kwargs)
 
         try:
@@ -48,7 +44,7 @@ class BeachOptions(CoupledOptions):
         self.set_up_morph_model(self.default_mesh)
 
         # Initial
-        self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
+        self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'
@@ -210,36 +206,6 @@ class BeachOptions(CoupledOptions):
             self.update_boundary_conditions(prob, t=t)
 
         return update_forcings
-
-    def initialise_fields(self, inputdir, outputdir):
-        """
-        Initialise simulation with results from a previous simulation
-        """
-        from firedrake.petsc import PETSc
-
-        # mesh
-        with timed_stage('mesh'):
-            # Load
-            newplex = PETSc.DMPlex().create()
-            newplex.createFromFile(inputdir + '/myplex.h5')
-            mesh = Mesh(newplex)
-
-        DG_2d = FunctionSpace(mesh, 'DG', 1)
-        vector_dg = VectorFunctionSpace(mesh, 'DG', 1)
-        # elevation
-        with timed_stage('initialising elevation'):
-            chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_READ)
-            elev_init = Function(DG_2d, name="elevation")
-            chk.load(elev_init)
-            chk.close()
-        # velocity
-        with timed_stage('initialising velocity'):
-            chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_READ)
-            uv_init = Function(vector_dg, name="velocity")
-            chk.load(uv_init)
-            chk.close()
-
-        return elev_init, uv_init,
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")

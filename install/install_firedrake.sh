@@ -19,8 +19,14 @@ unset PYTHONPATH
 # Environment variables for MPI
 export MPICC=/usr/bin/mpicc
 export MPICXX=/usr/bin/mpicxx
-export MPIF90=/usr/bin/mpif90
 export MPIEXEC=/usr/bin/mpiexec
+export MPIF90=/usr/bin/mpif90
+for mpi in mpicc mpicxx mpiexec mpif90; do
+	if [ ! -f /usr/bin/$mpi ]; then
+		echo "Cannot find $mpi in /usr/bin."
+		exit 1
+	fi
+done
 
 # Environment variables for Firedrake installation
 export FIREDRAKE_ENV=firedrake-adapt
@@ -32,9 +38,14 @@ echo "MPICXX="$MPICXX
 echo "MPIF90="$MPIF90
 echo "MPIEXEC="$MPIEXEC
 echo "PETSC_DIR="$PETSC_DIR
+if [ ! -e "$PETSC_DIR" ]; then
+    echo "$PETSC_DIR does not exist. Please run install_petsc.sh."
+    exit 1
+fi
 echo "PETSC_ARCH="$PETSC_ARCH
 echo "FIREDRAKE_ENV="$FIREDRAKE_ENV
 echo "FIREDRAKE_DIR="$FIREDRAKE_DIR
+echo "python3="$(which python3)
 echo "Are these settings okay? Press enter to continue."
 read chk
 
@@ -47,6 +58,10 @@ python3 firedrake-install --honour-petsc-dir --install thetis --venv-name $FIRED
         # --package-branch firedrake joe/meshadapt
 source $FIREDRAKE_DIR/bin/activate
 
-# Test installation
+# Very basic test of installation
 cd $FIREDRAKE_DIR/src/firedrake
 python3 tests/test_adapt_2d.py
+
+# Install pip dependencies for adapt_utils
+python3 -m pip install matplotlib netCDF4 numpy pandas scipy utide
+# python3 -m pip install jupyter qmesh

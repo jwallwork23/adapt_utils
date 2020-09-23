@@ -58,7 +58,7 @@ def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
     P1 = FunctionSpace(mesh, "CG", 1)
 
     b = swp.fwd_solutions_bathymetry[0]
-    bath_hess = recovery.construct_hessian(b, op=op)
+    bath_hess = recovery.recover_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
     frob_bath_norm = Function(b.function_space()).project(frob_bath_hess/max(frob_bath_hess.dat.data[:]))
     norm_two_proj = project(frob_bath_norm, P1)

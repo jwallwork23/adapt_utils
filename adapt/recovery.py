@@ -3,13 +3,13 @@ from firedrake import *
 from adapt_utils.options import Options
 
 
-__all__ = ["construct_gradient", "construct_hessian", "construct_boundary_hessian",
+__all__ = ["recover_gradient", "recover_hessian", "recover_boundary_hessian",
            "L2ProjectorGradient", "DoubleL2ProjectorHessian"]
 
 
 # --- Use the following drivers if only doing a single L2 projection on the current mesh
 
-def construct_gradient(f, **kwargs):
+def recover_gradient(f, **kwargs):
     r"""
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
@@ -22,10 +22,11 @@ def construct_gradient(f, **kwargs):
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
     """
+    kwargs.setdefault('op', Options())
     return L2ProjectorGradient(f.function_space(), **kwargs).project(f)
 
 
-def construct_hessian(f, **kwargs):
+def recover_hessian(f, **kwargs):
     r"""
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all
     second derivative information has been lost. As such, the Hessian of `f` cannot be directly
@@ -45,10 +46,11 @@ def construct_hessian(f, **kwargs):
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed Hessian associated with `f`.
     """
+    kwargs.setdefault('op', Options())
     return DoubleL2ProjectorHessian(f.function_space(), boundary=False, **kwargs).project(f)
 
 
-def construct_boundary_hessian(f, **kwargs):
+def recover_boundary_hessian(f, **kwargs):
     """
     Recover the Hessian of `f` on the domain boundary. That is, the Hessian in the direction
     tangential to the boundary. In two dimensions this gives a scalar field, whereas in three
@@ -59,15 +61,21 @@ def construct_boundary_hessian(f, **kwargs):
     :param op: `Options` class object providing max cell size value.
     :return: reconstructed boundary Hessian associated with `f`.
     """
+    kwargs.setdefault('op', Options())
     return DoubleL2ProjectorHessian(f.function_space(), boundary=True, **kwargs).project(f)
 
 
 # --- Use the following drivers if doing multiple L2 projections on the current mesh
 
-
 class L2Projector():
+    """
+    Base class for performing L2 projections.
 
-    def __init__(self, function_space, bcs=None, op=Options()):
+    Inherited classes must implement the :attr:`setup` method
+    """
+
+    def __init__(self, function_space, bcs=None, op=Options(), **kwargs):
+        self.op = op
         self.field = Function(function_space)
         self.mesh = function_space.mesh()
         self.n = FacetNormal(self.mesh)
@@ -77,18 +85,27 @@ class L2Projector():
         }
 
     def setup(self):
-        pass
+        raise NotImplementedError("Should be implemented in derived class.")
 
     def project(self, f):
+        self.op.print_debug("RECOVERY: L2 projecting {:s}...".format(self.name))
         assert f.function_space() == self.field.function_space()
         self.field.assign(f)
         if not hasattr(self, 'projector'):
             self.setup()
+        if not hasattr(self, 'l2_projection'):
+            raise ValueError("`setup` method should define `l2_projection` output field")
         self.projector.solve()
         return self.l2_projection
 
 
 class L2ProjectorGradient(L2Projector):
+    """
+    Class for L2 projecting a scalar field to obtain its gradient in P1 space.
+
+    Note that the field itself need not be continuously differentiable at all.
+    """
+    name = 'gradient'
 
     def setup(self):
         P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
@@ -104,6 +121,17 @@ class L2ProjectorGradient(L2Projector):
 
 
 class DoubleL2ProjectorHessian(L2Projector):
+    """
+    Class for L2 projecting a scalar field to obtain its Hessian in P1 space.
+
+    This can either be achieved by a direct integration by parts, or by a double L2 projection, with
+    the gradient as an intermediate variable. The former approach may be specified by setting
+    `op.hessian_recovery = 'parts'` and the latter by setting `op.hessian_recovery = 'dL2'`. For
+    double L2 projection, a mixed finite element method is used.
+
+    Note that the field itself need not be continuously differentiable at all.
+    """
+    name = 'Hessian'
 
     def __init__(self, *args, boundary=False, **kwargs):
         super(DoubleL2ProjectorHessian, self).__init__(*args, **kwargs)
@@ -115,21 +143,20 @@ class DoubleL2ProjectorHessian(L2Projector):
                 assert self.dim == 2
             except AssertionError:
                 raise NotImplementedError  # TODO
-        op = kwargs.get('op')
-        self.hessian_recovery = op.hessian_recovery
-        self.h_max = op.h_max
 
     def setup(self):
         if self.boundary:
+            self.name += ' on domain boundary'
             self._setup_boundary_projector()
         else:
+            self.name += ' on domain interior'
             self._setup_interior_projector()
 
     def _setup_interior_projector(self):
         P1_ten = TensorFunctionSpace(self.mesh, "CG", 1)
 
         # Integration by parts applied to the Hessian definition
-        if self.hessian_recovery == 'parts':
+        if self.op.hessian_recovery == 'parts':
             H, τ = TrialFunction(P1_ten), TestFunction(P1_ten)
             self.l2_projection = Function(P1_ten)
 
@@ -138,7 +165,7 @@ class DoubleL2ProjectorHessian(L2Projector):
             L += dot(grad(self.field), dot(τ, self.n))*ds
 
         # Double L2 projection, using a mixed formulation for the gradient and Hessian
-        elif self.hessian_recovery == 'dL2':
+        elif self.op.hessian_recovery == 'dL2':
             P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
             W = P1_ten*P1_vec
             H, g = TrialFunctions(W)
@@ -166,7 +193,7 @@ class DoubleL2ProjectorHessian(L2Projector):
 
         # Arbitrary value in domain interior
         a = v*Hs*dx
-        L = v*Constant(pow(self.h_max, -2))*dx
+        L = v*Constant(pow(self.op.h_max, -2))*dx
 
         # Hessian on boundary
         if self.bcs is None:
@@ -182,12 +209,13 @@ class DoubleL2ProjectorHessian(L2Projector):
     def project(self, f):
         assert f.function_space() == self.field.function_space()
         self.field.assign(f)
-        if not self.boundary and self.hessian_recovery == 'dL2':
+        if not self.boundary and self.op.hessian_recovery == 'dL2':
             return self._project_interior()
         else:
             return super(DoubleL2ProjectorHessian, self).project(f)
 
     def _project_interior(self):
+        self.op.print_debug("RECOVERY: L2 projecting Hessian on domain interior...")
         if not hasattr(self, 'projector'):
             self.setup()
         self.projector.solve()

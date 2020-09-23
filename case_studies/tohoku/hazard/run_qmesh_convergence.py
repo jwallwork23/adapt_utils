@@ -1,10 +1,10 @@
 from thetis import print_output, create_directory
 
 import argparse
-import datetime
 import os
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
+from adapt_utils.io import OuterLoopLogger
 from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
@@ -17,7 +17,7 @@ parser.add_argument("-end_time", help="End time of simulation in seconds (defaul
 parser.add_argument("-num_meshes", help="Number of meshes to consider (for testing, default 1)")
 
 # Solver
-parser.add_argument("-family", help="Element family for mixed FE space (default 'dg-cg')")
+parser.add_argument("-family", help="Element family for mixed FE space (default 'cg-cg')")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
 parser.add_argument("-stabilisation", help="Stabilisation method to use (default None)")
 
@@ -74,6 +74,7 @@ kwargs = {
 
     # I/O and debugging
     'debug': bool(args.debug or False),
+    'debug_mode': args.debug_mode or 'basic',
 }
 levels = int(args.levels or 4)
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh'))
@@ -88,10 +89,10 @@ for level in range(levels):
 
     # Set parameters
     kwargs['level'] = level
-    op = TohokuOptions(**kwargs)
+    op = TohokuHazardOptions(**kwargs)
 
     # Solve
-    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
+    swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)
     swp.solve_forward()
     qoi = swp.quantity_of_interest()
     print_output("Quantity of interest: {:.4e}".format(qoi))
@@ -99,32 +100,11 @@ for level in range(levels):
     # Diagnostics
     qois.append(qoi)
     num_cells.append(swp.num_cells[0][0])
+swp.qois = qois
+swp.num_cells = num_cells
 
 
-# --- Log results
+# --- Logging
 
-with open(os.path.join(os.path.dirname(__file__), '../../../.git/logs/HEAD'), 'r') as gitlog:
-    for line in gitlog:
-        words = line.split()
-    kwargs['adapt_utils git commit'] = words[1]
-kwargs['nonlinear'] = nonlinear
-logstr = 80*'*' + '\n' + 33*' ' + 'PARAMETERS\n' + 80*'*' + '\n'
-for key in kwargs:
-    logstr += "    {:32s}: {:}\n".format(key, kwargs[key])
-logstr += 80*'*' + '\n' + 35*' ' + 'SUMMARY\n' + 80*'*' + '\n'
-logstr += "{:8s}    {:7s}\n".format('Elements', 'QoI')
-for level in range(levels):
-    logstr += "{:8d}    {:7.4e}\n".format(num_cells[level], qois[level])
-date = datetime.date.today()
-date = '{:d}-{:d}-{:d}'.format(date.year, date.month, date.day)
-j = 0
-while True:
-    logdir = os.path.join(di, '{:s}-run-{:d}'.format(date, j))
-    if not os.path.exists(logdir):
-        create_directory(logdir)
-        break
-    j += 1
-with open(os.path.join(logdir, 'log'), 'w') as logfile:
-    logfile.write(logstr)
-print_output(logstr)
-print_output(logdir)
+logger = OuterLoopLogger(swp, nonlinear=nonlinear, **kwargs)
+logger.log(fpath=di)

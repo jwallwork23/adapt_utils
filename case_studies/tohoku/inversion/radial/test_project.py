@@ -136,7 +136,7 @@ for level in range(levels):
     else:
         for swp in (swp_saito, swp_radial):
             print_output("Solving forward on {:s}...".format(swp.__class__.__name__))
-            swp.setup_solver_forward(0)
+            swp.setup_solver_forward_step(0)
             swp.solve_forward_step(0)
         for gauge in gauges:
             for options, name in zip((op_saito, op), ('original', 'projected')):

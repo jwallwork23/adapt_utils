@@ -2,10 +2,11 @@ from thetis import *
 import firedrake as fire
 
 import datetime
+import os
 import time
 
 from adapt_utils.adapt import recovery
-from adapt_utils.io import initialise_fields, export_final_state
+from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.test_cases.trench_slant.options import TrenchSlantOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -59,8 +60,8 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     P1 = FunctionSpace(mesh, "CG", 1)
 
     b = swp.fwd_solutions_bathymetry[0]
-    bath_gradient = recovery.construct_gradient(b)
-    bath_hess = recovery.construct_hessian(b, op=op)
+    bath_gradient = recovery.recover_gradient(b)
+    bath_hess = recovery.recover_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
     frob_bath_norm = Function(b.function_space()).project(frob_bath_hess/max(frob_bath_hess.dat.data[:]))
     l2_bath_grad = Function(b.function_space()).project(local_norm(bath_gradient))
@@ -84,9 +85,10 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx), bath)
+fpath = "hydrodynamics_trench_slant_bath_{:d}_{:d}_{:d}_{:d}"+str(alpha, beta, gamma, nx)
+export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
 
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 
 print(nx)
 print(ny)

@@ -29,8 +29,8 @@ import os
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
-from adapt_utils.misc import StagnationError
 from adapt_utils.norms import total_variation
+from adapt_utils.optimisation import StagnationError
 from adapt_utils.plotting import *
 
 

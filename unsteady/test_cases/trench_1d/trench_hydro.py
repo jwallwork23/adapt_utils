@@ -14,28 +14,7 @@ from thetis import *
 import numpy as np
 import time
 
-from firedrake.petsc import PETSc
-
-
-def export_final_state(inputdir, uv, elev):  # TODO: Put into io?
-    """
-    Export fields to be used in a subsequent simulation
-    """
-    if not os.path.exists(inputdir):
-        os.makedirs(inputdir)
-    print_output("Exporting fields for subsequent simulation")
-    chk = DumbCheckpoint(inputdir + "/velocity", mode=FILE_CREATE)
-    chk.store(uv, name="velocity")
-    File(inputdir + '/velocityout.pvd').write(uv)
-    chk.close()
-    chk = DumbCheckpoint(inputdir + "/elevation", mode=FILE_CREATE)
-    chk.store(elev, name="elevation")
-    File(inputdir + '/elevationout.pvd').write(elev)
-    chk.close()
-
-    plex = elev.function_space().mesh()._plex
-    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
-    viewer(plex)
+from adapt_utils.io import export_hydrodynamics
 
 
 res = 1
@@ -131,4 +110,5 @@ solver_obj.assign_initial_conditions(uv=uv_init, elev=elev_init)
 solver_obj.iterate()
 
 uv, elev = solver_obj.fields.solution_2d.split()
-export_final_state("hydrodynamics_trench" + str(res), uv, elev)
+fpath = "hydrodynamics_trench_{:d}".format(res)
+export_hydrodynamics(uv, elev, fpath)

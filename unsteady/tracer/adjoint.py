@@ -1,6 +1,6 @@
 # TODO: doc
 from thetis.equation import *
-from thetis.tracer_eq_2d import TracerTerm
+from thetis.tracer_eq_2d import *
 from thetis.utility import *
 
 
@@ -50,16 +50,17 @@ class AdjointConservativeTracerTerm(AdjointTracerTerm):
 
 # --- Terms for adjoint of non-conservative form
 
-class AdjointAdvectionTerm(AdjointTracerTerm):
+class AdjointHorizontalAdvectionTerm(HorizontalAdvectionTerm):
     # TODO: doc
-    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        raise NotImplementedError  # TODO
+    def residual(self, *args, **kwargs):
+        return -super().residual(*args, **kwargs)
 
 
-class AdjointDiffusionTerm(AdjointTracerTerm):
+class AdjointHorizontalDiffusionTerm(HorizontalDiffusionTerm):
     # TODO: doc
-    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        raise NotImplementedError  # TODO: May need fully reimplementing to account for BCs
+    def residual(self, *args, **kwargs):
+        # TODO: May need fully reimplementing to account for BCs
+        return super().residual(*args, **kwargs)
 
 
 class AdjointSourceTerm(AdjointTracerTerm):
@@ -128,7 +129,7 @@ class AdjointTracerEquation2D(Equation):
         self.add_term(AdjointHorizontalAdvectionTerm(*args), 'explicit')
         self.add_term(AdjointHorizontalDiffusionTerm(*args), 'explicit')
         self.add_term(AdjointSourceTerm(*args), 'source')
-        self.add_term(AdjointSinkTerm(*args), 'source')
+        # self.add_term(AdjointSinkTerm(*args), 'source')  # TODO
 
 
 class AdjointConservativeTracerEquation2D(Equation):

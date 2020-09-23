@@ -10,8 +10,6 @@ import thetis as th
 import time
 import datetime
 import numpy as np
-import os
-from firedrake.petsc import PETSc
 
 
 def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init, elev_init, ks, average_size, dt, t_end, friction='nikuradse', friction_coef=0, fluc_bcs=False, viscosity=10**(-6), diffusivity=0.15):
@@ -129,47 +127,3 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init, e
 
     solver_obj.assign_initial_conditions(uv=uv_init, elev=elev_init)
     return solver_obj, update_forcings_hydrodynamics
-
-
-def export_final_state(inputdir, uv, elev):  # TODO: Put into io?
-    """
-    Export fields to be used in a subsequent simulation
-    """
-    if not os.path.exists(inputdir):
-        os.makedirs(inputdir)
-    th.print_output("Exporting fields for subsequent simulation")
-    chk = th.DumbCheckpoint(inputdir + "/velocity", mode=th.FILE_CREATE)
-    chk.store(uv, name="velocity")
-    th.File(inputdir + '/velocityout.pvd').write(uv)
-    chk.close()
-    chk = th.DumbCheckpoint(inputdir + "/elevation", mode=th.FILE_CREATE)
-    chk.store(elev, name="elevation")
-    th.File(inputdir + '/elevationout.pvd').write(elev)
-    chk.close()
-
-    plex = elev.function_space().mesh()._plex
-    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
-    viewer(plex)
-
-
-def initialise_fields(mesh2d, inputdir, outputdir):  # TODO: Put into io?
-    """
-    Initialise simulation with results from a previous simulation
-    """
-    DG_2d = th.FunctionSpace(mesh2d, 'DG', 1)
-    # elevation
-    with th.timed_stage('initialising elevation'):
-        chk = th.DumbCheckpoint(inputdir + "/elevation", mode=th.FILE_READ)
-        elev_init = th.Function(DG_2d, name="elevation")
-        chk.load(elev_init)
-        th.File(outputdir + "/elevation_imported.pvd").write(elev_init)
-        chk.close()
-    # velocity
-    with th.timed_stage('initialising velocity'):
-        chk = th.DumbCheckpoint(inputdir + "/velocity", mode=th.FILE_READ)
-        V = th.VectorFunctionSpace(mesh2d, 'DG', 1)
-        uv_init = th.Function(V, name="velocity")
-        chk.load(uv_init)
-        th.File(outputdir + "/velocity_imported.pvd").write(uv_init)
-        chk.close()
-        return elev_init, uv_init,

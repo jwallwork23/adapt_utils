@@ -26,17 +26,20 @@ op = SpaceshipOptions()
 
 # Interpolate forcing onto time range
 time_seconds = np.linspace(0.0, op.tidal_forcing_end_time, 1001)
+forcing = op.tidal_forcing_interpolator(time_seconds)
+time_seconds -= op.T_ramp
 time_hours = time_seconds/3600
 time_days = time_hours/24
-forcing = op.tidal_forcing_interpolator(time_seconds)
 
 # Plot the spin-up period only
 fig, axes = plt.subplots(figsize=(8, 6))
 axes.plot(time_hours, forcing, color='grey')
+axes.axhline(0, linestyle=':', color='lightgrey')
 axes.set_xlabel(r"Time $[h]$")
 axes.set_ylabel(r"Tidal forcing $[m]$")
-axes.set_xlim([0, op.T_ramp/3600])
-axes.set_xticks([0, 6, 12, 18, 24])
+axes.set_xlim([-op.T_ramp/3600, 0])
+axes.set_ylim([-4, 4])
+axes.set_xticks([-18, -12, -6, 0])
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 plt.tight_layout()
 for ext in ("png", "pdf"):
@@ -51,10 +54,12 @@ axes.set_ylabel("Tidal forcing [m]")
 # Annotate the spin-up period
 axes.set_xticks(range(17))
 r = op.T_ramp/3600/24
-axes.axvline(r, linestyle='--', color='b')
-axes.set_xlim([0, 16])
-axes.annotate("", xy=(0.0, -5), xytext=(r, -5), **plotting_kwargs)
-axes.annotate("Spin-up period", xy=(-0.25*r, -5.6), xytext=(-0.25*r, -5.6), color="b", annotation_clip=False)
+axes.axvline(0, linestyle='--', color='b')
+axes.axhline(0, linestyle=':', color='lightgrey')
+axes.set_xlim([-r, 15])
+axes.set_ylim([-4, 4])
+axes.annotate("", xy=(-r, -5), xytext=(0, -5), **plotting_kwargs)
+axes.annotate("Spin-up period", xy=(-1.3, -5.6), xytext=(-1.3, -5.6), color="b", annotation_clip=False)
 
 # Add second x-axis with non-dimensionalised time
 non_dimensionalise = lambda time: 24*3600*time/op.T_tide

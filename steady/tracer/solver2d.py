@@ -388,7 +388,7 @@ class SteadyTracerProblem2d(SteadyProblem):
     def get_loseille_metric(self, adjoint=False, relax=True):
         adj = self.get_solution(not adjoint)
         sol = self.get_solution(adjoint)
-        adj_diff = interpolate(abs(construct_gradient(adj)), self.P1_vec)
+        adj_diff = interpolate(abs(recover_gradient(adj)), self.P1_vec)
         adj_diff.rename("Gradient of adjoint solution")
         adj_diff_x = interpolate(adj_diff[0], self.P1)
         adj_diff_x.rename("x-derivative of adjoint solution")

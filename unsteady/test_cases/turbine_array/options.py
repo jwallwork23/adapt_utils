@@ -24,7 +24,7 @@ class TurbineArrayOptions(TurbineOptions):
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
-    def __init__(self, **kwargs):
+    def __init__(self, spun=False, **kwargs):
         super(TurbineArrayOptions, self).__init__(**kwargs)
         self.array_ids = np.array([[2, 5, 8, 11, 14],
                                    [3, 6, 9, 12, 15],
@@ -44,11 +44,11 @@ class TurbineArrayOptions(TurbineOptions):
         self.friction_coeff = 0.0025
 
         # Timestepping
-        self.dt = 3.0
+        self.dt = 2.232
         self.T_tide = 0.1*self.M2_tide_period
-        self.T_ramp = 1.0*self.T_tide
-        self.end_time = self.T_ramp + 2.0*self.T_tide
-        self.dt_per_export = 12
+        self.T_ramp = 1.06*3600
+        self.end_time = 2.0*self.T_tide
+        self.dt_per_export = 10
 
         # Tidal farm
         D = self.turbine_length
@@ -68,10 +68,11 @@ class TurbineArrayOptions(TurbineOptions):
         self.omega = 2*pi/self.T_tide
         self.elev_in = [None for i in range(self.num_meshes)]
         self.elev_out = [None for i in range(self.num_meshes)]
+        self.spun = spun
 
         # Solver parameters and discretisation
-        self.stabilisation = None
-        # self.stabilisation = 'lax_friedrichs'
+        self.stabilisation = 'lax_friedrichs'
+        self.use_automatic_sipg_parameter = True
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
         self.family = 'dg-cg'
@@ -103,16 +104,22 @@ class TurbineArrayOptions(TurbineOptions):
     def get_update_forcings(self, prob, i, **kwargs):
         tc = Constant(0.0)
         hmax = Constant(self.max_amplitude)
+        offset = self.T_ramp if self.spun else 0.0
 
         def update_forcings(t):
-            tc.assign(t)
-            self.elev_in[i].assign(hmax*cos(self.omega*(tc - self.T_ramp)))
-            self.elev_out[i].assign(hmax*cos(self.omega*(tc - self.T_ramp) + pi))
+            tc.assign(t - offset)
+            self.elev_in[i].assign(hmax*cos(self.omega*tc))
+            self.elev_out[i].assign(hmax*cos(self.omega*tc + pi))
 
         return update_forcings
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
         x, y = SpatialCoordinate(prob.meshes[0])
+
+        # Set an arbitrary, small, non-zero velocity which satisfies the free-slip conditions
         u.interpolate(as_vector([1e-8, 0.0]))
-        eta.interpolate(-x/self.domain_length)
+
+        # Set the initial surface so that it satisfies the forced boundary conditions
+        X = 2*x/self.domain_length  # Non-dimensionalised x
+        eta.interpolate(-self.max_amplitude*X)

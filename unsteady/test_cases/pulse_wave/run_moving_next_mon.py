@@ -3,10 +3,11 @@ from thetis import *
 import datetime
 import numpy as np
 import pandas as pd
+import os
 import time
 
 from adapt_utils.adapt import recovery
-from adapt_utils.io import export_final_state
+from adapt_utils.io import export_bathymetry
 from adapt_utils.norms import local_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_pulse_wave.options import BeachOptions
@@ -53,7 +54,7 @@ def velocity_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
     abs_horizontal_velocity = Function(elev.function_space()).project(abs(uv[0]))
     abs_hor_vel_norm = Function(elev.function_space()).project(abs_horizontal_velocity)
 
-    uv_gradient = recovery.construct_gradient(horizontal_velocity)
+    uv_gradient = recovery.recover_gradient(horizontal_velocity)
     frob_uv_hess = Function(elev.function_space()).project(local_norm(uv_gradient))
 
     if max(abs(frob_uv_hess.dat.data[:])) < 1e-10:
@@ -92,8 +93,8 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("adapt_output/hydrodynamics_beach_bath_new_"+str(int(nx*220)) + "_" + str(alpha) + '_' + str(beta) + '_' + str(gamma), bath)
-
+fpath = "hydrodynamics_beach_bath_new_{:d}_{:d}_{:d}_{:d}".format(int(nx*220), alpha, beta, gamma)
+export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
 
 xaxisthetis1 = []
 baththetis1 = []
@@ -101,6 +102,7 @@ baththetis1 = []
 for i in np.linspace(0, 219, 220):
     xaxisthetis1.append(i)
     baththetis1.append(-bath.at([i, 5]))
+
 df = pd.concat([pd.DataFrame(xaxisthetis1, columns=['x']), pd.DataFrame(baththetis1, columns=['bath'])], axis=1)
 df.to_csv("adapt_output/final_result_nx" + str(nx) + "_" + str(alpha) + '_' + str(beta) + '_' + str(gamma) + ".csv", index=False)
 

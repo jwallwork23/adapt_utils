@@ -1,6 +1,7 @@
 from thetis import *
 from firedrake_adjoint import *
 from firedrake.adjoint.blocks import GenericSolveBlock
+import pyadjoint
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
@@ -19,13 +20,22 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
         if self.num_meshes > 1:
             raise NotImplementedError  # TODO: Allow multiple meshes
 
+        # Check that only one set of equations has been solved  # TODO
+        for to_solve in (op.solve_swe, op.solve_tracer, op.solve_sediment, op.solve_exner):
+            if to_solve:
+                equations.append(to_solve)
+        if len(equations) == 0:
+            raise ValueError("No equations solved for!")
+        elif len(equations) > 1:
+            raise NotImplementedError("Haven't accounted for coupled model yet.")
+
     def clear_tape(self):
         self.tape.clear_tape()
 
     def solve_adjoint(self, scaling=1.0):
         """Solve the discrete adjoint problem for some quantity of interest."""
         J = self.quantity_of_interest()
-        return solve_adjoint(J, adj_value=scaling)
+        return pyadjoint.solve_adjoint(J, adj_value=scaling)
 
     def compute_gradient(self, controls, scaling=1.0):
         """Compute the gradient of the quantity of interest with respect to a list of controls."""
@@ -45,31 +55,40 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
 
         NOTE: Only currently supported for either shallow water *or* tracer, *not* coupled mode.
         """
+        op = self.op
         i = 0  # TODO: Allow multiple meshes
-        if solve_step % self.op.dt_per_export == 0:
-            msg = "{:2d} {:s}  ADJOINT EXTRACT mesh {:2d}/{:2d}  time {:8.2f}"
-            time = self.op.dt*solve_step
-            self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, time))
+        if solve_step % op.dt_per_export == 0:
+            time = op.dt*solve_step
+            if self.num_meshes == 1:
+                self.print("ADJOINT EXTRACT  time {:8.2f}".format(time))
+            else:
+                msg = "{:2d} {:s}  ADJOINT EXTRACT mesh {:2d}/{:2d}  time {:8.2f}"
+                self.print(msg.format(self.outer_iteration, '  '*i, i+1, self.num_meshes, time))
         if not hasattr(self, 'solve_blocks'):
             self.get_solve_blocks()
         adj_sol = self.solve_blocks[solve_step].adj_sol
+
+        # Extract adjoint solution and insert it into the appropriate solution field
         if self.op.solve_swe:
-            if self.op.solve_tracer:
-                raise NotImplementedError("Haven't accounted for coupled model yet.")  # TODO
-            else:
-                self.adj_solutions[i].assign(adj_sol)
+            self.adj_solutions[i].assign(adj_sol)
         elif self.op.solve_tracer:
             self.adj_solutions_tracer[i].assign(adj_sol)
+        elif self.op.solve_sediment:
+            self.adj_solutions_sediment[i].assign(adj_sol)
         else:
-            raise ValueError
+            self.adj_solutions_bathymetry[i].assign(adj_sol)
 
     def save_adjoint_trajectory(self):
         """Save the entire adjoint solution trajectory to .vtu, backwards in time."""
         self.get_solve_blocks()
         if self.op.solve_swe:
             self._save_adjoint_trajectory_shallow_water()
-        if self.op.solve_tracer:
+        elif self.op.solve_tracer:
             self._save_adjoint_trajectory_tracer()
+        elif self.op.solve_sediment:
+            self._save_adjoint_trajectory_sediment()
+        else:
+            self._save_adjoint_trajectory_bathymetry()
 
     def _save_adjoint_trajectory_shallow_water(self):
         i = 0  # TODO: Allow multiple meshes
@@ -97,3 +116,9 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             if self.op.plot_pvd:
                 proj.project(self.adj_solutions_tracer[i])
                 self.adjoint_tracer_file.write(proj)
+
+    def _save_adjoint_trajectory_sediment(self):
+        raise NotImplementedError
+
+    def _save_adjoint_trajectory_bathymetry(self):
+        raise NotImplementedError

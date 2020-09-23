@@ -10,8 +10,6 @@ import thetis as th
 import time
 import datetime
 import numpy as np
-from firedrake.petsc import PETSc
-import os
 
 
 def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
@@ -155,24 +153,3 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
     solver_obj.assign_initial_conditions(uv=uv_init, elev=elev_init)
 
     return solver_obj, update_forcings_hydrodynamics, outputdir
-
-
-def export_final_state(inputdir, uv, elev,):
-    """
-    Export fields to be used in a subsequent simulation
-    """
-    if not os.path.exists(inputdir):
-        os.makedirs(inputdir)
-    th.print_output("Exporting fields for subsequent simulation")
-    chk = th.DumbCheckpoint(inputdir + "/velocity", mode=th.FILE_CREATE)
-    chk.store(uv, name="velocity")
-    th.File(inputdir + '/velocityout.pvd').write(uv)
-    chk.close()
-    chk = th.DumbCheckpoint(inputdir + "/elevation", mode=th.FILE_CREATE)
-    chk.store(elev, name="elevation")
-    th.File(inputdir + '/elevationout.pvd').write(elev)
-    chk.close()
-
-    plex = elev.function_space().mesh()._plex
-    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
-    viewer(plex)

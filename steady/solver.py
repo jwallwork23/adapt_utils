@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 
 from adapt_utils.adapt.adaptation import *
 from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.recovery import construct_hessian
+from adapt_utils.adapt.recovery import recover_hessian
 from adapt_utils.adapt.p0_metric import *
 from adapt_utils.adapt.r import *
 from adapt_utils.adapt.kernels import eigen_kernel, matscale
@@ -888,7 +888,7 @@ class SteadyProblem():
                 def monitor(mesh):
                     P1 = FunctionSpace(mesh, "CG", 1)
                     b = project(self.solution if f == 'solution' else self.fields[f], P1)
-                    H = construct_hessian(b, op=self.op)
+                    H = recover_hessian(b, op=self.op)
                     return 1.0 + alpha*local_frobenius_norm(H, mesh=mesh, space=P1)
 
             else:
