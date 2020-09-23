@@ -257,7 +257,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         for control in self.active_controls:
             self._basis_functions[control] = []
             for i, subfault in enumerate(self.subfaults):
-                self.print_debug(msg.format(control, i, num_subfaults))
+                self.print_debug(msg.format(control, i, num_subfaults), mode='full')
                 self.control_parameters[control][i] = 1
                 self.set_initial_condition(prob, annotate_source=False, subtract_from_bathymetry=False)
                 self._basis_functions[control].append(prob.fwd_solutions[0].copy(deepcopy=True))
@@ -512,7 +512,8 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
 
     # --- Projection and interpolation into Okada basis
 
-    def project(self, prob, source, maxiter=5, rtol=1.0e-03):
+    @no_annotations
+    def project(self, prob, source, maxiter=5, rtol=1.0e-02):
         """
         Project a source field into the Okada basis.
 
@@ -548,19 +549,15 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
 
         # Cacheing
         cache_dir = create_directory(os.path.join(os.path.dirname(__file__), '.cache'))
-        fname = os.path.join(cache_dir, 'mass_matrix_okada_{:d}_{:d}x{:d}')
-        fname = fname.format(self.level, self.nx, self.ny) + '_{:s}.npy'
+        fname = os.path.join(cache_dir, 'mass_matrix_okada_{:d}_{:d}x{:d}_slip.npy')
 
         # Set rake to zero initially
         N = len(self.subfaults)
         self.control_parameters['rake'] = np.zeros(N)
 
-        # Fields to hold surface
-        surf_ = Function(prob.P1[0])
-        surf = Function(prob.P1[0])
-
         # Solve for slip and then rake
         dirty_cache = self.dirty_cache
+        errors = []
         for n in range(maxiter):
             for control in ('slip', 'rake'):
 
@@ -571,9 +568,10 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                 assert np.array([np.linalg.norm(phi_i.dat.data) for phi_i in phi]).min() > 0
 
                 # Assemble mass matrix
-                if os.path.isfile(fname.format(control)) and not dirty_cache:
-                    self.print_debug("PROJECTION: Loading {:s} mass matrix from cache...".format(control))
-                    A = np.load(fname.format(control))
+                if os.path.isfile(fname) and not dirty_cache:
+                    self.print_debug("PROJECTION: Loading slip mass matrix from cache...")
+                    A = np.load(fname)
+                    dirty_cache = True  # We only actually cache the first slip mass matrix
                 else:
                     self.print_debug("PROJECTION: Assembling {:s} mass matrix...".format(control))
                     A = np.zeros((N, N))
@@ -583,9 +581,9 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                     for i in range(N):
                         for j in range(i+1, N):
                             A[i, j] = A[j, i]
-                    self.print_debug("PROJECTION: Cacheing {:s} mass matrix...".format(control))
-                    np.save(fname.format(control), A)
-                    dirty_cache = True  # We only actually cache the first slip mass matrix
+                    if control == 'slip' and n == 0:
+                        self.print_debug("PROJECTION: Cacheing slip mass matrix...")
+                        np.save(fname, A)
 
                 # Assemble RHS
                 self.print_debug("PROJECTION: Assembling RHS for {:s} solve...".format(control))
@@ -595,17 +593,34 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                 self.print_debug("PROJECTION: Solving linear system for {:s}...".format(control))
                 self.control_parameters[control] = np.linalg.solve(A, b)
 
-            # Generate surface
-            surf = self.set_initial_condition(prob, annotate_source=False)
+                # Ensure that we always end with a slip solve
+                if control == 'rake':
+                    continue
 
-            # Check for convergence
-            rdiff = errornorm(surf, surf_)/norm(surf)
-            msg = "PROJECTION: Relative l2 difference at iteration {:d} = {:.2f}%"
-            self.print_debug(msg.format(n, 100*rdiff))
-            if rdiff < rtol:
-                self.print_debug("PROJECTION: Converged after {:d} iterations!".format(n+1))
-                break
-            surf_.assign(surf)
+                # Generate surface
+                surf = self.set_initial_condition(prob, annotate_source=False)
+                if self.debug:
+                    import matplotlib.pyplot as plt
+                    fig, axes = plt.subplots(figsize=(8, 8))
+                    fig.colorbar(tricontourf(surf, cmap='coolwarm', levels=50, axes=axes), ax=axes)
+                    axes.set_title("Iteration {:d} (after {:s} solve)".format(n, control))
+                    axes.axis(False)
+                    plt.show()
+
+                # Check for convergence
+                err = errornorm(surf, source)/norm(source)
+                errors.append(err)
+                msg = "PROJECTION: Relative l2 error at iteration {:d} = {:.2f}%"
+                self.print_debug(msg.format(n, 100*err))
+                if err < rtol:
+                    self.print_debug("PROJECTION: Converged after {:d} iterations!".format(n+1))
+                    self.print_debug("PROJECTION: relative errors: {:}".format(errors))
+                    break
+                if n == maxiter-1:
+                    msg = "PROJECTION: Terminated after maximum iteration count, {:d}!"
+                    self.print_debug(msg.format(maxiter))
+                    self.print_debug("PROJECTION: relative errors: {:}".format(errors))
+                    break
 
         # Reset active control tuple
         self.active_controls = active_controls
