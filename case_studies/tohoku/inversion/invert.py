@@ -172,6 +172,10 @@ with stop_annotating():
             swp.set_initial_condition()
             f = project(swp.fwd_solutions[0].split()[1], swp.P1[0])
 
+            # Print L2 error
+            msg = "Relative l2 error in initial guess projection: {:.2f}%"
+            print_output(msg.format(100*errornorm(f, f_src)/norm(f)))
+
             # Get corners of zoom
             lonlat_corners = [(138, 32), (148, 42), (138, 42)]
             utm_corners = [lonlat_to_utm(*corner, 54) for corner in lonlat_corners]
@@ -184,7 +188,7 @@ with stop_annotating():
             axes.set_ylim([utm_corners[0][1], utm_corners[2][1]])
             axes.axis(False)
             fname = 'initial_guess_{:s}_{:d}'.format(basis, level)
-            savefig(fname, fpath=plot_dir, extensions=plot.extensions)
+            savefig(fname, plot_dir, extensions=plot.extensions)
 if plot.only:
     sys.exit(0)
 
