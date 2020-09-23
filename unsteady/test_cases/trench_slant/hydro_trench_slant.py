@@ -17,6 +17,7 @@ timestep = 0.1
 fac = 3
 fac2 = 3
 
+
 def boundary_conditions_fn_trench(bathymetry_2d, flag, morfac=1, t_new=0, state='initial'):
     """
     Define boundary conditions for problem.
@@ -79,8 +80,6 @@ ax.set_xlim([0, 16])
 ax.set_ylim([0, 1.1])
 plt.text(19, 0.5, r'$z_{b}$ (m)', fontsize=12, rotation=270)
 plt.show()
-
-stop
 
 # define initial elevation
 elev_init = th.Function(P1_2d).interpolate(th.Constant(0.4))

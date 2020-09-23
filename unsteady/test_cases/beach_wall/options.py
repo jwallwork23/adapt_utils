@@ -5,13 +5,8 @@ from thetis.options import ModelOptions2d
 from adapt_utils.io import initialise_hydrodynamics
 from adapt_utils.unsteady.options import CoupledOptions
 from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
-from adapt_utils.unsteady.swe.utils import heaviside_approx
 
-import datetime
 import numpy as np
-import os
-import time
-
 
 __all__ = ["BeachOptions"]
 
@@ -49,8 +44,6 @@ class BeachOptions(CoupledOptions):
 
         # Initial
         self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
-        # self.elev_init = Constant(0.0)
-        # self.uv_init = as_vector((10**(-7), 0.0))
 
         self.plot_pvd = True
         self.hessian_recovery = 'dL2'
@@ -84,11 +77,11 @@ class BeachOptions(CoupledOptions):
         # Timeseries
         self.wd_obs = []
         self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
-        tol = 1e-8  # FIXME: Point evaluation hack
+        tol = 1e-8
         self.xrange = np.linspace(tol, 16-tol, 20)
         self.qois = []
 
-    def set_up_morph_model(self, mesh = None):
+    def set_up_morph_model(self, mesh=None):
 
         # Physical
         self.base_viscosity = 0.5
@@ -110,26 +103,20 @@ class BeachOptions(CoupledOptions):
         self.solve_exner = True
 
         self.norm_smoother = Constant(10/25)
-
-        P1 = FunctionSpace(mesh, "CG", 1)
-        bath = self.set_bathymetry(P1)
-        self.wetting_and_drying_alpha = Constant(0.0) #1/40) #bath.dx(0)
+        self.wetting_and_drying_alpha = Constant(0.0)
 
     def create_sediment_model(self, mesh, bathymetry):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
 
-        # if uv_init is None:
         self.uv_d = Function(self.P1_vec_dg).project(self.uv_init)
-        # if elev_init is None:
         self.eta_d = Function(self.P1DG).project(self.elev_init)
 
         self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
-            bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
-            mesh2d=mesh, bathymetry_2d=bathymetry,
-                            uv_init = self.uv_d, elev_init = self.eta_d, ks=self.ks, average_size=self.average_size,
-                            cons_tracer = self.use_tracer_conservative_form, wetting_and_drying = self.wetting_and_drying, wetting_alpha = self.wetting_and_drying_alpha)
-
+                                            bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
+                                            mesh2d=mesh, bathymetry_2d=bathymetry,
+                                            uv_init=self.uv_d, elev_init=self.eta_d, ks=self.ks, average_size=self.average_size,
+                                            cons_tracer=self.use_tracer_conservative_form, wetting_and_drying=self.wetting_and_drying, wetting_alpha=self.wetting_and_drying_alpha)
 
     def set_manning_drag_coefficient(self, fs):
         if self.friction == 'manning':
@@ -142,17 +129,16 @@ class BeachOptions(CoupledOptions):
     def set_bathymetry(self, fs, **kwargs):
         x, y = SpatialCoordinate(fs.mesh())
         self.bathymetry = Function(fs, name="Bathymetry")
-        self.bathymetry.interpolate(Constant(4)) # - x/40)
+        self.bathymetry.interpolate(Constant(4))
         return self.bathymetry
 
     def set_viscosity(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
         self.viscosity = Function(fs)
-        sponge_viscosity = Function(fs).interpolate(conditional(x>=100, -399 + 4*x, Constant(1.0)))
+        sponge_viscosity = Function(fs).interpolate(conditional(x >= 100, -399 + 4*x, Constant(1.0)))
         self.viscosity.interpolate(sponge_viscosity*self.base_viscosity)
-        return self.viscosity #Constant(self.base_viscosity)
+        return self.viscosity
 
-    
     def set_boundary_conditions(self, prob, i):
         if not hasattr(self, 'elev_in'):
             self.elev_in = Constant(0.0)
@@ -164,18 +150,16 @@ class BeachOptions(CoupledOptions):
 
         inflow_tag = 1
         outflow_tag = 2
-        bottom_wall_tag = 3
-        top_wall_tag = 4
         boundary_conditions = {
             'shallow_water': {
                 inflow_tag: {'elev': self.elev_in, 'uv': self.vel_in},
                 outflow_tag: {'un': Constant(0.0)},
             },
-	   'sediment': {
-               inflow_tag: {'value':self.sediment_model.equiltracer}
+            'sediment': {
+                inflow_tag: {'value': self.sediment_model.equiltracer}
             }
         }
-        return boundary_conditions    
+        return boundary_conditions
 
     def update_boundary_conditions(self, solver_obj, t=0.0):
         self.elev_in.assign(self.ocean_elev_func(t))
@@ -221,37 +205,22 @@ class BeachOptions(CoupledOptions):
         prob.fwd_solutions_sediment[0].interpolate(Constant(0.0))
 
     def set_initial_condition_bathymetry(self, prob):
-        prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))    
+        prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
 
     def get_update_forcings(self, prob, i, adjoint):
 
         def update_forcings(t):
             uv, elev = prob.fwd_solutions[0].split()
-            if np.round(t % 2.7, 0) == 3:
-                print(t)
-                print(assemble(elev*dx))
             self.update_boundary_conditions(prob, t=t)
 
         return update_forcings
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        # self.eta_tilde_file = File(self.di + "/eta_tilde.pvd").write(eta_tilde)
-        # self.eta_tilde_file._topology = None
-        if self.plot_timeseries:
-            u, eta = prob.fwd_solutions[i].split()
-            b = prob.bathymetry[i]
-            wd = Function(prob.P1DG[i], name="Heaviside approximation")
 
         def export_func():
             eta_tilde.project(self.get_eta_tilde(prob, i))
-            # self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
-            # if self.plot_timeseries:
-
-                 # Store modified bathymetry timeseries
-            #     wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
-            #     self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
 

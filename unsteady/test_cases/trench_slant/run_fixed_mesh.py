@@ -1,11 +1,8 @@
 from thetis import *
 import firedrake as fire
-from firedrake.petsc import PETSc
 
 import datetime
-import numpy as np
 import os
-import pandas as pd
 import sys
 import time
 

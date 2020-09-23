@@ -62,10 +62,10 @@ kwargs = {
 
 op = BeachOptions(**kwargs)
 swp = AdaptiveProblem(op)
-# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
-def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = kappa):
+
+def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K=kappa):
     """
     Monitor function focused around the steep_gradient (budd acta numerica)
 
@@ -73,23 +73,19 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = ka
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
-    # eta = swp.solution.split()[1]
     b = swp.fwd_solutions_bathymetry[0]
     bath_gradient = recovery.recover_gradient(b)
     bath_hess = recovery.recover_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
 
-    if max(abs(frob_bath_hess.dat.data[:]))<1e-10:
+    if max(abs(frob_bath_hess.dat.data[:])) < 1e-10:
         frob_bath_norm = Function(b.function_space()).project(frob_bath_hess)
     else:
         frob_bath_norm = Function(b.function_space()).project(frob_bath_hess/max(frob_bath_hess.dat.data[:]))
 
-    current_mesh = b.function_space().mesh()
-    bath_grad2 = Function(bath_gradient.function_space()).project(bath_gradient+as_vector((0.025, 0.0)))
     l2_bath_grad = Function(b.function_space()).project(abs(local_norm(bath_gradient)))
 
     bath_dx_l2_norm = Function(b.function_space()).interpolate(l2_bath_grad/max(l2_bath_grad.dat.data[:]))
-    # comp = interpolate(alpha*bath_dx_l2_norm, b.function_space())
     comp = interpolate(conditional(alpha*beta*bath_dx_l2_norm > alpha*gamma*frob_bath_norm, alpha*beta*bath_dx_l2_norm, alpha*gamma*frob_bath_norm), b.function_space())
     comp_new = project(comp, P1)
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
@@ -101,16 +97,8 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma, K = ka
     a = (inner(tau, H)*dx)+(K*inner(tau.dx(1), H.dx(1))*dx) - inner(tau, mon_init)*dx
     solve(a == 0, H)
 
-    # H = Function(P1)
-    # tau = TestFunction(P1)
-
-    # n = FacetNormal(mesh)
-
-    # a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
-    # a -= inner(tau, mon_init)*dx
-    # solve(a == 0, H)
-
     return H
+
 
 swp.set_monitor_functions(gradient_interface_monitor)
 
@@ -132,15 +120,14 @@ bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bath
 fpath = "hydrodynamics_beach_bath_new_{:d}_{:d}_{:d}_{:d}".format(nx*220, alpha, beta, gamma)
 export_bathymetry(bath, os.path.join('adapt_output', fpath), op=op)
 
-
 xaxisthetis1 = []
 baththetis1 = []
 
 for i in np.linspace(0, 219, 220):
     xaxisthetis1.append(i)
     baththetis1.append(-bath.at([i, 5]))
-df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
-df.to_csv("final_result_nx" + str(nx) +"_" + str(alpha) +'_' + str(beta) + '_' + str(gamma) + ".csv", index = False)
+df = pd.concat([pd.DataFrame(xaxisthetis1, columns=['x']), pd.DataFrame(baththetis1, columns=['bath'])], axis=1)
+df.to_csv("final_result_nx" + str(nx) + "_" + str(alpha) + '_' + str(beta) + '_' + str(gamma) + ".csv", index=False)
 
 df_real = pd.read_csv('final_result_nx3_ny1.csv')
 print("Mesh error: ")

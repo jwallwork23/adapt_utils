@@ -10,10 +10,6 @@ import thetis as th
 import time
 import datetime
 import numpy as np
-import firedrake as fire
-import math
-import os
-from firedrake.petsc import PETSc
 
 
 def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init, elev_init, ks, average_size, dt, t_end, friction='nikuradse', friction_coef=0, fluc_bcs=False, viscosity=10**(-6), diffusivity=0.15):

@@ -2,16 +2,13 @@ from thetis import *
 import firedrake as fire
 
 import datetime
-import numpy as np
 import os
-import pandas as pd
 import sys
 import time
 
 from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
-
 
 t1 = time.time()
 
@@ -23,7 +20,7 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
 
-# to create the input hydrodynamics directiory please run beach_tidal_hydro.py 
+# to create the input hydrodynamics directiory please run beach_tidal_hydro.py
 # setting nx and ny to be the same values as above
 
 # we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
@@ -69,4 +66,3 @@ bath_real = initialise_bathymetry(new_mesh, os.path.join(di, 'fixed_output/hydro
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
-
