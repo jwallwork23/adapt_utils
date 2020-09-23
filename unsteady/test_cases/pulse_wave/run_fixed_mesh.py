@@ -1,6 +1,5 @@
 from thetis import *
 import firedrake as fire
-from firedrake.petsc import PETSc
 
 import datetime
 import pandas as pd

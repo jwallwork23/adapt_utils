@@ -1,17 +1,15 @@
 from thetis import *
 import firedrake as fire
-from firedrake.petsc import PETSc
 
 import datetime
-import numpy as np
 import os
-import pandas as pd
 import time
+import numpy as np
+import pandas as pd
 
 from adapt_utils.io import initialise_fields, export_final_state
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
-
 
 t1 = time.time()
 
@@ -23,7 +21,7 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
 
-# to create the input hydrodynamics directiory please run beach_tidal_hydro.py 
+# to create the input hydrodynamics directiory please run beach_tidal_hydro.py
 # setting nx and ny to be the same values as above
 
 # we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
@@ -65,11 +63,10 @@ baththetis1 = []
 for i in np.linspace(0, 219, 220):
     xaxisthetis1.append(i)
     baththetis1.append(-bath.at([i, 5]))
-df = pd.concat([pd.DataFrame(xaxisthetis1, columns = ['x']), pd.DataFrame(baththetis1, columns = ['bath'])], axis = 1)
-df.to_csv("final_result_check_nx" + str(nx) + "_ny" + str(ny) + ".csv", index = False)
+df = pd.concat([pd.DataFrame(xaxisthetis1, columns=['x']), pd.DataFrame(baththetis1, columns=['bath'])], axis=1)
+df.to_csv("final_result_check_nx" + str(nx) + "_ny" + str(ny) + ".csv", index=False)
 
 bath_real = initialise_fields(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))
-

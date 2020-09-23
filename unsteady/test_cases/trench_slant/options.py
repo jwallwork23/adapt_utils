@@ -4,11 +4,9 @@ from thetis.configuration import *
 from firedrake.petsc import PETSc
 
 from adapt_utils.unsteady.options import CoupledOptions
-from adapt_utils.unsteady.swe.utils import heaviside_approx
 from thetis.options import ModelOptions2d
 from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
 
-import os
 import numpy as np
 import matplotlib
 # import matplotlib.pyplot as plt
@@ -23,7 +21,7 @@ __all__ = ["TrenchSlantOptions"]
 
 class TrenchSlantOptions(CoupledOptions):
 
-    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir = None, output_dir = None, **kwargs):
+    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
         super(TrenchSlantOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), np.int(np.ceil(5*ny)), 16, 1.1)
@@ -55,7 +53,7 @@ class TrenchSlantOptions(CoupledOptions):
         # Initial
         self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
 
-        self.set_up_morph_model(input_dir, self.default_mesh)        
+        self.set_up_morph_model(input_dir, self.default_mesh)
 
         self.morphological_acceleration_factor = Constant(100)
 
@@ -71,17 +69,17 @@ class TrenchSlantOptions(CoupledOptions):
         # Timeseries
         self.wd_obs = []
         self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
-        tol = 1e-8  # FIXME: Point evaluation hack
+        tol = 1e-8
         self.xrange = np.linspace(tol, 16-tol, 20)
 
-    def set_up_morph_model(self, input_dir, mesh = None):
+    def set_up_morph_model(self, input_dir, mesh=None):
 
         # Physical
         self.base_diffusivity = 0.18161630470135287
 
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
-        self.average_size = 160*(10**(-6))  # Average sediment size        
+        self.average_size = 160*(10**(-6))  # Average sediment size
 
         self.wetting_and_drying = False
         self.conservative = False
@@ -91,11 +89,6 @@ class TrenchSlantOptions(CoupledOptions):
         self.convective_vel_flag = True
         self.bedload = True
 
-        #if not hasattr(self, 'bathymetry') or self.bathymetry is None:
-        #    self.P1 = FunctionSpace(self.default_mesh, "CG", 1)
-        #    self.bathymetry = self.set_bathymetry(self.P1)
-
-
     def create_sediment_model(self, mesh, bathymetry):
         self.P1DG = FunctionSpace(mesh, "DG", 1)
         self.P1_vec_dg = VectorFunctionSpace(mesh, "DG", 1)
@@ -104,10 +97,10 @@ class TrenchSlantOptions(CoupledOptions):
 
         self.eta_d = Function(self.P1DG).project(self.elev_init)
         self.sediment_model = SedimentModel(ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
-            bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
-            mesh2d=mesh, bathymetry_2d=bathymetry,
-                            uv_init = self.uv_d, elev_init = self.eta_d, ks=self.ks, average_size=self.average_size,
-                            cons_tracer = self.conservative, wetting_and_drying = self.wetting_and_drying)
+                                            bedload=self.bedload, angle_correction=self.angle_correction, slope_eff=self.slope_eff, seccurrent=False,
+                                            mesh2d=mesh, bathymetry_2d=bathymetry,
+                                            uv_init=self.uv_d, elev_init=self.eta_d, ks=self.ks, average_size=self.average_size,
+                                            cons_tracer=self.conservative, wetting_and_drying=self.wetting_and_drying)
 
     def set_quadratic_drag_coefficient(self, fs):
         self.depth = Function(fs).interpolate(self.set_bathymetry(fs) + Constant(0.397))
@@ -132,9 +125,9 @@ class TrenchSlantOptions(CoupledOptions):
         depth_diff = depth_trench - depth_riv
         x, y = SpatialCoordinate(fs.mesh())
         trench = conditional(le(x, 5), (0.1*(y-0.55)) + depth_riv, conditional(le(x, 6.5), (0.1*(y-0.55)) + (1/1.5)*depth_diff*(x-6.5) + depth_trench,
-                        conditional(le(x, 9.5), (0.1*(y-0.55)) + depth_trench, conditional(le(x, 11), (0.1*(y-0.55)) - (1/1.5)*depth_diff*(x-11) + depth_riv, (0.1*(y-0.55)) + depth_riv))))
+                             conditional(le(x, 9.5), (0.1*(y-0.55)) + depth_trench, conditional(le(x, 11), (0.1*(y-0.55)) - (1/1.5)*depth_diff*(x-11) + depth_riv, (0.1*(y-0.55)) + depth_riv))))
         return interpolate(-trench, fs)
-    
+
     def set_viscosity(self, fs):
         self.viscosity = Function(fs)
         self.viscosity.assign(self.base_viscosity)
@@ -143,14 +136,12 @@ class TrenchSlantOptions(CoupledOptions):
     def set_boundary_conditions(self, prob, i):
         inflow_tag = 1
         outflow_tag = 2
-        bottom_wall_tag = 3
-        top_wall_tag = 4
         boundary_conditions = {
             'shallow_water': {
                 inflow_tag: {'flux': Constant(-0.22)},
                 outflow_tag: {'elev': Constant(0.397)},
             },
-	   'sediment': {
+            'sediment': {
                 inflow_tag: {'value': self.sediment_model.equiltracer}
             }
         }
@@ -180,7 +171,7 @@ class TrenchSlantOptions(CoupledOptions):
             return Constant(1.0)
 
     def set_initial_condition_sediment(self, prob):
-        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0)) #self.sediment_model.equiltracer)
+        prob.fwd_solutions_sediment[0].interpolate(Constant(0.0))
 
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space()))
@@ -190,21 +181,10 @@ class TrenchSlantOptions(CoupledOptions):
 
     def get_export_func(self, prob, i):
         eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
-        #self.eta_tilde_file._topology = None
-        if self.plot_timeseries:
-            u, eta = prob.fwd_solutions[i].split()
-            b = prob.bathymetry[i]
-            wd = Function(prob.P1DG[i], name="Heaviside approximation")
 
         def export_func():
             eta_tilde.project(self.get_eta_tilde(prob, i))
-            #self.eta_tilde_file.write(eta_tilde)
             u, eta = prob.fwd_solutions[i].split()
-            #if self.plot_timeseries:
-
-                # Store modified bathymetry timeseries
-            #    wd.project(heaviside_approx(-eta-b, self.wetting_and_drying_alpha))
-            #    self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
 
@@ -237,4 +217,3 @@ class TrenchSlantOptions(CoupledOptions):
             File(outputdir + "/velocity_imported.pvd").write(uv_init)
             chk.close()
         return elev_init, uv_init,
-

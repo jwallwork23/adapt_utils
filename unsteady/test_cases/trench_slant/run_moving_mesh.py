@@ -1,10 +1,7 @@
 from thetis import *
 import firedrake as fire
-from firedrake.petsc import PETSc
 
 import datetime
-import numpy as np
-import pandas as pd
 import time
 
 from adapt_utils.adapt import recovery
@@ -29,7 +26,7 @@ gamma = 1
 
 # we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
 
-inputdir = 'hydrodynamics_trench_slant_'  + str(nx)
+inputdir = 'hydrodynamics_trench_slant_' + str(nx)
 
 kwargs = {
     'approach': 'monge_ampere',
@@ -46,12 +43,12 @@ kwargs = {
     'use_automatic_sipg_parameter': True,
 }
 
-
 op = TrenchSlantOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 # swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
+
 
 def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     """
@@ -61,13 +58,11 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     """
     P1 = FunctionSpace(mesh, "CG", 1)
 
-    # eta = swp.solution.split()[1]
     b = swp.fwd_solutions_bathymetry[0]
     bath_gradient = recovery.construct_gradient(b)
     bath_hess = recovery.construct_hessian(b, op=op)
     frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
     frob_bath_norm = Function(b.function_space()).project(frob_bath_hess/max(frob_bath_hess.dat.data[:]))
-    current_mesh = b.function_space().mesh()
     l2_bath_grad = Function(b.function_space()).project(local_norm(bath_gradient))
     bath_dx_l2_norm = Function(b.function_space()).interpolate(l2_bath_grad/max(l2_bath_grad.dat.data[:]))
 
@@ -76,12 +71,8 @@ def gradient_interface_monitor(mesh, alpha=alpha, beta=beta, gamma=gamma):
     comp_new2 = interpolate(conditional(comp_new > Constant(0.0), comp_new, Constant(0.0)), P1)
     mon_init = project(Constant(1.0) + comp_new2, P1)
 
-    #K = 10*(0.2**2)/4
-    #a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
-    #a -= inner(tau, mon_init)*dx
-    #solve(a == 0, H)
-
     return mon_init
+
 
 swp.set_monitor_functions(gradient_interface_monitor)
 

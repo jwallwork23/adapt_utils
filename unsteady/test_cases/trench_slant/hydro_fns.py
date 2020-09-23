@@ -10,8 +10,6 @@ import thetis as th
 import time
 import datetime
 import numpy as np
-import firedrake as fire
-import math
 import os
 from firedrake.petsc import PETSc
 
@@ -131,7 +129,6 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init, e
 
     solver_obj.assign_initial_conditions(uv=uv_init, elev=elev_init)
     return solver_obj, update_forcings_hydrodynamics
-
 
 
 def export_final_state(inputdir, uv, elev):  # TODO: Put into io?
