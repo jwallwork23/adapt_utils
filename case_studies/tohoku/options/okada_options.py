@@ -513,7 +513,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
     # --- Projection and interpolation into Okada basis
 
     @no_annotations
-    def project(self, prob, source, maxiter=5, rtol=1.0e-02):
+    def project(self, prob, source, maxiter=2, rtol=1.0e-02):
         """
         Project a source field into the Okada basis.
 
