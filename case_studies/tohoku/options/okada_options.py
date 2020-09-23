@@ -1,3 +1,6 @@
+from thetis import *
+from pyadjoint.tape import no_annotations
+
 import numpy as np
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
@@ -202,12 +205,11 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         :kwarg tag: non-negative integer label for tape.
         """
         from scipy.interpolate import griddata
-        import firedrake
 
         # Create fault topography
         self.create_topography(annotate=annotate_source, **kwargs)
 
-        surf = firedrake.Function(prob.P1[0])
+        surf = Function(prob.P1[0])
         if self.N is not None:  # Interpolate it using SciPy
             surf.dat.data[:] = griddata(
                 (self.fault.dtopo.X, self.fault.dtopo.Y),
@@ -227,6 +229,56 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob, surf=surf)
         return surf
+
+    @no_annotations
+    def get_basis_functions(self, prob=None):
+        """
+        Assemble a dictionary containing lists of Okada basis functions on each subfault.
+
+        Each basis function associated with a subfault has active controls set to zero on all other
+        subfaults and only one non-zero active control on the subfault itself, set to one. All passive
+        controls retain the value that they hold before assembly.
+        """
+        from adapt_utils.unsteady.solver import AdaptiveProblem
+
+        prob = prob or AdaptiveProblem(self)
+        self._basis_functions = {}
+
+        # Stash the control parameters and zero out all active ones
+        tmp = self.control_parameters.copy()
+        num_subfaults = len(self.subfaults)
+        for control in self.active_controls:
+            self.control_parameters[control] = np.zeros(num_subfaults)
+
+        # Loop over active controls on each subfault and compute the associated basis functions
+        print_output("INIT: Assembling Okada basis function array...")
+        msg = "INIT: Assembling '{:s}' basis function on subfault {:d}/{:d}..."
+        for control in self.active_controls:
+            self._basis_functions[control] = []
+            for i, subfault in enumerate(self.subfaults):
+                print_output(msg.format(control, i, num_subfaults))
+                self.control_parameters[control][i] = 1
+                self.set_initial_condition(prob, annotate_source=False)
+                self._basis_functions[control].append(prob.fwd_solutions[0].copy(deepcopy=True))
+                self.control_parameters[control][i] = 0
+        self.control_parameters = tmp
+
+    @property
+    def basis_functions(self):
+        recompute = False
+        if not hasattr(self, '_basis_functions'):
+            recompute = True
+        else:
+            # Check the active controls haven't changed
+            for control in self.active_controls:
+                if control not in self._basis_functions:
+                    recompute = True
+            for control in self._basis_functions:
+                if control not in self.active_controls:
+                    recompute = True
+        if recompute:
+            self.get_basis_functions()
+        return self._basis_functions
 
     def create_topography(self, annotate=False, interpolate=False, **kwargs):
         """
@@ -386,18 +438,17 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         """
         Establish the mapping between Okada grid
         """
-        import firedrake
         from firedrake.projection import SupermeshProjector
 
         assert self.N is not None
 
         # Create a Firedrake mesh associated with the (uniform) Okada grid.
-        self.okada_mesh = firedrake.SquareMesh(self.N-1, self.N-1, self.lx, self.ly)
+        self.okada_mesh = SquareMesh(self.N-1, self.N-1, self.lx, self.ly)
         self.okada_mesh.coordinates.dat.data[:] += [self.xmin, self.ymin]
 
         # Create function spaces associated with both the Okada and longitude-latitude meshes
-        self.P1_okada = firedrake.FunctionSpace(self.okada_mesh, "CG", 1)
-        self.P1_lonlat = firedrake.FunctionSpace(self.lonlat_mesh, "CG", 1)
+        self.P1_okada = FunctionSpace(self.okada_mesh, "CG", 1)
+        self.P1_lonlat = FunctionSpace(self.lonlat_mesh, "CG", 1)
 
         # Establish an index mapping between the logical x- and y- directions and the vertex
         # ordering used by Firedrake's utility mesh, :class:`SquareMesh`.
@@ -409,13 +460,13 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
 
         # Create source and target images and a libsupermesh projector between them
         self.print_debug("SETUP: Establishing supermesh projector between Okada and lonlat meshes...")
-        self.source_okada = firedrake.Function(self.P1_okada, name="Interp. source on Okada mesh")
-        self.target_lonlat = firedrake.Function(self.P1_lonlat, name="Interp. target on lonlat mesh")
+        self.source_okada = Function(self.P1_okada, name="Interp. source on Okada mesh")
+        self.target_lonlat = Function(self.P1_lonlat, name="Interp. target on lonlat mesh")
         self._okada2lonlat = SupermeshProjector(self.source_okada, self.target_lonlat)
 
         # Target image on UTM mesh
-        P1 = firedrake.FunctionSpace(self.default_mesh, "CG", 1)
-        self.target_utm = firedrake.Function(P1, name="Interpolation target on UTM mesh")
+        P1 = FunctionSpace(self.default_mesh, "CG", 1)
+        self.target_utm = Function(P1, name="Interpolation target on UTM mesh")
 
     # TODO: No longer needed
     def _field_from_array(self, arr):

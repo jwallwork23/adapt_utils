@@ -120,7 +120,7 @@ params['label'] = r'$\alpha=0.00$' if use_regularisation else r'Parameter space'
 x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
 axes.plot(x, q(x), '--x', **params)
 axes.set_xlabel(r"Basis function coefficient, $m$", fontsize=fontsize)
-axes.set_ylabel(r"Mean square error", fontsize=fontsize)
+axes.set_ylabel(r"Quantity of interest", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
 plt.yticks(fontsize=fontsize_tick)
 plt.xlim([0, 8])

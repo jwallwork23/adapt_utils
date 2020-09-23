@@ -73,7 +73,7 @@ except AssertionError:
         op.gauges[gauge]['data'] = op.gauges[gauge]['timeseries']
         np.save(fname, op.gauges[gauge]['data'])
 
-# Solve the forward problem with 'suboptimal' control parameter m = 10, checkpointing state
+# Solve the forward problem with 'suboptimal' control parameter m = 7.5, checkpointing state
 swp = AdaptiveProblem(op, nonlinear=nonlinear, print_progress=False)
 op.assign_control_parameters(kwargs['control_parameters'])
 swp.solve_forward()
