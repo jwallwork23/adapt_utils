@@ -81,8 +81,8 @@ class BeachOptions(CoupledOptions):
 
         self.dt = 0.5
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 72
-        self.dt_per_export = 72
+        self.dt_per_mesh_movement = 1296
+        self.dt_per_export = 1296
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 

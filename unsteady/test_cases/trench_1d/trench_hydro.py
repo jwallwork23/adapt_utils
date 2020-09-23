@@ -10,6 +10,7 @@ Solves the initial hydrodynamics simulation of a migrating trench.
 """
 
 from thetis import *
+from firedrake.petsc import PETSc
 
 import numpy as np
 import time
@@ -31,7 +32,11 @@ def export_final_state(inputdir, uv, elev,):
     File(inputdir + '/elevationout.pvd').write(elev)
     chk.close()
 
-res = 1
+    plex = elev.function_space().mesh()._plex
+    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
+    viewer(plex)
+
+res = 0.4
 
 # define mesh
 lx = 16
@@ -43,8 +48,8 @@ mesh2d = RectangleMesh(nx, ny, lx, ly)
 x, y = SpatialCoordinate(mesh2d)
 
 # define function spaces
-V = get_function_space(mesh2d, "CG", 1)
-P1_2d = get_function_space(mesh2d, "DG", 1)
+V = FunctionSpace(mesh2d, "CG", 1)
+P1_2d = FunctionSpace(mesh2d, "DG", 1)
 
 # define underlying bathymetry
 bathymetry_2d = Function(V, name='Bathymetry')

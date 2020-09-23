@@ -53,7 +53,7 @@ class TrenchSedimentOptions(CoupledOptions):
         # Initial
         self.elev_init, self.uv_init = self.initialise_fields(input_dir, self.di)
 
-        self.set_up_morph_model(input_dir, self.default_mesh)        
+        self.set_up_morph_model(input_dir, self.default_mesh)
 
         self.morphological_acceleration_factor = Constant(100)
 
@@ -66,17 +66,6 @@ class TrenchSedimentOptions(CoupledOptions):
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
 
-        # Adaptivity
-        self.h_min = 1e-8
-        self.h_max = 10.
-
-        # Timeseries
-        self.wd_obs = []
-        self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
-        tol = 1e-8  # FIXME: Point evaluation hack
-        self.xrange = np.linspace(tol, 16-tol, 20)
-
-        #self.uv_file = File(os.path.join(self.di, 'uv.pvd'))
 
     def set_up_morph_model(self, input_dir, mesh = None):
 

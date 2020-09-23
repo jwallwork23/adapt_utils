@@ -1140,7 +1140,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if export_func is not None:
                     export_func()
                 self.callbacks[i].evaluate(mode='export')
-        update_forcings(self.simulation_time + op.dt)
+        if update_forcings is not None:
+            update_forcings(self.simulation_time + op.dt)
         op.print_debug("Done!")
         print_output(80*'=')
 

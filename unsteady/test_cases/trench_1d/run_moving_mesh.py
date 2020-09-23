@@ -15,8 +15,9 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.8
-alpha = 2
+nx = 0.1
+alpha = 17
+tol = 1e-3
 
 inputdir = 'hydrodynamics_trench_' + str(nx)
 
@@ -28,7 +29,7 @@ kwargs = {
     'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
-    'r_adapt_rtol': 1.0e-3,
+    'r_adapt_rtol': tol,
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': 'lax_friedrichs',
@@ -82,6 +83,13 @@ new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
+old_mesh = swp.fwd_solutions_bathymetry[0].function_space().mesh()
+
+mesh_element_size = Function(FunctionSpace(old_mesh, "DG", 0)).interpolate(CellSize(old_mesh))
+
+print(max(mesh_element_size.dat.data[:]))
+print(min(mesh_element_size.dat.data[:]))
+
 data = pd.read_csv('experimental_data.csv', header=None)
 
 datathetis = []
@@ -93,7 +101,7 @@ for i in np.linspace(0, 15.9, 160):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv('adapt_output/bed_trench_output_uni_s' + str(nx) + '_' + str(alpha) + '.csv')
+df.to_csv('adapt_output/bed_trench_output_uni_s' + str(nx) + '_' + str(alpha) + '_' + str(tol) + '.csv')
 
 datathetis = []
 bathymetrythetis1 = []
@@ -106,7 +114,7 @@ for i in range(len(data[0].dropna())):
 
 df_exp = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df_exp.to_csv('adapt_output/bed_trench_output_s' + str(nx) + '_' + str(alpha) + '.csv')
+df_exp.to_csv('adapt_output/bed_trench_output_s' + str(nx) + '_' + str(alpha) + '_' + str(tol) + '.csv')
 
 print(nx)
 print(alpha)
@@ -117,7 +125,7 @@ print("total time: ")
 print(t2-t1)
 
 
-df_real = pd.read_csv('fixed_output/bed_trench_output_uni_4.csv')
+df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c4.csv')
 print("Mesh error: ")
 print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
 #f = open("adapt_output/output_frob_norm_" + str(nx) + '_' + str(alpha) + '.txt', "w+")
@@ -125,3 +133,7 @@ print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]
 #f.write("\n")
 #f.write(str(t2-t1))
 #f.close()
+print('tolerance')
+print(tol)
+
+

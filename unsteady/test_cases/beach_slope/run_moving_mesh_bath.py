@@ -44,14 +44,14 @@ def initialise_fields(mesh2d, inputdir):
 
     return bath
 
-nx = 0.2
-ny = 0.5
+nx = 0.6
+ny = 1
 
-alpha = 3
+alpha = 7
 beta = 0
 gamma = 1
 
-kappa = 200
+kappa = 66 + 2/3
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -59,6 +59,9 @@ outputdir = 'outputs' + st
 
 inputdir = 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))
 print(inputdir)
+
+r_tol = 1e-3
+
 kwargs = {
     'approach': 'monge_ampere',
     'nx': nx,
@@ -67,7 +70,7 @@ kwargs = {
     'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
-    'r_adapt_rtol': 1.0e-3,
+    'r_adapt_rtol': r_tol,
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
@@ -165,3 +168,6 @@ bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(
 print('subdomain')
 
 print(fire.errornorm(bath_mod, bath_real_mod))
+
+print('tolerance')
+print(r_tol)

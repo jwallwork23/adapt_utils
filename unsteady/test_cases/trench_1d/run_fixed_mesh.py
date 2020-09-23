@@ -10,14 +10,14 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.125
+nx = 0.4
 
-inputdir = 'hydrodynamics_trench_' + str(nx)
-
+inputdir = 'hydrodynamics_trench' + str(nx)
+print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': nx,
-    'ny': 1,
+    'ny': 2,
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
