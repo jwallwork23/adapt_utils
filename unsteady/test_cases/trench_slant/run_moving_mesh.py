@@ -2,7 +2,6 @@ from thetis import *
 import firedrake as fire
 
 import datetime
-import os
 import time
 
 from adapt_utils.adapt import recovery

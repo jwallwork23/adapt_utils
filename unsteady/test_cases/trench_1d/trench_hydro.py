@@ -16,7 +16,6 @@ import time
 
 from adapt_utils.io import export_hydrodynamics
 
-
 res = 1
 
 # define mesh

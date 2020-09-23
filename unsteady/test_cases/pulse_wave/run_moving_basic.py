@@ -14,7 +14,7 @@ alpha = 1
 beta = 1
 gamma = 1
 
-kappa = 100  # 12.5
+kappa = 100
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')

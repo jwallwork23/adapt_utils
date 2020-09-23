@@ -8,6 +8,7 @@ from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
 
 import numpy as np
 
+
 __all__ = ["TrenchSedimentOptions"]
 
 
