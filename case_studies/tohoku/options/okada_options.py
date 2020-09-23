@@ -190,7 +190,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         # Create fault
         self.fault = Fault(*self.coords, subfaults=self.subfaults)
 
-    def set_initial_condition(self, prob, annotate_source=False, **kwargs):
+    def set_initial_condition(self, prob, annotate_source=False, subtract_from_bathymetry=True, **kwargs):
         """
         Set initial condition using the Okada parametrisation [Okada 85].
 
@@ -227,7 +227,8 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         eta.interpolate(surf)
 
         # Subtract initial surface from the bathymetry field
-        self.subtract_surface_from_bathymetry(prob, surf=surf)
+        if subtract_from_bathymetry:
+            self.subtract_surface_from_bathymetry(prob, surf=surf)
         return surf
 
     @no_annotations
@@ -256,9 +257,9 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         for control in self.active_controls:
             self._basis_functions[control] = []
             for i, subfault in enumerate(self.subfaults):
-                print_output(msg.format(control, i, num_subfaults))
+                self.print_debug(msg.format(control, i, num_subfaults))
                 self.control_parameters[control][i] = 1
-                self.set_initial_condition(prob, annotate_source=False)
+                self.set_initial_condition(prob, annotate_source=False, subtract_from_bathymetry=False)
                 self._basis_functions[control].append(prob.fwd_solutions[0].copy(deepcopy=True))
                 self.control_parameters[control][i] = 0
         self.control_parameters = tmp
@@ -292,24 +293,24 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         :kwarg interpolate: see the :attr:`interpolate` method.
         :kwarg tag: label for tape.
         """
-        msg = "Fault corresponds to an earthquake with moment magnitude {:4.1e}"
+        msg = "INIT: Fault corresponds to an earthquake with moment magnitude {:4.1e}"
         if annotate:
             if interpolate:
                 self._create_topography_active_interpolate(**kwargs)
             else:
                 self._create_topography_active(**kwargs)
-            self.print_debug(msg.format(self.fault.Mw().val))
+            self.print_debug(msg.format(self.fault.Mw().val), mode='full')
         else:
             self._create_topography_passive()
-            self.print_debug(msg.format(self.fault.Mw()))
+            self.print_debug(msg.format(self.fault.Mw()), mode='full')
 
     def _create_topography_passive(self):
-        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        msg = "INIT: Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
         for i, subfault in enumerate(self.subfaults):
             for control in self.all_controls:
                 subfault.__setattr__(control, self.control_parameters[control][i])
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo()))
-        self.fault.create_dtopography(verbose=self.debug, active=False)
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo()), mode='full')
+        self.fault.create_dtopography(verbose=self.debug and self.debug_mode == 'full', active=False)
 
     # --- Automatic differentiation
 
@@ -326,7 +327,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         adolc.trace_on(tag)
 
         # Read parameters and mark active variables as independent
-        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        msg = "INIT: Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
         for i, subfault in enumerate(self.subfaults):
             for control in self.all_controls:
                 if control in self.active_controls:
@@ -334,11 +335,11 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                     adolc.independent(subfault.__getattribute__(control))
                 else:
                     subfault.__setattr__(control, self.control_parameters[control][i])
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val))
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val), mode='full')
 
         # Create the topography, thereby calling Okada
         self.print_debug("SETUP: Creating topography using Okada model...")
-        self.fault.create_dtopography(verbose=self.debug, active=True)
+        self.fault.create_dtopography(verbose=self.debug and self.debug_mode == 'full', active=True)
 
         # Mark output as dependent
         if separate_faults:
@@ -361,7 +362,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         adolc.trace_on(tag)
 
         # Read parameters and mark active variables as independent
-        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        msg = "INIT: Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
         for i, subfault in enumerate(self.subfaults):
             for control in self.all_controls:
                 if control in self.active_controls:
@@ -369,11 +370,11 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                     adolc.independent(subfault.__getattribute__(control))
                 else:
                     subfault.__setattr__(control, self.control_parameters[control][i])
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val))
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val), mode='full')
 
         # Create the topography, thereby calling Okada
         self.print_debug("SETUP: Creating topography using Okada model...")
-        self.fault.create_dtopography(verbose=self.debug, active=True)
+        self.fault.create_dtopography(verbose=self.debug and self.debug_mode == 'full', active=True)
 
         # Compute quantity of interest
         self.J_subfaults = [0.0 for j in range(self.N)]
@@ -511,8 +512,105 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
 
     # --- Projection and interpolation into Okada basis
 
-    def project(self, prob, source):
-        raise NotImplementedError  # TODO: Newton method
+    def project(self, prob, source, maxiter=5, rtol=1.0e-03):
+        """
+        Project a source field into the Okada basis.
+
+        Whilst the Okada model (evaluated on each subfault) is nonlinear, the dislocation field across
+        the whole fault is computed by simply summing all contributions.
+
+        We restrict attention to the case where slip and rake are the only active control parameters.
+        On any given fault, if the slip is zero then so is the rake. This means that we cannot assemble
+        a monolithic system using basis functions from both slip and rake parameter spaces, as half of
+        its rows would be zero.
+
+        Instead, we take an iterative approach:
+
+          1. set all active control parameters to zero;
+          2. while not converged:
+              (a) solve for slip, holding rake parameters fixed;
+              (b) solve for rake, holding slip parameters fixed;
+              (c) compute dislocation field for current control parameters;
+              (d) check for convergence.
+
+        Convergence is determined either by subsequent dislocation field approximations meeting a
+        relative l2 error tolerance, or when the maximum number of iterations is met.
+        """
+        active_controls = self.active_controls
+        try:
+            assert 'slip' in active_controls
+            assert 'rake' in active_controls
+            for control in self.all_controls:
+                if control in active_controls:
+                    assert control in ('slip', 'rake')
+        except AssertionError:
+            raise NotImplementedError
+
+        # Cacheing
+        cache_dir = create_directory(os.path.join(os.path.dirname(__file__), '.cache'))
+        fname = os.path.join(cache_dir, 'mass_matrix_okada_{:d}_{:d}x{:d}')
+        fname = fname.format(self.level, self.nx, self.ny) + '_{:s}.npy'
+
+        # Set rake to zero initially
+        N = len(self.subfaults)
+        self.control_parameters['rake'] = np.zeros(N)
+
+        # Fields to hold surface
+        surf_ = Function(prob.P1[0])
+        surf = Function(prob.P1[0])
+
+        # Solve for slip and then rake
+        dirty_cache = self.dirty_cache
+        for n in range(maxiter):
+            for control in ('slip', 'rake'):
+
+                # Get basis functions with slip solution above
+                self.active_controls = (control, )
+                self.get_basis_functions(prob)
+                phi = [bf.split()[1] for bf in self.basis_functions[control]]
+                assert np.array([np.linalg.norm(phi_i.dat.data) for phi_i in phi]).min() > 0
+
+                # Assemble mass matrix
+                if os.path.isfile(fname.format(control)) and not dirty_cache:
+                    self.print_debug("PROJECTION: Loading {:s} mass matrix from cache...".format(control))
+                    A = np.load(fname.format(control))
+                else:
+                    self.print_debug("PROJECTION: Assembling {:s} mass matrix...".format(control))
+                    A = np.zeros((N, N))
+                    for i in range(N):
+                        for j in range(i+1):
+                            A[i, j] = assemble(phi[i]*phi[j]*dx)
+                    for i in range(N):
+                        for j in range(i+1, N):
+                            A[i, j] = A[j, i]
+                    self.print_debug("PROJECTION: Cacheing {:s} mass matrix...".format(control))
+                    np.save(fname.format(control), A)
+                    dirty_cache = True  # We only actually cache the first slip mass matrix
+
+                # Assemble RHS
+                self.print_debug("PROJECTION: Assembling RHS for {:s} solve...".format(control))
+                b = np.array([assemble(phi[i]*source*dx) for i in range(N)])
+
+                # Solve
+                self.print_debug("PROJECTION: Solving linear system for {:s}...".format(control))
+                self.control_parameters[control] = np.linalg.solve(A, b)
+
+            # Generate surface
+            surf = self.set_initial_condition(prob, annotate_source=False)
+
+            # Check for convergence
+            rdiff = errornorm(surf, surf_)/norm(surf)
+            msg = "PROJECTION: Relative l2 difference at iteration {:d} = {:.2f}%"
+            self.print_debug(msg.format(n, 100*rdiff))
+            if rdiff < rtol:
+                self.print_debug("PROJECTION: Converged after {:d} iterations!".format(n+1))
+                break
+            surf_.assign(surf)
+
+        # Reset active control tuple
+        self.active_controls = active_controls
+
+        return surf
 
     def interpolate(self, prob, source, tag=0):
         r"""

@@ -144,7 +144,7 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
     @no_annotations
     def project(self, prob, source):
         r"""
-        Project a source field into the box basis. This involves solving an auxiliary linear system.
+        Project a source field into the radial basis. This involves solving an auxiliary linear system.
         We seek a vector of control parameters :math:`\mathbf m` satisfying
 
       ..math::
