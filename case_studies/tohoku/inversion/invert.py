@@ -132,10 +132,11 @@ elif basis == 'radial':
     options_constructor = TohokuRadialBasisOptions
 elif basis == 'okada':
     options_constructor = TohokuOkadaBasisOptions
-    raise NotImplementedError  # TODO: Hook up Okada reduced functional and gradient
 else:
     raise ValueError("Basis type '{:s}' not recognised.".format(basis))
 op = options_constructor(**kwargs)
+if basis == 'okada':
+    op.active_controls = ('slip', 'rake')
 op.dirty_cache = bool(args.dirty_cache or False)
 gauges = list(op.gauges.keys())
 
@@ -191,12 +192,16 @@ with stop_annotating():
             savefig(fname, plot_dir, extensions=plot.extensions)
 if plot.only:
     sys.exit(0)
+if basis == 'okada':
+    raise NotImplementedError  # TODO: Hook up Okada reduced functional and gradient
 
 
 # --- Tracing
 
 # Set initial guess
 op = options_constructor(**kwargs)
+if basis == 'okada':
+    op.active_controls = ('slip', 'rake')
 swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.clear_tape()
 print_output("Setting initial guess...")
