@@ -55,7 +55,7 @@ plot_dir = create_directory(os.path.join(di, 'plots'))
 
 # Collect initialisation parameters
 kwargs = {
-    'level': level,
+    # 'level': level,  # Better not to instatiate large objects when plotting
     'save_timeseries': True,
 
     # Optimisation
@@ -91,15 +91,16 @@ if use_regularisation:
     func_values_reg = np.load(os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level)))
 
 # Fit a quadratic to the first three points and find its root
-assert len(control_values[::3]) == 3
-q = scipy.interpolate.lagrange(control_values[::3], func_values[::3])
+# q = scipy.interpolate.lagrange(control_values[::3], func_values[::3])
+q = scipy.interpolate.lagrange(control_values[:3], func_values[:3])
 dq = q.deriv()
 print_output("Exact gradient at 5.0:  {:.4f}".format(dq(5.0)))
 print_output("Exact gradient at 7.5:  {:.4f}".format(dq(7.5)))
 q_min = -dq.coefficients[1]/dq.coefficients[0]
-assert dq.deriv().coefficients[0] > 0
+assert len(q.coefficients) == 3
+assert dq.deriv().coefficients[0] > 0, "Minimum does not exist!"
 print_output("Minimiser of quadratic: {:.4f}".format(q_min))
-assert np.isclose(dq(q_min), 0.0)
+assert np.isclose(dq(q_min), 0.0), "Gradient at minimum = {:.1f}"
 if not plot.any:
     print_output("Nothing to plot.")
     sys.exit(0)
@@ -131,60 +132,75 @@ if use_regularisation:
 savefig('{:s}_{:d}'.format(fname, level), plot_dir, extensions=plot.extensions)
 
 # Load trajectory
+msg = "Cannot plot optimisation progress on mesh {:d} because {:s} data don't exist."
 fname = os.path.join(di, args.adjoint, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
-control_values_opt = np.load(fname.format('ctrl', level))
-func_values_opt = np.load(fname.format('func', level))
-gradient_values_opt = np.load(fname.format('grad', level))
-optimised_value = control_values_opt[-1]
+if not os.path.isfile(fname.format('ctrl')):
+    print_output(msg.format(level, 'control'))
+elif not os.path.isfile(fname.format('func')):
+    print_output(msg.format(level, 'functional'))
+elif not os.path.isfile(fname.format('grad')):
+    print_output(msg.format(level, 'gradient'))
+else:
+    control_values_opt = np.load(fname.format('ctrl', level))
+    func_values_opt = np.load(fname.format('func', level))
+    gradient_values_opt = np.load(fname.format('grad', level))
+    optimised_value = control_values_opt[-1]
 
-# Plot progress of optimisation routine
-params = {'markersize': 14, 'color': 'C0', 'label': r'$m^\star = {:.4f}$'.format(q_min)}
-if use_regularisation:
-    params['label'] = r'$m^\star|_{{\alpha=0.00}} = {:.4f}$'.format(q_min)
-axes.plot(q_min, q(q_min), '*', **params)
-if use_regularisation:
-    params = {
-        'linewidth': 1, 'markersize': 8, 'color': 'C6', 'markevery': 10,
-        'label': r'$\alpha = {:.2f}$'.format(op.regularisation),
-    }
-    axes.plot(x, q_reg(x), '--x', **params)
-    params = {
-        'markersize': 14, 'color': 'C6',
-        'label': r'$m^\star|_{{\alpha={:.2f}}} = {:.2f}$'.format(op.regularisation, q_reg_min),
-    }
-    axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
-params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress'}
-axes.plot(control_values_opt, func_values_opt, 'o', **params)
-delta_m = 0.25
-params = {'linewidth': 3, 'markersize': 8, 'color': 'C2', }
-for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
-    x = np.array([m - delta_m, m + delta_m])
+    # Plot progress of optimisation routine
+    params = {'markersize': 14, 'color': 'C0', 'label': r'$m^\star = {:.4f}$'.format(q_min)}
+    if use_regularisation:
+        params['label'] = r'$m^\star|_{{\alpha=0.00}} = {:.4f}$'.format(q_min)
+    axes.plot(q_min, q(q_min), '*', **params)
+    if use_regularisation:
+        params = {
+            'linewidth': 1, 'markersize': 8, 'color': 'C6', 'markevery': 10,
+            'label': r'$\alpha = {:.2f}$'.format(op.regularisation),
+        }
+        axes.plot(x, q_reg(x), '--x', **params)
+        params = {
+            'markersize': 14, 'color': 'C6',
+            'label': r'$m^\star|_{{\alpha={:.2f}}} = {:.2f}$'.format(op.regularisation, q_reg_min),
+        }
+        axes.plot(q_reg_min, q_reg(q_reg_min), '*', **params)
+    params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress'}
+    axes.plot(control_values_opt, func_values_opt, 'o', **params)
+    delta_m = 0.25
+    params = {'linewidth': 3, 'markersize': 8, 'color': 'C2', }
+    for m, f, g in zip(control_values_opt, func_values_opt, gradient_values_opt):
+        x = np.array([m - delta_m, m + delta_m])
+        axes.plot(x, g*(x-m) + f, '-', **params)
+    params['label'] = 'Computed gradient'
     axes.plot(x, g*(x-m) + f, '-', **params)
-params['label'] = 'Computed gradient'
-axes.plot(x, g*(x-m) + f, '-', **params)
-plt.legend(fontsize=fontsize)
-offset = 2 if level == 0 else -3
-axes.annotate(
-    r'$m = {:.4f}$'.format(control_values_opt[-1]),
-    xy=(q_min + offset, func_values_opt[-1]), color='C1', fontsize=fontsize
-)
-fname = 'optimisation_progress'
-if use_regularisation:
-    fname += '_reg'
-savefig(fname + '_{:d}'.format(level), plot_dir, args.adjoint, extensions=plot.extensions)
+    plt.legend(fontsize=fontsize)
+    offset = 2 if level == 0 else -3
+    axes.annotate(
+        r'$m = {:.4f}$'.format(control_values_opt[-1]),
+        xy=(q_min + offset, func_values_opt[-1]), color='C1', fontsize=fontsize
+    )
+    fname = 'optimisation_progress'
+    if use_regularisation:
+        fname += '_reg'
+    savefig(fname + '_{:d}'.format(level), plot_dir, args.adjoint, extensions=plot.extensions)
 
 
 # --- Plot timeseries
 
 # Before optimisation
+msg = "Cannot plot timeseries for initial guess controls on mesh {:d} because the data don't exist."
 N = int(np.ceil(np.sqrt(len(gauges))))
 fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
 for i, gauge in enumerate(gauges):
 
     # Load data
     fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
+    if not os.path.isfile(fname):
+        print_output(msg.format(level))
+        break
     op.gauges[gauge]['data'] = np.load(fname)
     fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
+    if not os.path.isfile(fname):
+        print_output(msg.format(level))
+        break
     op.gauges[gauge]['init'] = np.load(fname)
     data = np.array(op.gauges[gauge]['data'])
     init = np.array(op.gauges[gauge]['init'])

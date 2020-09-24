@@ -138,7 +138,7 @@ control_values = [[m] for m in np.linspace(0.5, 7.5, n)]
 # Unregularised parameter space
 fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
 if recompute or not os.path.isfile(fname):
-    msg = "{:2d}: control value {:.4e}  functional value {:.4e}"
+    msg = "{:2d}: control value {:.8e}  functional value {:.8e}"
     func_values = np.zeros(n)
     with stop_annotating():
         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
@@ -152,7 +152,7 @@ if recompute or not os.path.isfile(fname):
 # Regularised parameter space
 fname = os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level))
 if use_regularisation and (recompute or os.path.isfile(fname)):
-    msg = "{:2d}: control value {:.4e}  regularised functional value {:.4e}"
+    msg = "{:2d}: control value {:.8e}  regularised functional value {:.8e}"
     func_values_reg = np.zeros(n)
     with stop_annotating():
         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
