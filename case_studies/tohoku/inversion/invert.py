@@ -162,7 +162,10 @@ with stop_annotating():
         # Project into chosen basis
         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
         op.project(swp, f_src)
-        kwargs['control_parameters'] = [m.dat.data[0] for m in op.control_parameters]
+        if basis == 'okada':
+            kwargs['control_parameters'] = op.control_parameters.copy()
+        else:
+            kwargs['control_parameters'] = [m.dat.data[0] for m in op.control_parameters]
 
         # Plot
         if plot.any:

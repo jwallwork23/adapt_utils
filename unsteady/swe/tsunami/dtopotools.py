@@ -40,33 +40,55 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
             raise NotImplementedError
         self.dtopo.times = times
 
-    def create_dtopography(self, active=True, verbose=False):
+    def create_dtopography(self, active=True, unroll_tape=False, **kwargs):
         """
-        Annotated version of topography method.
+        Modified version of :attr:`create_dtopography` which accounts for automatic differentation (AD).
+        There are three cases:
+          1. Passive mode, where no AD is applied;
+          2. Active mode, where operations performed during the source model are annotated to tape;
+          3. Unroll mode, where the tape is unrolled in lieu of running the model itself.
         """
-        if active and not have_adolc:
-            raise ValueError("Cannot annotate the rupture process without an appropriate AD tool.")
         if self.rupture_type != 'static':
             raise NotImplementedError("Only static ruptures currently considered.")
+        if active:
+            if not have_adolc:
+                raise ValueError("Cannot annotate the rupture process without an appropriate AD tool.")
+            if unroll_tape:
+                raise ValueError("Cannot unroll tape and annotate at the same time.")
+            self._create_dtopography_active(**kwargs)
+        elif unroll_tape:
+            raise NotImplementedError  # TODO
+        else:
+            self._create_dtopography_passive(**kwargs)
 
+    def _create_dtopography_passive(self, verbose=False):
         num_subfaults = len(self.subfaults)
         tic = clock()
         msg = "created topography for subfault {:d}/{:d} ({:.1f} seconds)"
         dz = numpy.zeros(self.dtopo.X.shape)
-        if active:
-            dz = adolc.adouble(dz)
         for k, subfault in enumerate(self.subfaults):
             subfault.okada()
             dz += subfault.dtopo.dZ[0, :, :].reshape(dz.shape)
             if k % 10 == 0 and verbose:
                 print(msg.format(k+1, num_subfaults, clock() - tic))
                 tic = clock()
-        if active:
-            self.dtopo.dZ_a = dz
-            self.dtopo.dZ = numpy.array([dzi.val for dzi in numpy.ravel(dz)]).reshape((1, ) + dz.shape)
-        else:
-            self.dtopo.dZ = dz
+        self.dtopo.dZ = dz
+        return self.dtopo
 
+    def _create_dtopography_active(self, verbose=False):
+        num_subfaults = len(self.subfaults)
+        tic = clock()
+        msg = "created topography for subfault {:d}/{:d} ({:.1f} seconds)"
+        dz = numpy.zeros(self.dtopo.X.shape)
+        dz = adolc.adouble(dz)
+        for k, subfault in enumerate(self.subfaults):
+            subfault.okada()
+            dz += subfault.dtopo.dZ[0, :, :].reshape(dz.shape)
+            if k % 10 == 0 and verbose:
+                print(msg.format(k+1, num_subfaults, clock() - tic))
+                tic = clock()
+        self.dtopo.dZ_a = dz
+        self.dtopo.dZ = numpy.array([dzi.val for dzi in numpy.ravel(dz)]).reshape((1, ) + dz.shape)
         return self.dtopo
 
 
