@@ -9,10 +9,11 @@ try:
     import adolc
     have_adolc = True
 except ImportError:
-    print("WARNING: pyadolc could not be imported")
+    import warnings
+    warnings.warn("PyADOL-C could not be imported")
     have_adolc = False
 
-import numpy
+import numpy as np
 from time import clock
 
 import clawpack.geoclaw.dtopotools
@@ -31,7 +32,7 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
             self.dtopo.X, self.dtopo.Y = coordinates[:, 0], coordinates[:, 1]
         elif len(args) == 2:
             self.dtopo.x, self.dtopo.y = args
-            self.dtopo.X, self.dtopo.Y = numpy.meshgrid(self.dtopo.x, self.dtopo.y)
+            self.dtopo.X, self.dtopo.Y = np.meshgrid(self.dtopo.x, self.dtopo.y)
         else:
             raise ValueError
         for subfault in self.subfaults:
@@ -40,24 +41,19 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
             raise NotImplementedError
         self.dtopo.times = times
 
-    def create_dtopography(self, active=True, unroll_tape=False, **kwargs):
+    def create_dtopography(self, active=True, **kwargs):
         """
         Modified version of :attr:`create_dtopography` which accounts for automatic differentation (AD).
-        There are three cases:
+        There are two cases:
           1. Passive mode, where no AD is applied;
           2. Active mode, where operations performed during the source model are annotated to tape;
-          3. Unroll mode, where the tape is unrolled in lieu of running the model itself.
         """
         if self.rupture_type != 'static':
             raise NotImplementedError("Only static ruptures currently considered.")
         if active:
             if not have_adolc:
                 raise ValueError("Cannot annotate the rupture process without an appropriate AD tool.")
-            if unroll_tape:
-                raise ValueError("Cannot unroll tape and annotate at the same time.")
             self._create_dtopography_active(**kwargs)
-        elif unroll_tape:
-            raise NotImplementedError  # TODO
         else:
             self._create_dtopography_passive(**kwargs)
 
@@ -65,7 +61,7 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
         num_subfaults = len(self.subfaults)
         tic = clock()
         msg = "created topography for subfault {:d}/{:d} ({:.1f} seconds)"
-        dz = numpy.zeros(self.dtopo.X.shape)
+        dz = np.zeros(self.dtopo.X.shape)
         for k, subfault in enumerate(self.subfaults):
             subfault.okada()
             dz += subfault.dtopo.dZ[0, :, :].reshape(dz.shape)
@@ -79,7 +75,7 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
         num_subfaults = len(self.subfaults)
         tic = clock()
         msg = "created topography for subfault {:d}/{:d} ({:.1f} seconds)"
-        dz = numpy.zeros(self.dtopo.X.shape)
+        dz = np.zeros(self.dtopo.X.shape)
         dz = adolc.adouble(dz)
         for k, subfault in enumerate(self.subfaults):
             subfault.okada()
@@ -88,7 +84,7 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
                 print(msg.format(k+1, num_subfaults, clock() - tic))
                 tic = clock()
         self.dtopo.dZ_a = dz
-        self.dtopo.dZ = numpy.array([dzi.val for dzi in numpy.ravel(dz)]).reshape((1, ) + dz.shape)
+        self.dtopo.dZ = np.array([dzi.val for dzi in np.ravel(dz)]).reshape((1, ) + dz.shape)
         return self.dtopo
 
 
@@ -127,18 +123,18 @@ class SubFault(clawpack.geoclaw.dtopotools.SubFault):
 
         # Convert distance from (X,Y) to (x_bottom,y_bottom) from degrees to
         # meters:
-        xx = LAT2METER * numpy.cos(DEG2RAD * Y) * (X - x_bottom)
+        xx = LAT2METER * np.cos(DEG2RAD * Y) * (X - x_bottom)
         yy = LAT2METER * (Y - y_bottom)
 
         # Convert to distance along strike (x1) and dip (x2):
-        x1 = xx*numpy.sin(ang_strike) + yy*numpy.cos(ang_strike)
-        x2 = xx*numpy.cos(ang_strike) - yy*numpy.sin(ang_strike)
+        x1 = xx*np.sin(ang_strike) + yy*np.cos(ang_strike)
+        x2 = xx*np.cos(ang_strike) - yy*np.sin(ang_strike)
 
         # In Okada's paper, x2 is distance up the fault plane, not down dip:
         x2 = -x2
 
-        p = x2*numpy.cos(ang_dip) + depth_bottom*numpy.sin(ang_dip)
-        q = x2*numpy.sin(ang_dip) - depth_bottom*numpy.cos(ang_dip)
+        p = x2*np.cos(ang_dip) + depth_bottom*np.sin(ang_dip)
+        q = x2*np.sin(ang_dip) - depth_bottom*np.cos(ang_dip)
 
         f1 = self._strike_slip(x1 + halfL, p, ang_dip, q)
         f2 = self._strike_slip(x1 + halfL, p - w, ang_dip, q)
@@ -151,8 +147,8 @@ class SubFault(clawpack.geoclaw.dtopotools.SubFault):
         g4 = self._dip_slip(x1 - halfL, p - w, ang_dip, q)
 
         # Displacement in direction of strike and dip:
-        ds = slip * numpy.cos(ang_rake)
-        dd = slip * numpy.sin(ang_rake)
+        ds = slip * np.cos(ang_rake)
+        dd = slip * np.sin(ang_rake)
 
         us = (f1 - f2 - f3 + f4) * ds
         ud = (g1 - g2 - g3 + g4) * dd
@@ -162,6 +158,6 @@ class SubFault(clawpack.geoclaw.dtopotools.SubFault):
         dtopo = DTopography()
         dtopo.X = X
         dtopo.Y = Y
-        dtopo.dZ = numpy.array(dz, ndmin=3)
+        dtopo.dZ = np.array(dz, ndmin=3)
         dtopo.times = [0.0]
         self.dtopo = dtopo

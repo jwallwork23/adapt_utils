@@ -76,6 +76,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         self.nx = kwargs.get('nx', 19)
         self.ny = kwargs.get('ny', 10)
         assert self.nx*self.ny == len(self.subfaults)
+        self.num_subfaults = len(self.subfaults)
 
         # Active controls for automatic differentation
         self.active_controls = ('slip', 'rake', 'strike', 'dip')
@@ -190,7 +191,25 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         # Create fault
         self.fault = Fault(*self.coords, subfaults=self.subfaults)
 
-    def set_initial_condition(self, prob, annotate_source=False, subtract_from_bathymetry=True, **kwargs):
+    def interpolate_dislocation_field(self, prob, data=None):
+        from scipy.interpolate import griddata
+
+        surf = Function(prob.P1[0])
+        if data is not None:
+            surf.dat.data[self.indices] = data
+        elif self.N is not None:  # Interpolate it using SciPy
+            surf.dat.data[:] = griddata(
+                (self.fault.dtopo.X, self.fault.dtopo.Y),
+                self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape),
+                self.coords,
+                method='linear',
+                fill_value=0.0,
+            )
+        else:  # Just insert the data at the appropriate nodes, assuming zero elsewhere
+            surf.dat.data[self.indices] = self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape)
+        return surf
+
+    def set_initial_condition(self, prob, annotate_source=False, unroll_tape=False, **kwargs):
         """
         Set initial condition using the Okada parametrisation [Okada 85].
 
@@ -204,22 +223,23 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         :kwarg annotate_source: toggle annotation of the rupture process using pyadolc.
         :kwarg tag: non-negative integer label for tape.
         """
-        from scipy.interpolate import griddata
+        # separate_faults = kwargs.get('separate_faults', True)
+        separate_faults = kwargs.get('separate_faults', False)
+        subtract_from_bathymetry = kwargs.pop('subtract_from_bathymetry', True)
+        tag = kwargs.get('tag', 0)
 
-        # Create fault topography
-        self.create_topography(annotate=annotate_source, **kwargs)
-
-        surf = Function(prob.P1[0])
-        if self.N is not None:  # Interpolate it using SciPy
-            surf.dat.data[:] = griddata(
-                (self.fault.dtopo.X, self.fault.dtopo.Y),
-                self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape),
-                self.coords,
-                method='linear',
-                fill_value=0.0,
-            )
-        else:  # Just insert the data at the appropriate nodes, assuming zero elsewhere
-            surf.dat.data[self.indices] = self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape)
+        # Create fault topography...
+        if unroll_tape:
+            # ... by unrolling ADOL-C's tape
+            import adolc
+            F = adolc.zos_forward(tag, self.input_vector, keep=1)
+            if separate_faults:
+                F = np.sum(F.reshape(self.num_subfaults, len(self.indices)), axis=0)
+            surf = self.interpolate_dislocation_field(prob, data=F)
+        else:
+            # ... by running the Okada model
+            self.create_topography(annotate=annotate_source, **kwargs)
+            surf = self.interpolate_dislocation_field(prob)
 
         # Assume zero initial velocity and interpolate into the elevation space
         u, eta = prob.fwd_solutions[0].split()
@@ -247,9 +267,8 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
 
         # Stash the control parameters and zero out all active ones
         tmp = self.control_parameters.copy()
-        num_subfaults = len(self.subfaults)
         for control in self.active_controls:
-            self.control_parameters[control] = np.zeros(num_subfaults)
+            self.control_parameters[control] = np.zeros(self.num_subfaults)
 
         # Loop over active controls on each subfault and compute the associated basis functions
         msg = "INIT: Assembling Okada basis function array with active controls {:}..."
@@ -258,7 +277,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         for control in self.active_controls:
             self._basis_functions[control] = []
             for i, subfault in enumerate(self.subfaults):
-                self.print_debug(msg.format(control, i, num_subfaults), mode='full')
+                self.print_debug(msg.format(control, i, self.num_subfaults), mode='full')
                 self.control_parameters[control][i] = 1
                 self.set_initial_condition(prob, annotate_source=False, subtract_from_bathymetry=False)
                 self._basis_functions[control].append(prob.fwd_solutions[0].copy(deepcopy=True))
@@ -293,6 +312,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         :kwarg annotate: toggle annotation using pyadolc.
         :kwarg interpolate: see the :attr:`interpolate` method.
         :kwarg tag: label for tape.
+        :kwarg separate_faults: set to `True` if we want forward mode derivatives.
         """
         msg = "INIT: Fault corresponds to an earthquake with moment magnitude {:4.1e}"
         if annotate:
@@ -394,22 +414,18 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
             adolc.dependent(self.J)
         adolc.trace_off()
 
-    def get_input_vector(self):
+    @property
+    def input_vector(self):
         """
         Get a vector of the same length as the total number of controls and populate it with passive
         versions of each parameter. This provides a point at which we can compute derivative
         matrices.
         """
-        controls = self.control_parameters
-        num_subfaults = len(self.subfaults)
-        X = [controls[control][i] for i in range(num_subfaults) for control in self.active_controls]
-        self._input_vector = np.array(X)
-
-    @property
-    def input_vector(self):
-        if not hasattr(self, '_input_vector'):
-            self.get_input_vector()
-        return self._input_vector
+        return np.array([
+            self.control_parameters[control][i]
+            for i in range(self.num_subfaults)
+            for control in self.active_controls
+        ])
 
     def get_seed_matrices(self):
         """
@@ -421,11 +437,11 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
 
         In the default case we have four active controls and hence there are four seed matrices.
         """
-        if not hasattr(self, 'input_vector'):
-            self.get_input_vector()
         n = len(self.active_controls)
-        S = [[1 if i % n == j else 0 for j in range(n)] for i in range(len(self.input_vector))]
-        self._seed_matrices = np.array(S)
+        self._seed_matrices = np.array([
+            [1 if i % n == j else 0 for j in range(n)]
+            for i in range(len(self.input_vector))
+        ])
 
     @property
     def seed_matrices(self):
@@ -514,7 +530,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
     # --- Projection and interpolation into Okada basis
 
     @no_annotations
-    def project(self, prob, source, maxiter=2, rtol=1.0e-02):
+    def project(self, prob, source, maxiter=3, rtol=1.0e-02):
         """
         Project a source field into the Okada basis.
 
