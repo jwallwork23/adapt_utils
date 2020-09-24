@@ -7,7 +7,7 @@ import scipy
 import sys
 
 from adapt_utils.argparse import ArgumentParser
-from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
+from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.norms import vecnorm
 from adapt_utils.plotting import *
@@ -19,8 +19,7 @@ from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 parser = ArgumentParser(
     prog="invert",
     description="""
-            Invert for an initial condition defined in some basis over an array. The array types
-            include piecewise constants ('box') and (Gaussian) radial basis functions ('radial').
+            Invert for an initial condition defined in an Okada basis over an array.
 
             GPS and pressure gauge data are obtained from post-processed versions of observations.
 
@@ -28,7 +27,6 @@ parser = ArgumentParser(
             computed using either a discrete or continuous adjoint approach.
             """,
     adjoint=True,
-    basis=True,
     optimisation=True,
     plotting=True,
     shallow_water=True,
@@ -59,7 +57,6 @@ else:
 # --- Set parameters
 
 # Parsed arguments
-basis = args.basis
 level = int(args.level or 0)
 optimise = bool(args.rerun_optimisation or False)
 gtol = float(args.gtol or 1.0e-04)
@@ -76,7 +73,7 @@ if COMM_WORLD.size > 1 and plot['any']:
 
 # Setup output directories
 dirname = os.path.dirname(__file__)
-di = create_directory(os.path.join(dirname, basis, 'outputs', 'realistic'))
+di = create_directory(os.path.join(dirname, 'outputs', 'realistic'))
 if args.extension is not None:
     di = '_'.join([di, args.extension])
 di = create_directory(os.path.join(di, args.adjoint))
@@ -119,20 +116,8 @@ use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 
 # Construct Options parameter class
 gaussian_scaling = float(args.gaussian_scaling or 6.0)
-if basis == '1d':
-    kwargs['nx'] = 1
-    kwargs['ny'] = 1
-    options_constructor = TohokuRadialBasisOptions
-    gaussian_scaling = float(args.gaussian_scaling or 7.5)
-elif basis == 'box':
-    options_constructor = TohokuBoxBasisOptions
-elif basis == 'radial':
-    options_constructor = TohokuRadialBasisOptions
-elif basis == 'okada':
-    raise ValueError("For inversion in the Okada basis, see the relevant directory.")
-else:
-    raise ValueError("Basis type '{:s}' not recognised.".format(basis))
-op = options_constructor(**kwargs)
+op = TohokuOkadaBasisOptions(**kwargs)
+op.active_controls = ('slip', 'rake')
 op.dirty_cache = bool(args.dirty_cache or False)
 gauges = list(op.gauges.keys())
 
@@ -155,10 +140,10 @@ with stop_annotating():
         swp.set_initial_condition()
         f_src = swp.fwd_solutions[0].split()[1]
 
-        # Project into chosen basis
+        # Project into Okada basis
         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
         op.project(swp, f_src)
-        kwargs['control_parameters'] = [m.dat.data[0] for m in op.control_parameters]
+        kwargs['control_parameters'] = op.control_parameters.copy()
 
         # Plot
         if plot.any:
@@ -184,7 +169,7 @@ with stop_annotating():
             axes.set_xlim([utm_corners[0][0], utm_corners[1][0]])
             axes.set_ylim([utm_corners[0][1], utm_corners[2][1]])
             axes.axis(False)
-            fname = 'initial_guess_{:s}_{:d}'.format(basis, level)
+            fname = 'initial_guess_okada_{:d}'.format(level)
             savefig(fname, plot_dir, extensions=plot.extensions)
 if plot.only:
     sys.exit(0)
@@ -193,11 +178,13 @@ if plot.only:
 # --- Tracing
 
 # Set initial guess
-op = options_constructor(**kwargs)
+op = TohokuOkadaBasisOptions(**kwargs)
+op.active_controls = ('slip', 'rake')
 swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.clear_tape()
 print_output("Setting initial guess...")
-op.assign_control_parameters(kwargs['control_parameters'], swp.meshes[0])
+op.assign_control_parameters(kwargs['control_parameters'])
+raise NotImplementedError  # TODO
 controls = [Control(m) for m in op.control_parameters]
 
 # Solve the forward problem / load data

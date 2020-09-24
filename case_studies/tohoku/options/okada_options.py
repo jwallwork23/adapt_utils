@@ -55,7 +55,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         :kwarg okada_grid_lat_min: minimum latitude in the Okada grid.
         """
         super(TohokuOkadaBasisOptions, self).__init__(**kwargs)
-        self.control_parameters = kwargs.get('control_parameters')
+        self.assign_control_parameters(kwargs.get('control_parameters'))
         self.coordinate_specification = kwargs.get('coordinate_specification', 'centroid')
         self.N = kwargs.get('okada_grid_resolution', None)
         self.lx = kwargs.get('okada_grid_length_lon', 10)
@@ -130,6 +130,12 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                 self.control_parameters['length'].append(25.0e+03)
                 self.control_parameters['width'].append(20.0e+03)
         self.all_controls += ('length', 'width', )
+
+    def assign_control_parameters(self, control_values):
+        """
+        For consistency with :class:`TohokuBoxBasisOptions` and :class:`TohokuRadialBasisOptions`.
+        """
+        self.control_parameters = control_values
 
     def get_subfaults(self, check_validity=False, reset=False):
         """
@@ -530,7 +536,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
     # --- Projection and interpolation into Okada basis
 
     @no_annotations
-    def project(self, prob, source, maxiter=3, rtol=1.0e-02):
+    def project(self, prob, source, maxiter=4, rtol=1.0e-02):
         """
         Project a source field into the Okada basis.
 

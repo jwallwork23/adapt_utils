@@ -91,8 +91,8 @@ if use_regularisation:
     func_values_reg = np.load(os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level)))
 
 # Fit a quadratic to the first three points and find its root
-# q = scipy.interpolate.lagrange(control_values[::3], func_values[::3])
 q = scipy.interpolate.lagrange(control_values[:3], func_values[:3])
+# q = scipy.interpolate.lagrange(control_values[::3], func_values[::3])
 dq = q.deriv()
 print_output("Exact gradient at 5.0:  {:.4f}".format(dq(5.0)))
 print_output("Exact gradient at 7.5:  {:.4f}".format(dq(7.5)))
