@@ -252,7 +252,8 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
             self.control_parameters[control] = np.zeros(num_subfaults)
 
         # Loop over active controls on each subfault and compute the associated basis functions
-        print_output("INIT: Assembling Okada basis function array...")
+        msg = "INIT: Assembling Okada basis function array with active controls {:}..."
+        print_output(msg.format(self.active_controls))
         msg = "INIT: Assembling '{:s}' basis function on subfault {:d}/{:d}..."
         for control in self.active_controls:
             self._basis_functions[control] = []
@@ -598,7 +599,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                     continue
 
                 # Generate surface
-                surf = self.set_initial_condition(prob, annotate_source=False)
+                surf = self.set_initial_condition(prob, subtract_from_bathymetry=False)
                 if self.debug:
                     import matplotlib.pyplot as plt
                     fig, axes = plt.subplots(figsize=(8, 8))
@@ -613,7 +614,8 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                 msg = "PROJECTION: Relative l2 error at iteration {:d} = {:.2f}%"
                 self.print_debug(msg.format(n, 100*err))
                 if err < rtol:
-                    self.print_debug("PROJECTION: Converged after {:d} iterations!".format(n+1))
+                    msg = "PROJECTION: Converged due to meeting relative tol after {:d} iterations!"
+                    self.print_debug(msg.format(n+1))
                     self.print_debug("PROJECTION: relative errors: {:}".format(errors))
                     break
                 if n == maxiter-1:
@@ -621,6 +623,9 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                     self.print_debug(msg.format(maxiter))
                     self.print_debug("PROJECTION: relative errors: {:}".format(errors))
                     break
+
+        # Subtract initial surface from bathymetry
+        self.subtract_surface_from_bathymetry(prob, surf=surf)
 
         # Reset active control tuple
         self.active_controls = active_controls
