@@ -22,14 +22,20 @@ class Options(FrozenConfigurable):
           'cg-cg': Taylor-Hood                    (P2-P1);
           'dg-dg': Equal order DG                 (PpDG-PpDG);
           'dg-cg': Mixed continuous-discontinuous (P1DG-P2),
-        where p is the polynomial order specified by :attr:`degree`.""").tag(config=True)
+        where p is the polynomial order specified by :attr:`degree`.
+        """).tag(config=True)
     degree = NonNegativeInteger(1, help="""
-        Polynomial order for hydrodynamics finite element pair :attr:`family'.""").tag(config=True)
+        Polynomial order for hydrodynamics finite element pair :attr:`family'.
+        """).tag(config=True)
     degree_increase = NonNegativeInteger(0, help="""
         When defining an enriched hydrodynamics finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)
-    periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
+    periodic = Bool(False, help="Is the domain periodic?").tag(config=True)
+    quadrature_degree = NonNegativeInteger(None, allow_none=True, help="""
+        Quadrature degree used in all forms. If set to `None` then the Firedrake / Thetis
+        default is used.
+        """).tag(config=True)  # TODO: USEME
 
     # Time discretisation
     timestepper = Enum(
@@ -40,12 +46,14 @@ class Options(FrozenConfigurable):
     start_time = NonNegativeFloat(0.0, help="Start of time window of interest.").tag(config=True)
     end_time = PositiveFloat(60.0, help="End of time window of interest.").tag(config=True)
     num_meshes = PositiveInteger(1, help="""
-        Number of meshes in :class:`AdaptiveProblem` solver""").tag(config=True)
+        Number of meshes in :class:`AdaptiveProblem` solver
+        """).tag(config=True)
     dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
     dt_per_mesh_movement = PositiveFloat(1, help="Number of timesteps per mesh movement.").tag(config=True)
     use_semi_implicit_linearisation = Bool(False, help="""
         Toggle whether or not to linearise implicit terms. This is generally recommended if Manning
-        friction is to be included.""").tag(config=True)
+        friction is to be included.
+        """).tag(config=True)
     implicitness_theta = NonNegativeFloat(0.5, help=r"""
         Consider an ODE
 
@@ -63,22 +71,27 @@ class Options(FrozenConfigurable):
 
     # Boundary conditions
     boundary_conditions = PETScSolverParameters({}, help="""
-        Boundary conditions expressed as a dictionary.""").tag(config=True)
+        Boundary conditions expressed as a dictionary.
+        """).tag(config=True)
     adjoint_boundary_conditions = PETScSolverParameters({}, help="""
-        Boundary conditions for adjoint problem expressed as a dictionary.""").tag(config=True)
+        Boundary conditions for adjoint problem expressed as a dictionary.
+        """).tag(config=True)
 
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="""
         Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.
         """).tag(config=True)  # TODO: Account for different models
     use_automatic_sipg_parameter = Bool(True, help="""
-        Toggle automatic generation of symmetric interior penalty method.""").tag(config=True)
+        Toggle automatic generation of symmetric interior penalty method.
+        """).tag(config=True)
 
     # Solver parameters
     solver_parameters = PETScSolverParameters({}, help="""
-        Solver parameters for the forward model, separated by equation set.""").tag(config=True)
+        Solver parameters for the forward models, separated by equation set.
+        """).tag(config=True)
     adjoint_solver_parameters = PETScSolverParameters({}, help="""
-        Solver parameters for the adjoint models, separated by equation set.""").tag(config=True)
+        Solver parameters for the adjoint models, separated by equation set.
+        """).tag(config=True)
 
     # Outputs
     debug = Bool(False, help="Toggle debugging for more verbose screen output.").tag(config=True)
@@ -103,16 +116,20 @@ class Options(FrozenConfigurable):
 
     # Metric based
     rescaling = PositiveFloat(0.85, help="""
-        Scaling parameter for target number of vertices.""").tag(config=True)
+        Scaling parameter for target number of vertices.
+        """).tag(config=True)
     convergence_rate = PositiveInteger(6, help="""
-        Convergence rate parameter used in approach of [Carpio et al. 2013].""").tag(config=True)
+        Convergence rate parameter used in approach of [Carpio et al. 2013].
+        """).tag(config=True)
     h_min = PositiveFloat(1.0e-10, help="Minimum tolerated element size.").tag(config=True)
     h_max = PositiveFloat(5.0e+00, help="Maximum tolerated element size.").tag(config=True)
     max_anisotropy = PositiveFloat(1.0e+03, help="Maximum tolerated anisotropy.").tag(config=True)
     normalisation = Unicode('complexity', help="""
-        Metric normalisation approach, from {'complexity', 'error'}.""").tag(config=True)
+        Metric normalisation approach, from {'complexity', 'error'}.
+        """).tag(config=True)
     target = PositiveFloat(1.0e+2, help="""
-        Target complexity / inverse desired error for normalisation, as appropriate.""").tag(config=True)
+        Target complexity / inverse desired error for normalisation, as appropriate.
+        """).tag(config=True)
     norm_order = NonNegativeFloat(None, allow_none=True, help="""
         Degree p of Lp norm used in spatial normalisation. Use `None` to specify infinity norm.
         """).tag(config=True)
@@ -121,9 +138,11 @@ class Options(FrozenConfigurable):
     # Mesh movement
     pseudo_dt = PositiveFloat(0.1, help="Pseudo-timstep used in r-adaptation.").tag(config=True)
     r_adapt_maxit = PositiveInteger(1000, help="""
-        Maximum number of iterations in r-adaptation loop.""").tag(config=True)
+        Maximum number of iterations in r-adaptation loop.
+        """).tag(config=True)
     r_adapt_rtol = PositiveFloat(1.0e-8, help="""
-        Relative tolerance for residual in r-adaptation loop.""").tag(config=True)
+        Relative tolerance for residual in r-adaptation loop.
+        """).tag(config=True)
     nonlinear_method = Enum(
         ['quasi_newton', 'relaxation'],
         default_value='quasi_newton',
@@ -152,7 +171,8 @@ class Options(FrozenConfigurable):
         default_value='integrate',
         help="Method used to combine Hessians over timesteps.").tag(config=True)
     hessian_timestep_lag = PositiveFloat(1, help="""
-        Allow lagged Hessian computation by setting greater than one.""").tag(config=True)
+        Allow lagged Hessian computation by setting greater than one.
+        """).tag(config=True)
 
     # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="""
@@ -170,7 +190,8 @@ class Options(FrozenConfigurable):
         Base for exponential increase/decay of target complexity/error within outer mesh adaptation loop.
         """).tag(config=True)
     outer_iterations = PositiveInteger(1, help="""
-        Number of iterations in outer adaptation loop.""").tag(config=True)
+        Number of iterations in outer adaptation loop.
+        """).tag(config=True)
     indent = Unicode('', help="Indent used in nested print statements.").tag(config=True)
 
     def __init__(self, mesh=None, fpath=None, di=None, **kwargs):
