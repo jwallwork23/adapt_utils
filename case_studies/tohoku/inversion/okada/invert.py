@@ -101,7 +101,7 @@ if args.end_time is not None:
 # Construct Options parameter class
 gaussian_scaling = float(args.gaussian_scaling or 6.0)
 op = TohokuOkadaBasisOptions(**kwargs)
-op.active_control = ('slip', 'rake')
+op.active_controls = ('slip', 'rake')
 op.dirty_cache = bool(args.dirty_cache or False)
 gauges = list(op.gauges.keys())
 
@@ -111,7 +111,9 @@ gauges = list(op.gauges.keys())
 with stop_annotating():
     if zero_init:
         eps = 1.0e-03  # zero gives an error so just choose small
-        kwargs['control_parameters'] = eps*np.ones(op.nx*op.ny)
+        kwargs['control_parameters'] = op.control_parameters.copy()
+        for control in op.active_controls:
+            kwargs['control_parameters'][control] = eps*np.ones(op.nx*op.ny)
     else:
         # TODO: Cache the field itself
         print_output("Projecting initial guess...")
@@ -164,7 +166,7 @@ if plot.only:
 
 # Set initial guess
 op = TohokuOkadaBasisOptions(**kwargs)
-op.active_control = ('slip', 'rake')
+op.active_controls = ('slip', 'rake')
 num_active_controls = len(op.active_controls)
 swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.clear_tape()
@@ -221,7 +223,7 @@ def gradient(m):
 
     # Restrict to source region
     dJdeta0 = interpolate(dJdq0.split()[1], swp.P1[0])
-    dJdeta0 = dJeta0.dat.data[op.indices]
+    dJdeta0 = dJdeta0.dat.data[op.indices]
 
     # Reverse propagate on ADOL-C's tape
     return adolc.fos_reverse(tape_tag, dJdeta0)
@@ -230,6 +232,8 @@ def gradient(m):
 # --- Taylor test
 
 if taylor:
+    import adapt_utils.optimisation as opt
+    opt.taylor_test(reduced_functional, gradient, op.input_vector, verbose=True)
     raise NotImplementedError  # TODO
 
 # --- Optimisation
