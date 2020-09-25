@@ -85,17 +85,128 @@ fontsize_legend = 18
 kwargs = {'markevery': 5}
 
 
+# --- Plot optimisation progress
+
+# Load parameter spaces
+n = 8
+xc = yc = np.linspace(0.5, 7.5, n)
+Xc, Yc = np.meshgrid(xc, yc)
+func_values = np.load(os.path.join(di, 'parameter_space_{:d}.npy'.format(level)))
+if use_regularisation:
+    func_values_reg = np.load(os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level)))
+
+# Fit a cubic
+q = scipy.interpolate.interp2d(xc, yc, func_values, kind='cubic')
+
+# Fit quadratic to regularised functional values
+if use_regularisation:
+    q_reg = scipy.interpolate.interp2d(xc, yc, func_values_reg, kind='cubic')
+    raise NotImplementedError  # TODO
+
+# Evaluate interpolant and its gradient
+xc0, xcf = 1.5, 5.5
+yc0, ycf = 1.5, 7.5
+xf = np.linspace(xc0, xcf, int(10*(xcf - xc0)))
+yf = np.linspace(yc0, ycf, int(10*(ycf - yc0)))
+Xf, Yf = np.meshgrid(xf, yf)
+Q = q(xf, yf)
+xm = np.linspace(xc0, xcf, int(2*(xcf - xc0)))
+ym = np.linspace(yc0, ycf, int(2*(ycf - yc0)))
+Xm, Ym = np.meshgrid(xm, ym)
+dQx = q(xm, ym, dx=1)
+dQy = q(xm, ym, dy=1)
+
+# Plot parameter space
+fig, axes = plt.subplots(figsize=(8, 8))
+axes.contour(Xf, Yf, Q, levels=50, cmap='gray')
+axes.quiver(Xm, Ym, -dQx, -dQy, color='gray')
+axes.set_xlabel(r"First basis function coefficient, $m_1$", fontsize=fontsize)
+axes.set_ylabel(r"Second basis function coefficient, $m_2$", fontsize=fontsize)
+plt.xticks(fontsize=fontsize_tick)
+plt.yticks(fontsize=fontsize_tick)
+plt.xlim([xc0, xcf])
+plt.ylim([yc0, ycf])
+axes.grid()
+
+# Establish quadratic
+vandermonde = lambda x, y: np.array([x**2, x*y, y**2, x, y, 1], dtype=object)
+A = np.zeros((6, 6))
+b = np.zeros(6)
+i = 0
+for i, (x, y) in enumerate(4 + 3*np.random.rand(6, 2)):
+    A[i, :] = vandermonde(x, y)
+    b[i] = q(x, y)
+coeffs = np.linalg.solve(A, b)
+q_poly = lambda x, y: np.dot(coeffs, vandermonde(x, y))
+Q_poly = q_poly(Xf, Yf)
+# assert np.allclose(np.abs((Q - Q_poly)/Q), 0.0, atol=1.0e-03)  # Check we do indeed have a quadratic
+
+# Find root and plot it
+a, b, c, d, e, f = coeffs
+A = np.array([[2*a, b],
+              [b, 2*c]])
+b = np.array([-d, -e])
+q_min = np.linalg.solve(A, b)
+params = {'markersize': 14, 'color': 'C0', 'label': r'$m^\star = ({:.4f}, {:.4f})$'.format(*q_min)}
+axes.plot(*q_min, '*', **params)
+
+# Save parameter space plot
+fname = 'parameter_space'
+if use_regularisation:
+    fname += '_reg'
+savefig('{:s}_{:d}'.format(fname, level), plot_dir, extensions=plot.extensions)
+
+# Load trajectory
+fname = os.path.join(di, args.adjoint, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+control_values_opt = np.load(fname.format('ctrl', level))
+func_values_opt = np.load(fname.format('func', level))
+gradient_values_opt = np.load(fname.format('grad', level))
+optimised_value = control_values_opt[-1]
+
+# Plot trajectory and computed gradients
+params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress'}
+control_x = [m[0] for m in control_values_opt]
+control_y = [m[1] for m in control_values_opt]
+axes.plot(control_x, control_y, '-o', **params)
+params = {'linewidth': 3, 'color': 'C2'}
+# l = 8
+gradient_x = [g[0] for g in gradient_values_opt]
+gradient_y = [g[1] for g in gradient_values_opt]
+# for i, (mx, my, gx, gy) in enumerate(zip(control_x[:l], control_y[:l], gradient_x[:l], gradient_y[:l])):
+for i, (mx, my, gx, gy) in enumerate(zip(control_x, control_y, gradient_x, gradient_y)):
+    q = axes.quiver([mx], [my], [-gx], [-gy], **params)
+axes.quiverkey(q, 0.55, 1.02, 0.5, 'Computed gradient', labelpos='E', **params)
+plt.legend(fontsize=fontsize)
+axes.annotate(
+    r'$m = ({:.4f}, {:.4f})$'.format(*control_values_opt[-1]),
+    xy=(2.5, 3.8), color='C1', fontsize=fontsize, weight='bold',
+)
+
+# Save optimisation progress plot
+fname = 'optimisation_progress'
+if use_regularisation:
+    fname += '_reg'
+savefig(fname + '_{:d}'.format(level), plot_dir, args.adjoint, extensions=plot.extensions)
+
+
 # --- Plot timeseries
 
 # Before optimisation
+msg = "Cannot plot timeseries for initial guess controls on mesh {:d} because the data don't exist."
 N = int(np.ceil(np.sqrt(len(gauges))))
 fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
 for i, gauge in enumerate(gauges):
 
     # Load data
     fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
+    if not os.path.isfile(fname):
+        print_output(msg.format(level))
+        break
     op.gauges[gauge]['data'] = np.load(fname)
     fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries, level))
+    if not os.path.isfile(fname):
+        print_output(msg.format(level))
+        break
     op.gauges[gauge]['init'] = np.load(fname)
     data = np.array(op.gauges[gauge]['data'])
     init = np.array(op.gauges[gauge]['init'])
@@ -161,103 +272,3 @@ if plotted:
         axes[i//N, i % N].axis(False)
     fname = 'timeseries_optimised_{:d}'.format(level)
     savefig(fname, plot_dir, args.adjoint, extensions=plot.extensions)
-
-
-# --- Plot optimisation progress
-
-# Load parameter spaces
-n = 8
-xc = yc = np.linspace(0.5, 7.5, n)
-Xc, Yc = np.meshgrid(xc, yc)
-func_values = np.load(os.path.join(di, 'parameter_space_{:d}.npy'.format(level)))
-if use_regularisation:
-    func_values_reg = np.load(os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level)))
-
-# Fit a cubic
-q = scipy.interpolate.interp2d(xc, yc, func_values, kind='cubic')
-
-# Fit quadratic to regularised functional values
-if use_regularisation:
-    q_reg = scipy.interpolate.interp2d(xc, yc, func_values_reg, kind='cubic')
-    raise NotImplementedError  # TODO
-
-# Evaluate interpolant and its gradient
-xf = yf = np.linspace(xc[0], xc[-1], 10*n)
-Xf, Yf = np.meshgrid(xf, yf)
-Q = q(xf, yf)
-xm = ym = np.linspace(xc[0], xc[-1], 2*n)
-Xm, Ym = np.meshgrid(xm, ym)
-dQx = q(xm, ym, dx=1)
-dQy = q(xm, ym, dy=1)
-
-# Plot parameter space
-fig, axes = plt.subplots(figsize=(8, 8))
-axes.contour(Xf, Yf, Q, levels=50, cmap='gray')
-axes.quiver(Xm, Ym, -dQx, -dQy, color='gray')
-axes.set_xlabel(r"First basis function coefficient, $m_1$", fontsize=fontsize)
-axes.set_ylabel(r"Second basis function coefficient, $m_2$", fontsize=fontsize)
-plt.xticks(fontsize=fontsize_tick)
-plt.yticks(fontsize=fontsize_tick)
-plt.xlim([xc[0], xc[-1]])
-plt.ylim([xc[0], xc[-1]])
-axes.grid()
-
-# Establish quadratic
-vandermonde = lambda x, y: np.array([x**2, x*y, y**2, x, y, 1], dtype=object)
-A = np.zeros((6, 6))
-b = np.zeros(6)
-i = 0
-for i, (x, y) in enumerate(4 + 3*np.random.rand(6, 2)):
-    A[i, :] = vandermonde(x, y)
-    b[i] = q(x, y)
-coeffs = np.linalg.solve(A, b)
-q_poly = lambda x, y: np.dot(coeffs, vandermonde(x, y))
-Q_poly = q_poly(Xf, Yf)
-# assert np.allclose(np.abs((Q - Q_poly)/Q), 0.0, atol=1.0e-03)  # Check we do indeed have a quadratic
-
-# Find root and plot it
-a, b, c, d, e, f = coeffs
-A = np.array([[2*a, b],
-              [b, 2*c]])
-b = np.array([-d, -e])
-q_min = np.linalg.solve(A, b)
-params = {'markersize': 14, 'color': 'C0', 'label': r'$m^\star = ({:.4f}, {:.4f})$'.format(*q_min)}
-axes.plot(*q_min, '*', **params)
-
-# Save parameter space plot
-fname = 'parameter_space'
-if use_regularisation:
-    fname += '_reg'
-savefig('{:s}_{:d}'.format(fname, level), plot_dir, extensions=plot.extensions)
-
-# Load trajectory
-fname = os.path.join(di, args.adjoint, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
-control_values_opt = np.load(fname.format('ctrl', level))
-func_values_opt = np.load(fname.format('func', level))
-gradient_values_opt = np.load(fname.format('grad', level))
-optimised_value = control_values_opt[-1]
-
-# Plot trajectory and computed gradients
-params = {'markersize': 8, 'color': 'C1', 'label': 'Optimisation progress'}
-control_x = [m[0] for m in control_values_opt]
-control_y = [m[1] for m in control_values_opt]
-axes.plot(control_x, control_y, '-o', **params)
-params = {'linewidth': 3, 'color': 'C2'}
-# l = 8
-gradient_x = [g[0] for g in gradient_values_opt]
-gradient_y = [g[1] for g in gradient_values_opt]
-# for i, (mx, my, gx, gy) in enumerate(zip(control_x[:l], control_y[:l], gradient_x[:l], gradient_y[:l])):
-for i, (mx, my, gx, gy) in enumerate(zip(control_x, control_y, gradient_x, gradient_y)):
-    q = axes.quiver([mx], [my], [-gx], [-gy], **params)
-axes.quiverkey(q, 0.55, 1.02, 0.5, 'Computed gradient', labelpos='E', **params)
-plt.legend(fontsize=fontsize)
-axes.annotate(
-    r'$m = ({:.4f}, {:.4f})$'.format(*control_values_opt[-1]),
-    xy=(2.5, 3.8), color='C1', fontsize=fontsize
-)
-
-# Save optimisation progress plot
-fname = 'optimisation_progress'
-if use_regularisation:
-    fname += '_reg'
-savefig(fname + '_{:d}'.format(level), plot_dir, args.adjoint, extensions=plot.extensions)
