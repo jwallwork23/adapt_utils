@@ -183,8 +183,8 @@ if recompute or not os.path.isfile(fname):
     func_values = np.zeros((n, n))
     with stop_annotating():
         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
-        for i, m1 in enumerate(control_values):
-            for j, m2 in enumerate(control_values):
+        for j, m2 in enumerate(control_values):
+            for i, m1 in enumerate(control_values):
                 op.assign_control_parameters([m1, m2], mesh=swp.meshes[0])
                 swp.solve_forward()
                 func_values[i, j] = swp.quantity_of_interest()
@@ -198,8 +198,8 @@ if use_regularisation and (recompute or os.path.isfile(fname)):
     func_values_reg = np.zeros((n, n))
     with stop_annotating():
         swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
-        for i, m1 in enumerate(control_values):
-            for j, m2 in enumerate(control_values):
+        for j, m2 in enumerate(control_values):
+            for i, m1 in enumerate(control_values):
                 op.assign_control_parameters([m1, m2], mesh=swp.meshes[0])
                 swp.solve_forward()
                 func_values_reg[i, j] = swp.quantity_of_interest()
@@ -353,7 +353,8 @@ if optimise:
 
         # Run BFGS optimisation
         Jhat_save_data = ReducedFunctional(J, control, derivative_cb_post=derivative_cb_post)
-        optimised_value = minimize(Jhat_save_data, method='BFGS', options=opt_kwargs).dat.data
+        optimised_value = minimize(Jhat_save_data, method='BFGS', options=opt_kwargs)
+        optimised_value = [m.dat.data[0] for m in optimised_value]
     else:
         swp.checkpointing = True
 
