@@ -243,10 +243,11 @@ control_x = [m[0] for m in control_values_opt]
 control_y = [m[1] for m in control_values_opt]
 axes.plot(control_x, control_y, '-o', **params)
 params = {'linewidth': 3, 'color': 'C2'}
-l = 8
+# l = 8
 gradient_x = [g[0] for g in gradient_values_opt]
 gradient_y = [g[1] for g in gradient_values_opt]
-for i, (mx, my, gx, gy) in enumerate(zip(control_x[:l], control_y[:l], gradient_x[:l], gradient_y[:l])):
+# for i, (mx, my, gx, gy) in enumerate(zip(control_x[:l], control_y[:l], gradient_x[:l], gradient_y[:l])):
+for i, (mx, my, gx, gy) in enumerate(zip(control_x, control_y, gradient_x, gradient_y)):
     q = axes.quiver([mx], [my], [-gx], [-gy], **params)
 axes.quiverkey(q, 0.55, 1.02, 0.5, 'Computed gradient', labelpos='E', **params)
 plt.legend(fontsize=fontsize)
