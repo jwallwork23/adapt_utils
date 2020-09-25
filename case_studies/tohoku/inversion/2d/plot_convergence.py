@@ -118,8 +118,9 @@ dQy = q(xm, ym, dy=1)
 
 # Plot parameter space
 fig, axes = plt.subplots(figsize=(8, 8))
-axes.contour(Xf, Yf, Q, levels=50, cmap='gray')
-axes.quiver(Xm, Ym, -dQx, -dQy, color='gray')
+params = {'linewidths': 1, 'linestyles': 'dashed', 'levels': 30, 'cmap': 'Blues_r'}
+axes.contour(Xf, Yf, Q, **params)
+axes.quiver(Xm, Ym, -dQx, -dQy, color='C0')
 axes.set_xlabel(r"First basis function coefficient, $m_1$", fontsize=fontsize)
 axes.set_ylabel(r"Second basis function coefficient, $m_2$", fontsize=fontsize)
 plt.xticks(fontsize=fontsize_tick)
@@ -178,8 +179,8 @@ for i, (mx, my, gx, gy) in enumerate(zip(control_x, control_y, gradient_x, gradi
 axes.quiverkey(q, 0.55, 1.02, 0.5, 'Computed gradient', labelpos='E', **params)
 plt.legend(fontsize=fontsize)
 axes.annotate(
-    r'$m = ({:.4f}, {:.4f})$'.format(*control_values_opt[-1]),
-    xy=(2.5, 3.8), color='C1', fontsize=fontsize, weight='bold',
+    r'$m = ({:.4f}, {:.4f})$'.format(*control_values_opt[-1]), weight='bold',
+    xy=(2.8, 2.25), color='C1', fontsize=fontsize,
 )
 
 # Save optimisation progress plot

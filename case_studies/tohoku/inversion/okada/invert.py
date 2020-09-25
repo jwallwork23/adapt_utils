@@ -1,9 +1,11 @@
 from thetis import *
+from firedrake_adjoint import *
 
+import adolc
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-import scipy
+# import scipy
 import sys
 
 from adapt_utils.argparse import ArgumentParser
@@ -11,6 +13,7 @@ from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBas
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
 from adapt_utils.norms import vecnorm
 from adapt_utils.plotting import *
+from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 
@@ -26,7 +29,6 @@ parser = ArgumentParser(
             The gradient of the square gauge timeseries misfit w.r.t. the basis coefficients is
             computed using either a discrete or continuous adjoint approach.
             """,
-    adjoint=True,
     optimisation=True,
     plotting=True,
     shallow_water=True,
@@ -36,27 +38,12 @@ parser.add_argument("-zero_initial_guess", help="""
     Toggle between a zero initial guess and scaled Gaussian.
     """)
 parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial guess (default 6.0)")
-parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
-
-
-# --- Imports relevant to adjoint mode
-
-args = parser.args
-if args.adjoint == 'continuous':
-    from adapt_utils.pyadjoint_dummy import *
-    from adapt_utils.unsteady.solver import AdaptiveProblem
-    problem_constructor = AdaptiveProblem
-elif args.adjoint == 'discrete':
-    from firedrake_adjoint import *
-    from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
-    problem_constructor = AdaptiveDiscreteAdjointProblem
-else:
-    raise ValueError("Adjoint mode '{:}' not recognised.".format(args.adjoint))
 
 
 # --- Set parameters
 
 # Parsed arguments
+args = parser.args
 level = int(args.level or 0)
 optimise = bool(args.rerun_optimisation or False)
 gtol = float(args.gtol or 1.0e-04)
@@ -76,9 +63,9 @@ dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, 'outputs', 'realistic'))
 if args.extension is not None:
     di = '_'.join([di, args.extension])
-di = create_directory(os.path.join(di, args.adjoint))
+di = create_directory(os.path.join(di, 'discrete'))
 plot_dir = create_directory(os.path.join(di, 'plots'))
-create_directory(os.path.join(plot_dir, args.adjoint))
+create_directory(os.path.join(plot_dir, 'discrete'))
 
 # Collect initialisation parameters
 nonlinear = bool(args.nonlinear or False)
@@ -88,7 +75,6 @@ if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
 zero_init = bool(args.zero_initial_guess or False)
 taylor = bool(args.taylor_test or False)
-chk = args.checkpointing_mode or 'disk'
 kwargs = {
     'level': level,
     'save_timeseries': True,
@@ -102,7 +88,6 @@ kwargs = {
     'synthetic': False,
     'qoi_scaling': 1.0,
     'noisy_data': bool(args.noisy_data or False),
-    'regularisation': float(args.regularisation or 0.0),
 
     # I/O and debugging
     'plot_pvd': False,
@@ -112,12 +97,11 @@ kwargs = {
 }
 if args.end_time is not None:
     kwargs['end_time'] = float(args.end_time)
-use_regularisation = not np.isclose(kwargs['regularisation'], 0.0)
 
 # Construct Options parameter class
 gaussian_scaling = float(args.gaussian_scaling or 6.0)
 op = TohokuOkadaBasisOptions(**kwargs)
-op.active_controls = ('slip', 'rake')
+op.active_control = ('slip', 'rake')
 op.dirty_cache = bool(args.dirty_cache or False)
 gauges = list(op.gauges.keys())
 
@@ -129,6 +113,7 @@ with stop_annotating():
         eps = 1.0e-03  # zero gives an error so just choose small
         kwargs['control_parameters'] = eps*np.ones(op.nx*op.ny)
     else:
+        # TODO: Cache the field itself
         print_output("Projecting initial guess...")
 
         # Create Radial parameter object
@@ -136,12 +121,12 @@ with stop_annotating():
         kwargs_src['control_parameters'] = [gaussian_scaling]
         kwargs_src['nx'], kwargs_src['ny'] = 1, 1
         op_src = TohokuRadialBasisOptions(mesh=op.default_mesh, **kwargs_src)
-        swp = problem_constructor(op_src, nonlinear=nonlinear, print_progress=op.debug)
+        swp = AdaptiveDiscreteAdjointProblem(op_src, nonlinear=nonlinear, print_progress=op.debug)
         swp.set_initial_condition()
         f_src = swp.fwd_solutions[0].split()[1]
 
         # Project into Okada basis
-        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
+        swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
         op.project(swp, f_src)
         kwargs['control_parameters'] = op.control_parameters.copy()
 
@@ -179,126 +164,77 @@ if plot.only:
 
 # Set initial guess
 op = TohokuOkadaBasisOptions(**kwargs)
-op.active_controls = ('slip', 'rake')
-swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
+op.active_control = ('slip', 'rake')
+num_active_controls = len(op.active_controls)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.clear_tape()
 print_output("Setting initial guess...")
 op.assign_control_parameters(kwargs['control_parameters'])
-raise NotImplementedError  # TODO
-controls = [Control(m) for m in op.control_parameters]
+num_subfaults = len(op.subfaults)
 
-# Solve the forward problem / load data
+# Annotate the source model to ADOL-C's tape
+tape_tag = 0
+swp.set_initial_condition(annotate_source=True, tag=tape_tag, separate_faults=False)
+if op.debug:
+    print(adolc.tapestats(tape_tag))
+
+# Annotate the tsunami model to pyadjoint's tape
+control = Control(swp.fwd_solutions[0])
+swp.setup_solver_forward_step(0)
+print_output("Run forward to get initial timeseries...")
+swp.solve_forward_step(0)
+J = swp.quantity_of_interest()
+
+# Save data
 fnames = [os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries, level)) for gauge in gauges]
 fnames_data = [os.path.join(di, '{:s}_data_{:d}'.format(gauge, level)) for gauge in gauges]
-try:
-    assert args.adjoint == 'continuous'
-    assert np.all([os.path.isfile(fname) for fname in fnames])
-    assert np.all([os.path.isfile(fname) for fname in fnames_data])
-    print_output("Loading initial timeseries...")
-    for gauge, fname, fname_data in zip(gauges, fnames, fnames_data):
-        op.gauges[gauge][timeseries] = np.load(fname)
-        op.gauges[gauge]['data'] = np.load(fname_data)
-except AssertionError:
-    print_output("Run forward to get initial timeseries...")
-    swp.solve_forward()
-    J = swp.quantity_of_interest()
-    for gauge, fname, fname_data in zip(gauges, fnames, fnames_data):
-        np.save(fname, op.gauges[gauge][timeseries])
-        np.save(fname_data, op.gauges[gauge]['data'])
+for gauge, fname, fname_data in zip(gauges, fnames, fnames_data):
+    np.save(fname, op.gauges[gauge][timeseries])
+    np.save(fname_data, op.gauges[gauge]['data'])
 
-# Define reduced functional and gradient functions
-if args.adjoint == 'discrete':
-    Jhat = ReducedFunctional(J, controls)
-    gradient = None
-else:
 
-    def Jhat(m):
-        """
-        Reduced functional for continuous adjoint inversion.
-        """
-        try:
-            op.assign_control_parameters(m)
-        except Exception:
-            op.assign_control_parameters([m])
-        swp.solve_forward(checkpointing_mode=chk)
-        return swp.quantity_of_interest()
+# ---  Define reduced functional and gradient functions
 
-    def gradient(m):
-        """
-        Gradient of reduced functional for continuous adjoint inversion.
-        """
-        J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
-        swp.solve_adjoint(checkpointing_mode=chk)
-        g = np.array([
-            assemble(inner(bf, swp.adj_solution)*dx) for bf in op.basis_functions
-        ])  # TODO: No minus sign?
-        if use_regularisation:
-            g += op.regularisation_term_gradient
-        msg = " functional = {:15.8e}  gradient = {:15.8e}"
-        print_output(msg.format(J, vecnorm(g, order=np.Inf)))
-        return g
+Jhat = ReducedFunctional(J, control)
+stop_annotating()
+
+
+def reduced_functional(m):
+    """
+    Compose both unrolled tapes
+    """
+
+    # Unroll ADOL-C's tape
+    op.set_initial_condition(swp, unroll_tape=True, separate_faults=False)
+
+    # Unroll pyadjoint's tape
+    return Jhat(swp.fwd_solutions[0])
+
+
+def gradient(m):
+    """
+    Apply the chain rule to both tapes
+    """
+
+    # Reverse propagate on pyadjoint's tape
+    dJdq0 = Jhat.derivative()
+
+    # Restrict to source region
+    dJdeta0 = interpolate(dJdq0.split()[1], swp.P1[0])
+    dJdeta0 = dJeta0.dat.data[op.indices]
+
+    # Reverse propagate on ADOL-C's tape
+    return adolc.fos_reverse(tape_tag, dJdeta0)
 
 
 # --- Taylor test
 
 if taylor:
-
-    def get_controls(mode):
-        """
-        Get control parameter values assuming one of three modes:
-
-          'init' - control parameters are set to the initial guess;
-          'random' - control parameters are set randomly with a Normal distribution;
-          'optimised' - optimal control parameters from a previous run are used.
-        """
-        c = [Function(m) for m in op.control_parameters]
-        if mode == 'init':
-            pass
-        elif mode == 'random':
-            for ci in c:
-                ci.dat.data[0] += np.random.random() - 0.5
-        elif mode == 'optimised':
-            fname = os.path.join(di, 'optimisation_progress_ctrl_{:d}.npy'.format(level))
-            try:
-                c_dat = np.load(fname)[-1]
-                reason = "data of wrong length ({:s} vs. {:s})".format(len(c_dat), len(c))
-                assert len(c_dat) == len(c)
-                reason = "no data found"
-            except FileNotFoundError:
-                msg = "Skipping Taylor test at optimised controls because {:s}.".format(reason)
-                print_output(msg)
-                sys.exit(0)
-            for i, ci in enumerate(c):
-                ci.dat.data[0] = c_dat[i]
-        else:
-            raise ValueError("Taylor test mode '{:s}' not recognised.".format(mode))
-        return c
-
-    # Ensure consistency of tests
-    np.random.seed(0)
-
-    # Random search direction
-    dc = [Function(m) for m in op.control_parameters]
-    for dci in dc:
-        dci.dat.data[0] = np.random.random() - 0.5
-
-    # Run tests
-    for mode in ("init", "random", "optimised"):
-        print_output("Taylor test '{:s}' begin...".format(mode))
-        c = get_controls(mode)
-        swp.checkpointing = True
-        dJdm = None if args.adjoint == 'discrete' else gradient(c)
-        swp.checkpointing = False
-        minconv = taylor_test(Jhat, c, dc)
-        if minconv > 1.90:
-            print_output("Taylor test '{:s}' passed!".format(mode))
-        else:
-            msg = "Taylor test '{:s}' failed! Convergence ratio {:.2f} < 2."
-            raise ConvergenceError(msg.format(mode, minconv))
-    sys.exit(0)
-
+    raise NotImplementedError  # TODO
 
 # --- Optimisation
+
+raise NotImplementedError  # TODO
 
 fname = os.path.join(di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if optimise:
@@ -308,68 +244,38 @@ if optimise:
 
     opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
     print_output("Optimisation begin...")
-    if args.adjoint == 'discrete':
 
-        def derivative_cb_post(j, dj, m):
-            """
-            Callback for saving progress data to file during discrete adjoint inversion.
-            """
-            control = [mi.dat.data[0] for mi in m]
-            djdm = [dji.dat.data[0] for dji in dj]
-            msg = "functional {:15.8e}  gradient {:15.8e}"
-            print_output(msg.format(j, vecnorm(djdm, order=np.Inf)))
+    def derivative_cb_post(j, dj, m):
+        """
+        Callback for saving progress data to file during discrete adjoint inversion.
+        """
+        control = [mi.dat.data[0] for mi in m]
+        djdm = [dji.dat.data[0] for dji in dj]
+        msg = "functional {:15.8e}  gradient {:15.8e}"
+        print_output(msg.format(j, vecnorm(djdm, order=np.Inf)))
 
-            # Save progress to NumPy arrays on-the-fly
-            control_values_opt.append(control)
-            func_values_opt.append(j)
-            gradient_values_opt.append(djdm)
-            np.save(fname.format('ctrl'), np.array(control_values_opt))
-            np.save(fname.format('func'), np.array(func_values_opt))
-            np.save(fname.format('grad'), np.array(gradient_values_opt))
+        # Save progress to NumPy arrays on-the-fly
+        control_values_opt.append(control)
+        func_values_opt.append(j)
+        gradient_values_opt.append(djdm)
+        np.save(fname.format('ctrl'), np.array(control_values_opt))
+        np.save(fname.format('func'), np.array(func_values_opt))
+        np.save(fname.format('grad'), np.array(gradient_values_opt))
 
-        # Run BFGS optimisation
-        Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
-        optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs)
-        optimised_value = [m.dat.data[0] for m in optimised_value]
-    else:
-        swp.checkpointing = True
-
-        def Jhat_save_data(m):
-            """
-            Reduced functional for the continuous adjoint approach which saves progress data to
-            file during the inversion.
-            """
-            J = Jhat(m)
-            control_values_opt.append(m)
-            np.save(fname.format('ctrl'), np.array(control_values_opt))
-            func_values_opt.append(J)
-            np.save(fname.format('func'), np.array(func_values_opt))
-            return J
-
-        def gradient_save_data(m):
-            """
-            Gradient of the reduced functional for the continuous adjoint approach which saves
-            progress data to file during the inversion.
-            """
-            g = gradient(m)
-            gradient_values_opt.append(g)
-            np.save(fname.format('grad'), np.array(gradient_values_opt))
-            return g
-
-        opt_kwargs['fprime'] = gradient_save_data
-        opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
-        m_init = [m.dat.data[0] for m in op.control_parameters]
-        optimised_value = scipy.optimize.fmin_bfgs(Jhat_save_data, m_init, **opt_kwargs)
+    # Run BFGS optimisation
+    Jhat = ReducedFunctional(J, control, derivative_cb_post=derivative_cb_post)
+    optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs)
+    optimised_value = [m.dat.data[0] for m in optimised_value]
 else:
     optimised_value = np.load(fname.format('ctrl'))[-1]
 
 
-# --- Run with optimised controls
+# --- Run with optimised control
 
 # Run forward again using the optimised control parameters
 op.plot_pvd = plot_pvd
 op.di = di
-swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.clear_tape()
 print_output("Assigning optimised control parameters...")
 op.assign_control_parameters(optimised_value)

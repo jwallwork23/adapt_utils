@@ -302,7 +302,7 @@ if taylor:
         swp.checkpointing = True
         dJdm = None if args.adjoint == 'discrete' else gradient(c)
         swp.checkpointing = False
-        minconv = taylor_test(Jhat, c, dc)
+        minconv = taylor_test(Jhat, c, dc, dJdm=dJdm)
         if minconv > 1.90:
             print_output("Taylor test '{:s}' passed!".format(mode))
         else:
