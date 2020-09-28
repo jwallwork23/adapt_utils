@@ -4,6 +4,10 @@ mesh:
 	@echo "Generating Delauney mesh of turbine array domain..."
 	@gmsh -2 channel.geo
 
+mesh_box:
+	@echo "Generating Delauney mesh of turbine array domain..."
+	@gmsh -2 channel_box.geo
+
 spin_up:
 	@echo "Spinning up hydrodynamics..."
 	@python3 spin_up.py
