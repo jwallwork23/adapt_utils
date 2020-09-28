@@ -18,15 +18,16 @@ parser.add_argument("-min_viscosity", help="Minimum tolerated viscosity (default
 args = parser.parse_args()
 
 Re = float(args.Re)
+min_viscosity = float(args.min_viscosity or 0.0)
 kwargs = {
     'target_mesh_reynolds_number': Re,
-    'min_viscosity': float(args.min_viscosity or 0.0),
+    'min_viscosity': min_viscosity,
     'spun': True,
     'debug': True,
 }
 
 # Setup problem
-op = TurbineArrayOptions(**kwargs)
+op = TurbineArrayOptions(min_viscosity, **kwargs)
 L = op.domain_length
 W = op.domain_width
 swp = AdaptiveTurbineProblem(op, ramp_dir='data/ramp')

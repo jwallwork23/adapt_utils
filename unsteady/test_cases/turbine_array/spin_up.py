@@ -43,13 +43,14 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
+min_viscosity = float(args.min_viscosity or 0.0)
 kwargs = {
     'approach': approach,
     'target_mesh_reynolds_number': None if args.reynolds_number is None else float(args.reynolds_number),
-    'min_viscosity': float(args.min_viscosity or 0.0),
+    'min_viscosity': min_viscosity,
     'plot_pvd': plot_pvd,
 }
-op = TurbineArrayOptions(**kwargs)
+op = TurbineArrayOptions(min_viscosity, **kwargs)
 L = op.domain_length
 W = op.domain_width
 op.end_time = op.T_ramp
