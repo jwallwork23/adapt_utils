@@ -18,7 +18,7 @@ plotting_kwargs = {
         "arrowstyle": "<->",
     },
 }
-op = TurbineArrayOptions()
+op = TurbineArrayOptions(3.0)
 
 # Create parameter object and get time periods
 time_seconds = np.linspace(0.0, op.end_time, 1001) - op.T_ramp

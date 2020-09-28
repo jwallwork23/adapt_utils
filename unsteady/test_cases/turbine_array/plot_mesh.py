@@ -46,7 +46,7 @@ patch_kwargs = {
     "facecolor": "none",
     "linewidth": 2,
 }
-op = TurbineArrayOptions()
+op = TurbineArrayOptions(3.0)
 L = op.domain_length
 W = op.domain_width
 l = 15

@@ -56,18 +56,19 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
+min_viscosity = float(args.min_viscosity or 0.0)
 kwargs = {
     'approach': approach,
     'num_meshes': int(args.num_meshes or 1),
     'target_mesh_reynolds_number': None if args.reynolds_number is None else float(args.reynolds_number),
-    'min_viscosity': float(args.min_viscosity or 0.0),
+    'min_viscosity': min_viscosity,
     'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
 if args.end_time is not None:
     kwargs['end_time'] = float(args.end_time)
-op = TurbineArrayOptions(**kwargs)
+op = TurbineArrayOptions(min_viscosity, **kwargs)
 index_str = index_string(op.num_meshes)
 sea_water_density = 1030.0
 

@@ -8,7 +8,7 @@ from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 
 
 # Setup problem
-op = TurbineArrayOptions(debug=True)
+op = TurbineArrayOptions(3.0, debug=True)
 op.spun = True
 swp = AdaptiveTurbineProblem(op, ramp_dir='data/ramp')
 mesh = swp.meshes[0]

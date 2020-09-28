@@ -32,7 +32,7 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-op = TurbineArrayOptions(**kwargs)
+op = TurbineArrayOptions(3.0, **kwargs)
 mode = 'memory'  # TODO: disk
 
 # Create directories and check if spun-up solution exists

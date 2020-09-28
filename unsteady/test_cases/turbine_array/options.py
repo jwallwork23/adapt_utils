@@ -20,7 +20,8 @@ class TurbineArrayOptions(TurbineOptions):
     num_turbines = PositiveInteger(15).tag(config=False)
 
     # Domain specification
-    mesh_file = os.path.join(os.path.dirname(__file__), 'channel.msh')
+    # mesh_file = os.path.join(os.path.dirname(__file__), 'channel.msh')
+    mesh_file = os.path.join(os.path.dirname(__file__), 'channel_box.msh')
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
@@ -30,7 +31,7 @@ class TurbineArrayOptions(TurbineOptions):
     ).tag(config=False)
     thrust_coefficient = NonNegativeFloat(24.0).tag(config=True)  # NOTE: Gets halved
 
-    def __init__(self, spun=False, **kwargs):
+    def __init__(self, base_viscosity, spun=False, **kwargs):
         super(TurbineArrayOptions, self).__init__(**kwargs)
         self.array_ids = np.array([[2, 5, 8, 11, 14],
                                    [3, 6, 9, 12, 15],
@@ -44,7 +45,7 @@ class TurbineArrayOptions(TurbineOptions):
             raise OSError("Need to make mesh before initialising TurbineArrayOptions object.")
 
         # Physics
-        self.base_viscosity = 3.0
+        self.base_viscosity = base_viscosity
         self.base_bathymetry = 50.0
         self.max_depth = 50.0
         self.friction_coeff = 0.0025
