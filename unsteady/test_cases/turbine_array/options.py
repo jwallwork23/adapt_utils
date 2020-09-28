@@ -47,8 +47,8 @@ class TurbineArrayOptions(TurbineOptions):
         # Physics
         self.base_viscosity = base_viscosity
         self.min_viscosity = min_viscosity or base_viscosity
-        self.sponge_x = 100
-        self.sponge_y = 75
+        self.sponge_x = 200
+        self.sponge_y = 100
         self.base_bathymetry = 50.0
         self.max_depth = 50.0
         self.friction_coeff = 0.0025
@@ -126,6 +126,15 @@ class TurbineArrayOptions(TurbineOptions):
                 ),
             )
         )
+
+        # Enforce maximum Reynolds number
+        if hasattr(self, 'max_reynolds_number'):
+            Re_h, Re_h_min, Re_h_max = self.check_mesh_reynolds_number(nu)
+            target = self.max_reynolds_number
+            if Re_h_max > target:
+                nu_enforce = self.enforce_mesh_reynolds_number(fs, target)
+                nu.interpolate(conditional(Re_h > target, nu_enforce, nu))
+
         return nu
 
     def set_boundary_conditions(self, prob, i):

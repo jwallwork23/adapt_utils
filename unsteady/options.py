@@ -55,7 +55,6 @@ class CoupledOptions(Options):
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
     recover_vorticity = Bool(False).tag(config=True)  # TODO: help
-    target_mesh_reynolds_number = PositiveFloat(None, allow_none=True).tag(config=True)  # TODO: help
     characteristic_velocity = FiredrakeVectorExpression(None, allow_none=True)  # TODO: help
 
     # Tracer transport model
@@ -304,7 +303,7 @@ class CoupledOptions(Options):
 
         return export_func
 
-    def check_mesh_reynolds_number(self, characteristic_velocity, nu, mesh=None, index=None):
+    def check_mesh_reynolds_number(self, nu, characteristic_velocity=None, mesh=None, index=None):
         """
         Compute the mesh Reynolds number using provided characteristic velocity, viscosity field
         and mesh.
@@ -336,6 +335,7 @@ class CoupledOptions(Options):
         # fs = stats._P0
         Re_h = Function(fs, name="Reynolds number")
         Re_h.project(stats.dx*sqrt(dot(u, u))/nu)
+        # Re_h.interpolate(stats.dx*sqrt(dot(u, u))/nu)
         Re_h_vec = Re_h.vector().gather()
         Re_h_min = Re_h_vec.min()
         Re_h_max = Re_h_vec.max()
@@ -351,38 +351,33 @@ class CoupledOptions(Options):
         self.print_debug(msg.format(Re_h_mean, lg(Re_h_mean)))
         return Re_h, Re_h_min, Re_h_max
 
-    # TODO: REMOVE
-    def enforce_mesh_reynolds_number(self, fs, characteristic_velocity=None, index=None):
+    def enforce_mesh_reynolds_number(self, fs, target, characteristic_velocity=None, index=None):
         """
         Enforce the mesh Reynolds number specified by :attr:`target_mesh_reynolds_number`.
         Also needs a characteristic velocity (either passed as a keyword argument, or read from
         :attr:`characteristic_velocity`) and a :class:`FunctionSpace`.
-
-        A minimum tolerated viscosity may be enforced using :attr:`min_viscosity`.
         """
-        Re_h = self.target_mesh_reynolds_number
+        Re_h = target
         if Re_h is None:
             raise ValueError("Cannot enforce mesh Reynolds number for inviscid problems!")
-        nu_min = self.min_viscosity
         u = characteristic_velocity or self.characteristic_velocity
         if u is None:
             raise ValueError("Cannot enforce mesh Reynolds number without characteristic velocity!")
         if index is None:
-            msg = "INIT: Enforcing mesh Reynolds number {:.4e} (min viscosity {:.4e})..."
-            self.print_debug(msg.format(Re_h, nu_min))
+            msg = "INIT: Enforcing mesh Reynolds number {:.4e}..."
+            self.print_debug(msg.format(Re_h))
         else:
-            msg = "INIT: Enforcing Reynolds number {:.4e} (min viscosity {:.4e}) on mesh {:d}..."
-            self.print_debug(msg.format(Re_h, nu_min, index))
+            msg = "INIT: Enforcing Reynolds number {:.4e} on mesh {:d}..."
+            self.print_debug(msg.format(Re_h, index))
 
         # Get local mesh element size
         stats = MeshStats(self, fs.mesh())  # TODO: Build into solver
+        # fs = stats._P0
 
         # Compute viscosity which yields target mesh Reynolds number
         nu = Function(fs, name="Horizontal viscosity")
-        nu.project(max_value(stats.dx*sqrt(dot(u, u))/Re_h, nu_min))
-        nu_min = nu.vector().gather().min()
-        nu_max = nu.vector().gather().max()
-        self.print_debug("INIT:   min(nu) = {:11.4e}   max(nu) = {:11.4e}".format(nu_min, nu_max))
+        nu.project(stats.dx*sqrt(dot(u, u))/Re_h)
+        # nu.interpolate(stats.dx*sqrt(dot(u, u))/Re_h)
         return nu
 
 
@@ -405,7 +400,7 @@ class ReynoldsNumberArray(object):
     def __setitem__(self, i, value):
         (u, nu) = value
         mesh = self._meshes[i]
-        Re_h, Re_h_min, Re_h_max = self._op.check_mesh_reynolds_number(u, nu, mesh=mesh, index=i)
+        Re_h, Re_h_min, Re_h_max = self._op.check_mesh_reynolds_number(nu, u, mesh=mesh, index=i)
         self._data[i] = Re_h
         self._min[i] = Re_h_min
         self._max[i] = Re_h_max
