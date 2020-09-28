@@ -31,7 +31,7 @@ class TurbineArrayOptions(TurbineOptions):
     ).tag(config=False)
     thrust_coefficient = NonNegativeFloat(24.0).tag(config=True)  # NOTE: Gets halved
 
-    def __init__(self, base_viscosity, spun=False, **kwargs):
+    def __init__(self, base_viscosity, min_viscosity=None, spun=False, **kwargs):
         super(TurbineArrayOptions, self).__init__(**kwargs)
         self.array_ids = np.array([[2, 5, 8, 11, 14],
                                    [3, 6, 9, 12, 15],
@@ -46,6 +46,9 @@ class TurbineArrayOptions(TurbineOptions):
 
         # Physics
         self.base_viscosity = base_viscosity
+        self.min_viscosity = min_viscosity or base_viscosity
+        self.sponge_x = 100
+        self.sponge_y = 75
         self.base_bathymetry = 50.0
         self.max_depth = 50.0
         self.friction_coeff = 0.0025
@@ -85,15 +88,45 @@ class TurbineArrayOptions(TurbineOptions):
         self.family = 'dg-cg'
 
     def set_viscosity(self, fs):
-        sponge = False
-        if sponge:
-            x, y = SpatialCoordinate(fs.mesh())
-            xmax = 1000.0
-            ramp = 0.5
-            eps = 20.0
-            return interpolate(self.base_viscosity + exp(ramp*(x - xmax + eps)), fs)
-        else:
-            return super(TurbineArrayOptions, self).set_viscosity(fs)
+        """
+        Set the viscosity to be the :attr:`min_viscosity` in the tidal farm region and
+        :attr:`base_viscosity` elsewhere.
+        """
+
+        # Get box around tidal farm
+        D = self.turbine_length
+        delta_x = 3*10*D
+        delta_y = 1.3*7.5*D
+
+        # Base viscosity and minimum viscosity
+        nu_min = self.min_viscosity
+        nu_base = self.base_viscosity
+
+        # Distance functions
+        mesh = fs.mesh()
+        x, y = SpatialCoordinate(mesh)
+        dist_x = (abs(x) - delta_x)/self.sponge_x
+        dist_y = (abs(y) - delta_y)/self.sponge_y
+        dist_r = sqrt(dist_x**2 + dist_y**2)
+
+        # Define viscosity field with a sponge condition
+        nu = Function(fs, name="Horizontal viscosity")
+        nu.interpolate(
+            conditional(
+                And(x > -delta_x, x < delta_x),
+                conditional(
+                    And(y > -delta_y, y < delta_y),
+                    nu_min,
+                    min_value(nu_min*(1 - dist_y) + nu_base*dist_y, nu_base),
+                ),
+                conditional(
+                    And(y > -delta_y, y < delta_y),
+                    min_value(nu_min*(1 - dist_x) + nu_base*dist_x, nu_base),
+                    min_value(nu_min*(1 - dist_r) + nu_base*dist_r, nu_base),
+                ),
+            )
+        )
+        return nu
 
     def set_boundary_conditions(self, prob, i):
         self.elev_in[i] = Function(prob.V[i].sub(1))

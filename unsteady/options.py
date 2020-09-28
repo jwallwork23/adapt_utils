@@ -351,6 +351,7 @@ class CoupledOptions(Options):
         self.print_debug(msg.format(Re_h_mean, lg(Re_h_mean)))
         return Re_h, Re_h_min, Re_h_max
 
+    # TODO: REMOVE
     def enforce_mesh_reynolds_number(self, fs, characteristic_velocity=None, index=None):
         """
         Enforce the mesh Reynolds number specified by :attr:`target_mesh_reynolds_number`.

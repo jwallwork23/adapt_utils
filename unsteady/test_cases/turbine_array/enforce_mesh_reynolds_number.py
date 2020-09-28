@@ -11,6 +11,8 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 
 
+# NOTE: OUTDATED
+
 # Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("Re", help="Target Reynolds number.")
