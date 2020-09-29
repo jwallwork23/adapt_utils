@@ -59,23 +59,21 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         self.turbine_densities = [None for i in range(self.num_meshes)]
         self.turbine_drag_coefficients = [None for i in range(self.num_meshes)]
         c_T = op.get_thrust_coefficient(correction=self.thrust_correction)
-        if not self.discrete_turbines:
-            shape = op.bump if self.smooth_indicators else op.box
-        L, W = op.turbine_length, op.turbine_width
-        D = max(L, W)
-        A_T = L*W
+        L, W, D = op.turbine_length, op.turbine_width, op.turbine_diameter
+        footprint_area = L*W      # area of (horizontal) footprint
+        swept_area = pi*(D/2)**2  # area of (vertical) cross-section
+        shape = op.bump if self.smooth_indicators else op.box  # only used in continuous case
         for i, mesh in enumerate(self.meshes):
             if self.discrete_turbines:
-                self.turbine_densities[i] = Constant(1.0/A_T, domain=self.meshes[i])
+                self.turbine_densities[i] = Constant(1.0/footprint_area, domain=self.meshes[i])
             else:
                 area = assemble(shape(self.meshes[i])*dx)
                 self.turbine_densities[i] = shape(self.meshes[i], scale=num_turbines/area)
 
             self.farm_options[i].turbine_density = self.turbine_densities[i]
             self.farm_options[i].turbine_options.diameter = D
-            self.farm_options[i].turbine_options.area = A_T
             self.farm_options[i].turbine_options.thrust_coefficient = c_T
-            self.turbine_drag_coefficients[i] = 0.5*c_T*A_T*self.turbine_densities[i]
+            self.turbine_drag_coefficients[i] = 0.5*c_T*swept_area*self.turbine_densities[i]
 
             self.shallow_water_options[i].tidal_turbine_farms = {
                 farm_id: self.farm_options[i] for farm_id in op.farm_ids
@@ -97,9 +95,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         attributes of the :attr:`callbacks`.
         """
         di = di or self.callback_dir
-        power_watts = [np.array([]) for i in range(self.num_turbines)]
         for farm_id in self.op.farm_ids:
-            timeseries = np.array([])
             for i in range(self.op.num_meshes):
                 tag = 'power_output'
                 if farm_id != 'everywhere':

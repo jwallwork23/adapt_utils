@@ -17,9 +17,16 @@ class TurbineOptions(CoupledOptions):
     """
 
     # Turbine parameters
-    turbine_length = PositiveFloat(18.0).tag(config=False)
-    turbine_width = PositiveFloat(18.0).tag(config=False)
-    thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)  # TODO: Check
+    turbine_diameter = PositiveFloat(18.0, help="""
+        Diameter of the circular region swept in the vertical by the turbine blades.
+        """).tag(config=False)
+    turbine_length = PositiveFloat(18.0, help="""
+        Length of the rectangular turbine footprint region covered in the horizontal.
+        """).tag(config=False)
+    turbine_width = PositiveFloat(18.0, help="""
+        Width of the rectangular turbine footprint region covered in the horizontal.
+        """).tag(config=False)
+    thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)  # TODO: Check; help
 
     # Physics
     sea_water_density = PositiveFloat(1030.0).tag(config=True)
@@ -56,8 +63,7 @@ class TurbineOptions(CoupledOptions):
         """
         if not correction:
             return self.thrust_coefficient
-        # TODO: Modify for rectangular turbines?
-        D = max(self.turbine_length, self.turbine_width)
+        D = self.turbine_diameter
         A_T = pi*(D/2)**2
         correction = 4/(1 + sqrt(1 - A_T/(self.max_depth*D)))**2
         return self.thrust_coefficient*correction
