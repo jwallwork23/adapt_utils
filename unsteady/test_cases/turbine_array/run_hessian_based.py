@@ -18,8 +18,9 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 parser = argparse.ArgumentParser()
 
 # Physics
-parser.add_argument("-reynolds_number", help="Target mesh Reynolds number")
-parser.add_argument("-min_viscosity", help="Minimum tolerated viscosity (default 0).")
+parser.add_argument("-max_reynolds_number", help="Maximum tolerated mesh Reynolds number")
+parser.add_argument("-base_viscosity", help="Base viscosity (default 1).")
+parser.add_argument("-target_viscosity", help="Target viscosity (defaults to base value)")
 
 # Mesh adaptation
 parser.add_argument("-approach", help="Metric construction approach (default 'hessian')")
@@ -69,13 +70,12 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
-min_viscosity = float(args.min_viscosity or 0.0)
+base_viscosity = float(args.base_viscosity or 1.0)
 kwargs = {
     'approach': approach,
 
     # Physics
-    'target_mesh_reynolds_number': None if args.reynolds_number is None else float(args.reynolds_number),
-    'min_viscosity': min_viscosity,
+    'target_viscosity': float(args.target_viscosity or base_viscosity),
 
     # Mesh adaptation
     'num_meshes': int(args.num_meshes or 10),
@@ -107,7 +107,9 @@ plotting_kwargs = {
     },
 }
 plt.rc('font', **{'size': 18})
-op = TurbineArrayOptions(min_viscosity, **kwargs)
+op = TurbineArrayOptions(base_viscosity, **kwargs)
+if args.max_reynolds_number is not None:
+    op.max_reynolds_number = float(args.max_reynolds_number)
 op.end_time = op.T_tide  # Only adapt over a single tidal cycle
 
 # Create directories and check if spun-up solution exists
