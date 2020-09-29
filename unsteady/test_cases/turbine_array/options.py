@@ -10,9 +10,12 @@ __all__ = ["TurbineArrayOptions"]
 
 
 class TurbineArrayOptions(TurbineOptions):
-    """Parameters for the unsteady 15 turbine array test case."""
+    """
+    Parameters for the unsteady 15 turbine array test case from [Divett et al. 2013].
+    """
 
     # Turbine parameters
+    turbine_diameter = PositiveFloat(20.0).tag(config=False)
     turbine_length = PositiveFloat(20.0).tag(config=False)
     turbine_width = PositiveFloat(5.0).tag(config=False)
     array_length = PositiveInteger(5).tag(config=False)
@@ -29,9 +32,9 @@ class TurbineArrayOptions(TurbineOptions):
     characteristic_velocity = FiredrakeVectorExpression(
         Constant(as_vector([1.5, 0.0]))
     ).tag(config=False)
-    thrust_coefficient = NonNegativeFloat(24.0).tag(config=True)  # NOTE: Gets halved
+    thrust_coefficient = NonNegativeFloat(2.985).tag(config=True)
 
-    def __init__(self, base_viscosity, min_viscosity=None, spun=False, **kwargs):
+    def __init__(self, base_viscosity, target_viscosity=None, spun=False, **kwargs):
         super(TurbineArrayOptions, self).__init__(**kwargs)
         self.array_ids = np.array([[2, 5, 8, 11, 14],
                                    [3, 6, 9, 12, 15],
@@ -46,7 +49,7 @@ class TurbineArrayOptions(TurbineOptions):
 
         # Physics
         self.base_viscosity = base_viscosity
-        self.min_viscosity = min_viscosity or base_viscosity
+        self.target_viscosity = target_viscosity or base_viscosity
         self.sponge_x = 200
         self.sponge_y = 100
         self.base_bathymetry = 50.0
@@ -89,9 +92,10 @@ class TurbineArrayOptions(TurbineOptions):
 
     def set_viscosity(self, fs):
         """
-        Set the viscosity to be the :attr:`min_viscosity` in the tidal farm region and
+        Set the viscosity to be the :attr:`target_viscosity` in the tidal farm region and
         :attr:`base_viscosity` elsewhere.
         """
+        nu = Function(fs, name="Horizontal viscosity")
 
         # Get box around tidal farm
         D = self.turbine_length
@@ -99,8 +103,11 @@ class TurbineArrayOptions(TurbineOptions):
         delta_y = 1.3*7.5*D
 
         # Base viscosity and minimum viscosity
-        nu_min = self.min_viscosity
+        nu_tgt = self.target_viscosity
         nu_base = self.base_viscosity
+        if np.isclose(nu_tgt, nu_base):
+            nu.interpolate(nu_base)
+            return nu
 
         # Distance functions
         mesh = fs.mesh()
@@ -110,19 +117,18 @@ class TurbineArrayOptions(TurbineOptions):
         dist_r = sqrt(dist_x**2 + dist_y**2)
 
         # Define viscosity field with a sponge condition
-        nu = Function(fs, name="Horizontal viscosity")
         nu.interpolate(
             conditional(
                 And(x > -delta_x, x < delta_x),
                 conditional(
                     And(y > -delta_y, y < delta_y),
-                    nu_min,
-                    min_value(nu_min*(1 - dist_y) + nu_base*dist_y, nu_base),
+                    nu_tgt,
+                    min_value(nu_tgt*(1 - dist_y) + nu_base*dist_y, nu_base),
                 ),
                 conditional(
                     And(y > -delta_y, y < delta_y),
-                    min_value(nu_min*(1 - dist_x) + nu_base*dist_x, nu_base),
-                    min_value(nu_min*(1 - dist_r) + nu_base*dist_r, nu_base),
+                    min_value(nu_tgt*(1 - dist_x) + nu_base*dist_x, nu_base),
+                    min_value(nu_tgt*(1 - dist_r) + nu_base*dist_r, nu_base),
                 ),
             )
         )

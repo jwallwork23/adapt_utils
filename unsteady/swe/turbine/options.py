@@ -26,7 +26,7 @@ class TurbineOptions(CoupledOptions):
     turbine_width = PositiveFloat(18.0, help="""
         Width of the rectangular turbine footprint region covered in the horizontal.
         """).tag(config=False)
-    thrust_coefficient = NonNegativeFloat(7.6).tag(config=True)  # TODO: Check; help
+    thrust_coefficient = NonNegativeFloat(0.6).tag(config=True)
 
     # Physics
     sea_water_density = PositiveFloat(1030.0).tag(config=True)
@@ -63,10 +63,30 @@ class TurbineOptions(CoupledOptions):
         """
         if not correction:
             return self.thrust_coefficient
+        self.print_debug("TURBINE: Computing thrust coefficient correction...")
+
+        # Turbine geometry
         D = self.turbine_diameter
-        A_T = pi*(D/2)**2
-        correction = 4/(1 + sqrt(1 - A_T/(self.max_depth*D)))**2
-        return self.thrust_coefficient*correction
+        W = self.turbine_width
+        H = self.max_depth
+        swept_area = pi*(D/2)**2    # area swept by turbine blades in the vertical
+        footprint_area = D*W        # area of one turbine footprint
+        cross_sectional_area = H*D  # cross-sectional area of water depth
+
+        # Thrust correction
+        thrust = self.thrust_coefficient
+        drag = 0.5*thrust*swept_area/footprint_area
+        correction = 4/(1 + sqrt(1 - thrust*swept_area/cross_sectional_area))**2
+        thrust_corrected = thrust*correction
+        drag_corrected = 0.5*thrust_corrected*swept_area/footprint_area
+
+        # Debugging
+        self.print_debug("TURBINE: Input thrust coefficient     = {:.2f}".format(thrust))
+        self.print_debug("TURBINE: Input drag coefficient       = {:.2f}".format(drag))
+        self.print_debug("TURBINE: Thrust correction            = {:.2f}".format(correction))
+        self.print_debug("TURBINE: Corrected thrust coefficient = {:.2f}".format(thrust_corrected))
+        self.print_debug("TURBINE: Corrected drag coefficient   = {:.2f}".format(drag_corrected))
+        return thrust_corrected
 
     def get_max_depth(self, bathymetry=None):
         """

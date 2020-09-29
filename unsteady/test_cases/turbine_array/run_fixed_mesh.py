@@ -20,8 +20,9 @@ parser.add_argument("-num_meshes", help="Number of meshes (for debugging)")
 parser.add_argument("-end_time", help="End time of simulation in seconds")
 
 # Physics
-parser.add_argument("-reynolds_number", help="Target mesh Reynolds number")
-parser.add_argument("-min_viscosity", help="Minimum tolerated viscosity (default 0).")
+parser.add_argument("-max_reynolds_number", help="Maximum tolerated mesh Reynolds number")
+parser.add_argument("-base_viscosity", help="Base viscosity (default 1).")
+parser.add_argument("-target_viscosity", help="Target viscosity (defaults to base value).")
 
 # I/O and debugging
 parser.add_argument("-extension", help="Optional extension for output directory")
@@ -56,19 +57,20 @@ if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
-min_viscosity = float(args.min_viscosity or 0.0)
+base_viscosity = float(args.base_viscosity or 0.0)
 kwargs = {
     'approach': approach,
     'num_meshes': int(args.num_meshes or 1),
-    'target_mesh_reynolds_number': None if args.reynolds_number is None else float(args.reynolds_number),
-    'min_viscosity': min_viscosity,
+    'target_viscosity': float(args.target_viscosity or base_viscosity),
     'plot_pvd': plot_pvd,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
 if args.end_time is not None:
     kwargs['end_time'] = float(args.end_time)
-op = TurbineArrayOptions(min_viscosity, **kwargs)
+op = TurbineArrayOptions(base_viscosity, **kwargs)
+if args.max_reynolds_number is not None:
+    op.max_reynolds_number = float(args.max_reynolds_number)
 index_str = index_string(op.num_meshes)
 sea_water_density = 1030.0
 
