@@ -59,8 +59,8 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         self.turbine_densities = [None for i in range(self.num_meshes)]
         self.turbine_drag_coefficients = [None for i in range(self.num_meshes)]
         c_T = op.get_thrust_coefficient(correction=self.thrust_correction)
-        L, W, D = op.turbine_length, op.turbine_width, op.turbine_diameter
-        footprint_area = L*W      # area of (horizontal) footprint
+        W, D = op.turbine_width, op.turbine_diameter
+        footprint_area = D*W      # area of (horizontal) footprint
         swept_area = pi*(D/2)**2  # area of (vertical) cross-section
         shape = op.bump if self.smooth_indicators else op.box  # only used in continuous case
         for i, mesh in enumerate(self.meshes):

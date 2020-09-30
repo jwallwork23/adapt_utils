@@ -17,13 +17,18 @@ class TurbineOptions(CoupledOptions):
     """
 
     # Turbine parameters
-    turbine_diameter = PositiveFloat(18.0, help="""
+    turbine_diameter = PositiveFloat(18.0, help=r"""
         Diameter of the circular region swept in the vertical by the turbine blades.
+        
+        The 'swept area' of the turbine is calculated as :math:`pi*\frac{D^2}4`, where
+        :math:`D` is the turbine diameter.
+
+        The 'footprint area' of the turbine is calculated as :math:`D*W`, where :math:`W`
+        is the 'width' of the turbine footprint. By default, this is set to the diameter.
+        However, in some cases it is appropriate to choose a smaller value. This is the case
+        if the flow is unidirectional, for example.
         """).tag(config=False)
-    turbine_length = PositiveFloat(18.0, help="""
-        Length of the rectangular turbine footprint region covered in the horizontal.
-        """).tag(config=False)
-    turbine_width = PositiveFloat(18.0, help="""
+    turbine_width = PositiveFloat(None, allow_none=True, help="""
         Width of the rectangular turbine footprint region covered in the horizontal.
         """).tag(config=False)
     thrust_coefficient = NonNegativeFloat(0.6).tag(config=True)
@@ -36,6 +41,10 @@ class TurbineOptions(CoupledOptions):
     def __init__(self, **kwargs):
         super(TurbineOptions, self).__init__(**kwargs)
         self.farm_ids = ["everywhere"]
+        if self.turbine_width is None:
+            self.turbine_width = self.turbine_diameter
+        else:
+            assert self.turbine_width <= self.turbine_diameter
 
         # Timestepping
         self.timestepper = 'CrankNicolson'
