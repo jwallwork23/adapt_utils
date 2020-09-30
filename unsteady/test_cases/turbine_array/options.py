@@ -13,6 +13,7 @@ class TurbineArrayOptions(TurbineOptions):
     """
     Parameters for the unsteady 15 turbine array test case from [Divett et al. 2013].
     """
+    resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
 
     # Turbine parameters
     turbine_diameter = PositiveFloat(20.0).tag(config=False)
@@ -22,8 +23,6 @@ class TurbineArrayOptions(TurbineOptions):
     num_turbines = PositiveInteger(15).tag(config=False)
 
     # Domain specification
-    # mesh_file = os.path.join(os.path.dirname(__file__), 'channel.msh')
-    mesh_file = os.path.join(os.path.dirname(__file__), 'channel_box.msh')
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
@@ -33,7 +32,7 @@ class TurbineArrayOptions(TurbineOptions):
     ).tag(config=False)
     thrust_coefficient = NonNegativeFloat(2.985).tag(config=True)
 
-    def __init__(self, base_viscosity, target_viscosity=None, spun=False, **kwargs):
+    def __init__(self, base_viscosity, target_viscosity=None, level=0, spun=False, **kwargs):
         super(TurbineArrayOptions, self).__init__(**kwargs)
         self.array_ids = np.array([[2, 5, 8, 11, 14],
                                    [3, 6, 9, 12, 15],
@@ -41,10 +40,12 @@ class TurbineArrayOptions(TurbineOptions):
         self.farm_ids = tuple(self.array_ids.reshape((self.num_turbines, )))
 
         # Domain and mesh
+        self.mesh_file = os.path.join(self.resource_dir, 'channel_box_{:d}.msh'.format(level))
         if os.path.exists(self.mesh_file):
             self.default_mesh = Mesh(self.mesh_file)
         else:
-            raise OSError("Need to make mesh before initialising TurbineArrayOptions object.")
+            import warnings
+            warnings.warn("Need to make mesh before initialising TurbineArrayOptions object.")
 
         # Physics
         self.base_viscosity = base_viscosity
@@ -65,12 +66,13 @@ class TurbineArrayOptions(TurbineOptions):
 
         # Tidal farm
         W = self.turbine_width
-        deltax = 10.0*L
-        deltay = 7.5*L
+        D = self.turbine_diameter
+        deltax = 10.0*D
+        deltay = 7.5*D
         self.region_of_interest = []
         for i in range(-2, 3):
             for j in range(1, -2, -1):
-                self.region_of_interest.append((i*deltax, j*deltay, W, L))
+                self.region_of_interest.append((i*deltax, j*deltay, W, D))
         assert len(self.region_of_interest) == self.num_turbines
         self.turbine_tags = list(range(2, 2 + self.num_turbines))
 

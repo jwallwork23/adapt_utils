@@ -1,12 +1,16 @@
 all: clean mesh plot
 
 mesh:
-	@echo "Generating Delauney mesh of turbine array domain..."
-	@gmsh -2 channel.geo
-
-mesh_box:
-	@echo "Generating Delauney mesh of turbine array domain..."
-	@gmsh -2 channel_box.geo
+	@echo "Generating Delauney meshes of turbine array domain..."
+	@mkdir resources
+	@python3 meshgen.py 0
+	@cd resources && gmsh -2 channel_box_0.geo
+	@python3 meshgen.py 1
+	@cd resources && gmsh -2 channel_box_1.geo
+	@python3 meshgen.py 2
+	@cd resources && gmsh -2 channel_box_2.geo
+	@python3 meshgen.py 3
+	@cd resources && gmsh -2 channel_box_3.geo
 
 spin_up:
 	@echo "Spinning up hydrodynamics..."
@@ -25,5 +29,5 @@ plot:
 	@python3 plot_mesh.py
 
 clean:
-	@echo "Cleaning directory..."
-	@rm -rf *.msh
+	@echo "Cleaning resource directory..."
+	@cd resources && rm -rf *.msh

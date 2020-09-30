@@ -36,11 +36,13 @@ solid_body_rotation/__pycache__/
 trench_1d/outputs/
 trench_1d/results/
 trench_slant/results/
+turbine_array/channel*.geo
+turbine_array/data/
 turbine_array/nic.py
 turbine_array/output/
 turbine_array/outputs/
+turbine_array/plots/
+turbine_array/resources/
 turbine_array/screenshots/
 turbine_array/videos/
 turbine_array/__pycache__/
-turbine_array/data/
-turbine_array/plots/
