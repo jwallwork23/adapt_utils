@@ -16,7 +16,6 @@ class TurbineArrayOptions(TurbineOptions):
 
     # Turbine parameters
     turbine_diameter = PositiveFloat(20.0).tag(config=False)
-    turbine_length = PositiveFloat(20.0).tag(config=False)
     turbine_width = PositiveFloat(5.0).tag(config=False)
     array_length = PositiveInteger(5).tag(config=False)
     array_width = PositiveInteger(3).tag(config=False)
@@ -65,7 +64,6 @@ class TurbineArrayOptions(TurbineOptions):
         self.dt_per_export = 10
 
         # Tidal farm
-        L = self.turbine_length
         W = self.turbine_width
         deltax = 10.0*L
         deltay = 7.5*L
@@ -98,7 +96,7 @@ class TurbineArrayOptions(TurbineOptions):
         nu = Function(fs, name="Horizontal viscosity")
 
         # Get box around tidal farm
-        D = self.turbine_length
+        D = self.turbine_diameter
         delta_x = 3*10*D
         delta_y = 1.3*7.5*D
 

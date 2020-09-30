@@ -15,8 +15,7 @@ class SpaceshipOptions(TurbineOptions):
     """Parameters for the 'spaceship' idealised tidal lagoon test case."""
 
     # Turbine parameters
-    turbine_length = PositiveFloat(18.0).tag(config=False)
-    turbine_width = PositiveFloat(18.0).tag(config=False)
+    turbine_diameter = PositiveFloat(18.0).tag(config=False)
     num_turbines = PositiveInteger(2).tag(config=False)
     thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
 
@@ -67,8 +66,8 @@ class SpaceshipOptions(TurbineOptions):
         self.dt_per_export = 30
 
         # Tidal farm
-        L, W = self.turbine_length, self.turbine_width
-        self.region_of_interest = [(6050, 0, L, W), (6450, 0, L, W)]
+        D = self.turbine_diameter
+        self.region_of_interest = [(6050, 0, D, D), (6450, 0, D, D)]
 
         # Solver parameters and discretisation
         self.stabilisation = None
