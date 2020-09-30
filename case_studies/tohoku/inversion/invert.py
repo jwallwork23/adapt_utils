@@ -79,6 +79,7 @@ dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, basis, 'outputs', 'realistic'))
 if args.extension is not None:
     di = '_'.join([di, args.extension])
+output_dir = create_directory(di)
 di = create_directory(os.path.join(di, args.adjoint))
 plot_dir = create_directory(os.path.join(di, 'plots'))
 create_directory(os.path.join(plot_dir, args.adjoint))
@@ -201,8 +202,8 @@ op.assign_control_parameters(kwargs['control_parameters'], swp.meshes[0])
 controls = [Control(m) for m in op.control_parameters]
 
 # Solve the forward problem / load data
-fnames = [os.path.join(di, '{:s}_{:s}_{:d}'.format(gauge, timeseries, level)) for gauge in gauges]
-fnames_data = [os.path.join(di, '{:s}_data_{:d}'.format(gauge, level)) for gauge in gauges]
+fnames = [os.path.join(output_dir, '{:s}_{:s}_{:d}'.format(gauge, timeseries, level)) for gauge in gauges]
+fnames_data = [os.path.join(output_dir, '{:s}_data_{:d}'.format(gauge, level)) for gauge in gauges]
 try:
     assert args.adjoint == 'continuous'
     assert np.all([os.path.isfile(fname) for fname in fnames])

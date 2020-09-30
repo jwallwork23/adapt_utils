@@ -214,31 +214,36 @@ for level in range(levels):
         data = np.array(op.gauges[gauge]['data'])
         opt = np.array(op.gauges[gauge]['opt'])
         n = len(opt)
-        assert len(data) == n
         T = op.gauges[gauge]['times']
         T = np.linspace(T[0], T[-1], n)
 
-        # Compute mean square errors
-        square_error = (opt - data)**2
-        mse = square_error.sum()/n
-        msg = "{:5s} level {:d} optimised mean square error: {:.4e}"
-        print_output(msg.format(gauge, level, mse))
-        mean_square_errors[level] += mse
+        if len(data) == n:
+            print_output("Computing timeseries errors...")
 
-        # Compute discrete QoI
-        square_error *= 0.5
-        dt = T[1] - T[0]
-        for q, sq_err in enumerate(square_error):
-            wq = 0.5 if q in (0, n-1) else 1.0  # TODO: Other integrators than trapezium
-            discrete_qois[level] += wq*dt*sq_err
+            # Compute mean square errors
+            square_error = (opt - data)**2
+            mse = square_error.sum()/n
+            msg = "{:5s} level {:d} optimised mean square error: {:.4e}"
+            print_output(msg.format(gauge, level, mse))
+            mean_square_errors[level] += mse
 
-        # Compute total variation
-        # TODO
+            # Compute discrete QoI
+            square_error *= 0.5
+            dt = T[1] - T[0]
+            for q, sq_err in enumerate(square_error):
+                wq = 0.5 if q in (0, n-1) else 1.0  # TODO: Other integrators than trapezium
+                discrete_qois[level] += wq*dt*sq_err
+
+            # Compute total variation
+            # TODO
+
+        else:
+            print_output("Cannot compute timeseries errors because data have inconsistent lengths.")
 
         # Plot timeseries
         ax = axes[i//N, i % N]
         T /= 60
-        ax.plot(T, data, '-', **kwargs)
+        ax.plot(np.linspace(T[0], T[-1], len(data)), data, '-', **kwargs)
         ax.plot(T, opt, '-', label=gauge, **kwargs)
         ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
         if i//N == 3:

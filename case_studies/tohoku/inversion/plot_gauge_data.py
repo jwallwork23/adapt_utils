@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.plotting import *  # NOQA
 
 
@@ -20,7 +20,7 @@ dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, 'plots'))
 
 # Instantiate TohokuOptions object and setup interpolator
-op = TohokuOptions()
+op = TohokuInversionOptions()
 gauges = list(op.gauges)
 num_gauges = len(gauges)
 for smoothed in (True, False):
