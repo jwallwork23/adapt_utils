@@ -5,7 +5,7 @@ import adolc
 import matplotlib.pyplot as plt
 import numpy as np
 import os
-# import scipy
+import scipy
 import sys
 
 from adapt_utils.argparse import ArgumentParser
@@ -182,7 +182,7 @@ for key in stats:
     op.print_debug("ADOL-C: {:20s}: {:d}".format(key.lower(), stats[key]))
 
 # Annotate the tsunami model to pyadjoint's tape
-control = Control(swp.fwd_solutions[0])
+pyadjoint_control = Control(swp.fwd_solution)
 swp.setup_solver_forward_step(0)
 print_output("Run forward to get initial timeseries...")
 swp.solve_forward_step(0)
@@ -198,7 +198,7 @@ for gauge, fname, fname_data in zip(gauges, fnames, fnames_data):
 
 # ---  Define reduced functional and gradient functions
 
-Jhat = ReducedFunctional(J, control)
+Jhat = ReducedFunctional(J, pyadjoint_control)
 stop_annotating()
 
 
@@ -206,12 +206,25 @@ def reduced_functional(m):
     """
     Compose both unrolled tapes
     """
+    m_array = m.reshape((num_active_controls, num_subfaults))
+    for i, control in enumerate(op.active_controls):
+        assert len(op.control_parameters[control]) == len(m_array[i])
+        op.control_parameters[control][:] = m_array[i]
 
     # Unroll ADOL-C's tape
     op.set_initial_condition(swp, unroll_tape=True, separate_faults=False)
 
     # Unroll pyadjoint's tape
-    return Jhat(swp.fwd_solutions[0])
+    J = Jhat(swp.fwd_solution)
+
+    # Check equivalent to rerunning propagation model
+    if op.debug and op.debug_mode == 'full':
+        swp.solve_forward()
+        JJ = swp.quantity_of_interest()
+        msg = "Pyadjoint disagrees with solve_forward: {:.4e} vs {:.4e}"
+        assert np.isclose(J, JJ), msg.format(J, JJ)
+
+    return J
 
 
 def gradient(m):
@@ -233,13 +246,14 @@ def gradient(m):
 # --- Taylor test
 
 if taylor:
+
     import adapt_utils.optimisation as opt
     opt.taylor_test(reduced_functional, gradient, op.input_vector, verbose=True)  # FIXME
+    print_output("Taylor test passed!")
+    sys.exit(0)
 
 
 # --- Optimisation
-
-raise NotImplementedError  # TODO
 
 fname = os.path.join(di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if optimise:
@@ -250,27 +264,34 @@ if optimise:
     opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
     print_output("Optimisation begin...")
 
-    def derivative_cb_post(j, dj, m):
+    def reduced_functional_save_data(m):
         """
-        Callback for saving progress data to file during discrete adjoint inversion.
+        Reduced functional for the continuous adjoint approach which saves progress data to
+        file during the inversion.
         """
-        control = [mi.dat.data[0] for mi in m]
-        djdm = [dji.dat.data[0] for dji in dj]
-        msg = "functional {:15.8e}  gradient {:15.8e}"
-        print_output(msg.format(j, vecnorm(djdm, order=np.Inf)))
-
-        # Save progress to NumPy arrays on-the-fly
-        control_values_opt.append(control)
-        func_values_opt.append(j)
-        gradient_values_opt.append(djdm)
+        J = reduced_functional(m)
+        control_values_opt.append(m)
         np.save(fname.format('ctrl'), np.array(control_values_opt))
+        func_values_opt.append(J)
         np.save(fname.format('func'), np.array(func_values_opt))
-        np.save(fname.format('grad'), np.array(gradient_values_opt))
+        print_output("functional {:15.8e}".format(J))
+        return J
 
-    # Run BFGS optimisation
-    Jhat = ReducedFunctional(J, control, derivative_cb_post=derivative_cb_post)
-    optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs)
-    optimised_value = [m.dat.data[0] for m in optimised_value]
+    def gradient_save_data(m):
+        """
+        Gradient of the reduced functional for the continuous adjoint approach which saves
+        progress data to file during the inversion.
+        """
+        g = gradient(m)
+        gradient_values_opt.append(g)
+        np.save(fname.format('grad'), np.array(gradient_values_opt))
+        print_output(28*' ' + "gradient {:15.8e}".format(vecnorm(g, order=np.Inf)))
+        return g
+
+    opt_kwargs['fprime'] = gradient_save_data
+    opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
+    m_init = np.array([op.control_parameters[control] for control in op.active_controls]).flatten()
+    optimised_value = scipy.optimize.fmin_bfgs(reduced_functional_save_data, m_init, **opt_kwargs)
 else:
     optimised_value = np.load(fname.format('ctrl'))[-1]
 
@@ -283,6 +304,10 @@ op.di = di
 swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.clear_tape()
 print_output("Assigning optimised control parameters...")
+optimised_value = optimised_value.reshape((num_active_controls, num_subfaults))
+for control in op.active_controls:
+    assert len(kwargs['control_parameters'][control]) == len(optimised_value[i])
+    kwargs['control_parameters'][control][:] = optimised_value[i]
 op.assign_control_parameters(optimised_value)
 print_output("Run to plot optimised timeseries...")
 swp.solve_forward()
