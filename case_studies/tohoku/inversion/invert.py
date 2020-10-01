@@ -225,8 +225,21 @@ if args.adjoint == 'discrete':
     Jhat = ReducedFunctional(J, controls)
     gradient = None
 
-    def reduced_functional(m):  # TODO: Wrap it
-        return Jhat(m)
+    def reduced_functional(m):
+        """
+        Wrapper for the evaluation of square timeseries misfit QoI during the forward tsunami
+        propagation.
+        """
+        J = Jhat(m)
+
+        # Check equivalent to rerunning propagation model
+        if op.debug and op.debug_mode == 'full':
+            swp.solve_forward()
+            JJ = swp.quantity_of_interest()
+            msg = "Pyadjoint disagrees with solve_forward: {:.4e} vs {:.4e}"
+            assert np.isclose(J, JJ), msg.format(J, JJ)
+
+        return J
 
     # def gradient(m):  # TODO: Wrap it
     #     return Jhat.derivative()
@@ -310,12 +323,15 @@ if taylor:
         swp.checkpointing = True
         dJdm = None if args.adjoint == 'discrete' else gradient(c)
         swp.checkpointing = False
-        minconv = taylor_test(reduced_functional, c, dc, dJdm=dJdm)
+        minconv = taylor_test(Jhat, c, dc, dJdm=dJdm)
         if minconv > 1.90:
             print_output("Taylor test '{:s}' passed!".format(mode))
         else:
             msg = "Taylor test '{:s}' failed! Convergence ratio {:.2f} < 2."
             raise ConvergenceError(msg.format(mode, minconv))
+        import adapt_utils.optimisation as opt
+        # opt.taylor_test(reduced_functional, gradient, c, verbose=True)
+        # print_output("Taylor test '{:s}' passed!".format(mode))
     sys.exit(0)
 
 
@@ -330,6 +346,8 @@ if optimise:
     opt_kwargs = {'maxiter': 1000, 'gtol': gtol}
     print_output("Optimisation begin...")
     if args.adjoint == 'discrete':
+
+        # TODO: Wrap functions above
 
         def derivative_cb_post(j, dj, m):
             """
