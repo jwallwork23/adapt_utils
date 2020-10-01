@@ -177,8 +177,9 @@ num_subfaults = len(op.subfaults)
 # Annotate the source model to ADOL-C's tape
 tape_tag = 0
 swp.set_initial_condition(annotate_source=True, tag=tape_tag, separate_faults=False)
-if op.debug:
-    print(adolc.tapestats(tape_tag))
+stats = adolc.tapestats(tape_tag)
+for key in stats:
+    op.print_debug("ADOL-C: {:20s}: {:d}".format(key.lower(), stats[key]))
 
 # Annotate the tsunami model to pyadjoint's tape
 control = Control(swp.fwd_solutions[0])
@@ -233,8 +234,8 @@ def gradient(m):
 
 if taylor:
     import adapt_utils.optimisation as opt
-    opt.taylor_test(reduced_functional, gradient, op.input_vector, verbose=True)
-    raise NotImplementedError  # TODO
+    opt.taylor_test(reduced_functional, gradient, op.input_vector, verbose=True)  # FIXME
+
 
 # --- Optimisation
 

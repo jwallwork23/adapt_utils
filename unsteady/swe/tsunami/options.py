@@ -213,25 +213,29 @@ class TsunamiOptions(CoupledOptions):
 
         Note that we reset the bathymetry first, in case this method has already been called.
         """
-        self.print_debug("INIT: Subtracting initial surface from bathymetry field...")
 
         # Reset bathymetry
+        self.print_debug("INIT: Resetting bathymetry...")
         fs = prob.bathymetry[0].function_space()
         prob.bathymetry[0] = self.set_bathymetry(fs)
 
         # Project bathymetry into P1 space
         P1 = prob.P1[0]
+        self.print_debug("INIT: Projecting bathymetry into P1 space...")
         b = project(prob.bathymetry[0], P1)
 
         # Interpolate free surface into P1 space
         if surf is None:
-            surf = interpolate(prob.fwd_solutions[0].split()[1], P1)
+            self.print_debug("INIT: Projecting free surface into P1 space...")
+            surf = project(prob.fwd_solutions[0].split()[1], P1)
 
         # Subtract surface from bathymetry
+        self.print_debug("INIT: Subtracting initial surface from bathymetry field...")
         b -= surf
 
         # Project updated bathymetry onto each mesh
         for i in range(self.num_meshes):
+            self.print_debug("INIT: Projecting updated bathymetry onto mesh {:d}...".format(i))
             prob.bathymetry[i].project(b)
 
     def set_coriolis(self, fs):
