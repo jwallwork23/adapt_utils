@@ -162,6 +162,10 @@ class AdaptiveProblemBase(object):
             #     coords = mesh.coordinates
             #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
 
+    @property
+    def mesh(self):
+        return self.meshes[0]
+
     def setup_all(self):
         """
         Setup everything which isn't explicitly associated with either the forward or adjoint

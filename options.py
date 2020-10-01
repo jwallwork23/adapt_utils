@@ -268,13 +268,13 @@ class Options(FrozenConfigurable):
     def set_start_condition(self, fs, adjoint=False):
         return self.set_terminal_condition(fs) if adjoint else self.set_initial_condition(fs)
 
-    def set_initial_condition(self, fs):
+    def set_initial_condition(self, prob, i):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def set_terminal_condition(self, fs):
+    def set_terminal_condition(self, prob, i):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def set_boundary_conditions(self, fs):
+    def set_boundary_conditions(self, prob, i):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_boundary_surface(self):  # TODO: surely it needs an arg

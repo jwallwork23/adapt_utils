@@ -581,6 +581,7 @@ class TohokuInversionOptions(TohokuOptions):
         from adapt_utils.misc import ellipse
 
         self.J = 0 if np.isclose(self.regularisation, 0.0) else self.get_regularisation_term(prob)
+        quadrature_weight = Constant(1.0)
         scaling = Constant(0.5*self.qoi_scaling)
 
         # These will be updated by the checkpointing routine
@@ -643,7 +644,7 @@ class TohokuInversionOptions(TohokuOptions):
             """
             dt = self.dt
             t = t - dt
-            quadrature_weight = Constant(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
+            quadrature_weight.assign(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
                 I = gauge_dat["indicator"]
