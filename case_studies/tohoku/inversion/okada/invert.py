@@ -184,7 +184,8 @@ for key in stats:
     op.print_debug("ADOL-C: {:20s}: {:d}".format(key.lower(), stats[key]))
 
 # Annotate the tsunami model to pyadjoint's tape
-pyadjoint_control = Control(swp.fwd_solution)
+u, eta = swp.fwd_solution.split()
+pyadjoint_control = Control(eta)
 swp.setup_solver_forward_step(0)
 print_output("Run forward to get initial timeseries...")
 swp.solve_forward_step(0)
@@ -215,9 +216,10 @@ def reduced_functional(m):
 
     # Unroll ADOL-C's tape
     op.set_initial_condition(swp, unroll_tape=True, separate_faults=False)
+    u, eta = swp.fwd_solution.split()
 
     # Unroll pyadjoint's tape
-    J = Jhat(swp.fwd_solution)
+    J = Jhat(eta)
 
     # Check equivalent to rerunning propagation model
     if op.debug and op.debug_mode == 'full':

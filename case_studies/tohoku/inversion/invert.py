@@ -199,6 +199,8 @@ swp = problem_constructor(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.clear_tape()
 print_output("Setting initial guess...")
 op.assign_control_parameters(kwargs['control_parameters'], swp.meshes[0])
+# TODO: Invert for surface and source separately / don't project q
+# TODO: Use elev_init as control, rather than q_init
 controls = [Control(m) for m in op.control_parameters]
 
 # Solve the forward problem / load data

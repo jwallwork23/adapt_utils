@@ -216,6 +216,8 @@ swp.clear_tape()
 print_output("Setting initial guess...")
 op.assign_control_parameters(init, mesh=swp.meshes[0])
 control = [Control(m) for m in op.control_parameters]
+# TODO: Invert for surface and source separately / don't project q
+# TODO: Use elev_init as control, rather than q_init
 
 # Solve the forward problem / load data
 fname = '{:s}_{:s}_{:d}.npy'
