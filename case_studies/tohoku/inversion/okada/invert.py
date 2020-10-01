@@ -38,6 +38,7 @@ parser.add_argument("-zero_initial_guess", help="""
     Toggle between a zero initial guess and scaled Gaussian.
     """)
 parser.add_argument("-gaussian_scaling", help="Scaling for Gaussian initial guess (default 6.0)")
+parser.add_argument("-maxiter", help="Maximum number of iterations for projection (default 2)")
 
 
 # --- Set parameters
@@ -75,6 +76,7 @@ if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
 zero_init = bool(args.zero_initial_guess or False)
 taylor = bool(args.taylor_test or False)
+maxiter = int(args.maxiter or 2)
 kwargs = {
     'level': level,
     'save_timeseries': True,
@@ -129,7 +131,7 @@ with stop_annotating():
 
         # Project into Okada basis
         swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
-        op.project(swp, f_src)
+        op.project(swp, f_src, maxiter=maxiter)
         kwargs['control_parameters'] = op.control_parameters.copy()
 
         # Plot
