@@ -224,9 +224,16 @@ except AssertionError:
 if args.adjoint == 'discrete':
     Jhat = ReducedFunctional(J, controls)
     gradient = None
+
+    def reduced_functional(m):  # TODO: Wrap it
+        return Jhat(m)
+
+    # def gradient(m):  # TODO: Wrap it
+    #     return Jhat.derivative()
+
 else:
 
-    def Jhat(m):
+    def reduced_functional(m):
         """
         Reduced functional for continuous adjoint inversion.
         """
@@ -241,7 +248,7 @@ else:
         """
         Gradient of reduced functional for continuous adjoint inversion.
         """
-        J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
+        J = reduced_functional(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
         swp.solve_adjoint(checkpointing_mode=chk)
         g = np.array([
             assemble(inner(bf, swp.adj_solution)*dx) for bf in op.basis_functions
@@ -303,7 +310,7 @@ if taylor:
         swp.checkpointing = True
         dJdm = None if args.adjoint == 'discrete' else gradient(c)
         swp.checkpointing = False
-        minconv = taylor_test(Jhat, c, dc, dJdm=dJdm)
+        minconv = taylor_test(reduced_functional, c, dc, dJdm=dJdm)
         if minconv > 1.90:
             print_output("Taylor test '{:s}' passed!".format(mode))
         else:
@@ -342,18 +349,18 @@ if optimise:
             np.save(fname.format('grad'), np.array(gradient_values_opt))
 
         # Run BFGS optimisation
-        Jhat = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
-        optimised_value = minimize(Jhat, method='BFGS', options=opt_kwargs)
+        reduced_functional = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
+        optimised_value = minimize(reduced_functional, method='BFGS', options=opt_kwargs)
         optimised_value = [m.dat.data[0] for m in optimised_value]
     else:
         swp.checkpointing = True
 
-        def Jhat_save_data(m):
+        def reduced_functional_save_data(m):
             """
             Reduced functional for the continuous adjoint approach which saves progress data to
             file during the inversion.
             """
-            J = Jhat(m)
+            J = reduced_functional(m)
             control_values_opt.append(m)
             np.save(fname.format('ctrl'), np.array(control_values_opt))
             func_values_opt.append(J)
@@ -373,7 +380,7 @@ if optimise:
         opt_kwargs['fprime'] = gradient_save_data
         opt_kwargs['callback'] = lambda m: print_output("LINE SEARCH COMPLETE")
         m_init = [m.dat.data[0] for m in op.control_parameters]
-        optimised_value = scipy.optimize.fmin_bfgs(Jhat_save_data, m_init, **opt_kwargs)
+        optimised_value = scipy.optimize.fmin_bfgs(reduced_functional_save_data, m_init, **opt_kwargs)
 else:
     optimised_value = np.load(fname.format('ctrl'))[-1]
 
