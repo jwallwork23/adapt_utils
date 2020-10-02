@@ -108,7 +108,7 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         self._array = []
         for j, y in enumerate(Y):
             for i, x in enumerate(X):
-                psi, phi = self.basis_functions[i + j*nx].split()
+                phi = self.basis_functions[i + j*nx]
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
                 self._array.append([x_rot, y_rot])
                 phi.interpolate(gaussian([(x_rot, y_rot, rx, ry)], fs.mesh(), rotation=angle))
@@ -128,15 +128,18 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
 
         :arg prob: the :class:`AdaptiveProblem` object to which the initial condition is assigned.
         """
+        fs = prob.V[0].sub(1)
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
+            self.get_basis_functions(fs)
+
+        # Assume zero initial velocity
+        u, eta = prob.fwd_solutions[0].split()
+        u.assign(0.0)
 
         # Assemble initial surface
         self.print_debug("INIT: Assembling initial surface...")
-        q = prob.fwd_solutions[0]
-        q.assign(0.0)
         for coeff, bf in zip(self.control_parameters, self.basis_functions):
-            q.assign(q + project(coeff*bf, prob.V[0]))
+            eta.assign(eta + project(coeff*bf, fs))
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
@@ -166,8 +169,8 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
 
         # Get basis functions
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
-        phi = [bf.split()[1] for bf in self.basis_functions]
+            self.get_basis_functions(prob.V[0].sub(1))
+        phi = self.basis_functions
         N = self.nx*self.ny
 
         # Assemble mass matrix
@@ -223,14 +226,14 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         quantities can be pre-computed, meaning we just have a linear algebraic optimisation problem.
         """
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
+            self.get_basis_functions(prob.V[0].sub(1))
         N = self.nx*self.ny
 
         # Get RHS
         f = np.array([source.at(xy) for xy in self._array])
 
         # Get vector of pointwise basis function values
-        g = np.array([[bf.split()[1].at(xy) for bf in self.basis_functions] for xy in self._array])
+        g = np.array([[bf.at(xy) for bf in self.basis_functions] for xy in self._array])
 
         # Get initial guess by point evaluation (which will probably be an overestimate)
         m_init = f.copy()

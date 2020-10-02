@@ -94,7 +94,7 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         self._array = []
         for j, y in enumerate(Y):
             for i, x in enumerate(X):
-                psi, phi = self.basis_functions[i + j*nx].split()
+                phi = self.basis_functions[i + j*nx]
                 x_rot, y_rot = tuple(np.array([x0, y0]) + np.dot(R, np.array([x, y])))
                 self._array.append([x_rot, y_rot])
                 phi.interpolate(box([(x_rot, y_rot, rx, ry)], fs.mesh(), rotation=angle))
@@ -106,15 +106,18 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
 
         :arg prob: the :class:`AdaptiveProblem` object to which the initial condition is assigned.
         """
+        fs = prob.V[0].sub(1)
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
+            self.get_basis_functions(fs)
+
+        # Assume zero initial velocity
+        u, eta = prob.fwd_solutions[0].split()
+        u.assign(0.0)
 
         # Assemble initial surface
         self.print_debug("INIT: Assembling initial surface...")
-        q = prob.fwd_solutions[0]
-        q.assign(0.0)
         for coeff, bf in zip(self.control_parameters, self.basis_functions):
-            q.assign(q + project(coeff*bf, prob.V[0]))
+            eta.assign(eta + project(coeff*bf, fs))
 
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
@@ -133,8 +136,7 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
 
         # Get basis functions
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
-        basis_functions = [bf.split()[1] for bf in self.basis_functions]
+            self.get_basis_functions(prob.V[0].sub(1))
 
         # Assemble mass matrix
         if os.path.isfile(fname) and not self.dirty_cache:
@@ -142,13 +144,13 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
             A = np.load(fname)
         else:
             self.print_debug("PROJECTION: Assembling mass matrix...")
-            A = np.array([assemble(phi*phi*dx) for phi in basis_functions])
+            A = np.array([assemble(phi*phi*dx) for phi in self.basis_functions])
             self.print_debug("PROJECTION: Cacheing mass matrix...")
             np.save(fname, A)
 
         # Assemble RHS
         self.print_debug("PROJECTION: Assembling RHS...")
-        b = np.array([assemble(phi*source*dx) for phi in basis_functions])
+        b = np.array([assemble(phi*source*dx) for phi in self.basis_functions])
 
         # Project
         self.print_debug("PROJECTION: Solving linear system...")
@@ -166,5 +168,5 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         overlap.
         """
         if not hasattr(self, 'basis_functions'):
-            self.get_basis_functions(prob.V[0])
+            self.get_basis_functions(prob.V[0].sub(1))
         self.assign_control_parameters([source.at(xy) for xy in self._array], prob.meshes[0])
