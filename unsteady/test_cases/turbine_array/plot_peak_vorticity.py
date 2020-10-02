@@ -13,29 +13,54 @@ fname = os.path.join(data_dir, "vorticity_{:s}_{:d}.npy")
 # Create parameters object
 op = TurbineArrayOptions(1)
 num_timesteps = int(op.T_ramp/op.dt/op.dt_per_export) + 1
-time = np.linspace(0, op.T_ramp, num_timesteps)/60
+time = np.linspace(0, op.T_ramp/60, num_timesteps)
 
 # Plotting parameters
-resolutions = [24, 12, 6, 3]
+resolutions = {24: {'colour': 'r'}, 12: {'colour': 'b'}, 6: {'colour': 'k'}, 3: {'colour': 'g'}}
 resolutions_used = []
-colours = ['r', 'b', 'k', 'g']
 
-# Plotting
+# Plot peak vorticities
 fig, axes = plt.subplots(figsize=(10, 5))
-for dxfarm, colour in zip(resolutions, colours):
+label = r"$\Delta x_{\mathrm{farm}} = %d \mathrm m$"
+for dxfarm in resolutions:
+    resolutions[dxfarm]['data'] = {}
     try:
-        vorticity_min = np.load(fname.format('min', dxfarm))
-        vorticity_max = np.load(fname.format('max', dxfarm))
+        resolutions[dxfarm]['data']['min'] = np.load(fname.format('min', dxfarm))
+        resolutions[dxfarm]['data']['max'] = np.load(fname.format('max', dxfarm))
         resolutions_used.append(dxfarm)
     except FileNotFoundError:
         print("Need to extract peak vorticity for dxfarm = {:d}".format(dxfarm))
         continue
-    axes.plot(time, vorticity_max, color=colour, label=r"$\Delta x_{\mathrm{farm}} = %d$" % dxfarm)
-    axes.plot(time, vorticity_min, '-.', color=colour)
+    colour = resolutions[dxfarm]['colour']
+    data = resolutions[dxfarm]['data']
+    axes.plot(time, data['max'], color=colour, label=label % dxfarm)
+    axes.plot(time, data['min'], '-.', color=colour)
+axes.set_xlim([0, op.T_ramp/60])
 axes.grid(True)
 box = axes.get_position()
 axes.set_position([box.x0, box.y0, box.width, box.height * 0.9])
 axes.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=len(resolutions_used), fontsize=18)
 axes.set_xlabel(r"Time [$\mathrm h$]")
 axes.set_ylabel(r"Peak vorticity [$\mathrm s^{-1}$]")
-savefig("plots/peak_viscosity")
+savefig("plots/peak_vorticity")
+
+# Get non-dimensionalised time
+time = np.linspace(0, op.T_ramp/op.T_tide, num_timesteps)
+
+# Plot relative peak vorticities
+fig, axes = plt.subplots(figsize=(10, 5))
+for dxfarm in resolutions_used:
+    colour = resolutions[dxfarm]['colour']
+    data = resolutions[dxfarm]['data']
+    axes.plot(time, data['max']/data['max'].max(), color=colour, label=label % dxfarm)
+    axes.plot(time, data['min']/np.abs(data['min']).max(), '-.', color=colour)
+axes.set_xlim([0, op.T_ramp/op.T_tide])
+axes.set_xticks(np.linspace(0, 3.5, 8))
+axes.set_yticks(np.linspace(-1, 1, 9))
+axes.grid(True)
+box = axes.get_position()
+axes.set_position([box.x0, box.y0, box.width, box.height * 0.9])
+axes.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=len(resolutions_used), fontsize=18)
+axes.set_xlabel(r"Time/Tidal period")
+axes.set_ylabel(r"Relative peak vorticity")
+savefig("plots/relative_peak_vorticity")
