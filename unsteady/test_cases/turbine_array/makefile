@@ -2,7 +2,7 @@ all: clean mesh plot
 
 mesh:
 	@echo "Generating Delauney meshes of turbine array domain..."
-	@mkdir resources
+	@mkdir -p resources
 	@python3 meshgen.py 0
 	@cd resources && gmsh -2 channel_box_0.geo
 	@python3 meshgen.py 1
