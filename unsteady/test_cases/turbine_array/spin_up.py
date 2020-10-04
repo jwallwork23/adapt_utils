@@ -23,6 +23,7 @@ parser.add_argument("-plot_png", help="Toggle plotting to .png")
 parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
 parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
 parser.add_argument("-plot_only", help="Just plot using saved data")
+parser.add_argument("-plot_power_only", help="Just plot using saved data")
 args = parser.parse_args()
 
 
@@ -34,6 +35,9 @@ plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
 plot_all = bool(args.plot_all or False)
 plot_only = bool(args.plot_only or False)
+plot_power_only = bool(args.plot_power_only or False)
+if plot_power_only:
+    plot_only = True
 if plot_only:
     plot_all = True
 if plot_all:
@@ -66,7 +70,9 @@ swp = AdaptiveTurbineProblem(op, callback_dir=op.di, ramp_dir=op.di)
 
 # --- Run forward model; export solution tuple and QoI timeseries
 
-if plot_only:
+if plot_power_only:
+    pass
+elif plot_only:
     swp.load_state(0, op.di)
 else:
     cpu_timestamp = perf_counter()
@@ -151,6 +157,8 @@ secax.set_xlabel("Time/Tidal period")
 
 # Save
 savefig("columnar_power_output_ramp", plot_dir, extensions=extensions)
+if plot_power_only:
+    sys.exit(0)
 
 
 # --- Plot the spun-up hydrodynamics
