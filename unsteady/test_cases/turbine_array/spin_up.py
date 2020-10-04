@@ -14,6 +14,7 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
+parser.add_argument("-level", help="Mesh resolution level in turbine region")
 parser.add_argument("-max_reynolds_number", help="Maximum tolerated mesh Reynolds number")
 parser.add_argument("-base_viscosity", help="Base viscosity (default 1).")
 parser.add_argument("-target_viscosity", help="Target viscosity (defaults to base value)")
@@ -30,6 +31,7 @@ args = parser.parse_args()
 # --- Set parameters
 
 approach = 'fixed_mesh'
+level = int(args.level or 0)
 plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
@@ -51,6 +53,7 @@ if plot_png:
 base_viscosity = float(args.base_viscosity or 1.0)
 kwargs = {
     'approach': approach,
+    'level': level,
     'target_viscosity': float(args.target_viscosity or base_viscosity),
     'plot_pvd': plot_pvd,
 }
