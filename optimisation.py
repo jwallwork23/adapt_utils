@@ -8,6 +8,7 @@ from adapt_utils.misc import prod
 __all__ = ["taylor_test", "StagnationError"]
 
 
+# TODO: Taylor test gradient using Frobenius norm as QoI
 def taylor_test(function, gradient, m, delta_m=None, verbose=False, ratio_tol=3.95):
     """
     Apply a 'Taylor test' to verify that the provided `gradient` function is a consistent
