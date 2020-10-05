@@ -24,9 +24,9 @@ code += "D = {:.0f};\n".format(op.turbine_diameter)
 code += "d = {:.0f};\n".format(op.turbine_width)
 code += "deltax = 10*D;\ndeltay = 7.5*D;\n"
 code += "dx = 100;\n"
-dxfarm = 24*0.5**level
-code += "dxfarm = {:.0f};\n".format(dxfarm)
-code += "dxturbine = {:.0f};\n".format(min(dxfarm, 6))
+dxfarm = [24, 12, 6, 5, 4, 3][level]
+code += "dxfarm = {:.1f};\n".format(dxfarm)
+code += "dxturbine = {:.1f};\n".format(min(dxfarm, 6))
 
 # Channel geometry
 code += """

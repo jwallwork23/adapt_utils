@@ -16,7 +16,10 @@ num_timesteps = int(op.T_ramp/op.dt/op.dt_per_export) + 1
 time = np.linspace(0, op.T_ramp/60, num_timesteps)
 
 # Plotting parameters
-resolutions = {24: {'colour': 'r'}, 12: {'colour': 'b'}, 6: {'colour': 'k'}, 3: {'colour': 'g'}}
+resolutions = {
+    24: {'colour': 'r'}, 12: {'colour': 'b'}, 6: {'colour': 'k'},
+    5: {'colour': 'g'}, 4: {'colour': 'y'}, 3: {'colour': 'o'},
+}
 resolutions_used = []
 
 # Plot peak vorticities

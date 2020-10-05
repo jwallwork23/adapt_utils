@@ -49,11 +49,12 @@ plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
 # --- Plot energy output over last tidal cycle in spin up  # TODO: First cycle of actual simulation
 
-elements = [24294, 33118, 50782, 184896]  # TODO: Automate
+resolutions = [24, 12, 6, 5, 4, 3]
+elements = [24726, 33682, 51610, 58816, 149794, 186374]  # TODO: Automate
 elements_used = []
 columnar_energy_megajoules = []
 array_energy_megajoules = []
-for i, dxfarm in enumerate([24, 12, 6, 3]):
+for i, dxfarm in enumerate(resolutions):
     di = ramp_dir.format(dxfarm)
 
     # Load power output data
