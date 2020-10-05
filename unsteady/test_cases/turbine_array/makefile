@@ -11,6 +11,10 @@ mesh:
 	@cd resources && gmsh -2 channel_box_2.geo
 	@python3 meshgen.py 3
 	@cd resources && gmsh -2 channel_box_3.geo
+	@python3 meshgen.py 4
+	@cd resources && gmsh -2 channel_box_4.geo
+	@python3 meshgen.py 5
+	@cd resources && gmsh -2 channel_box_5.geo
 
 spin_up:
 	@echo "Spinning up hydrodynamics..."
