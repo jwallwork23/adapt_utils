@@ -129,15 +129,21 @@ axes.plot(time_hours, array_power_kilowatts, color="grey")
 axes.set_xlabel(r"Time [$\mathrm h$]")
 axes.set_ylabel(r"Array power output [$\mathrm{kW}$]")
 axes.set_xlim([0, op.T_ramp/3600])
-
-# Add second x-axis with non-dimensionalised time
 non_dimensionalise = lambda time: 3600*time/op.T_tide
 dimensionalise = lambda time: 3600*time*op.T_tide
 secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
 secax.set_xlabel("Time/Tidal period")
-
-# Save
 savefig("array_power_output_ramp", plot_dir, extensions=extensions)
+
+# Plot relative to peak
+fig, axes = plt.subplots(figsize=(8, 3.5))
+axes.plot(time_hours, array_power_watts/array_power_watts.max(), color="grey")
+axes.set_xlabel(r"Time [$\mathrm h$]")
+axes.set_ylabel("Power relative to peak")
+axes.set_xlim([0, op.T_ramp/3600])
+secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
+secax.set_xlabel("Time/Tidal period")
+savefig("array_relative_power_output_ramp", plot_dir, extensions=extensions)
 
 
 # --- Plot power timeseries of each column of the array
@@ -152,12 +158,8 @@ axes.set_xlabel(r"Time [$\mathrm h$]")
 axes.set_ylabel(r"Power output [$\mathrm{kW}$]")
 axes.set_xlim([0.5*op.T_ramp/3600, op.T_ramp/3600])
 axes.legend(bbox_to_anchor=(1.05, 1.2), fontsize=16)
-
-# Add second x-axis with non-dimensionalised time
 secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
 secax.set_xlabel("Time/Tidal period")
-
-# Save
 savefig("columnar_power_output_ramp", plot_dir, extensions=extensions)
 if plot_power_only:
     sys.exit(0)

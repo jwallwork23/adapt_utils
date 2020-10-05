@@ -172,27 +172,37 @@ array_power_kilowatts = array_power_watts/1.0e+03
 
 # --- Plot power timeseries of whole array
 
+plot_dir = create_directory(os.path.join(os.path.dirname(__file__), "plots"))
+
 # Convert to appropriate units and plot
 fig, axes = plt.subplots(figsize=(6, 4))
 time_seconds = np.linspace(0, op.end_time, num_timesteps)
 time_hours = time_seconds/3600
 axes.plot(time_hours, array_power_kilowatts, color="grey")
-axes.set_xlabel("Time [h]")
-axes.set_ylabel("Array power output [kW]")
+axes.set_xlabel(r"Time [$\mathrm h$]")
+axes.set_ylabel(r"Array power output [$\mathrm{kW}$]")
 axes.set_xlim([0, op.end_time/3600])
-
-# Add second x-axis with non-dimensionalised time
 non_dimensionalise = lambda time: 3600*time/op.T_tide
 dimensionalise = lambda time: 3600*time*op.T_tide
 secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
 secax.set_xlabel("Time/Tidal period")
-
-# Save
-plot_dir = create_directory(os.path.join(os.path.dirname(__file__), "plots"))
 fname = approach
 if args.extension is not None:
     fname = '_'.join([fname, args.extension])
 savefig('_'.join([fname, "array_power_output"]), plot_dir, extensions=extensions)
+
+# Plot power relative to peak
+fig, axes = plt.subplots(figsize=(6, 4))
+axes.plot(time_hours, array_power_watts/array_power_watts.max(), color="grey")
+axes.set_xlabel(r"Time [$\mathrm h$]")
+axes.set_ylabel("Power relative to peak")
+axes.set_xlim([0, op.end_time/3600])
+secax = axes.secondary_xaxis('top', functions=(non_dimensionalise, dimensionalise))
+secax.set_xlabel("Time/Tidal period")
+fname = approach
+if args.extension is not None:
+    fname = '_'.join([fname, args.extension])
+savefig('_'.join([fname, "array_relative_power_output"]), plot_dir, extensions=extensions)
 
 
 # --- Plot power timeseries of each column of the array

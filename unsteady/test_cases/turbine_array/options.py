@@ -106,7 +106,7 @@ class TurbineArrayOptions(TurbineOptions):
         nu_tgt = self.target_viscosity
         nu_base = self.base_viscosity
         if np.isclose(nu_tgt, nu_base):
-            nu.interpolate(nu_base)
+            nu.assign(nu_base)
             return nu
 
         # Distance functions
