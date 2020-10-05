@@ -172,6 +172,12 @@ class CoupledOptions(Options):
         #     ---------------- ------------ ----------------
         self.solver_parameters = {
             "shallow_water": {
+                "snes_type": "newtonls",
+                # "snes_linesearch_type": "bt",  # old Firedrake default
+                "snes_linesearch_type": "basic",  # new Firedrake default
+                # "snes_linesearch_type": "l2",
+                # "snes_linesearch_type": "cp",
+                # "snes_linesearch_type": "nleqerr",
                 "ksp_type": "gmres",
                 "pc_type": "fieldsplit",
                 "pc_fieldsplit_type": "multiplicative",
