@@ -120,7 +120,6 @@ op.di = create_directory(os.path.join(os.path.dirname(__file__), "outputs", appr
 if args.extension is not None:
     op.di = "_".join([op.di, args.extension])
 op.spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
-sea_water_density = 1030.0
 
 
 # --- Run model
@@ -158,7 +157,7 @@ for i, turbine in enumerate(op.farm_ids):
         if not os.path.exists(fname):
             raise IOError("Need to run the model in order to get power output timeseries.")
         timeseries = np.append(timeseries, np.load(fname))
-    power_watts[i] = np.append(power_watts[i], timeseries*sea_water_density)
+    power_watts[i] = np.append(power_watts[i], timeseries*op.sea_water_density)
 num_timesteps = len(power_watts[0])
 power_watts = np.array(power_watts).reshape((3, 5, num_timesteps))
 

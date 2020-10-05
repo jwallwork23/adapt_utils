@@ -40,12 +40,11 @@ data_dir = create_directory(os.path.join(os.path.dirname(__file__), "data"))
 ramp_dir = create_directory(os.path.join(data_dir, "ramp"))
 data_dir = create_directory(os.path.join(data_dir, approach))
 spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
-sea_water_density = 1030.0
 power_watts = [np.array([]) for i in range(15)]
 if spun:
     for i, turbine in enumerate(op.farm_ids):
         fname = os.path.join(ramp_dir, "power_output_{:d}.npy".format(turbine))
-        power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
+        power_watts[i] = np.append(power_watts[i], np.load(fname)*op.sea_water_density)
 else:
     op.end_time += op.T_ramp
 
