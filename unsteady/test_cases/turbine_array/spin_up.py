@@ -100,12 +100,11 @@ plt.rc('font', **{'size': 18})
 
 # Load power output data
 op.spun = np.all([os.path.isfile(os.path.join(op.di, f + ".h5")) for f in ('velocity', 'elevation')])
-sea_water_density = 1030.0
 power_watts = [np.array([]) for i in range(15)]
 if op.spun:
     for i, turbine in enumerate(op.farm_ids):
         fname = os.path.join(op.di, "power_output_{:d}_00000.npy".format(turbine))
-        power_watts[i] = np.append(power_watts[i], np.load(fname)*sea_water_density)
+        power_watts[i] = np.append(power_watts[i], np.load(fname)*op.sea_water_density)
 else:
     raise ValueError("Spin-up data not found.")
 num_timesteps = len(power_watts[0])
@@ -127,8 +126,8 @@ fig, axes = plt.subplots(figsize=(8, 3.5))
 time_seconds = np.linspace(0, op.T_ramp, num_timesteps)
 time_hours = time_seconds/3600
 axes.plot(time_hours, array_power_kilowatts, color="grey")
-axes.set_xlabel("Time [h]")
-axes.set_ylabel("Array power output [kW]")
+axes.set_xlabel(r"Time [$\mathrm h$]")
+axes.set_ylabel(r"Array power output [$\mathrm{kW}$]")
 axes.set_xlim([0, op.T_ramp/3600])
 
 # Add second x-axis with non-dimensionalised time
@@ -149,8 +148,8 @@ greys = ['k', 'dimgrey', 'grey', 'darkgrey', 'silver', 'lightgrey']
 for i, (linestyle, colour) in enumerate(zip(["-", "--", ":", "--", "-"], greys)):
     axes.plot(time_hours, columnar_power_kilowatts[i, :],
               label="{:d}".format(i+1), linestyle=linestyle, color=colour)
-axes.set_xlabel("Time [h]")
-axes.set_ylabel("Power output [kW]")
+axes.set_xlabel(r"Time [$\mathrm h$]")
+axes.set_ylabel(r"Power output [$\mathrm{kW}$]")
 axes.set_xlim([0.5*op.T_ramp/3600, op.T_ramp/3600])
 axes.legend(bbox_to_anchor=(1.05, 1.2), fontsize=16)
 

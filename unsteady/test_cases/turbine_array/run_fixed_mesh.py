@@ -72,7 +72,6 @@ op = TurbineArrayOptions(base_viscosity, **kwargs)
 if args.max_reynolds_number is not None:
     op.max_reynolds_number = float(args.max_reynolds_number)
 index_str = index_string(op.num_meshes)
-sea_water_density = 1030.0
 
 # Create directories and check if spun-up solution exists
 ramp_dir = os.path.join(os.path.dirname(__file__), "data", "ramp")
@@ -98,7 +97,7 @@ if not plot_only:
     cpu_time = perf_counter() - cpu_timestamp
     logstr = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours\n"
     logstr = logstr.format(cpu_time, cpu_time/60, cpu_time/3600)
-    energy_output = sea_water_density*swp.energy_output()
+    energy_output = op.sea_water_density*swp.energy_output()
     logstr += "Total energy output of array: {:.1f}J\n".format(energy_output)
     average_power_output = energy_output/op.end_time
     logstr += "Average power output of array: {:.1f}W".format(average_power_output)
@@ -126,7 +125,7 @@ for i, turbine in enumerate(op.farm_ids):
         if not os.path.exists(fname):
             raise IOError("Need to run the model in order to get power output timeseries.")
         timeseries = np.append(timeseries, np.load(fname))
-    power_watts[i] = np.append(power_watts[i], timeseries*sea_water_density)
+    power_watts[i] = np.append(power_watts[i], timeseries*op.sea_water_density)
 num_timesteps = len(power_watts[0])
 power_watts = np.array(power_watts).reshape((3, 5, num_timesteps))
 
