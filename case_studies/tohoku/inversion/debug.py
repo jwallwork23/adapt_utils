@@ -4,6 +4,7 @@ from firedrake_adjoint import *
 import numpy as np
 import os
 import scipy
+import sys
 
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
@@ -21,7 +22,7 @@ di = create_directory(os.path.join(dirname, 'box', 'outputs', 'realistic', 'disc
 kwargs = {
     'level': 0,
     'save_timeseries': True,
-    'end_time': 120,  # TODO: TEMP
+    # 'end_time': 120,  # TODO: TEMP
 
     # Spatial discretisation
     'family': 'dg-cg',
@@ -111,29 +112,74 @@ def adjoint_source(f):
 # Solve the forward problem / load data
 print_output("Run forward to get initial timeseries...")
 swp.clear_tape()
+m = op.control_parameters
+eta0 = source(m)
+pyadjoint_control = Control(eta0)
 u, eta = swp.fwd_solution.split()
 u.assign(0.0)
-eta.assign(source(op.control_parameters))
-pyadjoint_control = Control(eta)
+eta.assign(eta0)
 swp.setup_solver_forward_step(0)
 swp.solve_forward_step(0)
-J = swp.quantity_of_interest()
+# J = swp.quantity_of_interest()  # FIXME
+J = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
 
 # Define reduced functional and gradient functions
 Jhat = ReducedFunctional(J, pyadjoint_control)
 stop_annotating()
 
 
-def tsunami(eta0):
+# --- TEST CONSISTENCY OF REDUCED FUNCTIONAL EVALUATION
+
+# Change the control parameters
+for control in m:
+    control.assign(-control)
+
+# # Unroll tape
+# J = reduced_functional(m)
+#
+# By hand
+eta0 = source(m)
+# u, eta = swp.fwd_solution.split()
+# u.assign(0.0)
+# eta.assign(eta0)
+# swp.setup_solver_forward_step(0)
+# swp.solve_forward_step(0)
+# # JJ = swp.quantity_of_interest()
+# JJ = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
+#
+# # Check consistency
+# msg = "Pyadjoint disagrees with solve_forward: {:.8e} vs {:.8e}"
+# assert np.isclose(J, JJ), msg.format(J, JJ)
+# print_output("Tape unroll consistency test passed!")
+
+
+# --- TAYLOR TEST SOURCE
+
+# def source_reduced_functional(control_vector):
+#     S = source(control_vector)
+
+np.random.seed(0)
+# TODO
+# dm = m.copy()
+# dm[:] = np.random.rand(*dm.shape)
+# minconv = taylor_test(source_reduced_functional, m, dm, dJdm=dJdm)
+# assert minconv > 1.90
+# print_output("Taylor test for source passed!")
+
+
+# --- TAYLOR TEST TSUNAMI
+
+
+def tsunami(eta_init):
     """
     The tsunami propagation model.
 
     T: V -> R
     """
-    return Jhat(eta0)
+    return Jhat(eta_init)
 
 
-def adjoint_tsunami():
+def adjoint_tsunami():  # TODO: Do we need an arg?
     """
     Adjoint of the tsunami propagation model.
 
@@ -141,58 +187,6 @@ def adjoint_tsunami():
     """
     return Jhat.derivative()
 
-
-def reduced_functional(m):
-    """
-    Compose the source model and the tsunami propagation model.
-    """
-    J = tsunami(source(m))
-    print_output("functional {:15.8e}".format(J))
-    return J
-
-
-def gradient(m):
-    """
-    Compose the adjoint tsunami propagation and the adjoint source using the chain rule.
-    """
-    dJdm = adjoint_source(Jhat.derivative())
-    print_output(27*" " + "gradient {:15.8e}".format(vecnorm(dJdm, order=np.Inf)))
-    return dJdm
-
-
-# --- TEST CONSISTENCY OF REDUCED FUNCTIONAL EVALUATION
-
-# Change the control parameters
-m = op.control_parameters
-for control in m:
-    control.assign(-control)
-
-# Unroll tape
-J = reduced_functional(m)
-
-# By hand
-eta0 = source(m)
-u, eta = swp.fwd_solution.split()
-u.assign(0.0)
-eta.assign(eta0)
-swp.setup_solver_forward_step(0)
-swp.solve_forward_step(0)
-JJ = swp.quantity_of_interest()
-
-# Check consistency
-msg = "Pyadjoint disagrees with solve_forward: {:.8e} vs {:.8e}"
-assert np.isclose(J, JJ), msg.format(J, JJ)
-print_output("Tape unroll consistency test passed!")
-
-
-# --- TAYLOR TEST SOURCE
-
-np.random.seed(0)
-# TODO
-# print_output("Taylor test for source passed!")
-
-
-# --- TAYLOR TEST TSUNAMI
 
 deta0 = Function(eta0)
 deta0.dat.data[:] = np.random.rand(*deta0.dat.data.shape)
@@ -203,9 +197,29 @@ print_output("Taylor test for tsunami propagation passed!")
 
 # --- TAYLOR TEST COMPOSITION
 
+
+def reduced_functional(control_vector):
+    """
+    Compose the source model and the tsunami propagation model.
+    """
+    J = tsunami(source(control_vector))
+    print_output("functional {:15.8e}".format(J))
+    return J
+
+
+def gradient(control_vector):
+    """
+    Compose the adjoint tsunami propagation and the adjoint source using the chain rule.
+    """
+    dJdm = adjoint_source(adjoint_tsunami())  # TODO: args?
+    print_output(27*" " + "gradient {:15.8e}".format(vecnorm(dJdm, order=np.Inf)))
+    return dJdm
+
 # TODO
 # print_output("Taylor test for composition passed!")
 
+
+sys.exit(0)  # TODO: TEMP
 
 # --- OPTIMISATION
 
