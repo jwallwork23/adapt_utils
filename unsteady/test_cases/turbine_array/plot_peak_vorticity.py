@@ -33,8 +33,8 @@ for dxfarm in resolutions:
         continue
     colour = resolutions[dxfarm]['colour']
     data = resolutions[dxfarm]['data']
-    axes.plot(time, data['max'], color=colour, label=label % dxfarm)
-    axes.plot(time, data['min'], '-.', color=colour)
+    axes.plot(time, data['max'], color=colour, label=label % dxfarm, linewidth=1)
+    axes.plot(time, data['min'], '-.', color=colour, linewidth=1)
 axes.set_xlim([0, op.T_ramp/60])
 axes.grid(True)
 box = axes.get_position()
@@ -44,6 +44,10 @@ axes.set_xlabel(r"Time [$\mathrm h$]")
 axes.set_ylabel(r"Peak vorticity [$\mathrm s^{-1}$]")
 savefig("plots/peak_vorticity")
 
+# Plot over a single tidal cycle
+axes.set_xlim([(op.T_ramp - op.T_tide)/60, op.T_ramp/60])
+savefig("plots/peak_vorticity_cycle")
+
 # Get non-dimensionalised time
 time = np.linspace(0, op.T_ramp/op.T_tide, num_timesteps)
 
@@ -52,8 +56,8 @@ fig, axes = plt.subplots(figsize=(10, 5))
 for dxfarm in resolutions_used:
     colour = resolutions[dxfarm]['colour']
     data = resolutions[dxfarm]['data']
-    axes.plot(time, data['max']/data['max'].max(), color=colour, label=label % dxfarm)
-    axes.plot(time, data['min']/np.abs(data['min']).max(), '-.', color=colour)
+    axes.plot(time, data['max']/data['max'].max(), color=colour, label=label % dxfarm, linewidth=1)
+    axes.plot(time, data['min']/np.abs(data['min']).max(), '-.', color=colour, linewidth=1)
 axes.set_xlim([0, op.T_ramp/op.T_tide])
 axes.set_xticks(np.linspace(0, 3.5, 8))
 axes.set_yticks(np.linspace(-1, 1, 9))
@@ -64,3 +68,7 @@ axes.legend(loc='upper center', bbox_to_anchor=(0.5, 1.2), ncol=len(resolutions_
 axes.set_xlabel(r"Time/Tidal period")
 axes.set_ylabel(r"Relative peak vorticity")
 savefig("plots/relative_peak_vorticity")
+
+# Plot over a single tidal cycle
+axes.set_xlim([op.T_ramp/op.T_tide - 1, op.T_ramp/op.T_tide])
+savefig("plots/relative_peak_vorticity_cycle")
