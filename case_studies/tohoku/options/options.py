@@ -584,9 +584,6 @@ class TohokuInversionOptions(TohokuOptions):
         quadrature_weight = Constant(1.0)
         scaling = Constant(0.5*self.qoi_scaling)
 
-        # These will be updated by the checkpointing routine
-        u, eta = prob.fwd_solutions[i].split()
-
         # Account for timeseries shift
         # ============================
         #   This can be troublesome business. With synthetic data, we can actually get away with not
@@ -602,9 +599,10 @@ class TohokuInversionOptions(TohokuOptions):
             self.eta_init = Constant(0.0)
         else:
             # TODO: Use point evaluation once it is annotated
-            self.eta_init = Function(eta.function_space()).assign(eta)
+            self.eta_init = Function(eta)
 
-        mesh = eta.function_space().mesh()
+        u, eta = prob.fwd_solutions[i].split()
+        mesh = prob.meshes[i]
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
         for gauge in self.gauges:
             gauge_dat = self.gauges[gauge]
@@ -645,6 +643,7 @@ class TohokuInversionOptions(TohokuOptions):
             dt = self.dt
             t = t - dt
             quadrature_weight.assign(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
+            u, eta = prob.fwd_solutions[i].split()
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
                 I = gauge_dat["indicator"]
