@@ -623,14 +623,14 @@ class AdaptiveProblemBase(object):
             F -= 0.5*dt*inner(test, self.op.get_velocity(coords, t))*dx
 
             params = {
-                'mat_type': 'aij',
-                'snes_type': 'newtonls',
-                'snes_rtol': 1.0e-03,
-                # 'ksp_type': 'gmres',
-                'ksp_type': 'preonly',
-                # 'pc_type': 'sor',
-                'pc_type': 'lu',
-                'pc_type_factor_mat_solver_type': 'mumps',
+                # 'mat_type': 'aij',
+                'snes_type': 'ksponly',  # TODO: Reformulate as a linear system so not needed
+                'snes_rtol': 1.0e-08,
+                'ksp_type': 'gmres',
+                # 'ksp_type': 'preonly',
+                'pc_type': 'sor',
+                # 'pc_type': 'lu',
+                # 'pc_type_factor_mat_solver_type': 'mumps',
             }
             solve(F == 0, coords, solver_parameters=params)
 

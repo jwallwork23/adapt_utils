@@ -56,7 +56,7 @@ class TracerProblem(AdaptiveProblem):
     def quantity_of_interest(self):
         kernel = self.op.set_qoi_kernel_tracer(self, -1)
         sol = self.fwd_solutions_tracer[-1]
-        return assemble(kernel*sol*dx)
+        return assemble(kernel*sol*dx(degree=12))
 
 
 # Run model
@@ -68,16 +68,18 @@ assert np.allclose(init_coords, final_coords, atol=1.0e-02), "Non-matching initi
 
 # Print outputs
 f = open(os.path.join(tp.di, "{:s}_{:d}.log".format(geometry, n)), 'w+')
-head = "\n  Shape            Analytic QoI    Quadrature QoI  Calculated QoI  Error"
-rule = 74*'='
+head = "\n  Shape            Analytic QoI    Quadrature QoI  Calculated QoI  Error    Disc. error"
+rule = 90*'='
 write(head, f)
 write(rule, f)
 for shape, name in zip(range(3), ('Gaussian', 'Cone', 'Slotted cylinder')):
-    op.shape = shape
-    exact = op.exact_qoi()
+    op.set_region_of_interest(shape)
+    tp.op.set_qoi_kernel_tracer(tp, -1)
     qoi = tp.quantity_of_interest()
-    qois = (exact, op.quadrature_qoi(tp, -1), qoi, 100.0*abs(1.0 - qoi/exact))
-    line = "{:1d} {:16s} {:14.8e}  {:14.8e}  {:14.8e}  {:6.4f}%".format(shape, name, *qois)
+    exact = op.exact_qoi()
+    quadrature = op.quadrature_qoi(tp, -1)
+    qois = (exact, quadrature, qoi, 100*abs(1.0 - qoi/exact), 100*abs(1.0 - qoi/quadrature))
+    line = "{:1d} {:16s} {:14.8e}  {:14.8e}  {:14.8e}  {:6.4f}%  {:6.4f}%".format(shape, name, *qois)
     write(line, f)
 write(rule, f)
 approach = "'" + tp.approach.replace('_', ' ').capitalize() + "'"
