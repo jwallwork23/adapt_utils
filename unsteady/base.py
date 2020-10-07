@@ -623,14 +623,14 @@ class AdaptiveProblemBase(object):
             F -= 0.5*dt*inner(test, self.op.get_velocity(coords, t))*dx
 
             params = {
-                # 'mat_type': 'aij',
+                'mat_type': 'aij',
                 'snes_type': 'ksponly',  # TODO: Reformulate as a linear system so not needed
-                'snes_rtol': 1.0e-08,
-                'ksp_type': 'gmres',
-                # 'ksp_type': 'preonly',
-                'pc_type': 'sor',
-                # 'pc_type': 'lu',
-                # 'pc_type_factor_mat_solver_type': 'mumps',
+                'snes_rtol': 1.0e-03,
+                # 'ksp_type': 'gmres',
+                'ksp_type': 'preonly',
+                # 'pc_type': 'sor',
+                'pc_type': 'lu',
+                'pc_type_factor_mat_solver_type': 'mumps',
             }
             solve(F == 0, coords, solver_parameters=params)
 
@@ -644,7 +644,7 @@ class AdaptiveProblemBase(object):
         num_inverted = len(r[r < 0])
         if num_inverted > 0:
             import warnings
-            warnings.warn("WARNING: Mesh has {:d} inverted element(s)!".format(num_inverted))
+            warnings.warn("Mesh has {:d} inverted element(s)!".format(num_inverted))
 
     def move_mesh_monge_ampere(self, i):  # TODO: Annotation
         """
