@@ -3,8 +3,7 @@ from firedrake_adjoint import *
 
 import numpy as np
 import os
-import scipy
-import sys
+# import scipy
 
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
@@ -46,6 +45,12 @@ gaussian_scaling = 6.0
 op = TohokuBoxBasisOptions(**kwargs)
 op.dirty_cache = True
 gauges = list(op.gauges.keys())
+
+# Tests
+test_consistency = False
+taylor_test_source = False
+taylor_test_tsunami = False
+taylor_test_composition = True
 
 
 # --- Set initial guess
@@ -89,11 +94,11 @@ def source(m):
 
     S: R^N -> V
     """
-    fs = swp.V[0].sub(1)
-    S = Function(fs)
+    S = Function(swp.V[0].sub(1))
     assert len(m) == len(op.basis_functions)
     for m_i, phi_i in zip(m, op.basis_functions):
-        S += project(m_i*phi_i, fs)
+        # S.interpolate(S + m_i*phi_i)
+        S.project(S + m_i*phi_i)
     return S
 
 
@@ -105,26 +110,49 @@ def adjoint_source(f):
     """
     S_star = np.zeros(len(op.basis_functions))
     for i, phi_i in enumerate(op.basis_functions):
-        S_star[i] = assemble(phi_i*f*dx)
+        S_star[i] = np.dot(phi_i.dat.data, f.dat.data)
+        # S_star[i] = assemble(phi_i*f*dx(degree=12))
     return S_star
 
 
-# Solve the forward problem / load data
-print_output("Run forward to get initial timeseries...")
-swp.clear_tape()
+# Get initial surface
+tape = get_working_tape()
+tape.clear_tape()
 m = op.control_parameters
+box_controls = [Control(c) for c in m]
 eta0 = source(m)
 pyadjoint_control = Control(eta0)
+
+# Random search directions
+np.random.seed(0)
+deta0 = Function(eta0)
+deta0.dat.data[:] = np.random.rand(*deta0.dat.data.shape)
+dm = [Function(c) for c in m]
+for dmi in dm:
+    dmi.dat.data[0] = np.random.rand(1)
+
+
+# --- TAYLOR TEST SOURCE
+
+if taylor_test_source:
+    assert taylor_test(ReducedFunctional(assemble(inner(eta0, eta0)*dx), box_controls), m, dm) > 1.90
+
+
+# --- Tracing
+
+# Solve the forward problem
 u, eta = swp.fwd_solution.split()
 u.assign(0.0)
 eta.assign(eta0)
+print_output("Run forward to get initial timeseries...")
 swp.setup_solver_forward_step(0)
 swp.solve_forward_step(0)
 # J = swp.quantity_of_interest()  # FIXME
 J = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
 
-# Define reduced functional and gradient functions
+# Define reduced functionals
 Jhat = ReducedFunctional(J, pyadjoint_control)
+Jhat_box = ReducedFunctional(J, box_controls)
 stop_annotating()
 
 
@@ -134,40 +162,25 @@ stop_annotating()
 for control in m:
     control.assign(-control)
 
-# # Unroll tape
-# J = reduced_functional(m)
-#
-# By hand
 eta0 = source(m)
-# u, eta = swp.fwd_solution.split()
-# u.assign(0.0)
-# eta.assign(eta0)
-# swp.setup_solver_forward_step(0)
-# swp.solve_forward_step(0)
-# # JJ = swp.quantity_of_interest()
-# JJ = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
-#
-# # Check consistency
-# msg = "Pyadjoint disagrees with solve_forward: {:.8e} vs {:.8e}"
-# assert np.isclose(J, JJ), msg.format(J, JJ)
-# print_output("Tape unroll consistency test passed!")
+if test_consistency:
 
+    # Unroll tape
+    J = reduced_functional(m)
 
-# --- TAYLOR TEST SOURCE
+    # By hand
+    u, eta = swp.fwd_solution.split()
+    u.assign(0.0)
+    eta.assign(eta0)
+    swp.setup_solver_forward_step(0)
+    swp.solve_forward_step(0)
+    # JJ = swp.quantity_of_interest()
+    JJ = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
 
-# def source_reduced_functional(control_vector):
-#     S = source(control_vector)
-
-np.random.seed(0)
-# TODO
-# dm = m.copy()
-# dm[:] = np.random.rand(*dm.shape)
-# minconv = taylor_test(source_reduced_functional, m, dm, dJdm=dJdm)
-# assert minconv > 1.90
-# print_output("Taylor test for source passed!")
-
-
-# --- TAYLOR TEST TSUNAMI
+    # Check consistency
+    msg = "Pyadjoint disagrees with solve_forward: {:.8e} vs {:.8e}"
+    assert np.isclose(J, JJ), msg.format(J, JJ)
+    print_output("Tape unroll consistency test passed!")
 
 
 def tsunami(eta_init):
@@ -188,14 +201,11 @@ def adjoint_tsunami():  # TODO: Do we need an arg?
     return Jhat.derivative()
 
 
-deta0 = Function(eta0)
-deta0.dat.data[:] = np.random.rand(*deta0.dat.data.shape)
-minconv = taylor_test(Jhat, eta0, deta0)
-assert minconv > 1.90
-print_output("Taylor test for tsunami propagation passed!")
+# --- TAYLOR TEST TSUNAMI
 
-
-# --- TAYLOR TEST COMPOSITION
+if taylor_test_tsunami:
+    assert taylor_test(Jhat, eta0, deta0) > 1.90
+    print_output("Taylor test for tsunami propagation passed!")
 
 
 def reduced_functional(control_vector):
@@ -215,20 +225,28 @@ def gradient(control_vector):
     print_output(27*" " + "gradient {:15.8e}".format(vecnorm(dJdm, order=np.Inf)))
     return dJdm
 
-# TODO
-# print_output("Taylor test for composition passed!")
 
+# --- TAYLOR TEST COMPOSITION
 
-sys.exit(0)  # TODO: TEMP
+if taylor_test_composition:
+    assert taylor_test(Jhat_box, m, dm) > 1.90
+    print_output("Taylor test for composition passed!")
+
 
 # --- OPTIMISATION
 
-initial_guess = kwargs['control_parameters']
+def optimisation_callback(m):
+    # TODO: Save progress here
+    print_output("LINE SEARCH COMPLETE")
+
+
+print_output("Optimisation begin...")
 opt_kwargs = {
-    'fprime': gradient,
-    'callback': lambda _: print_output("LINE SEARCH COMPLETE"),
+    # 'fprime': gradient,
+    # 'callback': optimisation_callback,
     'maxiter': 1000,
     'gtol': 1.0e-04,
 }
-print_output("Optimisation begin...")
-optimised_value = scipy.optimize.fmin_bfgs(reduced_functional, initial_guess, **opt_kwargs)
+optimised_value = minimize(Jhat, method='BFGS', callback=optimisation_callback, options=opt_kwargs)
+# initial_guess = kwargs['control_parameters']
+# optimised_value = scipy.optimize.fmin_bfgs(reduced_functional, initial_guess, **opt_kwargs)

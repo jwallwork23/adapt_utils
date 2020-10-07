@@ -3,7 +3,7 @@ from firedrake_adjoint import *
 
 import numpy as np
 import os
-import scipy
+# import scipy
 
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
@@ -21,7 +21,7 @@ di = create_directory(os.path.join(dirname, 'box', 'outputs', 'realistic', 'disc
 kwargs = {
     'level': 0,
     'save_timeseries': True,
-    'end_time': 120,  # TODO: TEMP
+    # 'end_time': 120,  # TODO: TEMP
 
     # Spatial discretisation
     'family': 'dg-cg',
@@ -139,10 +139,7 @@ for dmi in dm:
 # --- TAYLOR TEST SOURCE
 
 if taylor_test_source:
-    J = assemble(inner(eta0, eta0)*dx)
-    Jhat = ReducedFunctional(J, box_controls)
-    minconv = taylor_test(Jhat, m, dm)
-    assert minconv > 1.90
+    assert taylor_test(ReducedFunctional(assemble(inner(eta0, eta0)*dx), box_controls), m, dm) > 1.90
 
 
 # --- Tracing
@@ -169,7 +166,7 @@ solver_obj.iterate()
 q = solver_obj.fields.solution_2d
 J = assemble(inner(q, q)*dx)
 
-# Define reduced functional and gradient functions
+# Define reduced functionals
 Jhat = ReducedFunctional(J, pyadjoint_control)
 Jhat_box = ReducedFunctional(J, box_controls)
 stop_annotating()
@@ -201,9 +198,6 @@ if test_consistency:
     print_output("Tape unroll consistency test passed!")
 
 
-# --- TAYLOR TEST TSUNAMI
-
-
 def tsunami(eta_init):
     """
     The tsunami propagation model.
@@ -222,13 +216,11 @@ def reverse_tsunami():  # TODO: Do we need an arg?
     return Jhat.derivative()
 
 
+# --- TAYLOR TEST TSUNAMI
+
 if taylor_test_tsunami:
-    minconv = taylor_test(Jhat, eta0, deta0)
-    assert minconv > 1.90
+    assert taylor_test(Jhat, eta0, deta0) > 1.90
     print_output("Taylor test for tsunami propagation passed!")
-
-
-# --- TAYLOR TEST COMPOSITION
 
 
 def reduced_functional(control_vector):
@@ -249,12 +241,14 @@ def gradient(control_vector):
     return dJdm
 
 
+# --- TAYLOR TEST COMPOSITION
+
 if taylor_test_composition:
-    minconv = taylor_test(Jhat_box, m, dm)
     # dJdm = np.dot(gradient(m), [dmi.dat.data[0] for dmi in dm])
     # # dJdm = sum(hi._ad_dot(di) for hi, di in zip(dm, gradient(m)))
     # minconv = taylor_test(reduced_functional, m, dm, dJdm=dJdm)
-    assert minconv > 1.90
+    # assert minconv > 1.90
+    assert taylor_test(Jhat_box, m, dm) > 1.90
     print_output("Taylor test for composition passed!")
 
 
@@ -265,12 +259,13 @@ def optimisation_callback(m):
     print_output("LINE SEARCH COMPLETE")
 
 
-initial_guess = kwargs['control_parameters']
+print_output("Optimisation begin...")
 opt_kwargs = {
-    'fprime': gradient,
-    'callback': optimisation_callback,
+    # 'fprime': gradient,
+    # 'callback': optimisation_callback,
     'maxiter': 1000,
     'gtol': 1.0e-04,
 }
-print_output("Optimisation begin...")
-optimised_value = scipy.optimize.fmin_bfgs(reduced_functional, initial_guess, **opt_kwargs)
+optimised_value = minimize(Jhat, method='BFGS', callback=optimisation_callback, options=opt_kwargs)
+# initial_guess = kwargs['control_parameters']
+# optimised_value = scipy.optimize.fmin_bfgs(reduced_functional, initial_guess, **opt_kwargs)
