@@ -21,7 +21,7 @@ di = create_directory(os.path.join(dirname, 'box', 'outputs', 'realistic', 'disc
 kwargs = {
     'level': 0,
     'save_timeseries': True,
-    # 'end_time': 120,  # TODO: TEMP
+    'end_time': 120,  # TODO: TEMP
 
     # Spatial discretisation
     'family': 'dg-cg',
@@ -49,7 +49,7 @@ gauges = list(op.gauges.keys())
 # Tests
 test_consistency = False
 taylor_test_source = False
-taylor_test_tsunami = False
+taylor_test_tsunami = True
 taylor_test_composition = True
 
 
@@ -116,8 +116,8 @@ def adjoint_source(f):
 
 
 # Get initial surface
-tape = get_working_tape()
-tape.clear_tape()
+# tape = get_working_tape()
+# tape.clear_tape()
 m = op.control_parameters
 box_controls = [Control(c) for c in m]
 eta0 = source(m)
@@ -140,19 +140,72 @@ if taylor_test_source:
 
 # --- Tracing
 
+P0_vec = VectorFunctionSpace(swp.mesh, "DG", 0)
+kernel = Function(P0_vec*swp.P0[0], name="QoI kernel")
+kernel_u, kernel_eta = kernel.split()
+kernel_u.assign(0.0)
+kernel_eta.assign(1.0)
+
+# quadrature_weight = Constant(1.0)
+# self.qoi_scaling = 1/(16*self.end_time)
+# scaling = Constant(0.5*self.qoi_scaling)
+
+# mesh = prob.meshes[i]
+# radius = 20.0e+03*pow(0.5, self.level)
+# for gauge in self.gauges:
+#     gauge_dat = self.gauges[gauge]
+
+#     x, y = gauge_dat["coords"]
+#     disc = ellipse([(x, y, radius)], mesh)
+#     area = assemble(disc*dx)
+#     gauge_dat["indicator"] = interpolate(disc/area, prob.P0[i])
+
+op.J = 0
+
+def update_forcings(t):
+    dt = op.dt
+    t = t - dt
+    # quadrature_weight.assign(0.5*dt if t < 0.5*dt or t >= op.end_time - 0.5*dt else dt)
+    # u, eta = swp.fwd_solution.split()
+    # for gauge in self.gauges:
+    #     I = gauge_dat["indicator"]
+    #     # op.J += assemble(scaling*quadrature_weight*I*eta*dx)
+    #     # op.J += assemble(I*eta*dx)
+    #     op.J += assemble(scaling*eta*dx)
+    # op.J = op.J + assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)  # WORKS
+    # op.J = op.J + assemble(inner(kernel, swp.fwd_solution)*dx)  # DOESN'T WORK
+    # op.J = op.J + assemble(swp.fwd_solution[1]*dx)
+    u, eta = swp.fwd_solution.split()
+    op.J = op.J + assemble(eta*dx)
+
 # Solve the forward problem
+print_output("Run forward to get initial timeseries...")
 u, eta = swp.fwd_solution.split()
 u.assign(0.0)
 eta.assign(eta0)
-print_output("Run forward to get initial timeseries...")
 swp.setup_solver_forward_step(0)
-swp.solve_forward_step(0)
-# J = swp.quantity_of_interest()  # FIXME
-J = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
+swp.solve_forward_step(0, update_forcings=update_forcings)
+J = swp.quantity_of_interest()  # FIXME
+# J = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
 
 # Define reduced functionals
-Jhat = ReducedFunctional(J, pyadjoint_control)
-Jhat_box = ReducedFunctional(J, box_controls)
+
+def derivative_cb_post(j, dj, c):
+    # djdm = vecnorm(dj, order=np.Inf)
+    # print_output("functional {:15.8e}  gradient {:15.8e}".format(j, djdm))
+    print_output("functional {:15.8e}".format(j))  # TODO: TEMP
+
+
+Jhat = ReducedFunctional(J, pyadjoint_control, derivative_cb_post=derivative_cb_post)
+
+
+def derivative_cb_post(j, dj, c):
+    djdm = [dji.dat.data[0] for dji in dj]
+    djdm = vecnorm(djdm, order=np.Inf)
+    print_output("functional {:15.8e}  gradient {:15.8e}".format(j, djdm))
+
+
+Jhat_box = ReducedFunctional(J, box_controls, derivative_cb_post=derivative_cb_post)
 stop_annotating()
 
 
@@ -173,9 +226,9 @@ if test_consistency:
     u.assign(0.0)
     eta.assign(eta0)
     swp.setup_solver_forward_step(0)
-    swp.solve_forward_step(0)
-    # JJ = swp.quantity_of_interest()
-    JJ = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
+    swp.solve_forward_step(0, update_forcings=update_forcings)
+    JJ = swp.quantity_of_interest()
+    # JJ = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
 
     # Check consistency
     msg = "Pyadjoint disagrees with solve_forward: {:.8e} vs {:.8e}"
@@ -247,6 +300,6 @@ opt_kwargs = {
     'maxiter': 1000,
     'gtol': 1.0e-04,
 }
-optimised_value = minimize(Jhat, method='BFGS', callback=optimisation_callback, options=opt_kwargs)
+optimised_value = minimize(Jhat_box, method='BFGS', callback=optimisation_callback, options=opt_kwargs)
 # initial_guess = kwargs['control_parameters']
 # optimised_value = scipy.optimize.fmin_bfgs(reduced_functional, initial_guess, **opt_kwargs)

@@ -511,8 +511,10 @@ class AdaptiveProblemBase(object):
 
         Should be implemented in derived class.
         """
-        assert hasattr(self.op, 'J')
-        return self.op.J
+        if hasattr(self.op, 'J'):
+            return self.op.J
+        else:
+            raise NotImplementedError("Should be implemented in derived class.")
 
     def save_to_checkpoint(self, i, f, mode='memory', **kwargs):
         """

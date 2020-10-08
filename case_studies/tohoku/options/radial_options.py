@@ -1,5 +1,4 @@
 from thetis import *
-from pyadjoint.tape import no_annotations
 
 import numpy as np
 import scipy
@@ -82,7 +81,6 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
             control.assign(control_value)
             self.control_parameters.append(control)
 
-    @no_annotations
     def get_basis_functions(self, fs):  # TODO: Implement radial basis functions other than Gaussians
         """
         Assemble an array of radial basis functions, rotated by specified angle.
@@ -144,7 +142,6 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
 
-    @no_annotations
     def project(self, prob, source):
         r"""
         Project a source field into the radial basis. This involves solving an auxiliary linear system.
@@ -200,7 +197,6 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         # Assign values
         self.assign_control_parameters(m, prob.meshes[0])
 
-    @no_annotations
     def interpolate(self, prob, source):
         r"""
         Interpolate a source field into the radial basis using point evaluation.

@@ -1,5 +1,4 @@
 from thetis import *
-from pyadjoint.tape import no_annotations
 
 import numpy as np
 
@@ -257,7 +256,6 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
             self.subtract_surface_from_bathymetry(prob, surf=surf)
         return surf
 
-    @no_annotations
     def get_basis_functions(self, prob=None):
         """
         Assemble a dictionary containing lists of Okada basis functions on each subfault.
@@ -535,7 +533,6 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
 
     # --- Projection and interpolation into Okada basis
 
-    @no_annotations
     def project(self, prob, source, maxiter=2, rtol=1.0e-02):
         """
         Project a source field into the Okada basis.

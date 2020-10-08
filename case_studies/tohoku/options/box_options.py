@@ -1,5 +1,4 @@
 from thetis import *
-from pyadjoint.tape import no_annotations
 
 import numpy as np
 
@@ -71,7 +70,6 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
             control.assign(control_value)
             self.control_parameters.append(control)
 
-    @no_annotations
     def get_basis_functions(self, fs):
         """
         Assemble an array of piecewise constant indicator functions, rotated by specified angle.
@@ -122,7 +120,6 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         # Subtract initial surface from the bathymetry field
         self.subtract_surface_from_bathymetry(prob)
 
-    @no_annotations
     def project(self, prob, source):
         """
         Project a source field into the box basis using a simple L2 projection.
@@ -159,7 +156,6 @@ class TohokuBoxBasisOptions(TohokuInversionOptions):
         # Assign values
         self.assign_control_parameters(m, prob.meshes[0])
 
-    @no_annotations
     def interpolate(self, prob, source):
         """
         Interpolate a source field into the box basis using point evaluation.

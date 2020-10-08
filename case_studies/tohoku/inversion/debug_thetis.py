@@ -266,6 +266,6 @@ opt_kwargs = {
     'maxiter': 1000,
     'gtol': 1.0e-04,
 }
-optimised_value = minimize(Jhat, method='BFGS', callback=optimisation_callback, options=opt_kwargs)
+optimised_value = minimize(Jhat_box, method='BFGS', callback=optimisation_callback, options=opt_kwargs)
 # initial_guess = kwargs['control_parameters']
 # optimised_value = scipy.optimize.fmin_bfgs(reduced_functional, initial_guess, **opt_kwargs)

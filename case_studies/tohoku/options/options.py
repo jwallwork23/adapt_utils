@@ -595,13 +595,13 @@ class TohokuInversionOptions(TohokuOptions):
         #   the best thing is to just use the initial surface *field*. This does modify the QoI, but
         #   it shouldn't be too much of a problem if the mesh is sufficiently fine (and hence the
         #   indicator regions are sufficiently small.
+        u, eta = prob.fwd_solutions[i].split()
         if self.synthetic:
             self.eta_init = Constant(0.0)
         else:
             # TODO: Use point evaluation once it is annotated
             self.eta_init = Function(eta)
 
-        u, eta = prob.fwd_solutions[i].split()
         mesh = prob.meshes[i]
         radius = 20.0e+03*pow(0.5, self.level)  # The finer the mesh, the smaller the region
         for gauge in self.gauges:
@@ -643,6 +643,7 @@ class TohokuInversionOptions(TohokuOptions):
             dt = self.dt
             t = t - dt
             quadrature_weight.assign(0.5*dt if t < 0.5*dt or t >= self.end_time - 0.5*dt else dt)
+            # FIXME: Quadrature weights should differ across gauges
             u, eta = prob.fwd_solutions[i].split()
             for gauge in self.gauges:
                 gauge_dat = self.gauges[gauge]
