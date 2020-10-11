@@ -21,7 +21,7 @@ di = create_directory(os.path.join(dirname, 'box', 'outputs', 'realistic', 'disc
 kwargs = {
     'level': 0,
     'save_timeseries': True,
-    # 'end_time': 120,  # TODO: TEMP
+    'end_time': 120,  # TODO: TEMP
 
     # Spatial discretisation
     'family': 'dg-cg',
@@ -47,9 +47,9 @@ op.dirty_cache = True
 gauges = list(op.gauges.keys())
 
 # Tests
-test_consistency = False
+# test_consistency = False
 taylor_test_source = False
-taylor_test_tsunami = False
+taylor_test_tsunami = True
 taylor_test_composition = True
 
 
@@ -79,16 +79,18 @@ with stop_annotating():
 
 # --- Tracing
 
-# Set initial guess
 op = TohokuBoxBasisOptions(**kwargs)
 mesh = op.default_mesh
+
+# Create P1DG-P2 space
 P1_vec = VectorFunctionSpace(mesh, "DG", 1)
 P1 = FunctionSpace(mesh, "CG", 1)
 P2 = FunctionSpace(mesh, "CG", 2)
 V = P1_vec*P2
+
+# Set initial guess
 print_output("Setting initial guess...")
 op.assign_control_parameters(kwargs['control_parameters'], mesh)
-# NOTE: If we are taking this route, then we don't actually need to use the R space
 op.get_basis_functions(P2)
 
 
@@ -104,19 +106,6 @@ def source(control_vector):
         # S.interpolate(S + m_i*phi_i)
         S.project(S + m_i*phi_i)
     return S
-
-
-def reverse_source(f):  # FIXME: Or just apply pyadjoint here, too
-    """
-    Adjoint of the source model: testing.
-
-    S*: V -> R^N
-    """
-    S_star = np.zeros(len(op.basis_functions))
-    for i, phi_i in enumerate(op.basis_functions):
-        S_star[i] = np.dot(phi_i.dat.data, f.dat.data)
-        # S_star[i] = assemble(phi_i*f*dx(degree=12))
-    return S_star
 
 
 # Get initial surface
@@ -145,16 +134,23 @@ if taylor_test_source:
 # --- Tracing
 
 # Create Thetis solver object
+# ===========================
+#  g = 9.81
+#  nu = 0
+#  f = 2*Omega_E*sin(lat)
+#  C_d = 0
+#  nonlinear = False
 print_output("Run forward to get initial timeseries...")
 solver_obj = solver2d.FlowSolver2d(mesh, op.set_bathymetry(P1))
 options = solver_obj.options
-options.use_nonlinear_equations = False
+options.use_nonlinear_equations = nonlinear
 options.element_family = op.family
 options.simulation_export_time = op.dt*op.dt_per_export
 options.simulation_end_time = op.end_time
 options.timestepper_type = op.timestepper
+options.use_lax_friedrichs_velocity = op.stabilisation == 'lax_friedrichs'
 options.timestep = op.dt
-options.horizontal_viscosity = None
+options.horizontal_viscosity = None  # problem is inviscid
 options.coriolis_frequency = op.set_coriolis(P1)
 solver_obj.assign_initial_conditions(elev=eta0)
 solver_obj.bnd_functions['shallow_water'] = {
@@ -162,13 +158,49 @@ solver_obj.bnd_functions['shallow_water'] = {
     200: {'un': Constant(0.0)},
     300: {'un': Constant(0.0)},
 }
-solver_obj.iterate()
-q = solver_obj.fields.solution_2d
-J = assemble(inner(q, q)*dx)
+options._isfrozen = False
+options.qoi = 0
+
+# Kernel function for elevation
+# kernel = Function(solver_obj.function_spaces.V_2d)
+# kernel.assign(solver_obj.fields.solution_2d)  # WORKS
+# indicator = Function(P0)
+# indicator.assign(2.0)
+# kernel.project(indicator*solver_obj.fields.solution_2d)  # WORKS
+
+P0 = FunctionSpace(mesh, "DG", 0)
+P0_vec = VectorFunctionSpace(mesh, "DG", 0)
+W = P0_vec*P0
+kernel = Function(W)
+
+test_u, test_eta = TestFunctions(W)
+trial_u, trial_eta = TrialFunctions(W)
+a = inner(test_u, trial_u)*dx + inner(test_eta, trial_eta)*dx
+L = inner(test_u, Constant(as_vector([0.0, 0.0])))*dx + inner(test_eta, Constant(1.0))*dx
+solve(a == L, kernel)  # DOESN'T WORK
+
+# kernel.assign(2.0)  # DOESN'T WORK
+# k_u, k_eta = kernel.split()
+# k_eta.assign(1.0)
+
+def update_forcings(t):
+    q = solver_obj.fields.solution_2d
+    # options.qoi = options.qoi + assemble(solver_obj.fields.elev_2d*dx)  # DOESN'T WORK
+    # options.qoi = options.qoi + assemble(inner(q, q)*dx)  # WORKS
+    # options.qoi = options.qoi + assemble(inner(kernel, q)*dx)  # WORKS if project sol
+    elev = project(inner(kernel, q), P1)
+    options.qoi = options.qoi + assemble(elev*dx)
+    # kernel.assign(q)
+    # options.qoi = options.qoi + assemble(inner(kernel, kernel)*dx)
+
+solver_obj.iterate(update_forcings=update_forcings)
+# q = solver_obj.fields.solution_2d
+# J = assemble(inner(q, q)*dx)
+J = options.qoi
 
 # Define reduced functionals
-Jhat = ReducedFunctional(J, pyadjoint_control)
 Jhat_box = ReducedFunctional(J, box_controls)
+Jhat = ReducedFunctional(J, pyadjoint_control)
 stop_annotating()
 
 
@@ -179,41 +211,23 @@ for control in m:
     control.assign(-control)
 
 eta0 = source(m)
-if test_consistency:
-
-    # Unroll tape
-    J = reduced_functional(m)
-
-    # By hand
-    u, eta = swp.fwd_solution.split()
-    u.assign(0.0)
-    eta.assign(eta0)
-    swp.setup_solver_forward_step(0)
-    swp.solve_forward_step(0)
-    JJ = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
-
-    # Check consistency
-    msg = "Pyadjoint disagrees with solve_forward: {:.8e} vs {:.8e}"
-    assert np.isclose(J, JJ), msg.format(J, JJ)
-    print_output("Tape unroll consistency test passed!")
-
-
-def tsunami(eta_init):
-    """
-    The tsunami propagation model.
-
-    T: V -> R
-    """
-    return Jhat(eta_init)
-
-
-def reverse_tsunami():  # TODO: Do we need an arg?
-    """
-    Adjoint of the tsunami propagation model.
-
-    T*: R -> V
-    """
-    return Jhat.derivative()
+# if test_consistency:
+# 
+#     # Unroll tape
+#     J = reduced_functional(m)
+# 
+#     # By hand
+#     u, eta = swp.fwd_solution.split()
+#     u.assign(0.0)
+#     eta.assign(eta0)
+#     swp.setup_solver_forward_step(0)
+#     swp.solve_forward_step(0)
+#     JJ = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
+# 
+#     # Check consistency
+#     msg = "Pyadjoint disagrees with solve_forward: {:.8e} vs {:.8e}"
+#     assert np.isclose(J, JJ), msg.format(J, JJ)
+#     print_output("Tape unroll consistency test passed!")
 
 
 # --- TAYLOR TEST TSUNAMI
@@ -221,24 +235,6 @@ def reverse_tsunami():  # TODO: Do we need an arg?
 if taylor_test_tsunami:
     assert taylor_test(Jhat, eta0, deta0) > 1.90
     print_output("Taylor test for tsunami propagation passed!")
-
-
-def reduced_functional(control_vector):
-    """
-    Compose the source model and the tsunami propagation model.
-    """
-    J = tsunami(source(control_vector))
-    print_output("functional {:15.8e}".format(J))
-    return J
-
-
-def gradient(control_vector):
-    """
-    Compose the adjoint tsunami propagation and the adjoint source using the chain rule.
-    """
-    dJdm = reverse_source(reverse_tsunami())  # TODO: args?
-    print_output(27*" " + "gradient {:15.8e}".format(vecnorm(dJdm, order=np.Inf)))
-    return dJdm
 
 
 # --- TAYLOR TEST COMPOSITION

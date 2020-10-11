@@ -162,9 +162,11 @@ kernel_eta.assign(1.0)
 
 op.J = 0
 
+kernel = Function(swp.fwd_solution)
+
 def update_forcings(t):
-    dt = op.dt
-    t = t - dt
+    # dt = op.dt
+    # t = t - dt
     # quadrature_weight.assign(0.5*dt if t < 0.5*dt or t >= op.end_time - 0.5*dt else dt)
     # u, eta = swp.fwd_solution.split()
     # for gauge in self.gauges:
@@ -173,10 +175,10 @@ def update_forcings(t):
     #     # op.J += assemble(I*eta*dx)
     #     op.J += assemble(scaling*eta*dx)
     # op.J = op.J + assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)  # WORKS
-    # op.J = op.J + assemble(inner(kernel, swp.fwd_solution)*dx)  # DOESN'T WORK
-    # op.J = op.J + assemble(swp.fwd_solution[1]*dx)
-    u, eta = swp.fwd_solution.split()
-    op.J = op.J + assemble(eta*dx)
+    op.J = op.J + assemble(inner(kernel, swp.fwd_solution)*dx)  # DOESN'T WORK
+    # op.J = op.J + assemble(swp.fwd_solution.split()[1]*dx)  # DOESN'T WORK
+    # op.J = op.J + assemble(swp.fwd_solution[1]*dx)  # DOESN'T WORK
+    # op.J = op.J + assemble(split(swp.fwd_solution)[1]*dx)  # DOESN'T WORK
 
 # Solve the forward problem
 print_output("Run forward to get initial timeseries...")
