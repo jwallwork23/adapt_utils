@@ -18,17 +18,17 @@ uniform: uniform_circle uniform_square
 
 uniform_circle:
 	@echo "Solving solid body rotation problem on circular domain..."
-	@python3 run_fixed_mesh.py -approach fixed_mesh -mesh_type circle -level 0
-	@python3 run_fixed_mesh.py -approach fixed_mesh -mesh_type circle -level 1
-	@python3 run_fixed_mesh.py -approach fixed_mesh -mesh_type circle -level 2
-	@python3 run_fixed_mesh.py -approach fixed_mesh -mesh_type circle -level 3
+	@python3 run_fixed_mesh.py -geometry circle -level 0
+	@python3 run_fixed_mesh.py -geometry circle -level 1
+	@python3 run_fixed_mesh.py -geometry circle -level 2
+	@python3 run_fixed_mesh.py -geometry circle -level 3
 
 uniform_square:
 	@echo "Solving solid body rotation problem on square domain..."
-	@python3 run_fixed_mesh.py -approach fixed_mesh -mesh_type square -level 0
-	@python3 run_fixed_mesh.py -approach fixed_mesh -mesh_type square -level 1
-	@python3 run_fixed_mesh.py -approach fixed_mesh -mesh_type square -level 2
-	@python3 run_fixed_mesh.py -approach fixed_mesh -mesh_type square -level 3
+	@python3 run_fixed_mesh.py -geometry square -level 0
+	@python3 run_fixed_mesh.py -geometry square -level 1
+	@python3 run_fixed_mesh.py -geometry square -level 2
+	@python3 run_fixed_mesh.py -geometry square -level 3
 
 print_circle:
 	@cat outputs/fixed_mesh/circle_1.log
@@ -46,12 +46,12 @@ plot: plot_circle plot_square
 
 plot_circle:
 	@echo "Plotting convergence for circular domain..."
-	@python3 plot_convergence.py -mesh_type circle
+	@python3 plot_convergence.py -geometry circle
 	@gio open outputs/fixed_mesh/convergence_circle.pdf
 
 plot_square:
 	@echo "Plotting convergence for square domain..."
-	@python3 plot_convergence.py -mesh_type square
+	@python3 plot_convergence.py -geometry square
 	@gio open outputs/fixed_mesh/convergence_square.pdf
 
 
