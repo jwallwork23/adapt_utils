@@ -79,7 +79,10 @@ class TracerEquation2D(Equation):
         self.add_term(HorizontalAdvectionTerm(*args), 'explicit')
         self.add_term(HorizontalDiffusionTerm(*args), 'explicit')
         self.add_term(thetis_tracer.SourceTerm(*args), 'source')
-        self.add_term(thetis_tracer.SinkTerm(*args), 'source')
+        try:
+            self.add_term(thetis_tracer.SinkTerm(*args), 'source')
+        except Exception:
+            print_output("WARNING: Cannot import SinkTerm.")
 
 
 class ConservativeTracerEquation2D(Equation):
@@ -98,4 +101,7 @@ class ConservativeTracerEquation2D(Equation):
         self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
         self.add_term(thetis_cons_tracer.ConservativeHorizontalDiffusionTerm(*args), 'explicit')
         self.add_term(thetis_cons_tracer.ConservativeSourceTerm(*args), 'source')
-        self.add_term(thetis_cons_tracer.ConservativeSinkTerm(*args), 'source')
+        try:
+            self.add_term(thetis_cons_tracer.ConservativeSinkTerm(*args), 'source')
+        except Exception:
+            print_output("WARNING: Cannot import ConservativeSinkTerm.")
