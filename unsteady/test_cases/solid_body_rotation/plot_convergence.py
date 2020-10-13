@@ -5,7 +5,7 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-approach", help="Choose adaptive approach")
-parser.add_argument("-mesh_type", help="Choose from 'circle' or 'square'")
+parser.add_argument("-geometry", help="Choose from 'circle' or 'square'")
 args = parser.parse_args()
 
 plt.rc('text', usetex=True)
@@ -14,7 +14,7 @@ fontsize = 18
 legend_fontsize = 16
 kwargs = {'linestyle': '--', 'marker': 'x'}
 
-mesh_type = args.mesh_type or 'circle'
+geometry = args.geometry or 'circle'
 approach = args.approach or 'fixed_mesh'
 
 shapes = ('Gaussian', 'Cone', 'Slotted Cylinder')
@@ -25,7 +25,7 @@ dat = {}
 for shape in shapes:
     dat[shape] = {'qois': [], 'errors': []}
 for n in (1, 2, 4, 8):
-    with open(os.path.join('outputs', approach, '{:s}_{:d}.log'.format(mesh_type, n)), 'r') as f:
+    with open(os.path.join('outputs', approach, '{:s}_{:d}.log'.format(geometry, n)), 'r') as f:
         f.readline()
         f.readline()
         f.readline()
@@ -55,4 +55,4 @@ format_spec = lambda l: r"{:.3f}\%".format(l) if l < 1.0 else r"{:.1f}\%".format
 ax.set_yticklabels([format_spec(l) for l in ax.get_yticks().tolist()])
 plt.legend(fontsize=legend_fontsize)
 plt.tight_layout()
-plt.savefig(os.path.join('outputs', approach, 'convergence_{:s}.pdf'.format(mesh_type)))
+plt.savefig(os.path.join('outputs', approach, 'convergence_{:s}.pdf'.format(geometry)))
