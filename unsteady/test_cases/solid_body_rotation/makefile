@@ -22,6 +22,7 @@ uniform_circle:
 	@python3 run_fixed_mesh.py -geometry circle -level 1
 	@python3 run_fixed_mesh.py -geometry circle -level 2
 	@python3 run_fixed_mesh.py -geometry circle -level 3
+	@python3 run_fixed_mesh.py -geometry circle -level 4
 
 uniform_square:
 	@echo "Solving solid body rotation problem on square domain..."
@@ -29,18 +30,21 @@ uniform_square:
 	@python3 run_fixed_mesh.py -geometry square -level 1
 	@python3 run_fixed_mesh.py -geometry square -level 2
 	@python3 run_fixed_mesh.py -geometry square -level 3
+	@python3 run_fixed_mesh.py -geometry square -level 4
 
 print_circle:
 	@cat outputs/fixed_mesh/circle_1.log
 	@cat outputs/fixed_mesh/circle_2.log
 	@cat outputs/fixed_mesh/circle_4.log
 	@cat outputs/fixed_mesh/circle_8.log
+	@cat outputs/fixed_mesh/circle_16.log
 
 print_square:
 	@cat outputs/fixed_mesh/square_1.log
 	@cat outputs/fixed_mesh/square_2.log
 	@cat outputs/fixed_mesh/square_4.log
 	@cat outputs/fixed_mesh/square_8.log
+	@cat outputs/fixed_mesh/square_16.log
 
 plot: plot_circle plot_square
 
