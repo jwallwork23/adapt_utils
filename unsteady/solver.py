@@ -451,7 +451,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Stabilisation
         eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = None
         if self.stabilisation is None:
-            eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = None
             return
         elif self.stabilisation == 'lax_friedrichs':
             assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')
@@ -459,10 +458,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
             eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
         elif self.stabilisation == 'su':
             assert family == 'cg'
-            eq_options[i]['su_stabilisation_parameter'] = op.su_stabilisation_parameter  # TODO: Allow mesh dependent
+            eq_options[i]['su_stabilisation'] = True
         elif self.stabilisation == 'supg':
             assert family == 'cg'
-            eq_options[i]['supg_stabilisation_parameter'] = op.supg_stabilisation_parameter  # TODO: Allow mesh dependent
+            assert self.op.timestepper == 'SteadyState'  # TODO
+            eq_options[i]['supg_stabilisation'] = True
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
@@ -984,9 +984,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         elif self.stabilisation == 'su':
-            fields['su_stabilisation_parameter'] = self.tracer_options[i].su_stabilisation_parameter
+            fields['su_stabilisation'] = True
         elif self.stabilisation == 'supg':
-            fields['supg_stabilisation_parameter'] = self.tracer_options[i].supg_stabilisation_parameter
+            fields['supg_stabilisation'] = True
         return fields
 
     def _get_fields_for_sediment_timestepper(self, i):

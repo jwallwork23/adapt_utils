@@ -43,6 +43,9 @@ for level in range(num_levels):
 
     # Solve PDE
     op = PointDischarge2dOptions(level=level, aligned=True)
+    op.tracer_family = args.family
+    op.stabilisation = args.stabilisation
+    op.use_automatic_sipg_parameter = auto_sipg
     tp = AdaptiveSteadyProblem(op)
     tp.solve_forward()
 

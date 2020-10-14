@@ -35,10 +35,15 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
                 return -f
             f += self.test*dot(uv, grad(solution))*dx
 
-            # Apply SU stabilisation
-            tau = fields.get('su_stabilisation_parameter')
+            # Apply SU / SUPG stabilisation
+            tau = fields.get('su_stabilisation')
+            if tau is None:
+                tau = fields.get('supg_stabilisation')
             if tau is not None:
-                f += dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
+                h = CellSize(solution.function_space().mesh())
+                tau = 0.5*h/sqrt(dot(uv, uv))
+                f += tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
+
             return -f
 
 
@@ -50,14 +55,18 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
             args = (solution, solution_old, fields, fields_old, )
             return super(HorizontalDiffusionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
         else:
+
+            # Get diffusion tensor etc.
             diffusivity_h = fields_old['diffusivity_h']
             diff_tensor = as_matrix([[diffusivity_h, 0, ],
                                      [0, diffusivity_h, ]])
             diff_flux = dot(diff_tensor, grad(solution))
 
+            # Element interior term
             f = 0
             f += inner(grad(self.test), diff_flux)*self.dx
 
+            # Apply boundary conditions
             if bnd_conditions is not None:
                 for bnd_marker in self.boundary_markers:
                     funcs = bnd_conditions.get(bnd_marker)
@@ -67,7 +76,40 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
                         f += -self.test*funcs['diff_flux']*ds_bnd
                     else:
                         f += -self.test*solution*ds_bnd
+
+            # Apply SUPG stabilisation
+            uv = fields_old.get('uv_2d')
+            if uv is None:
+                return -f
+            tau = fields.get('supg_stabilisation')
+            if tau is not None:
+                h = CellSize(solution.function_space().mesh())
+                tau = 0.5*h/sqrt(dot(uv, uv))
+                f += -tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
+
             return -f
+
+
+class SourceTerm(thetis_tracer.SourceTerm):
+    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        source = fields_old.get('source')
+        if source is None:
+            return 0
+        args = (solution, solution_old, fields, fields_old, )
+        f = -super(SourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+
+        # Apply SUPG stabilisation
+        if not self.horizontal_dg:
+            uv = fields_old.get('uv_2d')
+            if uv is None:
+                return -f
+            tau = fields.get('supg_stabilisation')
+            if tau is not None:
+                h = CellSize(solution.function_space().mesh())
+                tau = 0.5*h/sqrt(dot(uv, uv))
+                f += -tau*dot(uv, grad(self.test))*source*dx
+
+        return -f
 
 
 # --- Modified terms for the conservative form
@@ -111,7 +153,7 @@ class TracerEquation2D(Equation):
         args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
         self.add_term(HorizontalAdvectionTerm(*args), 'explicit')
         self.add_term(HorizontalDiffusionTerm(*args), 'explicit')
-        self.add_term(thetis_tracer.SourceTerm(*args), 'source')
+        self.add_term(SourceTerm(*args), 'source')
         try:
             self.add_term(thetis_tracer.SinkTerm(*args), 'source')
         except Exception:
