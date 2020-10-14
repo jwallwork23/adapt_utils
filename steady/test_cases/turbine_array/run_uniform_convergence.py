@@ -9,7 +9,6 @@ from adapt_utils.steady.test_cases.turbine_array.options import TurbineArrayOpti
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
-parser.add_argument("-offset")
 parser.add_argument('-offset', help="""
     Number of turbine diameters by which to offset turbines in y-direction.
     'Aligned' configuration given by offset=0, 'Offset' configuration given by offset=1.

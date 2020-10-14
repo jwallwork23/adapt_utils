@@ -124,7 +124,7 @@ if plot_any:
 
 # --- Solve forward problem
 
-tp = AdaptiveSteadyTurbineProblem(op, discrete_turbines=discrete_turbines)
+tp = AdaptiveSteadyTurbineProblem(op, discrete_turbines=discrete_turbines, callback_dir=op.di)
 tp.solve_forward()
 op.print_debug("Power output: {:.4e}kW".format(tp.quantity_of_interest()/1000))  # TODO: MegaWatts?
 

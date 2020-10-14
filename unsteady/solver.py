@@ -121,6 +121,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Custom arrays
         self.reynolds_number = ReynoldsNumberArray(self.meshes, op)
 
+    @property
+    def mesh(self):
+        return self.meshes[0]
+
+    @property
+    def fwd_solution(self):
+        return self.fwd_solutions[0]
+
+    @property
+    def adj_solution(self):
+        return self.adj_solutions[0]
+
     def create_outfiles(self):
         if not self.op.plot_pvd:
             return

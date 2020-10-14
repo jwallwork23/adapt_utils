@@ -1,10 +1,11 @@
 from thetis import *
 
+from adapt_utils.io import index_string
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
 from adapt_utils.unsteady.swe.turbine.callback import PowerOutputCallback  # TODO: Move from unsteady
 
 
-+# NOTE: DUPLICATED IN adapt_utils/unsteady/swe/turbine/solver.py
+# NOTE: DUPLICATED IN adapt_utils/unsteady/swe/turbine/solver.py
 
 __all__ = ["AdaptiveSteadyTurbineProblem"]
 
@@ -31,13 +32,10 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):
         self.remove_turbines = kwargs.pop('remove_turbines', False)
         self.load_mesh = kwargs.pop('load_mesh', None)
         self.callback_dir = kwargs.pop('callback_dir', None)
-        self.ramp_dir = kwargs.pop('ramp_dir', None)
-        if self.ramp_dir is None and not self.op.spun:
-            raise ValueError("Spin-up data directory not found.")
-        super(AdaptiveTurbineProblem, self).__init__(*args, **kwargs)
+        super(AdaptiveSteadyTurbineProblem, self).__init__(*args, **kwargs)
 
     def setup_all(self):
-        super(AdaptiveTurbineProblem, self).setup_all()
+        super(AdaptiveSteadyTurbineProblem, self).setup_all()
         self.create_tidal_farms()
 
     def create_tidal_farms(self):
@@ -57,9 +55,7 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):
         op = self.op
         op.print_debug("SETUP: Creating tidal turbine farms...")
         num_turbines = op.num_turbines
-        self.farm_options = [TidalTurbineFarmOptions() for i in range(self.num_meshes)]
-        self.turbine_densities = [None for i in range(self.num_meshes)]
-        self.turbine_drag_coefficients = [None for i in range(self.num_meshes)]
+        self.farm_options = TidalTurbineFarmOptions()
         c_T = op.get_thrust_coefficient(correction=self.thrust_correction)
         if not self.discrete_turbines:
             shape = op.bump if self.smooth_indicators else op.box
@@ -70,26 +66,25 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):
             D = max(op.turbine_length, op.turbine_width)
             A_T = op.turbine_length, op.turbine_width
             print_output("#### TODO: Account for non-square turbines")  # TODO
-        for i, mesh in enumerate(self.meshes):
-            if self.discrete_turbines:  # TODO: Use length and width
-                self.turbine_densities[i] = Constant(1.0/D**2, domain=self.meshes[i])
-            else:
-                area = assemble(shape(self.meshes[i])*dx)
-                self.turbine_densities[i] = shape(self.meshes[i], scale=num_turbines/area)
+        if self.discrete_turbines:  # TODO: Use length and width
+            self.turbine_density = Constant(1.0/D**2, domain=self.mesh)
+        else:
+            area = assemble(shape(self.mesh)*dx)
+            self.turbine_density = shape(self.mesh, scale=num_turbines/area)
 
-            self.farm_options[i].turbine_density = self.turbine_densities[i]
-            self.farm_options[i].turbine_options.diameter = D
-            self.farm_options[i].turbine_options.thrust_coefficient = c_T
-            self.turbine_drag_coefficients[i] = 0.5*c_T*A_T*self.turbine_densities[i]
+        self.farm_options.turbine_density = self.turbine_density
+        self.farm_options.turbine_options.diameter = D
+        self.farm_options.turbine_options.thrust_coefficient = c_T
+        self.turbine_drag_coefficient = 0.5*c_T*A_T*self.turbine_density
 
-            self.shallow_water_options[i].tidal_turbine_farms = {
-                farm_id: self.farm_options[i] for farm_id in op.farm_ids
-            }
+        self.shallow_water_options[0].tidal_turbine_farms = {
+            farm_id: self.farm_options for farm_id in op.farm_ids
+        }
 
     # --- Quantity of Interest
 
     def add_callbacks(self, i):
-        super(AdaptiveTurbineProblem, self).add_callbacks(i)
+        super(AdaptiveSteadyTurbineProblem, self).add_callbacks(i)
         di = self.callback_dir
         if di is None:
             return
@@ -104,10 +99,12 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):
                 if farm_id != 'everywhere':
                     tag += '_{:d}'.format(farm_id)
                 tag += '_{:5s}'.format(index_string(i))
-                self.qoi += self.callbacks[i]['timestep'][tag].time_integrate()
+                self.qoi += self.callbacks[i]['timestep'][tag].timeseries[-1]
         return self.qoi
 
     def quantity_of_interest_form(self, i):
-        """Power output quantity of interest expressed as a UFL form."""
+        """
+        Power output quantity of interest expressed as a UFL form.
+        """
         u, eta = split(self.fwd_solutions[i])
         return self.turbine_drag_coefficients[i]*pow(inner(u, u), 1.5)*dx
