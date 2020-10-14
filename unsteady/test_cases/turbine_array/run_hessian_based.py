@@ -16,6 +16,7 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
+parser.add_argument("-level", help="Mesh resolution level in turbine region")
 
 # Physics
 parser.add_argument("-max_reynolds_number", help="Maximum tolerated mesh Reynolds number")
@@ -51,6 +52,7 @@ p = args.norm_order
 
 # --- Set parameters
 
+level = int(args.level or 0)
 approach = args.approach or 'hessian'
 if approach not in ('hessian', 'vorticity'):
     raise ValueError("Metric construction approach {:s} not recognised.".format(approach))
@@ -73,6 +75,7 @@ if plot_png:
 base_viscosity = float(args.base_viscosity or 1.0)
 kwargs = {
     'approach': approach,
+    'level': level,
 
     # Physics
     'target_viscosity': float(args.target_viscosity or base_viscosity),
