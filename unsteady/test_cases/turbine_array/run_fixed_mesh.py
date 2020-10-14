@@ -16,6 +16,7 @@ from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOp
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
+parser.add_argument("-level", help="Mesh resolution level in turbine region")
 parser.add_argument("-num_meshes", help="Number of meshes (for debugging)")
 parser.add_argument("-end_time", help="End time of simulation in seconds")
 
@@ -41,6 +42,7 @@ args = parser.parse_args()
 # --- Set parameters
 
 approach = 'fixed_mesh'
+level = int(args.level or 0)
 load_mesh = None if args.load_mesh is None else 'plex'
 plot_pvd = bool(args.plot_pvd or False)
 plot_pdf = bool(args.plot_pdf or False)
@@ -60,6 +62,7 @@ if plot_png:
 base_viscosity = float(args.base_viscosity or 0.0)
 kwargs = {
     'approach': approach,
+    'level': level,
     'num_meshes': int(args.num_meshes or 1),
     'target_viscosity': float(args.target_viscosity or base_viscosity),
     'plot_pvd': plot_pvd,
