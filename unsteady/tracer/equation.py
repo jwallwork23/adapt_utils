@@ -34,6 +34,11 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
             if uv is None:
                 return -f
             f += self.test*dot(uv, grad(solution))*dx
+
+            # Apply SU stabilisation
+            tau = fields.get('su_stabilisation_parameter')
+            if tau is not None:
+                f += dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
             return -f
 
 

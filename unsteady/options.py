@@ -85,6 +85,8 @@ class CoupledOptions(Options):
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)
     lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
+    su_stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
+    supg_stabilisation_parameter = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
     sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the tracer model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.

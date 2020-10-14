@@ -449,6 +449,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     op.print_debug(msg.format(model, i, v.min()[1], v.max()[1]))
 
         # Stabilisation
+        eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = None
         if self.stabilisation is None:
             eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = None
             return
@@ -458,10 +459,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
         elif self.stabilisation == 'su':
             assert family == 'cg'
-            raise NotImplementedError  # TODO
+            eq_options[i]['su_stabilisation_parameter'] = op.su_stabilisation_parameter  # TODO: Allow mesh dependent
         elif self.stabilisation == 'supg':
             assert family == 'cg'
-            raise NotImplementedError  # TODO
+            eq_options[i]['supg_stabilisation_parameter'] = op.supg_stabilisation_parameter  # TODO: Allow mesh dependent
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
@@ -982,6 +983,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
+        elif self.stabilisation == 'su':
+            fields['su_stabilisation_parameter'] = self.tracer_options[i].su_stabilisation_parameter
+        elif self.stabilisation == 'supg':
+            fields['supg_stabilisation_parameter'] = self.tracer_options[i].supg_stabilisation_parameter
         return fields
 
     def _get_fields_for_sediment_timestepper(self, i):
