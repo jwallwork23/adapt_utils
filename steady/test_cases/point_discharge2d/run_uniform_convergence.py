@@ -23,18 +23,20 @@ for level in range(num_levels):
     tp = AdaptiveSteadyProblem(op)
     tp.solve_forward()
 
+    # Evaluate QoI in aligned case
     num_cells.append(tp.mesh.num_cells())
     print_output("\nMesh {:d} in the hierarchy".format(level+1))
     print_output("    Number of elements  : {:d}".format(num_cells[-1]))
     qois['aligned'].append(tp.quantity_of_interest())
     print_output("    Aligned QoI: {:.5f}".format(qois['aligned'][-1]))
-    qois_exact['aligned'].append(op.exact_qoi(tp.P1[0]))
+    qois_exact['aligned'].append(op.exact_qoi())
     print_output("    (Exact     : {:.5f})".format(qois_exact['aligned'][-1]))
 
+    # Evaluate QoI in offset case
     op.__init__(level=level, aligned=False)
     qois['offset'].append(tp.quantity_of_interest())
     print_output("    Offset QoI : {:.5f}".format(qois['offset'][-1]))
-    qois_exact['offset'].append(op.exact_qoi(tp.P1[0]))
+    qois_exact['offset'].append(op.exact_qoi())
     print_output("    (Exact     : {:.5f})".format(qois_exact['offset'][-1]))
 
 # Print to screen
