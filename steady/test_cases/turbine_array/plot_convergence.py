@@ -76,7 +76,7 @@ for offset in (0, 1):
     for approach in ('fixed_mesh', 'carpio_isotropic', 'carpio'):
 
         # Read data from file
-        fname = os.path.join(di'{:s}/hdf5/qoi_offset_{:d}.h5'.format(approach, offset))
+        fname = os.path.join(di, '{:s}/hdf5/qoi_offset_{:d}.h5'.format(approach, offset))
         if not os.path.exists(fname):
             raise IOError("File {:s} does not exist.".format(fname))
         with h5py.File(fname, 'r') as f:

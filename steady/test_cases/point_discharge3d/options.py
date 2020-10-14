@@ -11,7 +11,7 @@ __all__ = ["Telemac3dOptions"]
 
 
 # TODO: 3D tracer solver
-class Telemac3dOptions(TracerOptions):
+class PointDischarge3dOptions(TracerOptions):
     r"""
     Parameters for a 3D extension of the 'Point source with diffusion' test case from TELEMAC-2D
     validation document version 7.0.
@@ -27,7 +27,7 @@ class Telemac3dOptions(TracerOptions):
     :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
     def __init__(self, offset=0., centred=False, **kwargs):
-        super(Telemac3dOptions, self).__init__(**kwargs)
+        super(PointDischarge3dOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
         self.default_mesh = BoxMesh(100, 20, 20, 50, 10, 10)

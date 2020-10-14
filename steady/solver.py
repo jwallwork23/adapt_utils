@@ -85,7 +85,12 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         Returns the value of the quantity of interest (QoI) for the current forward solution.
         """
-        return assemble(inner(self.fwd_solution, self.kernel)*dx(degree=12))
+        if self.op.solve_tracer:
+            return assemble(inner(self.fwd_solution_tracer, self.kernel)*dx(degree=12))
+        elif self.op.solve_swe:
+            return assemble(inner(self.fwd_solution, self.kernel)*dx(degree=12))
+        else:
+            raise NotImplementedError  # TODO
 
     def quantity_of_interest_form(self):
         """

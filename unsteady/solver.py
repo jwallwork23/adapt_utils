@@ -133,6 +133,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def adj_solution(self):
         return self.adj_solutions[0]
 
+    @property
+    def fwd_solution_tracer(self):
+        return self.fwd_solutions_tracer[0]
+
+    @property
+    def adj_solution_tracer(self):
+        return self.adj_solutions_tracer[0]
+
     def create_outfiles(self):
         if not self.op.plot_pvd:
             return

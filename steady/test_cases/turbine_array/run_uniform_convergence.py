@@ -1,5 +1,8 @@
+from thetis import create_directory
+
 import argparse
 import h5py
+import os
 import sys
 
 from adapt_utils.steady.swe.turbine.solver import AdaptiveSteadyTurbineProblem
@@ -24,14 +27,17 @@ args = parser.parse_args()
 
 levels = 3
 # levels = 5
+offset = int(args.offset or 0)
 kwargs = {
     'plot_pvd': False,
-    'offset': int(args.offset or 0),
+    'offset': offset,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
 
 qois, num_cells, dofs = [], [], []
+discrete_turbines = True
+# discrete_turbines = False
 op = TurbineArrayOptions(level=levels, **kwargs)
 
 
@@ -39,7 +45,9 @@ op = TurbineArrayOptions(level=levels, **kwargs)
 
 for level in range(levels):
     op.default_mesh = op.hierarchy[level]
-    tp = AdaptiveSteadyTurbineProblem(op)
+    callback_dir = 'uniform_level{:d}_offset{:d}'.format(level, offset)
+    callback_dir = create_directory(os.path.join(op.di, callback_dir))
+    tp = AdaptiveSteadyTurbineProblem(op, discrete_turbines=discrete_turbines, callback_dir=callback_dir)
 
     # Solve forward problem
     tp.solve_forward()
