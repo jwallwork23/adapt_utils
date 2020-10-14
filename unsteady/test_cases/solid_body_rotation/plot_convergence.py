@@ -1,58 +1,69 @@
-import os
-import matplotlib.pyplot as plt
 import argparse
+import matplotlib.pyplot as plt
+import numpy as np
+import os
 
+from adapt_utils.plotting import *
+
+
+# --- Parse arguments
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-approach", help="Choose adaptive approach")
 parser.add_argument("-geometry", help="Choose from 'circle' or 'square'")
 args = parser.parse_args()
 
-plt.rc('text', usetex=True)
-plt.rc('font', family='serif')
+
+# --- Set parameters
+
+# Parsed arguments
+geometry = args.geometry or 'circle'
+approach = args.approach or 'fixed_mesh'
+
+# Plotting parameters
 fontsize = 18
 legend_fontsize = 16
 kwargs = {'linestyle': '--', 'marker': 'x'}
 
-geometry = args.geometry or 'circle'
-approach = args.approach or 'fixed_mesh'
-
+# Shapes to consider
 shapes = ('Gaussian', 'Cone', 'Slotted Cylinder')
 
-# Load data from log files
+
+# --- Load data from log files
+
 elements = []
 dat = {}
 for shape in shapes:
     dat[shape] = {'qois': [], 'errors': []}
-for n in (1, 2, 4, 8):
+for n in (1, 2, 4, 8, 16):
     with open(os.path.join('outputs', approach, '{:s}_{:d}.log'.format(geometry, n)), 'r') as f:
         f.readline()
         f.readline()
         f.readline()
         for shape in shapes:
             line = f.readline().split()
-            approx = float(line[-2])
-            exact = float(line[-4])
+            approx = float(line[-3])
+            exact = float(line[-5])
             dat[shape]['qois'].append(approx)
-            dat[shape]['errors'].append(100.0*abs(1.0 - approx/exact))
+            dat[shape]['errors'].append(abs(1.0 - approx/exact))
         f.readline()
         elements.append(int(f.readline().split()[-1]))
 
-# for shape in shapes:
-#     fig, ax = plt.subplots(figsize=(5, 5))
-#     ax.semilogx(elements, dat[shape]['qois'], **kwargs)
-#     ax.set_xlabel('Element count', fontsize=fontsize)
-#     ax.set_ylabel('Volume of solid body', fontsize=fontsize)
-#     plt.show()
 
-fig, ax = plt.subplots(figsize=(5, 5))
+# --- Plot relative errors
+
+fig, ax = plt.subplots(figsize=(6, 5))
 for shape in shapes:
     ax.loglog(elements, dat[shape]['errors'], label=shape.replace(' ', '\n'), **kwargs)
 ax.set_xlabel('Element Count', fontsize=fontsize)
-ax.set_ylabel('Relative Error in Solid Body Volume', fontsize=fontsize)
-ax.set_ylim([ax.get_ylim()[0], 10.0])
-format_spec = lambda l: r"{:.3f}\%".format(l) if l < 1.0 else r"{:.1f}\%".format(l)
-ax.set_yticklabels([format_spec(l) for l in ax.get_yticks().tolist()])
-plt.legend(fontsize=legend_fontsize)
-plt.tight_layout()
-plt.savefig(os.path.join('outputs', approach, 'convergence_{:s}.pdf'.format(geometry)))
+ax.set_ylabel('Relative Error', fontsize=fontsize)
+ax.set_xticks([1.0e+04, 1.0e+05, 1.0e+06])
+yticks = [0.000001, 0.00001, 0.0001, 0.001, 0.01, 0.1]
+ax.set_yticks(yticks)
+ax.set_ylim([yticks[0], yticks[-1]])
+ytick_labels = [int(np.log10(yt)) for yt in yticks]
+ax.set_yticklabels([r"$10^{{{:d}}}$".format(l) for l in ytick_labels])
+ax.grid(True)
+ax.legend(fontsize=legend_fontsize)
+fname = 'convergence_' + geometry
+savefig(fname, os.path.join('outputs', approach), extensions=['pdf', 'png'])
