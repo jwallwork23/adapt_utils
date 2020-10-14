@@ -23,10 +23,10 @@ class PointDischarge2dOptions(CoupledOptions):
     where :math:`A` is a circular 'receiver' region.
 
     :kwarg approach: Mesh adaptation strategy.
-    :kwarg offset: Shift in x-direction for source location.
-    :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
+    :kwarg shift: Shift in x-direction for source location.
+    :kwarg aligned: Toggle whether receiver is positioned in the centre of the flow or not.
     """
-    def __init__(self, level=0, offset=1.0, centred=False, **kwargs):
+    def __init__(self, level=0, shift=1.0, aligned=True, **kwargs):
         super(PointDischarge2dOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
@@ -37,7 +37,7 @@ class PointDischarge2dOptions(CoupledOptions):
 
         # Domain
         self.default_mesh = RectangleMesh(100*2**level, 20*2**level, 50, 10)
-        self.offset = offset
+        self.shift = shift
 
         # FEM
         self.degree_tracer = 1
@@ -61,9 +61,9 @@ class PointDischarge2dOptions(CoupledOptions):
         #       radius so that solving on a sequence of increasingly refined uniform meshes leads to
         #       convergence of the uniform mesh solution to the analytical solution.
         # calibrated_r = 0.06245
-        calibrated_r = 0.07980 if centred else 0.07972
-        self.source_loc = [(1.0 + self.offset, 5.0, calibrated_r)]
-        self.region_of_interest = [(20.0, 5.0, 0.5)] if centred else [(20.0, 7.5, 0.5)]
+        calibrated_r = 0.07980 if aligned else 0.07972
+        self.source_loc = [(1.0 + self.shift, 5.0, calibrated_r)]
+        self.region_of_interest = [(20.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 0.5)]
         self.source_value = 100.0
         self.source_discharge = 0.1
 
