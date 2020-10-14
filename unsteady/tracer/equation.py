@@ -9,6 +9,9 @@ import thetis.tracer_eq_2d as thetis_tracer
 import thetis.conservative_tracer_eq_2d as thetis_cons_tracer
 
 
+# TODO: SU stabilisation
+# TODO: SUPG stabilisation
+
 # --- Modified terms for the non-conservative form
 
 class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
@@ -26,17 +29,40 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
             args = (solution, solution_old, fields, fields_old, )
             f += -super(HorizontalAdvectionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
             return -f
-
-        raise NotImplementedError  # TODO: Consider CG case
+        else:
+            uv = fields_old.get('uv_2d')
+            if uv is None:
+                return -f
+            f += self.test*dot(uv, grad(solution))*dx
+            return -f
 
 
 class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        if fields_old.get('diffusivity_h') is None:
+            return 0
         if self.horizontal_dg:
             args = (solution, solution_old, fields, fields_old, )
             return super(HorizontalDiffusionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+        else:
+            diffusivity_h = fields_old['diffusivity_h']
+            diff_tensor = as_matrix([[diffusivity_h, 0, ],
+                                     [0, diffusivity_h, ]])
+            diff_flux = dot(diff_tensor, grad(solution))
 
-        raise NotImplementedError  # TODO: Consider CG case
+            f = 0
+            f += inner(grad(self.test), diff_flux)*self.dx
+
+            if bnd_conditions is not None:
+                for bnd_marker in self.boundary_markers:
+                    funcs = bnd_conditions.get(bnd_marker)
+                    ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                if funcs is not None:
+                    if 'diff_flux' in funcs:
+                        f += -self.test*funcs['diff_flux']*ds_bnd
+                    else:
+                        f += -self.test*solution*ds_bnd
+            return -f
 
 
 # --- Modified terms for the conservative form
@@ -63,7 +89,9 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
 # --- Equations
 
 class TracerEquation2D(Equation):
-    """Copied here from `thetis/tracer_eq_2d` to hook up modified terms."""
+    """
+    Copied here from `thetis/tracer_eq_2d` to hook up modified terms.
+    """
     def __init__(self, function_space, depth,
                  use_lax_friedrichs=False,
                  sipg_parameter=Constant(10.0)):
@@ -86,7 +114,9 @@ class TracerEquation2D(Equation):
 
 
 class ConservativeTracerEquation2D(Equation):
-    """Copied here from `thetis/conservative_tracer_eq_2d` to hook up modified terms."""
+    """
+    Copied here from `thetis/conservative_tracer_eq_2d` to hook up modified terms.
+    """
     def __init__(self, function_space, depth,
                  use_lax_friedrichs=False,
                  sipg_parameter=Constant(10.0)):

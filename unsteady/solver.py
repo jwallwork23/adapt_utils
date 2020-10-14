@@ -450,6 +450,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Stabilisation
         if self.stabilisation is None:
+            eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = None
             return
         elif self.stabilisation == 'lax_friedrichs':
             assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')

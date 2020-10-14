@@ -66,9 +66,9 @@ for level in range(num_levels):
 
 # Print to screen
 msg = "{:5d}  {:8d}  {:7.5f}  {:7.5f}"
-for alignment in ('aligned', 'offset'):
-    print_output("="*80 + alignment.capitalize())
-    print_output("\nLevel  Elements       J{:d}  J{:d}exact".format(index, index))
+for index, alignment in enumerate(('aligned', 'offset')):
+    print_output("="*80 + "\n" + alignment.capitalize())
+    print_output("\nLevel  Elements       J{:d}  J{:d}exact".format(index+1, index+1))
     for level in range(num_levels):
         print_output(msg.format(level+1, num_cells[level], qois[alignment][level], qois_exact[alignment][level]))
 
