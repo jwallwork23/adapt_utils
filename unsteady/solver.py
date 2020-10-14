@@ -331,7 +331,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'sediment_sink_2d': self.op.set_sediment_sink(self.P1DG[i]),
                 'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(self.P1DG[i]),
             })
-        self.inflow[i] = self.op.set_inflow(self.P1_vec[i])
+        self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
     def free_fields_step(self, i):
         super(AdaptiveProblem, self).free_fields_step(i)
