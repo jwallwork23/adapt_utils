@@ -11,15 +11,28 @@ from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischar
 
 # Parse arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('level')
-parser.add_argument('family')
-parser.add_argument('-stabilisation')
-parser.add_argument('-use_automatic_sipg_parameter')
-parser.add_argument('-test_consistency')
-parser.add_argument('-test_gradient')
+parser.add_argument('level', help="Mesh resolution level.")
+parser.add_argument('family', help="Finite element family, from {'cg', 'dg'}.")
+parser.add_argument('-stabilisation', help="""
+    Stabilisation method. No stabilisation by default.
+    Otherwise, choose from {'su', 'supg', 'lax_friedrichs'}.
+    Note that 'su' and 'supg' are ignored unless the finite element family is CG.
+    Note that 'lax_friedrichs' is ignored unless the finite element family is DG.
+    """)
+parser.add_argument('-use_automatic_sipg_parameter', help="""
+    Automatically compute symmetrisation parameter, based on the mesh.
+    """)
+parser.add_argument('-error_to_calibrate', help="Choose from {'l2', 'qoi'}.")
+parser.add_argument('-test_consistency', help="Test consistency of taped reduced functional.")
+parser.add_argument('-test_gradient', help="Taylor test reduced functional.")
+parser.add_argument('-recompute_parameter_space')
 args = parser.parse_args()
+
+# Collect parsed arguments
 test_consistency = bool(args.test_consistency or False)
 test_gradient = bool(args.test_gradient or False)
+error_to_calibrate = args.error_to_calibrate or 'l2'
+assert error_to_calibrate in ('l2', 'qoi')
 
 # Parameter object
 level = int(args.level)
@@ -49,23 +62,43 @@ control = Control(r_to_calibrate)
 # Use high quadrature degree
 dx = dx(degree=12)
 
+
 def exact_solution(r):
+    """
+    Compute exact solution field for a given source radius.
+    """
     u = Constant(as_vector(op.base_velocity))
     D = Constant(op.base_diffusivity)
     q = 1.0
     rr = max_value(sqrt((x - x0)**2 + (y - y0)**2), r)
-    return 0.5*q/(pi*D)*exp(0.5*u[0]*(x - x0)/D)*bessk0(0.5*u[0]*rr/D) 
+    return 0.5*q/(pi*D)*exp(0.5*u[0]*(x - x0)/D)*bessk0(0.5*u[0]*rr/D)
+
 
 def scaled_ball(xx, yy, rr, scaling=1.0):
+    """
+    UFL expression for a disc, scaled by an area adjustment.
+
+    :args xx,yy: centre of disc.
+    :arg rr: radius of disc.
+    :kwarg scaling: value by which to scale disc.
+    """
     area = assemble(conditional((x - xx)**2 + (y - yy)**2 <= rr**2, 1.0, 0.0)*dx)
     exact_area = pi*rr*rr
     scaling *= exact_area/area
     return conditional((x - xx)**2 + (y - yy)**2 <= rr**2, scaling, 0.0)
 
+
 def set_tracer_source(r):
+    """
+    Generate source field for a given source radius.
+    """
     return scaled_ball(x0, y0, r, scaling=0.5*source_value)
 
+
 def solve(r):
+    """
+    Solve the tracer transport problem for a given source radius.
+    """
     tp = AdaptiveSteadyProblem(op)
     tp.set_initial_condition()
     tp.fields[0].tracer_source_2d = set_tracer_source(r)
@@ -73,7 +106,21 @@ def solve(r):
     tp.solve_forward_step(0)
     return tp.fwd_solution_tracer
 
-def to_test(r):
+
+def l2_error(r):
+    """
+    Squared L2 error of approximate solution, ignoring the source region.
+    """
+    c = solve(r)
+    sol = exact_solution(r)
+    kernel = conditional((x - x0)**2 + (y - y0)**2 > r**2, 1.0, 0.0)
+    return assemble(kernel*(c - sol)**2*dx)
+
+
+def qoi_error(r):
+    """
+    Sum of squared errors of the aligned and offset QoIs.
+    """
     c = solve(r)
     sol = exact_solution(r)
     kernel1 = scaled_ball(20.0, 5.0, 0.5)
@@ -84,23 +131,31 @@ def to_test(r):
     J2_exact = assemble(kernel2*sol*dx)
     return (J1 - J1_exact)**2 + (J2 - J2_exact)**2
 
+
 # Progress arrays
 control_progress = []
 functional_progress = []
 gradient_progress = []
 
+
 def callback(j, dj, m):
-    msg = "functional {:15.8e}  gradient {:15.8e}  control {:15.8e}"
+    """
+    Print and store progress of optimisation routine.
+    """
     djdm = dj.dat.data[0]
     mm = m.dat.data[0]
     control_progress.append(mm)
     functional_progress.append(j)
     gradient_progress.append(djdm)
+    msg = "functional {:15.8e}  gradient {:15.8e}  control {:15.8e}"
     print_output(msg.format(j, djdm, mm))
 
+
 # Reduced functional
-J = to_test(r_to_calibrate)
+reduced_functional = l2_error if error_to_calibrate == 'l2' else qoi_error
+J = reduced_functional(r_to_calibrate)
 Jhat = ReducedFunctional(J, control, derivative_cb_post=callback)
+stop_annotating()
 
 # Test consistency
 if test_consistency:
@@ -114,9 +169,14 @@ if test_gradient:
     minconv = taylor_test(Jhat, m, dm)
     assert minconv > 1.90
 
+# Plot parameter space
+fname = os.path.join(op.di, "parameter_space_{:d}.npy".format(level))
+if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
+    np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.11, 21)]))
+
 # Optimisation
-callback = lambda m: print_output("LINE SEARCH COMPLETE")
-r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0, 1), callback=callback)
+callback = lambda _: print_output("LINE SEARCH COMPLETE")
+r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.01, 0.2), callback=callback)
 
 # Logging
 logstr = "level: {:d}\n".format(level)
