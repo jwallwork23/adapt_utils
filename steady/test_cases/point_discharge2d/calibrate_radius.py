@@ -193,7 +193,7 @@ if op.tracer_family == 'dg':
     logstr += "automatic SIPG: {:}\n".format(op.use_automatic_sipg_parameter)
 logstr += "calibrated radius: {:.8f}\n".format(r_calibrated.dat.data[0])
 print_output(logstr)
-with open(os.path.join(op.di, "log"), "w") as log:
+with open(os.path.join(op.di, "log"), "a") as log:
     log.write(logstr)
 
 # Plot calibrated exact and approx solutions

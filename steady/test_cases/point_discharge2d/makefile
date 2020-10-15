@@ -39,6 +39,15 @@ calibrate_dg:
 	@python3 calibrate_radius.py 5 dg -stabilisation lax_friedrichs \
 		-use_automatic_sipg_parameter 1
 
+print_calibration:
+	@cat outputs/fixed_mesh/cg/log
+	@cat outputs/fixed_mesh/su/log
+	@cat outputs/fixed_mesh/supg/log
+	@# cat outputs/fixed_mesh/dg/log
+	@cat outputs/fixed_mesh/dg_sipg/log
+	@# cat outputs/fixed_mesh/lax_friedrichs/log
+	@cat outputs/fixed_mesh/lax_friedrichs_sipg/log
+
 
 # --- Convergence analysis
 
