@@ -99,7 +99,7 @@ def solve(r):
     """
     Solve the tracer transport problem for a given source radius.
     """
-    tp = AdaptiveSteadyProblem(op)
+    tp = AdaptiveSteadyProblem(op, print_progress=False)
     tp.set_initial_condition()
     tp.fields[0].tracer_source_2d = set_tracer_source(r)
     tp.setup_solver_forward_step(0)
@@ -152,6 +152,7 @@ def callback(j, dj, m):
 
 
 # Reduced functional
+print_output("Tracing...")
 reduced_functional = l2_error if error_to_calibrate == 'l2' else qoi_error
 J = reduced_functional(r_to_calibrate)
 Jhat = ReducedFunctional(J, control, derivative_cb_post=callback)
@@ -159,11 +160,13 @@ stop_annotating()
 
 # Test consistency
 if test_consistency:
+    print_output("Testing consistency...")
     JJ = Jhat(r_to_calibrate)
     assert np.isclose(J, JJ), "{:.4e} vs. {:.4e}".format(J, JJ)
 
 # Taylor test
 if test_gradient:
+    print_output("Testing gradient...")
     m = Function(R).assign(r_to_calibrate)
     dm = Function(R).assign(0.1)
     minconv = taylor_test(Jhat, m, dm)
@@ -172,13 +175,16 @@ if test_gradient:
 # Plot parameter space
 fname = os.path.join(op.di, "parameter_space_{:d}.npy".format(level))
 if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
+    print_output("Exploring parameter space...")
     np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.11, 21)]))
 
 # Optimisation
+print_output("Running optimisation...")
 callback = lambda _: print_output("LINE SEARCH COMPLETE")
 r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.01, 0.2), callback=callback)
 
 # Logging
+print_output("Logging...")
 logstr = "level: {:d}\n".format(level)
 logstr += "family: {:s}\n".format(op.tracer_family.upper())
 if op.stabilisation is not None:
@@ -191,6 +197,7 @@ with open(os.path.join(op.di, "log"), "w") as log:
     log.write(logstr)
 
 # Plot calibrated exact and approx solutions
+print_output("Plotting...")
 approx = solve(r_calibrated)
 exact = Function(approx.function_space(), name="Exact solution")
 exact.interpolate(exact_solution(r_calibrated))
@@ -200,6 +207,7 @@ error.interpolate(abs(exact - approx))
 File(os.path.join(op.di, "error.pvd")).write(error)
 
 # Save optimisation progress
+print_output("Saving optimisation progress...")
 ext = args.family
 if ext == 'dg':
     if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
