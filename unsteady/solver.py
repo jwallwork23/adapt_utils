@@ -966,7 +966,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         return fields
 
     def _get_fields_for_tracer_timestepper(self, i):
-        u, eta = self.fwd_solutions[i].split()
+        if self.op.solve_swe:
+            # u, eta = self.fwd_solutions[i].split()  # FIXME: Not fully annotated
+            u, eta = split(self.fwd_solutions[i])  # FIXME: Not fully annotated
+        else:
+            u = Constant(as_vector(self.op.base_velocity))
+            eta = Constant(0.0)
         fields = AttrDict({
             'elev_2d': eta,
             'uv_2d': u,
