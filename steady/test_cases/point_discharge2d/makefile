@@ -13,6 +13,7 @@ dir:
 	@mkdir -p outputs/loseille_averaged/hdf5
 	@mkdir -p outputs/loseille_superposed/hdf5
 	@mkdir -p data
+	@mkdir -p plots
 
 uniform:
 	@echo "Running uniform convergence test..."

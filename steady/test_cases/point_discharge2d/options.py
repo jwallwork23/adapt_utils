@@ -60,8 +60,8 @@ class PointDischarge2dOptions(CoupledOptions):
         #       of analytical solutions, it is not quite right. As such, we have calibrated the
         #       radius so that solving on a sequence of increasingly refined uniform meshes leads to
         #       convergence of the uniform mesh solution to the analytical solution.
-        # calibrated_r = 0.06245
-        calibrated_r = 0.07980 if aligned else 0.07972
+        calibrated_r = 0.075
+        # calibrated_r = 0.07980 if aligned else 0.07972
         self.source_loc = [(1.0 + self.shift, 5.0, calibrated_r)]
         self.region_of_interest = [(20.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 0.5)]
         self.source_value = 100.0
