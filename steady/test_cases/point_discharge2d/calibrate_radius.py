@@ -80,7 +80,7 @@ def scaled_ball(xx, yy, rr, scaling=1.0):
 
     :args xx,yy: centre of disc.
     :arg rr: radius of disc.
-    :kwarg scaling: value by which to scale disc.
+    :kwarg scaling: value by which to scale.
     """
     area = assemble(conditional((x - xx)**2 + (y - yy)**2 <= rr**2, 1.0, 0.0)*dx)
     exact_area = pi*rr*rr
@@ -88,11 +88,24 @@ def scaled_ball(xx, yy, rr, scaling=1.0):
     return conditional((x - xx)**2 + (y - yy)**2 <= rr**2, scaling, 0.0)
 
 
+def gaussian(xx, yy, rr, scaling=1.0):
+    """
+    UFL expression for a Gaussian bump, scaled as appropriate.
+
+    :args xx,yy: centre of Gaussian.
+    :arg rr: radius of Gaussian.
+    :kwarg scaling: value by which to scale.
+    """
+    return scaling*exp(-((x - xx)**2 + (y - yy)**2)/rr**2)
+
+
 def set_tracer_source(r):
     """
     Generate source field for a given source radius.
     """
-    return scaled_ball(x0, y0, r, scaling=0.5*source_value)
+    # return scaled_ball(x0, y0, r, scaling=0.5*source_value)
+    return gaussian(x0, y0, r, scaling=source_value)
+    # return gaussian(x0, y0, r)
 
 
 def solve(r):
@@ -176,12 +189,12 @@ if test_gradient:
 fname = os.path.join(op.di, "parameter_space_{:d}.npy".format(level))
 if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
     print_output("Exploring parameter space...")
-    np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.11, 21)]))
+    np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.15, 31)]))
 
 # Optimisation
 print_output("Running optimisation...")
 callback = lambda _: print_output("LINE SEARCH COMPLETE")
-r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.01, 0.2), callback=callback)
+r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.01, 1), callback=callback)
 
 # Logging
 print_output("Logging...")

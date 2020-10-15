@@ -46,7 +46,7 @@ gradients = np.load(os.path.join(di, fname.format("gradient")))
 fig, axes = plt.subplots()
 fname = os.path.join(di, "parameter_space_{:s}.npy".format(args.level))
 if os.path.isfile(fname):
-    axes.semilogy(np.linspace(0.01, 0.11, 21), np.load(fname), 'x', color='C0')
+    axes.semilogy(np.linspace(0.01, 0.15, 31), np.load(fname), '--x', color='C0')
 axes.semilogy(controls, functionals, 'o', color='C1')
 axes.set_xlabel("Radius [m]")
 axes.set_ylabel("QoI")
