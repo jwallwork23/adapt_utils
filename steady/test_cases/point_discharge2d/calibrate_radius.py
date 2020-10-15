@@ -22,14 +22,16 @@ test_consistency = bool(args.test_consistency or False)
 test_gradient = bool(args.test_gradient or False)
 
 # Parameter object
-op = PointDischarge2dOptions(level=int(args.level))
+level = int(args.level)
+op = PointDischarge2dOptions(level=level)
+assert args.family in ('cg', 'dg')
 op.tracer_family = args.family or 'cg'
 op.stabilisation = args.stabilisation
 op.di = os.path.join(op.di, args.stabilisation or args.family)
+auto_sipg = bool(args.use_automatic_sipg_parameter or False)
 if op.tracer_family == 'cg':
     op.use_automatic_sipg_parameter = False
 else:
-    auto_sipg = bool(args.use_automatic_sipg_parameter or False)
     op.use_automatic_sipg_parameter = auto_sipg
     if auto_sipg:
         op.di += '_sipg'
@@ -82,9 +84,19 @@ def to_test(r):
     J2_exact = assemble(kernel2*sol*dx)
     return (J1 - J1_exact)**2 + (J2 - J2_exact)**2
 
+# Progress arrays
+control_progress = []
+functional_progress = []
+gradient_progress = []
+
 def callback(j, dj, m):
     msg = "functional {:15.8e}  gradient {:15.8e}  control {:15.8e}"
-    print_output(msg.format(j, dj.dat.data[0], m.dat.data[0]))
+    djdm = dj.dat.data[0]
+    mm = m.dat.data[0]
+    control_progress.append(mm)
+    functional_progress.append(j)
+    gradient_progress.append(djdm)
+    print_output(msg.format(j, djdm, mm))
 
 # Reduced functional
 J = to_test(r_to_calibrate)
@@ -105,8 +117,42 @@ if test_gradient:
 # Optimisation
 callback = lambda m: print_output("LINE SEARCH COMPLETE")
 r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0, 1), callback=callback)
-print_output("Calibrated radius for point source: {:.8f}".format(r_calibrated.dat.data[0]))
-solve(r_calibrated)
-exact = exact_solution(r_calibrated)
-exact.rename("Exact solution")
+
+# Logging
+logstr = "level: {:d}\n".format(level)
+logstr += "family: {:s}\n".format(op.tracer_family.upper())
+if op.stabilisation is not None:
+    logstr += "stabilisation: {:}\n".format(op.stabilisation.upper())
+if op.tracer_family == 'dg':
+    logstr += "automatic SIPG: {:}\n".format(op.use_automatic_sipg_parameter)
+logstr += "calibrated radius: {:.8f}\n".format(r_calibrated.dat.data[0])
+print_output(logstr)
+with open(os.path.join(op.di, "log"), "w") as log:
+    log.write(logstr)
+
+# Plot calibrated exact and approx solutions
+approx = solve(r_calibrated)
+exact = Function(approx.function_space(), name="Exact solution")
+exact.interpolate(exact_solution(r_calibrated))
 File(os.path.join(op.di, "exact.pvd")).write(exact)
+error = Function(approx.function_space(), name="Absolute error")
+error.interpolate(abs(exact - approx))
+File(os.path.join(op.di, "error.pvd")).write(error)
+
+# Save optimisation progress
+ext = args.family
+if ext == 'dg':
+    if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
+        ext += '_lf'
+    if auto_sipg:
+        ext += '_sipg'
+else:
+    if args.stabilisation in ('su', 'SU'):
+        ext += '_su'
+    if args.stabilisation in ('supg', 'SUPG'):
+        ext += '_supg'
+fname = "_".join(["{:s}", ext, str(level)])
+fname += ".npy"
+np.save(os.path.join(op.di, fname.format("control")), np.array(control_progress))
+np.save(os.path.join(op.di, fname.format("functional")), np.array(functional_progress))
+np.save(os.path.join(op.di, fname.format("gradient")), np.array(gradient_progress))
