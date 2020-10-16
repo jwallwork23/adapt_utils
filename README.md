@@ -24,15 +24,17 @@ This is research of the Applied Modelling and Computation Group ([AMCG][6]) at I
 London.
 
 
-### Publications and associated versions
+### Publications and associated versions and test cases
 
   * J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, <em>'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake'</em>, In: 28th International Meshing Roundtable, pp.83-100, (2020). DOI: 10.5281/zenodo.3653101.
     * Paper: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3653101.svg)](https://doi.org/10.5281/zenodo.3653101), URL: https://doi.org/10.5281/zenodo.3653101.
     * Code: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3358565.svg)](https://doi.org/10.5281/zenodo.3358565) (`v1.0`).
+    * Test cases: `steady/test_cases/point_discharge2d`, `steady/test_cases/point_discharge3d`
 
   * J. G. Wallwork, N. Barral, S. C. Kramer, D. A. Ham, M. D. Piggott, <em>'Goal-Oriented Error Estimation and Mesh Adaptation for Shallow Water Modelling'</em>, Springer Nature Applied Sciences, volume 2, pp.1053--1063 (2020).
     * Paper: DOI:10.1007/s42452-020-2745-9, URL: https://rdcu.be/b35wZ.
     * Code: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3695801.svg)](https://doi.org/10.5281/zenodo.3695801) (`v1.3`).
+    * Test case: `steady/test_cases/turbine_array`
 
 
 ### User instructions
