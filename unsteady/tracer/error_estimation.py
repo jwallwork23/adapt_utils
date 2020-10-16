@@ -84,7 +84,7 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         uv = self.corr_factor * fields_old['uv_2d']
 
         flux_terms = 0
-        if self.horizontal_dg:
+        if self.horizontal_dg:  # TODO: Check signs
             if bnd_conditions is not None:
                 for bnd_marker in self.boundary_markers:
                     funcs = bnd_conditions.get(bnd_marker)
@@ -127,7 +127,7 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
                                  [0, diffusivity_h, ]])
 
         flux_terms = 0
-        if self.horizontal_dg:
+        if self.horizontal_dg:  # TODO: Check signs
             alpha = self.sipg_parameter
             assert alpha is not None
             sigma = avg(alpha/self.cellsize)
@@ -140,39 +140,51 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
             arg_av = self.p0test*0.5*arg
             flux_terms += inner(dot(avg(diff_tensor), grad(arg_av)),
                                 jump(solution, self.normal))*ds_interior
+        else:
+            flux_terms += self.p0test*inner(dot(diff_tensor, grad(solution)),
+                                            dot(arg, self.normal))*ds_interior
         return flux_terms
 
     def boundary_flux(self, solution, solution_old, arg, arg_old, fields, fields_old, bnd_conditions):
+        flux_terms = 0
         if fields_old.get('diffusivity_h') is None:
-            return 0
+            return flux_terms
         diffusivity_h = fields_old['diffusivity_h']
         diff_tensor = as_matrix([[diffusivity_h, 0, ],
                                  [0, diffusivity_h, ]])
-
-        flux_terms = 0
 
         if bnd_conditions is not None:
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
                 c_in = solution
+
+                # Ignore open boundaries
+                if funcs is None or not ('value' in funcs or 'diff_flux' in funcs):
+                    continue
+
+                # Ignore Dirichlet boundaries for CG
+                elif 'value' in funcs and not self.horizontal_dg:
+                    continue
+
+                # Term from integration by parts
+                diff_flux = dot(diff_tensor, grad(c_in))
+                flux_terms += self.p0test*inner(diff_flux, dot(arg, self.normal))*ds_bnd
+
+                # Terms from boundary conditions
                 elev = fields_old['elev_2d']
                 self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
                 uv = self.corr_factor * fields_old['uv_2d']
-                if funcs is not None:
-                    if 'value' in funcs:
-                        c_ext, uv_ext, eta_ext = self.get_bnd_functions(c_in, uv, elev, bnd_marker, bnd_conditions)
-                        uv_av = 0.5*(uv + uv_ext)
-                        un_av = self.normal[0]*uv_av[0] + self.normal[1]*uv_av[1]
-                        s = 0.5*(sign(un_av) + 1.0)
-                        c_up = c_in*s + c_ext*(1-s)
-                        diff_flux_up = dot(diff_tensor, grad(c_up))
-                        flux_terms += self.p0test*arg*dot(diff_flux_up, self.normal)*ds_bnd
-                    elif 'diff_flux' in funcs:
-                        flux_terms += self.p0test*arg*funcs['diff_flux']*ds_bnd
-                    else:
-                        # Open boundary case
-                        flux_terms += self.p0test*arg*dot(diff_flux, self.normal)*ds_bnd
+                if 'value' in funcs:
+                    c_ext, uv_ext, eta_ext = self.get_bnd_functions(c_in, uv, elev, bnd_marker, bnd_conditions)
+                    uv_av = 0.5*(uv + uv_ext)
+                    un_av = self.normal[0]*uv_av[0] + self.normal[1]*uv_av[1]
+                    s = 0.5*(sign(un_av) + 1.0)
+                    c_up = c_in*s + c_ext*(1-s)
+                    diff_flux_up = dot(diff_tensor, grad(c_up))
+                    flux_terms += -self.p0test*arg*dot(diff_flux_up, self.normal)*ds_bnd
+                elif 'diff_flux' in funcs:
+                    flux_terms += -self.p0test*arg*funcs['diff_flux']*ds_bnd
         return flux_terms
 
 
@@ -185,7 +197,7 @@ class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         f = 0
         source = fields_old.get('source')
         if source is not None:
-            f += -self.p0test*inner(source, self.test)*self.dx
+            f += -self.p0test*inner(source, arg)*self.dx
         return -f
 
     def inter_element_flux(self, solution, solution_old, arg, arg_old, fields, fields_old):
