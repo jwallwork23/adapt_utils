@@ -34,8 +34,19 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         if fields_old.get('uv_2d') is None:
             return 0
         self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
-
         uv = self.corr_factor*fields_old['uv_2d']
+
+        # Apply SUPG stabilisation
+        tau = fields.get('supg_stabilisation')
+        if not self.horizontal_dg and tau is not None:
+            h = self.cellsize
+            unorm = sqrt(dot(uv, uv))
+            tau = 0.5*h/unorm
+            diffusivity_h = fields_old['diffusivity_h']
+            if diffusivity_h is not None:
+                Pe = 0.5*h*unorm/diffusivity_h
+                tau *= min_value(1, Pe/3)
+            arg = arg + tau*dot(uv, grad(arg))
 
         return -self.p0test*arg*inner(uv, grad(solution))*self.dx
 
@@ -80,7 +91,6 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
             return 0
         elev = fields_old['elev_2d']
         self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
-
         uv = self.corr_factor * fields_old['uv_2d']
 
         flux_terms = 0
@@ -116,6 +126,21 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         diffusivity_h = fields_old['diffusivity_h']
         diff_tensor = as_matrix([[diffusivity_h, 0, ],
                                  [0, diffusivity_h, ]])
+
+        # Apply SUPG stabilisation
+        tau = fields.get('supg_stabilisation')
+        if not self.horizontal_dg and tau is not None:
+            self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
+            uv = self.corr_factor*fields_old['uv_2d']
+            if uv is not None:
+                h = self.cellsize
+                unorm = sqrt(dot(uv, uv))
+                tau = 0.5*h/unorm
+                diffusivity_h = fields_old['diffusivity_h']
+                if diffusivity_h is not None:
+                    Pe = 0.5*h*unorm/diffusivity_h
+                    tau *= min_value(1, Pe/3)
+                arg = arg + tau*dot(uv, grad(arg))
 
         return self.p0test*arg*div(dot(diff_tensor, grad(solution)))*self.dx
 
@@ -196,8 +221,25 @@ class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
     def element_residual(self, solution, solution_old, arg, arg_old, fields, fields_old):
         f = 0
         source = fields_old.get('source')
-        if source is not None:
-            f += -self.p0test*inner(source, arg)*self.dx
+        if source is None:
+            return -f
+
+        # Apply SUPG stabilisation
+        tau = fields.get('supg_stabilisation')
+        if not self.horizontal_dg and tau is not None:
+            if fields_old.get('uv_2d') is not None:
+                self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
+                uv = self.corr_factor*fields_old['uv_2d']
+                h = self.cellsize
+                unorm = sqrt(dot(uv, uv))
+                tau = 0.5*h/unorm
+                diffusivity_h = fields_old['diffusivity_h']
+                if diffusivity_h is not None:
+                    Pe = 0.5*h*unorm/diffusivity_h
+                    tau *= min_value(1, Pe/3)
+                arg = arg + tau*dot(uv, grad(arg))
+
+        f += -self.p0test*inner(source, arg)*self.dx
         return -f
 
     def inter_element_flux(self, solution, solution_old, arg, arg_old, fields, fields_old):

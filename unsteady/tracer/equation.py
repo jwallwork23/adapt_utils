@@ -35,7 +35,7 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
             if tau is None:
                 tau = fields.get('supg_stabilisation')
             if tau is not None:
-                h = CellSize(solution.function_space().mesh())
+                h = self.cellsize
                 unorm = sqrt(dot(uv, uv))
                 tau = 0.5*h/unorm
                 diffusivity_h = fields_old['diffusivity_h']
@@ -83,7 +83,7 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
                 return -f
             tau = fields.get('supg_stabilisation')
             if tau is not None:
-                h = CellSize(solution.function_space().mesh())
+                h = self.cellsize
                 unorm = sqrt(dot(uv, uv))
                 tau = 0.5*h/unorm
                 Pe = 0.5*h*unorm/diffusivity_h
@@ -109,7 +109,7 @@ class SourceTerm(thetis_tracer.SourceTerm):
                 return -f
             tau = fields.get('supg_stabilisation')
             if tau is not None:
-                h = CellSize(solution.function_space().mesh())
+                h = self.cellsize
                 unorm = sqrt(dot(uv, uv))
                 tau = 0.5*h/unorm
                 diffusivity_h = fields_old['diffusivity_h']
@@ -149,7 +149,7 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
             if tau is None:
                 tau = fields.get('supg_stabilisation')
             if tau is not None:
-                h = CellSize(solution.function_space().mesh())
+                h = self.cellsize
                 unorm = sqrt(dot(uv, uv))
                 tau = 0.5*h/unorm
                 diffusivity_h = fields_old['diffusivity_h']
