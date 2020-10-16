@@ -9,9 +9,6 @@ import thetis.tracer_eq_2d as thetis_tracer
 import thetis.conservative_tracer_eq_2d as thetis_cons_tracer
 
 
-# TODO: SU stabilisation
-# TODO: SUPG stabilisation
-
 # --- Modified terms for the non-conservative form
 
 class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
@@ -24,11 +21,9 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
             f += (Dx(mesh_velocity[0]*self.test, 0)*solution
                   + Dx(mesh_velocity[1]*self.test, 1)*solution)*self.dx
 
-        # DG tracers
         if self.horizontal_dg:
             args = (solution, solution_old, fields, fields_old, )
             f += -super(HorizontalAdvectionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
-            return -f
         else:
             uv = fields_old.get('uv_2d')
             if uv is None:
@@ -49,16 +44,17 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
                     tau *= min_value(1, Pe/3)
                 f += tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
 
-            return -f
+        return -f
 
 
 class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        f = 0
         if fields_old.get('diffusivity_h') is None:
-            return 0
+            return -f
         if self.horizontal_dg:
             args = (solution, solution_old, fields, fields_old, )
-            return super(HorizontalDiffusionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+            f += -super(HorizontalDiffusionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
         else:
 
             # Get diffusion tensor etc.
@@ -68,7 +64,6 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
             diff_flux = dot(diff_tensor, grad(solution))
 
             # Element interior term
-            f = 0
             f += inner(grad(self.test), diff_flux)*self.dx
 
             # Apply boundary conditions
@@ -95,16 +90,17 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
                 tau *= min_value(1, Pe/3)
                 f += -tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
 
-            return -f
+        return -f
 
 
 class SourceTerm(thetis_tracer.SourceTerm):
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        f = 0
         source = fields_old.get('source')
         if source is None:
-            return 0
+            return -f
         args = (solution, solution_old, fields, fields_old, )
-        f = -super(SourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+        f += -super(SourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
 
         # Apply SUPG stabilisation
         if not self.horizontal_dg:
@@ -137,13 +133,51 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
             f += (Dx(mesh_velocity[0]*self.test, 0)*solution
                   + Dx(mesh_velocity[1]*self.test, 1)*solution)*self.dx
 
-        # DG tracers
         if self.horizontal_dg:
             args = (solution, solution_old, fields, fields_old, )
             f += -super(ConservativeHorizontalAdvectionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
-            return -f
 
-        raise NotImplementedError  # TODO: Consider CG case
+        else:
+            # NOTE: This is a different formulation as for DG!
+            uv = fields_old.get('uv_2d')
+            if uv is None:
+                return -f
+            f += self.test*div(uv*solution)*dx
+
+            # Apply SU / SUPG stabilisation
+            tau = fields.get('su_stabilisation')
+            if tau is None:
+                tau = fields.get('supg_stabilisation')
+            if tau is not None:
+                h = CellSize(solution.function_space().mesh())
+                unorm = sqrt(dot(uv, uv))
+                tau = 0.5*h/unorm
+                diffusivity_h = fields_old['diffusivity_h']
+                if diffusivity_h is not None:
+                    Pe = 0.5*h*unorm/diffusivity_h
+                    tau *= min_value(1, Pe/3)
+                f += tau*dot(uv, grad(self.test))*div(uv*solution)*dx
+        return -f
+
+
+class ConservativeHorizontalDiffusionTerm(thetis_cons_tracer.ConservativeHorizontalDiffusionTerm):
+    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        args = (solution, solution_old, fields, fields_old, )
+        if self.horizontal_dg:
+            return super(ConservativeHorizontalDiffusionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+        else:
+            # NOTE: This is a different formulation as for DG!
+            return super(HorizontalDiffusionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+
+
+class ConservativeSourceTerm(thetis_cons_tracer.ConservativeSourceTerm):
+    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        args = (solution, solution_old, fields, fields_old, )
+        if self.horizontal_dg:
+            return super(ConservativeSourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+        else:
+            # NOTE: This is a different formulation as for DG!
+            return super(SourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
 
 
 # --- Equations
@@ -189,8 +223,8 @@ class ConservativeTracerEquation2D(Equation):
         super(ConservativeTracerEquation2D, self).__init__(function_space)
         args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
         self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
-        self.add_term(thetis_cons_tracer.ConservativeHorizontalDiffusionTerm(*args), 'explicit')
-        self.add_term(thetis_cons_tracer.ConservativeSourceTerm(*args), 'source')
+        self.add_term(ConservativeHorizontalDiffusionTerm(*args), 'explicit')
+        self.add_term(ConservativeSourceTerm(*args), 'source')
         try:
             self.add_term(thetis_cons_tracer.ConservativeSinkTerm(*args), 'source')
         except Exception:

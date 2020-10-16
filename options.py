@@ -251,10 +251,10 @@ class Options(FrozenConfigurable):
     def set_qoi_kernel_tracer(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def exact_solution(self, fs):
+    def analytical_solution(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def exact_qoi(self):  # TODO: surely it needs an arg
+    def analytical_qoi(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def get_update_forcings(self, prob, i, **kwargs):

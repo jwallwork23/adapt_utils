@@ -91,9 +91,9 @@ class PointDischarge2dOptions(CoupledOptions):
         """
         calibration_results = {
             'cg': {
-                None: 0.05454219,    # Level 2 TODO: level 4
-                'su': 0.05457856,    # Level 2 TODO: level 4
-                'supg': 0.05607102,  # Level 3 TODO: level 4
+                None: 0.05607162,    # Level 3 TODO: level 4
+                'su': 0.05606179,    # Level 3 TODO: level 4
+                'supg': 0.05606535,
             },
             'dg': {
                 None: 0.05607102,              # TODO

@@ -53,14 +53,14 @@ for level in range(num_levels):
     # Evaluate QoI in aligned case
     qois['aligned'].append(tp.quantity_of_interest())
     print_output("    Aligned QoI: {:.5f}".format(qois['aligned'][-1]))
-    qois_exact['aligned'].append(op.exact_qoi())
+    qois_exact['aligned'].append(op.analytical_qoi())
     print_output("    (Exact     : {:.5f})".format(qois_exact['aligned'][-1]))
 
     # Evaluate QoI in offset case
     op.__init__(level=level, aligned=False)
     qois['offset'].append(tp.quantity_of_interest())
     print_output("    Offset QoI : {:.5f}".format(qois['offset'][-1]))
-    qois_exact['offset'].append(op.exact_qoi())
+    qois_exact['offset'].append(op.analytical_qoi())
     print_output("    (Exact     : {:.5f})".format(qois_exact['offset'][-1]))
 
 # Print to screen
