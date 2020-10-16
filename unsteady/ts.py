@@ -13,6 +13,7 @@ class SteadyState(thetis_ts.SteadyState):
     """
     def __init__(self, equation, solution, fields, dt, error_estimator=None, **kwargs):
         if 'adjoint' in kwargs:
+            fields.uv_2d = -fields.uv_2d
             kwargs.pop('adjoint')  # Unused in steady-state case
         super(SteadyState, self).__init__(equation, solution, fields, dt, **kwargs)
         self.error_estimator = error_estimator

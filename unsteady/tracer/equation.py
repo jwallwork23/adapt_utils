@@ -160,24 +160,10 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
         return -f
 
 
-class ConservativeHorizontalDiffusionTerm(thetis_cons_tracer.ConservativeHorizontalDiffusionTerm):
-    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        args = (solution, solution_old, fields, fields_old, )
-        if self.horizontal_dg:
-            return super(ConservativeHorizontalDiffusionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
-        else:
-            # NOTE: This is a different formulation as for DG!
-            return super(HorizontalDiffusionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
-
-
-class ConservativeSourceTerm(thetis_cons_tracer.ConservativeSourceTerm):
-    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
-        args = (solution, solution_old, fields, fields_old, )
-        if self.horizontal_dg:
-            return super(ConservativeSourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
-        else:
-            # NOTE: This is a different formulation as for DG!
-            return super(SourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+class ConservativeHorizontalDiffusionTerm(HorizontalDiffusionTerm):
+    """
+    Copied from above.
+    """
 
 
 # --- Equations
@@ -196,7 +182,6 @@ class TracerEquation2D(Equation):
         :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         """
         super(TracerEquation2D, self).__init__(function_space)
-
         args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
         self.add_term(HorizontalAdvectionTerm(*args), 'explicit')
         self.add_term(HorizontalDiffusionTerm(*args), 'explicit')
@@ -224,7 +209,10 @@ class ConservativeTracerEquation2D(Equation):
         args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
         self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
         self.add_term(ConservativeHorizontalDiffusionTerm(*args), 'explicit')
-        self.add_term(ConservativeSourceTerm(*args), 'source')
+        if self.function_space.ufl_element().family() == 'Lagrange':
+            self.add_term(SourceTerm(*args), 'source')
+        else:
+            self.add_term(thetis_cons_tracer.ConservativeSourceTerm(*args), 'source')
         try:
             self.add_term(thetis_cons_tracer.ConservativeSinkTerm(*args), 'source')
         except Exception:

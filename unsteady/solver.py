@@ -859,11 +859,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
     def create_adjoint_tracer_equation_step(self, i):
-        from .tracer.adjoint import AdjointTracerEquation2D, AdjointConservativeTracerEquation2D
+        from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
 
         op = self.tracer_options[i]
         conservative = op.use_tracer_conservative_form
-        model = AdjointConservativeTracerEquation2D if conservative else AdjointTracerEquation2D
+        model = TracerEquation2D if conservative else ConservativeTracerEquation2D
         self.equations[i].adjoint_tracer = model(
             self.Q[i],
             self.depth[i],
@@ -1182,8 +1182,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def create_adjoint_tracer_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
 
-        # fields.uv_2d = - fields.uv_2d
-
         # Account for dJdc
         dJdc = self.op.set_qoi_kernel_tracer(self, i)  # TODO: Store this kernel somewhere
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
@@ -1255,7 +1253,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.callbacks[i].add(VorticityNormCallback(self, i), 'export')
 
     def setup_solver_forward_step(self, i):
-        """Setup forward solver on mesh `i`."""
+        """
+        Setup forward solver on mesh `i`.
+        """
         op = self.op
         op.print_debug("SETUP: Creating forward equations on mesh {:d}...".format(i))
         self.create_forward_equations_step(i)
@@ -1472,11 +1472,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if op.solve_tracer:
             ts = self.timesteppers[i]['adjoint_tracer']
             dbcs = []
-            if op.family == 'cg':
+            if op.tracer_family == 'cg':
                 op.print_debug("SETUP: Applying adjoint tracer DirichletBCs on mesh {:d}...".format(i))
-                raise NotImplementedError  # TODO
+                for j in bcs['tracer']:
+                    if 'diff_flux' not in bcs['tracer'][j]:
+                        dbcs.append(DirichletBC(self.Q[i], 0, j))
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
+        if op.solve_sediment:
+            raise NotImplementedError
+        if op.solve_exner:
+            raise NotImplementedError
 
     def free_solver_adjoint_step(self, i):
         op = self.op
