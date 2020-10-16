@@ -31,7 +31,7 @@ class PointDischarge2dOptions(CoupledOptions):
         self.solve_swe = False
         self.solve_tracer = True
         self.timestepper = 'SteadyState'
-        self.end_time = 18.0
+        self.end_time = 20.0
         self.dt = 20.0
         self.dt_per_export = 1
 

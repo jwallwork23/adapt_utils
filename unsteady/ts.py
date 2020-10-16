@@ -12,16 +12,18 @@ class SteadyState(thetis_ts.SteadyState):
     See `thetis/timeintegrator.py` for original version.
     """
     def __init__(self, equation, solution, fields, dt, error_estimator=None, **kwargs):
+        if 'adjoint' in kwargs:
+            kwargs.pop('adjoint')  # Unused in steady-state case
         super(SteadyState, self).__init__(equation, solution, fields, dt, **kwargs)
         self.error_estimator = error_estimator
         if self.error_estimator is not None:
             if hasattr(self.error_estimator, 'setup_strong_residual'):
                 self.error_estimator.setup_strong_residual('all', solution, solution, fields, fields)
 
-    def setup_error_estimator(self, solution, adjoint, bnd_conditions):
+    def setup_error_estimator(self, solution, solution_old, adjoint, bnd_conditions):
         assert self.error_estimator is not None
         self.error_estimator.setup_components(
-            'all', solution, solution, adjoint, adjoint, self.fields, self.fields, bnd_conditions
+            'all', solution, solution_old, adjoint, adjoint, self.fields, self.fields, bnd_conditions
         )
 
 

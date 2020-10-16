@@ -1,10 +1,10 @@
 from thetis import *
 
-# import numpy as np
-# import os
+import numpy as np
+import os
 
-# from adapt_utils.adapt.adaptation import pragmatic_adapt
-# from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.adaptation import pragmatic_adapt
+from adapt_utils.adapt.metric import *
 from adapt_utils.norms import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
@@ -335,14 +335,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # --- Adapt mesh
 
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            self.mesh = pragmatic_adapt(self.mesh, metric)
+            self.meshes[0] = pragmatic_adapt(self.mesh, metric)
 
 
             # --- Setup for next run / logging
 
             self.set_meshes(self.mesh)
             self.setup_all()
-            self.dofs.append(np.sum(self.get_function_space(adapt_field).dof_count))
+            self.dofs.append(np.sum(self.get_function_space(adapt_field)[0].dof_count))
 
             # Print to screen
             msg = "\nResulting mesh: {:7d} vertices, {:7d} elements"

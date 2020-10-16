@@ -152,11 +152,11 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
                                  [0, diffusivity_h, ]])
 
         flux_terms = 0
+        ds_interior = self.dS
         if self.horizontal_dg:  # TODO: Check signs
             alpha = self.sipg_parameter
             assert alpha is not None
             sigma = avg(alpha/self.cellsize)
-            ds_interior = self.dS
             arg_n = self.p0test*arg*self.normal('+') + self.p0test*arg*self.normal('-')
             flux_terms += -sigma*inner(arg_n,
                                        dot(avg(diff_tensor),
@@ -166,8 +166,8 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
             flux_terms += inner(dot(avg(diff_tensor), grad(arg_av)),
                                 jump(solution, self.normal))*ds_interior
         else:
-            flux_terms += self.p0test*inner(dot(diff_tensor, grad(solution)),
-                                            dot(arg, self.normal))*ds_interior
+            I = self.p0test*inner(dot(diff_tensor, grad(solution)), arg*self.normal)
+            flux_terms += (I('+') + I('-'))*ds_interior
         return flux_terms
 
     def boundary_flux(self, solution, solution_old, arg, arg_old, fields, fields_old, bnd_conditions):
@@ -194,7 +194,7 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
 
                 # Term from integration by parts
                 diff_flux = dot(diff_tensor, grad(c_in))
-                flux_terms += self.p0test*inner(diff_flux, dot(arg, self.normal))*ds_bnd
+                flux_terms += self.p0test*inner(diff_flux, arg*self.normal)*ds_bnd
 
                 # Terms from boundary conditions
                 elev = fields_old['elev_2d']
