@@ -12,18 +12,14 @@ from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischar
 parser = argparse.ArgumentParser()
 parser.add_argument('family')
 parser.add_argument('-stabilisation')
-parser.add_argument('-use_automatic_sipg_parameter')
 args = parser.parse_args()
 
 # Get filenames
 ext = args.family
 assert ext in ('cg', 'dg')
-auto_sipg = bool(args.use_automatic_sipg_parameter or False)
 if ext == 'dg':
     if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
         ext += '_lf'
-    if auto_sipg:
-        ext += '_sipg'
 else:
     if args.stabilisation in ('su', 'SU'):
         ext += '_su'
@@ -45,7 +41,7 @@ for level in range(num_levels):
     op = PointDischarge2dOptions(level=level, aligned=True)
     op.tracer_family = args.family
     op.stabilisation = args.stabilisation
-    op.use_automatic_sipg_parameter = auto_sipg
+    op.use_automatic_sipg_parameter = args.family == 'dg'
     tp = AdaptiveSteadyProblem(op)
     tp.solve_forward()
 

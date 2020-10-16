@@ -19,9 +19,6 @@ parser.add_argument('-stabilisation', help="""
     Note that 'su' and 'supg' are ignored unless the finite element family is CG.
     Note that 'lax_friedrichs' is ignored unless the finite element family is DG.
     """)
-parser.add_argument('-use_automatic_sipg_parameter', help="""
-    Automatically compute symmetrisation parameter, based on the mesh.
-    """)
 parser.add_argument('-error_to_calibrate', help="Choose from {'l2', 'qoi'}.")
 parser.add_argument('-test_consistency', help="Test consistency of taped reduced functional.")
 parser.add_argument('-test_gradient', help="Taylor test reduced functional.")
@@ -41,13 +38,6 @@ assert args.family in ('cg', 'dg')
 op.tracer_family = args.family or 'cg'
 op.stabilisation = args.stabilisation
 op.di = os.path.join(op.di, args.stabilisation or args.family)
-auto_sipg = bool(args.use_automatic_sipg_parameter or False)
-if op.tracer_family == 'cg':
-    op.use_automatic_sipg_parameter = False
-else:
-    op.use_automatic_sipg_parameter = auto_sipg
-    if auto_sipg:
-        op.di += '_sipg'
 mesh = op.default_mesh
 x, y = SpatialCoordinate(mesh)
 
@@ -63,9 +53,9 @@ control = Control(r_to_calibrate)
 dx = dx(degree=12)
 
 
-def exact_solution(r):
+def analytical_solution(r):
     """
-    Compute exact solution field for a given source radius.
+    Compute analytical solution field for a given source radius.
     """
     u = Constant(as_vector(op.base_velocity))
     D = Constant(op.base_diffusivity)
@@ -83,8 +73,8 @@ def scaled_ball(xx, yy, rr, scaling=1.0):
     :kwarg scaling: value by which to scale.
     """
     area = assemble(conditional((x - xx)**2 + (y - yy)**2 <= rr**2, 1.0, 0.0)*dx)
-    exact_area = pi*rr*rr
-    scaling *= exact_area/area
+    analytical_area = pi*rr*rr
+    scaling *= analytical_area/area
     return conditional((x - xx)**2 + (y - yy)**2 <= rr**2, scaling, 0.0)
 
 
@@ -125,7 +115,7 @@ def l2_error(r):
     Squared L2 error of approximate solution, ignoring the source region.
     """
     c = solve(r)
-    sol = exact_solution(r)
+    sol = analytical_solution(r)
     kernel = conditional((x - x0)**2 + (y - y0)**2 > r**2, 1.0, 0.0)
     return assemble(kernel*(c - sol)**2*dx)
 
@@ -135,14 +125,14 @@ def qoi_error(r):
     Sum of squared errors of the aligned and offset QoIs.
     """
     c = solve(r)
-    sol = exact_solution(r)
+    sol = analytical_solution(r)
     kernel1 = scaled_ball(20.0, 5.0, 0.5)
     J1 = assemble(kernel1*c*dx)
-    J1_exact = assemble(kernel1*sol*dx)
+    J1_analytical = assemble(kernel1*sol*dx)
     kernel2 = scaled_ball(20.0, 7.5, 0.5)
     J2 = assemble(kernel2*c*dx)
-    J2_exact = assemble(kernel2*sol*dx)
-    return (J1 - J1_exact)**2 + (J2 - J2_exact)**2
+    J2_analytical = assemble(kernel2*sol*dx)
+    return (J1 - J1_analytical)**2 + (J2 - J2_analytical)**2
 
 
 # Progress arrays
@@ -202,21 +192,19 @@ logstr = "level: {:d}\n".format(level)
 logstr += "family: {:s}\n".format(op.tracer_family.upper())
 if op.stabilisation is not None:
     logstr += "stabilisation: {:}\n".format(op.stabilisation.upper())
-if op.tracer_family == 'dg':
-    logstr += "automatic SIPG: {:}\n".format(op.use_automatic_sipg_parameter)
 logstr += "calibrated radius: {:.8f}\n".format(r_calibrated.dat.data[0])
 print_output(logstr)
 with open(os.path.join(op.di, "log"), "a") as log:
     log.write(logstr)
 
-# Plot calibrated exact and approx solutions
+# Plot calibrated analytical and approx solutions
 print_output("Plotting...")
 approx = solve(r_calibrated)
-exact = Function(approx.function_space(), name="Exact solution")
-exact.interpolate(exact_solution(r_calibrated))
-File(os.path.join(op.di, "exact.pvd")).write(exact)
+analytical = Function(approx.function_space(), name="Analytical solution")
+analytical.interpolate(analytical_solution(r_calibrated))
+File(os.path.join(op.di, "analytical.pvd")).write(analytical)
 error = Function(approx.function_space(), name="Absolute error")
-error.interpolate(abs(exact - approx))
+error.interpolate(abs(analytical - approx))
 File(os.path.join(op.di, "error.pvd")).write(error)
 
 # Save optimisation progress
@@ -225,8 +213,6 @@ ext = args.family
 if ext == 'dg':
     if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
         ext += '_lf'
-    if auto_sipg:
-        ext += '_sipg'
 else:
     if args.stabilisation in ('su', 'SU'):
         ext += '_su'

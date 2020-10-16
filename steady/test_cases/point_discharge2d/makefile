@@ -31,22 +31,15 @@ calibrate_cg:
 calibrate_dg:
 	@echo "Calibrating radius for DG (no stabilisation)..."
 	@python3 calibrate_radius.py 5 dg
-	@echo "Calibrating radius for DG (auto-SIPG)..."
-	@python3 calibrate_radius.py 5 dg -use_automatic_sipg_parameter 1
 	@echo "Calibrating radius for DG (Lax-Friedrichs stabilisation)..."
 	@python3 calibrate_radius.py 5 dg -stabilisation lax_friedrichs
-	@echo "Calibrating radius for DG (Lax-Friedrichs stabilisation, auto-SIPG)..."
-	@python3 calibrate_radius.py 5 dg -stabilisation lax_friedrichs \
-		-use_automatic_sipg_parameter 1
 
 print_calibration:
 	@cat outputs/fixed_mesh/cg/log
 	@cat outputs/fixed_mesh/su/log
 	@cat outputs/fixed_mesh/supg/log
-	@# cat outputs/fixed_mesh/dg/log
-	@cat outputs/fixed_mesh/dg_sipg/log
-	@# cat outputs/fixed_mesh/lax_friedrichs/log
-	@cat outputs/fixed_mesh/lax_friedrichs_sipg/log
+	@cat outputs/fixed_mesh/dg/log
+	@cat outputs/fixed_mesh/lax_friedrichs/log
 
 
 # --- Convergence analysis

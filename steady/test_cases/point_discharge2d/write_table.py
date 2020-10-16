@@ -8,18 +8,14 @@ import os
 parser = argparse.ArgumentParser()
 parser.add_argument('family')
 parser.add_argument('-stabilisation')
-parser.add_argument('-use_automatic_sipg_parameter')
 args = parser.parse_args()
 
 # Get filenames
 ext = args.family
 assert ext in ('cg', 'dg')
-auto_sipg = bool(args.use_automatic_sipg_parameter or False)
 if ext == 'dg':
     if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
         ext += '_lf'
-    if auto_sipg:
-        ext += '_sipg'
 else:
     if args.stabilisation in ('su', 'SU'):
         ext += '_su'

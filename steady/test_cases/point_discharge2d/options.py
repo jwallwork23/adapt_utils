@@ -54,18 +54,9 @@ class PointDischarge2dOptions(CoupledOptions):
         self.base_diffusivity = 0.1
 
         # Source / receiver
-        # NOTE: It isn't obvious how to represent a delta function on a finite element mesh. The
-        #       idea here is to use a disc with a very small radius. In the context of desalination
-        #       outfall, this makes sense, because the source is from a pipe. However, in the context
-        #       of analytical solutions, it is not quite right. As such, we have calibrated the
-        #       radius so that solving on a sequence of increasingly refined uniform meshes leads to
-        #       convergence of the uniform mesh solution to the analytical solution.
-        calibrated_r = 0.075
-        # calibrated_r = 0.07980 if aligned else 0.07972
-        self.source_loc = [(1.0 + self.shift, 5.0, calibrated_r)]
-        self.region_of_interest = [(20.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 0.5)]
         self.source_value = 100.0
         self.source_discharge = 0.1
+        self.region_of_interest = [(20.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 0.5)]
 
         # Metric normalisation
         self.normalisation = 'error'
@@ -90,13 +81,33 @@ class PointDischarge2dOptions(CoupledOptions):
         }
         return boundary_conditions
 
+    def set_calibrated_radius(self):
+        """
+        It isn't obvious how to represent a delta function in a finite element model. The approach
+        here is to approximate it using a Gaussian with a narrow radius. This radius is calibrated
+        using gradient-based optimisation for the square L2 error against the analytical solution,
+        using the `calibrate_radius.py` script on a fine mesh.
+        """
+        calibration_results = {
+            'cg': {
+                None: 0.05454219,    # Level 2 TODO: level 4
+                'su': 0.05457856,    # Level 2 TODO: level 4
+                'supg': 0.05607102,  # Level 3 TODO: level 4
+            },
+            'dg': {
+                None: 0.05607102,              # TODO
+                'lax_friedrichs': 0.05607102,  # TODO
+            },
+        }
+        calibrated_r = calibration_results[self.tracer_family][self.stabilisation]
+        return [(1.0 + self.shift, 5.0, calibrated_r)]
+
+    @property
+    def source_loc(self):
+        return self.set_calibrated_radius()
+
     def set_tracer_source(self, fs):
-        x0, y0, r0 = self.source_loc[0]
-        nrm = assemble(self.ball(fs.mesh(), source=True)*dx)
-        scaling = 1.0 if np.allclose(nrm, 0.0) else pi*r0*r0/nrm
-        scaling *= 0.5*self.source_value
-        # scaling *= self.source_value
-        return self.ball(fs.mesh(), source=True, scale=scaling)
+        return self.gaussian(fs.mesh(), source=True, scale=self.source_value)
 
     def set_qoi_kernel_tracer(self, prob, i):
         return self.set_qoi_kernel(prob.meshes[i])
@@ -104,35 +115,35 @@ class PointDischarge2dOptions(CoupledOptions):
     def set_qoi_kernel(self, mesh):
         b = self.ball(mesh, source=False)
         area = assemble(b*dx)
-        area_exact = pi*self.region_of_interest[0][2]**2
-        rescaling = 1.0 if np.allclose(area, 0.0) else area_exact/area
+        area_analytical = pi*self.region_of_interest[0][2]**2
+        rescaling = 1.0 if np.allclose(area, 0.0) else area_analytical/area
         return rescaling*b
 
-    def exact_solution(self, fs):
+    def analytical_solution(self, fs):
         solution = Function(fs)
         mesh = fs.mesh()
         x, y = SpatialCoordinate(mesh)
         x0, y0, r = self.source_loc[0]
         u = Constant(as_vector(self.base_velocity))
-        nu = Constant(self.base_diffusivity)
+        D = Constant(self.base_diffusivity)
         # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
-        r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
-        solution.interpolate(0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu))
+        rr = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
+        solution.interpolate(0.5*q/(pi*D)*exp(0.5*u[0]*(x-x0)/D)*bessk0(0.5*u[0]*rr/D))
         solution.rename('Analytic tracer concentration')
         outfile = File(os.path.join(self.di, 'analytic.pvd'))
         outfile.write(solution)  # NOTE: use 40 discretisation levels in ParaView
         return solution
 
-    def exact_qoi(self, mesh=None):
+    def analytical_qoi(self, mesh=None):
         mesh = mesh or self.default_mesh
         x, y = SpatialCoordinate(mesh)
         x0, y0, r = self.source_loc[0]
         u = Constant(as_vector(self.base_velocity))
-        nu = Constant(self.base_diffusivity)
+        D = Constant(self.base_diffusivity)
         # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
-        r = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
-        sol = 0.5*q/(pi*nu)*exp(0.5*u[0]*(x-x0)/nu)*bessk0(0.5*u[0]*r/nu)
+        rr = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
+        sol = 0.5*q/(pi*D)*exp(0.5*u[0]*(x-x0)/D)*bessk0(0.5*u[0]*rr/D)
         kernel = self.set_qoi_kernel(mesh)
         return assemble(kernel*sol*dx(degree=12))
