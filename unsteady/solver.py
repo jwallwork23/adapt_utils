@@ -244,6 +244,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Record DOFs
         self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]  # TODO: other function spaces
 
+    def get_function_space(self, field):
+        space = {'shallow_water': 'V', 'tracer': 'Q', 'sediment': 'Q', 'bathymetry': 'W'}[field]
+        return self.__getattribute__(space)
+
     def create_intermediary_spaces(self):
         super(AdaptiveProblem, self).create_intermediary_spaces()
         if self.op.approach != 'monge_ampere':
@@ -294,6 +298,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.fwd_solutions_bathymetry[i] = Function(self.W[i], name="Forward bathymetry solution")
             # self.adj_solutions_bathymetry[i] = Function(self.W[i], name="Adjoint bathymetry solution")
+
+    def get_solutions(self, field, adjoint=False):
+        name = 'adj_solutions' if adjoint else 'fwd_solutions'
+        fields = ('tracer', 'sediment', 'bathymetry')
+        if field in fields:
+            name = '_'.join([name, field])
+        return self.__getattribute__(name)
 
     def free_solutions_step(self, i):
         super(AdaptiveProblem, self).free_solutions_step(i)
@@ -1787,11 +1798,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         except KeyError:
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
 
-    # TODO: Allow adaptation to tracer / sediment / Exner
     # TODO: Enable move to base class
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
+        adapt_field = op.adapt_field
+        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
+            adapt_field = 'shallow_water'
         for n in range(op.max_adapt):
             self.outer_iteration = n
 
@@ -1836,6 +1849,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 nonlinear=self.nonlinear,
             )
             ep.outer_iteration = n
+            enriched_space = ep.get_function_space(adapt_field)
 
             # --- Loop over mesh windows *in reverse*
 
@@ -1854,11 +1868,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # TODO: Need to transfer fwd sol in nonlinear case
                 ep.create_error_estimators_step(i)  # These get passed to the timesteppers under the hood
                 ep.setup_solver_forward_step(i)
-                ets = ep.timesteppers[i]['shallow_water']  # TODO: Tracer option
+                ets = ep.timesteppers[i][adapt_field]
 
                 # --- Solve forward on current window
 
-                ts = self.timesteppers[i]['shallow_water']  # TODO: Tracer option
+                ts = self.timesteppers[i][adapt_field]
 
                 def export_func():
                     fwd_solutions_step.append(ts.solution.copy(deepcopy=True))
@@ -1901,10 +1915,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 I = 0
                 op.print_debug("DWR indicators on mesh {:2d}".format(i))
                 indicator_enriched = Function(ep.P0[i])
-                fwd_proj = Function(ep.V[i])
-                fwd_old_proj = Function(ep.V[i])
-                adj_error = Function(ep.V[i])
-                bcs = self.boundary_conditions[i]['shallow_water']  # TODO: Tracer option
+                fwd_proj = Function(enriched_space[i])
+                fwd_old_proj = Function(enriched_space[i])
+                adj_error = Function(enriched_space[i])
+                bcs = self.boundary_conditions[i][adapt_field]
                 ets.setup_error_estimator(fwd_proj, fwd_old_proj, adj_error, bcs)
 
                 # Loop over exported timesteps
@@ -1925,7 +1939,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                     # Time-integrate
                     I += op.dt*self.dt_per_mesh*scaling*indicator_enriched
-                indicator_enriched_cts = interpolate(I, ep.P1[i])
+                indicator_enriched_cts = interpolate(I, ep.P1[i])  # TODO: Project?
                 tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
                 metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
 
@@ -1975,7 +1989,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             self.set_meshes(self.meshes)
             self.setup_all()
-            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
+            base_space = self.get_function_space(adapt_field)
+            self.dofs.append([np.sum(fs.dof_count) for fs in base_space])
 
             self.print("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"

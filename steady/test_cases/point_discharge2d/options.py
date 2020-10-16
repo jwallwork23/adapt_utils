@@ -64,6 +64,7 @@ class PointDischarge2dOptions(CoupledOptions):
 
         # Goal-oriented error estimation
         self.degree_increase_tracer = 1
+        self.adapt_field = 'tracer'
 
         # Mesh adaptation
         self.max_adapt = 35

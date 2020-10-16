@@ -234,3 +234,122 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         for the adjoint PDE.
         """
         raise NotImplementedError  # TODO
+
+    @property
+    def indicator(self):
+        return self.indicators[0]
+
+    def run_dwr(self, **kwargs):
+        # TODO: doc
+        op = self.op
+        adapt_field = op.adapt_field
+        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
+            adapt_field = 'shallow_water'
+        for n in range(op.max_adapt):
+            self.outer_iteration = n
+            fwd_solution = self.get_solutions(adapt_field)[0]
+            adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
+
+
+            # --- Setup problem on enriched space
+
+            hierarchy = MeshHierarchy(self.mesh, 1)
+            refined_mesh = hierarchy[1]
+            ep = type(self)(
+                op,
+                meshes=refined_mesh,
+                nonlinear=self.nonlinear,
+            )
+            ep.outer_iteration = n
+            enriched_space = ep.get_function_space(adapt_field)
+
+            # Create indicator and metric
+            self.indicator['dwr'] = Function(self.P1[0], name="DWR indicator")
+            metric = Function(self.P1_ten[0], name="Metric")
+
+            tm = dmhooks.get_transfer_manager(self.get_plex(0))
+
+            # Setup forward solver for enriched problem
+            ep.create_error_estimators_step(0)
+            ep.setup_solver_forward_step(0)
+            ets = ep.timesteppers[0][adapt_field]
+            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
+
+
+            # --- Solve forward
+
+            self.solve_forward()
+
+            # Check QoI convergence
+            qoi = self.quantity_of_interest()
+            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+            self.qois.append(qoi)
+            if len(self.qois) > 1:
+                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
+                    self.print("Converged quantity of interest!")
+                    break
+
+            # Check maximum number of iterations
+            if n == op.max_adapt - 1:
+                break
+
+
+            # --- Solve adjoint
+
+            self.solve_adjoint()  # Base space
+            ep.solve_adjoint()    # Enriched space
+
+
+            # --- Assemble indicator and metric
+
+            indicator_enriched = Function(ep.P0[0])
+            fwd_proj = Function(enriched_space[0])
+            adj_error = Function(enriched_space[0])
+            bcs = self.boundary_conditions[0][adapt_field]
+            ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
+
+            # Prolong forward solution at current timestep
+            tm.prolong(fwd_solution, fwd_proj)
+
+            # Approximate adjoint error in enriched space
+            tm.prolong(adj_solution, adj_error)
+            adj_error *= -1
+            adj_error += enriched_adj_solution
+
+            # Compute dual weighted residual
+            indicator_enriched.interpolate(abs(ets.error_estimator.weighted_residual()))
+            indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])  # TODO: Project?
+            tm.inject(indicator_enriched_cts, self.indicator['dwr'])
+
+            # Construct metric
+            metric.assign(isotropic_metric(self.indicator['dwr'], normalise=True))
+
+            # Output to .pvd and .vtu
+            if op.plot_pvd:
+                File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator['dwr'])
+                metric_file = File(os.path.join(self.di, 'metric.pvd')).write(metric)
+
+            # TODO: Log complexities
+
+
+            # --- Adapt mesh
+
+            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+            self.mesh = pragmatic_adapt(self.mesh, metric)
+
+
+            # --- Setup for next run / logging
+
+            self.set_meshes(self.mesh)
+            self.setup_all()
+            self.dofs.append(np.sum(self.get_function_space(adapt_field).dof_count))
+
+            # Print to screen
+            msg = "\nResulting mesh: {:7d} vertices, {:7d} elements"
+            num_cells = self.num_cells
+            self.print(msg.format(self.num_vertices[-1][0], num_cells[-1][0]))
+
+            # Check convergence of element count
+            if np.abs(num_cells[-1][0] - num_cells[-2][0]) > op.element_rtol*num_cells[-2][0]:
+                self.print("Converged number of mesh elements!")
+                break
