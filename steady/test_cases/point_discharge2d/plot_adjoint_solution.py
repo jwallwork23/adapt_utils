@@ -36,20 +36,27 @@ op.stabilisation = args.stabilisation
 alignment = 'offset' if offset else 'aligned'
 op.di = os.path.join(op.di, args.stabilisation or family, alignment)
 
-# Load from HDF5
-Q = FunctionSpace(op.default_mesh, op.tracer_family.upper(), op.degree_tracer)
-continuous = initialise_field(Q, "Adjoint tracer", "continuous_adjoint", fpath=op.di, op=op)
-
 # Plot
-fig, axes = plt.subplots(figsize=(8, 3))
-eps = 1.0e-05
-levels = np.linspace(-eps, 0.75 + eps, 50)
-tc = tricontourf(continuous, axes=axes, levels=levels, cmap='coolwarm')
-cbar = fig.colorbar(tc, ax=axes, orientation="horizontal", pad=0.1)
-cbar.set_ticks(np.linspace(0, 0.75, 4))
-axes.set_xticks(np.linspace(0, 50, 6))
-axes.xaxis.tick_top()
-axes.set_yticks(np.linspace(0, 10, 3))
-savefig("continuous_adjoint", op.di, extensions=["png"])
+Q = FunctionSpace(op.default_mesh, op.tracer_family.upper(), op.degree_tracer)
+solutions = []
+for approach in ('continuous', 'discrete'):
 
-# TODO: discrete
+    # Load from HDF5
+    fname = "_".join([approach, "adjoint"])
+    adj = initialise_field(Q, "Adjoint tracer", fname, fpath=op.di, op=op)
+    solutions.append(adj)
+
+    # Plot
+    fig, axes = plt.subplots(figsize=(8, 3))
+    eps = 1.0e-05
+    levels = np.linspace(-eps, 0.75 + eps, 20)
+    tc = tricontourf(adj, axes=axes, levels=levels, cmap='coolwarm')
+    cbar = fig.colorbar(tc, ax=axes, orientation="horizontal", pad=0.1)
+    cbar.set_ticks(np.linspace(0, 0.75, 4))
+    axes.set_xticks(np.linspace(0, 50, 6))
+    axes.xaxis.tick_top()
+    axes.set_yticks(np.linspace(0, 10, 3))
+    savefig(fname, op.di, extensions=["png"])
+
+# Compute L2 error
+print_output("L2 'error': {:.4f}%".format(100*errornorm(*solutions)/norm(solutions[1])))

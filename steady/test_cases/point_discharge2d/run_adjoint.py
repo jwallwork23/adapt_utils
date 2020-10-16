@@ -1,4 +1,7 @@
-from thetis import create_directory
+from thetis import *
+from firedrake_adjoint import *
+from firedrake.adjoint.blocks import GenericSolveBlock, ProjectBlock
+import pyadjoint
 
 import argparse
 import os
@@ -40,14 +43,29 @@ op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 # TODO: Limiters?
 
 
-# --- Solve
+# --- Solve forward
 
 tp = AdaptiveSteadyProblem(op)
+tp.solve_forward()
+J = tp.quantity_of_interest()
+pyadjoint.solve_adjoint(J)
+stop_annotating()
+
+
+# --- Solve discrete adjoint
+
+tape = get_working_tape()
+solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
+solve_blocks = [block for block in solve_blocks if not isinstance(block, ProjectBlock)]
+assert len(solve_blocks) == 1
+adj = solve_blocks[0].adj_sol
+adj *= -1  # FIXME: Why do we need this?
+export_field(adj, "Adjoint tracer", "discrete_adjoint", fpath=op.di, plexname=None, op=op)
+
+
+# --- Solve continuous adjoint
+
 tp.solve_adjoint()
 adj = tp.adj_solution_tracer
-
-# Export to HDF5
 op.plot_pvd = False
 export_field(adj, "Adjoint tracer", "continuous_adjoint", fpath=op.di, plexname=None, op=op)
-
-# TODO: discrete

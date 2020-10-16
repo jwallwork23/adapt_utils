@@ -518,7 +518,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         super(AdaptiveProblem, self).transfer_forward_solution(i, **kwargs)
 
         # Check Reynolds and CFL numbers
-        if self.op.debug:
+        if self.op.debug and self.op.solve_swe:
             self.compute_mesh_reynolds_number(i)
             if hasattr(self.op, 'check_cfl_criterion'):
                 self.op.check_cfl_criterion(self, i, error_factor=None)
@@ -981,7 +981,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # u, eta = self.fwd_solutions[i].split()  # FIXME: Not fully annotated
             u, eta = split(self.fwd_solutions[i])  # FIXME: Not fully annotated
         else:
-            u = Constant(as_vector(self.op.base_velocity))
+            # u = Constant(as_vector(self.op.base_velocity))  # FIXME: Pyadjoint doesn't like this
+            u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
             eta = Constant(0.0)
         fields = AttrDict({
             'elev_2d': eta,
