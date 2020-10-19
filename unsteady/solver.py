@@ -121,6 +121,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Custom arrays
         self.reynolds_number = ReynoldsNumberArray(self.meshes, op)
 
+    @property
+    def mesh(self):
+        return self.meshes[0]
+
+    @property
+    def fwd_solution(self):
+        return self.fwd_solutions[0]
+
+    @property
+    def adj_solution(self):
+        return self.adj_solutions[0]
+
+    @property
+    def fwd_solution_tracer(self):
+        return self.fwd_solutions_tracer[0]
+
+    @property
+    def adj_solution_tracer(self):
+        return self.adj_solutions_tracer[0]
+
     def create_outfiles(self):
         if not self.op.plot_pvd:
             return
@@ -224,6 +244,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Record DOFs
         self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]  # TODO: other function spaces
 
+    def get_function_space(self, field):
+        space = {'shallow_water': 'V', 'tracer': 'Q', 'sediment': 'Q', 'bathymetry': 'W'}[field]
+        return self.__getattribute__(space)
+
     def create_intermediary_spaces(self):
         super(AdaptiveProblem, self).create_intermediary_spaces()
         if self.op.approach != 'monge_ampere':
@@ -274,6 +298,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             self.fwd_solutions_bathymetry[i] = Function(self.W[i], name="Forward bathymetry solution")
             # self.adj_solutions_bathymetry[i] = Function(self.W[i], name="Adjoint bathymetry solution")
+
+    def get_solutions(self, field, adjoint=False):
+        name = 'adj_solutions' if adjoint else 'fwd_solutions'
+        fields = ('tracer', 'sediment', 'bathymetry')
+        if field in fields:
+            name = '_'.join([name, field])
+        return self.__getattribute__(name)
 
     def free_solutions_step(self, i):
         super(AdaptiveProblem, self).free_solutions_step(i)
@@ -331,7 +362,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 'sediment_sink_2d': self.op.set_sediment_sink(self.P1DG[i]),
                 'sediment_depth_integ_sink': self.op.set_sediment_depth_integ_sink(self.P1DG[i]),
             })
-        self.inflow[i] = self.op.set_inflow(self.P1_vec[i])
+        self.inflow = [self.op.set_inflow(P1_vec) for P1_vec in self.P1_vec]
 
     def free_fields_step(self, i):
         super(AdaptiveProblem, self).free_fields_step(i)
@@ -431,6 +462,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     op.print_debug(msg.format(model, i, v.min()[1], v.max()[1]))
 
         # Stabilisation
+        eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = None
         if self.stabilisation is None:
             return
         elif self.stabilisation == 'lax_friedrichs':
@@ -439,10 +471,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
             eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
         elif self.stabilisation == 'su':
             assert family == 'cg'
-            raise NotImplementedError  # TODO
+            eq_options[i]['su_stabilisation'] = True
         elif self.stabilisation == 'supg':
             assert family == 'cg'
-            raise NotImplementedError  # TODO
+            assert self.op.timestepper == 'SteadyState'  # TODO
+            eq_options[i]['supg_stabilisation'] = True
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
@@ -487,7 +520,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         super(AdaptiveProblem, self).transfer_forward_solution(i, **kwargs)
 
         # Check Reynolds and CFL numbers
-        if self.op.debug:
+        if self.op.debug and self.op.solve_swe:
             self.compute_mesh_reynolds_number(i)
             if hasattr(self.op, 'check_cfl_criterion'):
                 self.op.check_cfl_criterion(self, i, error_factor=None)
@@ -828,11 +861,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
     def create_adjoint_tracer_equation_step(self, i):
-        from .tracer.adjoint import AdjointTracerEquation2D, AdjointConservativeTracerEquation2D
+        from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
 
         op = self.tracer_options[i]
         conservative = op.use_tracer_conservative_form
-        model = AdjointConservativeTracerEquation2D if conservative else AdjointTracerEquation2D
+        model = TracerEquation2D if conservative else ConservativeTracerEquation2D
         self.equations[i].adjoint_tracer = model(
             self.Q[i],
             self.depth[i],
@@ -946,7 +979,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         return fields
 
     def _get_fields_for_tracer_timestepper(self, i):
-        u, eta = self.fwd_solutions[i].split()
+        if self.op.solve_swe:
+            # u, eta = self.fwd_solutions[i].split()  # FIXME: Not fully annotated
+            u, eta = split(self.fwd_solutions[i])  # FIXME: Not fully annotated
+        else:
+            # u = Constant(as_vector(self.op.base_velocity))  # FIXME: Pyadjoint doesn't like this
+            u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
+            eta = Constant(0.0)
         fields = AttrDict({
             'elev_2d': eta,
             'uv_2d': u,
@@ -963,6 +1002,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
+        elif self.stabilisation == 'su':
+            fields['su_stabilisation'] = True
+        elif self.stabilisation == 'supg':
+            fields['supg_stabilisation'] = True
         return fields
 
     def _get_fields_for_sediment_timestepper(self, i):
@@ -1142,8 +1185,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def create_adjoint_tracer_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_tracer_timestepper(i)
 
-        # fields.uv_2d = - fields.uv_2d
-
         # Account for dJdc
         dJdc = self.op.set_qoi_kernel_tracer(self, i)  # TODO: Store this kernel somewhere
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
@@ -1215,7 +1256,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.callbacks[i].add(VorticityNormCallback(self, i), 'export')
 
     def setup_solver_forward_step(self, i):
-        """Setup forward solver on mesh `i`."""
+        """
+        Setup forward solver on mesh `i`.
+        """
         op = self.op
         op.print_debug("SETUP: Creating forward equations on mesh {:d}...".format(i))
         self.create_forward_equations_step(i)
@@ -1433,11 +1476,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if op.solve_tracer:
             ts = self.timesteppers[i]['adjoint_tracer']
             dbcs = []
-            if op.family == 'cg':
+            if op.tracer_family == 'cg':
                 op.print_debug("SETUP: Applying adjoint tracer DirichletBCs on mesh {:d}...".format(i))
-                raise NotImplementedError  # TODO
+                for j in bcs['tracer']:
+                    if 'diff_flux' not in bcs['tracer'][j]:
+                        dbcs.append(DirichletBC(self.Q[i], 0, j))
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="adjoint_tracer")
+        if op.solve_sediment:
+            raise NotImplementedError
+        if op.solve_exner:
+            raise NotImplementedError
 
     def free_solver_adjoint_step(self, i):
         op = self.op
@@ -1759,11 +1808,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         except KeyError:
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
 
-    # TODO: Allow adaptation to tracer / sediment / Exner
     # TODO: Enable move to base class
     def run_dwr(self, **kwargs):
         # TODO: doc
         op = self.op
+        adapt_field = op.adapt_field
+        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
+            adapt_field = 'shallow_water'
         for n in range(op.max_adapt):
             self.outer_iteration = n
 
@@ -1808,6 +1859,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 nonlinear=self.nonlinear,
             )
             ep.outer_iteration = n
+            enriched_space = ep.get_function_space(adapt_field)
 
             # --- Loop over mesh windows *in reverse*
 
@@ -1826,11 +1878,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # TODO: Need to transfer fwd sol in nonlinear case
                 ep.create_error_estimators_step(i)  # These get passed to the timesteppers under the hood
                 ep.setup_solver_forward_step(i)
-                ets = ep.timesteppers[i]['shallow_water']  # TODO: Tracer option
+                ets = ep.timesteppers[i][adapt_field]
 
                 # --- Solve forward on current window
 
-                ts = self.timesteppers[i]['shallow_water']  # TODO: Tracer option
+                ts = self.timesteppers[i][adapt_field]
 
                 def export_func():
                     fwd_solutions_step.append(ts.solution.copy(deepcopy=True))
@@ -1873,10 +1925,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 I = 0
                 op.print_debug("DWR indicators on mesh {:2d}".format(i))
                 indicator_enriched = Function(ep.P0[i])
-                fwd_proj = Function(ep.V[i])
-                fwd_old_proj = Function(ep.V[i])
-                adj_error = Function(ep.V[i])
-                bcs = self.boundary_conditions[i]['shallow_water']  # TODO: Tracer option
+                fwd_proj = Function(enriched_space[i])
+                fwd_old_proj = Function(enriched_space[i])
+                adj_error = Function(enriched_space[i])
+                bcs = self.boundary_conditions[i][adapt_field]
                 ets.setup_error_estimator(fwd_proj, fwd_old_proj, adj_error, bcs)
 
                 # Loop over exported timesteps
@@ -1897,7 +1949,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                     # Time-integrate
                     I += op.dt*self.dt_per_mesh*scaling*indicator_enriched
-                indicator_enriched_cts = interpolate(I, ep.P1[i])
+                indicator_enriched_cts = interpolate(I, ep.P1[i])  # TODO: Project?
                 tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
                 metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
 
@@ -1947,7 +1999,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             self.set_meshes(self.meshes)
             self.setup_all()
-            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
+            base_space = self.get_function_space(adapt_field)
+            self.dofs.append([np.sum(fs.dof_count) for fs in base_space])
 
             self.print("\nResulting meshes")
             msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"

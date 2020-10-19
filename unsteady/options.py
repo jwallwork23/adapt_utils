@@ -29,6 +29,9 @@ class CoupledOptions(Options):
     base_diffusivity = NonNegativeFloat(0.0, help="""
         Non-negative value providing the default constant diffusivity field.
         """).tag(config=True)
+    base_bathymetry = PositiveFloat(1.0, help="""
+        Positive value providing the default bathymetry field.
+        """).tag(config=True)
     base_velocity = List([0.0, 0.0], help="""
         Two element list providing the default constant velocity field.
         """).tag(config=True)
@@ -234,7 +237,7 @@ class CoupledOptions(Options):
 
     def set_bathymetry(self, fs):
         """Should be implemented in derived class."""
-        return Function(fs).assign(1.0)
+        return Function(fs).assign(self.base_bathymetry)
 
     def set_advective_velocity_factor(self, fs):
         """Should be implemented in derived class."""
@@ -291,7 +294,7 @@ class CoupledOptions(Options):
         bathymetry_displacement = prob.equations[i].shallow_water.depth.wd_bathymetry_displacement
         return eta + bathymetry_displacement(eta)
 
-    def get_export_func(self, prob, i):
+    def get_export_func(self, prob, i, **kwargs):
         if self.wetting_and_drying:
             eta_tilde = Function(prob.P1DG[i], name="Modified elevation")
             self.eta_tilde_file._topology = None

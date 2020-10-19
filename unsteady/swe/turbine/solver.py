@@ -5,6 +5,9 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.swe.turbine.callback import PowerOutputCallback
 
 
+# NOTE: DUPLICATED IN adapt_utils/steady/swe/turbine/solver.py
+
+
 __all__ = ["AdaptiveTurbineProblem"]
 
 

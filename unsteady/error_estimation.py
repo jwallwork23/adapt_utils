@@ -112,6 +112,7 @@ class GOErrorEstimator(Equation):
         NOTE: The mass matrix is diagonal in P0 space so applying a Jacobi PC is an exact solve!
         """
         if self.inter_element_flux_terms == 0:
+            print_output("NOTE: No inter-element flux terms detected.")
             self.flux.assign(0.0)
         else:
             mass_term = self.p0test*self.p0trial*dx
@@ -126,6 +127,7 @@ class GOErrorEstimator(Equation):
         NOTE: The mass matrix is diagonal in P0 space so applying a Jacobi PC is an exact solve!
         """
         if self.bnd_flux_terms == 0:
+            print_output("NOTE: No boundary flux terms detected.")
             self.bnd.assign(0.0)
         else:
             mass_term = self.p0test*self.p0trial*dx
@@ -141,10 +143,10 @@ class GOErrorEstimator(Equation):
         If evaluated at the adjoint solution (and time-lagged adjoint solution), yields the so-called
         'Dual Weighted Residual'.
         """
-        wr = self.element_residual()
+        wr = Function(self.P0_2d, name="Weighted residual")
+        wr += self.element_residual()
         wr += self.inter_element_flux()
         wr += self.boundary_flux()
-        wr.rename("Weighted residual")
         return wr
 
     def residual(self):

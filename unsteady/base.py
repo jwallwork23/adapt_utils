@@ -84,7 +84,7 @@ class AdaptiveProblemBase(object):
             raise NotImplementedError("Time integrator {:s} not implemented".format(op.timestepper))
         self.integrator = implemented_steppers[self.op.timestepper]
         if op.timestepper == 'SteadyState':
-            assert op.end_time < op.dt
+            assert op.end_time <= op.dt
 
         # Mesh movement
         self.mesh_movers = [None for i in range(self.num_meshes)]
@@ -268,7 +268,9 @@ class AdaptiveProblemBase(object):
         raise NotImplementedError("To be implemented in derived class")
 
     def set_boundary_conditions(self):
-        """Set boundary conditions *for all models*"""
+        """
+        Set boundary conditions *for all models*.
+        """
         self.op.print_debug("SETUP: Setting boundary conditions...")
         self.boundary_conditions = [
             self.op.set_boundary_conditions(self, i) for i in range(self.num_meshes)
@@ -426,6 +428,7 @@ class AdaptiveProblemBase(object):
         """
         self.op.print_debug("I/O: Saving meshes to file...")
         fpath = fpath or self.di
+        self.op.print_debug(op.indent + "I/O: Storing plex to {:s}...".format(fname))
         for i, mesh in enumerate(self.meshes):
             save_mesh(mesh, '{:s}_{:d}'.format(fname, i), fpath)
 
@@ -439,6 +442,7 @@ class AdaptiveProblemBase(object):
         self.op.print_debug("I/O: Loading meshes from file...")
         fpath = fpath or self.di
         for i in range(self.num_meshes):
+            self.op.print_debug(op.indent + "I/O: Loading plex from {:s}...".format(fname))
             self.meshes[i] = load_mesh('{:s}_{:d}'.format(fname, i), fpath)
 
     def setup_solver_forward_step(self, i):

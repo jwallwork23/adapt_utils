@@ -286,7 +286,7 @@ def isotropic_metric(f, **kwargs):
 
     # Project into P1 space
     op.print_debug("METRIC: Constructing isotropic metric...")
-    M_diag = project(max_value(abs(f), 1e-10), V)
+    M_diag = project(max_value(abs(f), 1e-12), V)
     M_diag.interpolate(abs(M_diag))  # Ensure positivity
 
     # Normalise
@@ -303,7 +303,7 @@ def isotropic_metric(f, **kwargs):
             detM.interpolate(pow(detM, p/(2*p + dim)))
         if op.normalisation == 'complexity':
             M_diag *= pow(rescale/assemble(detM*dx), 2/dim)
-        else:
+        else:  # FIXME!!!
             if p is not None:
                 M_diag *= pow(assemble(detM*dx), 1/p)
             M_diag *= dim/rescale

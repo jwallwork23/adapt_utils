@@ -251,10 +251,10 @@ class Options(FrozenConfigurable):
     def set_qoi_kernel_tracer(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def exact_solution(self, fs):
+    def analytical_solution(self, fs):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def exact_qoi(self):  # TODO: surely it needs an arg
+    def analytical_qoi(self):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def get_update_forcings(self, prob, i, **kwargs):
@@ -280,7 +280,10 @@ class Options(FrozenConfigurable):
             return
         if mode == 'full' and self.debug_mode == 'basic':
             return
-        print_output(self.indent + msg)
+        try:
+            print_output(self.indent + msg)
+        except TypeError:
+            print(msg)
 
     # TODO: USEME
     def get_mesh_velocity(self):
