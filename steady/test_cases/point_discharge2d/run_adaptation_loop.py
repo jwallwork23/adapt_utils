@@ -37,6 +37,19 @@ assert family in ('cg', 'dg')
 target = float(args.target or 1.0e+03)
 level = int(args.level or 0)
 offset = bool(args.offset or False)
+
+# Get filenames
+ext = family
+if ext == 'dg':
+    if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
+        ext += '_lf'
+else:
+    if args.stabilisation in ('su', 'SU'):
+        ext += '_su'
+    if args.stabilisation in ('supg', 'SUPG'):
+        ext += '_supg'
+fname = 'qoi_{:s}'.format(ext)
+
 kwargs = {
     'level': level,
 
@@ -79,19 +92,6 @@ for n in range(op.outer_iterations):
     qois.append(tp.qois[-1])
     print("Element count: ", elements)
     print("QoIs:          ", qois)
-
-# Get filenames
-ext = args.family
-assert ext in ('cg', 'dg')
-if ext == 'dg':
-    if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
-        ext += '_lf'
-else:
-    if args.stabilisation in ('su', 'SU'):
-        ext += '_su'
-    if args.stabilisation in ('supg', 'SUPG'):
-        ext += '_supg'
-fname = 'qoi_{:s}'.format(ext)
 
 # Store element count and QoI to HDF5
 alignment = 'offset' if offset else 'aligned'

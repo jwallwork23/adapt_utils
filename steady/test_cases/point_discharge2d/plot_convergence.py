@@ -46,7 +46,8 @@ for alignment in ('aligned', 'offset'):
             elements = np.array(outfile['elements'])
             qoi = np.array(outfile['qoi'])
             if approach == 'fixed_mesh':
-                qoi_exact = np.array(outfile['qoi_exact'][-1])
+                # qoi_exact = np.array(outfile['qoi_exact'][-1])
+                qoi_exact = np.array(outfile['qoi'][-1])
         relative_error = np.abs(qoi - qoi_exact)/np.abs(qoi_exact)
         axes.semilogx(elements, relative_error, '--x', label=approaches[approach])
     axes.set_xlabel("Element count")
@@ -58,5 +59,4 @@ for alignment in ('aligned', 'offset'):
     axes.yaxis.set_minor_locator(MultipleLocator(yticks[1]/2))
     axes.grid(True)
     axes.grid(True, which='minor', axis='y')
-    plt.tight_layout()
     savefig('_'.join([filename, alignment]), plot_dir, extensions=['pdf', 'png'])

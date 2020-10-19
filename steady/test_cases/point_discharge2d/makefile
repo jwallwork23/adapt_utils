@@ -45,8 +45,16 @@ print_calibration:
 # --- Convergence analysis
 
 uniform:
-	@echo "Running uniform convergence test..."
+	@echo "Running uniform refinement convergence test..."
 	@python3 run_uniform_convergence.py
+
+isotropic:
+	@echo "Running isotropic adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -offset 1
+
+# TODO: A posteriori anisotropic
+# TODO: A priori anisotropic
 
 table:
 	@echo "Writing to LaTeX formatted table..."
