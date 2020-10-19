@@ -179,22 +179,71 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def get_dwr_flux_adjoint(self):
         raise NotImplementedError  # TODO
 
-    def dwr_indication(self, adjoint=False):
+    def indicate_error(self, adapt_field):
+        op = self.op
+        if op.approach == 'dwr':
+            return self.dwr_indicator(adapt_field, adjoint=False)
+        elif op.approach == 'dwr_adjoint':
+            return self.dwr_indicator(adapt_field, adjoint=True)
+        else:
+            raise NotImplementedError  # TODO
+
+    def dwr_indicator(self, adapt_field, adjoint=False):
         """
         Indicate errors in the quantity of interest by the 'Dual Weighted Residual' (DWR) method of
         [Becker and Rannacher, 2001].
 
         A P1 field to be used for isotropic mesh adaptation is stored as `self.indicator`.
         """
-        raise NotImplementedError  # TODO
+        op = self.op
+        self.indicator['dwr'] = Function(self.P1[0], name="DWR indicator")
 
-    def dwp_indication(self):
-        """
-        Indicate significance by the product of forward and adjoint solutions. This approach was
-        used for mesh adaptive tsunami modelling in [Davis and LeVeque, 2016]. Here 'DWP' is used
-        to stand for 'Dual Weighted Primal'.
-        """
-        raise NotImplementedError  # TODO
+        # Setup problem on enriched space
+        hierarchy = MeshHierarchy(self.mesh, 1)
+        refined_mesh = hierarchy[1]
+        ep = type(self)(
+            op,
+            meshes=refined_mesh,
+            nonlinear=self.nonlinear,
+        )
+        ep.outer_iteration = self.outer_iteration
+        enriched_space = ep.get_function_space(adapt_field)
+        tm = dmhooks.get_transfer_manager(self.get_plex(0))
+
+        # Setup forward solver for enriched problem
+        ep.create_error_estimators_step(0)
+        ep.setup_solver_forward_step(0)
+        if adjoint:
+            raise NotImplementedError  # TODO
+        else:
+            ep.solve_adjoint()
+        enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
+
+        # Create solution fields
+        fwd_solution = self.get_solutions(adapt_field)[0]
+        adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
+        indicator_enriched = Function(ep.P0[0])
+        fwd_proj = Function(enriched_space[0])
+        adj_error = Function(enriched_space[0])
+        bcs = self.boundary_conditions[0][adapt_field]
+
+        # Setup error estimator
+        ets = ep.timesteppers[0][adapt_field]
+        ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
+
+        # Prolong forward solution at current timestep
+        tm.prolong(fwd_solution, fwd_proj)
+
+        # Approximate adjoint error in enriched space
+        tm.prolong(adj_solution, adj_error)
+        adj_error *= -1
+        adj_error += enriched_adj_solution
+
+        # Compute dual weighted residual
+        indicator_enriched.interpolate(abs(ets.error_estimator.weighted_residual()))
+        indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])  # TODO: Project?
+        tm.inject(indicator_enriched_cts, self.indicator['dwr'])  # TODO: Project?
+        return self.indicator['dwr']
 
     def get_hessian_metric(self, adjoint=False, **kwargs):
         """
@@ -212,12 +261,26 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         raise NotImplementedError  # TODO
 
-    def get_isotropic_metric(self):
+    def get_metric(self, adapt_field):
+        if 'dwr' in self.op.approach:
+            metric = self.get_isotropic_metric(adapt_field)
+        else:
+            raise NotImplementedError  # TODO
+        if self.op.plot_pvd:
+            File(os.path.join(self.di, 'metric.pvd')).write(metric)
+        return metric
+
+    def get_isotropic_metric(self, adapt_field):
         """
         Scale an identity matrix by the indicator field in order to drive
         isotropic mesh refinement.
         """
-        raise NotImplementedError  # TODO
+        indicator = self.indicate_error(adapt_field)
+        if self.op.plot_pvd:
+            File(os.path.join(self.di, 'indicator.pvd')).write(indicator)
+        metric = Function(self.P1_ten[0], name="Metric")
+        metric.assign(isotropic_metric(indicator, normalise=True, op=self.op))
+        return metric
 
     def get_loseille_metric(self, adjoint=False, relax=True):
         """
@@ -247,37 +310,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             adapt_field = 'shallow_water'
         for n in range(op.max_adapt):
             self.outer_iteration = n
-            fwd_solution = self.get_solutions(adapt_field)[0]
-            adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
 
-
-            # --- Setup problem on enriched space
-
-            hierarchy = MeshHierarchy(self.mesh, 1)
-            refined_mesh = hierarchy[1]
-            ep = type(self)(
-                op,
-                meshes=refined_mesh,
-                nonlinear=self.nonlinear,
-            )
-            ep.outer_iteration = n
-            enriched_space = ep.get_function_space(adapt_field)
-
-            # Create indicator and metric
-            self.indicator['dwr'] = Function(self.P1[0], name="DWR indicator")
-            metric = Function(self.P1_ten[0], name="Metric")
-
-            tm = dmhooks.get_transfer_manager(self.get_plex(0))
-
-            # Setup forward solver for enriched problem
-            ep.create_error_estimators_step(0)
-            ep.setup_solver_forward_step(0)
-            ets = ep.timesteppers[0][adapt_field]
-            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
-
-
-            # --- Solve forward
-
+            # Solve forward in base space
             self.solve_forward()
 
             # Check QoI convergence
@@ -293,53 +327,19 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             if n == op.max_adapt - 1:
                 break
 
-
-            # --- Solve adjoint
-
-            self.solve_adjoint()  # Base space
-            ep.solve_adjoint()    # Enriched space
-
-
-            # --- Assemble indicator and metric
-
-            indicator_enriched = Function(ep.P0[0])
-            fwd_proj = Function(enriched_space[0])
-            adj_error = Function(enriched_space[0])
-            bcs = self.boundary_conditions[0][adapt_field]
-            ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
-
-            # Prolong forward solution at current timestep
-            tm.prolong(fwd_solution, fwd_proj)
-
-            # Approximate adjoint error in enriched space
-            tm.prolong(adj_solution, adj_error)
-            adj_error *= -1
-            adj_error += enriched_adj_solution
-
-            # Compute dual weighted residual
-            indicator_enriched.interpolate(abs(ets.error_estimator.weighted_residual()))
-            indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])  # TODO: Project?
-            tm.inject(indicator_enriched_cts, self.indicator['dwr'])  # TODO: Project?
+            # Solve adjoint equation in base space
+            self.solve_adjoint()
 
             # Construct metric
-            metric.assign(isotropic_metric(self.indicator['dwr'], normalise=True, op=self.op))
-
-            # Output to .pvd and .vtu
-            if op.plot_pvd:
-                File(os.path.join(self.di, 'indicator.pvd')).write(self.indicator['dwr'])
-                metric_file = File(os.path.join(self.di, 'metric.pvd')).write(metric)
+            metric = self.get_metric(adapt_field)
 
             # TODO: Log complexities
 
-
-            # --- Adapt mesh
-
+            # Adapt mesh
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             self.meshes[0] = pragmatic_adapt(self.mesh, metric)
 
-
-            # --- Setup for next run / logging
-
+            # Setup for next run
             self.set_meshes(self.mesh)
             self.setup_all()
             self.dofs.append(np.sum(self.get_function_space(adapt_field)[0].dof_count))

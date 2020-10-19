@@ -17,6 +17,8 @@ parser.add_argument('-stabilisation', help="Stabilisation method to use.")
 parser.add_argument('-approach', help="Mesh adaptation approach.")
 parser.add_argument('-target', help="Target complexity.")
 parser.add_argument('-normalisation', help="Metric normalisation strategy.")
+parser.add_argument('-min_adapt', help="Minimum number of mesh adaptations.")
+parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
 
 # I/O and debugging
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
@@ -38,6 +40,8 @@ kwargs = {
     'approach': args.approach or 'dwr',
     'target': float(args.target or 1.0e+03),
     'norm_order': 1,
+    'min_adapt': int(args.min_adapt or 0),
+    'max_adapt': int(args.max_adapt or 35),
 
     # I/O and debugging
     'plot_pvd': True,

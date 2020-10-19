@@ -66,7 +66,6 @@ class PointDischarge2dOptions(CoupledOptions):
         self.adapt_field = 'tracer'
 
         # Mesh adaptation
-        self.max_adapt = 35
         self.element_rtol = 0.002
         self.h_min = 1.0e-10
         self.h_max = 1.0e+02
@@ -89,16 +88,18 @@ class PointDischarge2dOptions(CoupledOptions):
         here is to approximate it using a Gaussian with a narrow radius. This radius is calibrated
         using gradient-based optimisation for the square L2 error against the analytical solution,
         using the `calibrate_radius.py` script on a fine mesh.
+
+        Note that the calibrated radii are computed on mesh level 4 in the hierarchy.
         """
         calibration_results = {
             'cg': {
-                None: 0.05607162,    # Level 3 TODO: level 4
-                'su': 0.05606179,    # Level 3 TODO: level 4
+                None: 0.05606309,
+                'su': 0.05606563,
                 'supg': 0.05606535,
             },
             'dg': {
-                None: 0.05607102,              # TODO
-                'lax_friedrichs': 0.05607102,  # TODO
+                None: 0.05453682,              # TODO: level 4
+                'lax_friedrichs': 0.05606172,  # TODO: level 4
             },
         }
         calibrated_r = calibration_results[self.tracer_family][self.stabilisation]
