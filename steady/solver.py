@@ -323,7 +323,11 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
         """
-        raise NotImplementedError  # TODO
+        op = self.op
+        if op.solve_tracer and op.adapt_field == 'tracer':
+            raise NotImplementedError  # TODO
+        else:
+            raise NotImplementedError  # TODO
 
     def run_dwr(self, **kwargs):
         """

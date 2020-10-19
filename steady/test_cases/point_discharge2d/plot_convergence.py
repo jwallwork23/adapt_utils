@@ -59,6 +59,7 @@ for alignment in ('aligned', 'offset'):
     axes.set_xlabel("Element count")
     axes.set_ylabel("Relative error")
     axes.legend(loc='upper right')
+    axes.set_xticks([1.0e+03, 1.0e+04, 1.0e+05, 1.0e+06])
     yticks = np.linspace(0, 1, 6)
     axes.set_yticks(yticks)
     axes.set_yticklabels([r"{{{:d}}}\%".format(int(yt*100)) for yt in yticks])
