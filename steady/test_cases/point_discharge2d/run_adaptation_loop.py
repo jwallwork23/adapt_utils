@@ -34,7 +34,7 @@ args = parser.parse_args()
 
 family = args.family or 'cg'
 assert family in ('cg', 'dg')
-target = float(args.target or 1.0e+03)
+target = float(args.target or 2.5e+02)
 level = int(args.level or 0)
 offset = bool(args.offset or False)
 
