@@ -1,6 +1,5 @@
 import argparse
 import h5py
-from matplotlib.ticker import MultipleLocator
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -61,12 +60,15 @@ for alignment in ('aligned', 'offset'):
         axes.semilogx(elements, relative_error, '--x', label=approaches[approach])
     axes.set_xlabel("Element count")
     axes.set_ylabel("Relative error")
-    axes.legend(loc='upper right', fontsize=18)
     axes.set_xticks([1.0e+03, 1.0e+04, 1.0e+05, 1.0e+06])
-    yticks = np.linspace(0, 1, 6)
+    yticks = np.linspace(0, 0.5, 6)
     axes.set_yticks(yticks)
     axes.set_yticklabels([r"{{{:d}}}\%".format(int(yt*100)) for yt in yticks])
-    axes.yaxis.set_minor_locator(MultipleLocator(yticks[1]/2))
+    axes.set_ylim([-0.01, 0.51])
+    xlim = axes.get_xlim()
+    axes.hlines(y=0.01, xmin=xlim[0], xmax=xlim[1], color='k', linestyle=':', label=r'1.0\% error')
+    axes.set_xlim(xlim)
+    axes.legend(loc='upper right', fontsize=18)
     axes.grid(True)
     axes.grid(True, which='minor', axis='y')
     savefig('_'.join([filename, alignment]), plot_dir, extensions=['pdf', 'png'])
