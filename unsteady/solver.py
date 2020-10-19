@@ -1605,17 +1605,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
         update_forcings(self.simulation_time - op.dt)
         self.print(80*'=')
 
+
     # --- Metric
 
-    # TODO: Allow Hessian metric for tracer / sediment / Exner
     def recover_hessian_metric(self, adjoint=False, **kwargs):
         kwargs.setdefault('normalise', True)
         kwargs['op'] = self.op
         self.metrics = []
-        solutions = self.adj_solutions if adjoint else self.fwd_solutions
-        for i, sol in enumerate(solutions):
-            fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
-            self.metrics.append(recover_hessian_metric(sol, fields=fields, **kwargs))
+        solutions = self.get_solutions(self.op.adapt_field, adjoint=adjoint)
+        if self.op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
+            for i, sol in enumerate(solutions):
+                self.metrics.append(steady_metric(sol, **kwargs))
+        else:
+            for i, sol in enumerate(solutions):
+                fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
+                self.metrics.append(recover_hessian_metric(sol, fields=fields, **kwargs))
 
     def get_recovery(self, i, **kwargs):
         op = self.op
@@ -1629,6 +1633,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 constant_fields={'bathymetry': self.bathymetry[i]}, **kwargs,
             )
         return recoverer
+
 
     # --- Run scripts
 
@@ -1802,6 +1807,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Metric-based with adjoint
             'dwp': self.run_dwp,
             'dwr': self.run_dwr,
+            'a_posteriori': self.run_dwr,
         }
         try:
             run_scripts[self.approach](**kwargs)

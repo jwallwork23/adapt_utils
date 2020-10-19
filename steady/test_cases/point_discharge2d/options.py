@@ -67,6 +67,8 @@ class PointDischarge2dOptions(CoupledOptions):
 
         # Mesh adaptation
         self.element_rtol = 0.002
+        self.estimator_rtol = 0.002
+        self.qoi_rtol = 0.002
         self.h_min = 1.0e-10
         self.h_max = 1.0e+02
 

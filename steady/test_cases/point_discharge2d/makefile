@@ -6,12 +6,12 @@ dir:
 	@mkdir -p outputs/dwr/hdf5
 	@mkdir -p outputs/dwr_averaged/hdf5
 	@mkdir -p outputs/dwr_superposed/hdf5
-	@mkdir -p outputs/power/hdf5
-	@mkdir -p outputs/power_averaged/hdf5
-	@mkdir -p outputs/power_superposed/hdf5
-	@mkdir -p outputs/loseille/hdf5
-	@mkdir -p outputs/loseille_averaged/hdf5
-	@mkdir -p outputs/loseille_superposed/hdf5
+	@mkdir -p outputs/a_posteriori/hdf5
+	@mkdir -p outputs/a_posteriori_averaged/hdf5
+	@mkdir -p outputs/a_posteriori_superposed/hdf5
+	@mkdir -p outputs/a_priori/hdf5
+	@mkdir -p outputs/a_priori_averaged/hdf5
+	@mkdir -p outputs/a_priori_superposed/hdf5
 	@mkdir -p data
 	@mkdir -p plots
 

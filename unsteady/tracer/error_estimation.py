@@ -268,14 +268,15 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         self.strong_residual_terms = 0
         for term in self.select_terms(label):
             self.strong_residual_terms += term.element_residual(*args)
-        self.strong_residual = Function(self.P0_2d, name="Strong residual")
+        self._strong_residual = Function(self.P0_2d, name="Strong residual")
 
-    def evaluate_strong_residual(self):
+    @property
+    def strong_residual(self):
         """
         Evaluate strong residual of 2D tracer equation.
         """
-        self.strong_residual.assign(assemble(self.strong_residual_terms))
-        return self.strong_residual
+        self._strong_residual.assign(assemble(self.strong_residual_terms))
+        return self._strong_residual
 
     def evaluate_flux_jump(self, sol):
         """

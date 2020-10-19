@@ -83,18 +83,24 @@ di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', op.appr
 
 elements = []
 qois = []
+estimators = []
 for n in range(op.outer_iterations):
     op.target = target*op.target_base**n
     op.default_mesh = RectangleMesh(100*2**level, 20*2**level, 50, 10)
     tp = AdaptiveSteadyProblem(op)
     tp.run()
     elements.append(tp.num_cells[-1][0])
-    qois.append(tp.qois[-1])
     print("Element count: ", elements)
+    qois.append(tp.qois[-1])
     print("QoIs:          ", qois)
+    if 'dwr' in op.approach:
+        estimators.append(tp.estimator[op.approach][-1])
+        print("Estimators:    ", estimators)
 
 # Store element count and QoI to HDF5
 alignment = 'offset' if offset else 'aligned'
 with h5py.File(os.path.join(di, '{:s}_{:s}.h5'.format(fname, alignment)), 'w') as outfile:
     outfile.create_dataset('elements', data=elements)
     outfile.create_dataset('qoi', data=qois)
+    if 'dwr' in op.approach:
+        outfile.create_dataset('estimators', data=estimators)
