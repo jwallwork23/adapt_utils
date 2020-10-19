@@ -48,7 +48,13 @@ for alignment in ('aligned', 'offset'):
             if approach == 'fixed_mesh':
                 # qoi_exact = np.array(outfile['qoi_exact'][-1])
                 qoi_exact = np.array(outfile['qoi'][-1])
-        relative_error = np.abs(qoi - qoi_exact)/np.abs(qoi_exact)
+            if approach == 'dwr':
+                estimators = np.abs(np.array(outfile['estimators']))
+        absolute_error = np.abs(qoi - qoi_exact)
+        relative_error = absolute_error/np.abs(qoi_exact)
+        if approach == 'dwr':
+            effectivity = estimators/absolute_error
+            print("Effectivity indices: ", effectivity)
         axes.semilogx(elements, relative_error, '--x', label=approaches[approach])
     axes.set_xlabel("Element count")
     axes.set_ylabel("Relative error")

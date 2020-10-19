@@ -54,6 +54,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         op = self.op
         return op.set_qoi_kernel(self, 0) if op.solve_swe else op.set_qoi_kernel_tracer(self, 0)
 
+    @property
+    def indicator(self):
+        return self.indicators[0]
+
+    @property
+    def estimator(self):
+        return self.estimators[0]
+
     def solve_adjoint(self, **kwargs):
         if self.discrete_adjoint:
             self._solve_discrete_adjoint(**kwargs)
@@ -98,19 +106,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         return inner(self.fwd_solution, self.kernel)*dx(degree=12)
 
-    def get_strong_residual(self, adjoint=False, **kwargs):
-        """
-        Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
-        boolean kwarg.
-        """
-        raise NotImplementedError  # TODO
-
-    def get_flux(self, adjoint=False, **kwargs):
-        """
-        Evaluate flux terms for forward or adjoint PDE, as specified by the `adjoint` boolean kwarg.
-        """
-        raise NotImplementedError  # TODO
-
     def get_scaled_residual(self, adjoint=False, **kwargs):
         r"""
         Evaluate the scaled form of the residual, as used in [Becker & Rannacher, 2001].
@@ -140,11 +135,34 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         raise NotImplementedError  # TODO
 
-    def get_strong_residual_forward(self, norm_type=None):
+    def get_strong_residual(self, adjoint=False, **kwargs):
+        """
+        Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
+        boolean kwarg.
+        """
+        if adjoint:
+            return self.get_strong_residual_adjoint(**kwargs)
+        else:
+            return self.get_strong_residual_forward(**kwargs)
+
+    def get_strong_residual_forward(self, **kwargs):
+        ts = self.timesteppers[0][self.op.adapt_field]
+        strong_residual = abs(ts.error_estimator.strong_residual)
+        # strong_residual_cts = project(strong_residual, self.P1[0])
+        strong_residual_cts = interpolate(strong_residual, self.P1[0])
+        return strong_residual_cts
+
+    def get_strong_residual_adjoint(self, **kwargs):
         raise NotImplementedError  # TODO
 
-    def get_strong_residual_adjoint(self, norm_type=None):
-        raise NotImplementedError  # TODO
+    def get_flux(self, adjoint=False, **kwargs):
+        """
+        Evaluate flux terms for forward or adjoint PDE, as specified by the `adjoint` boolean kwarg.
+        """
+        if adjoint:
+            return self.get_flux_adjoint(**kwargs)
+        else:
+            return self.get_flux_forward(**kwargs)
 
     def get_flux_forward(self):
         raise NotImplementedError  # TODO
@@ -196,7 +214,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         A P1 field to be used for isotropic mesh adaptation is stored as `self.indicator`.
         """
         op = self.op
-        self.indicator['dwr'] = Function(self.P1[0], name="DWR indicator")
+        self.indicator[op.approach] = Function(self.P1[0], name=op.approach + " indicator")
 
         # Setup problem on enriched space
         hierarchy = MeshHierarchy(self.mesh, 1)
@@ -211,39 +229,42 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         tm = dmhooks.get_transfer_manager(self.get_plex(0))
 
         # Setup forward solver for enriched problem
-        ep.create_error_estimators_step(0)
-        ep.setup_solver_forward_step(0)
         if adjoint:
             raise NotImplementedError  # TODO
         else:
+            ep.create_error_estimators_step(0)
             ep.solve_adjoint()
-        enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
+            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
 
-        # Create solution fields
-        fwd_solution = self.get_solutions(adapt_field)[0]
-        adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
-        indicator_enriched = Function(ep.P0[0])
-        fwd_proj = Function(enriched_space[0])
-        adj_error = Function(enriched_space[0])
-        bcs = self.boundary_conditions[0][adapt_field]
+            # Create solution fields
+            fwd_solution = self.get_solutions(adapt_field)[0]
+            adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
+            indicator_enriched = Function(ep.P0[0])
+            fwd_proj = Function(enriched_space[0])
+            adj_error = Function(enriched_space[0])
+            bcs = self.boundary_conditions[0][adapt_field]
 
-        # Setup error estimator
-        ets = ep.timesteppers[0][adapt_field]
-        ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
+            # Setup error estimator
+            ets = ep.timesteppers[0][adapt_field]
+            ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
 
-        # Prolong forward solution at current timestep
-        tm.prolong(fwd_solution, fwd_proj)
+            # Prolong forward solution at current timestep
+            tm.prolong(fwd_solution, fwd_proj)
 
-        # Approximate adjoint error in enriched space
-        tm.prolong(adj_solution, adj_error)
-        adj_error *= -1
-        adj_error += enriched_adj_solution
+            # Approximate adjoint error in enriched space
+            tm.prolong(adj_solution, adj_error)
+            adj_error *= -1
+            adj_error += enriched_adj_solution
 
         # Compute dual weighted residual
-        indicator_enriched.interpolate(abs(ets.error_estimator.weighted_residual()))
-        indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])  # TODO: Project?
-        tm.inject(indicator_enriched_cts, self.indicator['dwr'])  # TODO: Project?
-        return self.indicator['dwr']
+        dwr = ets.error_estimator.weighted_residual()
+        self.estimator[op.approach].append(assemble(dwr*dx))
+        indicator_enriched.interpolate(abs(dwr))
+        # indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
+        indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
+        # self.indicator[op.approach].project(indicator_enriched_cts)
+        tm.inject(indicator_enriched_cts, self.indicator[op.approach])
+        return self.indicator[op.approach]
 
     def get_hessian_metric(self, adjoint=False, **kwargs):
         """
@@ -263,7 +284,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
     def get_metric(self, adapt_field):
         if 'dwr' in self.op.approach:
-            metric = self.get_isotropic_metric(adapt_field)
+            metric = self.get_isotropic_metric(self.op.adapt_field)
+        elif self.op.approach == 'a_posteriori':
+            metric = self.get_a_posteriori_metric(adjoint=False)
         else:
             raise NotImplementedError  # TODO
         if self.op.plot_pvd:
@@ -282,13 +305,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         metric.assign(isotropic_metric(indicator, normalise=True, op=self.op))
         return metric
 
-    def get_loseille_metric(self, adjoint=False, relax=True):
-        """
-        Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
-        """
-        raise NotImplementedError  # TODO
-
-    def get_power_metric(self, adjoint=False):
+    def get_a_posteriori_metric(self, adjoint=False):
         """
         Construct an anisotropic metric using an approach inspired by [Power et al. 2006].
 
@@ -296,20 +313,37 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         for the forward PDE. Otherwise, weight the Hessian of the forward solution with a residual
         for the adjoint PDE.
         """
+        strong_residual = self.get_strong_residual()
+        self.recover_hessian_metric(normalise=False, enforce_constraints=False, adjoint=not adjoint)
+        scaled_hessian = interpolate(strong_residual*self.metrics[0], self.P1_ten[0])
+        return steady_metric(H=scaled_hessian, normalise=True, enforce_constraints=True, op=self.op)
+
+    def get_a_priori_metric(self, adjoint=False, relax=True):
+        """
+        Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
+        """
         raise NotImplementedError  # TODO
 
-    @property
-    def indicator(self):
-        return self.indicators[0]
-
     def run_dwr(self, **kwargs):
-        # TODO: doc
+        """
+        Apply a goal-oriented mesh adaptation loop, until a convergence criterion is met.
+
+        Convergence criteria:
+          * Convergence of quantity of interest (relative tolerance `op.qoi_rtol`);
+          * Convergence of mesh element count (relative tolerance `op.element_rtol`);
+          * Convergence of error estimator (relative tolerance `op.estimator_rtol`);
+          * Maximum number of iterations reached (`op.max_adapt`).
+
+        A minimum number of iterations may also be imposed via `op.min_adapt`.
+        """
         op = self.op
         adapt_field = op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
+        self.estimator[op.approach] = []
         for n in range(op.max_adapt):
             self.outer_iteration = n
+            self.create_error_estimators_step(0)
 
             # Solve forward in base space
             self.solve_forward()
@@ -318,7 +352,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             qoi = self.quantity_of_interest()
             self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
             self.qois.append(qoi)
-            if len(self.qois) > 1:
+            if len(self.qois) > 1 and n >= op.min_adapt:
                 if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
                     self.print("Converged quantity of interest!")
                     break
@@ -332,6 +366,13 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
             # Construct metric
             metric = self.get_metric(adapt_field)
+
+            # Check convergence of error estimator
+            estimators = self.estimator[op.approach]
+            if len(estimators) > 1 and n >= op.min_adapt:
+                if np.abs(estimators[-1] - estimators[-2]) <= op.estimator_rtol*estimators[-2]:
+                    self.print("Converged error estimator!")
+                    break
 
             # TODO: Log complexities
 
@@ -348,6 +389,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             msg = "\nResulting mesh: {:7d} vertices, {:7d} elements"
             num_cells = self.num_cells
             self.print(msg.format(self.num_vertices[-1][0], num_cells[-1][0]))
+
+            # Ensure minimum number of adaptations met
+            if n < op.min_adapt:
+                continue
 
             # Check convergence of element count
             if np.abs(num_cells[-1][0] - num_cells[-2][0]) <= op.element_rtol*num_cells[-2][0]:
