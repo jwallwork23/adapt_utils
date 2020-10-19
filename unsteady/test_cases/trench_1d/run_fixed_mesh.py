@@ -1,3 +1,11 @@
+"""
+Migrating Trench Test case
+=======================
+
+Solves the hydro-morphodynamic simulation of a migrating trench on a fixed mesh
+
+"""
+
 from thetis import *
 
 import datetime
@@ -15,18 +23,18 @@ st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
 
-nx = 1
+res = 0.5
 
 # to create the input hydrodynamics directiory please run trench_hydro.py
-# setting nx to be the same values as above
+# setting res to be the same values as above
 
-# we have included the hydrodynamics input dir for nx = 1 as an example
+# we have included the hydrodynamics input dir for res = 0.5 as an example
 
-inputdir = os.path.join(di, 'hydrodynamics_trench' + str(nx))
+inputdir = os.path.join(di, 'hydrodynamics_trench_' + str(res))
 print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
-    'nx': nx,
+    'nx': res,
     'ny': 1,
     'plot_pvd': True,
     'input_dir': inputdir,
@@ -63,7 +71,7 @@ for i in np.linspace(0, 15.9, 160):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_uni_c_{:d}.csv'.format(nx)))
+df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_uni_c_' + str(res) + '.csv'))
 
 
 datathetis = []
@@ -76,10 +84,10 @@ for i in range(len(data[0].dropna())):
 
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
 
-df.to_csv(os.path.join(di, 'fixed_output/bed_trench_outputc_{:d}.csv'.format(nx)))
+df.to_csv(os.path.join(di, 'fixed_output/bed_trench_outputc_' + str(res) + '.csv'))
 
-print("L2 norm: ")
+print("Total error L2 norm: ")
 print(np.sqrt(sum(diff_thetis)))
-print(nx)
+print(res)
 print("total time: ")
 print(t2-t1)

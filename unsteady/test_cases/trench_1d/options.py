@@ -14,9 +14,8 @@ __all__ = ["TrenchSedimentOptions"]
 
 class TrenchSedimentOptions(CoupledOptions):
 
-    def __init__(self, friction='nik_solver', plot_timeseries=False, nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
+    def __init__(self, friction='nik_solver', nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
         super(TrenchSedimentOptions, self).__init__(**kwargs)
-        self.plot_timeseries = plot_timeseries
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
         self.num_hours = 15
@@ -59,15 +58,10 @@ class TrenchSedimentOptions(CoupledOptions):
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
 
-        # Timeseries
-        self.trange = np.linspace(0.0, self.end_time, self.num_hours+1)
-        tol = 1e-8
-        self.xrange = np.linspace(tol, 16-tol, 20)
-
     def set_up_morph_model(self, input_dir, mesh=None):
 
         # Physical
-        self.base_diffusivity = 0.18161630470135287
+        self.base_diffusivity = 0.18011042551606954
 
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)

@@ -12,15 +12,8 @@ __all__ = ["BeachOptions"]
 
 
 class BeachOptions(CoupledOptions):
-    """
-    Parameters for test case adapted from [1].
 
-    [1] Roberts, W. et al. "Investigation using simple mathematical models of
-    the effect of tidal currents and waves on the profile shape of intertidal
-    mudflats." Continental Shelf Research 20.10-11 (2000): 1079-1097.
-    """
-
-    def __init__(self, friction='manning', plot_timeseries=False, nx=1, ny=1, mesh=None, input_dir=None, output_dir=None, **kwargs):
+    def __init__(self, friction='manning', nx=1, ny=1, mesh=None, input_dir=None, output_dir=None, **kwargs):
         super(BeachOptions, self).__init__(**kwargs)
 
         try:
@@ -34,8 +27,6 @@ class BeachOptions(CoupledOptions):
 
         if output_dir is not None:
             self.di = output_dir
-
-        self.plot_timeseries = plot_timeseries
 
         self.default_mesh = RectangleMesh(np.int(220*nx), np.int(10*ny), self.lx, self.ly)
 
