@@ -1808,6 +1808,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'dwp': self.run_dwp,
             'dwr': self.run_dwr,
             'a_posteriori': self.run_dwr,
+            'a_priori': self.run_dwr,
         }
         try:
             run_scripts[self.approach](**kwargs)

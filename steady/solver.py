@@ -288,6 +288,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             metric = self.get_isotropic_metric(self.op.adapt_field)
         elif self.op.approach == 'a_posteriori':
             metric = self.get_a_posteriori_metric(adjoint=False)
+        elif self.op.approach == 'a_priori':
+            metric = self.get_a_priori_metric(adjoint=False)
         else:
             raise NotImplementedError  # TODO
         if self.op.plot_pvd:
@@ -323,9 +325,32 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
         """
-        op = self.op
-        if op.solve_tracer and op.adapt_field == 'tracer':
-            raise NotImplementedError  # TODO
+        from adapt_utils.adapt.recovery import recover_gradient
+
+        if self.op.solve_tracer and self.op.adapt_field == 'tracer':
+            c = self.fwd_solution_tracer
+            c_star = self.adj_solution_tracer
+
+            # Interior Hessian term
+            u, eta = split(self.fwd_solutions[0])
+            D = self.fields[0].horizontal_diffusivity
+            F1 = u[0]*c - D*c.dx(0)
+            F2 = u[1]*c - D*c.dx(1)
+            # TODO: Don't want to have to interpolate
+            H1 = steady_metric(F1, normalise=False, enforce_constraints=False, op=self.op)
+            H2 = steady_metric(F2, normalise=False, enforce_constraints=False, op=self.op)
+
+            # Interior gradient term
+            grad_c_star = recover_gradient(c_star, op=self.op)
+            dadjdx1 = interpolate(abs(grad_c_star[0]), self.P1[0])
+            dadjdx2 = interpolate(abs(grad_c_star[1]), self.P1[0])
+
+            # TODO: Boundary term
+            print_output("#### TODO: Boundary term for a priori metric")
+
+            # Assemble metric
+            H = interpolate(H1*dadjdx1 + H2*dadjdx2, self.P1_ten[0])
+            return steady_metric(H=H, normalise=True, enforce_constraints=True, op=self.op)
         else:
             raise NotImplementedError  # TODO
 

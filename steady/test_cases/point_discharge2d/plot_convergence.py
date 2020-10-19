@@ -33,7 +33,7 @@ approaches = {
     'fixed_mesh': 'Uniform',
     'dwr': 'Isotropic',
     'a_posteriori': 'A posteriori',
-    # 'a_priori': 'A priori',  # TODO
+    'a_priori': 'A priori',
 }
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
@@ -41,7 +41,10 @@ for alignment in ('aligned', 'offset'):
     # Plot convergence curves
     for approach in approaches:
         fname = os.path.join(di.format(approach), '{:s}_{:s}.h5'.format(filename, alignment))
-        assert os.path.isfile(fname)
+        if not os.path.isfile(fname):
+            msg = "Cannot find convergence data for {:s} adaptation in the {:s} setup."
+            print(msg.format(approach, alignment))
+            continue
         with h5py.File(fname, 'r') as outfile:
             elements = np.array(outfile['elements'])
             qoi = np.array(outfile['qoi'])
@@ -58,7 +61,7 @@ for alignment in ('aligned', 'offset'):
         axes.semilogx(elements, relative_error, '--x', label=approaches[approach])
     axes.set_xlabel("Element count")
     axes.set_ylabel("Relative error")
-    axes.legend(loc='upper right')
+    axes.legend(loc='upper right', fontsize=18)
     axes.set_xticks([1.0e+03, 1.0e+04, 1.0e+05, 1.0e+06])
     yticks = np.linspace(0, 1, 6)
     axes.set_yticks(yticks)
