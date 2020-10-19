@@ -30,6 +30,8 @@ class PointDischarge2dOptions(CoupledOptions):
         super(PointDischarge2dOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
+
+        # Steady state
         self.timestepper = 'SteadyState'
         self.start_time = 0.0
         self.end_time = 20.0
@@ -42,10 +44,10 @@ class PointDischarge2dOptions(CoupledOptions):
 
         # FEM
         self.degree_tracer = 1
-        # self.family = 'cg'
-        # self.stabilisation = 'SUPG'
-        self.tracer_family = 'dg'
-        self.stabilisation = 'lax_friedrichs'
+        self.tracer_family = 'cg'
+        self.stabilisation = 'SUPG'
+        # self.tracer_family = 'dg'
+        # self.stabilisation = 'lax_friedrichs'
         self.use_automatic_sipg_parameter = True
         self.use_limiter_for_tracers = False
         self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
@@ -59,10 +61,6 @@ class PointDischarge2dOptions(CoupledOptions):
         self.source_discharge = 0.1
         self.region_of_interest = [(20.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 0.5)]
 
-        # Metric normalisation
-        self.normalisation = 'error'
-        self.norm_order = 1
-
         # Goal-oriented error estimation
         self.degree_increase_tracer = 1
         self.adapt_field = 'tracer'
@@ -70,6 +68,8 @@ class PointDischarge2dOptions(CoupledOptions):
         # Mesh adaptation
         self.max_adapt = 35
         self.element_rtol = 0.002
+        self.h_min = 1.0e-10
+        self.h_max = 1.0e+02
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)

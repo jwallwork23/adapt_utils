@@ -24,7 +24,7 @@ class SteadyState(thetis_ts.SteadyState):
     def setup_error_estimator(self, solution, solution_old, adjoint, bnd_conditions):
         assert self.error_estimator is not None
         self.error_estimator.setup_components(
-            'all', solution, solution_old, adjoint, adjoint, self.fields, self.fields, bnd_conditions
+            'all', solution, solution, adjoint, adjoint, self.fields, self.fields, bnd_conditions
         )
 
 

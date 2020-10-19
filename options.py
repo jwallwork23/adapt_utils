@@ -280,7 +280,10 @@ class Options(FrozenConfigurable):
             return
         if mode == 'full' and self.debug_mode == 'basic':
             return
-        print_output(self.indent + msg)
+        try:
+            print_output(self.indent + msg)
+        except TypeError:
+            print(msg)
 
     # TODO: USEME
     def get_mesh_velocity(self):

@@ -222,7 +222,7 @@ class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         f = 0
         source = fields_old.get('source')
         if source is None:
-            return -f
+            return f
 
         # Apply SUPG stabilisation
         tau = fields.get('supg_stabilisation')
@@ -239,8 +239,8 @@ class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
                     tau *= min_value(1, Pe/3)
                 arg = arg + tau*dot(uv, grad(arg))
 
-        f += -self.p0test*inner(source, arg)*self.dx
-        return -f
+        f += self.p0test*inner(source, arg)*self.dx
+        return f
 
     def inter_element_flux(self, solution, solution_old, arg, arg_old, fields, fields_old):
         return 0
@@ -271,12 +271,16 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         self.strong_residual = Function(self.P0_2d, name="Strong residual")
 
     def evaluate_strong_residual(self):
-        """Evaluate strong residual of 2D tracer equation."""
+        """
+        Evaluate strong residual of 2D tracer equation.
+        """
         self.strong_residual.assign(assemble(self.strong_residual_terms))
         return self.strong_residual
 
     def evaluate_flux_jump(self, sol):
-        """Evaluate flux jump as element-wise indicator functions."""
+        """
+        Evaluate flux jump as element-wise indicator functions.
+        """
         flux_jump = Function(VectorFunctionSpace(self.mesh, "DG", 0)*self.P0_2d)
         solve(self.p0test*self.p0trial*dx == jump(self.p0test*sol)*dS, flux_jump)
         return flux_jump

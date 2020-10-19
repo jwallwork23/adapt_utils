@@ -319,10 +319,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # Compute dual weighted residual
             indicator_enriched.interpolate(abs(ets.error_estimator.weighted_residual()))
             indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])  # TODO: Project?
-            tm.inject(indicator_enriched_cts, self.indicator['dwr'])
+            tm.inject(indicator_enriched_cts, self.indicator['dwr'])  # TODO: Project?
 
             # Construct metric
-            metric.assign(isotropic_metric(self.indicator['dwr'], normalise=True))
+            metric.assign(isotropic_metric(self.indicator['dwr'], normalise=True, op=self.op))
 
             # Output to .pvd and .vtu
             if op.plot_pvd:
@@ -350,6 +350,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.print(msg.format(self.num_vertices[-1][0], num_cells[-1][0]))
 
             # Check convergence of element count
-            if np.abs(num_cells[-1][0] - num_cells[-2][0]) > op.element_rtol*num_cells[-2][0]:
+            if np.abs(num_cells[-1][0] - num_cells[-2][0]) <= op.element_rtol*num_cells[-2][0]:
                 self.print("Converged number of mesh elements!")
                 break
