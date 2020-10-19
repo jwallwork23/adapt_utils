@@ -245,6 +245,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             bcs = self.boundary_conditions[0][adapt_field]
 
             # Setup error estimator
+            ep.setup_solver_forward_step(0)  # Needed to create timestepper
             ets = ep.timesteppers[0][adapt_field]
             ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
 
