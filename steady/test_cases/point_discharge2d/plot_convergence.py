@@ -32,7 +32,7 @@ plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 approaches = {
     'fixed_mesh': 'Uniform',
     'dwr': 'Isotropic',
-    # 'a_posteriori': 'A posteriori',  # TODO
+    'a_posteriori': 'A posteriori',
     # 'a_priori': 'A priori',  # TODO
 }
 for alignment in ('aligned', 'offset'):
