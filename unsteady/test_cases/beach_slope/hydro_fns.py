@@ -1,11 +1,3 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
-"""
-Created on Fri Apr  5 15:05:02 2019
-
-@author: mc4117
-"""
-
 import thetis as th
 import time
 import datetime

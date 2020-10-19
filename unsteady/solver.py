@@ -403,7 +403,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         sipg = None
         if family == 'dg':
             if hasattr(op, 'sipg_parameter_tracer'):
-                sipg = op.sipg_parameter_sediment if sediment else op.sipg_parameter_tracer
+                sipg = op.sipg_parameter_tracer if not sediment else None
+            if hasattr(op, 'sipg_parameter_sediment'):
+                sipg = op.sipg_parameter_sediment if sediment else None
             if eq_options[i].use_automatic_sipg_parameter:
                 cot_theta = 1.0/tan(self.minimum_angles[i])
 
@@ -764,8 +766,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.Q[i],
             # self.op.sediment_model.depth_expr,
             self.depth[i],
-            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            use_lax_friedrichs=self.sediment_options[i].use_lax_friedrichs_tracer,
+            sipg_parameter=self.sediment_options[i].sipg_parameter,
             conservative=self.op.use_tracer_conservative_form,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
@@ -1406,7 +1408,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     export_func()
                 self.callbacks[i].evaluate(mode='export')
             self.callbacks[i].evaluate(mode='timestep')
-        update_forcings(self.simulation_time + op.dt)
+        if update_forcings is not None:
+            update_forcings(self.simulation_time + op.dt)
         self.print(80*'=')
 
     def setup_solver_adjoint_step(self, i):

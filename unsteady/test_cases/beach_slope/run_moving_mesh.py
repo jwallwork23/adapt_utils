@@ -1,3 +1,11 @@
+"""
+Beach Profile Test case
+=======================
+
+Solves the hydro-morphodynamic simulation of a beach profile using moving mesh methods
+
+"""
+
 import firedrake as fire
 from thetis import *
 
@@ -11,8 +19,8 @@ from adapt_utils.norms import local_frobenius_norm, local_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
 
-nx = 0.5
-ny = 1
+fac_x = 0.5
+fac_y = 1
 
 alpha = 5
 beta = 1
@@ -26,19 +34,22 @@ di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
 
 # to create the input hydrodynamics directiory please run beach_tidal_hydro.py
-# setting nx and ny to be the same values as above
+# setting fac_x and fac_y to be the same values as above
 
-# we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
+# we have included the hydrodynamics input dir for fac_x = 0.5 and fac_y = 1 as an example
 
-inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220))) + '_10'
+# Note to recreate subdomain errors in options.py self.dt_per_mesh_movement = 72 and for whole
+# domain errors self.dt_per_mesh_movement = 648
+
+inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(fac_x*220)) + '_' + str(int(fac_y*10)))
 print(inputdir)
 
 tol_value = 1e-3
 
 kwargs = {
     'approach': 'monge_ampere',
-    'nx': nx,
-    'ny': ny,
+    'nx': fac_x,
+    'ny': fac_y,
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
@@ -54,7 +65,6 @@ kwargs = {
 op = BeachOptions(**kwargs)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-# swp.shallow_water_options[0]['mesh_velocity'] = swp.mesh_velocities[0]
 swp.shallow_water_options[0]['mesh_velocity'] = None
 
 
@@ -103,7 +113,7 @@ t2 = time.time()
 
 print(t2-t1)
 
-print(nx)
+print(fac_x)
 print(alpha)
 print(beta)
 print(gamma)
@@ -113,10 +123,10 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
 fpath = "hydrodynamics_beach_bath_mov_{:d}_{:d}_{:d}_{:d}_{:d}"
-fpath = fpath.format(op.dt_per_export, (int(nx*220), alpha, beta, gamma)
+fpath = fpath.format(op.dt_per_export, int(fac_x*220), alpha, beta, gamma)
 export_bathymetry(bath, os.path.join("adapt_output", fpath), op=op)
 
-bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1')
+bath_real = initialise_bathymetry(new_mesh, 'fixed_output/hydrodynamics_beach_bath_fixed_440_10')
 
 print('L2')
 print(fire.errornorm(bath, bath_real))

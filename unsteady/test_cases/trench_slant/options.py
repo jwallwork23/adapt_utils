@@ -67,7 +67,7 @@ class TrenchSlantOptions(CoupledOptions):
     def set_up_morph_model(self, input_dir, mesh=None):
 
         # Physical
-        self.base_diffusivity = 0.18161630470135287
+        self.base_diffusivity = 0.18011042551606954
 
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)

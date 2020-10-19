@@ -4,9 +4,6 @@ Migrating Trench Test case
 
 Solves the initial hydrodynamics simulation of a migrating trench.
 
-[1] Clare et al. 2020. “Hydro-morphodynamics 2D Modelling Using a Discontinuous
-    Galerkin Discretisation.” EarthArXiv. January 9. doi:10.31223/osf.io/tpqvy.
-
 """
 
 from thetis import *
@@ -16,7 +13,7 @@ import time
 
 from adapt_utils.io import export_hydrodynamics
 
-res = 1
+res = 0.5
 
 # define mesh
 lx = 16
@@ -86,7 +83,6 @@ options.horizontal_viscosity = Constant(1e-6)
 # crank-nicholson used to integrate in time system of ODEs resulting from application of galerkin FEM
 options.timestepper_type = 'CrankNicolson'
 options.timestepper_options.implicitness_theta = 1.0
-options.norm_smoother = Constant(0.1)
 
 if not hasattr(options.timestepper_options, 'use_automatic_timestep'):
     options.timestep = 0.25
@@ -109,5 +105,5 @@ solver_obj.assign_initial_conditions(uv=uv_init, elev=elev_init)
 solver_obj.iterate()
 
 uv, elev = solver_obj.fields.solution_2d.split()
-fpath = "hydrodynamics_trench_{:d}".format(res)
+fpath = "hydrodynamics_trench_" + str(res)
 export_hydrodynamics(uv, elev, fpath)
