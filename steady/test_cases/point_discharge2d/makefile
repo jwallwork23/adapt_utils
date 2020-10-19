@@ -50,10 +50,16 @@ uniform:
 
 isotropic:
 	@echo "Running isotropic adaptation convergence test..."
-	@python3 run_adaptation_loop.py -family cg -stabilisation supg
-	@python3 run_adaptation_loop.py -family cg -stabilisation supg -offset 1
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach dwr
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach dwr -offset 1
 
-# TODO: A posteriori anisotropic
+a_posteriori:
+	@echo "Running a posteriori anisotropic adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg \
+		-approach a_posteriori
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg \
+		-approach a_posteriori -offset 1
+
 # TODO: A priori anisotropic
 
 table:
