@@ -21,6 +21,7 @@ parser.add_argument('-stabilisation', help="Stabilisation method to use.")
 parser.add_argument('-approach', help="Mesh adaptation approach.")
 parser.add_argument('-target', help="Target complexity.")
 parser.add_argument('-normalisation', help="Metric normalisation strategy.")
+parser.add_argument('-norm_order', help="Metric normalisation order.")
 parser.add_argument('-min_adapt', help="Minimum number of mesh adaptations.")
 parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
 
@@ -28,6 +29,7 @@ parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
+p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 4)  # NOTE
 
 
 # --- Set parameters
@@ -48,6 +50,7 @@ else:
         ext += '_su'
     if args.stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
+ext += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
 fname = 'qoi_{:s}'.format(ext)
 
 kwargs = {
@@ -58,7 +61,7 @@ kwargs = {
 
     # Mesh adaptation
     'approach': args.approach or 'dwr',
-    'norm_order': 1,
+    'norm_order': p,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
 

@@ -9,9 +9,11 @@ from adapt_utils.plotting import *
 
 # Parse arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('family')
-parser.add_argument('-stabilisation')
+parser.add_argument('family', help="Finite element family.")
+parser.add_argument('-stabilisation', help="Stabilisation method to use.")
+parser.add_argument('-norm_order', help="Metric normalisation order.")
 args = parser.parse_args()
+p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 4)  # NOTE
 
 # Get filenames
 ext = args.family
@@ -24,7 +26,6 @@ else:
         ext += '_su'
     if args.stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
-filename = 'qoi_{:s}'.format(ext)
 di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
@@ -39,10 +40,13 @@ for alignment in ('aligned', 'offset'):
 
     # Plot convergence curves
     for approach in approaches:
+        filename = 'qoi_{:s}'.format(ext)
+        if approach != 'fixed_mesh':
+            filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
         fname = os.path.join(di.format(approach), '{:s}_{:s}.h5'.format(filename, alignment))
         if not os.path.isfile(fname):
-            msg = "Cannot find convergence data for {:s} adaptation in the {:s} setup."
-            print(msg.format(approach, alignment))
+            msg = "Cannot find convergence data for {:}-norm {:s} adaptation in the {:s} setup."
+            print(msg.format(p, approach, alignment))
             continue
         with h5py.File(fname, 'r') as outfile:
             elements = np.array(outfile['elements'])
