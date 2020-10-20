@@ -9,6 +9,7 @@ from adapt_utils.adapt.kernels import *
 
 __all__ = ["metric_complexity", "cell_size_metric",
            "steady_metric", "isotropic_metric", "space_normalise", "space_time_normalise",
+           "boundary_metric_from_hessian",
            "combine_metrics", "metric_intersection", "metric_average"]
 
 
@@ -30,7 +31,7 @@ def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
     :kwarg f: Field to compute the Hessian of.
     :kwarg H: Reconstructed Hessian associated with `f` (if already computed).
     :kwarg projector: :class:`DoubleL2Projector` object to compute Hessian.
-    :kwarg normalise: Toggle spatial normalisation.
+    :kwarg normalise: toggle spatial normalisation.
     :kwarg enforce_constraints: Toggle enforcement of element size/anisotropy constraints.
     :kwarg op: :class:`Options` parameter class.
     :return: Steady metric associated with Hessian `H`.
@@ -72,6 +73,47 @@ def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
         enforce_element_constraints(M, op=op)
 
     return M
+
+
+def boundary_metric_from_hessian(H, mesh=None, boundary_tag='on_boundary', **kwargs):
+    """
+    Computes a boundary metric from a boundary Hessian, following the approach of
+    [Loseille et al. 2011].
+
+    :kwarg H: reconstructed boundary Hessian
+    :kwarg normalise: toggle spatial normalisation.
+    :kwarg enforce_constraints: Toggle enforcement of element size/anisotropy constraints.
+    :kwarg op: :class:`Options` parameter class.
+    :return: boundary metric associated with Hessian `H`.
+    """
+    kwargs.setdefault('normalise', True)
+    kwargs.setdefault('enforce_constraints', True)
+    kwargs.setdefault('noscale', False)
+    op = kwargs.get('op', Options())
+    if mesh is None:
+        mesh = H.function_space().mesh()
+    dim = mesh.topological_dimension()
+    if dim == 3:
+        raise NotImplementedError  # TODO
+    elif dim != 2:
+        raise ValueError("Dimensions other than 2D and 3D not considered.")
+    n = FacetNormal(mesh)
+    s = perp(n)
+    ns = as_matrix([[*n], [*s]])
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    M = Function(P1_ten, name="Boundary metric")
+
+    # Arbitrary value in domain interior
+    sigma, tau = TrialFunction(P1_ten), TestFunction(P1_ten)
+    a = inner(tau, sigma)*dx
+    L = inner(tau, Constant(1/op.h_max**2)*Identity(dim))*dx
+
+    # Boundary values imposed as in [Loseille et al. 2011]
+    a_bc = inner(tau, sigma)*ds
+    L_bc = inner(tau, dot(transpose(ns), dot(H, ns)))*ds
+    bcs = EquationBC(a_bc == L_bc, M, boundary_tag)
+    solve(a == L, M, bcs=bcs, solver_parameters={'ksp_type': 'cg'})
+    return steady_metric(H=M, **kwargs)
 
 
 # TODO: Check equivalent to normalising in space and time separately

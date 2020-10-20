@@ -127,9 +127,33 @@ def recover_boundary_hessian(f, **kwargs):
     # Argument is a Function
     if isinstance(f, Function):
         return DoubleL2ProjectorHessian(f.function_space(), boundary=True, **kwargs).project(f)
+    op = kwargs.get('op')
+    op.print_debug("RECOVERY: Recovering Hessian on domain boundary...")
 
     # Argument is a UFL expression
-    raise NotImplementedError  # TODO
+    bcs = kwargs.get('bcs')
+    mesh = kwargs.get('mesh', op.default_mesh)
+    P1 = FunctionSpace(mesh, "CG", 1)
+    n = FacetNormal(mesh)
+    Hs, v = TrialFunction(P1), TestFunction(P1)
+    l2_proj = Function(P1, name="Recovered boundary Hessian")
+
+    # Arbitrary value in domain interior
+    a = v*Hs*dx
+    L = v*Constant(1/op.h_max**2)*dx
+
+    # Hessian on boundary
+    if bcs is None:
+        s = perp(n)  # Tangent vector
+        a_bc = v*Hs*ds
+        L_bc = -dot(s, grad(v))*dot(s, grad(f))*ds
+        # TODO: bbcs?
+        bcs = EquationBC(a_bc == L_bc, l2_proj, 'on_boundary')
+
+    solver_parameters = op.hessian_solver_parameters['parts']
+    nullspace = VectorSpaceBasis(constant=True)
+    solve(a == L, l2_proj, bcs=bcs, nullspace=nullspace, solver_parameters=solver_parameters)
+    return l2_proj
 
 
 # --- Use the following drivers if doing multiple L2 projections on the current mesh
@@ -173,6 +197,7 @@ class L2ProjectorGradient(L2Projector):
     Note that the field itself need not be continuously differentiable at all.
     """
     name = 'gradient'
+
     def __init__(self, *args, **kwargs):
         super(L2ProjectorGradient, self).__init__(*args, **kwargs)
         self.kwargs = {
@@ -259,7 +284,7 @@ class DoubleL2ProjectorHessian(L2Projector):
 
     # TODO: Couple with the above instead of setting arbitrary interior value
     def _setup_boundary_projector(self):
-        P1 = FunctionSpace(mesh, "CG", degree)
+        P1 = FunctionSpace(mesh, "CG", 1)
         Hs, v = TrialFunction(P1), TestFunction(P1)
         self.l2_projection = Function(P1, name="Recovered boundary Hessian")
 
