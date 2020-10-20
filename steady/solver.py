@@ -321,7 +321,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         scaled_hessian = interpolate(strong_residual*self.metrics[0], self.P1_ten[0])
         return steady_metric(H=scaled_hessian, normalise=True, enforce_constraints=True, op=self.op)
 
-    def get_a_priori_metric(self, adjoint=False, relax=True):
+    def get_a_priori_metric(self, adjoint=False, average=True):
         """
         Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
         """
@@ -336,9 +336,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             D = self.fields[0].horizontal_diffusivity
             F1 = u[0]*c - D*c.dx(0)
             F2 = u[1]*c - D*c.dx(1)
-            # TODO: Don't want to have to interpolate
-            H1 = steady_metric(F1, normalise=False, enforce_constraints=False, op=self.op)
-            H2 = steady_metric(F2, normalise=False, enforce_constraints=False, op=self.op)
+            kwargs = dict(normalise=False, enforce_constraints=False, mesh=self.mesh, op=self.op)
+            H1 = steady_metric(F1, **kwargs)
+            H2 = steady_metric(F2, **kwargs)
 
             # Interior gradient term
             grad_c_star = recover_gradient(c_star, op=self.op)
@@ -348,9 +348,18 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # TODO: Boundary term
             print_output("#### TODO: Boundary term for a priori metric")
 
-            # Assemble metric
-            H = interpolate(H1*dadjdx1 + H2*dadjdx2, self.P1_ten[0])
-            return steady_metric(H=H, normalise=True, enforce_constraints=True, op=self.op)
+            # Assemble metrics
+            H1.interpolate(H1*dadjdx1)
+            H2.interpolate(H2*dadjdx2)
+            kwargs = dict(normalise=True, enforce_constraints=True, mesh=self.mesh, op=self.op)
+            M1 = steady_metric(H=H1, **kwargs)
+            M2 = steady_metric(H=H2, **kwargs)
+
+            # Combine
+            if average:
+                return metric_average(M1, M2)
+            else:
+                return metric_intersection(M1, M2)
         else:
             raise NotImplementedError  # TODO
 
