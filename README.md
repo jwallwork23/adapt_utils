@@ -53,7 +53,7 @@ London.
   * Once you have a working Firedrake installation, get to grips with `adapt_utils` by looking at the test cases in `steady/test_cases` and `unsteady/test_cases`, as well as the notebooks hosted [here][7].
 
 
-#### For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk or m.clare17@imperial.ac.uk.
+#### For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk or m.clare17@imperial.ac.uk (for feedback related to Clare et al.).
 
 [1]: http://firedrakeproject.org/ "Firedrake"
 [2]: http://thetisproject.org/index.html "Thetis"
