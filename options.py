@@ -128,18 +128,61 @@ class Options(FrozenConfigurable):
         Boundary conditions to apply to prescribed velocity (if any).
         """).tag(config=True)  # TODO: unused, see bottom of this file
 
-    # Hessian recovery
+    # Recovery
     hessian_recovery = Enum(
         ['dL2', 'parts'],
         default_value='dL2',
         help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
-    hessian_solver_parameters = PETScSolverParameters(
+    gradient_solver_parameters = PETScSolverParameters(
         {
             'snes_rtol': 1e8,
             'ksp_rtol': 1e-5,
             'ksp_gmres_restart': 20,
             'pc_type': 'sor',
-        }, help="Solver parameters for Hessian recovery.").tag(config=True)
+        },
+        help="Solver parameters for gradient recovery.").tag(config=True)
+    hessian_solver_parameters = PETScSolverParameters(
+        {
+            # Integration by parts
+            'parts': {
+
+                # GMRES with restarts
+                'ksp_type': 'gmres',
+                'ksp_gmres_restart': 20,
+                'ksp_rtol': 1.0e-05,
+
+                # SOR preconditioning
+                'pc_type': 'sor',
+            },
+
+            # Double L2 projection
+            'dL2': {
+                'mat_type': 'aij',
+
+                # Use stationary preconditioners in the Schur complement, to get away with applying
+                # GMRES to the whole mixed system
+                'ksp_type': 'gmres',
+                'pc_type': 'fieldsplit',
+                'pc_fieldsplit_type': 'schur',
+
+                # We want to eliminate H (field 1) to get an equation for g (field 0)
+                'pc_fieldsplit_0_fields': '1',
+                'pc_fieldsplit_1_fields': '0',
+
+                # Use a diagonal approximation of the A00 block.
+                'pc_fieldsplit_schur_precondition': 'selfp',
+
+                # Use ILU to approximate the inverse of A00, without a KSP solver
+                'fieldsplit_0_pc_type': 'ilu',
+                'fieldsplit_0_ksp_type': 'preonly',
+
+                # Use GAMG to approximate the inverse of the Schur complement matrix
+                'fieldsplit_1_ksp_type': 'preonly',
+                'fieldsplit_1_pc_type': 'gamg',
+                'ksp_max_it': 20,
+            }
+        },
+        help="Solver parameters for Hessian recovery.").tag(config=True)
     hessian_time_combination = Enum(
         ['integrate', 'intersect'],
         default_value='integrate',
