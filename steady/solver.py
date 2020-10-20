@@ -321,15 +321,20 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         scaled_hessian = interpolate(strong_residual*self.metrics[0], self.P1_ten[0])
         return steady_metric(H=scaled_hessian, normalise=True, enforce_constraints=True, op=self.op)
 
-    def get_a_priori_metric(self, adjoint=False, average=True):
+    def get_a_priori_metric(self, adjoint=False, average=True, source=True):
         """
         Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
         """
-        from adapt_utils.adapt.recovery import recover_gradient
+        from adapt_utils.adapt.recovery import recover_gradient, recover_boundary_hessian
 
+        P1 = self.P1[0]
+        P1_ten = self.P1_ten[0]
         if self.op.solve_tracer and self.op.adapt_field == 'tracer':
             c = self.fwd_solution_tracer
             c_star = self.adj_solution_tracer
+
+            # Interior gradient term
+            grad_c_star = recover_gradient(c_star, op=self.op)
 
             # Interior Hessian term
             u, eta = split(self.fwd_solutions[0])
@@ -337,29 +342,42 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             F1 = u[0]*c - D*c.dx(0)
             F2 = u[1]*c - D*c.dx(1)
             kwargs = dict(normalise=False, enforce_constraints=False, mesh=self.mesh, op=self.op)
-            H1 = steady_metric(F1, **kwargs)
-            H2 = steady_metric(F2, **kwargs)
+            interior_hessians = [
+                interpolate(steady_metric(F1, **kwargs)*abs(grad_c_star[0]), P1_ten),
+                interpolate(steady_metric(F2, **kwargs)*abs(grad_c_star[1]), P1_ten)
+            ]
 
-            # Interior gradient term
-            grad_c_star = recover_gradient(c_star, op=self.op)
-            dadjdx1 = interpolate(abs(grad_c_star[0]), self.P1[0])
-            dadjdx2 = interpolate(abs(grad_c_star[1]), self.P1[0])
+            # Boundary Hessian
+            n = FacetNormal(self.mesh)
+            Fbar = c*dot(u, n) - D*dot(grad(c), n)
+            Hs = recover_boundary_hessian(Fbar, mesh=self.mesh, op=self.op)
+            boundary_hessian = abs(c_star)*as_matrix([[Constant(1/self.op.h_max**2), 0],
+                                                      [0, abs(Hs)]])
 
-            # TODO: Boundary term
-            print_output("#### TODO: Boundary term for a priori metric")
+            # TODO: Get target
+            target = self.op.target
+            # a = ...
+            # b = ...
+            # op.target = get_metric_coefficient(a, b, op=self.op)
 
-            # Assemble metrics
-            H1.interpolate(H1*dadjdx1)
-            H2.interpolate(H2*dadjdx2)
+            # Interior source Hessian term
+            if source:
+                S = self.fields[0].tracer_source_2d
+                interior_hessians.append(interpolate(steady_metric(S, **kwargs)*abs(c_star), P1_ten))
+
+            # Assemble and combine interior metrics
             kwargs = dict(normalise=True, enforce_constraints=True, mesh=self.mesh, op=self.op)
-            M1 = steady_metric(H=H1, **kwargs)
-            M2 = steady_metric(H=H2, **kwargs)
+            interior_metrics = [steady_metric(H=H, **kwargs) for H in interior_hessians]
+            interior_metric = combine_metrics(*interior_metrics, average=average)
 
-            # Combine
-            if average:
-                return metric_average(M1, M2)
-            else:
-                return metric_intersection(M1, M2)
+            # Assemble boundary metric
+            boundary_metric = boundary_metric_from_hessian(boundary_hessian, **kwargs)
+
+            # Reset target complexity
+            self.op.target = target
+
+            # Combine interior and boundary metrics
+            return metric_intersection(interior_metric, boundary_metric, boundary_tag='on_boundary')
         else:
             raise NotImplementedError  # TODO
 
