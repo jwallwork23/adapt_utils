@@ -48,6 +48,12 @@ uniform:
 	@echo "Running uniform refinement convergence test..."
 	@python3 run_uniform_convergence.py
 
+table:
+	@echo "Writing to LaTeX formatted table..."
+	@python3 write_table.py
+
+adaptive: isotropic a_posteriori a_priori
+
 isotropic:
 	@echo "Running isotropic adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach dwr
@@ -65,6 +71,8 @@ a_priori:
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach a_priori
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach a_priori -offset 1
 
-table:
-	@echo "Writing to LaTeX formatted table..."
-	@python3 write_table.py
+plot:
+	@echo "Plotting convergence curves..."
+	@python3 plot_convergence.py cg -stabilisation supg
+
+convergence: uniform table adaptive plot

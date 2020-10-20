@@ -34,7 +34,7 @@ args = parser.parse_args()
 
 family = args.family or 'cg'
 assert family in ('cg', 'dg')
-target = float(args.target or 2.5e+02)
+target = float(args.target or 1.25e+02)
 level = int(args.level or 0)
 offset = bool(args.offset or False)
 
@@ -64,7 +64,7 @@ kwargs = {
 
     # Convergence analysis
     'target_base': 2,
-    'outer_iterations': 7,
+    'outer_iterations': 8,
 
     # I/O and debugging
     'plot_pvd': True,
