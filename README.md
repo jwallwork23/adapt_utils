@@ -35,6 +35,12 @@ London.
     * Paper: DOI:10.1007/s42452-020-2745-9, URL: https://rdcu.be/b35wZ.
     * Code: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3695801.svg)](https://doi.org/10.5281/zenodo.3695801) (`v1.3`).
     * Test case: `steady/test_cases/turbine_array`
+    
+ * M. C. A. Clare, J. G. Wallwork, S. C. Kramer, H. Weller, C. J. Cotter, M. D. Piggott, <em> 'On the use of mesh movement methods to help overcome the multi-scale challenges associated with hydro-morphodynamic modelling'</em>, Submitted to Journal of Computational Physics.
+    * Code:
+      * The specific version of Firedrake used has been stored and can be downloaded from the following site: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110204.svg)](https://doi.org/10.5281/zenodo.4110204). To install this specific version please follow instructions here https://www.firedrakeproject.org/zenodo.html
+      * The specific version of Thetis used has been stored and can be downloaded from the following site: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110172.svg)](https://doi.org/10.5281/zenodo.4110172) 
+    * Test cases: `unsteady/test_cases/trench_1d` (Section 4.1); `unsteady/test_cases/trench_slant` (Section 4.2); `unsteady/test_cases/beach_slope` (Section 4.3)       
 
 
 ### User instructions
