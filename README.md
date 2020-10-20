@@ -38,6 +38,7 @@ London.
     
  * M. C. A. Clare, J. G. Wallwork, S. C. Kramer, H. Weller, C. J. Cotter, M. D. Piggott, <em> 'On the use of mesh movement methods to help overcome the multi-scale challenges associated with hydro-morphodynamic modelling'</em>, Submitted to Journal of Computational Physics.
     * Code:
+      * adapt_utils [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110655.svg)](https://doi.org/10.5281/zenodo.4110655) (`v2.1`).
       * The specific version of Firedrake used has been stored and can be downloaded from the following site: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110204.svg)](https://doi.org/10.5281/zenodo.4110204). To install this specific version please follow instructions here https://www.firedrakeproject.org/zenodo.html
       * The specific version of Thetis used has been stored and can be downloaded from the following site: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110172.svg)](https://doi.org/10.5281/zenodo.4110172) 
     * Test cases: `unsteady/test_cases/trench_1d` (Section 4.1); `unsteady/test_cases/trench_slant` (Section 4.2); `unsteady/test_cases/beach_slope` (Section 4.3)       
@@ -52,7 +53,7 @@ London.
   * Once you have a working Firedrake installation, get to grips with `adapt_utils` by looking at the test cases in `steady/test_cases` and `unsteady/test_cases`, as well as the notebooks hosted [here][7].
 
 
-#### For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk.
+#### For feedback, comments and questions, please email j.wallwork16@imperial.ac.uk or m.clare17@imperial.ac.uk.
 
 [1]: http://firedrakeproject.org/ "Firedrake"
 [2]: http://thetisproject.org/index.html "Thetis"
