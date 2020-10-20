@@ -19,7 +19,7 @@ def recover_gradient(f, **kwargs):
     That `f` is P1 is not actually a requirement. In fact, this implementation supports an argument
     which is a scalar UFL expression.
 
-    :arg f: (scalar) solution field.
+    :arg f: field which we seek the gradient of.
     :kwarg bcs: boundary conditions for L2 projection.
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
@@ -29,9 +29,11 @@ def recover_gradient(f, **kwargs):
     # Argument is a Function
     if isinstance(f, Function):
         return L2ProjectorGradient(f.function_space(), **kwargs).project(f)
+    op = kwargs.get('op')
+    op.print_debug("RECOVERY: Recovering gradient on domain interior...")
 
     # Argument is a UFL expression
-    op = kwargs.get('op')
+    bcs = kwargs.get('bcs')
     mesh = kwargs.get('mesh', op.default_mesh)
     P1_vec = VectorFunctionSpace(mesh, "CG", 1)
     g, φ = TrialFunction(P1_vec), TestFunction(P1_vec)
@@ -40,8 +42,7 @@ def recover_gradient(f, **kwargs):
     # L = inner(φ, grad(f))*dx
     L = f*dot(φ, n)*ds - div(φ)*f*dx  # Enables field to be P0
     l2_proj = Function(P1_vec, name="Recovered gradient")
-    bcs = kwargs.get('bcs')
-    solve(a == L, l2_proj, bcs=bcs, solver_parameters=op.hessian_solver_parameters)
+    solve(a == L, l2_proj, bcs=bcs, solver_parameters=op.gradient_solver_parameters)
     return l2_proj
 
 
@@ -49,8 +50,10 @@ def recover_hessian(f, **kwargs):
     r"""
     Assuming the smooth solution field has been approximated by a function `f` which is P1, all
     second derivative information has been lost. As such, the Hessian of `f` cannot be directly
-    computed. We provide two means of recovering it, as follows. That `f` is P1 is not actually
-    a requirement.
+    computed. We provide two means of recovering it, as follows.
+
+    That `f` is P1 is not actually a requirement. In fact, this implementation supports an argument
+    which is a scalar UFL expression.
 
     (1) "Integration by parts" ('parts'):
     This involves solving the PDE $H = \nabla^T\nabla f$ in the weak sense. Code is based on the
@@ -61,12 +64,51 @@ def recover_hessian(f, **kwargs):
     This involves two applications of the L2 projection operator. In this mode, we are permitted
     to recover the Hessian of a P0 field, since no derivatives of `f` are required.
 
-    :arg f: P1 solution field.
+    :arg f: field which we seek the Hessian of.
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed Hessian associated with `f`.
     """
     kwargs.setdefault('op', Options())
-    return DoubleL2ProjectorHessian(f.function_space(), boundary=False, **kwargs).project(f)
+
+    # Argument  is a Function
+    if isinstance(f, Function):
+        return DoubleL2ProjectorHessian(f.function_space(), boundary=False, **kwargs).project(f)
+    op = kwargs.get('op')
+    op.print_debug("RECOVERY: Recovering Hessian on domain interior...")
+
+    # Argument is a UFL expression
+    bcs = kwargs.get('bcs')
+    mesh = kwargs.get('mesh', op.default_mesh)
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    n = FacetNormal(mesh)
+    solver_parameters = op.hessian_solver_parameters[op.hessian_recovery]
+
+    # Integration by parts
+    if op.hessian_recovery == 'parts':
+        H, τ = TrialFunction(P1_ten), TestFunction(P1_ten)
+        l2_proj = Function(P1_ten, name="Recovered Hessian")
+        a = inner(τ, H)*dx
+        L = -inner(div(τ), grad(f))*dx
+        L += dot(grad(f), dot(τ, n))*ds
+        solve(a == L, l2_proj, bcs=bcs, solver_parameters=solver_parameters)
+        return l2_proj
+
+    # Double L2 projection
+    P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+    W = P1_vec*P1_ten
+    g, H = TrialFunctions(W)
+    φ, τ = TestFunctions(W)
+    l2_proj = Function(W)
+    a = inner(τ, H)*dx
+    a += inner(φ, g)*dx
+    a += inner(div(τ), g)*dx
+    a += -dot(g, dot(τ, n))*ds
+    # L = inner(grad(f), φ)*dx
+    L = f*dot(φ, n)*ds - f*div(φ)*dx  # Enables field to be P0
+    solve(a == L, l2_proj, bcs=bcs, solver_parameters=solver_parameters)
+    g, H = l2_proj.split()
+    H.rename("Recovered Hessian")
+    return H
 
 
 def recover_boundary_hessian(f, **kwargs):
@@ -76,12 +118,18 @@ def recover_boundary_hessian(f, **kwargs):
     dimensions it gives a 2D field on the surface. The resulting field should only be considered on
     the boundary and is set arbitrarily to 1/h_max in the interior.
 
-    :arg f: Scalar solution field.
+    :arg f: field which we seek the Hessian of.
     :param op: `Options` class object providing max cell size value.
     :return: reconstructed boundary Hessian associated with `f`.
     """
     kwargs.setdefault('op', Options())
-    return DoubleL2ProjectorHessian(f.function_space(), boundary=True, **kwargs).project(f)
+
+    # Argument is a Function
+    if isinstance(f, Function):
+        return DoubleL2ProjectorHessian(f.function_space(), boundary=True, **kwargs).project(f)
+
+    # Argument is a UFL expression
+    raise NotImplementedError  # TODO
 
 
 # --- Use the following drivers if doing multiple L2 projections on the current mesh
@@ -100,7 +148,7 @@ class L2Projector():
         self.n = FacetNormal(self.mesh)
         self.bcs = bcs
         self.kwargs = {
-            'solver_parameters': op.hessian_solver_parameters,
+            'solver_parameters': op.hessian_solver_parameters[op.hessian_recovery],
         }
 
     def setup(self):
@@ -125,6 +173,11 @@ class L2ProjectorGradient(L2Projector):
     Note that the field itself need not be continuously differentiable at all.
     """
     name = 'gradient'
+    def __init__(self, *args, **kwargs):
+        super(L2ProjectorGradient, self).__init__(*args, **kwargs)
+        self.kwargs = {
+            'solver_parameters': self.op.gradient_solver_parameters,
+        }
 
     def setup(self):
         P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
@@ -186,9 +239,9 @@ class DoubleL2ProjectorHessian(L2Projector):
         # Double L2 projection, using a mixed formulation for the gradient and Hessian
         elif self.op.hessian_recovery == 'dL2':
             P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
-            W = P1_ten*P1_vec
-            H, g = TrialFunctions(W)
-            τ, φ = TestFunctions(W)
+            W = P1_vec*P1_ten
+            g, H = TrialFunctions(W)
+            φ, τ = TestFunctions(W)
             self.l2_projection = Function(W)
 
             a = inner(τ, H)*dx
@@ -234,10 +287,10 @@ class DoubleL2ProjectorHessian(L2Projector):
             return super(DoubleL2ProjectorHessian, self).project(f)
 
     def _project_interior(self):
-        self.op.print_debug("RECOVERY: L2 projecting Hessian on domain interior...")
+        self.op.print_debug("RECOVERY: Recovering Hessian on domain interior...")
         if not hasattr(self, 'projector'):
             self.setup()
         self.projector.solve()
-        H, g = self.l2_projection.split()
+        g, H = self.l2_projection.split()
         H.rename("Recovered Hessian")
         return H
