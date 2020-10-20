@@ -13,17 +13,36 @@ def recover_gradient(f, **kwargs):
     r"""
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
-    smooth gradient, we solve an auxiliary finite element problem in P1 space. This "L2 projection"
-    gradient recovery technique makes use of the Cl\'ement interpolation operator. That `f` is P1
-    is not actually a requirement.
+    smooth gradient, we solve an auxiliary finite element problem in P1 space. This 'L2 projection'
+    gradient recovery technique makes use of the Cl\'ement interpolation operator.
 
-    :arg f: (scalar) P1 solution field.
+    That `f` is P1 is not actually a requirement. In fact, this implementation supports an argument
+    which is a scalar UFL expression.
+
+    :arg f: (scalar) solution field.
     :kwarg bcs: boundary conditions for L2 projection.
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
     """
     kwargs.setdefault('op', Options())
-    return L2ProjectorGradient(f.function_space(), **kwargs).project(f)
+
+    # Argument is a Function
+    if isinstance(f, Function):
+        return L2ProjectorGradient(f.function_space(), **kwargs).project(f)
+
+    # Argument is a UFL expression
+    op = kwargs.get('op')
+    mesh = kwargs.get('mesh', op.default_mesh)
+    P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+    g, φ = TrialFunction(P1_vec), TestFunction(P1_vec)
+    n = FacetNormal(mesh)
+    a = inner(φ, g)*dx
+    # L = inner(φ, grad(f))*dx
+    L = f*dot(φ, n)*ds - div(φ)*f*dx  # Enables field to be P0
+    l2_proj = Function(P1_vec, name="Recovered gradient")
+    bcs = kwargs.get('bcs')
+    solve(a == L, l2_proj, bcs=bcs, solver_parameters=op.hessian_solver_parameters)
+    return l2_proj
 
 
 def recover_hessian(f, **kwargs):
