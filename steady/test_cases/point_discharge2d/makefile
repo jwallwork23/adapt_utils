@@ -60,7 +60,10 @@ a_posteriori:
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg \
 		-approach a_posteriori -offset 1
 
-# TODO: A priori anisotropic
+a_priori:
+	@echo "Running a priori anisotropic adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach a_priori
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach a_priori -offset 1
 
 table:
 	@echo "Writing to LaTeX formatted table..."
