@@ -7,7 +7,7 @@ from adapt_utils.adapt.recovery import recover_hessian, recover_boundary_hessian
 from adapt_utils.adapt.kernels import *
 
 
-__all__ = ["metric_complexity", "cell_size_metric",
+__all__ = ["metric_complexity", "cell_size_metric", "metric_coefficient",
            "steady_metric", "isotropic_metric", "space_normalise", "space_time_normalise",
            "boundary_metric_from_hessian",
            "combine_metrics", "metric_intersection", "metric_average"]
@@ -488,23 +488,36 @@ class UnsteadyHessianMetric():
         raise NotImplementedError  # TODO
 
 
-def get_metric_coefficient(a, b, op=Options()):
+def metric_coefficient(interior_hessian, boundary_hessian, op=Options(), **kwargs):
     r"""
     Solve algebraic problem to get scaling coefficient for interior/boundary metric. See
-    [Loseille et al. 2010] for details.
+    [Loseille et al. 2011] for details.
 
-    :arg a: determinant integral associated with interior metric.
-    :arg b: determinant integral associated with boundary metric.
-    :kwarg op: `Options` class object providing min/max cell size values.
+    :arg interior_hessian: component from domain interior.
+    :arg boundary_hessian: component from domain boundary.
+    :kwarg interior_hessian_scaling: positive scaling function for interior Hessian.
+    :kwarg boundary_hessian_scaling: positive scaling function for boundary Hessian.
+    :kwarg op: :class:`Options` parameters object.
     :return: Scaling coefficient.
     """
-    from sympy.solvers import solve
-    from sympy import Symbol
+    from sympy import Symbol, solve
 
+    # Collect parameters
+    n = interior_hessian.function_space().mesh().topological_dimension()
+    assert n in (2, 3)
+    g = kwargs.get('interior_hessian_scaling', Constant(op.target**3))  # TODO: How to choose?
+    gbar = kwargs.get('boundary_hessian_scaling', Constant(0.5*op.target**3))  # TODO: How to choose?
+
+    # Compute optimal coefficient for mixed interior-boundary Hessian
+    a = assemble(pow(g, n/(2*n-1))*pow(det(interior_hessian), 1/(2*n-1))*dx)
+    b = assemble(pow(gbar, 0.5)*pow(det(boundary_hessian), 1/(2*n-2))*ds)
     c = Symbol('c')
-    sol = solve(a*pow(c, -0.6) + b*pow(c, -0.5) - op.target, c)
+    sol = solve(a*pow(c, n/(1-2*n)) + b*pow(c, -0.5) - op.target, c)
     assert len(sol) == 1
-    return Constant(sol[0])
+    coefficient = float(sol[0])
+    op.print_debug("METRIC: original target complexity = {:.4e}".format(op.target))
+    op.print_debug("METRIC: target interior/boundary complexity = {:.4e}".format(coefficient))
+    return coefficient
 
 
 # TODO: Update
