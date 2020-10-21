@@ -1,7 +1,9 @@
 from thetis import *
 
+from adapt_utils.adapt.kernels import *
 
-__all__ = ["MeshStats"]
+
+__all__ = ["MeshStats", "isotropic_cell_size", "anisotropic_cell_size"]
 
 
 class MeshStats(object):
@@ -65,3 +67,38 @@ class MeshStats(object):
         get_horizontal_elem_size_2d(self.volume)
         self.volume_min = self.volume.vector().gather().min()
         self.volume_max = self.volume.vector().gather().max()
+
+
+def isotropic_cell_size(mesh):
+    """
+    Standard measure of cell size, as determined by UFL's `CellSize`.
+    """
+    P0 = FunctionSpace(mesh, "DG", 0)
+    return interpolate(CellSize(mesh), P0)
+
+
+def anisotropic_cell_size(mesh):
+    """
+    Measure of cell size for anisotropic meshes, as described in [Micheletti, Perotto & Picasso 2003]
+    """
+    dim = mesh.topological_dimension()
+
+    # Compute cell Jacobian
+    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
+    J = Function(P0_ten, name="Cell Jacobian")
+    J.interpolate(Jacobian(mesh))
+
+    # Get SPD part of polar decomposition
+    B = Function(P0_ten, name="SPD part")
+    op2.par_loop(eigen_kernel(poldec_spd, dim), P0_ten.node_set, B.dat(op2.RW), J.dat(op2.READ))
+
+    # Get eigendecomposition
+    P0_vec = VectorFunctionSpace(mesh, "DG", 0)
+    evalues = Function(P0_vec, name="Eigenvalues")
+    evectors = Function(P0_ten, name="Eigenvectors")
+    kernel = eigen_kernel(get_reordered_eigendecomposition, dim)
+    op2.par_loop(kernel, P0_ten.node_set, evectors.dat(op2.RW), evalues.dat(op2.RW), B.dat(op2.READ))
+
+    # Get minimum eigenvalue
+    P0 = FunctionSpace(mesh, "DG", 0)
+    return interpolate(min_value(evalues[0], evalues[1]), P0)
