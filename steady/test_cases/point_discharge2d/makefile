@@ -22,17 +22,21 @@ calibrate: calibrate_cg calibrate_dg
 
 calibrate_cg:
 	@echo "Calibrating radius for CG (no stabilisation)..."
-	@python3 calibrate_radius.py 5 cg
-	@echo "Calibrating radius for CG (SU stabilisation)..."
-	@python3 calibrate_radius.py 5 cg -stabilisation su
-	@echo "Calibrating radius for CG (SUPG stabilisation)..."
-	@python3 calibrate_radius.py 5 cg -stabilisation supg
+	@python3 calibrate_radius.py 4 cg
+	@echo "Calibrating radius for CG (isotropic SU stabilisation)..."
+	@python3 calibrate_radius.py 4 cg -stabilisation su
+	@echo "Calibrating radius for CG (isotropic SUPG stabilisation)..."
+	@python3 calibrate_radius.py 4 cg -stabilisation supg
+	@echo "Calibrating radius for CG (anisotropic SU stabilisation)..."
+	@python3 calibrate_radius.py 4 cg -stabilisation su -anisotropic_stabilisation 1
+	@echo "Calibrating radius for CG (anisotropic SUPG stabilisation)..."
+	@python3 calibrate_radius.py 4 cg -stabilisation supg -anisotropic_stabilisation 1
 
 calibrate_dg:
 	@echo "Calibrating radius for DG (no stabilisation)..."
-	@python3 calibrate_radius.py 5 dg
+	@python3 calibrate_radius.py 4 dg
 	@echo "Calibrating radius for DG (Lax-Friedrichs stabilisation)..."
-	@python3 calibrate_radius.py 5 dg -stabilisation lax_friedrichs
+	@python3 calibrate_radius.py 4 dg -stabilisation lax_friedrichs
 
 print_calibration:
 	@cat outputs/fixed_mesh/cg/log
