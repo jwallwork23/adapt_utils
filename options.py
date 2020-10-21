@@ -30,6 +30,7 @@ class Options(FrozenConfigurable):
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)
     periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
+    anisotropic_stabilisation = Bool(False).tag(config=True)
 
     # Time discretisation
     timestepper = Enum(

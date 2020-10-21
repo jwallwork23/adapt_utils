@@ -98,10 +98,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
             to.update(static_options)
             if hasattr(op, 'sipg_parameter_tracer') and op.sipg_parameter_tracer is not None:
                 swo['sipg_parameter_tracer'] = op.sipg_parameter_tracer
+            to.anisotropic_stabilisation = op.anisotropic_stabilisation
         for i, to in enumerate(self.sediment_options):
             to.update(static_options)
             if hasattr(op, 'sipg_parameter_sediment') and op.sipg_parameter_sediment is not None:
                 swo['sipg_parameter_sediment'] = op.sipg_parameter_sediment
+            to.anisotropic_stabilisation = op.anisotropic_stabilisation
 
         # Lists to be populated
         self.fwd_solutions = [None for i in range(op.num_meshes)]
@@ -785,6 +787,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
+            anisotropic=op.anisotropic_stabilisation,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -871,6 +874,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
+            anisotropic=op.anisotropic_stabilisation,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
