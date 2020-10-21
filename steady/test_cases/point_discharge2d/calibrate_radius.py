@@ -19,6 +19,7 @@ parser.add_argument('-stabilisation', help="""
     Note that 'su' and 'supg' are ignored unless the finite element family is CG.
     Note that 'lax_friedrichs' is ignored unless the finite element family is DG.
     """)
+parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-error_to_calibrate', help="Choose from {'l2', 'qoi'}.")
 parser.add_argument('-test_consistency', help="Test consistency of taped reduced functional.")
 parser.add_argument('-test_gradient', help="Taylor test reduced functional.")
@@ -37,6 +38,7 @@ op = PointDischarge2dOptions(level=level)
 assert args.family in ('cg', 'dg')
 op.tracer_family = args.family or 'cg'
 op.stabilisation = args.stabilisation
+op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 op.di = os.path.join(op.di, args.stabilisation or args.family)
 mesh = op.default_mesh
 x, y = SpatialCoordinate(mesh)
@@ -218,6 +220,8 @@ else:
         ext += '_su'
     if args.stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
+    if op.anisotropic_stabilisation:
+        ext += '_anisotropic'
 fname = "_".join(["{:s}", ext, str(level)])
 fname += ".npy"
 np.save(os.path.join(op.di, fname.format("control")), np.array(control_progress))

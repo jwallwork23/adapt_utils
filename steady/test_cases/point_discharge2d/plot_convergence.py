@@ -11,6 +11,7 @@ from adapt_utils.plotting import *
 parser = argparse.ArgumentParser()
 parser.add_argument('family', help="Finite element family.")
 parser.add_argument('-stabilisation', help="Stabilisation method to use.")
+parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-norm_order', help="Metric normalisation order.")
 args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 4)  # NOTE
@@ -18,6 +19,7 @@ p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 4)  # NOTE
 # Get filenames
 ext = args.family
 assert ext in ('cg', 'dg')
+anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 if ext == 'dg':
     if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
         ext += '_lf'
@@ -26,6 +28,8 @@ else:
         ext += '_su'
     if args.stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
+    if anisotropic_stabilisation:
+        ext += '_anisotropic'
 di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 

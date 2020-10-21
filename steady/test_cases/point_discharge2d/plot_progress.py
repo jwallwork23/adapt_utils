@@ -8,9 +8,10 @@ from adapt_utils.plotting import *
 
 # Parse arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('level')
-parser.add_argument('family')
-parser.add_argument('-stabilisation')
+parser.add_argument('level', help="Number of uniform refinements to apply to the initial mesh.")
+parser.add_argument('family', help="Finite element family.")
+parser.add_argument('-stabilisation', help="Stabilisation method to use.")
+parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 args = parser.parse_args()
 assert args.family in ('cg', 'dg')
 
@@ -21,6 +22,7 @@ plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
 # Load progress arrays
 ext = args.family
+anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 if ext == 'dg':
     if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
         ext += '_lf'
@@ -29,6 +31,8 @@ else:
         ext += '_su'
     if args.stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
+    if anisotropic_stabilisation:
+        ext += '_anisotropic'
 ext += "_" + args.level
 fname = "_".join(["{:s}", ext])
 fname += ".npy"
