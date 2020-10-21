@@ -1,5 +1,4 @@
 from firedrake import *
-from firedrake.petsc import PETSc
 
 import argparse
 import matplotlib
@@ -60,7 +59,7 @@ kwargs = {
     'approach': args.approach,
 
     # Problem setup
-    'level': int(args.level or 0)
+    'level': int(args.level or 0),
     'offset': int(args.offset or 0),
 
     # Adaptation parameters

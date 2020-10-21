@@ -1609,7 +1609,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         update_forcings(self.simulation_time - op.dt)
         self.print(80*'=')
 
-
     # --- Metric
 
     def recover_hessian_metric(self, adjoint=False, **kwargs):
@@ -1638,11 +1637,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             )
         return recoverer
 
-
     # --- Run scripts
 
-    # TODO: Modify indicator for time interval
-    def run_dwp(self, **kwargs):
+    def run_dwp(self, **kwargs):  # TODO: Modify indicator for time interval
         r"""
         The "dual weighted primal" approach, first used (not under this name) in [1]. For shallow
         water tsunami propagation problems with a quantity of interest of the form

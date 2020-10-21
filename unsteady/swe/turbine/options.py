@@ -19,7 +19,7 @@ class TurbineOptions(CoupledOptions):
     # Turbine parameters
     turbine_diameter = PositiveFloat(18.0, help=r"""
         Diameter of the circular region swept in the vertical by the turbine blades.
-        
+
         The 'swept area' of the turbine is calculated as :math:`pi*\frac{D^2}4`, where
         :math:`D` is the turbine diameter.
 

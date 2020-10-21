@@ -3,7 +3,6 @@ from thetis import create_directory
 import argparse
 import h5py
 import os
-import sys
 
 from adapt_utils.steady.swe.turbine.solver import AdaptiveSteadyTurbineProblem
 from adapt_utils.steady.test_cases.turbine_array.options import TurbineArrayOptions
