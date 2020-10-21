@@ -8,7 +8,7 @@ from thetis.utility import *
 import thetis.tracer_eq_2d as thetis_tracer
 import thetis.conservative_tracer_eq_2d as thetis_cons_tracer
 
-from adapt_utils.mesh import *
+from adapt_utils.mesh import anisotropic_cell_size
 
 
 # --- Modified terms for the non-conservative form
@@ -17,8 +17,8 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
     # TODO: doc
     def __init__(self, *args, anisotropic=True, **kwargs):
         super(HorizontalAdvectionTerm, self).__init__(*args, **kwargs)
-        cell_size = anisotropic_cell_size if anisotropic else isotropic_cell_size
-        self.cellsize = cell_size(self.mesh)
+        if anisotropic:
+            self.cellsize = anisotropic_cell_size(self.mesh)
 
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
@@ -59,8 +59,8 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
     # TODO: doc
     def __init__(self, *args, anisotropic=True, **kwargs):
         super(HorizontalDiffusionTerm, self).__init__(*args, **kwargs)
-        cell_size = anisotropic_cell_size if anisotropic else isotropic_cell_size
-        self.cellsize = cell_size(self.mesh)
+        if anisotropic:
+            self.cellsize = anisotropic_cell_size(self.mesh)
 
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
@@ -111,8 +111,8 @@ class SourceTerm(thetis_tracer.SourceTerm):
     # TODO: doc
     def __init__(self, *args, anisotropic=True, **kwargs):
         super(SourceTerm, self).__init__(*args, **kwargs)
-        cell_size = anisotropic_cell_size if anisotropic else isotropic_cell_size
-        self.cellsize = cell_size(self.mesh)
+        if anisotropic:
+            self.cellsize = anisotropic_cell_size(self.mesh)
 
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
@@ -147,8 +147,8 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
     # TODO: doc
     def __init__(self, *args, anisotropic=True, **kwargs):
         super(ConservativeHorizontalAdvectionTerm, self).__init__(*args, **kwargs)
-        cell_size = anisotropic_cell_size if anisotropic else isotropic_cell_size
-        self.cellsize = cell_size(self.mesh)
+        if anisotropic:
+            self.cellsize = anisotropic_cell_size(self.mesh)
 
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
