@@ -75,4 +75,10 @@ plot:
 	@echo "Plotting convergence curves..."
 	@python3 plot_convergence.py cg -stabilisation supg
 
+plot_norms:
+	@echo "Plotting convergence curves across norm orders..."
+	@python3 plot_convergence_norms.py dwr cg -stabilisation supg
+	@python3 plot_convergence_norms.py a_posteriori cg -stabilisation supg
+	@python3 plot_convergence_norms.py a_priori cg -stabilisation supg
+
 convergence: uniform table adaptive plot
