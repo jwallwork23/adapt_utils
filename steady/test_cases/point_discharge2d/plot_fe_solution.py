@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('approach', help="Mesh adaptation approach")
 parser.add_argument('family', help="Finite element family")
 parser.add_argument('-stabilisation', help="Stabilisation method to use")
+parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 
@@ -28,6 +29,7 @@ kwargs = {
 op = PointDischarge2dOptions(**kwargs)
 op.tracer_family = args.family
 op.stabilisation = args.stabilisation
+op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 op.di = os.path.join(op.di, args.stabilisation or args.family)
 
 # Load from HDF5
