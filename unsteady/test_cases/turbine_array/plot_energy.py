@@ -94,7 +94,7 @@ fig, axes = plt.subplots(figsize=(8, 3.5))
 greys = ['k', 'dimgrey', 'grey', 'darkgrey', 'silver', 'lightgrey']
 for i, (linestyle, colour) in enumerate(zip(["-", "--", ":", "--", "-"], greys)):
     axes.semilogx(elements_used, columnar_energy_megajoules[i, :],
-              label="{:d}".format(i+1), linestyle=linestyle, marker='x', color=colour)
+                  label="{:d}".format(i+1), linestyle=linestyle, marker='x', color=colour)
 axes.set_xlabel("Element count")
 axes.set_ylabel(r"Energy output [$\mathrm{MJ}$]")
 axes.legend(bbox_to_anchor=(1.05, 1.2), fontsize=16)

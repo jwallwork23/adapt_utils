@@ -5,11 +5,9 @@ Migrating Trench 2D Test case
 Solves initial hydrodynamics simulation of a 2D migrating trench
 
 """
-
 import thetis as th
 import hydro_fns as hydro
 import numpy as np
-import pylab as plt
 
 from adapt_utils.io import export_hydrodynamics
 

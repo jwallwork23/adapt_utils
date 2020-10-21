@@ -327,7 +327,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         from adapt_utils.adapt.recovery import recover_gradient, recover_boundary_hessian
 
-        P1 = self.P1[0]
         P1_ten = self.P1_ten[0]
         if self.op.solve_tracer and self.op.adapt_field == 'tracer':
             c = self.fwd_solution_tracer

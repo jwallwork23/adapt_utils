@@ -2,8 +2,6 @@ import thetis as th
 import time
 import datetime
 import numpy as np
-import math
-import os
 
 
 def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
@@ -37,8 +35,8 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
     """
     def update_forcings_hydrodynamics(t_new):
         # update boundary conditions if have fluctuating conditions
-        if fluc_bcs == True:
-            in_fn, out_fn = boundary_conditions_fn(bathymetry_2d, t_new = t_new, state = 'update')
+        if fluc_bcs:
+            in_fn, out_fn = boundary_conditions_fn(bathymetry_2d, t_new=t_new, state='update')
             for j in range(len(in_fn)):
                 exec('constant_in' + str(j) + '.assign(' + str(in_fn[j]) + ')')
 
@@ -48,7 +46,7 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
         if friction == 'nikuradse':
             uv1, elev1 = solver_obj.fields.solution_2d.split()
 
-            if wetting_and_drying == True:
+            if wetting_and_drying:
                 wd_bath_displacement = solver_obj.depth.wd_bathymetry_displacement
                 depth.project(elev1 + wd_bath_displacement(elev1) + bathymetry_2d)
             else:
@@ -60,13 +58,13 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
     # choose directory to output results
     ts = time.time()
     st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
-    outputdir = 'outputs'+ st
+    outputdir = 'outputs' + st
 
     # export interval in seconds
     if t_end < 40:
         t_export = 0.1
     else:
-        t_export = np.round(t_end/40,0)
+        t_export = np.round(t_end/40, 0)
 
     th.print_output('Exporting to '+outputdir)
 
@@ -121,7 +119,7 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
 
     # set boundary conditions
 
-    swe_bnd, left_bnd_id, right_bnd_id, in_constant, out_constant, left_string, right_string = boundary_conditions_fn(bathymetry_2d, flag = 'hydro')
+    swe_bnd, left_bnd_id, right_bnd_id, in_constant, out_constant, left_string, right_string = boundary_conditions_fn(bathymetry_2d, flag='hydro')
 
     for j in range(len(in_constant)):
         exec('constant_in' + str(j) + ' = th.Constant(' + str(in_constant[j]) + ')', globals())
@@ -129,7 +127,7 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
     str1 = '{'
     if len(left_string) > 0:
         for i in range(len(left_string)):
-            str1 += "'"+ str(left_string[i]) + "': constant_in" + str(i) + ","
+            str1 += "'" + str(left_string[i]) + "': constant_in" + str(i) + ","
         str1 = str1[0:len(str1)-1] + "}"
         exec('swe_bnd[left_bnd_id] = ' + str1)
 
@@ -139,7 +137,7 @@ def hydrodynamics_only(boundary_conditions_fn, mesh2d, bathymetry_2d, uv_init,
     str2 = '{'
     if len(right_string) > 0:
         for i in range(len(right_string)):
-            str2 += "'"+ str(right_string[i]) + "': constant_out" + str(i) + ","
+            str2 += "'" + str(right_string[i]) + "': constant_out" + str(i) + ","
         str2 = str2[0:len(str2)-1] + "}"
         exec('swe_bnd[right_bnd_id] = ' + str2)
 

@@ -118,8 +118,8 @@ for offset in (0, 1):
     # Save to file
     plt.tight_layout()
     fname = os.path.join(di, 'convergence_{:d}'.format(offset))
-     if loglog:
-         fname = '_'.join([fname, 'loglog'])
+    if loglog:
+        fname = '_'.join([fname, 'loglog'])
     for ext in extensions:
         plt.savefig('.'.join([fname, ext]))
 

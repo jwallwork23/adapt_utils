@@ -1,6 +1,3 @@
-from adapt_utils.swe.turbine.meshgen import *
-from adapt_utils.test_cases.steady_turbine.options import *
-
 import argparse
 import os
 
