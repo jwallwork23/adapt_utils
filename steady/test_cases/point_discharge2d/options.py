@@ -100,7 +100,7 @@ class PointDischarge2dOptions(CoupledOptions):
                 'supg': 0.05606535,
             },
             'dg': {
-                None: 0.05453682,              # TODO: level 4
+                None: 0.05606172,              # TODO: level 4
                 'lax_friedrichs': 0.05606172,  # TODO: level 4
             },
         }

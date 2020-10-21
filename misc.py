@@ -328,7 +328,8 @@ def _cg2dg_tensor(f_cg, f_dg):
 
 def is_symmetric(M, tol=1.0e-08):
     """Determine whether or not a tensor field `M` is symmetric"""
-    return assemble(abs(det(M - transpose(M)))*dx) < tol
+    area = assemble(Constant(1.0, domain=M.function_space().mesh())*dx)
+    return assemble(abs(det(M - transpose(M)))*dx)/area < tol
 
 
 def is_pos_def(M):

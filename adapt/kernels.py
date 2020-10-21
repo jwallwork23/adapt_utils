@@ -8,7 +8,7 @@ from adapt_utils.options import Options
 __all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecomposition",
            "set_eigendecomposition", "set_eigendecomposition_transpose", "intersect",
            "anisotropic_refinement", "metric_from_hessian", "postproc_metric",
-           "gemv", "matscale", "singular_value_decomposition", "get_maximum_length_edge"]
+           "gemv", "matscale", "poldec_unitary", "poldec_spd", "get_maximum_length_edge"]
 
 
 # --- Find Eigen include files
@@ -332,12 +332,12 @@ void matscale(double B_[%d], const double * A_, const double * alpha_) {
 }
 """
 
-svd_str = """
+poldec_spd_str = """
 #include <Eigen/Dense>
 
 using namespace Eigen;
 
-void singular_value_decomposition(double A_[%d], const double * B_) {
+void poldec_spd(double A_[%d], const double * B_) {
 
   // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
@@ -346,8 +346,26 @@ void singular_value_decomposition(double A_[%d], const double * B_) {
   // Compute singular value decomposition
   JacobiSVD<Matrix<double, %d, %d, RowMajor> > svd(B, ComputeFullV);
 
-  // Build metric from singular value decomposition
+  // Get SPD part of polar decomposition
   A += svd.matrixV() * svd.singularValues().asDiagonal() * svd.matrixV().transpose();
+}"""
+
+poldec_unitary_str = """
+#include <Eigen/Dense>
+
+using namespace Eigen;
+
+void poldec_unitary(double A_[%d], const double * B_) {
+
+  // Map inputs and outputs onto Eigen objects
+  Map<Matrix<double, %d, %d, RowMajor> > A((double *)A_);
+  Map<Matrix<double, %d, %d, RowMajor> > B((double *)B_);
+
+  // Compute singular value decomposition
+  JacobiSVD<Matrix<double, %d, %d, RowMajor> > svd(B, ComputeFullU | ComputeFullV);
+
+  // Get unitary part of polar decomposition
+  A += svd.matrixU() * svd.matrixV().transpose();
 }"""
 
 get_max_length_edge_2d_str = """
@@ -423,9 +441,14 @@ def matscale(d):
     return matscale_str % (d*d, d, d, d, d)
 
 
-def singular_value_decomposition(d):
-    """Compute the singular value decomposition of a metric."""
-    return svd_str % (d*d, d, d, d, d, d, d)
+def poldec_unitary(d):
+    """Compute the unitary part of the polar decomposition of a matrix."""
+    return poldec_unitary_str % (d*d, d, d, d, d, d, d)
+
+
+def poldec_spd(d):
+    """Compute the SPD part of the polar decomposition of a matrix."""
+    return poldec_spd_str % (d*d, d, d, d, d, d, d)
 
 
 def get_maximum_length_edge(d):
