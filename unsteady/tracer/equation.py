@@ -8,10 +8,18 @@ from thetis.utility import *
 import thetis.tracer_eq_2d as thetis_tracer
 import thetis.conservative_tracer_eq_2d as thetis_cons_tracer
 
+from adapt_utils.mesh import *
+
 
 # --- Modified terms for the non-conservative form
 
 class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
+    # TODO: doc
+    def __init__(self, *args, anisotropic=True, **kwargs):
+        super(HorizontalAdvectionTerm, self).__init__(*args, **kwargs)
+        cell_size = anisotropic_cell_size if anisotropic else isotropic_cell_size
+        self.cellsize = cell_size(self.mesh)
+
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
 
@@ -48,6 +56,12 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
 
 
 class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
+    # TODO: doc
+    def __init__(self, *args, anisotropic=True, **kwargs):
+        super(HorizontalDiffusionTerm, self).__init__(*args, **kwargs)
+        cell_size = anisotropic_cell_size if anisotropic else isotropic_cell_size
+        self.cellsize = cell_size(self.mesh)
+
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
         if fields_old.get('diffusivity_h') is None:
@@ -94,6 +108,12 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
 
 
 class SourceTerm(thetis_tracer.SourceTerm):
+    # TODO: doc
+    def __init__(self, *args, anisotropic=True, **kwargs):
+        super(SourceTerm, self).__init__(*args, **kwargs)
+        cell_size = anisotropic_cell_size if anisotropic else isotropic_cell_size
+        self.cellsize = cell_size(self.mesh)
+
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
         source = fields_old.get('source')
@@ -124,6 +144,12 @@ class SourceTerm(thetis_tracer.SourceTerm):
 # --- Modified terms for the conservative form
 
 class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizontalAdvectionTerm):
+    # TODO: doc
+    def __init__(self, *args, anisotropic=True, **kwargs):
+        super(ConservativeHorizontalAdvectionTerm, self).__init__(*args, **kwargs)
+        cell_size = anisotropic_cell_size if anisotropic else isotropic_cell_size
+        self.cellsize = cell_size(self.mesh)
+
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
 
@@ -174,7 +200,8 @@ class TracerEquation2D(Equation):
     """
     def __init__(self, function_space, depth,
                  use_lax_friedrichs=False,
-                 sipg_parameter=Constant(10.0)):
+                 sipg_parameter=Constant(10.0),
+                 anisotropic=False):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
@@ -182,11 +209,17 @@ class TracerEquation2D(Equation):
         :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         """
         super(TracerEquation2D, self).__init__(function_space)
-        args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
-        self.add_term(HorizontalAdvectionTerm(*args), 'explicit')
-        self.add_term(HorizontalDiffusionTerm(*args), 'explicit')
-        self.add_term(SourceTerm(*args), 'source')
+        args = (function_space, depth)
+        kwargs = {
+            'use_lax_friedrichs': use_lax_friedrichs,
+            'sipg_parameter': sipg_parameter,
+            'anisotropic': anisotropic,
+        }
+        self.add_term(HorizontalAdvectionTerm(*args, **kwargs), 'explicit')
+        self.add_term(HorizontalDiffusionTerm(*args, **kwargs), 'explicit')
+        self.add_term(SourceTerm(*args, **kwargs), 'source')
         try:
+            args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
             self.add_term(thetis_tracer.SinkTerm(*args), 'source')
         except Exception:
             print_output("WARNING: Cannot import SinkTerm.")
@@ -198,7 +231,8 @@ class ConservativeTracerEquation2D(Equation):
     """
     def __init__(self, function_space, depth,
                  use_lax_friedrichs=False,
-                 sipg_parameter=Constant(10.0)):
+                 sipg_parameter=Constant(10.0),
+                 anisotropic=False):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
@@ -206,14 +240,21 @@ class ConservativeTracerEquation2D(Equation):
         :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         """
         super(ConservativeTracerEquation2D, self).__init__(function_space)
-        args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
-        self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
-        self.add_term(ConservativeHorizontalDiffusionTerm(*args), 'explicit')
+        args = (function_space, depth)
+        kwargs = {
+            'use_lax_friedrichs': use_lax_friedrichs,
+            'sipg_parameter': sipg_parameter,
+            'anisotropic': anisotropic,
+        }
+        self.add_term(ConservativeHorizontalAdvectionTerm(*args, **kwargs), 'explicit')
+        self.add_term(ConservativeHorizontalDiffusionTerm(*args, **kwargs), 'explicit')
         if self.function_space.ufl_element().family() == 'Lagrange':
-            self.add_term(SourceTerm(*args), 'source')
+            self.add_term(SourceTerm(*args, **kwargs), 'source')
         else:
-            self.add_term(thetis_cons_tracer.ConservativeSourceTerm(*args), 'source')
+            kwargs.pop('anisotropic')
+            self.add_term(thetis_cons_tracer.ConservativeSourceTerm(*args, **kwargs), 'source')
         try:
+            args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
             self.add_term(thetis_cons_tracer.ConservativeSinkTerm(*args), 'source')
         except Exception:
             print_output("WARNING: Cannot import ConservativeSinkTerm.")

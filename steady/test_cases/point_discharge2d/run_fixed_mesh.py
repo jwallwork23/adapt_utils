@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-level', help="Number of uniform refinements to apply to the initial mesh.")
 parser.add_argument('-family', help="Finite element family")
 parser.add_argument('-stabilisation', help="Stabilisation method to use")
+parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 
@@ -22,6 +23,7 @@ family = args.family or 'dg'
 assert family in ('cg', 'dg')
 kwargs = {
     'level': int(args.level or 0),
+    'anisotropic_stabilisation': bool(args.anisotropic_stabilisation or False),
     'plot_pvd': True,
     'debug': bool(args.debug or False),
 }
