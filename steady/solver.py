@@ -426,11 +426,12 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             metric = self.get_metric(adapt_field)
 
             # Check convergence of error estimator
-            estimators = self.estimator[op.approach]
-            if len(estimators) > 1 and n >= op.min_adapt:
-                if np.abs(estimators[-1] - estimators[-2]) <= op.estimator_rtol*estimators[-2]:
-                    self.print("Converged error estimator!")
-                    break
+            if 'dwr' in op.approach:
+                estimators = self.estimator[op.approach]
+                if len(estimators) > 1 and n >= op.min_adapt:
+                    if np.abs(estimators[-1] - estimators[-2]) <= op.estimator_rtol*estimators[-2]:
+                        self.print("Converged error estimator!")
+                        break
 
             # TODO: Log complexities
 
