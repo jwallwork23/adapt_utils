@@ -207,6 +207,8 @@ class AdaptiveProblemBase(object):
         """
         self.op.print_debug("SETUP: Creating function spaces...")
         self.P0 = [FunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
+        self.P0_vec = [VectorFunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
+        self.P0_ten = [TensorFunctionSpace(mesh, "DG", 0) for mesh in self.meshes]
         self.P1 = [FunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
         self.P1_vec = [VectorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]
         self.P1_ten = [TensorFunctionSpace(mesh, "CG", 1) for mesh in self.meshes]

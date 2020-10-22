@@ -4,14 +4,17 @@ dir:
 	@echo "Making directories..."
 	@mkdir -p outputs/fixed_mesh/hdf5
 	@mkdir -p outputs/dwr/hdf5
-	@mkdir -p outputs/dwr_averaged/hdf5
-	@mkdir -p outputs/dwr_superposed/hdf5
+	@# mkdir -p outputs/dwr_averaged/hdf5
+	@# mkdir -p outputs/dwr_superposed/hdf5
+	@mkdir -p outputs/anisotropic_dwr/hdf5
+	@# mkdir -p outputs/anisotropic_dwr_averaged/hdf5
+	@# mkdir -p outputs/anisotropic_dwr_superposed/hdf5
 	@mkdir -p outputs/weighted_hessian/hdf5
-	@mkdir -p outputs/weighted_hessian_averaged/hdf5
-	@mkdir -p outputs/weighted_hessian_superposed/hdf5
+	@# mkdir -p outputs/weighted_hessian_averaged/hdf5
+	@# mkdir -p outputs/weighted_hessian_superposed/hdf5
 	@mkdir -p outputs/weighted_gradient/hdf5
-	@mkdir -p outputs/weighted_gradient_averaged/hdf5
-	@mkdir -p outputs/weighted_gradient_superposed/hdf5
+	@# mkdir -p outputs/weighted_gradient_averaged/hdf5
+	@# mkdir -p outputs/weighted_gradient_superposed/hdf5
 	@mkdir -p data
 	@mkdir -p plots
 
@@ -56,14 +59,21 @@ table:
 	@echo "Writing to LaTeX formatted table..."
 	@python3 write_table.py
 
-adaptive: isotropic weighted_hessian weighted_gradient
+adaptive: isotropic anisotropic weighted_hessian weighted_gradient
 
 isotropic:
-	@echo "Running isotropic adaptation convergence test..."
+	@echo "Running isotropic DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-approach dwr
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-approach dwr -offset 1
+
+anisotropic:
+	@echo "Running anisotropic DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-approach anisotropic_dwr
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-approach anisotropic_dwr -offset 1
 
 weighted_hessian:
 	@echo "Running 'weighted Hessian' anisotropic adaptation convergence test..."
@@ -88,5 +98,6 @@ plot_norms:
 	@python3 plot_convergence_norms.py dwr cg -stabilisation supg
 	@python3 plot_convergence_norms.py weighted_hessian cg -stabilisation supg
 	@python3 plot_convergence_norms.py weighted_gradient cg -stabilisation supg
+	@python3 plot_convergence_norms.py anisotropic_dwr cg -stabilisation supg
 
 convergence: uniform table adaptive plot

@@ -1827,6 +1827,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'dwr': self.run_dwr,
             'weighted_hessian': self.run_dwr,
             'weighted_gradient': self.run_dwr,
+            'anisotropic_dwr': self.run_dwr,
         }
         try:
             run_scripts[self.approach](**kwargs)

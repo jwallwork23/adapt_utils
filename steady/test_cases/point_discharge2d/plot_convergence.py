@@ -36,6 +36,7 @@ plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 approaches = {
     'fixed_mesh': 'Uniform',
     'dwr': 'Isotropic DWR',
+    'anisotropic_dwr': 'Anisotropic DWR',
     'weighted_hessian': 'Weighted Hessian',
     'weighted_gradient': 'Weighted Gradient',
 }
