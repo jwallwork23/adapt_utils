@@ -91,7 +91,7 @@ weighted_gradient:
 
 plot:
 	@echo "Plotting convergence curves..."
-	@python3 plot_convergence.py cg -stabilisation supg
+	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1
 
 plot_norms:
 	@echo "Plotting convergence curves across norm orders..."

@@ -28,8 +28,6 @@ else:
         ext += '_su'
     if args.stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
-    if anisotropic_stabilisation:
-        ext += '_anisotropic'
 di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
@@ -47,6 +45,8 @@ for alignment in ('aligned', 'offset'):
     for approach in approaches:
         filename = 'qoi_{:s}'.format(ext)
         if approach != 'fixed_mesh':
+            if anisotropic_stabilisation:
+                filename += '_anisotropic'
             filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
         fname = os.path.join(di.format(approach), '{:s}_{:s}.h5'.format(filename, alignment))
         if not os.path.isfile(fname):
