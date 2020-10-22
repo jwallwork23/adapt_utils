@@ -60,20 +60,24 @@ adaptive: isotropic a_posteriori a_priori
 
 isotropic:
 	@echo "Running isotropic adaptation convergence test..."
-	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach dwr
-	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach dwr -offset 1
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-approach dwr
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-approach dwr -offset 1
 
 a_posteriori:
 	@echo "Running a posteriori anisotropic adaptation convergence test..."
-	@python3 run_adaptation_loop.py -family cg -stabilisation supg \
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-approach a_posteriori
-	@python3 run_adaptation_loop.py -family cg -stabilisation supg \
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-approach a_posteriori -offset 1
 
 a_priori:
 	@echo "Running a priori anisotropic adaptation convergence test..."
-	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach a_priori
-	@python3 run_adaptation_loop.py -family cg -stabilisation supg -approach a_priori -offset 1
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-approach a_priori
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-approach a_priori -offset 1
 
 plot:
 	@echo "Plotting convergence curves..."
