@@ -1612,13 +1612,30 @@ class AdaptiveProblem(AdaptiveProblemBase):
     # --- Metric
 
     def recover_hessian_metric(self, adjoint=False, **kwargs):
+        op = self.op
         kwargs.setdefault('normalise', True)
-        kwargs['op'] = self.op
+        kwargs['op'] = op
         self.metrics = []
         solutions = self.get_solutions(self.op.adapt_field, adjoint=adjoint)
-        if self.op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
+        if op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
+            from adapt_utils.mesh import anisotropic_cell_size
+
             for i, sol in enumerate(solutions):
-                self.metrics.append(steady_metric(sol, **kwargs))
+
+                # Account for SUPG stabilisation
+                if op.stabilisation == 'supg':
+                    cell_size = anisotropic_cell_size if op.anisotropic_stabilisation else CellSize
+                    h = cell_size(self.meshes[i])
+                    u, eta = self.fwd_solutions[i].split()
+                    unorm = sqrt(dot(u, u))
+                    tau = 0.5*h/unorm
+                    D = self.fields[i].horizontal_diffusivity
+                    if D is not None:
+                        Pe = 0.5*h*unorm/D
+                        tau *= min_value(1, Pe/3)
+                    sol = sol + tau*dot(u, grad(sol))
+
+                self.metrics.append(steady_metric(sol, mesh=self.meshes[i], **kwargs))
         else:
             for i, sol in enumerate(solutions):
                 fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
