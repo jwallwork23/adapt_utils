@@ -4,6 +4,7 @@ import numpy as np
 import os
 
 from adapt_utils.adapt.adaptation import pragmatic_adapt
+from adapt_utils.adapt.kernels import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.norms import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -197,11 +198,12 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def get_dwr_flux_adjoint(self):
         raise NotImplementedError  # TODO
 
-    def indicate_error(self, adapt_field):
+    def indicate_error(self, adapt_field, approach=None):
         op = self.op
-        if op.approach == 'dwr':
+        approach = approach or op.approach
+        if approach == 'dwr':
             return self.dwr_indicator(adapt_field, adjoint=False)
-        elif op.approach == 'dwr_adjoint':
+        elif approach == 'dwr_adjoint':
             return self.dwr_indicator(adapt_field, adjoint=True)
         else:
             raise NotImplementedError  # TODO
@@ -284,12 +286,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         raise NotImplementedError  # TODO
 
     def get_metric(self, adapt_field):
-        if 'dwr' in self.op.approach:
+        if self.op.approach in ('dwr', 'dwr_adjoint'):
             metric = self.get_isotropic_metric(self.op.adapt_field)
         elif self.op.approach == 'weighted_hessian':
             metric = self.get_weighted_hessian_metric(adjoint=False)
         elif self.op.approach == 'weighted_gradient':
             metric = self.get_weighted_gradient_metric(adjoint=False)
+        elif self.op.approach == 'anisotropic_dwr':
+            metric = self.get_anisotropic_dwr_metric(adjoint=False)
         else:
             raise NotImplementedError  # TODO
         if self.op.plot_pvd:
@@ -316,7 +320,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         for the forward PDE. Otherwise, weight the Hessian of the forward solution with a residual
         for the adjoint PDE.
         """
-        strong_residual = self.get_strong_residual()
+        strong_residual = self.get_strong_residual(adjoint=adjoint)
         self.recover_hessian_metric(normalise=False, enforce_constraints=False, adjoint=not adjoint)
         scaled_hessian = interpolate(strong_residual*self.metrics[0], self.P1_ten[0])
         return steady_metric(H=scaled_hessian, normalise=True, enforce_constraints=True, op=self.op)
@@ -381,6 +385,65 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             return M
         else:
             raise NotImplementedError  # TODO
+
+    def get_anisotropic_dwr_metric(self, adjoint=False):
+        """
+        Construct an anisotropic metric using an approach inspired by [Carpio et al. 2013].
+        """
+        dim = self.mesh.topological_dimension()
+        adapt_field = self.op.adapt_field
+        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
+            adapt_field = 'shallow_water'
+        fwd_solution = self.get_solutions(adapt_field)[0]
+
+        # Compute error indicators
+        dwr = self.indicate_error('tracer', approach='dwr_adjoint' if adjoint else 'dwr')
+
+        # Get current element volume
+        K = Function(self.P0[0], name="Element volume")
+        K_hat = 0.5  # Area of a triangular reference element
+        K.interpolate(K_hat*abs(JacobianDeterminant(self.mesh)))
+
+        # Get optimal element volume
+        K_opt = Function(self.P0[0], name="Optimal element volume")
+        alpha = self.op.convergence_rate
+        K_opt.interpolate(pow(dwr, 1/(alpha + 1)))
+        Sum = K_opt.vector().gather().sum()
+        if self.op.normalisation == 'error':
+            scaling = pow(Sum*self.op.target, -1/alpha)  # FIXME
+        else:
+            scaling = Sum/self.op.target
+        K_opt.interpolate(min_value(max_value(scaling*K/K_opt, self.op.h_min**2), self.op.h_max**2))
+
+        # Recover Hessian and compute eigendecomposition
+        H = Function(self.P0_ten[0], name="Elementwise Hessian")
+        kwargs = dict(mesh=self.mesh, normalise=False, enforce_constrants=False, op=self.op)
+        if self.op.adapt_field == 'shallow_water':
+            raise NotImplementedError  # TODO
+        else:
+            # TODO: Could the Hessian not be recovered in P0 space?
+            H.project(steady_metric(fwd_solution, **kwargs))
+        evectors = Function(self.P0_ten[0], name="Elementwise Hessian eigenvectors")
+        evalues = Function(self.P0_vec[0], name="Elementwise Hessian eigenvalues")
+        kernel = eigen_kernel(get_reordered_eigendecomposition, dim)
+        op2.par_loop(kernel, self.P0_ten[0].node_set, evectors.dat(op2.RW), evalues.dat(op2.RW), H.dat(op2.READ))
+
+        # Compute stretching factor
+        s = sqrt(abs(evalues[-1]/evalues[0]))
+
+        # Build metric
+        M = Function(self.P0_ten[0], name="Elementwise metric")
+        if dim == 2:
+            evalues.interpolate(as_vector([abs(K_hat/K_opt/s), abs(K_hat/K_opt*s)]))
+        else:
+            raise NotImplementedError  # TODO
+        kernel = eigen_kernel(set_eigendecomposition_transpose, dim)
+        op2.par_loop(kernel, self.P0_ten[0].node_set, M.dat(op2.RW), evectors.dat(op2.READ), evalues.dat(op2.READ))
+
+        # Project metric
+        M_p1 = Function(self.P1_ten[0], name="Anisotropic DWR metric")
+        M_p1.project(M)
+        return M_p1
 
     def run_dwr(self, **kwargs):
         """

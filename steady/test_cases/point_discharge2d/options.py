@@ -104,13 +104,13 @@ class PointDischarge2dOptions(CoupledOptions):
             },
             'dg': {
                 None: 0.05606298,
-                'lax_friedrichs': 0.05606172,  # TODO
+                'lax_friedrichs': 0.05606298,
                 'lax_friedrichs_anisotropic': None,  # TODO
             },
         }
         if self.anisotropic_stabilisation:
-            stabilisatiom += '_anisotropic'
-        calibrated_r = calibration_results[self.tracer_family][stabilisation][cell_size]
+            stabilisation += '_anisotropic'
+        calibrated_r = calibration_results[self.tracer_family][stabilisation]
         if calibrated_r is None:
             raise NotImplementedError
         return [(1.0 + self.shift, 5.0, calibrated_r)]
