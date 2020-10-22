@@ -32,7 +32,7 @@ else:
 di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
-assert args.approach in ('dwr', 'a_posteriori', 'a_priori')
+assert args.approach in ('dwr', 'weighted_hessian', 'weighted_gradient')
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
 

@@ -286,10 +286,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def get_metric(self, adapt_field):
         if 'dwr' in self.op.approach:
             metric = self.get_isotropic_metric(self.op.adapt_field)
-        elif self.op.approach == 'a_posteriori':
-            metric = self.get_a_posteriori_metric(adjoint=False)
-        elif self.op.approach == 'a_priori':
-            metric = self.get_a_priori_metric(adjoint=False)
+        elif self.op.approach == 'weighted_hessian':
+            metric = self.get_weighted_hessian_metric(adjoint=False)
+        elif self.op.approach == 'weighted_gradient':
+            metric = self.get_weighted_gradient_metric(adjoint=False)
         else:
             raise NotImplementedError  # TODO
         if self.op.plot_pvd:
@@ -308,7 +308,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         metric.assign(isotropic_metric(indicator, normalise=True, op=self.op))
         return metric
 
-    def get_a_posteriori_metric(self, adjoint=False):
+    def get_weighted_hessian_metric(self, adjoint=False):
         """
         Construct an anisotropic metric using an approach inspired by [Power et al. 2006].
 
@@ -321,7 +321,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         scaled_hessian = interpolate(strong_residual*self.metrics[0], self.P1_ten[0])
         return steady_metric(H=scaled_hessian, normalise=True, enforce_constraints=True, op=self.op)
 
-    def get_a_priori_metric(self, adjoint=False, source=True):
+    def get_weighted_gradient_metric(self, adjoint=False, source=True):
         """
         Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
         """
