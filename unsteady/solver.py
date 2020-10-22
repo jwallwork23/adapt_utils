@@ -1825,8 +1825,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Metric-based with adjoint
             'dwp': self.run_dwp,
             'dwr': self.run_dwr,
-            'a_posteriori': self.run_dwr,
-            'a_priori': self.run_dwr,
+            'weighted_hessian': self.run_dwr,
+            'weighted_gradient': self.run_dwr,
         }
         try:
             run_scripts[self.approach](**kwargs)

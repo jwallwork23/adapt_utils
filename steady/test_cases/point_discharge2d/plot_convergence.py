@@ -35,9 +35,9 @@ plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
 approaches = {
     'fixed_mesh': 'Uniform',
-    'dwr': 'Isotropic',
-    'a_posteriori': 'A posteriori',
-    'a_priori': 'A priori',
+    'dwr': 'Isotropic DWR',
+    'weighted_hessian': 'Weighted Hessian',
+    'weighted_gradient': 'Weighted Gradient',
 }
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()

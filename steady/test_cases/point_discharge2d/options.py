@@ -93,18 +93,26 @@ class PointDischarge2dOptions(CoupledOptions):
 
         Note that the calibrated radii are computed on mesh level 4 in the hierarchy.
         """
+        stabilisation = self.stabilisation
         calibration_results = {
             'cg': {
                 None: 0.05606309,
                 'su': 0.05606563,
                 'supg': 0.05606535,
+                'su_anisotropic': 0.05606563,  # TODO
+                'supg_anisotropic': 0.05606535,  # TODO
             },
             'dg': {
-                None: 0.05606172,              # TODO: level 4
-                'lax_friedrichs': 0.05606172,  # TODO: level 4
+                None: 0.05606298,
+                'lax_friedrichs': 0.05606172,  # TODO
+                'lax_friedrichs_anisotropic': None,  # TODO
             },
         }
-        calibrated_r = calibration_results[self.tracer_family][self.stabilisation]
+        if self.anisotropic_stabilisation:
+            stabilisatiom += '_anisotropic'
+        calibrated_r = calibration_results[self.tracer_family][stabilisation][cell_size]
+        if calibrated_r is None:
+            raise NotImplementedError
         return [(1.0 + self.shift, 5.0, calibrated_r)]
 
     @property
