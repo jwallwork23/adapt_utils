@@ -261,7 +261,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         # Compute dual weighted residual
         dwr = ets.error_estimator.weighted_residual()
-        self.estimator[op.approach].append(assemble(dwr*dx))
+        self.estimator[op.approach].append(dwr.vector().gather().sum())
         indicator_enriched.interpolate(abs(dwr))
         # indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
         indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
@@ -429,12 +429,13 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         op2.par_loop(kernel, self.P0_ten[0].node_set, evectors.dat(op2.RW), evalues.dat(op2.RW), H.dat(op2.READ))
 
         # Compute stretching factor
-        s = sqrt(abs(evalues[-1]/evalues[0]))
+        s = sqrt(abs(evalues[0]/evalues[-1]))
 
         # Build metric
         M = Function(self.P0_ten[0], name="Elementwise metric")
         if dim == 2:
-            evalues.interpolate(as_vector([abs(K_hat/K_opt/s), abs(K_hat/K_opt*s)]))
+            # NOTE: Here the abs replaces a squared square root
+            evalues.interpolate(as_vector([abs(K_hat/K_opt*s), abs(K_hat/K_opt/s)]))
         else:
             raise NotImplementedError  # TODO
         kernel = eigen_kernel(set_eigendecomposition_transpose, dim)
