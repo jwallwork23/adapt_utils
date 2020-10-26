@@ -13,8 +13,10 @@ parser.add_argument('family', help="Finite element family.")
 parser.add_argument('-stabilisation', help="Stabilisation method to use.")
 parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-norm_order', help="Metric normalisation order.")
+parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
 args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 4)  # NOTE
+alpha = float(args.convergence_rate or 10)
 
 # Get filenames
 ext = args.family
@@ -47,7 +49,10 @@ for alignment in ('aligned', 'offset'):
         if approach != 'fixed_mesh':
             if anisotropic_stabilisation:
                 filename += '_anisotropic'
-            filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
+            if approach == 'anisotropic_dwr':
+                filename += '_{:.0f}'.format(alpha)
+            else:
+                filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
         fname = os.path.join(di.format(approach), '{:s}_{:s}.h5'.format(filename, alignment))
         if not os.path.isfile(fname):
             msg = "Cannot find convergence data for {:}-norm {:s} adaptation in the {:s} setup."
@@ -65,7 +70,8 @@ for alignment in ('aligned', 'offset'):
         relative_error = absolute_error/np.abs(qoi_exact)
         if approach == 'dwr':
             effectivity = estimators/absolute_error
-            print("Effectivity indices: ", effectivity)
+            print("Effectivity indices: ", effectivity)  # FIXME
+            # print("Effectivity indices: ", effectivity/elements)
         axes.semilogx(elements, relative_error, '--x', label=approaches[approach])
     axes.set_xlabel("Element count")
     axes.set_ylabel("Relative error")
@@ -80,4 +86,11 @@ for alignment in ('aligned', 'offset'):
     axes.legend(loc='upper right', fontsize=18)
     axes.grid(True)
     axes.grid(True, which='minor', axis='y')
+
+    # Save to file
+    filename = 'qoi_{:s}'.format(ext)
+    if anisotropic_stabilisation:
+        filename += '_anisotropic'
+    filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
+    filename += '_{:.0f}'.format(alpha)
     savefig('_'.join([filename, alignment]), plot_dir, extensions=['pdf', 'png'])

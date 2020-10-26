@@ -98,7 +98,7 @@ class Options(FrozenConfigurable):
     # Metric based
     rescaling = PositiveFloat(0.85, help="""
         Scaling parameter for target number of vertices.""").tag(config=True)
-    convergence_rate = PositiveInteger(6, help="""
+    convergence_rate = PositiveFloat(6, help="""
         Convergence rate parameter used in approach of [Carpio et al. 2013].""").tag(config=True)
     h_min = PositiveFloat(1.0e-10, help="Minimum tolerated element size.").tag(config=True)
     h_max = PositiveFloat(5.0e+00, help="Maximum tolerated element size.").tag(config=True)

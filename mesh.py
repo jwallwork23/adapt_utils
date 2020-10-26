@@ -73,7 +73,7 @@ def isotropic_cell_size(mesh):
     """
     Standard measure of cell size, as determined by UFL's `CellSize`.
     """
-    print_output("MESH: Computing isotropic cell size")
+    # print_output("MESH: Computing isotropic cell size")
     P0 = FunctionSpace(mesh, "DG", 0)
     return interpolate(CellSize(mesh), P0)
 
@@ -82,7 +82,7 @@ def anisotropic_cell_size(mesh):
     """
     Measure of cell size for anisotropic meshes, as described in [Micheletti, Perotto & Picasso 2003]
     """
-    print_output("MESH: Computing anisotropic cell size")
+    # print_output("MESH: Computing anisotropic cell size")
     dim = mesh.topological_dimension()
 
     # Compute cell Jacobian

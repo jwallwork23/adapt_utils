@@ -99,20 +99,18 @@ class PointDischarge2dOptions(CoupledOptions):
                 None: 0.05606309,
                 'su': 0.05606563,
                 'supg': 0.05606535,
-                'su_anisotropic': 0.05606563,  # TODO
-                'supg_anisotropic': 0.05606535,  # TODO
+                'su_anisotropic': 0.05606395,
+                'supg_anisotropic': 0.05606388,
             },
             'dg': {
                 None: 0.05606298,
                 'lax_friedrichs': 0.05606298,
-                'lax_friedrichs_anisotropic': None,  # TODO
+                'lax_friedrichs_anisotropic': 0.05606303,
             },
         }
         if self.anisotropic_stabilisation:
             stabilisation += '_anisotropic'
         calibrated_r = calibration_results[self.tracer_family][stabilisation]
-        if calibrated_r is None:
-            raise NotImplementedError
         return [(1.0 + self.shift, 5.0, calibrated_r)]
 
     @property
