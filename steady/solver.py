@@ -372,18 +372,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             boundary_hessian = abs(c_star)*as_matrix([[Constant(1/op.h_max**2), 0], [0, abs(Hs)]])
 
             # Get target complexities based on interior and boundary Hessians
-            target = op.target
-            interior_target, boundary_target = volume_and_surface_contributions(
-                    interior_hessian, boundary_hessian, op=op
-            )
+            integrals = volume_and_surface_contributions(interior_hessian, boundary_hessian, op=op)
 
             # Assemble and combine metrics
             kwargs = dict(normalise=True, enforce_constraints=True, mesh=mesh, op=op)
-            op.target = interior_target
+            kwargs['integral'] = integrals[0]
             interior_metric = steady_metric(H=interior_hessian, **kwargs)
-            op.target = boundary_target
-            boundary_metric = boundary_metric_from_hessian(boundary_hessian, **kwargs)
-            op.target = target
+            kwargs['integral'] = integrals[1]
+            boundary_metric = boundary_steady_metric(boundary_hessian, **kwargs)
             return metric_intersection(interior_metric, boundary_metric, boundary_tag=tags)
         else:
             raise NotImplementedError  # TODO
