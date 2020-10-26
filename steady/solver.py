@@ -331,20 +331,25 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         from adapt_utils.adapt.recovery import recover_gradient, recover_boundary_hessian
 
+        op = self.op
+        mesh = self.mesh
         P1_ten = self.P1_ten[0]
-        if self.op.solve_tracer and self.op.adapt_field == 'tracer':
+        adapt_field = op.adapt_field
+        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
+            adapt_field = 'shallow_water'
+        if op.solve_tracer and adapt_field == 'tracer':
             c = self.fwd_solution_tracer
             c_star = self.adj_solution_tracer
 
             # Interior gradient term
-            grad_c_star = recover_gradient(c_star, op=self.op)
+            grad_c_star = recover_gradient(c_star, op=op)
 
             # Interior Hessian term
             u, eta = split(self.fwd_solutions[0])
             D = self.fields[0].horizontal_diffusivity
             F1 = u[0]*c - D*c.dx(0)
             F2 = u[1]*c - D*c.dx(1)
-            kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=self.mesh, op=self.op)
+            kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=mesh, op=op)
             interior_hessians = [
                 interpolate(steady_metric(F1, **kwargs)*abs(grad_c_star[0]), P1_ten),
                 interpolate(steady_metric(F2, **kwargs)*abs(grad_c_star[1]), P1_ten)
@@ -359,30 +364,27 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             interior_hessian = metric_average(*interior_hessians)
 
             # Boundary Hessian
-            n = FacetNormal(self.mesh)
-            Fbar = c*dot(u, n) - D*dot(grad(c), n)
-            Hs = recover_boundary_hessian(Fbar, mesh=self.mesh, op=self.op)
-            boundary_hessian = abs(c_star)*as_matrix([[Constant(1/self.op.h_max**2), 0],
-                                                      [0, abs(Hs)]])
+            n = FacetNormal(mesh)
+            Fbar = c*dot(u, n) - D*dot(grad(c), n)  # NOTE: Minus zero (imposed boundary value)
+            bcs = self.boundary_conditions[0]['tracer']
+            tags = [tag for tag in bcs if 'diff_flux' in bcs[tag]]
+            Hs = recover_boundary_hessian(Fbar, mesh=mesh, op=op, boundary_tag=tags)
+            boundary_hessian = abs(c_star)*as_matrix([[Constant(1/op.h_max**2), 0], [0, abs(Hs)]])
 
-            # Set target complexity based on interior and boundary Hessians  # TODO
-            target = self.op.target
-            # kwargs = {
-            #     'interior_hessian_scaling': self.kernel,
-            #     'boundary_hessian_scaling': self.kernel,
-            #     'op': self.op,
-            # }
-            # self.op.target = metric_coefficient(interior_hessian, boundary_hessian, **kwargs)
+            # Get target complexities based on interior and boundary Hessians
+            target = op.target
+            interior_target, boundary_target = volume_and_surface_contributions(
+                    interior_hessian, boundary_hessian, op=op
+            )
 
             # Assemble and combine metrics
-            kwargs = dict(normalise=True, enforce_constraints=True, mesh=self.mesh, op=self.op)
+            kwargs = dict(normalise=True, enforce_constraints=True, mesh=mesh, op=op)
+            op.target = interior_target
             interior_metric = steady_metric(H=interior_hessian, **kwargs)
+            op.target = boundary_target
             boundary_metric = boundary_metric_from_hessian(boundary_hessian, **kwargs)
-            M = metric_intersection(interior_metric, boundary_metric, boundary_tag='on_boundary')
-
-            # Reset target complexity
-            self.op.target = target
-            return M
+            op.target = target
+            return metric_intersection(interior_metric, boundary_metric, boundary_tag=tags)
         else:
             raise NotImplementedError  # TODO
 
