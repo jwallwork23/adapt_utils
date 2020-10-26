@@ -38,8 +38,10 @@ calibrate_cg:
 calibrate_dg:
 	@echo "Calibrating radius for DG (no stabilisation)..."
 	@python3 calibrate_radius.py 4 dg
-	@echo "Calibrating radius for DG (Lax-Friedrichs stabilisation)..."
+	@echo "Calibrating radius for DG (isotropic Lax-Friedrichs stabilisation)..."
 	@python3 calibrate_radius.py 4 dg -stabilisation lax_friedrichs
+	@echo "Calibrating radius for DG (anisotropic Lax-Friedrichs stabilisation)..."
+	@python3 calibrate_radius.py 4 dg -stabilisation lax_friedrichs -anisotropic_stabilisation 1
 
 print_calibration:
 	@cat outputs/fixed_mesh/cg/log
@@ -71,9 +73,9 @@ isotropic:
 anisotropic:
 	@echo "Running anisotropic DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach anisotropic_dwr
+		-approach anisotropic_dwr -convergence_rate 4
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach anisotropic_dwr -offset 1
+		-approach anisotropic_dwr -convergence_rate 4 -offset 1
 
 weighted_hessian:
 	@echo "Running 'weighted Hessian' anisotropic adaptation convergence test..."
@@ -91,7 +93,18 @@ weighted_gradient:
 
 plot:
 	@echo "Plotting convergence curves..."
-	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1
+	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -convergence_rate 2
+
+plot_1:
+	@echo "Plotting convergence curves..."
+	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -convergence_rate 1
+
+plot_1_10:
+	@echo "Plotting convergence curves..."
+	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -convergence_rate 10
 
 plot_norms:
 	@echo "Plotting convergence curves across norm orders..."

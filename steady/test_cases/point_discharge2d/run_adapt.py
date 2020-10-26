@@ -21,6 +21,7 @@ parser.add_argument('-approach', help="Mesh adaptation approach.")
 parser.add_argument('-target', help="Target complexity.")
 parser.add_argument('-normalisation', help="Metric normalisation strategy.")
 parser.add_argument('-norm_order', help="Metric normalisation order.")
+parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
 parser.add_argument('-min_adapt', help="Minimum number of mesh adaptations.")
 parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
 
@@ -29,6 +30,7 @@ parser.add_argument('-offset', help="Toggle between aligned or offset region of 
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 4)  # NOTE
+alpha = float(args.convergence_rate or 10)
 
 
 # --- Set parameters
@@ -45,6 +47,7 @@ kwargs = {
     'approach': args.approach or 'dwr',
     'target': float(args.target or 1.0e+03),
     'norm_order': p,
+    'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
 

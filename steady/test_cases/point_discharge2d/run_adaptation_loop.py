@@ -1,8 +1,9 @@
-from thetis import create_directory, RectangleMesh
+from thetis import create_directory, print_output, RectangleMesh
 
 import argparse
 import h5py
 import os
+import sys
 
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
@@ -23,6 +24,7 @@ parser.add_argument('-approach', help="Mesh adaptation approach.")
 parser.add_argument('-target', help="Target complexity.")
 parser.add_argument('-normalisation', help="Metric normalisation strategy.")
 parser.add_argument('-norm_order', help="Metric normalisation order.")
+parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
 parser.add_argument('-min_adapt', help="Minimum number of mesh adaptations.")
 parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
 
@@ -31,6 +33,7 @@ parser.add_argument('-offset', help="Toggle between aligned or offset region of 
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 4)  # NOTE
+alpha = float(args.convergence_rate or 10)
 
 
 # --- Set parameters
@@ -54,7 +57,14 @@ else:
         ext += '_supg'
     if anisotropic_stabilisation:
         ext += '_anisotropic'
-ext += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
+approach = args.approach or 'dwr'
+if approach == 'fixed_mesh':
+    print_output("Nothing to run.")
+    sys.exit(0)
+elif approach == 'anisotropic_dwr':
+    ext += '_{:.0f}'.format(alpha)
+else:
+    ext += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
 fname = 'qoi_{:s}'.format(ext)
 
 kwargs = {
@@ -64,8 +74,9 @@ kwargs = {
     'aligned': not offset,
 
     # Mesh adaptation
-    'approach': args.approach or 'dwr',
+    'approach': approach,
     'norm_order': p,
+    'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
 
