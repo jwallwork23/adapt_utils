@@ -349,7 +349,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             D = self.fields[0].horizontal_diffusivity
             F1 = u[0]*c - D*c.dx(0)
             F2 = u[1]*c - D*c.dx(1)
-            kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=mesh, op=op)
+            # kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=mesh, op=op)
+            kwargs = dict(normalise=False, enforce_constraints=False, mesh=mesh, op=op)
             interior_hessians = [
                 interpolate(steady_metric(F1, **kwargs)*abs(grad_c_star[0]), P1_ten),
                 interpolate(steady_metric(F2, **kwargs)*abs(grad_c_star[1]), P1_ten)
@@ -372,13 +373,17 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             boundary_hessian = abs(c_star)*as_matrix([[Constant(1/op.h_max**2), 0], [0, abs(Hs)]])
 
             # Get target complexities based on interior and boundary Hessians
-            integrals = volume_and_surface_contributions(interior_hessian, boundary_hessian, op=op)
+            C = volume_and_surface_contributions(
+                interior_hessian,
+                boundary_hessian,
+                # interior_hessian_scaling=Constant(1.0),  # TODO
+                # boundary_hessian_scaling=Constant(1.0),  # TODO
+                op=op,
+            )
 
             # Assemble and combine metrics
-            kwargs = dict(normalise=True, enforce_constraints=True, mesh=mesh, op=op)
-            kwargs['integral'] = integrals[0]
+            kwargs = dict(normalise=True, enforce_constraints=True, mesh=mesh, integral=C, op=op)
             interior_metric = steady_metric(H=interior_hessian, **kwargs)
-            kwargs['integral'] = integrals[1]
             boundary_metric = boundary_steady_metric(boundary_hessian, **kwargs)
             return metric_intersection(interior_metric, boundary_metric, boundary_tag=tags)
         else:
