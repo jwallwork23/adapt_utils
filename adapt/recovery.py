@@ -119,7 +119,8 @@ def recover_boundary_hessian(f, **kwargs):
     the boundary and is set arbitrarily to 1/h_max in the interior.
 
     :arg f: field which we seek the Hessian of.
-    :param op: `Options` class object providing max cell size value.
+    :kwarg op: `Options` class object providing max cell size value.
+    :kwarg boundary_tag: physical ID for boundary segment
     :return: reconstructed boundary Hessian associated with `f`.
     """
     kwargs.setdefault('op', Options())
@@ -143,12 +144,13 @@ def recover_boundary_hessian(f, **kwargs):
     L = v*Constant(1/op.h_max**2)*dx
 
     # Hessian on boundary
+    boundary_tag = kwargs.get('boundary_tag', 'on_boundary')
     if bcs is None:
         s = perp(n)  # Tangent vector
         a_bc = v*Hs*ds
         L_bc = -dot(s, grad(v))*dot(s, grad(f))*ds
         # TODO: bbcs?
-        bcs = EquationBC(a_bc == L_bc, l2_proj, 'on_boundary')
+        bcs = EquationBC(a_bc == L_bc, l2_proj, boundary_tag)
 
     solver_parameters = op.hessian_solver_parameters['parts']
     nullspace = VectorSpaceBasis(constant=True)
