@@ -2,9 +2,10 @@ from firedrake import *
 
 import numpy as np
 
-from adapt_utils.options import Options
-from adapt_utils.adapt.recovery import recover_hessian
 from adapt_utils.adapt.kernels import *
+from adapt_utils.adapt.recovery import recover_hessian
+from adapt_utils.options import Options
+from adapt_utils.misc import check_spd
 
 
 __all__ = ["metric_complexity", "cell_size_metric", "volume_and_surface_contributions",
@@ -12,12 +13,15 @@ __all__ = ["metric_complexity", "cell_size_metric", "volume_and_surface_contribu
            "boundary_steady_metric", "combine_metrics", "metric_intersection", "metric_average"]
 
 
-def metric_complexity(M):
+def metric_complexity(M, boundary=False):
     """
     Compute the complexity of a metric, which approximates the number of vertices in a mesh adapted
     based thereupon.
     """
-    return assemble(sqrt(det(M))*dx)
+    if boundary:
+        return assemble(sqrt(det(M))*ds)
+    else:
+        return assemble(sqrt(det(M))*dx)
 
 
 def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
@@ -73,6 +77,10 @@ def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
         op.print_debug("METRIC: Enforcing elemental constraints...")
         enforce_element_constraints(M, op=op)
 
+    # Check a valid metric
+    if op.debug:
+        check_spd(M)
+
     return M
 
 
@@ -116,11 +124,8 @@ def boundary_steady_metric(H, mesh=None, boundary_tag='on_boundary', **kwargs):
     solve(a == L, M, bcs=bcs, solver_parameters={'ksp_type': 'cg'})
 
     # Ensure positive definite
+    op.print_debug("METRIC: Ensuring positivity of boundary metric...")
     M.interpolate(abs(M))
-    if op.debug:
-        from adapt_utils.misc import check_pos_def
-        op.print_debug("METRIC: Ensuring positivity of boundary metric...")
-        check_pos_def(M)
 
     # Apply Lp normalisation
     if kwargs.get('normalise'):
@@ -133,6 +138,10 @@ def boundary_steady_metric(H, mesh=None, boundary_tag='on_boundary', **kwargs):
     if kwargs.get('enforce_constraints'):
         op.print_debug("METRIC: Enforcing elemental constraints on boundary metric...")
         enforce_element_constraints(M, boundary_tag='on_boundary', op=op)
+
+    # Check a valid metric
+    if op.debug:
+        check_spd(M)
 
     return M
 
@@ -244,10 +253,11 @@ def space_normalise(M, f=None, integral=None, boundary=False, **kwargs):
     d = mesh.topological_dimension()
     if boundary:
         d -= 1
-    target = 1 if kwargs.get('noscale') else op.target
 
     if integral is None:
-        integral = metric_complexity(M) if p is None else assemble(pow(det(M), p/(2*p + d))*dx)
+        target = 1 if kwargs.get('noscale') else op.target
+        form = pow(det(M), 0.5) if p is None else pow(det(M), p/(2*p + d))
+        integral = assemble(form*ds) if boundary else assemble(form*dx)
         if op.normalisation == 'complexity':
             integral = pow(target/integral, 2/d)
         else:
@@ -381,6 +391,10 @@ def isotropic_metric(f, **kwargs):
         op.print_debug("METRIC: Enforcing elemental constraints...")
         M_diag = max_value(1/pow(op.h_max, 2), min_value(M_diag, 1/pow(op.h_min, 2)))
 
+    # Check a valid metric
+    if op.debug:
+        check_spd(M)
+
     return interpolate(M_diag*Identity(dim), V_ten)
 
 
@@ -470,17 +484,14 @@ def volume_and_surface_contributions(interior_hessian, boundary_hessian, op=Opti
     assert n in (2, 3)
     g = kwargs.get('interior_hessian_scaling', Constant(1.0))  # TODO: How to choose?
     gbar = kwargs.get('boundary_hessian_scaling', Constant(1.0))  # TODO: How to choose?
+    op.print_debug("METRIC: original target complexity = {:.4e}".format(op.target))
 
     # Compute optimal coefficient for mixed interior-boundary Hessian
     a = assemble(pow(g, n/(2*n-1))*pow(det(interior_hessian), 1/(2*n-1))*dx)
+    op.print_debug("METRIC: a = {:.4e}".format(a))
     b = assemble(pow(gbar, 0.5)*pow(det(boundary_hessian), 1/(2*n-2))*ds)
+    op.print_debug("METRIC: b = {:.4e}".format(b))
     c = Symbol('c')
-    sol = solve(a*pow(c, n/(1-2*n)) + b*pow(c, -0.5) - op.target, c)
-    assert len(sol) == 1
-    C = float(sol[0])
-    op.print_debug("METRIC: original target complexity = {:.4e}".format(op.target))
-    interior_target = C/a
-    boundary_target = C/b
-    op.print_debug("METRIC: target interior complexity = {:.4e}".format(interior_target))
-    op.print_debug("METRIC: target boundary complexity = {:.4e}".format(boundary_target))
-    return interior_target, boundary_target
+    C = float(solve(a*pow(c, n/(1-2*n)) + b*pow(c, -0.5) - op.target, c)[0])
+    op.print_debug("METRIC: C = {:.4e}".format(C))
+    return C
