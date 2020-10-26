@@ -3,14 +3,13 @@ from firedrake import *
 import numpy as np
 
 from adapt_utils.options import Options
-from adapt_utils.adapt.recovery import recover_hessian, recover_boundary_hessian
+from adapt_utils.adapt.recovery import recover_hessian
 from adapt_utils.adapt.kernels import *
 
 
 __all__ = ["metric_complexity", "cell_size_metric", "volume_and_surface_contributions",
            "steady_metric", "isotropic_metric", "space_normalise", "space_time_normalise",
-           "boundary_metric_from_hessian",
-           "combine_metrics", "metric_intersection", "metric_average"]
+           "boundary_steady_metric", "combine_metrics", "metric_intersection", "metric_average"]
 
 
 def metric_complexity(M):
@@ -65,7 +64,9 @@ def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
     # Apply Lp normalisation
     if kwargs.get('normalise'):
         op.print_debug("METRIC: Normalising metric in space...")
-        space_normalise(M, noscale=kwargs.get('noscale'), f=f, op=op)
+        noscale = kwargs.get('noscale')
+        integral = kwargs.get('integral')
+        space_normalise(M, noscale=noscale, f=f, integral=integral, op=op)
 
     # Enforce maximum/minimum element sizes and anisotropy
     if kwargs.get('enforce_constraints'):
@@ -75,7 +76,7 @@ def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
     return M
 
 
-def boundary_metric_from_hessian(H, mesh=None, boundary_tag='on_boundary', **kwargs):
+def boundary_steady_metric(H, mesh=None, boundary_tag='on_boundary', **kwargs):
     """
     Computes a boundary metric from a boundary Hessian, following the approach of
     [Loseille et al. 2011].
@@ -113,7 +114,27 @@ def boundary_metric_from_hessian(H, mesh=None, boundary_tag='on_boundary', **kwa
     L_bc = inner(tau, dot(transpose(ns), dot(H, ns)))*ds
     bcs = EquationBC(a_bc == L_bc, M, boundary_tag)
     solve(a == L, M, bcs=bcs, solver_parameters={'ksp_type': 'cg'})
-    return steady_metric(H=M, **kwargs)
+
+    # Ensure positive definite
+    M.interpolate(abs(M))
+    if op.debug:
+        from adapt_utils.misc import check_pos_def
+        op.print_debug("METRIC: Ensuring positivity of boundary metric...")
+        check_pos_def(M)
+
+    # Apply Lp normalisation
+    if kwargs.get('normalise'):
+        op.print_debug("METRIC: Normalising boundary metric in space...")
+        noscale = kwargs.get('noscale')
+        integral = kwargs.get('integral')
+        space_normalise(M, noscale=noscale, integral=integral, boundary=True, op=op)
+
+    # Enforce maximum/minimum element sizes and anisotropy
+    if kwargs.get('enforce_constraints'):
+        op.print_debug("METRIC: Enforcing elemental constraints on boundary metric...")
+        enforce_element_constraints(M, boundary_tag='on_boundary', op=op)
+
+    return M
 
 
 # TODO: Check equivalent to normalising in space and time separately
@@ -173,7 +194,7 @@ def space_time_normalise(hessians, timestep_integrals=None, enforce_constraints=
             enforce_element_constraints(H, op=op)
 
 
-def space_normalise(M, f=None, **kwargs):
+def space_normalise(M, f=None, integral=None, boundary=False, **kwargs):
     r"""
     Normalise steady metric `M` based on field `f`.
 
@@ -221,22 +242,24 @@ def space_normalise(M, f=None, **kwargs):
     p = op.norm_order
     mesh = M.function_space().mesh()
     d = mesh.topological_dimension()
+    if boundary:
+        d -= 1
     target = 1 if kwargs.get('noscale') else op.target
 
-    integral = metric_complexity(M) if p is None else assemble(pow(det(M), p/(2*p + d))*dx)
+    if integral is None:
+        integral = metric_complexity(M) if p is None else assemble(pow(det(M), p/(2*p + d))*dx)
+        if op.normalisation == 'complexity':
+            integral = pow(target/integral, 2/d)
+        else:
+            integral = 1 if p is None else pow(integral, 1/p)
+            integral *= d*target
     assert integral > 1.0e-08
-    if op.normalisation == 'complexity':
-        scaling = pow(target/integral, 2/d)
-    else:
-        scaling = 1 if p is None else pow(integral, 1/p)
-        scaling = d*target*scaling
-    if p is not None:
-        scaling = scaling*pow(det(M), -1/(2*p + d))
-    M.interpolate(scaling*M)
+    determinant = 1 if p is None else pow(det(M), -1/(2*p + d))
+    M.interpolate(integral*determinant*M)
     return
 
 
-def enforce_element_constraints(M, op=Options()):
+def enforce_element_constraints(M, op=Options(), boundary_tag=None):
     """
     Post-process a metric `M` so that it obeys the following constraints specified by
     :class:`Options` class `op`:
@@ -245,8 +268,10 @@ def enforce_element_constraints(M, op=Options()):
       * `h_max`          - maximum element size;
       * `max_anisotropy` - maximum element anisotropy.
     """
-    kernel = eigen_kernel(postproc_metric, M.function_space().mesh().topological_dimension(), op=op)
-    op2.par_loop(kernel, M.function_space().node_set, M.dat(op2.RW))
+    V = M.function_space()
+    kernel = eigen_kernel(postproc_metric, V.mesh().topological_dimension(), op=op)
+    node_set = V.node_set if boundary_tag is None else DirichletBC(V, 0, boundary_tag).node_set
+    op2.par_loop(kernel, node_set, M.dat(op2.RW))
 
 
 # TODO: Test identities hold
