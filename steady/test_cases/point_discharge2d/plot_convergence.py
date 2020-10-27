@@ -15,7 +15,7 @@ parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell siz
 parser.add_argument('-norm_order', help="Metric normalisation order.")
 parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
 args = parser.parse_args()
-p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 4)  # NOTE
+p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 10)
 
 # Get filenames
