@@ -369,17 +369,11 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             Fbar = c*dot(u, n) - D*dot(grad(c), n)  # NOTE: Minus zero (imposed boundary value)
             bcs = self.boundary_conditions[0]['tracer']
             tags = [tag for tag in bcs if 'diff_flux' in bcs[tag]]
-            Hs = recover_boundary_hessian(Fbar, mesh=mesh, op=op, boundary_tag=tags)
-            boundary_hessian = abs(c_star)*as_matrix([[Constant(1/op.h_max**2), 0], [0, abs(Hs)]])
+            H = recover_boundary_hessian(Fbar, mesh=mesh, op=op, boundary_tag=tags)
+            boundary_hessian = abs(c_star)*abs(H)
 
             # Get target complexities based on interior and boundary Hessians
-            C = volume_and_surface_contributions(
-                interior_hessian,
-                boundary_hessian,
-                # interior_hessian_scaling=Constant(1.0),  # TODO
-                # boundary_hessian_scaling=Constant(1.0),  # TODO
-                op=op,
-            )
+            C = volume_and_surface_contributions(interior_hessian, boundary_hessian, op=op)
 
             # Assemble and combine metrics
             kwargs = dict(normalise=True, enforce_constraints=True, mesh=mesh, integral=C, op=op)
