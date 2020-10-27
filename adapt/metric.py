@@ -119,7 +119,7 @@ def boundary_steady_metric(H, mesh=None, boundary_tag='on_boundary', **kwargs):
 
     # Boundary values imposed as in [Loseille et al. 2011]
     a_bc = inner(tau, sigma)*ds
-    L_bc = inner(tau, dot(transpose(ns), dot(H, ns)))*ds
+    L_bc = inner(tau, dot(ns, dot(H, transpose(ns))))*ds
     bcs = EquationBC(a_bc == L_bc, M, boundary_tag)
     solve(a == L, M, bcs=bcs, solver_parameters={'ksp_type': 'cg'})
 
