@@ -124,38 +124,67 @@ def recover_boundary_hessian(f, **kwargs):
     :return: reconstructed boundary Hessian associated with `f`.
     """
     kwargs.setdefault('op', Options())
-
-    # Argument is a Function
-    if isinstance(f, Function):
-        return DoubleL2ProjectorHessian(f.function_space(), boundary=True, **kwargs).project(f)
     op = kwargs.get('op')
     op.print_debug("RECOVERY: Recovering Hessian on domain boundary...")
-
-    # Argument is a UFL expression
-    bcs = kwargs.get('bcs')
     mesh = kwargs.get('mesh', op.default_mesh)
-    P1 = FunctionSpace(mesh, "CG", 1)
+    dim = mesh.topological_dimension()
+    assert dim in (2, 3)
+    if dim == 3:
+        raise NotImplementedError  # TODO
+    elif dim != 2:
+        raise ValueError("Dimensions other than 2D and 3D not considered.")
+
+    # Normal and tangent vectors
     n = FacetNormal(mesh)
-    Hs, v = TrialFunction(P1), TestFunction(P1)
-    l2_proj = Function(P1, name="Recovered boundary Hessian")
+    s = perp(n)
+    ns = as_vector([n, s])
+
+    # --- Solve tangent to boundary
+
+    if isinstance(f, Function):
+        # Argument is a Function
+        l2_proj = DoubleL2ProjectorHessian(f.function_space(), boundary=True, **kwargs).project(f)
+    else:
+        # Argument is a UFL expression
+        bcs = kwargs.get('bcs')
+        P1 = FunctionSpace(mesh, "CG", 1)
+        Hs, v = TrialFunction(P1), TestFunction(P1)
+        l2_proj = Function(P1, name="Recovered boundary Hessian")
+
+        # Arbitrary value in domain interior
+        a = v*Hs*dx
+        L = v*Constant(1/op.h_max**2)*dx
+
+        # Hessian on boundary
+        boundary_tag = kwargs.get('boundary_tag', 'on_boundary')
+        if bcs is None:
+            s = perp(n)  # Tangent vector
+            a_bc = v*Hs*ds
+            L_bc = -dot(s, grad(v))*dot(s, grad(f))*ds
+            # TODO: bbcs?
+            bcs = EquationBC(a_bc == L_bc, l2_proj, boundary_tag)
+
+        solver_parameters = op.hessian_solver_parameters['parts']
+        nullspace = VectorSpaceBasis(constant=True)
+        solve(a == L, l2_proj, bcs=bcs, nullspace=nullspace, solver_parameters=solver_parameters)
+
+    # --- Construct tensor field
+
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    H = as_matrix([[Constant(1/op.h_max**2), 0], [0, abs(l2_proj)]])
+    boundary_hessian = Function(P1_ten)
 
     # Arbitrary value in domain interior
-    a = v*Hs*dx
-    L = v*Constant(1/op.h_max**2)*dx
+    sigma, tau = TrialFunction(P1_ten), TestFunction(P1_ten)
+    a = inner(tau, sigma)*dx
+    L = inner(tau, Constant(1/op.h_max**2)*Identity(dim))*dx
 
-    # Hessian on boundary
-    boundary_tag = kwargs.get('boundary_tag', 'on_boundary')
-    if bcs is None:
-        s = perp(n)  # Tangent vector
-        a_bc = v*Hs*ds
-        L_bc = -dot(s, grad(v))*dot(s, grad(f))*ds
-        # TODO: bbcs?
-        bcs = EquationBC(a_bc == L_bc, l2_proj, boundary_tag)
-
-    solver_parameters = op.hessian_solver_parameters['parts']
-    nullspace = VectorSpaceBasis(constant=True)
-    solve(a == L, l2_proj, bcs=bcs, nullspace=nullspace, solver_parameters=solver_parameters)
-    return l2_proj
+    # Boundary values imposed as in [Loseille et al. 2011]
+    a_bc = inner(tau, sigma)*ds
+    L_bc = inner(tau, dot(transpose(ns), dot(H, ns)))*ds
+    bcs = EquationBC(a_bc == L_bc, boundary_hessian, boundary_tag)
+    solve(a == L, boundary_hessian, bcs=bcs, solver_parameters=solver_parameters)
+    return boundary_hessian
 
 
 # --- Use the following drivers if doing multiple L2 projections on the current mesh

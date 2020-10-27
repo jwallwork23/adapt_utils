@@ -106,26 +106,12 @@ def boundary_steady_metric(H, mesh=None, boundary_tag='on_boundary', **kwargs):
         raise NotImplementedError  # TODO
     elif dim != 2:
         raise ValueError("Dimensions other than 2D and 3D not considered.")
-    n = FacetNormal(mesh)
-    s = perp(n)
-    ns = as_matrix([[*n], [*s]])
     P1_ten = TensorFunctionSpace(mesh, "CG", 1)
     M = Function(P1_ten, name="Boundary metric")
 
-    # Arbitrary value in domain interior
-    sigma, tau = TrialFunction(P1_ten), TestFunction(P1_ten)
-    a = inner(tau, sigma)*dx
-    L = inner(tau, Constant(1/op.h_max**2)*Identity(dim))*dx
-
-    # Boundary values imposed as in [Loseille et al. 2011]
-    a_bc = inner(tau, sigma)*ds
-    L_bc = inner(tau, dot(ns, dot(H, transpose(ns))))*ds
-    bcs = EquationBC(a_bc == L_bc, M, boundary_tag)
-    solve(a == L, M, bcs=bcs, solver_parameters={'ksp_type': 'cg'})
-
     # Ensure positive definite
     op.print_debug("METRIC: Ensuring positivity of boundary metric...")
-    M.interpolate(abs(M))
+    M.interpolate(abs(H))
 
     # Apply Lp normalisation
     if kwargs.get('normalise'):
