@@ -366,7 +366,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
             # Boundary Hessian
             n = FacetNormal(mesh)
-            Fbar = c*dot(u, n) - D*dot(grad(c), n)  # NOTE: Minus zero (imposed boundary value)
+            # Fbar = c*dot(u, n) - D*dot(grad(c), n)
+            Fbar = -D*dot(grad(c), n)  # NOTE: Minus zero (imposed boundary value)
+            # TODO: weakly imposed Dirichlet conditions
             bcs = self.boundary_conditions[0]['tracer']
             tags = [tag for tag in bcs if 'diff_flux' in bcs[tag]]
             H = recover_boundary_hessian(Fbar, mesh=mesh, op=op, boundary_tag=tags)
