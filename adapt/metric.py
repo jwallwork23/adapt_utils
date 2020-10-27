@@ -433,7 +433,7 @@ def _metric_intersection_pair(M1, M2, boundary_tag=None):
     return M12
 
 
-def metric_relaxation(*metrics, weights=None):
+def metric_relaxation(*metrics, function_space=None, weights=None):
     r"""
     As an alternative to intersection, pointwise metric information may be combined using a convex
     combination. Whilst this method does not have as clear an interpretation as metric intersection,
@@ -449,20 +449,21 @@ def metric_relaxation(*metrics, weights=None):
         weights = np.ones(n)/n
     else:
         assert len(weights) == n
-    V = metrics[0].function_space()
+    V = function_space or metrics[0].function_space()
     M = Function(V)
     for i, Mi in enumerate(metrics):
-        assert Mi.function_space() == V
+        if not isinstance(Mi, Function) or Mi.function_space() != V:
+            Mi = interpolate(Mi, V)
         M += Mi*weights[i]
     return M
 
 
-def metric_average(*metrics):
-    return metric_relaxation(*metrics)
+def metric_average(*metrics, **kwargs):
+    return metric_relaxation(*metrics, **kwargs)
 
 
-def combine_metrics(*metrics, average=True):
-    return metric_average(*metrics) if average else metric_intersection(*metrics)
+def combine_metrics(*metrics, average=True, **kwargs):
+    return metric_average(*metrics, **kwargs) if average else metric_intersection(*metrics, **kwargs)
 
 
 def volume_and_surface_contributions(interior_hessian, boundary_hessian, op=Options(), **kwargs):
@@ -480,18 +481,24 @@ def volume_and_surface_contributions(interior_hessian, boundary_hessian, op=Opti
     from sympy import Symbol, solve
 
     # Collect parameters
-    n = interior_hessian.function_space().mesh().topological_dimension()
-    assert n in (2, 3)
-    g = kwargs.get('interior_hessian_scaling', Constant(1.0))  # TODO: How to choose?
-    gbar = kwargs.get('boundary_hessian_scaling', Constant(1.0))  # TODO: How to choose?
+    d = interior_hessian.function_space().mesh().topological_dimension()
+    assert d in (2, 3)
+    p = op.norm_order
+    g = kwargs.get('interior_hessian_scaling', Constant(1.0))
+    gbar = kwargs.get('boundary_hessian_scaling', Constant(1.0))
     op.print_debug("METRIC: original target complexity = {:.4e}".format(op.target))
 
     # Compute optimal coefficient for mixed interior-boundary Hessian
-    a = assemble(pow(g, n/(2*n-1))*pow(det(interior_hessian), 1/(2*n-1))*dx)
+    if p is None:
+        a = metric_complexity(interior_hessian, boundary=False)
+        b = metric_complexity(boundary_hessian, boundary=True)
+    else:
+        a = assemble(pow(g, d/(2*p + d))*pow(det(interior_hessian), p/(2*p + d))*dx)
+        b = assemble(pow(gbar, d/(2*p + d - 1))*pow(det(boundary_hessian), p/(2*p + d - 1))*ds)
     op.print_debug("METRIC: a = {:.4e}".format(a))
-    b = assemble(pow(gbar, 0.5)*pow(det(boundary_hessian), 1/(2*n-2))*ds)
     op.print_debug("METRIC: b = {:.4e}".format(b))
     c = Symbol('c')
-    C = float(solve(a*pow(c, n/(1-2*n)) + b*pow(c, -0.5) - op.target, c)[0])
+    # C = float(solve(a*pow(c, -d/(2*p + d)) + b*pow(c, -d/(2*p + d - 1)) - op.target, c)[0])
+    C = float(solve(a*pow(c, d/2) + b*pow(c, (d-1)/2) - op.target, c)[0])  # NOTE: Differs from paper
     op.print_debug("METRIC: C = {:.4e}".format(C))
     return C
