@@ -2,10 +2,10 @@ from thetis import *
 
 from adapt_utils.io import index_string
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
-from adapt_utils.unsteady.swe.turbine.callback import PowerOutputCallback  # TODO: Move from unsteady
+from adapt_utils.swe.turbine.callback import PowerOutputCallback
 
 
-# NOTE: DUPLICATED IN adapt_utils/unsteady/swe/turbine/solver.py
+# NOTE: DUPLICATED IN adapt_utils/swe/turbine/solver.py
 
 __all__ = ["AdaptiveSteadyTurbineProblem"]
 

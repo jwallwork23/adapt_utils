@@ -3,7 +3,7 @@ from thetis.configuration import *
 
 import os
 
-from adapt_utils.unsteady.swe.turbine.options import TurbineOptions
+from adapt_utils.swe.turbine.options import TurbineOptions
 
 
 __all__ = ["TurbineArrayOptions"]

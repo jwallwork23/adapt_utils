@@ -7,7 +7,7 @@ import os
 from time import perf_counter
 
 from adapt_utils.plotting import *  # NOQA
-from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
+from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.spaceship.options import SpaceshipOptions
 
 

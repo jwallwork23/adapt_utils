@@ -5,8 +5,8 @@ import numpy as np
 import os
 import scipy.interpolate as si
 
+from adapt_utils.swe.tsunami.conversion import *
 from adapt_utils.unsteady.options import CoupledOptions
-from adapt_utils.unsteady.swe.tsunami.conversion import *
 
 
 __all__ = ["TsunamiOptions"]
@@ -56,7 +56,7 @@ class TsunamiOptions(CoupledOptions):
     def get_utm_mesh(self):
         """
         Given a mesh in longitude-latitude coordinates, establish a corresponding mesh in UTM
-        coordinates using the conversion code in `adapt_utils.unsteady.swe.tsunami.conversion`.
+        coordinates using the conversion code in `adapt_utils.swe.tsunami.conversion`.
         """
         assert hasattr(self, 'lonlat_mesh')
         zone = self.force_zone_number
@@ -68,7 +68,7 @@ class TsunamiOptions(CoupledOptions):
     def get_lonlat_mesh(self, northern=True):
         """
         Given a mesh in UTM coordinates, establish a corresponding mesh in longitude-latitude
-        coordinates using the conversion code in `adapt_utils.unsteady.swe.tsunami.conversion`.
+        coordinates using the conversion code in `adapt_utils.swe.tsunami.conversion`.
 
         :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
         """

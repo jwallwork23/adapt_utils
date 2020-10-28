@@ -13,7 +13,7 @@ from .base import AdaptiveProblemBase
 from .callback import *
 from ..io import *
 from .options import ReynoldsNumberArray
-from .swe.utils import *
+from ..swe.utils import *
 
 
 __all__ = ["AdaptiveProblem"]
@@ -765,7 +765,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.create_forward_exner_equation_step(i)
 
     def create_forward_shallow_water_equations_step(self, i):
-        from .swe.equation import ShallowWaterEquations
+        from ..swe.equation import ShallowWaterEquations
 
         if self.mesh_velocities[i] is not None:
             self.shallow_water_options[i]['mesh_velocity'] = self.mesh_velocities[i]
@@ -811,7 +811,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].sediment.bnd_functions = self.boundary_conditions[i]['sediment']
 
     def create_forward_exner_equation_step(self, i):
-        from .sediment.exner_eq import ExnerEquation
+        from ..sediment.exner_eq import ExnerEquation
 
         model = ExnerEquation
         self.equations[i].exner = model(
@@ -854,7 +854,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.create_adjoint_exner_equation_step(i)
 
     def create_adjoint_shallow_water_equations_step(self, i):
-        from .swe.adjoint import AdjointShallowWaterEquations
+        from ..swe.adjoint import AdjointShallowWaterEquations
 
         self.equations[i].adjoint_shallow_water = AdjointShallowWaterEquations(
             self.V[i],
@@ -921,7 +921,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.create_exner_error_estimator_step(i)
 
     def create_shallow_water_error_estimator_step(self, i):
-        from .swe.error_estimation import ShallowWaterGOErrorEstimator
+        from ..swe.error_estimation import ShallowWaterGOErrorEstimator
 
         self.error_estimators[i].shallow_water = ShallowWaterGOErrorEstimator(
             self.V[i],
@@ -1059,7 +1059,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         bcs = self.boundary_conditions[i]['shallow_water']
         kwargs = {'bnd_conditions': bcs}
         if self.op.timestepper == 'PressureProjectionPicard':
-            from .swe.equation import ShallowWaterMomentumEquation
+            from ..swe.equation import ShallowWaterMomentumEquation
 
             self.equations[i].shallow_water_momentum = ShallowWaterMomentumEquation(
                 TestFunction(self.V[i].sub(0)),

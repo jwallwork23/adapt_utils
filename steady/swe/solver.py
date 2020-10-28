@@ -2,7 +2,7 @@ from thetis import *
 from thetis.physical_constants import *
 
 from adapt_utils.steady.solver import SteadyProblem
-from adapt_utils.unsteady.swe.utils import *  # TODO: Don't refer to unsteady
+from adapt_utils.swe.utils import *
 
 
 __all__ = ["SteadyShallowWaterProblem"]

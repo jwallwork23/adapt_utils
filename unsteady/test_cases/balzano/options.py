@@ -1,17 +1,11 @@
 from thetis import *
 from thetis.configuration import *
 
+from adapt_utils.swe.utils import heaviside_approx
 from adapt_utils.unsteady.options import CoupledOptions
-from adapt_utils.unsteady.swe.utils import heaviside_approx
 
-import os
 import numpy as np
-import matplotlib
-# import matplotlib.pyplot as plt
-
-
-matplotlib.rc('text', usetex=True)
-matplotlib.rc('font', family='serif')
+import os
 
 
 __all__ = ["BalzanoOptions"]
@@ -173,23 +167,3 @@ class BalzanoOptions(CoupledOptions):
                 self.wd_obs.append([wd.at([x, 0]) for x in self.xrange])
 
         return export_func
-
-    # def plot_heaviside(self):  # TODO
-    #     """Timeseries plot of approximate Heavyside function."""
-    #     scaling = 0.7
-    #     plt.figure(1, figsize=(scaling*7.0, scaling*4.0))
-    #     plt.gcf().subplots_adjust(bottom=0.15)
-    #     T = [[t/3600]*20 for t in self.trange]
-    #     X = [self.xrange for t in T]
-
-    #     cset1 = plt.contourf(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
-    #     plt.clim(0.0, 1.2)
-    #     # cset2 = plt.contour(T, X, self.wd_obs, 20, cmap=plt.cm.get_cmap('binary'))
-    #     plt.clim(0.0, 1.2)
-    #     # cset3 = plt.contour(T, X, self.wd_obs, 1, colors='k', linestyles='dotted', linewidths=5.0, levels=[0.5])
-    #     cb = plt.colorbar(cset1, ticks=np.linspace(0, 1, 6))
-    #     cb.set_label(r"$\mathcal H(\eta-b)$")
-    #     plt.ylim(min(X[0]), max(X[0]))
-    #     plt.xlabel(r"Time [$\mathrm h$]")
-    #     plt.ylabel(r"$x$ [$\mathrm m$]")
-    #     plt.savefig(os.path.join(self.di, "heaviside_timeseries.pdf"))

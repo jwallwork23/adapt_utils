@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 from thetis.utility import *
-from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
+from .error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
 from thetis.shallowwater_eq import ShallowWaterTerm
 
 

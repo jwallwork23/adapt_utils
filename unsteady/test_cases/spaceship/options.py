@@ -5,7 +5,7 @@ from math import e
 import numpy as np
 import os
 
-from adapt_utils.unsteady.swe.turbine.options import TurbineOptions
+from adapt_utils.swe.turbine.options import TurbineOptions
 
 
 __all__ = ["SpaceshipOptions"]
