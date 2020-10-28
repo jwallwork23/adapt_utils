@@ -777,7 +777,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
     def create_forward_tracer_equation_step(self, i):
-        from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
+        from ..tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
 
         op = self.tracer_options[i]
         conservative = op.use_tracer_conservative_form
@@ -864,7 +864,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_shallow_water.bnd_functions = self.boundary_conditions[i]['shallow_water']
 
     def create_adjoint_tracer_equation_step(self, i):
-        from .tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
+        from ..tracer.equation import TracerEquation2D, ConservativeTracerEquation2D
 
         op = self.tracer_options[i]
         conservative = op.use_tracer_conservative_form
@@ -930,7 +930,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
 
     def create_tracer_error_estimator_step(self, i):
-        from .tracer.error_estimation import TracerGOErrorEstimator
+        from ..tracer.error_estimation import TracerGOErrorEstimator
 
         if self.tracer_options[i].use_tracer_conservative_form:
             raise NotImplementedError("Error estimation for conservative tracers not implemented.")

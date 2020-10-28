@@ -19,7 +19,7 @@ from thetis.utility import *
 from thetis.equation import Equation
 from thetis.tracer_eq_2d import HorizontalDiffusionTerm, TracerTerm
 from thetis.conservative_tracer_eq_2d import ConservativeHorizontalDiffusionTerm
-from adapt_utils.unsteady.tracer.equation import HorizontalAdvectionTerm, ConservativeHorizontalAdvectionTerm
+from adapt_utils.tracer.equation import HorizontalAdvectionTerm, ConservativeHorizontalAdvectionTerm
 
 
 class SedimentTerm(TracerTerm):
