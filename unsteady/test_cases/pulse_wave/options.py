@@ -4,8 +4,8 @@ from thetis.options import ModelOptions2d
 
 import numpy as np
 
+from adapt_utils.sediment.sediments_model import SedimentModel
 from adapt_utils.unsteady.options import CoupledOptions
-from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
 
 
 __all__ = ["BeachOptions"]
