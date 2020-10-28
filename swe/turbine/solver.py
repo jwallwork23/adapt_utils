@@ -1,8 +1,8 @@
 from thetis import *
 
 from adapt_utils.io import index_string
+from adapt_utils.swe.turbine.callback import PowerOutputCallback
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.unsteady.swe.turbine.callback import PowerOutputCallback
 
 
 # NOTE: DUPLICATED IN adapt_utils/steady/swe/turbine/solver.py

@@ -1,7 +1,7 @@
 from thetis import *
 from thetis.configuration import *
 
-from adapt_utils.unsteady.swe.turbine.options import TurbineOptions  # TODO: Don't refer to unsteady
+from adapt_utils.swe.turbine.options import TurbineOptions
 
 
 __all__ = ["TurbineOptions"]

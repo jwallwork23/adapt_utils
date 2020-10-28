@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
 from adapt_utils.io import TimeDependentAdaptationLogger
-from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
+from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
 # --- Parse arguments

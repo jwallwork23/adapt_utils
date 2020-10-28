@@ -9,7 +9,7 @@ from time import perf_counter
 
 from adapt_utils.io import index_string
 from adapt_utils.plotting import *
-from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
+from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.turbine_array.options import TurbineArrayOptions
 
 

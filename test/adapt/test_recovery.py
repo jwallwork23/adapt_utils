@@ -4,8 +4,8 @@ import pytest
 import numpy as np
 
 from adapt_utils.adapt.recovery import *
+from adapt_utils.swe.utils import recover_vorticity
 from adapt_utils.unsteady.options import *
-from adapt_utils.unsteady.swe.utils import recover_vorticity
 
 
 def get_mesh(dim, n):

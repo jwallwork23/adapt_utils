@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 from adapt_utils.io import index_string
-from adapt_utils.unsteady.swe.utils import L2ProjectorVorticity
+from adapt_utils.swe.utils import L2ProjectorVorticity
 
 
 __all__ = ["VelocityNormCallback", "ElevationNormCallback", "TracerNormCallback",

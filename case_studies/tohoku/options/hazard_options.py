@@ -1,7 +1,7 @@
 import numpy as np
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
-from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
+from adapt_utils.swe.tsunami.conversion import from_latlon
 
 
 __all__ = ["TohokuHazardOptions"]
