@@ -794,7 +794,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     def create_forward_sediment_equation_step(self, i):
-        from .sediment.equation import SedimentEquation2D
+        from ..sediment.equation import SedimentEquation2D
 
         op = self.sediment_options[i]
         model = SedimentEquation2D
