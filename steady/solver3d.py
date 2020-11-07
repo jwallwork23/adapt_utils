@@ -1,4 +1,4 @@
-# from thetis import *
+from thetis import *
 
 # import numpy as np
 # import os
@@ -24,6 +24,35 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             raise NotImplementedError("Only CG has been considered for the 3D case.")
         if op.stabilisation is not None:
             assert op.stabilisation in ('su', 'supg')
+
+    def set_finite_elements(self):
+        self.op.print_debug("SETUP: Creating finite elements...")
+        p = self.op.degree
+        family = self.op.family
+        if family == 'cg-cg':
+            assert p == 1
+            u_element = VectorElement("Lagrange", tetrahedron, p+1)
+            eta_element = FiniteElement("Lagrange", tetrahedron, p, variant='equispaced')
+        elif family == 'dg-dg':
+            u_element = VectorElement("DG", tetrahedron, p)
+            eta_element = FiniteElement("DG", tetrahedron, p, variant='equispaced')
+        elif family == 'dg-cg':
+            assert p == 1
+            u_element = VectorElement("DG", tetrahedron, p)
+            eta_element = FiniteElement("Lagrange", tetrahedron, p+1, variant='equispaced')
+        else:
+            raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
+        self.finite_element = u_element*eta_element
+
+        if self.op.solve_tracer:
+            p = self.op.degree_tracer
+            family = self.op.tracer_family
+            if family == 'cg':
+                self.finite_element_tracer = FiniteElement("Lagrange", tetrahedron, p)
+            elif family == 'dg':
+                self.finite_element_tracer = FiniteElement("DG", tetrahedron, p)
+            else:
+                raise NotImplementedError("Cannot build order {:d} {:s} element".format(p, family))
 
     def create_forward_tracer_equation_step(self, i):
         from ..tracer.equation3d import TracerEquation3D, ConservativeTracerEquation3D

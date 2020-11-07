@@ -141,8 +141,13 @@ class AdaptiveProblemBase(object):
         for i, mesh in enumerate(self.meshes):
 
             # Endow mesh with its boundary length
-            bnd_len = compute_boundary_length(mesh)
-            mesh.boundary_len = bnd_len
+            dim = mesh.topological_dimension()
+            if dim == 2:
+                bnd_len = compute_boundary_length(mesh)
+                mesh.boundary_len = bnd_len
+            else:
+                mesh.boundary_len = None
+                print_output("WARNING: Cannot compute boundary length in {:d}D.".format(dim))
 
             # Print diagnostics / store for later use over mesh adaptation loop
             num_cells, num_vertices = mesh.num_cells(), mesh.num_vertices()

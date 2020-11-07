@@ -2,8 +2,8 @@ import argparse
 import os
 
 from adapt_utils.io import export_field
-from adapt_utils.steady.solver import AdaptiveSteadyProblem
-from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
+from adapt_utils.steady.solver3d import AdaptiveSteadyProblem3d
+from adapt_utils.steady.test_cases.point_discharge3d.options import PointDischarge3dOptions
 
 
 # --- Parse arguments
@@ -27,7 +27,7 @@ kwargs = {
     'plot_pvd': True,
     'debug': bool(args.debug or False),
 }
-op = PointDischarge2dOptions(approach='fixed_mesh', **kwargs)
+op = PointDischarge3dOptions(approach='fixed_mesh', **kwargs)
 op.tracer_family = family
 op.stabilisation = args.stabilisation
 op.di = os.path.join(op.di, args.stabilisation or family)
@@ -38,9 +38,9 @@ op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 
 # --- Solve
 
-tp = AdaptiveSteadyProblem(op)
+tp = AdaptiveSteadyProblem3d(op)
 tp.solve_forward()
 
-# Export to HDF5
-op.plot_pvd = False
-export_field(tp.fwd_solution_tracer, "Tracer", "finite_element", fpath=op.di, op=op)
+# # Export to HDF5
+# op.plot_pvd = False
+# export_field(tp.fwd_solution_tracer, "Tracer", "finite_element", fpath=op.di, op=op)

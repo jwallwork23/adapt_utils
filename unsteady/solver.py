@@ -373,9 +373,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
     # --- Stabilisation
 
     def set_stabilisation_step(self, i):
-        """ Set stabilisation mode and corresponding parameter on the ith mesh."""
+        """
+        Set stabilisation mode and corresponding parameter on the ith mesh.
+        """
+        dim = self.meshes[i].topological_dimension()
         if self.op.use_automatic_sipg_parameter:
-            self.minimum_angles[i] = get_minimum_angles_2d(self.meshes[i])
+            if dim == 2:
+                self.minimum_angles[i] = get_minimum_angles_2d(self.meshes[i])
+            else:
+                print_output("WARNING: Cannot compute minimum angle in {:d}D.".format(dim))
         if self.op.solve_swe:
             self._set_shallow_water_stabilisation_step(i)
         if self.op.solve_tracer:
