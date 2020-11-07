@@ -82,7 +82,7 @@ void get_reordered_eigendecomposition(double EVecs_[9], double EVals_[3], const 
 
   // Map inputs and outputs onto Eigen objects
   Map<Matrix<double, 3, 3, RowMajor> > EVecs((double *)EVecs_);
-  Map<Vector2d> EVals((double *)EVals_);
+  Map<Vector3d> EVals((double *)EVals_);
   Map<Matrix<double, 3, 3, RowMajor> > M((double *)M_);
 
   // Solve eigenvalue problem
