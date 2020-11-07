@@ -382,48 +382,71 @@ for (int i=0; i<max_vector.dofs; i++) {
 # --- Python interpreters for C++ kernels
 
 def eigen_kernel(kernel, *args, **kwargs):
-    """Helper function to easily pass Eigen kernels to Firedrake via PyOP2."""
+    """
+    Helper function to easily pass Eigen kernels to Firedrake via PyOP2.
+    """
     return op2.Kernel(kernel(*args, **kwargs), kernel.__name__, cpp=True, include_dirs=include_dir)
 
 
 def get_eigendecomposition(d):
-    """Extract eigenvectors/eigenvalues from a metric field."""
+    """
+    Extract eigenvectors/eigenvalues from a metric field.
+
+    If you care about the order, use `get_reordered_eigendecomposition`.
+    """
     return get_eigendecomposition_str % (d*d, d, d, d, d, d, d, d, d)
 
 
 def get_reordered_eigendecomposition(d):
-    """Extract eigenvectors/eigenvalues from a metric field, ordered by eigenvalue magnitude."""
+    """
+    Extract eigenvectors/eigenvalues from a metric field, with eigenvalues
+    **decreasing** in magnitude.
+    """
     assert d in (2, 3)
     return get_reordered_eigendecomp_2d_str if d == 2 else get_reordered_eigendecomp_3d_str
 
 
 def set_eigendecomposition(d):
-    """Compute metric from eigenvectors/eigenvalues."""
+    """
+    Compute a metric from eigenvectors and eigenvalues as an
+    orthogonal eigendecomposition.
+    """
     return set_eigendecomposition_str % (d*d, d, d, d, d, d)
 
 
 def set_eigendecomposition_transpose(d):
-    """Compute metric from transposed eigenvectors/eigenvalues."""
+    """
+    Compute metric from transposed eigenvectors and eigenvalues
+    as an orthogonal eigendecomposition.
+    """
     return set_eigendecomposition_transpose_str % (d*d, d, d, d, d, d)
 
 
 def intersect(d):
-    """Intersect two metric fields."""
+    """
+    Intersect two metric fields.
+    """
     return intersect_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d, d)
 
 
 def anisotropic_refinement(d, direction):
-    """Refine a metric in a single coordinate direction."""
+    """
+    Refine a metric in a single coordinate direction.
+    """
     return anisotropic_refinement_str % (d*d, d, d, d, d, d, d, d, d, direction, 4)
 
 
 def metric_from_hessian(d):
-    """Build a metric field from a Hessian"""
+    """
+    Build a metric field from a Hessian.
+    """
     return metric_from_hessian_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d)
 
 
 def postproc_metric(d, op=Options()):
-    """Post-process a metric field in order to enforce max/min element sizes and anisotropy."""
+    """
+    Post-process a metric field in order to enforce max/min element sizes and anisotropy.
+    """
     return postproc_metric_str % (d*d, d, d, d, d, d, d, d, d, op.h_min, op.h_max, d, op.max_anisotropy)
 
 
@@ -437,21 +460,29 @@ def gemv(d, alpha=1.0, beta=0.0, tol=1e-8):
 
 
 def matscale(d):
-    """Multiply a matrix by a scalar field."""
+    """
+    Multiply a matrix by a scalar field.
+    """
     return matscale_str % (d*d, d, d, d, d)
 
 
 def poldec_unitary(d):
-    """Compute the unitary part of the polar decomposition of a matrix."""
+    """
+    Compute the unitary part of the polar decomposition of a matrix.
+    """
     return poldec_unitary_str % (d*d, d, d, d, d, d, d)
 
 
 def poldec_spd(d):
-    """Compute the SPD part of the polar decomposition of a matrix."""
+    """
+    Compute the SPD part of the polar decomposition of a matrix.
+    """
     return poldec_spd_str % (d*d, d, d, d, d, d, d)
 
 
 def get_maximum_length_edge(d):
+    """
+    Find the mesh edge with maximum length.
+    """
     assert d == 2
-    """Find the mesh edge with maximum length."""
     return get_max_length_edge_2d_str
