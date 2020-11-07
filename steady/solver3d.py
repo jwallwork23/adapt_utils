@@ -75,15 +75,19 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
 
     def _get_fields_for_tracer_timestepper(self, i):
         assert i == 0
-        raise NotImplementedError  # TODO
-
-    def create_forward_tracer_timestepper(self, i, integrator):
-        assert i == 0
-        raise NotImplementedError  # TODO
-
-    def create_adjoint_tracer_timestepper(self, i, integrator):
-        assert i == 0
-        raise NotImplementedError  # TODO
+        # u = Constant(as_vector(self.op.base_velocity))  # FIXME: Pyadjoint doesn't like this
+        u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
+        fields = AttrDict({
+            'uv_3d': u,
+            'diffusivity_h': self.fields[i].horizontal_diffusivity,
+            'source': self.fields[i].tracer_source_2d,
+            'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
+        })
+        if self.stabilisation == 'su':
+            fields['su_stabilisation'] = True
+        elif self.stabilisation == 'supg':
+            fields['supg_stabilisation'] = True
+        return fields
 
     def recover_hessian_metric(self, adjoint=False, **kwargs):
         raise NotImplementedError  # TODO
