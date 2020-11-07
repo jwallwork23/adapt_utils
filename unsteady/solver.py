@@ -431,8 +431,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
         family = op.sediment_family if sediment else op.tracer_family
-        sipg = None
         if family == 'dg':
+            sipg = None
             if hasattr(op, 'sipg_parameter_tracer'):
                 sipg = op.sipg_parameter_tracer if not sediment else None
             if hasattr(op, 'sipg_parameter_sediment'):

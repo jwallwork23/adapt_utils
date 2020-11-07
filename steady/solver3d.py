@@ -1,7 +1,7 @@
-from thetis import *
+# from thetis import *
 
-import numpy as np
-import os
+# import numpy as np
+# import os
 
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
 
@@ -20,14 +20,23 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
         assert op.solve_tracer, msg
         assert not op.solve_sediment, msg
         assert not op.solve_exner, msg
-
-    def _set_tracer_stabilisation_step(self, i, **kwargs):
-        assert i == 0
-        raise NotImplementedError  # TODO
+        if op.tracer_family != 'cg':
+            raise NotImplementedError("Only CG has been considered for the 3D case.")
+        if op.stabilisation is not None:
+            assert op.stabilisation in ('su', 'supg')
 
     def create_forward_tracer_equation_step(self, i):
+        from ..tracer.equation3d import TracerEquation3D, ConservativeTracerEquation3D
+
         assert i == 0
-        raise NotImplementedError  # TODO
+        op = self.tracer_options[i]
+        conservative = op.use_tracer_conservative_form
+        model = ConservativeTracerEquation3D if conservative else TracerEquation3D
+        self.equations[i].tracer = model(
+            self.Q[i],
+            self.depth,
+            anisotropic=op.anisotropic_stabilisation,
+        )
 
     def create_adjoint_tracer_equation_step(self, i):
         assert i == 0
