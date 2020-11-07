@@ -1,6 +1,6 @@
 from __future__ import absolute_import
 from thetis.utility import *
-from .error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
+from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
 from thetis.tracer_eq_2d import TracerTerm
 
 
@@ -16,13 +16,24 @@ class TracerGOErrorEstimatorTerm(GOErrorEstimatorTerm, TracerTerm):
     model.
     """
     def __init__(self, function_space,
-                 depth=None, use_lax_friedrichs=True, sipg_parameter=Constant(10.0)):
+                 depth=None,
+                 use_lax_friedrichs=True,
+                 sipg_parameter=Constant(10.0),
+                 anisotropic=False):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :kwarg depth: DepthExpression for the domain
         """
         TracerTerm.__init__(self, function_space, depth, use_lax_friedrichs, sipg_parameter)
         GOErrorEstimatorTerm.__init__(self, function_space.mesh())
+        if anisotropic:
+            self.cellsize = anisotropic_cell_size(self.mesh)
+
+    def inter_element_flux(self, solution, solution_old, arg, arg_old, fields, fields_old):
+        return 0
+
+    def boundary_flux(self, solution, solution_old, arg, arg_old, fields, fields_old, bnd_conditions):
+        return 0
 
 
 class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
@@ -242,12 +253,6 @@ class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         f += self.p0test*inner(source, arg)*self.dx
         return f
 
-    def inter_element_flux(self, solution, solution_old, arg, arg_old, fields, fields_old):
-        return 0
-
-    def boundary_flux(self, solution, solution_old, arg, arg_old, fields, fields_old, bnd_conditions):
-        return 0
-
 
 class TracerGOErrorEstimator(GOErrorEstimator):
     """
@@ -263,12 +268,12 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         self.add_term(TracerSourceGOErrorEstimatorTerm(*args), 'source')
 
     def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):
-        adj = Function(self.P0_2d).assign(1.0)
+        adj = Function(self.P0).assign(1.0)
         args = (solution, solution_old, adj, adj, fields, fields_old)
         self.strong_residual_terms = 0
         for term in self.select_terms(label):
             self.strong_residual_terms += term.element_residual(*args)
-        self._strong_residual = Function(self.P0_2d, name="Strong residual")
+        self._strong_residual = Function(self.P0, name="Strong residual")
 
     @property
     def strong_residual(self):
@@ -282,6 +287,6 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         """
         Evaluate flux jump as element-wise indicator functions.
         """
-        flux_jump = Function(VectorFunctionSpace(self.mesh, "DG", 0)*self.P0_2d)
+        flux_jump = Function(VectorFunctionSpace(self.mesh, "DG", 0)*self.P0)
         solve(self.p0test*self.p0trial*dx == jump(self.p0test*sol)*dS, flux_jump)
         return flux_jump

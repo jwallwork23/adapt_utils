@@ -12,6 +12,7 @@ from adapt_utils.tracer.equation import *
 class HorizontalAdvectionTerm3D(HorizontalAdvectionTerm):
     # TODO: doc
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        assert not self.horizontal_dg
         f = 0
         uv = fields_old.get('uv_3d')
         if uv is None:
@@ -38,6 +39,7 @@ class HorizontalAdvectionTerm3D(HorizontalAdvectionTerm):
 class HorizontalDiffusionTerm3D(HorizontalDiffusionTerm):
     # TODO: doc
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        assert not self.horizontal_dg
         f = 0
         if fields_old.get('diffusivity_h') is None:
             return -f
@@ -82,6 +84,7 @@ class HorizontalDiffusionTerm3D(HorizontalDiffusionTerm):
 class SourceTerm3D(SourceTerm):
     # TODO: doc
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        assert not self.horizontal_dg
         f = 0
         source = fields_old.get('source')
         if source is None:
@@ -110,6 +113,7 @@ class SourceTerm3D(SourceTerm):
 class ConservativeHorizontalAdvectionTerm3D(ConservativeHorizontalAdvectionTerm):
     # TODO: doc
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        assert not self.horizontal_dg
         f = 0
         uv = fields_old.get('uv_3d')
         if uv is None:

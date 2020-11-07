@@ -939,6 +939,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.depth[i],
             use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
+            anisotropic=self.tracer_options[i].anisotropic_stabilisation,
         )
 
     def create_sediment_error_estimator_step(self, i):

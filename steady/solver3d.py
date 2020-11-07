@@ -58,8 +58,20 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
         self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     def create_forward_tracer_error_estimator_step(self, i):
+        from ..tracer.error_estimation3d import TracerGOErrorEstimator3D
+
         assert i == 0
-        raise NotImplementedError  # TODO
+        if self.tracer_options[i].use_tracer_conservative_form:
+            raise NotImplementedError("Error estimation for conservative tracers not implemented.")
+        else:
+            estimator = TracerGOErrorEstimator3D
+        self.error_estimators[i].tracer = estimator(
+            self.Q[i],
+            self.depth[i],
+            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
+            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            anisotropic=self.tracer_options[i].anisotropic_stabilisation,
+        )
 
     def _get_fields_for_tracer_timestepper(self, i):
         assert i == 0
