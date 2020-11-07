@@ -8,7 +8,7 @@ import os
 from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 
 
-__all__ = ["prod", "combine", "rotation_matrix", "rotate",
+__all__ = ["prod", "combine", "rotation_matrix", "rotate", "integrate_boundary",
            "box", "ellipse", "bump", "circular_bump", "gaussian", "cg2dg", "copy_mesh",
            "get_finite_element", "get_component_space", "get_component", "get_boundary_nodes",
            "is_symmetric", "is_pos_def", "is_spd", "check_spd", "num_days",
@@ -279,6 +279,23 @@ def get_boundary_nodes(fs, segment='on_boundary'):
     :kwarg segment: segment of boundary to get nodes of (default 'on_boundary').
     """
     return fs.boundary_nodes(segment, 'topological')
+
+
+def integrate_boundary(mesh):
+    """
+    Integrates over domain boundary.
+
+    Extension of `thetis.utility.compute_boundary_length` to
+    arbitrary dimensions.
+    """
+    P1 = FunctionSpace(mesh, 'CG', 1)
+    boundary_markers = sorted(mesh.exterior_facets.unique_markers)
+    boundary_len = OrderedDict()
+    for i in boundary_markers:
+        ds_restricted = ds(int(i))
+        one_func = Function(P1).assign(1.0)
+        boundary_len[i] = assemble(one_func*ds_restricted)
+    return boundary_len
 
 
 # --- Continuous to discontinuous transfer
