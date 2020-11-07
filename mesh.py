@@ -94,13 +94,12 @@ def anisotropic_cell_size(mesh):
     B = Function(P0_ten, name="SPD part")
     op2.par_loop(eigen_kernel(poldec_spd, dim), P0_ten.node_set, B.dat(op2.RW), J.dat(op2.READ))
 
-    # Get eigendecomposition
+    # Get eigendecomposition with eigenvalues decreasing in magnitude
     P0_vec = VectorFunctionSpace(mesh, "DG", 0)
     evalues = Function(P0_vec, name="Eigenvalues")
     evectors = Function(P0_ten, name="Eigenvectors")
     kernel = eigen_kernel(get_reordered_eigendecomposition, dim)
     op2.par_loop(kernel, P0_ten.node_set, evectors.dat(op2.RW), evalues.dat(op2.RW), B.dat(op2.READ))
 
-    # Get minimum eigenvalue
-    P0 = FunctionSpace(mesh, "DG", 0)
-    return interpolate(min_value(evalues[0], evalues[1]), P0)
+    # Return minimum eigenvalue
+    return interpolate(evalues[-1], FunctionSpace(mesh, "DG", 0))
