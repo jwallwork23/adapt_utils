@@ -21,9 +21,7 @@ __all__ = ["AdaptiveProblem"]
 
 # TODO:
 #  * Mesh movement ALE formulation
-#  * CG tracers (plus SU and SUPG stabilisation)
-#  * Multiple tracers
-#  * Checkpointing to disk
+#  * SUPG stabilisation in unsteady case
 #  * Allow mesh dependent Lax-Friedrichs parameter(s)
 
 class AdaptiveProblem(AdaptiveProblemBase):

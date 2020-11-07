@@ -26,7 +26,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     """
     def __init__(self, op, discrete_adjoint=False, **kwargs):
         super(AdaptiveSteadyProblem, self).__init__(op, **kwargs)
-        op = self.op
         self.discrete_adjoint = discrete_adjoint
         if self.num_meshes > 1:
             raise ValueError("`AdaptiveSteadyProblem` only supports single meshes.")
@@ -34,10 +33,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # if ts not in ["SteadyState", "PressureProjectionPicard"]:  # TODO
         if ts not in ["SteadyState", ]:
             raise ValueError("Timestepper {:s} not allowed for steady-state problems.".format(ts))
-        if op.solve_swe:
-            self.equation_set = 'shallow_water'
-        elif op.solve_tracer:
+        if op.solve_tracer:
             self.equation_set = 'tracer'
+        elif op.solve_swe:
+            self.equation_set = 'shallow_water'
         else:
             raise ValueError("Steady-state solver only supports one of hydrodynamics and tracers.")
 
