@@ -5,7 +5,7 @@ import thetis.utility as thetis_utils
 
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.recovery import DoubleL2ProjectorHessian, L2Projector
-from ..options import CoupledOptions
+from ..unsteady.options import CoupledOptions
 from adapt_utils.misc import get_component, get_component_space
 
 

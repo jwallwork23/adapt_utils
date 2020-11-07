@@ -9,6 +9,7 @@ __all__ = ["CoupledOptions", "ReynoldsNumberArray"]
 
 
 # TODO: Improve doc
+# TODO: Move to base level
 class CoupledOptions(Options):
     """
     Parameters for the coupled system. Selection from the four model components may be achieved using

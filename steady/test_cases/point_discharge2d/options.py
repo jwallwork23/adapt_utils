@@ -8,7 +8,7 @@ from adapt_utils.steady.tracer.options import bessk0
 from adapt_utils.unsteady.options import CoupledOptions
 
 
-__all__ = ["TelemacOptions"]
+__all__ = ["PointDischarge2dOptions"]
 
 
 class PointDischarge2dOptions(CoupledOptions):
