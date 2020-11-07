@@ -1,7 +1,5 @@
 from firedrake import *
 
-import numpy as np
-
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 
 

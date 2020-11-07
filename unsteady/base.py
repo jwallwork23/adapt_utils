@@ -120,6 +120,8 @@ class AdaptiveProblemBase(object):
               rather than explicitly copied. This rears its head in :attr:`run_dwr`, where a the
               enriched meshes are built from a single mesh hierarchy.
         """
+        from ..misc import integrate_boundary
+
         op = self.op
         if meshes is None:
             op.print_debug("SETUP: Setting default meshes...")
@@ -140,14 +142,8 @@ class AdaptiveProblemBase(object):
         msg = "SETUP: Mesh {:d} has {:d} elements and {:d} vertices"
         for i, mesh in enumerate(self.meshes):
 
-            # Endow mesh with its boundary length
-            dim = mesh.topological_dimension()
-            if dim == 2:
-                bnd_len = compute_boundary_length(mesh)
-                mesh.boundary_len = bnd_len
-            else:
-                mesh.boundary_len = None
-                print_output("WARNING: Cannot compute boundary length in {:d}D.".format(dim))
+            # Endow mesh with its boundary "length"
+            mesh.boundary_len = integrate_boundary(mesh)
 
             # Print diagnostics / store for later use over mesh adaptation loop
             num_cells, num_vertices = mesh.num_cells(), mesh.num_vertices()

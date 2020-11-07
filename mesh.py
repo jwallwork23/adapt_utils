@@ -16,6 +16,8 @@ class MeshStats(object):
         :kwarg mesh: if a mesh is not provided, the :attr:`default_mesh` associated with :attr:`op`
             is used.
         """
+        from .misc import integrate_boundary
+
         self._op = op
         self._mesh = mesh or op.default_mesh
         self._P0 = FunctionSpace(mesh, "DG", 0)
@@ -28,12 +30,12 @@ class MeshStats(object):
         # Compute statistics
         self.get_element_sizes()
         self.facet_areas = get_facet_areas(self._mesh)
+        self.boundary_lengths = integrate_boundary(self._mesh)
+        self.boundary_length = sum(self.boundary_lengths[tag] for tag in self.boundary_markers)
         if self.dim == 2:
             self.angles_min = get_minimum_angles_2d(self._mesh)
             self.angle_min = self.angles_min.vector().gather().min()
             self.get_element_volumes()
-            self.boundary_lengths = compute_boundary_length(self._mesh)
-            self.boundary_length = sum(self.boundary_lengths[tag] for tag in self.boundary_markers)
         elif self.dim != 3:
             raise ValueError("Mesh of dimension {:d} not supported.".format(self.dim))
         op.print_debug(self.summary)
