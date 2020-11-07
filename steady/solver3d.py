@@ -34,13 +34,28 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
         model = ConservativeTracerEquation3D if conservative else TracerEquation3D
         self.equations[i].tracer = model(
             self.Q[i],
-            self.depth,
+            self.depth[i],
             anisotropic=op.anisotropic_stabilisation,
         )
+        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+            self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
+        self.equations[i].tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     def create_adjoint_tracer_equation_step(self, i):
+        from ..tracer.equation3d import TracerEquation3D, ConservativeTracerEquation3D
+
         assert i == 0
-        raise NotImplementedError  # TODO
+        op = self.tracer_options[i]
+        conservative = op.use_tracer_conservative_form
+        model = TracerEquation3D if conservative else ConservativeTracerEquation3D
+        self.equations[i].adjoint_tracer = model(
+            self.Q[i],
+            self.depth[i],
+            anisotropic=op.anisotropic_stabilisation,
+        )
+        if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
+            self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
+        self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
     def create_forward_tracer_error_estimator_step(self, i):
         assert i == 0
