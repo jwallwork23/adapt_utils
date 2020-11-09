@@ -1,5 +1,4 @@
 import argparse
-import os
 
 from adapt_utils.steady.solver3d import AdaptiveSteadyProblem3d
 from adapt_utils.steady.test_cases.point_discharge3d.options import PointDischarge3dOptions

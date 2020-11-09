@@ -40,7 +40,7 @@ alpha = float(args.convergence_rate or 10)
 
 family = args.family or 'cg'
 assert family in ('cg', 'dg')
-target = float(args.target or 1.25e+02)
+target = float(args.target or 5.0e+02)
 level = int(args.level or 0)
 offset = bool(args.offset or False)
 anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)

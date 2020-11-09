@@ -1,5 +1,4 @@
 import argparse
-import os
 
 from adapt_utils.io import save_mesh
 from adapt_utils.steady.solver3d import AdaptiveSteadyProblem3d
