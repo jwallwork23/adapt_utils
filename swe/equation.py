@@ -6,11 +6,13 @@ Depth averaged shallow water equations as in Thetis, with a few minor modificati
     2. Allow for mesh movement under some prescribed mesh velocity using the option `mesh_velocity`.
     3. Do not include friction terms if the `use_nonlinear_equations` option is set to false.
     4. Do not include 3D bottom drag or atmospheric pressure terms.
+    5. Enable choice of anisotropic cell size measure.
 """
 from __future__ import absolute_import
 from thetis.equation import *
 from thetis.utility import *
 import thetis.shallowwater_eq as thetis_sw
+from ..equation import Equation
 
 
 __all__ = ["ShallowWaterEquations", "ShallowWaterMomentumEquation"]
@@ -84,7 +86,8 @@ class HorizontalAdvectionTerm(thetis_sw.HorizontalAdvectionTerm):
 
 class QuadraticDragTerm(thetis_sw.QuadraticDragTerm):
     """
-    Quadratic bottom friction term from Thetis, modified so that it isn't included in the linear model.
+    Quadratic bottom friction term from Thetis, modified so that it isn't included in the linear
+    model.
     """
     def residual(self, *args, **kwargs):
         if not self.options.use_nonlinear_equations:
@@ -93,15 +96,23 @@ class QuadraticDragTerm(thetis_sw.QuadraticDragTerm):
 
 
 class TurbineDragTerm(thetis_sw.TurbineDragTerm):
-    """Turbine drag term from Thetis, modified so that it isn't included in the linear model."""
+    """
+    Turbine drag term from Thetis, modified so that it isn't included in the linear model.
+    """
     def residual(self, *args, **kwargs):
         if not self.options.use_nonlinear_equations:
             return 0
         return super(TurbineDragTerm, self).residual(*args, **kwargs)
 
 
-class BaseShallowWaterEquation(thetis_sw.BaseShallowWaterEquation):
-    """Copied here from `thetis/shallowwater_eq` to hook up modified terms."""
+class BaseShallowWaterEquation(Equation):
+    """
+    Copied here from `thetis/shallowwater_eq` to hook up modified terms.
+    """
+    def __init__(self, function_space, depth, options):
+        super(BaseShallowWaterEquation, self).__init__(function_space)
+        self.depth = depth
+        self.options = options
 
     def add_momentum_terms(self, *args):
         self.add_term(ExternalPressureGradientTerm(*args), 'implicit')
@@ -120,9 +131,17 @@ class BaseShallowWaterEquation(thetis_sw.BaseShallowWaterEquation):
         self.add_term(HUDivTerm(*args), 'implicit')
         self.add_term(thetis_sw.ContinuitySourceTerm(*args), 'source')
 
+    def residual_uv_eta(self, label, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions):
+        f = 0
+        for term in self.select_terms(label):
+            f += term.residual(uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions)
+        return f
+
 
 class ShallowWaterEquations(BaseShallowWaterEquation):
-    """Copied here from `thetis/shallowwater_eq` to hook up modified terms."""
+    """
+    Copied here from `thetis/shallowwater_eq` to hook up modified terms.
+    """
     def __init__(self, function_space, depth, options):
         """
         :arg function_space: Mixed function space where the solution belongs
@@ -155,7 +174,9 @@ class ShallowWaterEquations(BaseShallowWaterEquation):
 
 
 class ShallowWaterMomentumEquation(BaseShallowWaterEquation):
-    """Copied here from `thetis/shallowwater_eq` to hook up modified terms."""
+    """
+    Copied here from `thetis/shallowwater_eq` to hook up modified terms.
+    """
     def __init__(self, u_test, u_space, eta_space, depth, options):
         """
         :arg u_test: test function of the velocity function space

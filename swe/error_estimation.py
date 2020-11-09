@@ -1,3 +1,4 @@
+# TODO: doc
 from __future__ import absolute_import
 from thetis.utility import *
 from .error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
@@ -619,8 +620,8 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
     """
     :class:`GOErrorEstimator` for the shallow water model.
     """
-    def __init__(self, function_space, depth, options):
-        super(ShallowWaterGOErrorEstimator, self).__init__(function_space)
+    def __init__(self, function_space, depth, options, anisotropic=False):
+        super(ShallowWaterGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
         self.depth = depth
         self.options = options
 
