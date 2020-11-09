@@ -34,11 +34,11 @@ di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
 approaches = {
-    'fixed_mesh': 'Uniform',
-    'dwr': 'Isotropic DWR',
-    'anisotropic_dwr': 'Anisotropic DWR',
-    'weighted_hessian': 'Weighted Hessian',
-    'weighted_gradient': 'Weighted Gradient',
+    'fixed_mesh': {'label': 'Uniform', 'marker': '*'},
+    'dwr': {'label': 'Isotropic DWR', 'marker': '^'},
+    'anisotropic_dwr': {'label': 'Anisotropic DWR', 'marker': 'h'},
+    'weighted_hessian': {'label': 'Weighted Hessian', 'marker': 's'},
+    'weighted_gradient': {'label': 'Weighted Gradient', 'marker': 'x'},
 }
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
@@ -72,18 +72,22 @@ for alignment in ('aligned', 'offset'):
             effectivity = estimators/absolute_error
             print("Effectivity indices: ", effectivity)  # FIXME
             # print("Effectivity indices: ", effectivity/elements)
-        axes.semilogx(elements, relative_error, '--x', label=approaches[approach])
+        label = approaches[approach]['label']
+        marker = approaches[approach]['marker']
+        axes.semilogx(elements, relative_error, '--', label=label, marker=marker)
     axes.set_xlabel("Element count")
     axes.set_ylabel("Relative error")
     axes.set_xticks([1.0e+03, 1.0e+04, 1.0e+05, 1.0e+06])
     yticks = np.linspace(0, 0.5, 6)
     axes.set_yticks(yticks)
     axes.set_yticklabels([r"{{{:d}}}\%".format(int(yt*100)) for yt in yticks])
-    axes.set_ylim([-0.01, 0.51])
-    xlim = axes.get_xlim()
-    axes.hlines(y=0.01, xmin=xlim[0], xmax=xlim[1], color='k', linestyle=':', label=r'1.0\% error')
+    axes.set_ylim([-0.01, 0.31])
+    # xlim = axes.get_xlim()
+    xlim = [0.8e+03, 1.2e+06]
+    axes.hlines(y=0.01, xmin=xlim[0], xmax=xlim[1], color='k', linestyle='-', label=r'1.0\% error')
     axes.set_xlim(xlim)
-    axes.legend(loc='upper right', fontsize=18)
+    if alignment == 'aligned':
+        axes.legend(bbox_to_anchor=(0.525, 0.3), fontsize=18)
     axes.grid(True)
     axes.grid(True, which='minor', axis='y')
 
