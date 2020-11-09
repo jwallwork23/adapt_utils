@@ -4,7 +4,7 @@ from firedrake_adjoint import *
 import argparse
 import numpy as np
 
-from adapt_utils.steady.tracer.options import bessk0
+from adapt_utils.maths import bessk0
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 

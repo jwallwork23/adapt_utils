@@ -4,7 +4,7 @@ from thetis.configuration import *
 import numpy as np
 import os
 
-from adapt_utils.steady.tracer.options import bessk0
+from adapt_utils.maths import bessk0
 from adapt_utils.unsteady.options import CoupledOptions
 
 

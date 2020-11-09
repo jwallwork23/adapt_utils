@@ -6,6 +6,9 @@ FIXME
 .DS_Store
 condition.py
 
+# File endings
+*_old.py
+
 # File types
 *.swp
 *.msh
