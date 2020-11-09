@@ -46,8 +46,6 @@ class PointDischarge2dOptions(CoupledOptions):
         self.degree_tracer = 1
         self.tracer_family = 'cg'
         self.stabilisation = 'SUPG'
-        # self.tracer_family = 'dg'
-        # self.stabilisation = 'lax_friedrichs'
         self.use_automatic_sipg_parameter = True
         self.use_limiter_for_tracers = False
         self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
@@ -66,11 +64,20 @@ class PointDischarge2dOptions(CoupledOptions):
         self.adapt_field = 'tracer'
 
         # Mesh adaptation
-        self.element_rtol = 0.001
-        self.estimator_rtol = 0.001
-        self.qoi_rtol = 0.001
+        rtol = 0.005
+        self.element_rtol = rtol
+        self.estimator_rtol = rtol
+        self.qoi_rtol = rtol
         self.h_min = 1.0e-10
         self.h_max = 1.0e+02
+
+        # Robust solver parameters
+        self.solver_parameters['tracer'] = {
+            'mat_type': 'aij',
+            'ksp_type': 'preonly',
+            'pc_type': 'lu',
+            'pc_factor_mat_solver_type': 'mumps',
+        }
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)
