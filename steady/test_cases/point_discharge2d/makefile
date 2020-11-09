@@ -66,45 +66,35 @@ adaptive: isotropic anisotropic weighted_hessian weighted_gradient
 isotropic:
 	@echo "Running isotropic DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach dwr
+		-norm_order 1 -approach dwr
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach dwr -offset 1
+		-norm_order 1 -approach dwr -offset 1
 
 anisotropic:
 	@echo "Running anisotropic DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach anisotropic_dwr -convergence_rate 4
+		-convergence_rate 2 -approach anisotropic_dwr
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach anisotropic_dwr -convergence_rate 4 -offset 1
+		-convergence_rate 2 -approach anisotropic_dwr -offset 1
 
 weighted_hessian:
 	@echo "Running 'weighted Hessian' anisotropic adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach weighted_hessian
+		-norm_order 1 -approach weighted_hessian
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach weighted_hessian -offset 1
+		-norm_order 1 -approach weighted_hessian -offset 1
 
 weighted_gradient:
 	@echo "Running 'weighted gradient' anisotropic adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach weighted_gradient
+		-norm_order 1 -approach weighted_gradient
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-approach weighted_gradient -offset 1
+		-norm_order 1 -approach weighted_gradient -offset 1
 
 plot:
 	@echo "Plotting convergence curves..."
 	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -convergence_rate 2
-
-plot_1:
-	@echo "Plotting convergence curves..."
-	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-norm_order 1 -convergence_rate 1
-
-plot_1_10:
-	@echo "Plotting convergence curves..."
-	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-norm_order 1 -convergence_rate 10
 
 plot_norms:
 	@echo "Plotting convergence curves across norm orders..."

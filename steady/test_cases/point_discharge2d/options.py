@@ -66,9 +66,9 @@ class PointDischarge2dOptions(CoupledOptions):
         self.adapt_field = 'tracer'
 
         # Mesh adaptation
-        self.element_rtol = 0.002
-        self.estimator_rtol = 0.002
-        self.qoi_rtol = 0.002
+        self.element_rtol = 0.001
+        self.estimator_rtol = 0.001
+        self.qoi_rtol = 0.001
         self.h_min = 1.0e-10
         self.h_max = 1.0e+02
 
