@@ -84,7 +84,7 @@ class CoupledOptions(Options):
     degree_increase_tracer = NonNegativeInteger(1, help="""
         When defining an enriched tracer finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
-        """).tag(config=True)
+        """).tag(config=True)  # TODO: UNUSED
     lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
     sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the tracer model.
@@ -106,7 +106,7 @@ class CoupledOptions(Options):
     degree_increase_sediment = NonNegativeInteger(1, help="""
         When defining an enriched sediment finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
-        """).tag(config=True)
+        """).tag(config=True)  # TODO: UNUSED
     sipg_parameter_sediment = FiredrakeScalarExpression(None, allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the sediment model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
@@ -151,7 +151,7 @@ class CoupledOptions(Options):
        """).tag(config=True)
 
     def __init__(self, **kwargs):
-        self.degree_increase = 0
+        self.degree_increase = 0  # TODO: UNUSED
 
         # Solver
         # =====

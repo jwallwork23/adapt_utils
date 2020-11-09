@@ -1,4 +1,4 @@
-from firedrake import *
+from firedrake import BoxMesh, Constant
 
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 
@@ -16,7 +16,7 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
 
     We consider a quantity of interest (QoI) :math:`J` of the form
 
-..  math:: J(\phi) = \int_A \phi \;\mathrm{d}x,
+..  math:: J(\phi) = \int_A \phi \;\mathrm dx,
 
     where :math:`A` is a spherical 'receiver' region.
 
@@ -26,10 +26,23 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
     """
     def __init__(self, level=0, aligned=True, **kwargs):
         super(PointDischarge3dOptions, self).__init__(aligned=aligned, **kwargs)
+
+        # Simple 3D extension of 2D problem
         self.default_mesh = BoxMesh(100*2**level, 20*2**level, 20*2**level, 50, 10, 10)
         self.region_of_interest = [(20.0, 5.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 7.5, 0.5)]
         self.base_velocity = [1.0, 0.0, 0.0]
-        # TODO: h_min, h_max
+
+        # Adaptation parameters
+        self.h_min = 1.0e-12
+        self.h_max = 1.0e+06
+
+        # # Robust solver parameters
+        # self.solver_parameters['tracer'] = {
+        #     'mat_type': 'aij',
+        #     'ksp_type': 'preonly',
+        #     'pc_type': 'lu',
+        #     'pc_factor_mat_solver_type': 'mumps',
+        # }
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)

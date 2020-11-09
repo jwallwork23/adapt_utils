@@ -189,6 +189,6 @@ class ConservativeTracerEquation3D(Equation):
         if self.function_space.ufl_element().family() != 'Lagrange':
             raise NotImplementedError  # TODO
         args = (function_space, depth)
-        self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
-        self.add_term(ConservativeHorizontalDiffusionTerm(*args), 'explicit')
-        self.add_term(SourceTerm(*args), 'source')
+        self.add_term(ConservativeHorizontalAdvectionTerm3D(*args), 'explicit')
+        self.add_term(ConservativeHorizontalDiffusionTerm3D(*args), 'explicit')
+        self.add_term(SourceTerm3D(*args), 'source')
