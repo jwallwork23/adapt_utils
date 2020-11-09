@@ -1,7 +1,6 @@
 from __future__ import absolute_import
 from thetis.utility import *
-from thetis.equation import Equation
-from collections import OrderedDict
+from .equation import Equation
 
 
 class GOErrorEstimatorTerm(object):
@@ -50,16 +49,8 @@ class GOErrorEstimator(Equation):
     Implements a goal-oriented error estimator, comprised of the corresponding terms from the
     underlying equation.
     """
-    def __init__(self, function_space):
-        """
-        :arg function_space: the :class:`FunctionSpace` the solution belongs to
-        """
-        self.terms = OrderedDict()
-        self.labels = {}
-        self.function_space = function_space
-        self.mesh = function_space.mesh()
-        self.normal = FacetNormal(self.mesh)
-        self.xyz = SpatialCoordinate(self.mesh)
+    def __init__(self, *args, **kwargs):
+        super(GOErrorEstimator, self).__init__(*args, **kwargs)
         self.P0 = FunctionSpace(self.mesh, "DG", 0)
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
