@@ -1,7 +1,7 @@
+# TODO: doc
 from __future__ import absolute_import
 from thetis.utility import *
-
-from .error_estimation import TracerGOErrorEstimatorTerm
+from .error_estimation import TracerGOErrorEstimatorTerm, TracerGOErrorEstimator
 
 
 __all__ = ['TracerGOErrorEstimator3D']
@@ -44,8 +44,8 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm
 
 class TracerHorizontalDiffusionGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm3D):
     """
-    :class:`TracerGOErrorEstimatorTerm` object associated with the :class:`HorizontalDiffusionTerm`
-    term of the 2D tracer model.
+    :class:`TracerGOErrorEstimatorTerm3D` object associated with the
+    :class:`HorizontalDiffusionTerm3D` term of the 3D tracer model.
     """
     def element_residual(self, solution, solution_old, arg, arg_old, fields, fields_old):
         if fields_old.get('diffusivity_h') is None:
@@ -129,10 +129,10 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm
         return flux_terms
 
 
-class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
+class TracerSourceGOErrorEstimatorTerm3D(TracerGOErrorEstimatorTerm3D):
     """
-    :class:`TracerGOErrorEstimatorTerm` object associated with the :class:`SourceTerm` term of the
-    2D tracer model.
+    :class:`TracerGOErrorEstimatorTerm3D` object associated with the :class:`SourceTerm3D` term of
+    the 3D tracer model.
     """
     def element_residual(self, solution, solution_old, arg, arg_old, fields, fields_old):
         f = 0
@@ -159,39 +159,18 @@ class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         return f
 
 
-class TracerGOErrorEstimator3D(GOErrorEstimator):
+class TracerGOErrorEstimator3D(TracerGOErrorEstimator):
     """
-    :class:`GOErrorEstimator` for the 2D tracer model.
+    :class:`GOErrorEstimator` for the 3D tracer model.
     """
     def __init__(self, function_space,
-                 depth=None, use_lax_friedrichs=True, sipg_parameter=Constant(10.0)):
-        super(TracerGOErrorEstimator, self).__init__(function_space)
+                 depth=None,
+                 use_lax_friedrichs=True,
+                 sipg_parameter=Constant(10.0),
+                 anisotropic=False):
+        super(TracerGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
 
         args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
         self.add_term(TracerHorizontalAdvectionGOErrorEstimatorTerm3D(*args), 'explicit')
         self.add_term(TracerHorizontalDiffusionGOErrorEstimatorTerm3D(*args), 'explicit')
         self.add_term(TracerSourceGOErrorEstimatorTerm3D(*args), 'source')
-
-    def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):
-        adj = Function(self.P0).assign(1.0)
-        args = (solution, solution_old, adj, adj, fields, fields_old)
-        self.strong_residual_terms = 0
-        for term in self.select_terms(label):
-            self.strong_residual_terms += term.element_residual(*args)
-        self._strong_residual = Function(self.P0, name="Strong residual")
-
-    @property
-    def strong_residual(self):
-        """
-        Evaluate strong residual of 2D tracer equation.
-        """
-        self._strong_residual.assign(assemble(self.strong_residual_terms))
-        return self._strong_residual
-
-    def evaluate_flux_jump(self, sol):
-        """
-        Evaluate flux jump as element-wise indicator functions.
-        """
-        flux_jump = Function(VectorFunctionSpace(self.mesh, "DG", 0)*self.P0)
-        solve(self.p0test*self.p0trial*dx == jump(self.p0test*sol)*dS, flux_jump)
-        return flux_jump

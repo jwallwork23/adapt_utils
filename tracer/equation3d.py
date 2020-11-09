@@ -1,16 +1,18 @@
 """
 3D non-conservative and conservative tracer equations. Note that only the CG case is considered.
 """
-from thetis.equation import *
+from __future__ import absolute_import
 from thetis.utility import *
-
-from adapt_utils.tracer.equation import *
+from ..equation import Equation
+from .equation import *
 
 
 # --- Terms
 
 class HorizontalAdvectionTerm3D(HorizontalAdvectionTerm):
-    # TODO: doc
+    """
+    Horizontal advection term for the 3D tracer model.
+    """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         assert not self.horizontal_dg
         f = 0
@@ -37,7 +39,9 @@ class HorizontalAdvectionTerm3D(HorizontalAdvectionTerm):
 
 
 class HorizontalDiffusionTerm3D(HorizontalDiffusionTerm):
-    # TODO: doc
+    """
+    Horizontal diffusion term for the 3D tracer model.
+    """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         assert not self.horizontal_dg
         f = 0
@@ -82,7 +86,9 @@ class HorizontalDiffusionTerm3D(HorizontalDiffusionTerm):
 
 
 class SourceTerm3D(SourceTerm):
-    # TODO: doc
+    """
+    Source term for the 3D tracer model.
+    """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         assert not self.horizontal_dg
         f = 0
@@ -111,7 +117,9 @@ class SourceTerm3D(SourceTerm):
 
 
 class ConservativeHorizontalAdvectionTerm3D(ConservativeHorizontalAdvectionTerm):
-    # TODO: doc
+    """
+    Conservative horizontal advection term for the 3D tracer model.
+    """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         assert not self.horizontal_dg
         f = 0
@@ -145,38 +153,42 @@ class ConservativeHorizontalDiffusionTerm3D(HorizontalDiffusionTerm3D):
 # --- Equations
 
 class TracerEquation3D(Equation):
-    # TODO: doc
+    """
+    3D tracer advection-diffusion equation in non-conservative form.
+
+    NOTE: Only CG discretisations are currently implemented, with SU and SUPG stabilisation options.
+    """
     def __init__(self, function_space, depth, anisotropic=False):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
+        :kwarg anisotropic: toggle anisotropic cell size measure
         """
-        super(TracerEquation3D, self).__init__(function_space)
+        super(TracerEquation3D, self).__init__(function_space, anisotropic=anisotropic)
         if self.function_space.ufl_element().family() != 'Lagrange':
             raise NotImplementedError  # TODO
         args = (function_space, depth)
-        kwargs = {
-            'anisotropic': anisotropic,
-        }
-        self.add_term(HorizontalAdvectionTerm3D(*args, **kwargs), 'explicit')
-        self.add_term(HorizontalDiffusionTerm3D(*args, **kwargs), 'explicit')
-        self.add_term(SourceTerm3D(*args, **kwargs), 'source')
+        self.add_term(HorizontalAdvectionTerm3D(*args), 'explicit')
+        self.add_term(HorizontalDiffusionTerm3D(*args), 'explicit')
+        self.add_term(SourceTerm3D(*args), 'source')
 
 
 class ConservativeTracerEquation3D(Equation):
-    # TODO: doc
+    """
+    3D tracer advection-diffusion equation in conservative form.
+
+    NOTE: Only CG discretisations are currently implemented, with SU and SUPG stabilisation options.
+    """
     def __init__(self, function_space, depth, anisotropic=False):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
+        :kwarg anisotropic: toggle anisotropic cell size measure
         """
-        super(ConservativeTracerEquation3D, self).__init__(function_space)
+        super(ConservativeTracerEquation3D, self).__init__(function_space, anisotropic=anisotropic)
         if self.function_space.ufl_element().family() != 'Lagrange':
             raise NotImplementedError  # TODO
         args = (function_space, depth)
-        kwargs = {
-            'anisotropic': anisotropic,
-        }
-        self.add_term(ConservativeHorizontalAdvectionTerm(*args, **kwargs), 'explicit')
-        self.add_term(ConservativeHorizontalDiffusionTerm(*args, **kwargs), 'explicit')
-        self.add_term(SourceTerm(*args, **kwargs), 'source')
+        self.add_term(ConservativeHorizontalAdvectionTerm(*args), 'explicit')
+        self.add_term(ConservativeHorizontalDiffusionTerm(*args), 'explicit')
+        self.add_term(SourceTerm(*args), 'source')
