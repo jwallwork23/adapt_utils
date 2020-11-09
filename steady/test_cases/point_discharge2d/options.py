@@ -1,5 +1,4 @@
 from firedrake import *
-from thetis.configuration import *
 
 import numpy as np
 import os
@@ -39,7 +38,8 @@ class PointDischarge2dOptions(CoupledOptions):
         self.dt_per_export = 1
 
         # Domain
-        self.default_mesh = RectangleMesh(100*2**level, 20*2**level, 50, 10)
+        n = 2**level
+        self.default_mesh = RectangleMesh(100*n, 20*n, 50, 10)
         self.shift = shift
 
         # FEM
@@ -50,7 +50,7 @@ class PointDischarge2dOptions(CoupledOptions):
         self.use_limiter_for_tracers = False
         self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
 
-        # Physics
+        # Hydrodynamics
         self.base_velocity = [1.0, 0.0]
         self.base_diffusivity = 0.1
 

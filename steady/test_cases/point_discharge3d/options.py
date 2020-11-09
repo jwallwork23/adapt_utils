@@ -28,7 +28,8 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         super(PointDischarge3dOptions, self).__init__(aligned=aligned, **kwargs)
 
         # Simple 3D extension of 2D problem
-        self.default_mesh = BoxMesh(100*2**level, 20*2**level, 20*2**level, 50, 10, 10)
+        n = 2**level
+        self.default_mesh = BoxMesh(100*n, 20*n, 20*n, 50, 10, 10)
         self.region_of_interest = [(20.0, 5.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 7.5, 0.5)]
         self.base_velocity = [1.0, 0.0, 0.0]
 
