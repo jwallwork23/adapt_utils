@@ -8,6 +8,7 @@ from adapt_utils.unsteady.options import CoupledOptions
 
 class DesalinationOutfallOptions(CoupledOptions):
     # TODO: doc
+    resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
 
     # Domain specification
     domain_length = PositiveFloat(3000.0).tag(config=False)
@@ -89,19 +90,21 @@ class DesalinationOutfallOptions(CoupledOptions):
     def set_boundary_conditions(self, prob, i):
         self.elev_in[i] = Function(prob.V[i].sub(1))
         self.elev_out[i] = Function(prob.V[i].sub(1))
-        inflow_tag = 4
+        bottom_tag = 1
         outflow_tag = 2
+        top_tag = 3
+        inflow_tag = 4
         zero = Constant(0.0)
         boundary_conditions = {
             'shallow_water': {
-                inflow_tag: {'elev': self.elev_in[i]},
                 outflow_tag: {'elev': self.elev_out[i]},
+                inflow_tag: {'elev': self.elev_in[i]},
             },
             'tracer': {
-                1: {'diff_flux': zero},
-                2: {'value': zero},
-                3: {'diff_flux': zero},
-                4: {'value': zero},
+                bottom_tag: {},
+                outflow_tag: {'value': zero},
+                top_tag: {'diff_flux': zero},
+                inflow_tag: {'value': zero},
             },
         }
         return boundary_conditions
