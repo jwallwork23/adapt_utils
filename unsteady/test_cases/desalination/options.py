@@ -13,10 +13,11 @@ class DesalinationOutfallOptions(CoupledOptions):
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
-    def __init__(self, aligned=True, spun=False, **kwargs):
+    def __init__(self, aligned=False, spun=False, **kwargs):
         super(DesalinationOutfallOptions, self).__init__(**kwargs)
         self.solve_swe = True
-        self.solve_tracer = True
+        self.solve_tracer = spun
+        self.spun = spun
 
         # Domain
         self.default_mesh = os.path.join(os.path.dirname(__file__), 'channel.msh')
@@ -24,9 +25,7 @@ class DesalinationOutfallOptions(CoupledOptions):
         # Hydrodynamics
         self.base_viscosity = 3.0
         self.base_diffusivity = 1.0
-        self.base_bathymetry = 50.0  # TODO: Varying bathymetry
-        self.max_depth = 50.0
-        self.friction_coeff = 0.0025
+        self.friction_coeff = 0.0025  # TODO: Increased drag at pipes?
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
 
@@ -56,14 +55,36 @@ class DesalinationOutfallOptions(CoupledOptions):
         # Source / receiver
         self.source_value = 100.0
         self.source_discharge = 0.1
-        self.region_of_interest = [(2500.0, 500.0, 5.0)] if aligned else [(2500.0, 750.0, 5.0)]
+        outlet_x = 1500.0
+        self.source_location = [(1500.0, 750.0, 50.0)]  # Outlet
+        inlet_x = outlet_x if aligned else 750.0
+        self.region_of_interest = [(inlet_x, 250.0, 5.0)]  # Inlet
 
         # Boundary forcing
         self.max_amplitude = 0.5
         self.omega = 2*pi/self.T_tide
         self.elev_in = [None for i in range(self.num_meshes)]
         self.elev_out = [None for i in range(self.num_meshes)]
-        self.spun = spun
+
+    def set_tracer_source(self, fs):
+        return self.ball(fs.mesh(), source=True, scale=self.source_value)
+
+    def set_qoi_kernel_tracer(self, prob, i):
+        return self.set_qoi_kernel(prob.meshes[i])
+
+    def set_qoi_kernel(self, mesh):
+        b = self.ball(mesh, source=False)
+        area = assemble(b*dx)
+        area_analytical = pi*self.region_of_interest[0][2]**2
+        rescaling = 1.0 if np.allclose(area, 0.0) else area_analytical/area
+        return rescaling*b
+
+    def set_bathymetry(self, fs):
+        x, y = SpatialCoordinate(fs.mesh())
+        bathymetry = Function(fs)
+        W = self.domain_width
+        bathymetry.interpolate(100.0 + 50.0*(W - y)/W)
+        return bathymetry
 
     def set_boundary_conditions(self, prob, i):
         self.elev_in[i] = Function(prob.V[i].sub(1))
