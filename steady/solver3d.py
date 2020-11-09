@@ -86,7 +86,7 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
         self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
 
-    def create_forward_tracer_error_estimator_step(self, i):
+    def create_tracer_error_estimator_step(self, i):
         from ..tracer.error_estimation3d import TracerGOErrorEstimator3D
 
         assert i == 0
@@ -117,9 +117,6 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
         elif self.stabilisation == 'supg':
             fields['supg_stabilisation'] = True
         return fields
-
-    def recover_hessian_metric(self, adjoint=False, **kwargs):
-        raise NotImplementedError  # TODO
 
     def get_weighted_gradient_metric(self, adjoint=False, source=True):
         raise NotImplementedError  # TODO
