@@ -40,9 +40,10 @@ to that presented in [1]. A :math:`\mathbb P2-\mathbb P1` Taylor-Hood element pa
 [1] Funke, S. W., P. E. Farrell, and M. D. Piggott. "Reconstructing wave profiles from inundation data."
     Computer Methods in Applied Mechanics and Engineering 322 (2017): 167-186.
 """
-from thetis.equation import *
+from __future__ import absolute_import
 from thetis.shallowwater_eq import ShallowWaterTerm
 from thetis.utility import *
+from ..equation import Equation
 
 
 __all__ = ["AdjointShallowWaterEquations"]
@@ -473,10 +474,11 @@ class ContinuitySourceTerm(AdjointShallowWaterContinuityTerm):
 
 
 class BaseAdjointShallowWaterEquation(Equation):
-    # TODO: doc
-    def __init__(self, function_space,
-                 depth, options):
-        super(BaseAdjointShallowWaterEquation, self).__init__(function_space)
+    """
+    Abstract base class for continuous adjoint shallow water formulations.
+    """
+    def __init__(self, function_space, depth, options, **kwargs):
+        super(BaseAdjointShallowWaterEquation, self).__init__(function_space, **kwargs)
         self.depth = depth
         self.options = options
 
@@ -507,14 +509,17 @@ class BaseAdjointShallowWaterEquation(Equation):
 
 
 class AdjointShallowWaterEquations(BaseAdjointShallowWaterEquation):
-    # TODO: doc
-    def __init__(self, function_space, depth, options):
+    """
+    Continuous adjoint formulation of 2D depth-averaged shallow water equations in non-conservative
+    form.
+    """
+    def __init__(self, function_space, depth, options, **kwargs):
         """
         :arg function_space: Mixed function space where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
         :arg options: :class:`.AttrDict` object containing all circulation model options
         """
-        super(AdjointShallowWaterEquations, self).__init__(function_space, depth, options)
+        super(AdjointShallowWaterEquations, self).__init__(function_space, depth, options, **kwargs)
         if options.get('family') == 'dg-dg':
             raise NotImplementedError("Equal order DG finite element not supported.")
         if options.get('wind_stress') is not None:
