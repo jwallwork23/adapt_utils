@@ -2,24 +2,22 @@
 2D non-conservative and conservative tracer equations as in Thetis, with a few minor modifications:
     1. Allow for CG discretisations and either SU or SUPG stabilisation.
     2. Account for mesh movement under a prescribed mesh velocity.
+    3. Enable choice of anisotropic cell size measure.
 """
-from thetis.equation import *
+from __future__ import absolute_import
 from thetis.utility import *
 import thetis.tracer_eq_2d as thetis_tracer
 import thetis.conservative_tracer_eq_2d as thetis_cons_tracer
-
-from adapt_utils.mesh import anisotropic_cell_size
+from ..equation import Equation
 
 
 # --- Modified terms for the non-conservative form
 
 class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
-    # TODO: doc
-    def __init__(self, *args, anisotropic=True, **kwargs):
-        super(HorizontalAdvectionTerm, self).__init__(*args, **kwargs)
-        if anisotropic:
-            self.cellsize = anisotropic_cell_size(self.mesh)
-
+    """
+    Horizontal advection term from Thetis, modified to allow for mesh movement and CG
+    discretisations, with SU and SUPG stabilisation options.
+    """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
 
@@ -56,12 +54,10 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
 
 
 class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
-    # TODO: doc
-    def __init__(self, *args, anisotropic=True, **kwargs):
-        super(HorizontalDiffusionTerm, self).__init__(*args, **kwargs)
-        if anisotropic:
-            self.cellsize = anisotropic_cell_size(self.mesh)
-
+    """
+    Horizontal diffusion term from Thetis, modified to allow for CG discretisations, with SU and
+    SUPG stabilisation options.
+    """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
         if fields_old.get('diffusivity_h') is None:
@@ -108,12 +104,10 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
 
 
 class SourceTerm(thetis_tracer.SourceTerm):
-    # TODO: doc
-    def __init__(self, *args, anisotropic=True, **kwargs):
-        super(SourceTerm, self).__init__(*args, **kwargs)
-        if anisotropic:
-            self.cellsize = anisotropic_cell_size(self.mesh)
-
+    """
+    Source term from Thetis, modified to allow for CG discretisations, with SU and SUPG stabilisation
+    options.
+    """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
         source = fields_old.get('source')
@@ -144,12 +138,10 @@ class SourceTerm(thetis_tracer.SourceTerm):
 # --- Modified terms for the conservative form
 
 class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizontalAdvectionTerm):
-    # TODO: doc
-    def __init__(self, *args, anisotropic=True, **kwargs):
-        super(ConservativeHorizontalAdvectionTerm, self).__init__(*args, **kwargs)
-        if anisotropic:
-            self.cellsize = anisotropic_cell_size(self.mesh)
-
+    """
+    Conservative horizontal advection term from Thetis, modified to allow for mesh movement and CG
+    discretisations, with SU and SUPG stabilisation options.
+    """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
 
@@ -207,13 +199,13 @@ class TracerEquation2D(Equation):
         :arg depth: :class: `DepthExpression` containing depth info
         :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
         :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
+        :kwarg anisotropic: toggle anisotropic cell size measure
         """
-        super(TracerEquation2D, self).__init__(function_space)
+        super(TracerEquation2D, self).__init__(function_space, anisotropic=anisotropic)
         args = (function_space, depth)
         kwargs = {
             'use_lax_friedrichs': use_lax_friedrichs,
             'sipg_parameter': sipg_parameter,
-            'anisotropic': anisotropic,
         }
         self.add_term(HorizontalAdvectionTerm(*args, **kwargs), 'explicit')
         self.add_term(HorizontalDiffusionTerm(*args, **kwargs), 'explicit')
@@ -238,20 +230,19 @@ class ConservativeTracerEquation2D(Equation):
         :arg depth: :class: `DepthExpression` containing depth info
         :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
         :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
+        :kwarg anisotropic: toggle anisotropic cell size measure
         """
-        super(ConservativeTracerEquation2D, self).__init__(function_space)
+        super(ConservativeTracerEquation2D, self).__init__(function_space, anisotropic=anisotropic)
         args = (function_space, depth)
         kwargs = {
             'use_lax_friedrichs': use_lax_friedrichs,
             'sipg_parameter': sipg_parameter,
-            'anisotropic': anisotropic,
         }
         self.add_term(ConservativeHorizontalAdvectionTerm(*args, **kwargs), 'explicit')
         self.add_term(ConservativeHorizontalDiffusionTerm(*args, **kwargs), 'explicit')
         if self.function_space.ufl_element().family() == 'Lagrange':
             self.add_term(SourceTerm(*args, **kwargs), 'source')
         else:
-            kwargs.pop('anisotropic')
             self.add_term(thetis_cons_tracer.ConservativeSourceTerm(*args, **kwargs), 'source')
         try:
             args = (function_space, depth, use_lax_friedrichs, sipg_parameter)

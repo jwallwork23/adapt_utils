@@ -1,7 +1,8 @@
+# TODO: doc
 from __future__ import absolute_import
 from thetis.utility import *
-from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
 from thetis.tracer_eq_2d import TracerTerm
+from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
 
 
 __all__ = ['TracerGOErrorEstimator']
@@ -18,16 +19,13 @@ class TracerGOErrorEstimatorTerm(GOErrorEstimatorTerm, TracerTerm):
     def __init__(self, function_space,
                  depth=None,
                  use_lax_friedrichs=True,
-                 sipg_parameter=Constant(10.0),
-                 anisotropic=False):
+                 sipg_parameter=Constant(10.0)):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :kwarg depth: DepthExpression for the domain
         """
         TracerTerm.__init__(self, function_space, depth, use_lax_friedrichs, sipg_parameter)
         GOErrorEstimatorTerm.__init__(self, function_space.mesh())
-        if anisotropic:
-            self.cellsize = anisotropic_cell_size(self.mesh)
 
     def inter_element_flux(self, solution, solution_old, arg, arg_old, fields, fields_old):
         return 0
@@ -259,8 +257,11 @@ class TracerGOErrorEstimator(GOErrorEstimator):
     :class:`GOErrorEstimator` for the 2D tracer model.
     """
     def __init__(self, function_space,
-                 depth=None, use_lax_friedrichs=True, sipg_parameter=Constant(10.0)):
-        super(TracerGOErrorEstimator, self).__init__(function_space)
+                 depth=None,
+                 use_lax_friedrichs=True,
+                 sipg_parameter=Constant(10.0),
+                 anisotropic=False):
+        super(TracerGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
 
         args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
         self.add_term(TracerHorizontalAdvectionGOErrorEstimatorTerm(*args), 'explicit')
