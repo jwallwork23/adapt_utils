@@ -33,7 +33,7 @@ kwargs = {
 
     # Mesh adaptation
     'approach': args.approach or 'weighted_hessian',
-    'target': float(args.target or 1.0e+04),
+    'target': float(args.target or 1.0e+03),
     'norm_order': p,
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
