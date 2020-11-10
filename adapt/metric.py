@@ -4,8 +4,8 @@ import numpy as np
 
 from adapt_utils.adapt.kernels import *
 from adapt_utils.adapt.recovery import recover_hessian
+from adapt_utils.linalg import check_spd
 from adapt_utils.options import Options
-from adapt_utils.misc import check_spd
 
 
 __all__ = ["metric_complexity", "cell_size_metric", "volume_and_surface_contributions",

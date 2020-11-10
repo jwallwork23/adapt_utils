@@ -5,8 +5,8 @@ import thetis.utility as thetis_utils
 
 from ..adapt.metric import *
 from ..adapt.recovery import DoubleL2ProjectorHessian, L2Projector
+from ..fem import get_component, get_component_space
 from ..options import CoupledOptions
-from ..misc import get_component, get_component_space
 
 
 __all__ = ["recover_hessian_metric", "ShallowWaterHessianRecoverer",

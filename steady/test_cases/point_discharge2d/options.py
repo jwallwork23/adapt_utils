@@ -117,7 +117,8 @@ class PointDischarge2dOptions(CoupledOptions):
         }
         if self.anisotropic_stabilisation:
             stabilisation += '_anisotropic'
-        calibrated_r = calibration_results[self.tracer_family][stabilisation.lower()]
+        stabilisation = None if stabilisation is None else stabilsation.lower()
+        calibrated_r = calibration_results[self.tracer_family][stabilisation]
         return [(1.0 + self.shift, 5.0, calibrated_r)]
 
     @property
