@@ -129,13 +129,14 @@ def recover_boundary_hessian(f, **kwargs):
     :kwarg boundary_tag: physical ID for boundary segment
     :return: reconstructed boundary Hessian associated with `f`.
     """
+    import numpy as np
+    from adapt_utils.linalg import gram_schmidt
+
     kwargs.setdefault('op', Options())
     op = kwargs.get('op')
     op.print_debug("RECOVERY: Recovering Hessian on domain boundary...")
     mesh = kwargs.get('mesh', op.default_mesh)
     dim = mesh.topological_dimension()
-    if dim == 3:
-        raise NotImplementedError  # TODO
     if dim not in (2, 3):
         raise ValueError("Dimensions other than 2D and 3D not considered.")
 
@@ -145,49 +146,60 @@ def recover_boundary_hessian(f, **kwargs):
         solver_parameters['ksp_monitor'] = None
         solver_parameters['ksp_converged_reason'] = None
 
-    # Normal and tangent vectors
+    # Function spaces
+    P1 = FunctionSpace(mesh, "CG", 1)
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+
+    # Apply Gram-Schmidt to get tangent vectors
     n = FacetNormal(mesh)
-    s = perp(n)
-    ns = as_vector([n, s])
+    vectors = [as_vector(np.random.rand(dim)) for i in range(dim-1)]  # Arbitrary
+    tangent_vectors = gram_schmidt(n, *vectors, normalise=True)[1:]   # Orthonormal
+    ns = as_vector([n, *tangent_vectors])
 
     # --- Solve tangent to boundary
 
-    if isinstance(f, Function):
-        # Argument is a Function
-        l2_proj = DoubleL2ProjectorHessian(f.function_space(), boundary=True, **kwargs).project(f)
-    else:
-        # Argument is a UFL expression
-        bcs = kwargs.get('bcs')
-        P1 = FunctionSpace(mesh, "CG", 1)
-        Hs, v = TrialFunction(P1), TestFunction(P1)
-        l2_proj = Function(P1, name="Recovered boundary Hessian")
+    bcs = kwargs.get('bcs')
+    assert bcs is None  # TODO
+    boundary_tag = kwargs.get('boundary_tag', 'on_boundary')
+    Hs, v = TrialFunction(P1), TestFunction(P1)
+    l2_proj = [[Function(P1) for i in range(dim-1)] for j in range(dim-1)]
 
-        # Arbitrary value in domain interior
-        a = v*Hs*dx
-        L = v*Constant(1/op.h_max**2)*dx
+    # Arbitrary value in domain interior
+    a = v*Hs*dx
+    L = v*Constant(1/op.h_max**2)*dx
 
-        # Hessian on boundary
-        boundary_tag = kwargs.get('boundary_tag', 'on_boundary')
-        if bcs is None:
-            s = perp(n)  # Tangent vector
+    # Hessian on boundary
+    for j, s1 in enumerate(tangent_vectors):
+        for i, s0 in enumerate(tangent_vectors):
             a_bc = v*Hs*ds
-            L_bc = -dot(s, grad(v))*dot(s, grad(f))*ds
-            # TODO: bbcs?
-            bcs = EquationBC(a_bc == L_bc, l2_proj, boundary_tag)
+            L_bc = -dot(s0, grad(v))*dot(s1, grad(f))*ds
+            bbcs = None  # TODO?
+            bcs = EquationBC(a_bc == L_bc, l2_proj[i][j], boundary_tag, bcs=bbcs)
 
         nullspace = VectorSpaceBasis(constant=True)
-        solve(a == L, l2_proj, bcs=bcs, nullspace=nullspace, solver_parameters=solver_parameters)
+        solve(a == L, l2_proj[i][j], bcs=bcs, nullspace=nullspace, solver_parameters=solver_parameters)
 
     # --- Construct tensor field
 
-    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
-    H = as_matrix([[Constant(1/op.h_max**2), 0], [0, abs(l2_proj)]])
     boundary_hessian = Function(P1_ten)
+    h = Constant(1/op.h_max**2)
+    if dim == 2:
+        Hsub = abs(l2_proj[i][j])
+        H = as_matrix([[h, 0],
+                       [0, Hsub]])
+    else:
+        Hsub = Function(TensorFunctionSpace(mesh, "CG", 1, shape=(2, 2)))
+        Hsub.interpolate(as_matrix([[l2_proj[0, 0], l2_proj[0, 1]],
+                                    [l2_proj[1, 0], l2_proj[1, 1]]]))
+        Hsub = steady_metric(H=Hsub, normalise=False, enforce_constraints=False, op=op)
+        H = as_matrix([[h, 0, 0],
+                       [0, Hsub[0, 0], Hsub[0, 1]],
+                       [0, Hsub[1, 0], Hsub[1, 1]]])
 
     # Arbitrary value in domain interior
     sigma, tau = TrialFunction(P1_ten), TestFunction(P1_ten)
     a = inner(tau, sigma)*dx
-    L = inner(tau, Constant(1/op.h_max**2)*Identity(dim))*dx
+    L = inner(tau, h*Identity(dim))*dx
 
     # Boundary values imposed as in [Loseille et al. 2011]
     a_bc = inner(tau, sigma)*ds
@@ -211,6 +223,7 @@ class L2Projector():
         self.field = Function(function_space)
         self.mesh = function_space.mesh()
         self.dim = self.mesh.topological_dimension()
+        assert self.dim in (2, 3)
         self.n = FacetNormal(self.mesh)
         self.bcs = bcs
         self.kwargs = {
@@ -278,13 +291,6 @@ class DoubleL2ProjectorHessian(L2Projector):
     def __init__(self, *args, boundary=False, **kwargs):
         super(DoubleL2ProjectorHessian, self).__init__(*args, **kwargs)
         self.boundary = boundary
-        self.dim = self.mesh.topological_dimension()
-        assert self.dim in (2, 3)
-        if self.boundary:
-            try:
-                assert self.dim == 2
-            except AssertionError:
-                raise NotImplementedError  # TODO
 
     def setup(self):
         if self.boundary:
@@ -327,12 +333,11 @@ class DoubleL2ProjectorHessian(L2Projector):
         prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)
         self.projector = LinearVariationalSolver(prob, **self.kwargs)
 
-    # TODO: Couple with the above instead of setting arbitrary interior value
     def _setup_boundary_projector(self):
         if self.dim == 2:
             self._setup_boundary_projector_2d()
         else:
-            self._setup_boundary_projector_3d()
+            raise NotImplementedError  # TODO: Hook up
 
     def _setup_boundary_projector_2d(self):
         P1 = FunctionSpace(mesh, "CG", 1)
@@ -348,14 +353,11 @@ class DoubleL2ProjectorHessian(L2Projector):
             a_bc = v*Hs*ds
             s = perp(self.n)  # Tangent vector
             L_bc = -dot(s, grad(v))*dot(s, grad(self.field))*ds
-            # TODO: Account for nullspace
+            # TODO: Account for nullspace?
             self.bcs = EquationBC(a_bc == L_bc, self.l2_projection, 'on_boundary')
 
         prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)
         self.projector = LinearVariationalSolver(prob, **self.kwargs)
-
-    def _setup_boundary_projector_3d(self):
-        raise NotImplementedError  # TODO
 
     def project(self, f):
         assert f.function_space() == self.field.function_space()

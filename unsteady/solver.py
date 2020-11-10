@@ -995,9 +995,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # u = Constant(as_vector(self.op.base_velocity))  # FIXME: Pyadjoint doesn't like this
             u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
             eta = Constant(0.0)
+        uv_str = 'uv_2d' if self.dim == 2 else 'uv_3d'
         fields = AttrDict({
             'elev_2d': eta,
-            'uv_2d': u,
+            uv_str: u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,

@@ -84,22 +84,25 @@ def check_spd(M):
 
 # --- Orthogonalisation
 
-def gram_schmidt(*v):
+def gram_schmidt(*v, normalise=False):
     """
     Apply the Gram-Schmidt orthogonalisation process to a sequence of vectors in order to obtain
     an orthogonal basis.
+
+    :args v: list of vectors to orthogonalise.
+    :kwarg normalise: if `True`, an orthonormal basis is constructed.
     """
     if isinstance(v[0], np.ndarray):
-        from numpy import dot
+        from numpy import dot, sqrt
     else:
-        from ufl import dot
+        from ufl import dot, sqrt
     u = []
     proj = lambda x, y: dot(x, y)/dot(x, x)*x
     for i, vi in enumerate(v):
-        if i == 0:
-            u.append(vi)
-        else:
-            u.append(vi - sum([proj(uj, vi) for uj in u]))
+        vv = vi
+        if i > 0:
+            vv -= sum([proj(uj, vi) for uj in u])
+        u.append(vv/sqrt(dot(vv, vv)) if normalise else vv)
     if isinstance(v[0], np.ndarray):
         u = [np.array(ui) for ui in u]
     return u
