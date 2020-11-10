@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 from adapt_utils.maths import bessk0
-from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.options import CoupledOptions
 
 
 __all__ = ["PointDischarge2dOptions"]
@@ -117,7 +117,7 @@ class PointDischarge2dOptions(CoupledOptions):
         }
         if self.anisotropic_stabilisation:
             stabilisation += '_anisotropic'
-        calibrated_r = calibration_results[self.tracer_family][stabilisation]
+        calibrated_r = calibration_results[self.tracer_family][stabilisation.lower()]
         return [(1.0 + self.shift, 5.0, calibrated_r)]
 
     @property

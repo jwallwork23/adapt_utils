@@ -4,7 +4,7 @@ from thetis.configuration import *
 import math
 import os
 
-from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.options import CoupledOptions
 
 
 __all__ = ["LeVequeOptions"]

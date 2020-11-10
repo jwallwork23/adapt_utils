@@ -5,8 +5,8 @@ import numpy as np
 import os
 import scipy.interpolate as si
 
+from adapt_utils.options import CoupledOptions
 from adapt_utils.swe.tsunami.conversion import *
-from adapt_utils.unsteady.options import CoupledOptions
 
 
 __all__ = ["TsunamiOptions"]

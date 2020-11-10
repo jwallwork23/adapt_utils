@@ -93,10 +93,13 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         Returns the value of the quantity of interest (QoI) for the current forward solution.
         """
-        if self.op.solve_tracer:
-            return assemble(inner(self.fwd_solution_tracer, self.kernel)*dx(degree=12))
-        elif self.op.solve_swe:
-            return assemble(inner(self.fwd_solution, self.kernel)*dx(degree=12))
+        op = self.op
+        deg = op.qoi_quadrature_degree
+        op.print_debug("DIAGNOSTICS: Evaluating QoI using quadrature degree {:d}".format(deg))
+        if op.solve_tracer:
+            return assemble(inner(self.fwd_solution_tracer, self.kernel)*dx(degree=deg))
+        elif op.solve_swe:
+            return assemble(inner(self.fwd_solution, self.kernel)*dx(degree=deg))
         else:
             raise NotImplementedError  # TODO
 
@@ -104,7 +107,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         UFL form describing the quantity of interest (QoI).
         """
-        return inner(self.fwd_solution, self.kernel)*dx(degree=12)
+        deg = self.op.qoi_quadrature_degree
+        op.print_debug("DIAGNOSTICS: Generating QoI form using quadrature degree {:d}".format(deg))
+        return inner(self.fwd_solution, self.kernel)*dx(degree=deg)
 
     def get_scaled_residual(self, adjoint=False, **kwargs):
         r"""

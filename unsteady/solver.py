@@ -12,7 +12,7 @@ from ..adapt.metric import *
 from .base import AdaptiveProblemBase
 from .callback import *
 from ..io import *
-from .options import ReynoldsNumberArray
+from ..options import ReynoldsNumberArray
 from ..swe.utils import *
 
 

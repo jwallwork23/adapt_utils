@@ -1,7 +1,5 @@
 from thetis import *
 
-from adapt_utils.adapt.kernels import *
-
 
 __all__ = ["MeshStats", "isotropic_cell_size", "anisotropic_cell_size"]
 
@@ -56,9 +54,9 @@ class MeshStats(object):
         msg += 35*"*" + "\n"
         return msg
 
-    def get_element_sizes(self):
-        self.dx = Function(self._P0, name="")
-        self.dx.interpolate(CellDiameter(self._mesh))
+    def get_element_sizes(self, anisotropic=False):
+        cell_size_measure = anisotropic_cell_size if anisotropic else isotropic_cell_size
+        self.dx = cell_size_measure(self._mesh)
         self.dx_min = self.dx.vector().gather().min()
         self.dx_max = self.dx.vector().gather().max()
 
@@ -84,6 +82,8 @@ def anisotropic_cell_size(mesh):
     """
     Measure of cell size for anisotropic meshes, as described in [Micheletti, Perotto & Picasso 2003]
     """
+    from adapt_utils.adapt.kernels import eigen_kernel, get_reordered_eigendecomposition, poldec_spd
+
     # print_output("MESH: Computing anisotropic cell size")
     dim = mesh.topological_dimension()
 

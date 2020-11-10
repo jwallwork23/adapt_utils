@@ -3,7 +3,7 @@ from thetis.configuration import *
 
 import os
 
-from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.options import CoupledOptions
 
 
 class DesalinationOutfallOptions(CoupledOptions):

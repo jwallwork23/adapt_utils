@@ -55,7 +55,7 @@ print_calibration:
 
 uniform:
 	@echo "Running uniform refinement convergence test..."
-	@python3 run_uniform_convergence.py
+	@python3 run_uniform_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1
 
 table:
 	@echo "Writing to LaTeX formatted table..."

@@ -2,7 +2,7 @@ from thetis import *
 from thetis.configuration import *
 
 from adapt_utils.swe.utils import heaviside_approx
-from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.options import CoupledOptions
 
 import numpy as np
 import os
