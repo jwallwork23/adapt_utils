@@ -130,6 +130,7 @@ def recover_boundary_hessian(f, **kwargs):
     :return: reconstructed boundary Hessian associated with `f`.
     """
     import numpy as np
+    from adapt_utils.adapt.metric import steady_metric
     from adapt_utils.linalg import get_orthonormal_vectors
 
     kwargs.setdefault('op', Options())
@@ -188,8 +189,8 @@ def recover_boundary_hessian(f, **kwargs):
                        [0, Hsub]])
     else:
         Hsub = Function(TensorFunctionSpace(mesh, "CG", 1, shape=(2, 2)))
-        Hsub.interpolate(as_matrix([[l2_proj[0, 0], l2_proj[0, 1]],
-                                    [l2_proj[1, 0], l2_proj[1, 1]]]))
+        Hsub.interpolate(as_matrix([[l2_proj[0][0], l2_proj[0][1]],
+                                    [l2_proj[1][0], l2_proj[1][1]]]))
         Hsub = steady_metric(H=Hsub, normalise=False, enforce_constraints=False, op=op)
         H = as_matrix([[h, 0, 0],
                        [0, Hsub[0, 0], Hsub[0, 1]],

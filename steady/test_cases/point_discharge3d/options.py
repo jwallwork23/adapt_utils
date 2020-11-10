@@ -27,7 +27,7 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
     def __init__(self, level=0, aligned=True, **kwargs):
         super(PointDischarge3dOptions, self).__init__(aligned=aligned, **kwargs)
         # self.qoi_quadrature_degree = 12
-        self.qoi_quadrature_degree = 1
+        self.qoi_quadrature_degree = 3
 
         # Simple 3D extension of 2D problem
         n = 2**level
