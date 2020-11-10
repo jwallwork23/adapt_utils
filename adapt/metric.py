@@ -102,9 +102,7 @@ def boundary_steady_metric(H, mesh=None, boundary_tag='on_boundary', **kwargs):
     if mesh is None:
         mesh = H.function_space().mesh()
     dim = mesh.topological_dimension()
-    if dim == 3:
-        raise NotImplementedError  # TODO
-    elif dim != 2:
+    if dim not in (2, 3):
         raise ValueError("Dimensions other than 2D and 3D not considered.")
     P1_ten = TensorFunctionSpace(mesh, "CG", 1)
     M = Function(P1_ten, name="Boundary metric")

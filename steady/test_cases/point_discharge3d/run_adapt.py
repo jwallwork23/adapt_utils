@@ -26,7 +26,7 @@ alpha = float(args.convergence_rate or 10)
 # --- Set parameters
 
 kwargs = {
-    'level': int(args.level or 1),
+    'level': int(args.level or 0),
 
     # QoI
     'aligned': not bool(args.offset or False),
