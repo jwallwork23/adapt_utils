@@ -17,7 +17,7 @@ parser.add_argument('-norm_order', help="Metric normalisation order.")
 parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
 parser.add_argument('-min_adapt', help="Minimum number of mesh adaptations.")
 parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
-
+parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 10)
@@ -41,7 +41,7 @@ kwargs = {
 
     # I/O and debugging
     'plot_pvd': True,
-    'debug': True,
+    'debug': bool(args.debug or False),
 }
 op = PointDischarge3dOptions(**kwargs)
 op.tracer_family = 'cg'
