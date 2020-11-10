@@ -30,15 +30,15 @@ Below are listed publications which use `adapt_utils`. The specific versions of 
 used for each publication are also shown and can be downloaded from the corresponding links.
 To install a specific version of Firedrake, please follow the instructions [here][7].
 
-  * J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, <em>'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake'</em>, In: 28th International Meshing Roundtable, pp.83-100, (2020). DOI: 10.5281/zenodo.3653101.
-    * Paper: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3653101.svg)](https://doi.org/10.5281/zenodo.3653101), URL: https://doi.org/10.5281/zenodo.3653101.
+  * J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, <em>'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake'</em>, In: 28th International Meshing Roundtable, pp.83-100, (2020).
+    * [Paper][9]: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3653101.svg)](https://doi.org/10.5281/zenodo.3653101).
     * Code:
       * `adapt_utils`: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3358565.svg)](https://doi.org/10.5281/zenodo.3358565) (`v1.0`).
       * Firedrake: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3250888.svg)](https://doi.org/10.5281/zenodo.3250888).
     * Test cases: `steady/test_cases/point_discharge2d` (Section 5.3), `steady/test_cases/point_discharge3d` (Section 5.4).
 
   * J. G. Wallwork, N. Barral, S. C. Kramer, D. A. Ham, M. D. Piggott, <em>'Goal-Oriented Error Estimation and Mesh Adaptation for Shallow Water Modelling'</em>, Springer Nature Applied Sciences, volume 2, pp.1053--1063 (2020).
-    * Paper: DOI:10.1007/s42452-020-2745-9, URL: https://rdcu.be/b35wZ.
+    * [Paper][10]: DOI: 10.1007/s42452-020-2745-9.
     * Code:
       * `adapt_utils`: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3695801.svg)](https://doi.org/10.5281/zenodo.3695801) (`v1.3`).
       * Firedrake: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3568997.svg)](https://doi.org/10.5281/zenodo.3568997).
@@ -46,6 +46,7 @@ To install a specific version of Firedrake, please follow the instructions [here
     * Test case: `steady/test_cases/turbine_array` (Section 4).
     
  * M. C. A. Clare, J. G. Wallwork, S. C. Kramer, H. Weller, C. J. Cotter, M. D. Piggott, <em> 'On the use of mesh movement methods to help overcome the multi-scale challenges associated with hydro-morphodynamic modelling'</em>, Submitted to Journal of Computational Physics.
+    * [Preprint][11]: DOI: 10.31223/osf.io/tpqvy.
     * Code:
       * `adapt_utils` [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110708.svg)](https://doi.org/10.5281/zenodo.4110708) (`v2.2`).
       * Firedrake: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110204.svg)](https://doi.org/10.5281/zenodo.4110204).
@@ -72,3 +73,6 @@ To install a specific version of Firedrake, please follow the instructions [here
 [6]: http://www.imperial.ac.uk/earth-science/research/research-groups/amcg/ "AMCG"
 [7]: https://www.firedrakeproject.org/zenodo.html "firedrake_zenodo"
 [8]: https://github.com/jwallwork23/adapt_utils_notebooks "adapt_utils_notebooks"
+[9]: https://doi.org/10.5281/zenodo.3653101 "imr_paper"
+[10]: https://rdcu.be/b35wZ "snas_paper"
+[11]: https://doi.org/10.31223/osf.io/tpqvy "mesh_movement_paper"
