@@ -140,7 +140,9 @@ class AdaptiveProblemBase(object):
             self.num_vertices.append([])
 
         msg = "SETUP: Mesh {:d} has {:d} elements and {:d} vertices"
+        self.dim = self.meshes[0].topological_dimension()
         for i, mesh in enumerate(self.meshes):
+            assert self.dim == mesh.topological_dimension()
 
             # Endow mesh with its boundary "length"
             mesh.boundary_len = integrate_boundary(mesh)
