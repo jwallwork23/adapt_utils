@@ -31,6 +31,9 @@ def recover_gradient(f, **kwargs):
         return L2ProjectorGradient(f.function_space(), **kwargs).project(f)
     op = kwargs.get('op')
     op.print_debug("RECOVERY: Recovering gradient on domain interior...")
+    if op.debug:
+        op.gradient_solver_parameters['ksp_monitor'] = None
+        op.gradient_solver_parameters['ksp_converged_reason'] = None
 
     # Argument is a UFL expression
     bcs = kwargs.get('bcs')
@@ -82,6 +85,9 @@ def recover_hessian(f, **kwargs):
     P1_ten = TensorFunctionSpace(mesh, "CG", 1)
     n = FacetNormal(mesh)
     solver_parameters = op.hessian_solver_parameters[op.hessian_recovery]
+    if op.debug:
+        solver_parameters['ksp_monitor'] = None
+        solver_parameters['ksp_converged_reason'] = None
 
     # Integration by parts
     if op.hessian_recovery == 'parts':
@@ -134,6 +140,12 @@ def recover_boundary_hessian(f, **kwargs):
     elif dim != 2:
         raise ValueError("Dimensions other than 2D and 3D not considered.")
 
+    # Solver parameters
+    solver_parameters = op.hessian_solver_parameters['parts']
+    if op.debug:
+        solver_parameters['ksp_monitor'] = None
+        solver_parameters['ksp_converged_reason'] = None
+
     # Normal and tangent vectors
     n = FacetNormal(mesh)
     s = perp(n)
@@ -164,7 +176,6 @@ def recover_boundary_hessian(f, **kwargs):
             # TODO: bbcs?
             bcs = EquationBC(a_bc == L_bc, l2_proj, boundary_tag)
 
-        solver_parameters = op.hessian_solver_parameters['parts']
         nullspace = VectorSpaceBasis(constant=True)
         solve(a == L, l2_proj, bcs=bcs, nullspace=nullspace, solver_parameters=solver_parameters)
 
@@ -205,6 +216,9 @@ class L2Projector():
         self.kwargs = {
             'solver_parameters': op.hessian_solver_parameters[op.hessian_recovery],
         }
+        if op.debug:
+            self.kwargs['solver_parameters']['ksp_monitor'] = None
+            self.kwargs['solver_parameters']['ksp_converged_reason'] = None
 
     def setup(self):
         raise NotImplementedError("Should be implemented in derived class.")
