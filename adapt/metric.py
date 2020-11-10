@@ -376,10 +376,10 @@ def isotropic_metric(f, **kwargs):
         M_diag = max_value(1/pow(op.h_max, 2), min_value(M_diag, 1/pow(op.h_min, 2)))
 
     # Check a valid metric
+    M = interpolate(M_diag*Identity(dim), V_ten)
     if op.debug:
         check_spd(M)
-
-    return interpolate(M_diag*Identity(dim), V_ten)
+    return M
 
 
 def cell_size_metric(mesh, op=Options()):
