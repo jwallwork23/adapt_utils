@@ -1,29 +1,29 @@
 from thetis import *
 
 import fnmatch
-import math
-import numpy as np
 import os
 
-from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
+from adapt_utils.linalg import rotate
 
 
-__all__ = ["prod", "combine", "rotation_matrix", "rotate", "integrate_boundary",
-           "box", "ellipse", "bump", "circular_bump", "gaussian", "cg2dg", "copy_mesh",
-           "get_finite_element", "get_component_space", "get_component", "get_boundary_nodes",
-           "is_symmetric", "is_pos_def", "is_spd", "check_spd", "num_days",
-           "find", "knownargs2dict", "unknownargs2dict"]
+__all__ = ["prod", "combine", "integrate_boundary", "copy_mesh", "get_boundary_nodes",
+           "box", "ellipse", "bump", "circular_bump", "gaussian",
+           "num_days", "find", "knownargs2dict", "unknownargs2dict"]
 
 
 # --- UFL
 
 def abs(u):
-    """Hack due to the fact `abs` seems to be broken in conditional statements."""
+    """
+    Hack due to the fact `abs` seems to be broken in conditional statements.
+    """
     return conditional(u < 0, -u, u)
 
 
 def prod(arr):
-    """Helper function for taking the product of an array (similar to `sum`)."""
+    """
+    Helper function for taking the product of an array (similar to `sum`).
+    """
     n = len(arr)
     if n == 0:
         raise ValueError
@@ -34,7 +34,9 @@ def prod(arr):
 
 
 def combine(operator, *args):
-    """Helper function for repeatedly application of binary operators."""
+    """
+    Helper function for repeatedly application of binary operators.
+    """
     n = len(args)
     if n == 0:
         raise ValueError
@@ -42,22 +44,6 @@ def combine(operator, *args):
         return args[0]
     else:
         return operator(args[0], combine(operator, *args[1:]))
-
-
-# --- Rotation
-
-def rotation_matrix(theta):
-    """NumPy array 2D rotation matrix associated with angle `theta`."""
-    return np.array([[math.cos(theta), -math.sin(theta)],
-                    [math.sin(theta), math.cos(theta)]])
-
-
-def rotate(vectors, angle):
-    """Rotate a list of 2D `vector`s by `angle` about the origin."""
-    R = rotation_matrix(angle)
-    for i in range(len(vectors)):
-        assert len(vectors[i]) == 2
-        vectors[i] = np.dot(R, vectors[i])
 
 
 # --- Utility functions
@@ -230,47 +216,10 @@ def gaussian(locs, mesh, scale=1.0, rotation=None):
 # --- Extraction from Firedrake objects
 
 def copy_mesh(mesh):
-    """Deepcopy a mesh."""
+    """
+    Deepcopy a mesh.
+    """
     return Mesh(Function(mesh.coordinates))
-
-
-def get_finite_element(fs, variant='equispaced'):
-    """
-    Extract :class:`FiniteElement` instance from a :class:`FunctionSpace`, with specified variant
-    default.
-    """
-    el = fs.ufl_element()
-    if hasattr(el, 'variant'):
-        variant = el.variant() or variant
-    return FiniteElement(el.family(), fs.mesh().ufl_cell(), el.degree(), variant=variant)
-
-
-def get_component_space(fs, variant='equispaced'):
-    """
-    Extract a single (scalar) :class:`FunctionSpace` component from a :class:`VectorFunctionSpace`.
-    """
-    return FunctionSpace(fs.mesh(), get_finite_element(fs, variant=variant))
-
-
-def get_component(f, index, component_space=None):
-    """
-    Extract component `index` of a :class:`Function` from a :class:`VectorFunctionSpace` and store
-    it in a :class:`Function` defined on the appropriate (scalar) :class:`FunctionSpace`. The
-    component space can either be provided or computed on-the-fly.
-    """
-    n = f.ufl_shape[0]
-    try:
-        assert index < n
-    except AssertionError:
-        raise IndexError("Requested index {:d} of a {:d}-vector.".format(index, n))
-
-    # Create appropriate component space
-    fi = Function(component_space or get_component_space(f.function_space()))
-
-    # Transfer data
-    par_loop(('{[i] : 0 <= i < v.dofs}', 's[i] = v[i, %d]' % index), dx,
-             {'v': (f, READ), 's': (fi, WRITE)}, is_loopy_kernel=True)
-    return fi
 
 
 def get_boundary_nodes(fs, segment='on_boundary'):
@@ -298,92 +247,6 @@ def integrate_boundary(mesh):
     return boundary_len
 
 
-# --- Continuous to discontinuous transfer
-
-def cg2dg(f_cg, f_dg=None):
-    """
-    Transfer data from a the degrees of freedom of a Pp field directly to those of the
-    corresponding PpDG field, for some p>1.
-    """
-    n = len(f_cg.ufl_shape)
-    assert f_cg.ufl_element().family() == 'Lagrange'
-    if n == 0:
-        _cg2dg_scalar(f_cg, f_dg)
-    elif n == 1:
-        _cg2dg_vector(f_cg, f_dg)
-    elif n == 2:
-        _cg2dg_tensor(f_cg, f_dg)
-    else:
-        raise NotImplementedError
-
-
-def _cg2dg_scalar(f_cg, f_dg):
-    fs = f_cg.function_space()
-    f_dg = f_dg or Function(FunctionSpace(fs.mesh(), "DG", fs.ufl_element().degree()))
-    index = '{[i] : 0 <= i < cg.dofs}'
-    kernel = 'dg[i] = cg[i]'
-    par_loop((index, kernel), dx, {'cg': (f_cg, READ), 'dg': (f_dg, WRITE)}, is_loopy_kernel=True)
-
-
-def _cg2dg_vector(f_cg, f_dg):
-    fs = f_cg.function_space()
-    f_dg = f_dg or Function(VectorFunctionSpace(fs.mesh(), "DG", fs.ufl_element().degree()))
-    index = '{[i, j] : 0 <= i < cg.dofs and 0 <= j < %d}' % f_cg.ufl_shape
-    kernel = 'dg[i, j] = cg[i, j]'
-    par_loop((index, kernel), dx, {'cg': (f_cg, READ), 'dg': (f_dg, WRITE)}, is_loopy_kernel=True)
-
-
-def _cg2dg_tensor(f_cg, f_dg):
-    fs = f_cg.function_space()
-    f_dg = f_dg or Function(TensorFunctionSpace(fs.mesh(), "DG", fs.ufl_element().degree()))
-    index = '{[i, j, k] : 0 <= i < cg.dofs and 0 <= j < %d and 0 <= k < %d}' % f_cg.ufl_shape
-    kernel = 'dg[i, j, k] = cg[i, j, k]'
-    par_loop((index, kernel), dx, {'cg': (f_cg, READ), 'dg': (f_dg, WRITE)}, is_loopy_kernel=True)
-
-
-# --- Matrix properties
-
-def is_symmetric(M, tol=1.0e-08):
-    """Determine whether or not a tensor field `M` is symmetric"""
-    area = assemble(Constant(1.0, domain=M.function_space().mesh())*dx)
-    return assemble(abs(det(M - transpose(M)))*dx)/area < tol
-
-
-def is_pos_def(M):
-    """Determine whether or not a tensor field `M` is positive-definite"""
-    fs = M.function_space()
-    fs_vec = VectorFunctionSpace(fs.mesh(), get_finite_element(fs))
-    V = Function(fs, name="Eigenvectors")
-    Λ = Function(fs_vec, name="Eigenvalues")
-    kernel = eigen_kernel(get_eigendecomposition, fs.mesh().topological_dimension())
-    op2.par_loop(kernel, fs.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
-    return Λ.vector().gather().min() > 0.0
-
-
-def is_spd(M):
-    """Determine whether or not a tensor field `M` is symmetric positive-definite"""
-    return is_symmetric(M) and is_pos_def(M)
-
-
-def check_spd(M):
-    """Verify that a tensor field `M` is symmetric positive-definite."""
-    print_output("TEST: Checking matrix is SPD...")
-
-    # Check symmetric
-    try:
-        assert is_symmetric(M)
-    except AssertionError:
-        raise ValueError("FAIL: Matrix is not symmetric")
-    print_output("PASS: Matrix is indeed symmetric")
-
-    # Check positive definite
-    try:
-        assert is_pos_def(M)
-    except AssertionError:
-        raise ValueError("FAIL: Matrix is not positive-definite")
-    print_output("PASS: Matrix is indeed positive-definite")
-
-
 # --- Non-Firedrake specific
 
 def num_days(month, year):
@@ -397,7 +260,9 @@ def num_days(month, year):
 
 
 def find(pattern, path):
-    """Find all files with a specified pattern."""
+    """
+    Find all files with a specified pattern.
+    """
     result = []
     for root, dirs, files in os.walk(path):
         for name in files:
@@ -407,7 +272,9 @@ def find(pattern, path):
 
 
 def knownargs2dict(ka):
-    """Extract all public attributes from namespace `ka` and return as a dictionary."""
+    """
+    Extract all public attributes from namespace `ka` and return as a dictionary.
+    """
     out = {}
     for arg in [arg for arg in dir(ka) if arg[0] != '_']:
         attr = ka.__getattribute__(arg)
@@ -422,7 +289,9 @@ def knownargs2dict(ka):
 
 
 def unknownargs2dict(ua):
-    """Extract all public attributes from list `ua` and return as a dictionary."""
+    """
+    Extract all public attributes from list `ua` and return as a dictionary.
+    """
     out = {}
     for i in range(len(ua)//2):
         key = ua[2*i][1:]

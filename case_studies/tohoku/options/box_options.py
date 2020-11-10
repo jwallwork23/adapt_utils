@@ -60,7 +60,8 @@ class TohokuBoxBasisOptions(TohokuOptions):
         """
         Assemble an array of piecewise constant indicator functions, rotated by specified angle.
         """
-        from adapt_utils.misc import box, rotation_matrix
+        from adapt_utils.misc import box
+        from adapt_utils.linalg import rotation_matrix
 
         # Gather parameters
         x0, y0 = self.centre_x, self.centre_y  # Centre of basis region

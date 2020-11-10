@@ -210,6 +210,7 @@ class L2Projector():
         self.op = op
         self.field = Function(function_space)
         self.mesh = function_space.mesh()
+        self.dim = self.mesh.topological_dimension()
         self.n = FacetNormal(self.mesh)
         self.bcs = bcs
         self.kwargs = {
@@ -328,6 +329,12 @@ class DoubleL2ProjectorHessian(L2Projector):
 
     # TODO: Couple with the above instead of setting arbitrary interior value
     def _setup_boundary_projector(self):
+        if self.dim == 2:
+            self._setup_boundary_projector_2d()
+        else:
+            self._setup_boundary_projector_3d()
+
+    def _setup_boundary_projector_2d(self):
         P1 = FunctionSpace(mesh, "CG", 1)
         Hs, v = TrialFunction(P1), TestFunction(P1)
         self.l2_projection = Function(P1, name="Recovered boundary Hessian")
@@ -346,6 +353,9 @@ class DoubleL2ProjectorHessian(L2Projector):
 
         prob = LinearVariationalProblem(a, L, self.l2_projection, bcs=self.bcs)
         self.projector = LinearVariationalSolver(prob, **self.kwargs)
+
+    def _setup_boundary_projector_3d(self):
+        raise NotImplementedError  # TODO
 
     def project(self, f):
         assert f.function_space() == self.field.function_space()

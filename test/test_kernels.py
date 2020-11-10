@@ -3,7 +3,7 @@ from firedrake import *
 import pytest
 
 from adapt_utils.adapt.kernels import *
-from adapt_utils.misc import *
+from adapt_utils.linalg import check_spd
 
 
 def get_mesh(dim, n=2):

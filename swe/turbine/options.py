@@ -77,6 +77,8 @@ class TurbineOptions(CoupledOptions):
         # Turbine geometry
         D = self.turbine_diameter
         W = self.turbine_width
+        if not hasattr(self, 'max_depth'):  # TODO: Use a property
+            self.get_max_depth()
         H = self.max_depth
         swept_area = pi*(D/2)**2    # area swept by turbine blades in the vertical
         footprint_area = D*W        # area of one turbine footprint

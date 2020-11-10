@@ -3,7 +3,8 @@ from firedrake import *
 import pytest
 import numpy as np
 
-from adapt_utils.misc import *
+from adapt_utils.linalg import *
+from adapt_utils.fem import cg2dg
 
 
 def get_mesh(dim, n=4):
