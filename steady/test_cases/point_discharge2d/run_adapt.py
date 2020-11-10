@@ -57,8 +57,10 @@ kwargs = {
 }
 op = PointDischarge2dOptions(**kwargs)
 op.tracer_family = family
-op.stabilisation = args.stabilisation
-op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
+stabilisation = args.stabilisation or 'supg'
+op.stabilisation = None if stabilisation == 'none' else stabilisation
+anisotropic_stabilisation = args.anisotropic_stabilisation
+op.anisotropic_stabilisation = False if anisotropic_stabilisation == 0 else True
 op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 op.di = os.path.join(op.di, args.stabilisation or family)
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
