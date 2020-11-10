@@ -7,7 +7,8 @@ from adapt_utils.adapt.kernels import eigen_kernel, get_eigendecomposition
 from adapt_utils.fem import get_finite_element
 
 
-__all__ = ["rotation_matrix", "rotate", "is_symmetric", "is_pos_def", "is_spd", "check_spd"]
+__all__ = ["rotation_matrix", "rotate", "is_symmetric", "is_pos_def", "is_spd", "check_spd",
+           "gram_schmidt"]
 
 
 # --- Rotation
@@ -79,3 +80,26 @@ def check_spd(M):
     except AssertionError:
         raise ValueError("FAIL: Matrix is not positive-definite")
     print_output("PASS: Matrix is indeed positive-definite")
+
+
+# --- Orthogonalisation
+
+def gram_schmidt(*v):
+    """
+    Apply the Gram-Schmidt orthogonalisation process to a sequence of vectors in order to obtain
+    an orthogonal basis.
+    """
+    if isinstance(v[0], np.ndarray):
+        from numpy import dot
+    else:
+        from ufl import dot
+    u = []
+    proj = lambda x, y: dot(x, y)/dot(x, x)*x
+    for i, vi in enumerate(v):
+        if i == 0:
+            u.append(vi)
+        else:
+            u.append(vi - sum([proj(uj, vi) for uj in u]))
+    if isinstance(v[0], np.ndarray):
+        u = [np.array(ui) for ui in u]
+    return u
