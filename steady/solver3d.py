@@ -117,6 +117,3 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
         elif self.stabilisation == 'supg':
             fields['supg_stabilisation'] = True
         return fields
-
-    def get_weighted_gradient_metric(self, adjoint=False, source=True):
-        raise NotImplementedError  # TODO

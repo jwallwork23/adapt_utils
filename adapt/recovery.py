@@ -134,10 +134,9 @@ def recover_boundary_hessian(f, **kwargs):
     op.print_debug("RECOVERY: Recovering Hessian on domain boundary...")
     mesh = kwargs.get('mesh', op.default_mesh)
     dim = mesh.topological_dimension()
-    assert dim in (2, 3)
     if dim == 3:
         raise NotImplementedError  # TODO
-    elif dim != 2:
+    if dim not in (2, 3):
         raise ValueError("Dimensions other than 2D and 3D not considered.")
 
     # Solver parameters

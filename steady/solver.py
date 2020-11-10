@@ -337,6 +337,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         op = self.op
         mesh = self.mesh
+        dim = mesh.topological_dimension()
+        dims = range(dim)
         P1_ten = self.P1_ten[0]
         adapt_field = op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
@@ -351,13 +353,11 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # Interior Hessian term
             u, eta = split(self.fwd_solutions[0])
             D = self.fields[0].horizontal_diffusivity
-            F1 = u[0]*c - D*c.dx(0)
-            F2 = u[1]*c - D*c.dx(1)
+            F = [u[i]*c - D*c.dx(i) for i in dims]
             # kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=mesh, op=op)
             kwargs = dict(normalise=False, enforce_constraints=False, mesh=mesh, op=op)
             interior_hessians = [
-                interpolate(steady_metric(F1, **kwargs)*abs(grad_c_star[0]), P1_ten),
-                interpolate(steady_metric(F2, **kwargs)*abs(grad_c_star[1]), P1_ten)
+                interpolate(steady_metric(F[i], **kwargs)*abs(grad_c_star[i]), P1_ten) for i in dims
             ]
 
             # Interior source Hessian term
