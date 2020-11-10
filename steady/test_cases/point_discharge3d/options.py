@@ -37,13 +37,19 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         self.h_min = 1.0e-12
         self.h_max = 1.0e+06
 
-        # # Robust solver parameters
+        # Solver parameters
+        self.solver_parameters['tracer'] = {
+            'ksp_type': 'gmres',
+            'pc_type': 'sor',
+        }
+        self.qoi_quadrature_degree = 12
         # self.solver_parameters['tracer'] = {
         #     'mat_type': 'aij',
         #     'ksp_type': 'preonly',
         #     'pc_type': 'lu',
         #     'pc_factor_mat_solver_type': 'mumps',
         # }
+        # self.qoi_quadrature_degree = 1
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)

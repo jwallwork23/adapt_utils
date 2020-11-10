@@ -4,7 +4,7 @@ from firedrake.petsc import PETSc
 import datetime
 import os
 
-from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.options import CoupledOptions
 
 
 __all__ = ["save_mesh", "load_mesh", "initialise_field", "export_field",

@@ -5,7 +5,7 @@ import os
 import pytest
 
 from adapt_utils.io import *
-from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.options import CoupledOptions
 
 
 def get_mesh(dim, n=4):

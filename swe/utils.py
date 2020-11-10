@@ -3,10 +3,10 @@ from __future__ import absolute_import
 from firedrake import *
 import thetis.utility as thetis_utils
 
-from adapt_utils.adapt.metric import *
-from adapt_utils.adapt.recovery import DoubleL2ProjectorHessian, L2Projector
-from ..unsteady.options import CoupledOptions
-from adapt_utils.misc import get_component, get_component_space
+from ..adapt.metric import *
+from ..adapt.recovery import DoubleL2ProjectorHessian, L2Projector
+from ..options import CoupledOptions
+from ..misc import get_component, get_component_space
 
 
 __all__ = ["recover_hessian_metric", "ShallowWaterHessianRecoverer",

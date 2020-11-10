@@ -87,7 +87,7 @@ for alignment in ('aligned', 'offset'):
     axes.hlines(y=0.01, xmin=xlim[0], xmax=xlim[1], color='k', linestyle='-', label=r'1.0\% error')
     axes.set_xlim(xlim)
     if alignment == 'aligned':
-        axes.legend(bbox_to_anchor=(0.525, 0.3), fontsize=18)
+        axes.legend(bbox_to_anchor=(0.5, 0.3), fontsize=18)
     axes.grid(True)
     axes.grid(True, which='minor', axis='y')
 
