@@ -1,4 +1,4 @@
-## Mesh adaptation for coastal ocean modelling in Firedrake
+## Mesh Adaptation for Coastal Ocean Modelling in Firedrake
 
 In this code, anisotropic and isotropic goal-oriented mesh adaptation is applied to solving a variety
 of 2D coastal ocean modelling problems using the coastal, estuarine and ocean modelling solver
@@ -26,9 +26,10 @@ London.
 
 ### Publications and associated versions and test cases
 
-Below are listed publications which use `adapt_utils`. The specific versions of Firedrake and Thetis
-used for each publication are also shown and can be downloaded from the corresponding links.
-To install a specific version of Firedrake, please follow the instructions [here][7].
+Below are listed publications which use `adapt_utils`. BibTeX formatted references are also available
+in `docs/publications.bib`. The specific versions of Firedrake and Thetis used for each publication
+are also shown below and can be downloaded from the corresponding links. To install a specific
+version of Firedrake, please follow the instructions [here][7].
 
   * J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, <em>'Anisotropic Goal-Oriented Mesh Adaptation in Firedrake'</em>, In: 28th International Meshing Roundtable, pp.83-100, (2020).
     * [Paper][9]: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3653101.svg)](https://doi.org/10.5281/zenodo.3653101).
@@ -45,7 +46,7 @@ To install a specific version of Firedrake, please follow the instructions [here
       * Thetis: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3689727.svg)](https://doi.org/10.5281/zenodo.3689727).
     * Test case: `steady/test_cases/turbine_array` (Section 4).
     
- * M. C. A. Clare, J. G. Wallwork, S. C. Kramer, H. Weller, C. J. Cotter, M. D. Piggott, <em> 'On the use of mesh movement methods to help overcome the multi-scale challenges associated with hydro-morphodynamic modelling'</em>, Submitted to Journal of Computational Physics.
+ * M. C. A. Clare, J. G. Wallwork, S. C. Kramer, H. Weller, C. J. Cotter, M. D. Piggott, <em> 'On the Use of Mesh Movement Methods to Help Overcome the Multi-Scale Challenges Associated with Hydro-Morphodynamic Modelling'</em>, Submitted to Journal of Computational Physics.
     * [Preprint][11]: DOI: 10.31223/osf.io/tpqvy.
     * Code:
       * `adapt_utils` [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4110708.svg)](https://doi.org/10.5281/zenodo.4110708) (`v2.2`).
@@ -59,7 +60,10 @@ To install a specific version of Firedrake, please follow the instructions [here
   * Clone this repository and make it accessible to the `$PYTHONPATH` environment variable.
   * Set the `$SOFTWARE` environment variable to where you would like your PETSc and Firedrake installations to exist.
   * Copy the contents of the `install` directory into `$SOFTWARE` and enter that directory.
-  * Call `bash install_petsc.sh` and then `bash install_firedrake.sh`, modifying these scripts, if desired. If installing on a fresh Ubuntu OS then you will need to call `bash install_compilers.sh` beforehand.
+  * Install Firedrake:
+      * For an installation with Pragmatic, call `source install_petsc.sh` and then `source install_firedrake.sh`, modifying these scripts, if desired.
+      * For an installation without Pragmatic, call `source install_firedrake_no_adapt.sh`.
+      * If installing on a fresh Ubuntu OS then you will need to call `source install_compilers.sh` beforehand.
   * Once you have a working Firedrake installation, get to grips with `adapt_utils` by looking at the test cases in `steady/test_cases` and `unsteady/test_cases`, as well as the notebooks hosted [here][8].
 
 
