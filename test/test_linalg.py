@@ -77,3 +77,16 @@ def test_rotation():
     v = np.array([1.0, 0.0])
     Rv = np.dot(rotation_matrix(pi/2), v)
     assert np.allclose(np.dot(v, Rv), 0.0)
+
+
+def test_gram_schmidt_numpy(dim):
+    v = [np.random.rand(dim) for i in range(dim)]
+    orth = gram_schmidt(*v, normalise=True)
+    for j in range(dim):
+
+        # Check orthogonal
+        for i in range(j):
+            assert np.isclose(np.dot(orth[i], orth[j]), 0.0)
+
+        # Check orthonormal
+        assert np.isclose(np.dot(orth[j], orth[j]), 1.0)
