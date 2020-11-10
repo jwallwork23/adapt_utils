@@ -995,10 +995,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # u = Constant(as_vector(self.op.base_velocity))  # FIXME: Pyadjoint doesn't like this
             u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
             eta = Constant(0.0)
-        uv_str = 'uv_2d' if self.dim == 2 else 'uv_3d'
         fields = AttrDict({
-            'elev_2d': eta,
-            uv_str: u,
+            'elev_{:d}d'.format(self.dim): eta,
+            'uv_{:d}d'.format(self.dim): u,
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
@@ -1009,7 +1008,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             fields['mesh_velocity'] = self.mesh_velocities[i]
         if self.op.approach == 'lagrangian':
             self.mesh_velocities[i] = u
-            fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
+            fields['uv_{:d}d'.format(self.dim)] = Constant(as_vector(np.zeros(self.dim)))
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         elif self.stabilisation == 'su':
@@ -1169,7 +1168,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def create_adjoint_shallow_water_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
-        fields['uv_2d'], fields['elev_2d'] = self.fwd_solutions[i].split()
+        uv_str = 'uv_{:d}d'.format(self.dim)
+        elev_str = 'elev_{:d}d'.format(self.dim)
+        fields[uv_str], fields[elev_str] = self.fwd_solutions[i].split()
 
         # Account for dJdq
         self.op.set_qoi_kernel(self, i)
@@ -1835,10 +1836,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'weighted_gradient': self.run_dwr,
             'anisotropic_dwr': self.run_dwr,
         }
-        try:
-            run_scripts[self.approach](**kwargs)
-        except KeyError:
+        if self.approach not in run_scripts:
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
+        run_scripts[self.approach](**kwargs)
 
     # TODO: Enable move to base class
     def run_dwr(self, **kwargs):

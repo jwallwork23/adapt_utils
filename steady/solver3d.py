@@ -108,6 +108,7 @@ class AdaptiveSteadyProblem3d(AdaptiveSteadyProblem):
         u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
         fields = AttrDict({
             'uv_3d': u,
+            'elev_3d': Constant(0.0),
             'diffusivity_h': self.fields[i].horizontal_diffusivity,
             'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
