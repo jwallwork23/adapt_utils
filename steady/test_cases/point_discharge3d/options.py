@@ -36,7 +36,7 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         self.base_velocity = [1.0, 0.0, 0.0]
 
         # Adaptation parameters
-        self.h_min = 1.0e-16
+        self.h_min = 1.0e-30
         self.h_max = 1.0e+06
         # self.hessian_recovery = 'parts'
         self.hessian_recovery = 'dL2'
