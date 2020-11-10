@@ -48,15 +48,6 @@ def shape(request):
     return request.param
 
 
-def test_cg2dg(dim, shape):
-    mesh = get_mesh(dim)
-    P1, P1DG = get_function_spaces(mesh, shape)
-    cg = Function(P1).assign(RandomGenerator(PCG64(seed=0)).normal(P1, 0.0, 1.0))
-    dg = Function(P1DG)
-    cg2dg(cg, dg)
-    assert np.allclose(cg.dat.data, project(dg, P1).dat.data)
-
-
 def test_is_spd(dim):
     mesh = get_mesh(dim)
     P1_ten, _ = get_function_spaces(mesh, 'tensor')
@@ -90,3 +81,26 @@ def test_gram_schmidt_numpy(dim):
 
         # Check orthonormal
         assert np.isclose(np.dot(orth[j], orth[j]), 1.0)
+
+def test_gram_schmidt_2d():
+    dim = 2
+    mesh = get_mesh(dim, n=1)
+    n = FacetNormal(mesh)
+    v = as_vector(np.random.rand(dim))
+    n, s = gram_schmidt(n, v, normalise=True)
+
+    P1_vec, _ = get_function_spaces(mesh, 'vector')
+    for i, u in zip([1, 2, 3, 4], [[-1, 0], [1, 0], [0, -1], [0, 1]]):
+        uu = interpolate(as_vector(u), P1_vec)
+        assert np.isclose(assemble(dot(uu, n)*ds(i)), 1.0)  # Check normals align
+        assert np.isclose(assemble(dot(uu, s)*ds(i)), 0.0)  # Check tangents align
+        
+
+
+def test_cg2dg(dim, shape):
+    mesh = get_mesh(dim)
+    P1, P1DG = get_function_spaces(mesh, shape)
+    cg = Function(P1).assign(RandomGenerator(PCG64(seed=0)).normal(P1, 0.0, 1.0))
+    dg = Function(P1DG)
+    cg2dg(cg, dg)
+    assert np.allclose(cg.dat.data, project(dg, P1).dat.data)
