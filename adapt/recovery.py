@@ -130,7 +130,7 @@ def recover_boundary_hessian(f, **kwargs):
     :return: reconstructed boundary Hessian associated with `f`.
     """
     import numpy as np
-    from adapt_utils.linalg import gram_schmidt
+    from adapt_utils.linalg import get_orthonormal_vectors
 
     kwargs.setdefault('op', Options())
     op = kwargs.get('op')
@@ -152,9 +152,8 @@ def recover_boundary_hessian(f, **kwargs):
 
     # Apply Gram-Schmidt to get tangent vectors
     n = FacetNormal(mesh)
-    vectors = [as_vector(np.random.rand(dim)) for i in range(dim-1)]  # Arbitrary
-    tangent_vectors = gram_schmidt(n, *vectors, normalise=True)[1:]   # Orthonormal
-    ns = as_vector([n, *tangent_vectors])
+    s = get_orthonormal_vectors(n)
+    ns = as_vector([n, *s])
 
     # --- Solve tangent to boundary
 
@@ -169,8 +168,8 @@ def recover_boundary_hessian(f, **kwargs):
     L = v*Constant(1/op.h_max**2)*dx
 
     # Hessian on boundary
-    for j, s1 in enumerate(tangent_vectors):
-        for i, s0 in enumerate(tangent_vectors):
+    for j, s1 in enumerate(s):
+        for i, s0 in enumerate(s):
             a_bc = v*Hs*ds
             L_bc = -dot(s0, grad(v))*dot(s1, grad(f))*ds
             bbcs = None  # TODO?
