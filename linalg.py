@@ -8,7 +8,7 @@ from adapt_utils.fem import get_finite_element
 
 
 __all__ = ["rotation_matrix", "rotate", "is_symmetric", "is_pos_def", "is_spd", "check_spd",
-           "gram_schmidt"]
+           "gram_schmidt", "get_orthonormal_vectors"]
 
 
 # --- Rotation
@@ -106,3 +106,19 @@ def gram_schmidt(*v, normalise=False):
     if isinstance(v[0], np.ndarray):
         u = [np.array(ui) for ui in u]
     return u
+
+
+def get_orthonormal_vectors(n, dim=None, seed=0):
+    """
+    Given a vector `n`, get a set of orthonormal vectors.
+    """
+    np.random.seed(seed)
+    dim = dim or n.ufl_domain().topological_dimension()
+    if dim == 2:
+        return [perp(n)]
+    elif dim > 2:
+    # if dim > 1:
+        vectors = [as_vector(np.random.rand(dim)) for i in range(dim-1)]  # Arbitrary
+        return gram_schmidt(n, *vectors, normalise=True)[1:]  # Orthonormal
+    else:
+        raise ValueError("Cannot get tangent vector in {:} dimensions.".format(dim))
