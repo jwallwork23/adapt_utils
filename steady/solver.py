@@ -3,7 +3,6 @@ from thetis import *
 import numpy as np
 import os
 
-from adapt_utils.adapt.adaptation import pragmatic_adapt
 from adapt_utils.adapt.kernels import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.norms import *
@@ -504,7 +503,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
             # Adapt mesh
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            self.meshes[0] = pragmatic_adapt(self.mesh, metric)
+            self.meshes[0] = adapt(self.mesh, metric)
 
             # Setup for next run
             self.set_meshes(self.mesh)

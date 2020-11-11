@@ -7,6 +7,8 @@ Sensors as defined in
 Olivier, Géraldine. Anisotropic metric-based mesh adaptation for unsteady CFD simulations involving
 moving geometries. Diss. 2011.
 """
+from firedrake import *
+
 import pytest
 import os
 import matplotlib.pyplot as plt
@@ -62,7 +64,7 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False):
     P1 = FunctionSpace(mesh, "CG", 1)
     f = interpolate(sensor(mesh), P1)
     M = steady_metric(f, op=op)
-    newmesh = pragmatic_adapt(mesh, M)
+    newmesh = adapt(mesh, M)
 
     # Plot mesh
     if plot_mesh:

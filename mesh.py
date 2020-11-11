@@ -1,5 +1,7 @@
 from thetis import *
 
+import matplotlib.pyplot as plt
+
 
 __all__ = ["MeshStats", "isotropic_cell_size", "anisotropic_cell_size"]
 
@@ -105,3 +107,59 @@ def anisotropic_cell_size(mesh):
 
     # Return minimum eigenvalue
     return interpolate(evalues[-1], FunctionSpace(mesh, "DG", 0))
+
+
+# FIXME: Why do rotations of the same element not have the same quality?
+def quality(mesh):
+    r"""
+    Compute the scaled Jacobian for each mesh element:
+..  math::
+        Q(K) = \frac{\det(J_K)}{\|\mathbf e_1\|\,\|\mathbf e2\|},
+
+    where element :math:`K` is defined by edges :math:`\mathbf e_1` and :math:`\mathbf e_2`.
+
+    NOTE that :math:`J_K = [\mathbf e_1, \mathbf e_2]`.
+    """
+    assert mesh.topological_dimension() == 2
+    P0 = FunctionSpace(mesh, "DG", 0)
+    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
+    J = interpolate(Jacobian(mesh), P0_ten)
+    detJ = JacobianDeterminant(mesh)
+    jacobian_sign = interpolate(sign(detJ), P0)
+    # unswapped = as_matrix([[J[0, 0], J[0, 1]], [J[1, 0], J[1, 1]]])
+    # swapped = as_matrix([[J[1, 0], J[1, 1]], [J[0, 0], J[0, 1]]])
+    # sgn = Function(P0)
+    # sgn.dat.data[:] = jacobian_sign.dat.data
+    # J.interpolate(conditional(ge(jacobian_sign, 0), unswapped, swapped))
+    # J.interpolate(conditional(ge(sgn, 0), unswapped, swapped))
+    # detJ = det(J)
+    edge1 = as_vector([J[0, 0], J[1, 0]])
+    edge2 = as_vector([J[0, 1], J[1, 1]])
+    norm1 = sqrt(dot(edge1, edge1))
+    norm2 = sqrt(dot(edge2, edge2))
+    scaled_jacobian = interpolate(detJ/(norm1*norm2*jacobian_sign), P0)
+    return scaled_jacobian
+
+
+# FIXME: Inverted elements do not show! Tried making transparent but it didn't do anything.
+def plot_quality(mesh, fig=None, axes=None, extensions=['png']):
+    """
+    Plot scaled Jacobian using a discretised scale:
+      * green   : high quality elements (over 75%);
+      * yellow  : medium quality elements (50 - 75%);
+      * blue    : low quality elements (0 - 50%);
+      * magenta : inverted elements (quality < 0).
+    """
+    q = quality(mesh)
+
+    cmap = plt.get_cmap('viridis', 30)
+    newcolours = cmap(np.linspace(0, 1, 30))
+    newcolours[:10] = np.array([1, 0, 1, 1])    # Magenta
+    newcolours[10:20] = np.array([0, 1, 1, 1])  # Cyan
+    newcolours[20:25] = np.array([1, 1, 0, 1])  # Yellow
+    newcolours[25:] = np.array([0, 1, 0, 1])    # Green
+
+    if fig is None or axes is None:
+        fig, axes = plt.subplots()
+    triplot(mesh, axes=axes)
+    fig.colorbar(tricontourf(q, axes=axes, cmap=cmap), ax=axes)

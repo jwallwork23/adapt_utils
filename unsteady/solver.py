@@ -7,7 +7,6 @@ import numpy as np
 import os
 from time import perf_counter
 
-from ..adapt.adaptation import pragmatic_adapt
 from ..adapt.metric import *
 from .base import AdaptiveProblemBase
 from .callback import *
@@ -1785,7 +1784,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
+                self.meshes[i] = adapt(self.meshes[i], M)
             del metrics
 
             # ---  Setup for next run / logging
@@ -2024,7 +2023,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
             for i, M in enumerate(metrics):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
+                self.meshes[i] = adapt(self.meshes[i], M)
             del metrics
 
             # ---  Setup for next run / logging
