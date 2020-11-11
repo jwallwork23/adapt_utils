@@ -129,7 +129,6 @@ def recover_boundary_hessian(f, **kwargs):
     :kwarg boundary_tag: physical ID for boundary segment
     :return: reconstructed boundary Hessian associated with `f`.
     """
-    import numpy as np
     from adapt_utils.adapt.metric import steady_metric
     from adapt_utils.linalg import get_orthonormal_vectors
 
@@ -163,26 +162,26 @@ def recover_boundary_hessian(f, **kwargs):
     boundary_tag = kwargs.get('boundary_tag', 'on_boundary')
     Hs, v = TrialFunction(P1), TestFunction(P1)
     l2_proj = [[Function(P1) for i in range(dim-1)] for j in range(dim-1)]
+    h = Constant(1/op.h_max**2)
 
     # Arbitrary value in domain interior
     a = v*Hs*dx
-    L = v*Constant(1/op.h_max**2)*dx
+    L = v*h*dx
 
     # Hessian on boundary
+    a_bc = v*Hs*ds
+    nullspace = VectorSpaceBasis(constant=True)
     for j, s1 in enumerate(s):
         for i, s0 in enumerate(s):
-            a_bc = v*Hs*ds
             L_bc = -dot(s0, grad(v))*dot(s1, grad(f))*ds
             bbcs = None  # TODO?
             bcs = EquationBC(a_bc == L_bc, l2_proj[i][j], boundary_tag, bcs=bbcs)
-
-        nullspace = VectorSpaceBasis(constant=True)
-        solve(a == L, l2_proj[i][j], bcs=bcs, nullspace=nullspace, solver_parameters=solver_parameters)
+            solve(a == L, l2_proj[i][j], bcs=bcs,
+                  nullspace=nullspace, solver_parameters=solver_parameters)
 
     # --- Construct tensor field
 
     boundary_hessian = Function(P1_ten)
-    h = Constant(1/op.h_max**2)
     if dim == 2:
         Hsub = abs(l2_proj[i][j])
         H = as_matrix([[h, 0],
