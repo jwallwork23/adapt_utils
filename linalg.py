@@ -117,7 +117,6 @@ def get_orthonormal_vectors(n, dim=None, seed=0):
     if dim == 2:
         return [perp(n)]
     elif dim > 2:
-    # if dim > 1:
         vectors = [as_vector(np.random.rand(dim)) for i in range(dim-1)]  # Arbitrary
         return gram_schmidt(n, *vectors, normalise=True)[1:]  # Orthonormal
     else:
