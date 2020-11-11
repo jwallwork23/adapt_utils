@@ -2,6 +2,7 @@
 __pycache__/
 
 # Specific files
+TODO
 FIXME
 .DS_Store
 condition.py
