@@ -184,6 +184,39 @@ class ConservativeHorizontalDiffusionTerm(HorizontalDiffusionTerm):
     """
 
 
+class ConservativeSourceTerm(thetis_cons_tracer.ConservativeSourceTerm):
+    """
+    Conservative source term from Thetis, modified to allow for CG discretisations, with SU and
+    SUPG stabilisation options.
+    """
+    def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
+        if self.horizontal_dg:
+            return super(ConservativeSourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+
+        # NOTE: The following is a different formulation as for DG!
+        f = 0
+        source = fields_old.get('source')
+        if source is None:
+            return -f
+        f += -inner(source, self.test)*self.dx
+
+        # Apply SUPG stabilisation
+        uv = fields_old.get('uv_2d')
+        if uv is None:
+            return -f
+        tau = fields.get('supg_stabilisation')
+        if tau is not None:
+            h = self.cellsize
+            unorm = sqrt(dot(uv, uv))
+            tau = 0.5*h/unorm
+            diffusivity_h = fields_old['diffusivity_h']
+            if diffusivity_h is not None:
+                Pe = 0.5*h*unorm/diffusivity_h
+                tau *= min_value(1, Pe/3)
+            f += -tau*dot(uv, grad(self.test))*source*dx
+        return -f
+
+
 # --- Equations
 
 class TracerEquation2D(Equation):
@@ -240,10 +273,7 @@ class ConservativeTracerEquation2D(Equation):
         }
         self.add_term(ConservativeHorizontalAdvectionTerm(*args, **kwargs), 'explicit')
         self.add_term(ConservativeHorizontalDiffusionTerm(*args, **kwargs), 'explicit')
-        if self.function_space.ufl_element().family() == 'Lagrange':
-            self.add_term(SourceTerm(*args, **kwargs), 'source')
-        else:
-            self.add_term(thetis_cons_tracer.ConservativeSourceTerm(*args, **kwargs), 'source')
+        self.add_term(ConservativeSourceTerm(*args, **kwargs), 'source')
         try:
             args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
             self.add_term(thetis_cons_tracer.ConservativeSinkTerm(*args), 'source')
