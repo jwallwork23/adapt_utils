@@ -82,6 +82,7 @@ def test_gram_schmidt_numpy(dim):
         # Check orthonormal
         assert np.isclose(np.dot(orth[j], orth[j]), 1.0)
 
+
 def test_gram_schmidt_2d():
     dim = 2
     mesh = get_mesh(dim, n=1)
@@ -94,7 +95,6 @@ def test_gram_schmidt_2d():
         uu = interpolate(as_vector(u), P1_vec)
         assert np.isclose(assemble(dot(uu, n)*ds(i)), 1.0)  # Check normals align
         assert np.isclose(assemble(dot(uu, s)*ds(i)), 0.0)  # Check tangents align
-        
 
 
 def test_cg2dg(dim, shape):
