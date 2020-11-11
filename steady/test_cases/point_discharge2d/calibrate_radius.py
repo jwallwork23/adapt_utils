@@ -181,7 +181,7 @@ if test_gradient:
 fname = os.path.join(op.di, "parameter_space_{:d}.npy".format(level))
 if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
     print_output("Exploring parameter space...")
-    np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.15, 31)]))
+    np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.4, 100)]))
 
 # Optimisation
 print_output("Running optimisation...")

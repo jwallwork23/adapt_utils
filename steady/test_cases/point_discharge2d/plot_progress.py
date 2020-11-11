@@ -38,14 +38,16 @@ fname = "_".join(["{:s}", ext])
 fname += ".npy"
 controls = np.load(os.path.join(di, fname.format("control")))
 functionals = np.load(os.path.join(di, fname.format("functional")))
-gradients = np.load(os.path.join(di, fname.format("gradient")))
+# gradients = np.load(os.path.join(di, fname.format("gradient")))
 
 # Plot progress
 fig, axes = plt.subplots()
 fname = os.path.join(di, "parameter_space_{:s}.npy".format(args.level))
 if os.path.isfile(fname):
-    axes.semilogy(np.linspace(0.01, 0.15, 31), np.load(fname), 'x', color='C0')
-axes.semilogy(controls, functionals, 'o', color='C1')
+    axes.plot(np.linspace(0.01, 0.15, 31), np.load(fname), ':x', color='C0')
+axes.scatter(controls, functionals, c=list(range(len(controls))), cmap='autumn')
+axes.plot(controls, functionals, '-', color='C1', linewidth=0.5)
+axes.set_yscale('log')
 axes.set_xlabel(r"Radius [$\mathrm m$]")
 axes.set_ylabel(r"$J_{\mathrm{calibration}}$")
 axes.set_xlim([0, 0.16])
