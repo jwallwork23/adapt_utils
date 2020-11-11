@@ -499,7 +499,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def compute_mesh_reynolds_number(self, i):
         # u, eta = self.fwd_solutions[i].split()
-        u = self.op.characteristic_velocity
+        u = self.op.characteristic_velocity or self.fwd_solutions[i].split()[0]
         nu = self.fields[i].horizontal_viscosity
         self.reynolds_number[i] = (u, nu)
         if self.op.plot_pvd:
