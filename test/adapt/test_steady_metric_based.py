@@ -1,3 +1,5 @@
+from firedrake import *
+
 import numpy as np
 import os
 import pytest
@@ -51,7 +53,7 @@ def test_indentity_metric(dim):
     identity = Identity(dim)/sqrt(dim)
     P1_ten = TensorFunctionSpace(mesh, "CG", 1)
     M_hardcoded = interpolate(identity, P1_ten)
-    newmesh = pragmatic_adapt(mesh, M_hardcoded)
+    newmesh = adapt(mesh, M_hardcoded)
     assert mesh.num_vertices() == newmesh.num_vertices()
     check_coordinates(mesh, newmesh)
 
@@ -59,7 +61,7 @@ def test_indentity_metric(dim):
     P1 = FunctionSpace(mesh, "CG", 1)
     f = Function(P1).assign(1/np.sqrt(dim))
     M = isotropic_metric(f, normalise=False, enforce_constraints=False)
-    newmesh = pragmatic_adapt(mesh, M)
+    newmesh = adapt(mesh, M)
     assert np.allclose(M_hardcoded.dat.data, M.dat.data)
     assert mesh.num_vertices() == newmesh.num_vertices()
     check_coordinates(mesh, newmesh)

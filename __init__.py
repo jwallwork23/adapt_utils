@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+# Generic imports
 from .misc import *  # NOQA
 from .norms import *  # NOQA
 from .options import *  # NOQA
@@ -10,9 +11,7 @@ from .steady.solver import *  # NOQA
 from .unsteady.solver import *  # NOQA
 
 # Mesh adaptation
-from .adapt.adaptation import *  # NOQA
 from .adapt.metric import *  # NOQA
-from .adapt.p0_metric import *  # NOQA
 from .adapt.r import *  # NOQA
 from .adapt.recovery import *  # NOQA
 

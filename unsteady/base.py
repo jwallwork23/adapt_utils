@@ -5,7 +5,6 @@ from thetis import *
 import numpy as np
 import os
 
-from ..adapt.adaptation import pragmatic_adapt
 from ..adapt.metric import *
 from ..io import save_mesh, load_mesh
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
@@ -880,7 +879,7 @@ class AdaptiveProblemBase(object):
             self.print(msg.format(self.outer_iteration+1))
             for i, M in enumerate(metrics):
                 self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = pragmatic_adapt(self.meshes[i], M)
+                self.meshes[i] = adapt(self.meshes[i], M)
             metrics = [None for P1_ten in self.P1_ten]
 
             # Save adapted meshes to file
