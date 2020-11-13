@@ -3,7 +3,6 @@ from thetis import *
 import netCDF4
 import os
 
-from adapt_utils.io import load_mesh
 from adapt_utils.swe.tsunami.options import TsunamiOptions
 from adapt_utils.swe.tsunami.conversion import from_latlon
 

@@ -2,7 +2,7 @@ import argparse
 import matplotlib.pyplot as plt
 import os
 
-from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
+from adapt_utils.case_studies.tohoku.hazard.options import TohokuHazardOptions
 from adapt_utils.io import TimeDependentAdaptationLogger
 from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 
@@ -83,7 +83,7 @@ nonlinear = bool(args.nonlinear or False)
 stabilisation = args.stabilisation or 'lax_friedrichs'
 if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
-approach = args.approach or 'dwr'
+approach = args.approach or 'hessian'
 kwargs = {
     'approach': approach,
     'estimate_error': approach == 'dwr',  # TODO: Redundant?
