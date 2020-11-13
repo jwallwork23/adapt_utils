@@ -1925,7 +1925,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
-                self.solve_forward_step(i, export_func=export_func, plot_pvd=False)
+                self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
 
                 # --- Solve adjoint on current window
 

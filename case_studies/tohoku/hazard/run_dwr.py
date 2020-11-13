@@ -82,7 +82,7 @@ if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
 kwargs = {
     'approach': 'dwr',
-    'estimate_error': True,
+    'estimate_error': True,  # TODO: Redundant?
 
     # Space-time domain
     'level': int(args.level or 0),
