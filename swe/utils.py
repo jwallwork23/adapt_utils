@@ -180,13 +180,17 @@ class L2ProjectorVorticity(L2Projector):
 # --- Misc
 
 def speed(sol):
-    """Fluid velocity magnitude, i.e. fluid speed."""
+    """
+    Fluid velocity magnitude, i.e. fluid speed.
+    """
     uv, elev = sol.split()
     return sqrt(inner(uv, uv))
 
 
 def heaviside_approx(H, alpha):
-    """C0 continuous approximation to Heaviside function."""
+    """
+    C0 continuous approximation to Heaviside function.
+    """
     return 0.5*(H/(sqrt(H**2 + alpha**2))) + 0.5
 
 
