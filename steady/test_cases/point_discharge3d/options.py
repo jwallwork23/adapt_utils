@@ -1,4 +1,6 @@
-from firedrake import BoxMesh, Constant
+from firedrake import *
+
+import os
 
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 
@@ -72,7 +74,34 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         return [(1.0 + self.shift, 5.0, 5.0, r)]
 
     def analytical_solution(self, fs):
-        raise NotImplementedError
+        solution = Function(fs, name="Analytical tracer concentration")
+        mesh = fs.mesh()
+        x, y, z = SpatialCoordinate(mesh)
+        x0, y0, z0, r = self.source_loc[0]
+        u = Constant(as_vector(self.base_velocity))
+        D = Constant(self.base_diffusivity)
+        Pe = 0.5*u[0]/D
+        # q = 0.01  # sediment discharge of source (kg/s)
+        q = 1
+        rr = sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0))
+        rr = max_value(rr, r)  # Bessel function explodes at (x0, y0, z0)
+        solution.interpolate(q/(8*pi*pi*D*rr)*exp(Pe*(x-x0))*exp(-Pe*rr))
+        if self.plot_pvd:
+            outfile = File(os.path.join(self.di, 'analytical.pvd'))
+            outfile.write(solution)  # NOTE: use 40 discretisation levels in ParaView
+        return solution
 
     def analytical_qoi(self, mesh=None):
-        raise NotImplementedError
+        mesh = mesh or self.default_mesh
+        x, y, z = SpatialCoordinate(mesh)
+        x0, y0, z0, r = self.source_loc[0]
+        u = Constant(as_vector(self.base_velocity))
+        D = Constant(self.base_diffusivity)
+        Pe = 0.5*u[0]/D
+        # q = 0.01  # sediment discharge of source (kg/s)
+        q = 1
+        rr = sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0) + (z-z0)*(z-z0))
+        rr = max_value(rr, r)  # (Bessel fn explodes at (x0, y0))
+        sol = q/(8*pi*pi*D*rr)*exp(Pe*(x-x0))*exp(-Pe*rr)
+        kernel = self.set_qoi_kernel(mesh)
+        return assemble(kernel*sol*dx(degree=self.qoi_quadrature_degree))

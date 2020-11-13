@@ -139,19 +139,21 @@ class PointDischarge2dOptions(CoupledOptions):
         return rescaling*b
 
     def analytical_solution(self, fs):
-        solution = Function(fs)
+        solution = Function(fs, name="Analytical tracer concentration")
         mesh = fs.mesh()
         x, y = SpatialCoordinate(mesh)
         x0, y0, r = self.source_loc[0]
         u = Constant(as_vector(self.base_velocity))
         D = Constant(self.base_diffusivity)
+        Pe = 0.5*u[0]/D
         # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
-        rr = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
-        solution.interpolate(0.5*q/(pi*D)*exp(0.5*u[0]*(x-x0)/D)*bessk0(0.5*u[0]*rr/D))
-        solution.rename('Analytic tracer concentration')
-        outfile = File(os.path.join(self.di, 'analytic.pvd'))
-        outfile.write(solution)  # NOTE: use 40 discretisation levels in ParaView
+        rr = sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0))
+        rr = max_value(rr, r)  # Bessel function explodes at (x0, y0)
+        solution.interpolate(0.5*q/(pi*D)*exp(Pe*(x-x0))*bessk0(Pe*rr))
+        if self.plot_pvd:
+            outfile = File(os.path.join(self.di, 'analytical.pvd'))
+            outfile.write(solution)  # NOTE: use 40 discretisation levels in ParaView
         return solution
 
     def analytical_qoi(self, mesh=None):
@@ -160,9 +162,11 @@ class PointDischarge2dOptions(CoupledOptions):
         x0, y0, r = self.source_loc[0]
         u = Constant(as_vector(self.base_velocity))
         D = Constant(self.base_diffusivity)
+        Pe = 0.5*u[0]/D
         # q = 0.01  # sediment discharge of source (kg/s)
         q = 1
-        rr = max_value(sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0)), r)  # (Bessel fn explodes at (x0, y0))
-        sol = 0.5*q/(pi*D)*exp(0.5*u[0]*(x-x0)/D)*bessk0(0.5*u[0]*rr/D)
+        rr = sqrt((x-x0)*(x-x0) + (y-y0)*(y-y0))
+        rr = max_value(rr, r)  # (Bessel fn explodes at (x0, y0))
+        sol = 0.5*q/(pi*D)*exp(Pe*(x-x0))*bessk0(Pe*rr)
         kernel = self.set_qoi_kernel(mesh)
-        return assemble(kernel*sol*dx(degree=12))
+        return assemble(kernel*sol*dx(degree=self.qoi_quadrature_degree))
