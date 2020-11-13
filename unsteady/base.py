@@ -432,7 +432,7 @@ class AdaptiveProblemBase(object):
         """
         self.op.print_debug("I/O: Saving meshes to file...")
         fpath = fpath or self.di
-        self.op.print_debug(op.indent + "I/O: Storing plex to {:s}...".format(fname))
+        self.op.print_debug(self.op.indent + "I/O: Storing plex to {:s}...".format(fname))
         for i, mesh in enumerate(self.meshes):
             save_mesh(mesh, '{:s}_{:d}'.format(fname, i), fpath)
 
@@ -446,7 +446,7 @@ class AdaptiveProblemBase(object):
         self.op.print_debug("I/O: Loading meshes from file...")
         fpath = fpath or self.di
         for i in range(self.num_meshes):
-            self.op.print_debug(op.indent + "I/O: Loading plex from {:s}...".format(fname))
+            self.op.print_debug(self.op.indent + "I/O: Loading plex from {:s}...".format(fname))
             self.meshes[i] = load_mesh('{:s}_{:d}'.format(fname, i), fpath)
 
     def setup_solver_forward_step(self, i):
