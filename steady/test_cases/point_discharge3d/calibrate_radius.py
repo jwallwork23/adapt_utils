@@ -171,12 +171,12 @@ fname = os.path.join(op.di, "parameter_space_{:d}.npy".format(level))
 # if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
 if bool(args.recompute_parameter_space or False):
     print_output("Exploring parameter space...")
-    np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.4, 100)]))
+    np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.001, 0.4, 100)]))
 
 # Optimisation
 print_output("Running optimisation...")
 callback = lambda _: print_output("LINE SEARCH COMPLETE")
-r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.01, 1), callback=callback)
+r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.001, 1), callback=callback)
 
 # Logging
 print_output("Logging...")
