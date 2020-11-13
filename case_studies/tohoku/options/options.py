@@ -68,8 +68,6 @@ class TohokuOptions(TsunamiOptions):
         :kwarg noisy_data: :type:`bool` toggling whether timeseries data are used as-is, or sampled.
         :kwarg qoi_scaling: custom scaling for quantity of interest (defaults to unity).
         :kwarg base_viscosity: :type:`float` value to be assigned to constant viscosity field.
-        :kwarg postproc: :type:`bool` value toggling whether to use an initial mesh which has been
-            postprocessed using Pragmatic (see `resources/meshes/postproc.py`.)
         """
         super(TohokuOptions, self).__init__(force_zone_number=force_zone_number, **kwargs)
 
@@ -80,25 +78,18 @@ class TohokuOptions(TsunamiOptions):
         if not self.synthetic:
             self.noisy_data = kwargs.get('noisy_data', False)
         self.qoi_scaling = kwargs.get('qoi_scaling', 1.0)
-        postproc = kwargs.get('postproc', False)
 
         # Mesh
         self.print_debug("INIT: Loading mesh...")
         self.resource_dir = os.path.join(os.path.dirname(__file__), '..', 'resources')
         self.mesh_dir = os.path.join(self.resource_dir, 'meshes')
         self.mesh_file = 'Tohoku{:d}'.format(self.level)
-        if mesh is None:
-            if postproc:
-                self.default_mesh = load_mesh(self.mesh_file, self.mesh_dir)
-            else:
-                self.default_mesh = Mesh(os.path.join(self.mesh_dir, self.mesh_file) + '.msh')
-        else:
-            self.default_mesh = mesh
+        self.default_mesh = mesh or Mesh(os.path.join(self.mesh_dir, self.mesh_file) + '.msh')
 
         # Physics
         self.friction = None
         # self.friction = 'manning'  # FIXME
-        self.friction_coeff = 0.025
+        self.friction_coeff = 0.0025
         self.base_viscosity = kwargs.get('base_viscosity', 0.0)
 
         # Stabilisation

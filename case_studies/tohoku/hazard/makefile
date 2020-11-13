@@ -38,13 +38,13 @@ fixed_mesh:
 
 hessian:
 	@echo "Solving Tohoku tsunami problem using anisotropic 'hessian' adaptation..."
-	@python3 run_hessian_based.py -plot_pvd 1 \
+	@python3 run_adapt.py -approach hessian -plot_pvd 1 \
 		-dm_plex_prescribed_boundary_labels 100,200,300 \
 		-dm_plex_prescribed_boundary_sizes 20e3,10e3,5e3
 
 dwp:
 	@echo "Solving Tohoku tsunami problem using isotropic 'dual weighted primal' adaptation..."
-	@python3 run_dwp.py -plot_pvd 1 \
+	@python3 run_adapt.py -approach dwp -plot_pvd 1 \
 		-dm_plex_prescribed_boundary_labels 100,200,300 \
 		-dm_plex_prescribed_boundary_sizes 20e3,10e3,5e3
 # @python3 run_dwp.py -plot_pvd 1 \
@@ -53,9 +53,11 @@ dwp:
 
 dwr:
 	@echo "Solving Tohoku tsunami problem using isotropic 'dual weighted residual' adaptation..."
-	@python3 run_dwr.py -plot_pvd 1 \
+	@python3 run_adapt.py -approach dwr -plot_pvd 1 \
 		-dm_plex_prescribed_boundary_labels 100,200,300 \
 		-dm_plex_prescribed_boundary_sizes 20e3,10e3,5e3
+
+# TODO: weighted_hessian
 
 # Cleanup
 
