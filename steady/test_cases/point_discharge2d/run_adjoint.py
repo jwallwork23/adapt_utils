@@ -59,8 +59,7 @@ stop_annotating()
 tape = get_working_tape()
 solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
 solve_blocks = [block for block in solve_blocks if not isinstance(block, ProjectBlock)]
-assert len(solve_blocks) == 1
-adj = solve_blocks[0].adj_sol
+adj = solve_blocks[-1].adj_sol
 adj *= -1  # FIXME: Why do we need this?
 export_field(adj, "Adjoint tracer", "discrete_adjoint", fpath=op.di, plexname=None, op=op)
 

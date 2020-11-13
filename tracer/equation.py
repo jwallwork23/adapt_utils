@@ -191,6 +191,7 @@ class ConservativeSourceTerm(thetis_cons_tracer.ConservativeSourceTerm):
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         if self.horizontal_dg:
+            args = (solution, solution_old, fields, fields_old, )
             return super(ConservativeSourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
 
         # NOTE: The following is a different formulation as for DG!

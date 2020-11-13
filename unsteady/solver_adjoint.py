@@ -21,6 +21,8 @@ class AdaptiveDiscreteAdjointProblem(AdaptiveProblem):
             raise NotImplementedError  # TODO: Allow multiple meshes
 
         # Check that only one set of equations has been solved  # TODO
+        op = self.op
+        equations = []
         for to_solve in (op.solve_swe, op.solve_tracer, op.solve_sediment, op.solve_exner):
             if to_solve:
                 equations.append(to_solve)
