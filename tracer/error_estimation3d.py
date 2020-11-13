@@ -1,4 +1,6 @@
-# TODO: doc
+"""
+Extension of the goal-oriented error indicators in `tracer/error_estimation.py` to the 3D case.
+"""
 from __future__ import absolute_import
 from thetis.utility import *
 from .error_estimation import TracerGOErrorEstimatorTerm, TracerGOErrorEstimator

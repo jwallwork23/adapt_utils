@@ -1,4 +1,11 @@
-# TODO: doc
+"""
+Goal-oriented error indicators for the tracer transport model. See [Wallwork et al. 2021] for details
+on the formulation.
+
+[Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented Error
+    Estimation and Mesh Adaptation for Tracer Transport Problems", to be submitted to Computer
+    Aided Design.
+"""
 from __future__ import absolute_import
 from thetis.utility import *
 from thetis.tracer_eq_2d import TracerTerm
@@ -27,10 +34,10 @@ class TracerGOErrorEstimatorTerm(GOErrorEstimatorTerm, TracerTerm):
         TracerTerm.__init__(self, function_space, depth, use_lax_friedrichs, sipg_parameter)
         GOErrorEstimatorTerm.__init__(self, function_space.mesh())
 
-    def inter_element_flux(self, solution, solution_old, arg, arg_old, fields, fields_old):
+    def inter_element_flux(self, *args, **kwargs):
         return 0
 
-    def boundary_flux(self, solution, solution_old, arg, arg_old, fields, fields_old, bnd_conditions):
+    def boundary_flux(self, *args, **kwargs):
         return 0
 
 
