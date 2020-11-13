@@ -1,7 +1,15 @@
-# TODO: doc
+"""
+Goal-oriented error indicators for the shallow water hydrodynamics model. See [Wallwork et al. 2020b]
+for details on the formulation.
+
+[Wallwork et al. 2020b] J. G. Wallwork, N. Barral, S. C. Kramer, D. A. Ham, M. D. Piggott,
+    "Goal-oriented error estimation and mesh adaptation for shallow water modelling" (2020),
+    Springer Nature Applied Sciences, volume 2, pp.1053--1063, DOI: 10.1007/s42452-020-2745-9,
+    URL: https://rdcu.be/b35wZ.
+"""
 from __future__ import absolute_import
 from thetis.utility import *
-from .error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
+from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
 from thetis.shallowwater_eq import ShallowWaterTerm
 
 
@@ -26,13 +34,13 @@ class ShallowWaterGOErrorEstimatorTerm(GOErrorEstimatorTerm, ShallowWaterTerm):
         ShallowWaterTerm.__init__(self, function_space, depth, options)
         GOErrorEstimatorTerm.__init__(self, function_space.mesh())
 
-    def element_residual(self, solution, solution_old, arg, arg_old, fields, fields_old):
+    def element_residual(self, *args):
         return 0
 
-    def inter_element_flux(self, solution, solution_old, arg, arg_old, fields, fields_old):
+    def inter_element_flux(self, *args):
         return 0
 
-    def boundary_flux(self, solution, solution_old, arg, arg_old, fields, fields_old, bnd_conditions):
+    def boundary_flux(self, *args, **kwargs):
         return 0
 
 
@@ -468,8 +476,8 @@ class WindStressGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMomentumTerm):
 
 class AtmosphericPressureGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMomentumTerm):
     """
-    :class:`ShallowWaterGOErrorEstimatorTerm` object associated with the :class:`AtmosphericPressureTerm` term
-    of the shallow water model.
+    :class:`ShallowWaterGOErrorEstimatorTerm` object associated with the
+    :class:`AtmosphericPressureTerm` term of the shallow water model.
     """
     def element_residual(self, solution, solution_old, arg, arg_old, fields, fields_old):
         uv, eta = split(solution)
@@ -587,8 +595,8 @@ class MomentumSourceGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMomentumTer
 
 class ContinuitySourceGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorContinuityTerm):
     """
-    :class:`ShallowWaterGOErrorEstimatorTerm` object associated with the :class:`ContinuitySourceTerm`
-    term of the shallow water model.
+    :class:`ShallowWaterGOErrorEstimatorTerm` object associated with the
+    :class:`ContinuitySourceTerm` term of the shallow water model.
     """
     def element_residual(self, solution, solution_old, arg, arg_old, fields, fields_old):
         z, zeta = split(arg)
@@ -681,7 +689,9 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
             self.strong_residual_terms_eta += term.element_residual(*args)
 
     def evaluate_strong_residual(self):
-        """Evaluate strong residual of shallow water equations."""
+        """
+        Evaluate strong residual of shallow water equations.
+        """
         residual_u, residual_eta = self.strong_residual.split()
         residual_u.interpolate(as_vector([abs(assemble(self.strong_residual_terms_u)),
                                           abs(assemble(self.strong_residual_terms_v))]))
@@ -689,7 +699,9 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
         return self.strong_residual
 
     def evaluate_flux_jump(self, sol):
-        """Evaluate flux jump as element-wise indicator functions."""
+        """
+        Evaluate flux jump as element-wise indicator functions.
+        """
         sol_u, sol_eta = sol.split()
         flux_jump = Function(VectorFunctionSpace(self.mesh, "DG", 0)*self.P0)
         flux_jump_1 = Function(self.P0)

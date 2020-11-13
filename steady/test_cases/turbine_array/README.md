@@ -30,8 +30,9 @@ drag coefficient and divided by water depth).
 
 ### References
 
-[Wallwork et al. 2020b] J.G. Wallwork, N. Barral, S.C. Kramer, D.A. Ham, M.D. Piggott, "Goal-oriented
-error estimation and mesh adaptation for shallow water modelling" (2020), Springer Nature Applied
-Sciences, volume 2, pp.1053--1063, DOI: 10.1007/s42452-020-2745-9, URL: https://rdcu.be/b35wZ.
+[Wallwork et al. 2020b] J. G. Wallwork, N. Barral, S. C. Kramer, D. A. Ham, M. D. Piggott,
+    "Goal-oriented error estimation and mesh adaptation for shallow water modelling" (2020),
+    Springer Nature Applied Sciences, volume 2, pp.1053--1063, DOI: 10.1007/s42452-020-2745-9,
+    URL: https://rdcu.be/b35wZ.
 
 [1]: https://www.imperial.ac.uk/people/s.kramer "Stephan Kramer"
