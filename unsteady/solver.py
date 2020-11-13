@@ -1826,12 +1826,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Non-adaptive
             'fixed_mesh': self.solve_forward,
 
-            # Metric-based, no adjoint
+            # Metric-based using forward solution fields
             'hessian': self.run_hessian_based,
             'vorticity': self.run_hessian_based,  # TODO: Change name and update docs
 
-            # Metric-based with adjoint
+            # Metric-based using forward *and* adjoint solution fields
             'dwp': self.run_dwp,
+
+            # Metric-based goal-oriented
             'dwr': self.run_dwr,
             'weighted_hessian': self.run_dwr,
             'weighted_gradient': self.run_dwr,
@@ -1841,9 +1843,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
         run_scripts[self.approach](**kwargs)
 
-    # TODO: Enable move to base class
+    # TODO: Change name to something like run_goal_based
     def run_dwr(self, **kwargs):
-        # TODO: doc
+        """
+        Main script for goal-oriented mesh adaptation routines.
+
+        A number of isotropic and anisotropic metrics are considered, as described in
+        [Wallwork et al. 2021].
+
+        [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
+            Error Estimation and Mesh Adaptation for Tracer Transport Problems", to be submitted to
+            Computer Aided Design.
+        """
         op = self.op
         adapt_field = op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
