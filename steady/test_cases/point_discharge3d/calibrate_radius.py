@@ -4,22 +4,13 @@ from firedrake_adjoint import *
 import argparse
 import numpy as np
 
-from adapt_utils.maths import bessk0
-from adapt_utils.steady.solver import AdaptiveSteadyProblem
-from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
+from adapt_utils.steady.solver3d import AdaptiveSteadyProblem3d
+from adapt_utils.steady.test_cases.point_discharge3d.options import PointDischarge3dOptions
 
 
 # Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('level', help="Mesh resolution level.")
-parser.add_argument('family', help="Finite element family, from {'cg', 'dg'}.")
-parser.add_argument('-stabilisation', help="""
-    Stabilisation method. No stabilisation by default.
-    Otherwise, choose from {'su', 'supg', 'lax_friedrichs'}.
-    Note that 'su' and 'supg' are ignored unless the finite element family is CG.
-    Note that 'lax_friedrichs' is ignored unless the finite element family is DG.
-    """)
-parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-error_to_calibrate', help="Choose from {'l2', 'qoi'}.")
 parser.add_argument('-test_consistency', help="Test consistency of taped reduced functional.")
 parser.add_argument('-test_gradient', help="Taylor test reduced functional.")
@@ -34,25 +25,24 @@ assert error_to_calibrate in ('l2', 'qoi')
 
 # Parameter object
 level = int(args.level)
-op = PointDischarge2dOptions(level=level)
-assert args.family in ('cg', 'dg')
-op.tracer_family = args.family or 'cg'
-op.stabilisation = args.stabilisation
-op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
-op.di = os.path.join(op.di, args.stabilisation or args.family)
+op = PointDischarge3dOptions(level=level)
+op.tracer_family = 'cg'
+op.stabilisation = 'supg'
+op.anisotropic_stabilisation = True
 mesh = op.default_mesh
-x, y = SpatialCoordinate(mesh)
+x, y, z = SpatialCoordinate(mesh)
 
 # Source parametrisation
 x0 = 2.0
 y0 = 5.0
+z0 = 5.0
 source_value = 100.0
 R = FunctionSpace(mesh, "R", 0)
 r_to_calibrate = Function(R).assign(0.1)
 control = Control(r_to_calibrate)
 
-# Use high quadrature degree
-dx = dx(degree=12)
+# Use reasonable quadrature degree  # TODO: Increase
+dx = dx(degree=3)
 
 
 def analytical_solution(r):
@@ -63,47 +53,47 @@ def analytical_solution(r):
     D = Constant(op.base_diffusivity)
     Pe = 0.5*u[0]/D
     q = 1.0
-    rr = max_value(sqrt((x - x0)**2 + (y - y0)**2), r)
-    return 0.5*q/(pi*D)*exp(Pe*(x - x0))*bessk0(Pe*rr)
+    rr = max_value(sqrt((x - x0)**2 + (y - y0)**2 + (z - z0)**2), r)
+    return q/(8*pi*pi*rr*D)*exp(Pe*(x - x0))*exp(-Pe*rr)
 
 
-def scaled_ball(xx, yy, rr, scaling=1.0):
+def scaled_ball(xx, yy, zz, rr, scaling=1.0):
     """
     UFL expression for a disc, scaled by an area adjustment.
 
-    :args xx,yy: centre of disc.
+    :args xx,yy,zz: centre of disc.
     :arg rr: radius of disc.
     :kwarg scaling: value by which to scale.
     """
-    area = assemble(conditional((x - xx)**2 + (y - yy)**2 <= rr**2, 1.0, 0.0)*dx)
+    area = assemble(conditional((x - xx)**2 + (y - yy)**2 + (z - zz)**2 <= rr**2, 1.0, 0.0)*dx)
     analytical_area = pi*rr*rr
     scaling *= analytical_area/area
-    return conditional((x - xx)**2 + (y - yy)**2 <= rr**2, scaling, 0.0)
+    return conditional((x - xx)**2 + (y - yy)**2 + (z - zz)**2 <= rr**2, scaling, 0.0)
 
 
-def gaussian(xx, yy, rr, scaling=1.0):
+def gaussian(xx, yy, zz, rr, scaling=1.0):
     """
     UFL expression for a Gaussian bump, scaled as appropriate.
 
-    :args xx,yy: centre of Gaussian.
+    :args xx,yy,zz: centre of Gaussian.
     :arg rr: radius of Gaussian.
     :kwarg scaling: value by which to scale.
     """
-    return scaling*exp(-((x - xx)**2 + (y - yy)**2)/rr**2)
+    return scaling*exp(-((x - xx)**2 + (y - yy)**2 + (z - zz)**2)/rr**2)
 
 
 def set_tracer_source(r):
     """
     Generate source field for a given source radius.
     """
-    return gaussian(x0, y0, r, scaling=source_value)
+    return gaussian(x0, y0, z0, r, scaling=source_value)
 
 
 def solve(r):
     """
     Solve the tracer transport problem for a given source radius.
     """
-    tp = AdaptiveSteadyProblem(op, print_progress=False)
+    tp = AdaptiveSteadyProblem3d(op, print_progress=False)
     tp.set_initial_condition()
     tp.fields[0].tracer_source_2d = set_tracer_source(r)
     tp.setup_solver_forward_step(0)
@@ -117,7 +107,7 @@ def l2_error(r):
     """
     c = solve(r)
     sol = analytical_solution(r)
-    kernel = conditional((x - x0)**2 + (y - y0)**2 > r**2, 1.0, 0.0)
+    kernel = conditional((x - x0)**2 + (y - y0)**2 + (z - z0)**2 > r**2, 1.0, 0.0)
     return assemble(kernel*(c - sol)**2*dx)
 
 
@@ -178,7 +168,8 @@ if test_gradient:
 
 # Plot parameter space
 fname = os.path.join(op.di, "parameter_space_{:d}.npy".format(level))
-if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
+# if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
+if bool(args.recompute_parameter_space or False):
     print_output("Exploring parameter space...")
     np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.4, 100)]))
 
@@ -210,19 +201,7 @@ File(os.path.join(op.di, "error.pvd")).write(error)
 
 # Save optimisation progress
 print_output("Saving optimisation progress...")
-ext = args.family
-if ext == 'dg':
-    if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
-        ext += '_lf'
-else:
-    if args.stabilisation in ('su', 'SU'):
-        ext += '_su'
-    if args.stabilisation in ('supg', 'SUPG'):
-        ext += '_supg'
-    if op.anisotropic_stabilisation:
-        ext += '_anisotropic'
-fname = "_".join(["{:s}", ext, str(level)])
-fname += ".npy"
+fname = "_".join(["{:s}", str(level)]) + ".npy"
 np.save(os.path.join(op.di, fname.format("control")), np.array(control_progress))
 np.save(os.path.join(op.di, fname.format("functional")), np.array(functional_progress))
 np.save(os.path.join(op.di, fname.format("gradient")), np.array(gradient_progress))

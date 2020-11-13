@@ -8,7 +8,6 @@ from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischar
 __all__ = ["PointDischarge3dOptions"]
 
 
-# TODO: Analytical solution
 # TODO: Calibrate radius
 
 class PointDischarge3dOptions(PointDischarge2dOptions):

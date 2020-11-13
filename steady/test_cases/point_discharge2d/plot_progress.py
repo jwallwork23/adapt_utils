@@ -51,7 +51,8 @@ axes.scatter(controls, functionals, c=list(range(len(controls))), cmap='autumn')
 axes.plot(controls, functionals, color='C1', linewidth=0.5)
 axes.set_yscale('log')
 for i in [0, 3, 5, 6, 7]:
-    axes.annotate("",
+    axes.annotate(
+        "",
         xy=(0.5*sum(controls[i:i+2]), 10**(0.5*(log10(functionals[i]) + log10(functionals[i+1])))),
         xytext=(controls[i], functionals[i]),
         arrowprops=dict(arrowstyle="->, head_width=0.1", color='C1', lw=0.5))
