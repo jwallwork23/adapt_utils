@@ -3,7 +3,7 @@ from thetis import *
 import argparse
 import os
 
-from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
+from adapt_utils.case_studies.tohoku.hazard.options import TohokuHazardOptions
 from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
