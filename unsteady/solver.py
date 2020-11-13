@@ -555,14 +555,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.op.set_initial_condition(self, **kwargs)
 
         # TODO: Stash the below as metadata
-        fns = (self.fwd_solutions_tracer, self.fwd_solutions_sediment, self.fwd_solutions_bathymetry)
         flgs = (self.op.solve_tracer, self.op.solve_sediment, self.op.solve_exner)
         names = ("tracer", "sediment", "bathymetry")
         spaces = (self.Q, self.Q, self.W)
 
         # Project between spaces, constructing if necessary
-        for flg, f, name, space in zip(flgs, fns, names, spaces):
+        for flg, name, space in zip(flgs, names, spaces):
             if flg:
+                f = self.__getattribute__('fwd_solutions_{:s}'.format(name))
                 if f[i] is None:
                     raise ValueError("Nothing to project.")
                 elif f[j] is None:
@@ -582,14 +582,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.op.set_terminal_condition(self, **kwargs)
 
         # TODO: Stash the below as metadata
-        fns = (self.adj_solutions_tracer, self.adj_solutions_sediment, self.adj_solutions_bathymetry)
         flgs = (self.op.solve_tracer, self.op.solve_sediment, self.op.solve_exner)
         names = ("tracer", "sediment", "bathymetry")
         spaces = (self.Q, self.Q, self.W)
 
         # Project between spaces, constructing if necessary
-        for flg, f, name, space in zip(flgs, fns, names, spaces):
+        for flg, name, space in zip(flgs, names, spaces):
             if flg:
+                f = self.__getattribute__('adj_solutions_{:s}'.format(name))
                 if f[i] is None:
                     raise ValueError("Nothing to project.")
                 elif f[j] is None:
@@ -1315,7 +1315,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug("FREE: Removing forward equations on mesh {:d}...".format(i))
         self.free_forward_equations_step(i)
 
-    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
+    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False):
         """
         Solve forward PDE on mesh `i`.
 
@@ -1352,7 +1352,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Callbacks
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
         export_func = export_func or self.op.get_export_func(self, i)
-        if i == 0:
+        if i == 0 or export_initial:
             if export_func is not None:
                 export_func()
             self.callbacks[i].evaluate(mode='export')
@@ -1466,7 +1466,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.print(80*'=')
 
     def setup_solver_adjoint_step(self, i):
-        """Setup forward solver on mesh `i`."""
+        """
+        Setup forward solver on mesh `i`.
+        """
         op = self.op
         op.print_debug("SETUP: Creating adjoint equations on mesh {:d}...".format(i))
         self.create_adjoint_equations_step(i)
@@ -1727,7 +1729,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
-                self.solve_forward_step(i, export_func=export_func, plot_pvd=False)
+                self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
 
                 # --- Solve adjoint on current window
 
