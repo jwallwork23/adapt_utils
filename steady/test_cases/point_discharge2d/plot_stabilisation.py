@@ -1,6 +1,7 @@
 from thetis import *
 
 import argparse
+from matplotlib import ticker
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -37,13 +38,13 @@ op.di = os.path.join(op.di, op.stabilisation_tracer or args.family)
 # Load from HDF5
 op.plot_pvd = False
 mesh = load_mesh("mesh", fpath=op.di)
+h = anisotropic_cell_size(mesh) if op.anisotropic_stabilisation else isotropic_cell_size(mesh)
 
 # Plot
 if args.family == 'cg':
 
     # Plot cell size measure
     fig, axes = plt.subplots(figsize=(8, 3))
-    h = anisotropic_cell_size(mesh) if op.anisotropic_stabilisation else isotropic_cell_size(mesh)
     hmin = np.floor(h.vector().gather().min())
     hmax = np.ceil(h.vector().gather().max())
     levels = np.linspace(hmin, hmax, 40)
@@ -78,4 +79,26 @@ if args.family == 'cg':
     fname = 'anisotropic_stabilisation' if op.anisotropic_stabilisation else 'isotropic_stabilisation'
     savefig(fname, op.di, extensions=["png"])
 else:
-    raise NotImplementedError  # TODO: Plot SIPG parameter
+
+    # Calculate SIPG parameter
+    min_angles = get_minimum_angles_2d(mesh)
+    cot_theta = 1.0/tan(min_angles)
+    p = op.degree_tracer
+    alpha = Constant(5.0*p*(p+1) if p != 0 else 1.5)
+    alpha = alpha*get_sipg_ratio(Constant(op.base_diffusivity))*cot_theta
+    # alpha = interpolate(alpha/h, min_angles.function_space())
+    alpha = interpolate(h/alpha, min_angles.function_space())
+
+    # Plot stabilisation parameter
+    fig, axes = plt.subplots(figsize=(8, 3))
+    alphamin = np.floor(alpha.vector().gather().min())
+    alphamax = np.ceil(alpha.vector().gather().max())
+    levels = np.linspace(alphamin, alphamax, 40)
+    tc = tricontourf(alpha, axes=axes, levels=levels, cmap='coolwarm')
+    cbar = fig.colorbar(tc, ax=axes, orientation="horizontal", pad=0.1)
+    cbar.set_ticks(np.linspace(alphamin, alphamax, 5))
+    axes.axis(False)
+    axes.set_xlim([0, 50])
+    axes.set_ylim([0, 10])
+    fname = 'anisotropic_sipg' if op.anisotropic_stabilisation else 'isotropic_sipg'
+    savefig(fname, op.di, extensions=["png"])
