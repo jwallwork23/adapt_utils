@@ -226,7 +226,7 @@ class TracerEquation2D(Equation):
         if self.stabilisation == 'supg':
             assert velocity is not None
             assert hasattr(self, 'supg_stabilisation')
-            test = test + self.supg_stabilisation*dot(velocity, grad(solution))
+            test = test + self.supg_stabilisation*dot(velocity, grad(test))
         return inner(solution, test)*dx
 
     def add_terms(self, function_space, depth, stabilisation, sipg_parameter):

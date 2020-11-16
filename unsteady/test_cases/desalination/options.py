@@ -44,7 +44,7 @@ class DesalinationOutfallOptions(CoupledOptions):
         # Tracer FEM
         self.degree_tracer = 1
         self.tracer_family = 'cg'
-        self.stabilisation_tracer = 'supg'  # TODO
+        self.stabilisation_tracer = 'supg'
         self.use_limiter_for_tracers = False
 
         # Hydrodynamics FEM
@@ -108,7 +108,7 @@ class DesalinationOutfallOptions(CoupledOptions):
             'shallow_water': {
                 # bottom_tag: {???},
                 outflow_tag: {'elev': self.elev_out[i]},  # forced
-                top_tag: {},                              # free-slip
+                # top_tag: {},                              # free-slip
                 inflow_tag: {'elev': self.elev_in[i]},    # forced
             },
             'tracer': {
