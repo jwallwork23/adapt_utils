@@ -52,6 +52,8 @@ class PointDischarge2dOptions(CoupledOptions):
         # Hydrodynamics
         self.base_velocity = [1.0, 0.0]
         self.base_diffusivity = 0.1
+        self.characteristic_speed = Constant(1.0)
+        self.characteristic_diffusion = Constant(0.1)
 
         # Source / receiver
         self.source_value = 100.0

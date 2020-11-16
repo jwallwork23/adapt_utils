@@ -66,10 +66,11 @@ class LeVequeOptions(CoupledOptions):
 
         # Physics
         self.base_diffusivity = 0.0
+        self.characteristic_speed = Constant(1.0)  # TODO: check
 
         # Spatial discretisation
         if self.tracer_family == 'cg':
-            self.stabilisation_tracer = 'SUPG'
+            self.stabilisation_tracer = 'supg'
         elif self.tracer_family == 'dg':
             self.stabilisation_tracer = 'lax_friedrichs'
             self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)

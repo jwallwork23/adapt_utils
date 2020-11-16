@@ -20,8 +20,8 @@ __all__ = ["AdaptiveProblem"]
 
 # TODO:
 #  * Mesh movement ALE formulation
-#  * SUPG stabilisation in unsteady case
 #  * Allow mesh dependent Lax-Friedrichs parameter(s)
+#  * Move SU/SUPG parameter computations from equations to here
 
 class AdaptiveProblem(AdaptiveProblemBase):
     """
@@ -480,12 +480,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
             assert family == 'dg'
             eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
         elif stabilisation == 'su':
+            # TODO: Compute parameter here, instead on in equation
             assert family == 'cg'
-            eq_options[i]['su_stabilisation'] = True
         elif stabilisation == 'supg':
+            # TODO: Compute parameter here, instead on in equation
             assert family == 'cg'
-            assert self.op.timestepper == 'SteadyState'  # TODO: unsteady case
-            eq_options[i]['supg_stabilisation'] = True
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(stabilisation, self.__class__.__name__))
@@ -794,8 +793,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             stabilisation=self.stabilisation_tracer,
             anisotropic=op.anisotropic_stabilisation,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
-            # characteristic_speed=op.characteristic_speed,  # TODO
-            # characteristic_diffusion=op.characteristic_diffusion,  # TODO
+            characteristic_speed=self.op.characteristic_speed,
+            characteristic_diffusion=self.op.characteristic_diffusion,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -883,8 +882,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             stabilisation=self.stabilisation_tracer,
             anisotropic=op.anisotropic_stabilisation,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
-            # characteristic_speed=op.characteristic_speed,  # TODO
-            # characteristic_diffusion=op.characteristic_diffusion,  # TODO
+            characteristic_speed=self.op.characteristic_speed,
+            characteristic_diffusion=self.op.characteristic_diffusion,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -949,9 +948,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.error_estimators[i].tracer = estimator(
             self.Q[i],
             self.depth[i],
-            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
+            stabilisation=self.stabilisation_tracer,
+            anisotropic=self.op.anisotropic_stabilisation,
             sipg_parameter=self.tracer_options[i].sipg_parameter,
-            anisotropic=self.tracer_options[i].anisotropic_stabilisation,
+            characteristic_speed=self.op.characteristic_speed,
+            characteristic_diffusion=self.op.characteristic_diffusion,
         )
 
     def create_sediment_error_estimator_step(self, i):
@@ -1019,10 +1020,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             fields['uv_{:d}d'.format(self.dim)] = Constant(as_vector(np.zeros(self.dim)))
         if self.stabilisation_tracer == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
-        elif self.stabilisation_tracer == 'su':
-            fields['su_stabilisation'] = True
-        elif self.stabilisation_tracer == 'supg':
-            fields['supg_stabilisation'] = True
         return fields
 
     def _get_fields_for_sediment_timestepper(self, i):

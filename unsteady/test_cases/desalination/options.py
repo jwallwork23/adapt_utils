@@ -29,6 +29,8 @@ class DesalinationOutfallOptions(CoupledOptions):
         self.friction_coeff = 0.0025  # TODO: Increased drag at pipes?
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
+        self.characteristic_speed = Constant(1.0)
+        self.characteristic_diffusion = Constant(1.0)
 
         # Time integration
         self.timestepper = 'CrankNicolson'

@@ -55,7 +55,7 @@ class GOErrorEstimator(Equation):
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
 
-    def mass_term(self, solution, arg):
+    def mass_term(self, solution, arg):  # TODO: account for SUPG
         """
         Returns an UFL form of the solution weighted by the argument.
 

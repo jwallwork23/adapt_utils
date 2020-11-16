@@ -12,9 +12,10 @@ class Equation(thetis_eq.Equation):
     Modified version of `thetis.equation.Equation` which enables the use of an anisotropic
     cell size measure.
     """
-    def __init__(self, *args, anisotropic=False, **kwargs):
-        super(Equation, self).__init__(*args, **kwargs)
+    def __init__(self, *args, stabilisation=None, anisotropic=False, **kwargs):
+        self.stabilisation = stabilisation
         self.anisotropic = anisotropic
+        super(Equation, self).__init__(*args, **kwargs)
         if anisotropic:
             self.cellsize = anisotropic_cell_size(self.mesh)
 
@@ -28,10 +29,7 @@ class Equation(thetis_eq.Equation):
         key = term.__class__.__name__
         if self.anisotropic:
             self.terms[key].cellsize = self.cellsize
-        if hasattr(self, 'stabilisation'):
-            self.terms[key].stabilisation = self.stabilisation
-        else:
-            self.terms[key].stabilisation = None
+        self.terms[key].stabilisation = self.stabilisation
         if hasattr(self, 'tau'):
             self.terms[key].tau = self.tau
 
@@ -40,5 +38,5 @@ class Equation(thetis_eq.Equation):
         if self.stabilisation == 'supg':  # TODO: Hook up time-dependent SUPG
             assert velocity is not None
             assert hasattr(self, 'tau')
-            test = test + dot(velocity, grad(solution))
+            test = test + self.tau*dot(velocity, grad(solution))
         return inner(solution, test)*dx
