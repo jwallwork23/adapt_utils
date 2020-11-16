@@ -42,18 +42,9 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
             f += self.test*dot(uv, grad(solution))*dx
 
             # Apply SU / SUPG stabilisation
-            tau = fields.get('su_stabilisation')
-            if tau is None:
-                tau = fields.get('supg_stabilisation')
-            if tau is not None:
-                h = self.cellsize
-                unorm = sqrt(dot(uv, uv))
-                tau = 0.5*h/unorm
-                diffusivity_h = fields_old['diffusivity_h']
-                if diffusivity_h is not None:
-                    Pe = 0.5*h*unorm/diffusivity_h
-                    tau *= min_value(1, Pe/3)
-                f += tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
+            if self.stabilisation in ('su', 'supg'):
+                assert hasattr(self, 'tau')
+                f += self.tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
 
         return -f
 
@@ -94,16 +85,9 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
 
             # Apply SUPG stabilisation
             uv = fields_old.get('uv_2d')
-            if uv is None:
-                return -f
-            tau = fields.get('supg_stabilisation')
-            if tau is not None:
-                h = self.cellsize
-                unorm = sqrt(dot(uv, uv))
-                tau = 0.5*h/unorm
-                Pe = 0.5*h*unorm/diffusivity_h
-                tau *= min_value(1, Pe/3)
-                f += -tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
+            if self.stabilisation == 'supg' and uv is not None:
+                assert hasattr(self, 'tau')
+                f += -self.tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
 
         return -f
 
@@ -122,20 +106,10 @@ class SourceTerm(thetis_tracer.SourceTerm):
         f += -super(SourceTerm, self).residual(*args, bnd_conditions=bnd_conditions)
 
         # Apply SUPG stabilisation
-        if not self.horizontal_dg:
-            uv = fields_old.get('uv_2d')
-            if uv is None:
-                return -f
-            tau = fields.get('supg_stabilisation')
-            if tau is not None:
-                h = self.cellsize
-                unorm = sqrt(dot(uv, uv))
-                tau = 0.5*h/unorm
-                diffusivity_h = fields_old['diffusivity_h']
-                if diffusivity_h is not None:
-                    Pe = 0.5*h*unorm/diffusivity_h
-                    tau *= min_value(1, Pe/3)
-                f += -tau*dot(uv, grad(self.test))*source*dx
+        uv = fields_old.get('uv_2d')
+        if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
+            assert hasattr(self, 'tau')
+            f += -self.tau*dot(uv, grad(self.test))*source*dx
 
         return -f
 
@@ -168,18 +142,10 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
             f += self.test*div(uv*solution)*dx
 
             # Apply SU / SUPG stabilisation
-            tau = fields.get('su_stabilisation')
-            if tau is None:
-                tau = fields.get('supg_stabilisation')
-            if tau is not None:
-                h = self.cellsize
-                unorm = sqrt(dot(uv, uv))
-                tau = 0.5*h/unorm
-                diffusivity_h = fields_old['diffusivity_h']
-                if diffusivity_h is not None:
-                    Pe = 0.5*h*unorm/diffusivity_h
-                    tau *= min_value(1, Pe/3)
-                f += tau*dot(uv, grad(self.test))*div(uv*solution)*dx
+            if self.stabilisation == 'supg' and uv is not None:
+                assert hasattr(self, 'tau')
+                f += self.tau*dot(uv, grad(self.test))*div(uv*solution)*dx
+
         return -f
 
 
@@ -208,18 +174,10 @@ class ConservativeSourceTerm(thetis_cons_tracer.ConservativeSourceTerm):
 
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_2d')
-        if uv is None:
-            return -f
-        tau = fields.get('supg_stabilisation')
-        if tau is not None:
-            h = self.cellsize
-            unorm = sqrt(dot(uv, uv))
-            tau = 0.5*h/unorm
-            diffusivity_h = fields_old['diffusivity_h']
-            if diffusivity_h is not None:
-                Pe = 0.5*h*unorm/diffusivity_h
-                tau *= min_value(1, Pe/3)
-            f += -tau*dot(uv, grad(self.test))*source*dx
+        if self.stabilisation == 'supg' and uv is not None:
+            assert hasattr(self, 'tau')
+            f += -self.tau*dot(uv, grad(self.test))*source*dx
+
         return -f
 
 
@@ -230,20 +188,38 @@ class TracerEquation2D(Equation):
     Copied here from `thetis/tracer_eq_2d` to hook up modified terms.
     """
     def __init__(self, function_space, depth,
-                 use_lax_friedrichs=False,
+                 stabilisation='lax_friedrichs',
+                 anisotropic=False,
                  sipg_parameter=Constant(10.0),
-                 anisotropic=False):
+                 characteristic_speed=Constant(1.0),
+                 characteristic_diffusion=Constant(0.1)):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
-        :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
+        :kwarg stabilisation: method of choice, from {'lax_friedrichs', 'su', 'supg'}.
         :kwarg anisotropic: toggle anisotropic cell size measure
+        :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         """
         super(TracerEquation2D, self).__init__(function_space, anisotropic=anisotropic)
+        self.stabilisation = stabilisation
+
+        # Calculate SU / SUPG parameter
+        if stabilisation is not None and stabilisation.lower() in ('su', 'supg'):
+            h = self.cellsize
+            U = characteristic_speed
+            self.tau = 0.5*h/U
+            D = characteristic_diffusion
+            if D is not None:
+                Pe = 0.5*h*U/D
+                self.tau *= min_value(1, Pe/3)
+
+        # Add terms to equation
+        self.add_terms(function_space, depth, stabilisation, sipg_parameter)
+
+    def add_terms(self, function_space, depth, stabilisation, sipg_parameter):
         args = (function_space, depth)
         kwargs = {
-            'use_lax_friedrichs': use_lax_friedrichs,
+            'use_lax_friedrichs': stabilisation == 'lax_friedrichs',
             'sipg_parameter': sipg_parameter,
         }
         self.add_term(HorizontalAdvectionTerm(*args, **kwargs), 'explicit')
@@ -256,25 +232,14 @@ class TracerEquation2D(Equation):
             print_output("WARNING: Cannot import SinkTerm.")
 
 
-class ConservativeTracerEquation2D(Equation):
+class ConservativeTracerEquation2D(TracerEquation2D):
     """
     Copied here from `thetis/conservative_tracer_eq_2d` to hook up modified terms.
     """
-    def __init__(self, function_space, depth,
-                 use_lax_friedrichs=False,
-                 sipg_parameter=Constant(10.0),
-                 anisotropic=False):
-        """
-        :arg function_space: :class:`FunctionSpace` where the solution belongs
-        :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg bool use_lax_friedrichs: whether to use Lax Friedrichs stabilisation
-        :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
-        :kwarg anisotropic: toggle anisotropic cell size measure
-        """
-        super(ConservativeTracerEquation2D, self).__init__(function_space, anisotropic=anisotropic)
+    def add_terms(self, function_space, depth, stabilisation, sipg_parameter):
         args = (function_space, depth)
         kwargs = {
-            'use_lax_friedrichs': use_lax_friedrichs,
+            'use_lax_friedrichs': stabilisation == 'lax_friedrichs',
             'sipg_parameter': sipg_parameter,
         }
         self.add_term(ConservativeHorizontalAdvectionTerm(*args, **kwargs), 'explicit')

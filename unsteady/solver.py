@@ -791,9 +791,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].tracer = model(
             self.Q[i],
             self.depth[i],
-            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            stabilisation=self.stabilisation_tracer,
             anisotropic=op.anisotropic_stabilisation,
+            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            # characteristic_speed=op.characteristic_speed,  # TODO
+            # characteristic_diffusion=op.characteristic_diffusion,  # TODO
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -878,9 +880,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.equations[i].adjoint_tracer = model(
             self.Q[i],
             self.depth[i],
-            use_lax_friedrichs=self.tracer_options[i].use_lax_friedrichs_tracer,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            stabilisation=self.stabilisation_tracer,
             anisotropic=op.anisotropic_stabilisation,
+            sipg_parameter=self.tracer_options[i].sipg_parameter,
+            # characteristic_speed=op.characteristic_speed,  # TODO
+            # characteristic_diffusion=op.characteristic_diffusion,  # TODO
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -991,8 +995,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _get_fields_for_tracer_timestepper(self, i):
         if self.op.solve_swe:
-            # u, eta = self.fwd_solutions[i].split()  # FIXME: Not fully annotated
-            u, eta = split(self.fwd_solutions[i])  # FIXME: Not fully annotated
+            if self.op.timestepper == 'SteadyState':
+                u, eta = split(self.fwd_solutions[i])  # FIXME: Not fully annotated
+            else:
+                u, eta = self.fwd_solutions[i].split()  # FIXME: Not fully annotated
         else:
             # u = Constant(as_vector(self.op.base_velocity))  # FIXME: Pyadjoint doesn't like this
             u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
