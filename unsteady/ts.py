@@ -145,8 +145,13 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
         bnd_flux_terms = 0
 
         # Time derivative
-        residual_terms += ee.mass_term(u, z)
-        residual_terms += -ee.mass_term(u_old, z)
+        kwargs = {}
+        if 'Tracer' in self.equation.__class__.__name__:
+            uv = f_old.get('uv_2d', None)
+            uv = f_old.get('uv_3d', uv)
+            kwargs['velocity'] = uv
+        residual_terms += ee.mass_term(u, z, **kwargs)
+        residual_terms += -ee.mass_term(u_old, z, **kwargs)
 
         # Term from current timestep
         ee.setup_components('all', u, u_nl, z, z, f, f, bnd)

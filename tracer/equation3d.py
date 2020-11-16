@@ -27,8 +27,8 @@ class HorizontalAdvectionTerm3D(HorizontalAdvectionTerm):
 
         # Apply SU / SUPG stabilisation
         if self.stabilisation in ('su', 'supg'):
-            assert hasattr(self, 'tau')
-            f += self.tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
+            tau = self.su_stabilisation if self.stabilisation == 'su' else self.supg_stabilisation
+            f += tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
 
         return -f
 
@@ -67,8 +67,8 @@ class HorizontalDiffusionTerm3D(HorizontalDiffusionTerm):
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_3d')
         if self.stabilisation == 'supg' and uv is not None:
-            assert hasattr(self, 'tau')
-            f += -self.tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
+            tau = self.supg_stabilisation
+            f += -tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
 
         return -f
 
@@ -89,8 +89,8 @@ class SourceTerm3D(SourceTerm):
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_3d')
         if self.stabilisation == 'supg' and uv is not None:
-            assert hasattr(self, 'tau')
-            f += -self.tau*dot(uv, grad(self.test))*source*dx
+            tau = self.supg_stabilisation
+            f += -tau*dot(uv, grad(self.test))*source*dx
 
         return -f
 
@@ -109,8 +109,8 @@ class ConservativeHorizontalAdvectionTerm3D(ConservativeHorizontalAdvectionTerm)
 
         # Apply SU / SUPG stabilisation
         if self.stabilisation == 'supg':
-            assert hasattr(self, 'tau')
-            f += self.tau*dot(uv, grad(self.test))*div(uv*solution)*dx
+            tau = self.supg_stabilisation
+            f += tau*dot(uv, grad(self.test))*div(uv*solution)*dx
         return -f
 
 
@@ -128,7 +128,7 @@ class TracerEquation3D(TracerEquation2D):
 
     NOTE: Only CG discretisations are currently implemented, with SU and SUPG stabilisation options.
     """
-    def __init__(self, function_space, depth, anisotropic=False):
+    def __init__(self, function_space, depth, **kwargs):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
@@ -136,7 +136,7 @@ class TracerEquation3D(TracerEquation2D):
         """
         if function_space.ufl_element().family() != 'Lagrange':
             raise NotImplementedError  # TODO
-        super(TracerEquation3D, self).__init__(function_space, depth, anisotropic=anisotropic)
+        super(TracerEquation3D, self).__init__(function_space, depth, **kwargs)
 
     def add_terms(self, function_space, depth, *unused):
         args = (function_space, depth)

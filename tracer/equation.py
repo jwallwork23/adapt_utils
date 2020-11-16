@@ -43,8 +43,8 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
 
             # Apply SU / SUPG stabilisation
             if self.stabilisation in ('su', 'supg'):
-                assert hasattr(self, 'tau')
-                f += self.tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
+                tau = self.su_stabilisation if self.stabilisation == 'su' else self.supg_stabilisation
+                f += tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
 
         return -f
 
@@ -86,8 +86,8 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
             # Apply SUPG stabilisation
             uv = fields_old.get('uv_2d')
             if self.stabilisation == 'supg' and uv is not None:
-                assert hasattr(self, 'tau')
-                f += -self.tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
+                tau = self.supg_stabilisation
+                f += -tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
 
         return -f
 
@@ -108,8 +108,8 @@ class SourceTerm(thetis_tracer.SourceTerm):
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_2d')
         if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
-            assert hasattr(self, 'tau')
-            f += -self.tau*dot(uv, grad(self.test))*source*dx
+            tau = self.supg_stabilisation
+            f += -tau*dot(uv, grad(self.test))*source*dx
 
         return -f
 
@@ -143,8 +143,8 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
 
             # Apply SU / SUPG stabilisation
             if self.stabilisation == 'supg' and uv is not None:
-                assert hasattr(self, 'tau')
-                f += self.tau*dot(uv, grad(self.test))*div(uv*solution)*dx
+                tau = self.supg_stabilisation
+                f += tau*dot(uv, grad(self.test))*div(uv*solution)*dx
 
         return -f
 
@@ -175,8 +175,8 @@ class ConservativeSourceTerm(thetis_cons_tracer.ConservativeSourceTerm):
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_2d')
         if self.stabilisation == 'supg' and uv is not None:
-            assert hasattr(self, 'tau')
-            f += -self.tau*dot(uv, grad(self.test))*source*dx
+            tau = self.supg_stabilisation
+            f += -tau*dot(uv, grad(self.test))*source*dx
 
         return -f
 
@@ -191,8 +191,8 @@ class TracerEquation2D(Equation):
                  stabilisation='lax_friedrichs',
                  anisotropic=False,
                  sipg_parameter=Constant(10.0),
-                 characteristic_speed=Constant(1.0),
-                 characteristic_diffusion=Constant(0.1)):
+                 su_stabilisation=None,
+                 supg_stabilisation=None):
         """
         :arg function_space: :class:`FunctionSpace` where the solution belongs
         :arg depth: :class: `DepthExpression` containing depth info
@@ -200,22 +200,34 @@ class TracerEquation2D(Equation):
         :kwarg anisotropic: toggle anisotropic cell size measure
         :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         """
-        super(TracerEquation2D, self).__init__(
-            function_space, stabilisation=stabilisation, anisotropic=anisotropic
-        )
-
-        # Calculate SU / SUPG parameter
-        if stabilisation is not None and stabilisation.lower() in ('su', 'supg'):
-            h = self.cellsize
-            U = characteristic_speed
-            self.tau = 0.5*h/U
-            D = characteristic_diffusion
-            if D is not None:
-                Pe = 0.5*h*U/D
-                self.tau *= min_value(1, Pe/3)
-
-        # Add terms to equation
+        self.stabilisation = stabilisation
+        self.su_stabilisation = su_stabilisation
+        self.supg_stabilisation = supg_stabilisation
+        super(TracerEquation2D, self).__init__(function_space, anisotropic=anisotropic)
         self.add_terms(function_space, depth, stabilisation, sipg_parameter)
+
+    def add_term(self, term, label):
+        """
+        Add :class:`term` to the equation as a :str:`label` type term.
+
+        Also, pass over the chosen cell size measure and any stabilisation parameters.
+        """
+        super(TracerEquation2D, self).add_term(term, label)
+        key = term.__class__.__name__
+        self.terms[key].stabilisation = self.stabilisation
+        self.terms[key].su_stabilisation = self.su_stabilisation
+        self.terms[key].supg_stabilisation = self.supg_stabilisation
+
+    def mass_term(self, solution, velocity=None):
+        """
+        Account for SUPG stabilisation in mass term.
+        """
+        test = self.test
+        if self.stabilisation == 'supg':
+            assert velocity is not None
+            assert hasattr(self, 'supg_stabilisation')
+            test = test + self.supg_stabilisation*dot(velocity, grad(solution))
+        return inner(solution, test)*dx
 
     def add_terms(self, function_space, depth, stabilisation, sipg_parameter):
         args = (function_space, depth)
