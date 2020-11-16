@@ -1,5 +1,3 @@
-from thetis import *
-
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
@@ -16,7 +14,9 @@ class AdaptiveDesalinationProblem(AdaptiveProblem):
 
     def set_initial_condition(self):
         if self.op.spun:
+            self.op.solve_tracer = False
             self.load_state(0, self.ramp_dir)
+            self.op.solve_tracer = True
             if self.load_mesh is not None:
                 tmp = self.fwd_solutions[0].copy(deepcopy=True)
                 u_tmp, eta_tmp = tmp.split()

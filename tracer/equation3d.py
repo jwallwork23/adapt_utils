@@ -8,7 +8,6 @@
 """
 from __future__ import absolute_import
 from thetis.utility import *
-from ..equation import Equation
 from .equation import *
 
 
@@ -27,18 +26,9 @@ class HorizontalAdvectionTerm3D(HorizontalAdvectionTerm):
         f += self.test*dot(uv, grad(solution))*dx
 
         # Apply SU / SUPG stabilisation
-        tau = fields.get('su_stabilisation')
-        if tau is None:
-            tau = fields.get('supg_stabilisation')
-        if tau is not None:
-            h = self.cellsize
-            unorm = sqrt(dot(uv, uv))
-            tau = 0.5*h/unorm
-            diffusivity_h = fields_old['diffusivity_h']
-            if diffusivity_h is not None:
-                Pe = 0.5*h*unorm/diffusivity_h
-                tau *= min_value(1, Pe/3)
-            f += tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
+        if self.stabilisation in ('su', 'supg'):
+            assert hasattr(self, 'tau')
+            f += self.tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
 
         return -f
 
@@ -76,16 +66,9 @@ class HorizontalDiffusionTerm3D(HorizontalDiffusionTerm):
 
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_3d')
-        if uv is None:
-            return -f
-        tau = fields.get('supg_stabilisation')
-        if tau is not None:
-            h = self.cellsize
-            unorm = sqrt(dot(uv, uv))
-            tau = 0.5*h/unorm
-            Pe = 0.5*h*unorm/diffusivity_h
-            tau *= min_value(1, Pe/3)
-            f += -tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
+        if self.stabilisation == 'supg' and uv is not None:
+            assert hasattr(self, 'tau')
+            f += -self.tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
 
         return -f
 
@@ -105,18 +88,9 @@ class SourceTerm3D(SourceTerm):
 
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_3d')
-        if uv is None:
-            return -f
-        tau = fields.get('supg_stabilisation')
-        if tau is not None:
-            h = self.cellsize
-            unorm = sqrt(dot(uv, uv))
-            tau = 0.5*h/unorm
-            diffusivity_h = fields_old['diffusivity_h']
-            if diffusivity_h is not None:
-                Pe = 0.5*h*unorm/diffusivity_h
-                tau *= min_value(1, Pe/3)
-            f += -tau*dot(uv, grad(self.test))*source*dx
+        if self.stabilisation == 'supg' and uv is not None:
+            assert hasattr(self, 'tau')
+            f += -self.tau*dot(uv, grad(self.test))*source*dx
 
         return -f
 
@@ -134,18 +108,9 @@ class ConservativeHorizontalAdvectionTerm3D(ConservativeHorizontalAdvectionTerm)
         f += self.test*div(uv*solution)*dx
 
         # Apply SU / SUPG stabilisation
-        tau = fields.get('su_stabilisation')
-        if tau is None:
-            tau = fields.get('supg_stabilisation')
-        if tau is not None:
-            h = self.cellsize
-            unorm = sqrt(dot(uv, uv))
-            tau = 0.5*h/unorm
-            diffusivity_h = fields_old['diffusivity_h']
-            if diffusivity_h is not None:
-                Pe = 0.5*h*unorm/diffusivity_h
-                tau *= min_value(1, Pe/3)
-            f += tau*dot(uv, grad(self.test))*div(uv*solution)*dx
+        if self.stabilisation == 'supg':
+            assert hasattr(self, 'tau')
+            f += self.tau*dot(uv, grad(self.test))*div(uv*solution)*dx
         return -f
 
 
@@ -157,7 +122,7 @@ class ConservativeHorizontalDiffusionTerm3D(HorizontalDiffusionTerm3D):
 
 # --- Equations
 
-class TracerEquation3D(Equation):
+class TracerEquation3D(TracerEquation2D):
     """
     3D tracer advection-diffusion equation in non-conservative form.
 
@@ -169,30 +134,24 @@ class TracerEquation3D(Equation):
         :arg depth: :class: `DepthExpression` containing depth info
         :kwarg anisotropic: toggle anisotropic cell size measure
         """
-        super(TracerEquation3D, self).__init__(function_space, anisotropic=anisotropic)
-        if self.function_space.ufl_element().family() != 'Lagrange':
+        if function_space.ufl_element().family() != 'Lagrange':
             raise NotImplementedError  # TODO
+        super(TracerEquation3D, self).__init__(function_space, depth, anisotropic=anisotropic)
+
+    def add_terms(self, function_space, depth, *unused):
         args = (function_space, depth)
         self.add_term(HorizontalAdvectionTerm3D(*args), 'explicit')
         self.add_term(HorizontalDiffusionTerm3D(*args), 'explicit')
         self.add_term(SourceTerm3D(*args), 'source')
 
 
-class ConservativeTracerEquation3D(Equation):
+class ConservativeTracerEquation3D(TracerEquation3D):
     """
     3D tracer advection-diffusion equation in conservative form.
 
     NOTE: Only CG discretisations are currently implemented, with SU and SUPG stabilisation options.
     """
-    def __init__(self, function_space, depth, anisotropic=False):
-        """
-        :arg function_space: :class:`FunctionSpace` where the solution belongs
-        :arg depth: :class: `DepthExpression` containing depth info
-        :kwarg anisotropic: toggle anisotropic cell size measure
-        """
-        super(ConservativeTracerEquation3D, self).__init__(function_space, anisotropic=anisotropic)
-        if self.function_space.ufl_element().family() != 'Lagrange':
-            raise NotImplementedError  # TODO
+    def add_terms(self, function_space, depth, *unused):
         args = (function_space, depth)
         self.add_term(ConservativeHorizontalAdvectionTerm3D(*args), 'explicit')
         self.add_term(ConservativeHorizontalDiffusionTerm3D(*args), 'explicit')
