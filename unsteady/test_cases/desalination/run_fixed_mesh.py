@@ -22,7 +22,7 @@ args = parser.parse_args()
 
 
 # Create directories and check if spun-up solution exists
-ramp_dir = os.path.join(os.path.dirname(__file__), "outputs", "fixed_mesh")  # TODO: move
+ramp_dir = os.path.join(os.path.dirname(__file__), "data", "ramp")
 spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
 
 # --- Set parameters

@@ -1,6 +1,7 @@
 from thetis import print_output
 
 import argparse
+import os
 from time import perf_counter
 
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -36,6 +37,7 @@ kwargs = {
 if args.end_time is not None:
     kwargs['end_time'] = float(args.end_time)
 op = DesalinationOutfallOptions(**kwargs)
+op.di = os.path.join(os.path.dirname(__file__), "data", "ramp")
 
 
 # --- Solve problem

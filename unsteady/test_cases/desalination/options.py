@@ -42,7 +42,7 @@ class DesalinationOutfallOptions(CoupledOptions):
         # Tracer FEM
         self.degree_tracer = 1
         self.tracer_family = 'cg'
-        self.stabilisation_tracer = 'supg'
+        self.stabilisation_tracer = 'supg'  # TODO
         self.use_limiter_for_tracers = False
 
         # Hydrodynamics FEM
@@ -86,8 +86,9 @@ class DesalinationOutfallOptions(CoupledOptions):
     def set_bathymetry(self, fs):
         x, y = SpatialCoordinate(fs.mesh())
         bathymetry = Function(fs)
-        W = self.domain_width
-        bathymetry.interpolate(100.0 + 50.0*(W - y)/W)
+        # W = self.domain_width
+        # bathymetry.interpolate(50.0 + 100.0*(W - y)/W)  # TODO: use, accounting for BC
+        bathymetry.assign(50.0)
         return bathymetry
 
     def set_quadratic_drag_coefficient(self, fs):
@@ -103,14 +104,17 @@ class DesalinationOutfallOptions(CoupledOptions):
         zero = Constant(0.0)
         boundary_conditions = {
             'shallow_water': {
-                outflow_tag: {'elev': self.elev_out[i]},
-                inflow_tag: {'elev': self.elev_in[i]},
+                # bottom_tag: {???},
+                outflow_tag: {'elev': self.elev_out[i]},  # forced
+                top_tag: {},                              # free-slip
+                inflow_tag: {'elev': self.elev_in[i]},    # forced
             },
             'tracer': {
-                bottom_tag: {},
-                outflow_tag: {'value': zero},
-                top_tag: {'diff_flux': zero},
-                inflow_tag: {'value': zero},
+                # bottom_tag: {},                   # open
+                bottom_tag: {'diff_flux': zero},  # Neumann
+                outflow_tag: {'value': zero},     # Dirichlet
+                top_tag: {'diff_flux': zero},     # Neumann
+                inflow_tag: {'value': zero},      # Dirichlet
             },
         }
         return boundary_conditions
