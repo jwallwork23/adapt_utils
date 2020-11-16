@@ -1,4 +1,3 @@
-from firedrake import dot, dx, grad, inner
 import thetis.equation as thetis_eq
 
 from .mesh import anisotropic_cell_size
@@ -12,8 +11,7 @@ class Equation(thetis_eq.Equation):
     Modified version of `thetis.equation.Equation` which enables the use of an anisotropic
     cell size measure.
     """
-    def __init__(self, *args, stabilisation=None, anisotropic=False, **kwargs):
-        self.stabilisation = stabilisation
+    def __init__(self, *args, anisotropic=False, **kwargs):
         self.anisotropic = anisotropic
         super(Equation, self).__init__(*args, **kwargs)
         if anisotropic:
@@ -29,14 +27,3 @@ class Equation(thetis_eq.Equation):
         key = term.__class__.__name__
         if self.anisotropic:
             self.terms[key].cellsize = self.cellsize
-        self.terms[key].stabilisation = self.stabilisation
-        if hasattr(self, 'tau'):
-            self.terms[key].tau = self.tau
-
-    def mass_term(self, solution, velocity=None):
-        test = self.test
-        if self.stabilisation == 'supg':  # TODO: Hook up time-dependent SUPG
-            assert velocity is not None
-            assert hasattr(self, 'tau')
-            test = test + self.tau*dot(velocity, grad(solution))
-        return inner(solution, test)*dx

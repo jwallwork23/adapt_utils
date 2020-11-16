@@ -11,8 +11,8 @@ from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischar
 
 # Parse arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('level', help="Mesh resolution level.")
-parser.add_argument('family', help="Finite element family, from {'cg', 'dg'}.")
+parser.add_argument('-level', help="Mesh resolution level.")
+parser.add_argument('-family', help="Finite element family, from {'cg', 'dg'}.")
 parser.add_argument('-stabilisation', help="""
     Stabilisation method. No stabilisation by default.
     Otherwise, choose from {'su', 'supg', 'lax_friedrichs'}.
@@ -27,19 +27,21 @@ parser.add_argument('-recompute_parameter_space')
 args = parser.parse_args()
 
 # Collect parsed arguments
-test_consistency = bool(args.test_consistency or False)
-test_gradient = bool(args.test_gradient or False)
+test_consistency = False if args.test_consistency == '0' else True
+test_gradient = False if args.test_gradient == '0' else True
 error_to_calibrate = args.error_to_calibrate or 'l2'
 assert error_to_calibrate in ('l2', 'qoi')
 
 # Parameter object
-level = int(args.level)
+level = int(args.level or 0)
 op = PointDischarge2dOptions(level=level)
-assert args.family in ('cg', 'dg')
-op.tracer_family = args.family or 'cg'
-op.stabilisation_tracer = args.stabilisation
-op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
-op.di = os.path.join(op.di, args.stabilisation or args.family)
+family = args.family or 'cg'
+assert family in ('cg', 'dg')
+op.tracer_family = family
+stabilisation = args.stabilisation or 'supg'
+op.stabilisation_tracer = None if stabilisation == 'none' else stabilisation
+op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
+op.di = os.path.join(op.di, op.stabilisation_tracer or args.family)
 mesh = op.default_mesh
 x, y = SpatialCoordinate(mesh)
 
@@ -178,7 +180,8 @@ if test_gradient:
 
 # Plot parameter space
 fname = os.path.join(op.di, "parameter_space_{:d}.npy".format(level))
-if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
+# if not os.path.isfile(fname) or bool(args.recompute_parameter_space or False):
+if bool(args.recompute_parameter_space or False):
     print_output("Exploring parameter space...")
     np.save(fname, np.array([reduced_functional(r) for r in np.linspace(0.01, 0.4, 100)]))
 
@@ -210,16 +213,16 @@ File(os.path.join(op.di, "error.pvd")).write(error)
 
 # Save optimisation progress
 print_output("Saving optimisation progress...")
-ext = args.family
+ext = op.tracer_family
 if ext == 'dg':
-    if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
+    if op.stabilisation_tracer in ('lf', 'LF', 'lax_friedrichs'):
         ext += '_lf'
 else:
-    if args.stabilisation in ('su', 'SU'):
+    if op.stabilisation_tracer in ('su', 'SU'):
         ext += '_su'
-    if args.stabilisation in ('supg', 'SUPG'):
+    if op.stabilisation_tracer in ('supg', 'SUPG'):
         ext += '_supg'
-    if op.anisotropic_stabilisation:
+    if op.anisotropic_stabilisation and op.stabilisation_tracer is not None:
         ext += '_anisotropic'
 fname = "_".join(["{:s}", ext, str(level)])
 fname += ".npy"

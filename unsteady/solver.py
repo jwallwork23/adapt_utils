@@ -11,6 +11,7 @@ from ..adapt.metric import *
 from .base import AdaptiveProblemBase
 from .callback import *
 from ..io import *
+from ..mesh import anisotropic_cell_size
 from ..options import ReynoldsNumberArray
 from ..swe.utils import *
 
@@ -473,18 +474,29 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Stabilisation
         eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = None
+        eq_options[i]['su_stabilisation'] = None
+        eq_options[i]['supg_stabilisation'] = None
         if stabilisation is None:
             return
         elif stabilisation == 'lax_friedrichs':
             assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')
             assert family == 'dg'
             eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
-        elif stabilisation == 'su':
-            # TODO: Compute parameter here, instead on in equation
+        elif stabilisation in ('su', 'supg'):
             assert family == 'cg'
-        elif stabilisation == 'supg':
-            # TODO: Compute parameter here, instead on in equation
-            assert family == 'cg'
+            assert op.characteristic_speed is not None
+            cell_size_measure = anisotropic_cell_size if op.anisotropic_stabilisation else CellSize
+            h = cell_size_measure(self.meshes[i])
+            U = op.characteristic_speed
+            D = op.characteristic_diffusion
+            tau = 0.5*h/U
+            if D is not None:
+                Pe = 0.5*h*U/D
+                tau *= min_value(1, Pe/3)
+            if stabilisation == 'su':
+                eq_options[i]['su_stabilisation'] = tau
+            else:
+                eq_options[i]['supg_stabilisation'] = tau
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(stabilisation, self.__class__.__name__))
@@ -792,9 +804,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.depth[i],
             stabilisation=self.stabilisation_tracer,
             anisotropic=op.anisotropic_stabilisation,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
-            characteristic_speed=self.op.characteristic_speed,
-            characteristic_diffusion=self.op.characteristic_diffusion,
+            sipg_parameter=op.sipg_parameter,
+            su_stabilisation=op.su_stabilisation,
+            supg_stabilisation=op.supg_stabilisation,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -881,9 +893,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.depth[i],
             stabilisation=self.stabilisation_tracer,
             anisotropic=op.anisotropic_stabilisation,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
-            characteristic_speed=self.op.characteristic_speed,
-            characteristic_diffusion=self.op.characteristic_diffusion,
+            sipg_parameter=op.sipg_parameter,
+            su_stabilisation=op.su_stabilisation,
+            supg_stabilisation=op.supg_stabilisation,
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
@@ -945,14 +957,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError("Error estimation for conservative tracers not implemented.")
         else:
             estimator = TracerGOErrorEstimator
+        op = self.tracer_options[i]
         self.error_estimators[i].tracer = estimator(
             self.Q[i],
             self.depth[i],
             stabilisation=self.stabilisation_tracer,
             anisotropic=self.op.anisotropic_stabilisation,
-            sipg_parameter=self.tracer_options[i].sipg_parameter,
-            characteristic_speed=self.op.characteristic_speed,
-            characteristic_diffusion=self.op.characteristic_diffusion,
+            sipg_parameter=op.sipg_parameter,
+            su_stabilisation=op.su_stabilisation,
+            supg_stabilisation=op.supg_stabilisation,
         )
 
     def create_sediment_error_estimator_step(self, i):

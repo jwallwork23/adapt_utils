@@ -54,8 +54,8 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
 
         # Apply SUPG stabilisation
         if not self.horizontal_dg and self.stabilisation in ('su', 'supg'):
-            assert hasattr(self, 'tau')
-            arg = arg + self.tau*dot(uv, grad(arg))
+            tau = self.supg_stabilisation
+            arg = arg + tau*dot(uv, grad(arg))
 
         return -self.p0test*arg*inner(uv, grad(solution))*self.dx
 
@@ -139,10 +139,10 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_2d')
         if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
-            assert hasattr(self, 'tau')
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
             uv = self.corr_factor*uv
-            arg = arg + self.tau*dot(uv, grad(arg))
+            tau = self.supg_stabilisation
+            arg = arg + tau*dot(uv, grad(arg))
 
         return self.p0test*arg*div(dot(diff_tensor, grad(solution)))*self.dx
 
@@ -229,10 +229,10 @@ class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         # Apply SUPG stabilisation
         uv = fields_old.get('uv_2d')
         if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
-            assert hasattr(self, 'tau')
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
             uv = self.corr_factor*uv
-            arg = arg + self.tau*dot(uv, grad(arg))
+            tau = self.supg_stabilisation
+            arg = arg + tau*dot(uv, grad(arg))
 
         f += self.p0test*inner(source, arg)*self.dx
         return f
@@ -247,27 +247,36 @@ class TracerGOErrorEstimator(GOErrorEstimator):
                  stabilisation='lax_friedrichs',
                  anisotropic=False,
                  sipg_parameter=Constant(10.0),
-                 characteristic_speed=Constant(1.0),
-                 characteristic_diffusion=Constant(0.1)):
-        super(TracerGOErrorEstimator, self).__init__(
-            function_space, anisotropic=anisotropic, stabilisation=stabilisation,
-        )
-
-        # Calculate SU / SUPG parameter
-        if stabilisation is not None and stabilisation.lower() in ('su', 'supg'):
-            h = self.cellsize
-            U = characteristic_speed
-            self.tau = 0.5*h/U
-            D = characteristic_diffusion
-            if D is not None:
-                Pe = 0.5*h*U/D
-                self.tau *= min_value(1, Pe/3)
-
-        # Add terms
+                 su_stabilisation=None,
+                 supg_stabilisation=None):
+        self.stabilisation = stabilisation
+        self.su_stabilisation = su_stabilisation
+        self.supg_stabilisation = supg_stabilisation
+        super(TracerGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
         args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_parameter)
         self.add_term(TracerHorizontalAdvectionGOErrorEstimatorTerm(*args), 'explicit')
         self.add_term(TracerHorizontalDiffusionGOErrorEstimatorTerm(*args), 'explicit')
         self.add_term(TracerSourceGOErrorEstimatorTerm(*args), 'source')
+
+    def add_term(self, term, label):
+        """
+        Add :class:`term` to the equation as a :str:`label` type term.
+
+        Also, pass over the chosen cell size measure and any stabilisation parameters.
+        """
+        super(TracerGOErrorEstimator, self).add_term(term, label)
+        key = term.__class__.__name__
+        self.terms[key].stabilisation = self.stabilisation
+        self.terms[key].su_stabilisation = self.su_stabilisation
+        self.terms[key].supg_stabilisation = self.supg_stabilisation
+
+    def mass_term(self, solution, arg, velocity=None):
+        """
+        Account for SUPG stabilisation in mass term.
+        """
+        if self.stabilisation == 'supg':
+            arg = arg + tau*dot(velocity, grad(arg))
+        return self.p0test*inner(solution, arg)*dx
 
     def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):
         adj = Function(self.P0).assign(1.0)
