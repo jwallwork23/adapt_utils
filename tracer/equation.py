@@ -200,8 +200,9 @@ class TracerEquation2D(Equation):
         :kwarg anisotropic: toggle anisotropic cell size measure
         :kwarg sipg_parameter: :class: `Constant` or :class: `Function` penalty parameter for SIPG
         """
-        super(TracerEquation2D, self).__init__(function_space, anisotropic=anisotropic)
-        self.stabilisation = stabilisation
+        super(TracerEquation2D, self).__init__(
+            function_space, stabilisation=stabilisation, anisotropic=anisotropic
+        )
 
         # Calculate SU / SUPG parameter
         if stabilisation is not None and stabilisation.lower() in ('su', 'supg'):

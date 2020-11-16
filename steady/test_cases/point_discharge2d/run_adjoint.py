@@ -25,7 +25,7 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-family = args.family or 'dg'
+family = args.family or 'cg'
 assert family in ('cg', 'dg')
 offset = bool(args.offset or False)
 kwargs = {

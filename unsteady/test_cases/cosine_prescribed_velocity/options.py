@@ -26,6 +26,7 @@ class CosinePrescribedVelocityOptions(CoupledOptions):
         # self.base_diffusivity = 1.0e-8
         self.base_diffusivity = 0.0
         self.base_velocity = [1.0, 0.0]
+        self.characteristic_speed = Constant(1.0)
 
     def set_boundary_conditions(self, prob, i):
         boundary_conditions = {

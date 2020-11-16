@@ -53,16 +53,9 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         uv = self.corr_factor*fields_old['uv_2d']
 
         # Apply SUPG stabilisation
-        tau = fields.get('supg_stabilisation')
-        if not self.horizontal_dg and tau is not None:
-            h = self.cellsize
-            unorm = sqrt(dot(uv, uv))
-            tau = 0.5*h/unorm
-            diffusivity_h = fields_old['diffusivity_h']
-            if diffusivity_h is not None:
-                Pe = 0.5*h*unorm/diffusivity_h
-                tau *= min_value(1, Pe/3)
-            arg = arg + tau*dot(uv, grad(arg))
+        if not self.horizontal_dg and self.stabilisation in ('su', 'supg'):
+            assert hasattr(self, 'tau')
+            arg = arg + self.tau*dot(uv, grad(arg))
 
         return -self.p0test*arg*inner(uv, grad(solution))*self.dx
 
@@ -144,19 +137,12 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
                                  [0, diffusivity_h, ]])
 
         # Apply SUPG stabilisation
-        tau = fields.get('supg_stabilisation')
-        if not self.horizontal_dg and tau is not None:
+        uv = fields_old.get('uv_2d')
+        if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
+            assert hasattr(self, 'tau')
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
-            uv = self.corr_factor*fields_old['uv_2d']
-            if uv is not None:
-                h = self.cellsize
-                unorm = sqrt(dot(uv, uv))
-                tau = 0.5*h/unorm
-                diffusivity_h = fields_old['diffusivity_h']
-                if diffusivity_h is not None:
-                    Pe = 0.5*h*unorm/diffusivity_h
-                    tau *= min_value(1, Pe/3)
-                arg = arg + tau*dot(uv, grad(arg))
+            uv = self.corr_factor*uv
+            arg = arg + self.tau*dot(uv, grad(arg))
 
         return self.p0test*arg*div(dot(diff_tensor, grad(solution)))*self.dx
 
@@ -241,19 +227,12 @@ class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
             return f
 
         # Apply SUPG stabilisation
-        tau = fields.get('supg_stabilisation')
-        if not self.horizontal_dg and tau is not None:
-            if fields_old.get('uv_2d') is not None:
-                self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
-                uv = self.corr_factor*fields_old['uv_2d']
-                h = self.cellsize
-                unorm = sqrt(dot(uv, uv))
-                tau = 0.5*h/unorm
-                diffusivity_h = fields_old['diffusivity_h']
-                if diffusivity_h is not None:
-                    Pe = 0.5*h*unorm/diffusivity_h
-                    tau *= min_value(1, Pe/3)
-                arg = arg + tau*dot(uv, grad(arg))
+        uv = fields_old.get('uv_2d')
+        if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
+            assert hasattr(self, 'tau')
+            self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
+            uv = self.corr_factor*uv
+            arg = arg + self.tau*dot(uv, grad(arg))
 
         f += self.p0test*inner(source, arg)*self.dx
         return f
@@ -265,12 +244,27 @@ class TracerGOErrorEstimator(GOErrorEstimator):
     """
     def __init__(self, function_space,
                  depth=None,
-                 use_lax_friedrichs=True,
+                 stabilisation='lax_friedrichs',
+                 anisotropic=False,
                  sipg_parameter=Constant(10.0),
-                 anisotropic=False):
-        super(TracerGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
+                 characteristic_speed=Constant(1.0),
+                 characteristic_diffusion=Constant(0.1)):
+        super(TracerGOErrorEstimator, self).__init__(
+            function_space, anisotropic=anisotropic, stabilisation=stabilisation,
+        )
 
-        args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
+        # Calculate SU / SUPG parameter
+        if stabilisation is not None and stabilisation.lower() in ('su', 'supg'):
+            h = self.cellsize
+            U = characteristic_speed
+            self.tau = 0.5*h/U
+            D = characteristic_diffusion
+            if D is not None:
+                Pe = 0.5*h*U/D
+                self.tau *= min_value(1, Pe/3)
+
+        # Add terms
+        args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_parameter)
         self.add_term(TracerHorizontalAdvectionGOErrorEstimatorTerm(*args), 'explicit')
         self.add_term(TracerHorizontalDiffusionGOErrorEstimatorTerm(*args), 'explicit')
         self.add_term(TracerSourceGOErrorEstimatorTerm(*args), 'source')

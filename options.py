@@ -408,6 +408,12 @@ class CoupledOptions(Options):
         Characteristic velocity value to use in Reynolds and Peclet number calculations. Typically,
         this is set using a `Constant`, but it could also be spatially varying.
         """)
+    characteristic_speed = FiredrakeScalarExpression(None, allow_none=True, help="""
+        Characteristic speed value used in SU/SUPG stabilisation.
+        """)
+    characteristic_diffusion = FiredrakeScalarExpression(None, allow_none=True, help="""
+        Characteristic diffusion value used in SU/SUPG stabilisation.
+        """)
 
     # Tracer transport model
     solve_tracer = Bool(False, help="Toggle solving the tracer transport model.").tag(config=True)

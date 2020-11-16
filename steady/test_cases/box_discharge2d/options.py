@@ -32,6 +32,8 @@ class PowerOptions(TracerOptions):
         self.region_of_interest = [(3., 2., 0.1)] if centred else [(3., 2.5, 0.1)]
         self.base_diffusivity = 1.0
         self.base_velocity = [15.0, 0.0]
+        self.characteristic_speed = Constant(15.0)
+        self.characteristic_diffusion = Constant(1.0)
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)
