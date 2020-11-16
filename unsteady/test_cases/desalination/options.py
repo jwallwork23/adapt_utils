@@ -14,14 +14,14 @@ class DesalinationOutfallOptions(CoupledOptions):
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
-    def __init__(self, aligned=False, spun=False, **kwargs):
+    def __init__(self, level=0, aligned=False, spun=False, **kwargs):
         super(DesalinationOutfallOptions, self).__init__(**kwargs)
         self.solve_swe = True
         self.solve_tracer = spun
         self.spun = spun
 
         # Domain
-        self.default_mesh = os.path.join(self.resource_dir, 'channel.msh')
+        self.default_mesh = Mesh(os.path.join(self.resource_dir, 'channel_{:d}.msh'.format(level)))
 
         # Hydrodynamics
         self.base_viscosity = 3.0
@@ -34,10 +34,10 @@ class DesalinationOutfallOptions(CoupledOptions):
         self.timestepper = 'CrankNicolson'
         self.start_time = 0.0
         self.T_tide = 1.24*3600
-        self.T_ramp = 2*self.T_tide
+        self.T_ramp = 3.855*self.T_tide
         self.end_time = self.T_tide
-        self.dt = 3.0
-        self.dt_per_export = 20
+        self.dt = 2.232
+        self.dt_per_export = 10
 
         # Tracer FEM
         self.degree_tracer = 1
@@ -86,6 +86,9 @@ class DesalinationOutfallOptions(CoupledOptions):
         W = self.domain_width
         bathymetry.interpolate(100.0 + 50.0*(W - y)/W)
         return bathymetry
+
+    def set_quadratic_drag_coefficient(self, fs):
+        return Constant(self.friction_coeff)
 
     def set_boundary_conditions(self, prob, i):
         self.elev_in[i] = Function(prob.V[i].sub(1))
