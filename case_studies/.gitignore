@@ -13,6 +13,7 @@ tohoku/resources/tohoku_utm.nc
 tohoku/resources/surf_zeroed_utm.nc
 tohoku/resources/log
 tohoku/resources/boundaries_old
+tohoku/resources/boundaries_curved
 tohoku/resources/meshes_old
 tohoku/notebooks/plotting.ipynb
 tohoku/notebooks/02-okada/*.npy
