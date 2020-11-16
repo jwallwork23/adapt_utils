@@ -21,7 +21,7 @@ class DesalinationOutfallOptions(CoupledOptions):
         self.spun = spun
 
         # Domain
-        self.default_mesh = os.path.join(os.path.dirname(__file__), 'channel.msh')
+        self.default_mesh = os.path.join(self.resource_dir, 'channel.msh')
 
         # Hydrodynamics
         self.base_viscosity = 3.0
