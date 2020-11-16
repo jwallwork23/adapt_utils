@@ -36,10 +36,11 @@ kwargs = {
 }
 op = PointDischarge2dOptions(approach='fixed_mesh', **kwargs)
 op.tracer_family = family
-op.stabilisation_tracer = args.stabilisation
-op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
+stabilisation = args.stabilisation or 'supg'
+op.stabilisation_tracer = None if stabilisation == 'none' else stabilisation
+op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
 alignment = 'offset' if offset else 'aligned'
-op.di = create_directory(os.path.join(op.di, args.stabilisation or family, alignment))
+op.di = create_directory(os.path.join(op.di, op.stabilisation_tracer or family, alignment))
 op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 
 # TODO: Limiters?
