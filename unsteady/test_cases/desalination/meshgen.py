@@ -6,7 +6,7 @@ from adapt_utils.unsteady.test_cases.desalination.options import DesalinationOut
 
 # Parse for refinement level
 parser = argparse.ArgumentParser()
-parser.add_argument("refinement_level", help="Number of refinements of farm region")
+parser.add_argument("refinement_level", help="Number of refinements in central box")
 level = int(parser.parse_args().refinement_level)
 
 # Boiler plate

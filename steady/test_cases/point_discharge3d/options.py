@@ -69,7 +69,7 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         return boundary_conditions
 
     def set_calibrated_radius(self):
-        r = 0.00000001  # TODO: Rerun for 3D case
+        r = 6.97574750e-02  # (Level 1, anisotropic SUPG)  # TODO: Higher level
         return [(1.0 + self.shift, 5.0, 5.0, r)]
 
     def analytical_solution(self, fs):
