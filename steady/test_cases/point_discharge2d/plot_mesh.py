@@ -28,7 +28,7 @@ kwargs = {
 }
 op = PointDischarge2dOptions(**kwargs)
 op.tracer_family = args.family
-op.stabilisation = args.stabilisation
+op.stabilisation_tracer = args.stabilisation
 op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 op.di = os.path.join(op.di, args.stabilisation or args.family)
 

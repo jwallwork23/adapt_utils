@@ -42,9 +42,8 @@ class DesalinationOutfallOptions(CoupledOptions):
         # Tracer FEM
         self.degree_tracer = 1
         self.tracer_family = 'cg'
-        self.stabilisation = 'SUPG'  # TODO: Separate stabilisation for tracer
+        self.stabilisation_tracer = 'SUPG'
         self.use_limiter_for_tracers = False
-        self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
 
         # Hydrodynamics FEM
         self.degree = 1
@@ -53,13 +52,17 @@ class DesalinationOutfallOptions(CoupledOptions):
         self.stabilisation = 'lax_friedrichs'
         self.lax_friedrichs_velocity_scaling_factor = Constant(1.0)
 
-        # Source / receiver
+        # Source (outlet pipe)
         self.source_value = 100.0
-        self.source_discharge = 0.1
-        outlet_x = 1500.0
-        self.source_location = [(1500.0, 750.0, 50.0)]  # Outlet
+        self.source_discharge = 0.1  # TODO: UNUSED
+        outlet_x = 0.0
+        outlet_y = 250.0
+        self.source_loc = [(outlet_x, outlet_y, 50.0)]  # Outlet
+
+        # Receiver (inlet pipe)
         inlet_x = outlet_x if aligned else 750.0
-        self.region_of_interest = [(inlet_x, 250.0, 5.0)]  # Inlet
+        inlet_y = -250.0
+        self.region_of_interest = [(inlet_x, inlet_y, 5.0)]  # Inlet
 
         # Boundary forcing
         self.max_amplitude = 0.5

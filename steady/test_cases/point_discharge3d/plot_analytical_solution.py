@@ -19,7 +19,7 @@ kwargs = {
 }
 op = PointDischarge3dOptions(approach='fixed_mesh', **kwargs)
 op.tracer_family = 'cg'
-op.stabilisation = 'supg'
+op.stabilisation_tracer = 'supg'
 op.anisotropic_stabilisation = True
 
 # Get analytical solution

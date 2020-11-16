@@ -50,6 +50,7 @@ class BeachOptions(CoupledOptions):
         self.hessian_recovery = 'dL2'
         self.grad_depth_viscosity = True
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude

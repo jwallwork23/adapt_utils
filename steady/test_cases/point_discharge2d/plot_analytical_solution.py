@@ -26,11 +26,10 @@ kwargs = {
     'level': int(args.level or 0),
     'plot_pvd': False,
     'debug': bool(args.debug or False),
-    'stabilisation': args.stabilisation,
 }
 op = PointDischarge2dOptions(approach='fixed_mesh', **kwargs)
 op.tracer_family = family
-op.stabilisation = args.stabilisation
+op.stabilisation_tracer = args.stabilisation
 op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 op.di = os.path.join(op.di, args.stabilisation or args.family)
 

@@ -29,8 +29,9 @@ kwargs = {
 }
 op = PointDischarge2dOptions(approach='fixed_mesh', **kwargs)
 op.tracer_family = family
-op.stabilisation = args.stabilisation
-op.di = os.path.join(op.di, args.stabilisation or family)
+op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
+op.stabilisation_tracer = None if args.stabilisation == 'none' else 'supg'
+op.di = os.path.join(op.di, op.stabilisation_tracer or family)
 op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 
 # TODO: Limiters?

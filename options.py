@@ -461,6 +461,9 @@ class CoupledOptions(Options):
         When defining an enriched sediment finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)  # TODO: UNUSED
+    stabilisation_sediment = Unicode(None, allow_none=True, help="""
+        Stabilisation approach for sediment model, set to 'lax_friedrichs', if not None.
+        """).tag(config=True)
     sipg_parameter_sediment = FiredrakeScalarExpression(None, allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the sediment model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
@@ -570,13 +573,27 @@ class CoupledOptions(Options):
         super(CoupledOptions, self).__init__(**kwargs)
 
         # Check setup
-        if not np.any(self.solve_swe, self.solve_tracer, self.solve_sediment, self.solve_exner):
+        if not np.any([self.solve_swe, self.solve_tracer, self.solve_sediment, self.solve_exner]):
             print_output("No equation set specified.")
             sys.exit(0)
         if self.solve_tracer and self.solve_sediment:
             raise NotImplementedError("Model does not support both tracers and sediment.")
         if self.solve_exner and not self.solve_sediment:
             raise NotImplementedError("Model does not support Exner without sediment.")
+
+        # Metadata
+        self.solve_flags = (
+            self.solve_swe,
+            self.solve_tracer,
+            self.solve_sediment,
+            self.solve_exner,
+        )
+        self.solve_fields = (
+            "shallow_water",
+            "tracer",
+            "sediment",
+            "bathymetry",
+        )
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()

@@ -46,6 +46,7 @@ class BeachOptions(CoupledOptions):
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         self.morphological_acceleration_factor = Constant(10000)
 

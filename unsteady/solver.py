@@ -78,12 +78,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     op.adjoint_solver_parameters[model]['ksp_monitor'] = None
                     op.adjoint_solver_parameters[model]['snes_monitor'] = None
         self.tracer_options = [AttrDict() for i in range(op.num_meshes)]
+        self.stabilisation_tracer = op.stabilisation_tracer
         self.sediment_options = [AttrDict() for i in range(op.num_meshes)]
+        self.stabilisation_sediment = op.stabilisation_sediment
         self.exner_options = [AttrDict() for i in range(op.num_meshes)]
         static_options = {
             'use_automatic_sipg_parameter': op.use_automatic_sipg_parameter,
             # 'check_tracer_conservation': True,  # TODO
-            'use_lax_friedrichs_tracer': op.stabilisation == 'lax_friedrichs',
+            'use_lax_friedrichs_tracer': op.stabilisation_tracer == 'lax_friedrichs',
             'use_limiter_for_tracers': op.use_limiter_for_tracers and op.tracer_family == 'dg',
             'sipg_parameter': None,
             'use_tracer_conservative_form': op.use_tracer_conservative_form,
@@ -433,6 +435,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def _set_tracer_stabilisation_step(self, i, sediment=False):
         op = self.op
         eq_options = self.sediment_options if sediment else self.tracer_options
+        stabilisation = self.stabilisation_sediment if sediment else self.stabilisation_tracer
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
         family = op.sediment_family if sediment else op.tracer_family
@@ -468,27 +471,29 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Stabilisation
         eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = None
-        if self.stabilisation is None:
+        if stabilisation is None:
             return
-        elif self.stabilisation == 'lax_friedrichs':
+        elif stabilisation == 'lax_friedrichs':
             assert hasattr(op, 'lax_friedrichs_tracer_scaling_factor')
             assert family == 'dg'
             eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = op.lax_friedrichs_tracer_scaling_factor  # TODO: Allow mesh dependent
-        elif self.stabilisation == 'su':
+        elif stabilisation == 'su':
             assert family == 'cg'
             eq_options[i]['su_stabilisation'] = True
-        elif self.stabilisation == 'supg':
+        elif stabilisation == 'supg':
             assert family == 'cg'
-            assert self.op.timestepper == 'SteadyState'  # TODO
+            assert self.op.timestepper == 'SteadyState'  # TODO: unsteady case
             eq_options[i]['supg_stabilisation'] = True
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
-            raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
+            raise ValueError(msg.format(stabilisation, self.__class__.__name__))
 
     # --- Solution initialisation and transfer
 
     def set_initial_condition(self, **kwargs):
-        """Apply initial condition(s) for forward solution(s) on first mesh."""
+        """
+        Apply initial condition(s) for forward solution(s) on first mesh.
+        """
         self.op.set_initial_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.op.set_initial_condition_tracer(self)
@@ -533,7 +538,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # TODO: allow t-adaptation on subinterval
 
     def set_terminal_condition(self, **kwargs):
-        """Apply terminal condition(s) for adjoint solution(s) on terminal mesh."""
+        """
+        Apply terminal condition(s) for adjoint solution(s) on terminal mesh.
+        """
         self.op.set_terminal_condition(self, **kwargs)
         if self.op.solve_tracer:
             self.op.set_terminal_condition_tracer(self, **kwargs)
@@ -549,18 +556,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
         If the shallow water equations are not solved then the fluid velocity
         and surface elevation are set via the initial condition.
         """
-        if self.op.solve_swe:
+        op = self.op
+        if op.solve_swe:
             self.project(self.fwd_solutions, i, j)
         else:
-            self.op.set_initial_condition(self, **kwargs)
-
-        # TODO: Stash the below as metadata
-        flgs = (self.op.solve_tracer, self.op.solve_sediment, self.op.solve_exner)
-        names = ("tracer", "sediment", "bathymetry")
-        spaces = (self.Q, self.Q, self.W)
+            op.set_initial_condition(self, **kwargs)
 
         # Project between spaces, constructing if necessary
-        for flg, name, space in zip(flgs, names, spaces):
+        for flg, name in zip(op.solve_flags[1:], op.solve_fields[1:]):
+            space = self.get_function_space(name)
             if flg:
                 f = self.__getattribute__('fwd_solutions_{:s}'.format(name))
                 if f[i] is None:
@@ -576,18 +580,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
         If the adjoint shallow water equations are not solved then the adjoint
         fluid velocity and surface elevation are set via the terminal condition.
         """
-        if self.op.solve_swe:
+        op = self.op
+        if op.solve_swe:
             self.project(self.adj_solutions, i, j)
         else:
-            self.op.set_terminal_condition(self, **kwargs)
-
-        # TODO: Stash the below as metadata
-        flgs = (self.op.solve_tracer, self.op.solve_sediment, self.op.solve_exner)
-        names = ("tracer", "sediment", "bathymetry")
-        spaces = (self.Q, self.Q, self.W)
+            op.set_terminal_condition(self, **kwargs)
 
         # Project between spaces, constructing if necessary
-        for flg, name, space in zip(flgs, names, spaces):
+        for flg, name in zip(op.solve_flags[1:], op.solve_fields[1:]):
+            space = self.get_function_space(name)
             if flg:
                 f = self.__getattribute__('adj_solutions_{:s}'.format(name))
                 if f[i] is None:
@@ -1008,11 +1009,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.approach == 'lagrangian':
             self.mesh_velocities[i] = u
             fields['uv_{:d}d'.format(self.dim)] = Constant(as_vector(np.zeros(self.dim)))
-        if self.stabilisation == 'lax_friedrichs':
+        if self.stabilisation_tracer == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
-        elif self.stabilisation == 'su':
+        elif self.stabilisation_tracer == 'su':
             fields['su_stabilisation'] = True
-        elif self.stabilisation == 'supg':
+        elif self.stabilisation_tracer == 'supg':
             fields['supg_stabilisation'] = True
         return fields
 
@@ -1035,7 +1036,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.approach == 'lagrangian':
             self.mesh_velocities[i] = u
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
-        if self.stabilisation == 'lax_friedrichs':
+        if self.stabilisation_sediment == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.sediment_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
 
@@ -1631,7 +1632,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for i, sol in enumerate(solutions):
 
                 # Account for SUPG stabilisation
-                if op.stabilisation == 'supg':
+                supg = op.adapt_field == 'tracer' and op.stabilisation_tracer == 'supg'
+                supg |= op.adapt_field == 'sediment' and op.stabilisation_sediment == 'supg'
+                if supg:
                     cell_size = anisotropic_cell_size if op.anisotropic_stabilisation else CellSize
                     h = cell_size(self.meshes[i])
                     u, eta = self.fwd_solutions[i].split()

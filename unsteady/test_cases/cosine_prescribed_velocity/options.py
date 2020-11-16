@@ -12,9 +12,9 @@ class CosinePrescribedVelocityOptions(CoupledOptions):
         self.solve_swe = False
         self.solve_tracer = True
         if self.tracer_family == 'cg':
-            self.stabilisation = 'supg'
+            self.stabilisation_tracer = 'supg'
         elif self.tracer_family == 'dg':
-            self.stabilisation = 'lax_friedrichs'
+            self.stabilisation_tracer = 'lax_friedrichs'
 
         lx, ly = 10, 10
         self.default_mesh = PeriodicRectangleMesh(n, n, lx, ly, direction='x')

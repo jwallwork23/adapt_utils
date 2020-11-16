@@ -45,7 +45,7 @@ kwargs = {
 
     # Mesh adaptation
     'approach': args.approach or 'dwr',
-    'target': float(args.target or 1.0e+03),
+    'target': float(args.target or 5.0e+02),
     'norm_order': p,
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
@@ -57,12 +57,10 @@ kwargs = {
 }
 op = PointDischarge2dOptions(**kwargs)
 op.tracer_family = family
-stabilisation = args.stabilisation or 'supg'
-op.stabilisation = None if stabilisation == 'none' else stabilisation
-anisotropic_stabilisation = args.anisotropic_stabilisation
-op.anisotropic_stabilisation = False if anisotropic_stabilisation == 0 else True
+op.stabilisation_tracer = None if args.stabilisation == 'none' else 'supg'
+op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
 op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
-op.di = os.path.join(op.di, args.stabilisation or family)
+op.di = os.path.join(op.di, op.stabilisation_tracer or family)
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
 op.print_debug(op)
 
