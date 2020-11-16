@@ -42,7 +42,7 @@ class DesalinationOutfallOptions(CoupledOptions):
         # Tracer FEM
         self.degree_tracer = 1
         self.tracer_family = 'cg'
-        self.stabilisation_tracer = 'SUPG'
+        self.stabilisation_tracer = 'supg'
         self.use_limiter_for_tracers = False
 
         # Hydrodynamics FEM

@@ -422,20 +422,22 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     op.print_debug(msg.format(i, v.min()[1], v.max()[1]))
 
         # Stabilisation
-        if self.stabilisation is None:
+        stabilisation = None if self.stabilisation is None else self.stabilisation.lower()
+        if stabilisation is None:
             return
-        elif self.stabilisation == 'lax_friedrichs':
+        elif stabilisation == 'lax_friedrichs':
             assert op.family != 'cg-cg'
             assert hasattr(op, 'lax_friedrichs_velocity_scaling_factor')
             self.shallow_water_options[i]['lax_friedrichs_velocity_scaling_factor'] = op.lax_friedrichs_velocity_scaling_factor  # TODO: Allow mesh dependent
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
-            raise ValueError(msg.format(self.stabilisation, self.__class__.__name__))
+            raise ValueError(msg.format(stabilisation, self.__class__.__name__))
 
     def _set_tracer_stabilisation_step(self, i, sediment=False):
         op = self.op
         eq_options = self.sediment_options if sediment else self.tracer_options
         stabilisation = self.stabilisation_sediment if sediment else self.stabilisation_tracer
+        stabilisation = None if stabilisation is None else stabilisation.lower()
 
         # Symmetric Interior Penalty Galerkin (SIPG) method
         family = op.sediment_family if sediment else op.tracer_family
