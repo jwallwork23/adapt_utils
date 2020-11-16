@@ -45,10 +45,9 @@ class PointDischarge2dOptions(CoupledOptions):
         # FEM
         self.degree_tracer = 1
         self.tracer_family = 'cg'
-        self.stabilisation = 'SUPG'
+        self.stabilisation_tracer = 'SUPG'
         self.use_automatic_sipg_parameter = True
         self.use_limiter_for_tracers = False
-        self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
 
         # Hydrodynamics
         self.base_velocity = [1.0, 0.0]
@@ -71,13 +70,17 @@ class PointDischarge2dOptions(CoupledOptions):
         self.h_min = 1.0e-10
         self.h_max = 1.0e+02
 
-        # Robust solver parameters
+        # Solver parameters
         self.solver_parameters['tracer'] = {
-            'mat_type': 'aij',
-            'ksp_type': 'preonly',
-            'pc_type': 'lu',
-            'pc_factor_mat_solver_type': 'mumps',
+            'ksp_type': 'gmres',
+            'pc_type': 'sor',
         }
+        # self.solver_parameters['tracer'] = {
+        #     'mat_type': 'aij',
+        #     'ksp_type': 'preonly',
+        #     'pc_type': 'lu',
+        #     'pc_factor_mat_solver_type': 'mumps',
+        # }
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)
@@ -100,7 +103,7 @@ class PointDischarge2dOptions(CoupledOptions):
 
         Note that the calibrated radii are computed on mesh level 4 in the hierarchy.
         """
-        stabilisation = self.stabilisation
+        stabilisation = self.stabilisation_tracer
         calibration_results = {
             'cg': {
                 None: 0.05606309,

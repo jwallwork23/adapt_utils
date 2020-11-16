@@ -41,6 +41,7 @@ class TrenchSedimentOptions(CoupledOptions):
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         # Initial
         self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)

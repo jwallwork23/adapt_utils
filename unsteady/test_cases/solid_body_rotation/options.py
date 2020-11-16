@@ -69,9 +69,9 @@ class LeVequeOptions(CoupledOptions):
 
         # Spatial discretisation
         if self.tracer_family == 'cg':
-            self.stabilisation = 'SUPG'
+            self.stabilisation_tracer = 'SUPG'
         elif self.tracer_family == 'dg':
-            self.stabilisation = 'lax_friedrichs'
+            self.stabilisation_tracer = 'lax_friedrichs'
             self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
 
         # Solver

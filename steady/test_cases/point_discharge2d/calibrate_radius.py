@@ -37,7 +37,7 @@ level = int(args.level)
 op = PointDischarge2dOptions(level=level)
 assert args.family in ('cg', 'dg')
 op.tracer_family = args.family or 'cg'
-op.stabilisation = args.stabilisation
+op.stabilisation_tracer = args.stabilisation
 op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 op.di = os.path.join(op.di, args.stabilisation or args.family)
 mesh = op.default_mesh
@@ -191,8 +191,8 @@ r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.01, 1), callback=call
 print_output("Logging...")
 logstr = "level: {:d}\n".format(level)
 logstr += "family: {:s}\n".format(op.tracer_family.upper())
-if op.stabilisation is not None:
-    logstr += "stabilisation: {:}\n".format(op.stabilisation.upper())
+if op.stabilisation_tracer is not None:
+    logstr += "stabilisation: {:}\n".format(op.stabilisation_tracer.upper())
 logstr += "calibrated radius: {:.8f}\n".format(r_calibrated.dat.data[0])
 print_output(logstr)
 with open(os.path.join(op.di, "log"), "a") as log:

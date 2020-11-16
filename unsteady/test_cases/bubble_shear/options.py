@@ -16,9 +16,9 @@ class BubbleOptions(CoupledOptions):
         self.solve_tracer = True
         self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
         if self.tracer_family == 'cg':
-            self.stabilisation = 'supg'
+            self.stabilisation_tracer = 'supg'
         elif self.tracer_family == 'dg':
-            self.stabilisation = 'lax_friedrichs'
+            self.stabilisation_tracer = 'lax_friedrichs'
         else:
             raise NotImplementedError
 
