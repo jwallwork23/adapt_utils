@@ -1,7 +1,6 @@
 from thetis import *
 
 import argparse
-from matplotlib import ticker
 import matplotlib.pyplot as plt
 import numpy as np
 import os
