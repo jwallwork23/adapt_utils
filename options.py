@@ -1,7 +1,9 @@
 from __future__ import absolute_import
 from thetis import *
 from thetis.configuration import *
+
 import os
+import sys
 
 from . import misc
 from .mesh import MeshStats
@@ -32,7 +34,6 @@ class Options(FrozenConfigurable):
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)
     periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
-    anisotropic_stabilisation = Bool(False).tag(config=True)
 
     # Time discretisation
     timestepper = Enum(
@@ -72,8 +73,11 @@ class Options(FrozenConfigurable):
 
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="""
-        Stabilisation approach, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if not None.
-        """).tag(config=True)  # TODO: Account for different models
+        Stabilisation approach to use for hydrodynamic model.
+        """).tag(config=True)
+    anisotropic_stabilisation = Bool(False, help="""
+        Account for mesh anisotropy by using an alternative cell size measure to `CellSize`.
+        """).tag(config=True)
     use_automatic_sipg_parameter = Bool(True, help="""
         Toggle automatic generation of symmetric interior penalty method.""").tag(config=True)
 
@@ -99,16 +103,20 @@ class Options(FrozenConfigurable):
 
     # Metric based
     rescaling = PositiveFloat(0.85, help="""
-        Scaling parameter for target number of vertices.""").tag(config=True)
+        Scaling parameter for target number of vertices.
+        """).tag(config=True)  # TODO: UNUSED?
     convergence_rate = PositiveFloat(6, help="""
-        Convergence rate parameter used in approach of [Carpio et al. 2013].""").tag(config=True)
+        Convergence rate parameter used in approach of [Carpio et al. 2013].
+        """).tag(config=True)
     h_min = PositiveFloat(1.0e-10, help="Minimum tolerated element size.").tag(config=True)
     h_max = PositiveFloat(5.0e+00, help="Maximum tolerated element size.").tag(config=True)
     max_anisotropy = PositiveFloat(1.0e+03, help="Maximum tolerated anisotropy.").tag(config=True)
     normalisation = Unicode('complexity', help="""
-        Metric normalisation approach, from {'complexity', 'error'}.""").tag(config=True)
+        Metric normalisation approach, from {'complexity', 'error'}.
+        """).tag(config=True)
     target = PositiveFloat(1.0e+2, help="""
-        Target complexity / inverse desired error for normalisation, as appropriate.""").tag(config=True)
+        Target complexity / inverse desired error for normalisation, as appropriate.
+        """).tag(config=True)
     norm_order = NonNegativeFloat(None, allow_none=True, help="""
         Degree p of Lp norm used in spatial normalisation. Use `None` to specify infinity norm.
         """).tag(config=True)
@@ -117,19 +125,14 @@ class Options(FrozenConfigurable):
     # Mesh movement
     pseudo_dt = PositiveFloat(0.1, help="Pseudo-timstep used in r-adaptation.").tag(config=True)
     r_adapt_maxit = PositiveInteger(1000, help="""
-        Maximum number of iterations in r-adaptation loop.""").tag(config=True)
+        Maximum number of iterations in r-adaptation loop.
+        """).tag(config=True)
     r_adapt_rtol = PositiveFloat(1.0e-8, help="""
-        Relative tolerance for residual in r-adaptation loop.""").tag(config=True)
-    nonlinear_method = Enum(
-        ['quasi_newton', 'relaxation'],
-        default_value='quasi_newton',
-        help="Method for solving nonlinear system under Monge-Ampere mesh movement.").tag(config=True)
-    prescribed_velocity = Unicode('fluid', allow_none=True, help="""
-        Prescribed velocity to use in ALE adaptation, if any.
-        """).tag(config=True)  # TODO: unused, see bottom of this file
-    prescribed_velocity_bc = Unicode(None, allow_none=True, help="""
-        Boundary conditions to apply to prescribed velocity (if any).
-        """).tag(config=True)  # TODO: unused, see bottom of this file
+        Relative tolerance for residual in r-adaptation loop.
+        """).tag(config=True)
+    nonlinear_method = Enum(['quasi_newton', 'relaxation'], default_value='quasi_newton', help="""
+        Method for solving nonlinear system under Monge-Ampere mesh movement.
+        """).tag(config=True)
 
     # Recovery
     hessian_recovery = Enum(
@@ -191,12 +194,14 @@ class Options(FrozenConfigurable):
         default_value='integrate',
         help="Method used to combine Hessians over timesteps.").tag(config=True)
     hessian_timestep_lag = PositiveFloat(1, help="""
-        Allow lagged Hessian computation by setting greater than one.""").tag(config=True)
+        Allow lagged Hessian computation by setting greater than one.
+        """).tag(config=True)
 
     # Goal-oriented adaptation
     region_of_interest = List(default_value=[], help="""
-    Spatial region related to quantity of interest""").tag(config=True)
-    estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)  # TODO: unused in unsteady
+        Spatial region related to quantity of interest.
+        """).tag(config=True)
+    estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)  # TODO: UNUSED
 
     # Adaptation loop
     min_adapt = NonNegativeInteger(0, help="""
@@ -206,13 +211,17 @@ class Options(FrozenConfigurable):
         Maximum number of mesh adaptations in outer loop.
         """).tag(config=True)
     element_rtol = PositiveFloat(0.005, help="""
-        Relative tolerance for convergence in mesh element count""").tag(config=True)
+        Relative tolerance for convergence in mesh element count
+        """).tag(config=True)
     qoi_rtol = PositiveFloat(0.005, allow_none=True, help="""
-        Relative tolerance for convergence in quantity of interest.""").tag(config=True)
+        Relative tolerance for convergence in quantity of interest.
+        """).tag(config=True)
     estimator_rtol = PositiveFloat(0.005, allow_none=True, help="""
-        Relative tolerance for convergence in error estimator.""").tag(config=True)
+        Relative tolerance for convergence in error estimator.
+        """).tag(config=True)
     target_base = PositiveFloat(10.0, help="""
-        Base for exponential increase/decay of target complexity/error within outer mesh adaptation loop.
+        Base for exponential increase/decay of target complexity/error within outer mesh adaptation
+        loop.
         """).tag(config=True)
     outer_iterations = PositiveInteger(1, help="""
         Number of iterations in outer adaptation loop.""").tag(config=True)
@@ -376,16 +385,29 @@ class CoupledOptions(Options):
     solve_swe = Bool(True, help="Toggle solving the shallow water model.").tag(config=True)
     grad_div_viscosity = Bool(False).tag(config=True)  # TODO: help
     grad_depth_viscosity = Bool(False).tag(config=True)  # TODO: help
-    wetting_and_drying = Bool(False).tag(config=True)  # TODO: help
-    wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(4.3)).tag(config=True)  # TODO: help
-    lax_friedrichs_velocity_scaling_factor = FiredrakeConstantTraitlet(
-        Constant(1.0), help="Scaling factor for Lax Friedrichs stabilisation term in horizontal momentum advection.").tag(config=True)
+    wetting_and_drying = Bool(False, help="""
+        Toggle use of Thetis' wetting-and-drying routine.
+        """).tag(config=True)
+    wetting_and_drying_alpha = FiredrakeScalarExpression(Constant(4.3), help="""
+        Scalar parameter used in Thetis' wetting-and-drying routine.
+        """).tag(config=True)
+    stabilisation = Unicode(None, allow_none=True, help="""
+        Stabilisation approach for shallow water model, either 'lax_friedrichs'} or None.
+        """).tag(config=True)
+    lax_friedrichs_velocity_scaling_factor = FiredrakeConstantTraitlet(Constant(1.0), help="""
+        Scaling factor for Lax Friedrichs stabilisation term in horizontal momentum advection.
+        """).tag(config=True)
     sipg_parameter = FiredrakeScalarExpression(None, allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the shallow water model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
         """).tag(config=True)
-    recover_vorticity = Bool(False).tag(config=True)  # TODO: help
-    characteristic_velocity = FiredrakeVectorExpression(None, allow_none=True)  # TODO: help
+    recover_vorticity = Bool(False, help="""
+        If True, a vorticity field is L2-projected from the hydrodynamics velocity output.
+        """).tag(config=True)
+    characteristic_velocity = FiredrakeVectorExpression(None, allow_none=True, help="""
+        Characteristic velocity value to use in Reynolds and Peclet number calculations. Typically,
+        this is set using a `Constant`, but it could also be spatially varying.
+        """)
 
     # Tracer transport model
     solve_tracer = Bool(False, help="Toggle solving the tracer transport model.").tag(config=True)
@@ -411,7 +433,13 @@ class CoupledOptions(Options):
         When defining an enriched tracer finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
         """).tag(config=True)  # TODO: UNUSED
-    lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
+    stabilisation_tracer = Unicode(None, allow_none=True, help="""
+        Stabilisation approach for tracer model, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if
+        not None.
+        """).tag(config=True)
+    lax_friedrichs_tracer_scaling_factor = FiredrakeScalarExpression(Constant(1.0), help="""
+        Scaling factor for Lax Friedrichs stabilisation term in tracer advection.
+        """).tag(config=True)
     sipg_parameter_tracer = FiredrakeScalarExpression(None, allow_none=True, help="""
         Optional user-provided symemetric interior penalty parameter for the tracer model.
         Can also be set automatically using :attr:`use_automatic_sipg_parameter`.
@@ -540,6 +568,15 @@ class CoupledOptions(Options):
         }
         self.adjoint_solver_parameters.update(self.solver_parameters)
         super(CoupledOptions, self).__init__(**kwargs)
+
+        # Check setup
+        if not np.any(self.solve_swe, self.solve_tracer, self.solve_sediment, self.solve_exner):
+            print_output("No equation set specified.")
+            sys.exit(0)
+        if self.solve_tracer and self.solve_sediment:
+            raise NotImplementedError("Model does not support both tracers and sediment.")
+        if self.solve_exner and not self.solve_sediment:
+            raise NotImplementedError("Model does not support Exner without sediment.")
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
