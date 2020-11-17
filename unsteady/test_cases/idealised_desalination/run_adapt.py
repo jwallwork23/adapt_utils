@@ -24,7 +24,7 @@ parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
-p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
+p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 10)  # NOTE
 
 
 # --- Set parameters

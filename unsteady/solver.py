@@ -2093,5 +2093,5 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.print("Converged number of mesh elements!")
                 break
 
-    def run_dwr(self, **kwargs):
+    def run_no_dwr(self, **kwargs):
         raise NotImplementedError
