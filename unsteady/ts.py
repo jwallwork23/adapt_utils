@@ -169,8 +169,35 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
         ee.inter_element_flux_terms = inter_element_flux_terms
         ee.bnd_flux_terms = bnd_flux_terms
 
-    def setup_strong_residual(self, solution, solution_old, adjoint):
-        raise NotImplementedError  # TODO
+    def setup_strong_residual(self, solution, solution_old):  # TODO: Account for non-scalar spaces
+        ee = self.error_estimator
+        assert ee is not None
+        u = solution
+        u_old = solution_old
+        u_nl = u_old if self.semi_implicit else u
+        f = self.fields
+        f_old = self.fields_old
+
+        # Time derivative
+        kwargs = {}
+        if 'Tracer' in self.equation.__class__.__name__:
+            uv = f_old.get('uv_2d', None)
+            uv = f_old.get('uv_3d', uv)
+            kwargs['velocity'] = uv
+        one = Function(solution.function_space()).assign(1.0)
+        residual = ee.mass_term(u, one, **kwargs)
+        residual += -ee.mass_term(u_old, one, **kwargs)
+
+        # Term from current timestep
+        ee.setup_strong_residual('all', u, u_nl, f, f)
+        residual += -self.dt_const*self.theta_const*ee.strong_residual_terms
+
+        # Term from previous timestep
+        ee.setup_strong_residual('all', u_old, u_old, f_old, f_old)
+        residual += -self.dt_const*(1-self.theta_const)*ee.strong_residual_terms
+
+        # Pass forms back to error estimator
+        ee.strong_residual_termss = residual
 
 
 class PressureProjectionPicard(thetis_ts.PressureProjectionPicard):
