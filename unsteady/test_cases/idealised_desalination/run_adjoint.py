@@ -37,9 +37,8 @@ op = IdealisedDesalinationOutfallOptions(**kwargs)
 
 tp = AdaptiveDesalinationProblem(op)
 cpu_timestamp = perf_counter()
-tp.solve_forward()
+tp.solve_adjoint()
 cpu_time = perf_counter() - cpu_timestamp
 logstr = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours\n"
 logstr = logstr.format(cpu_time, cpu_time/60, cpu_time/3600)
 print_output(logstr)
-print_output("Quantity of interest: {:.4e}".format(tp.quantity_of_interest()))

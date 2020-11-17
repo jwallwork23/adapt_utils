@@ -17,6 +17,7 @@ import shutil
 examples = [
     'steady/test_cases/point_discharge2d/run_adjoint.py',
     'steady/test_cases/point_discharge2d/calibrate_radius.py',
+    'unsteady/test_cases/idealised_desalination/run_adjoint.py',
     'unsteady/test_cases/solid_body_rotation/run_adjoint.py',  # FIXME: loopy error
     # 'case_studies/tohoku/inversion/1d/compare_gradients.py',  # TODO: update
     # 'case_studies/tohoku/hazard/run_continuous_adjoint.py',  # TODO: update

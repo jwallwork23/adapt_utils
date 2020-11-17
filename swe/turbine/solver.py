@@ -99,7 +99,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         """
         di = di or self.callback_dir
         for farm_id in self.op.farm_ids:
-            for i in range(self.op.num_meshes):
+            for i in range(self.num_meshes):
                 tag = 'power_output'
                 if farm_id != 'everywhere':
                     tag += '_{:d}'.format(farm_id)

@@ -1962,7 +1962,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # --- Solve adjoint on current window
 
                 def export_func():
-                    adj_solutions_step.append(self.adj_solutions[i].copy(deepcopy=True))
+                    adj = self.get_solutions(adapt_field, adjoint=True)[i].copy(deepcopy=True)
+                    adj_solutions_step.append(adj)
 
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint_step(i)
@@ -1971,7 +1972,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # --- Solve adjoint on current window in enriched space
 
                 def export_func():
-                    enriched_adj_solutions_step.append(ep.adj_solutions[i].copy(deepcopy=True))
+                    adj = ep.get_solutions(adapt_field, adjoint=True)[i].copy(deepcopy=True)
+                    enriched_adj_solutions_step.append(adj)
 
                 ep.simulation_time = (i+1)*op.dt*self.dt_per_mesh  # TODO: Shouldn't be needed
                 ep.transfer_adjoint_solution(i)
