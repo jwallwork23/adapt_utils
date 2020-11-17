@@ -16,7 +16,7 @@ code = "//" + 80*"*" + """
 """.format(level) + "//" + 80*"*" + "\n\n"
 
 # Domain and turbine specification
-op = IdealisedDesalinationOutfallOptions(1.0)
+op = IdealisedDesalinationOutfallOptions()
 code += "// Domain and turbine specification\n"
 code += "L = {:.0f};\n".format(op.domain_length)
 code += "W = {:.0f};\n".format(op.domain_width)
