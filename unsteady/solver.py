@@ -1711,7 +1711,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Solve forward to get checkpoints
 
-            # self.get_checkpoints()
             self.solve_forward()
 
             # --- Convergence criteria
@@ -1850,17 +1849,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Metric-based using forward *and* adjoint solution fields
             'dwp': self.run_dwp,
 
-            # Metric-based goal-oriented
+            # Metric-based goal-oriented using DWR
             'dwr': self.run_dwr,
-            'weighted_hessian': self.run_dwr,
-            'weighted_gradient': self.run_dwr,
-            'anisotropic_dwr': self.run_dwr,
+            'anisotropic_dwr': self.run_dwr,  # TODO
+
+            # Metric-based goal-oriented *not* using DWR
+            'weighted_hessian': self.run_no_dwr,  # TODO
+            'weighted_gradient': self.run_no_dwr,  # TODO
         }
         if self.approach not in run_scripts:
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
         run_scripts[self.approach](**kwargs)
 
-    # TODO: Change name to something like run_goal_based
     def run_dwr(self, **kwargs):
         """
         Main script for goal-oriented mesh adaptation routines.
@@ -1881,8 +1881,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Solve forward to get checkpoints
 
-            # self.get_checkpoints()
-            self.solve_forward()
+            self.solve_forward()  # TODO: Don't need to solve final window
 
             # --- Convergence criteria
 
@@ -1912,8 +1911,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 refined_meshes = [hierarchy[1] for mesh in self.meshes]
             else:
                 self.print("Meshes differ so we create separate hierarchies.")
-                hierarchies = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
-                refined_meshes = [hierarchy[1] for hierarchy in hierarchies]
+                hierarchy = [MeshHierarchy(mesh, 1) for mesh in self.meshes]
+                refined_meshes = [h[1] for h in hierarchy]
             ep = type(self)(
                 op,
                 meshes=refined_meshes,
@@ -1937,7 +1936,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # --- Setup forward solver for enriched problem
 
                 # TODO: Need to transfer fwd sol in nonlinear case
-                ep.create_error_estimators_step(i)  # These get passed to the timesteppers under the hood
+                ep.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
                 ep.setup_solver_forward_step(i)
                 ets = ep.timesteppers[i][adapt_field]
 
@@ -1985,18 +1984,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     raise ValueError(msg.format(n_fwd, n_adj))
                 adj_solutions_step = list(reversed(adj_solutions_step))
                 enriched_adj_solutions_step = list(reversed(enriched_adj_solutions_step))
-                I = 0
                 op.print_debug("DWR indicators on mesh {:2d}".format(i))
+
+                # Various work fields
                 indicator_enriched = Function(ep.P0[i])
+                indicator_enriched_cts = Function(ep.P1[i])
+                tmp = Function(ep.P1[i])
                 fwd_proj = Function(enriched_space[i])
                 fwd_old_proj = Function(enriched_space[i])
                 adj_error = Function(enriched_space[i])
+
+                # Setup error estimator
                 bcs = self.boundary_conditions[i][adapt_field]
                 ets.setup_error_estimator(fwd_proj, fwd_old_proj, adj_error, bcs)
 
                 # Loop over exported timesteps
                 for j in range(len(fwd_solutions_step)):
-                    scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule  # TODO: Other integrators
+                    if self.op.timestepper == 'CrankNicolson':
+                        scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
+                    else:
+                        raise NotImplementedError  # TODO: Other integrators
 
                     # Prolong forward solution at current and previous timestep
                     tm.prolong(fwd_solutions_step[j], fwd_proj)
@@ -2011,20 +2018,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     indicator_enriched.interpolate(abs(ets.error_estimator.weighted_residual()))
 
                     # Time-integrate
-                    I += op.dt*self.dt_per_mesh*scaling*indicator_enriched
-                indicator_enriched_cts = interpolate(I, ep.P1[i])  # TODO: Project?
-                tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
-                metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
+                    tmp.project(indicator_enriched)
+                    indicator_enriched_cts += op.dt*self.op.dt_per_export*scaling*tmp
 
-            del indicator_enriched_cts
+                # Inject into the base space and construct an isotropic metric
+                tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
+                if self.approach == 'dwr':
+                    metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
+                else:
+                    raise NotImplementedError  # TODO: anisotropic_dwr
+
             del adj_error
             del indicator_enriched
             del ep
             del refined_meshes
-            if same_mesh:
-                del hierarchy
-            else:
-                del hierarchies
+            del hierarchy
 
             # --- Normalise metrics
 
@@ -2084,3 +2092,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 self.print("Converged number of mesh elements!")
                 break
+
+    def run_dwr(self, **kwargs):
+        raise NotImplementedError
