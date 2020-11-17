@@ -1,8 +1,6 @@
 from thetis import print_output
 
 import argparse
-import numpy as np
-import os
 from time import perf_counter
 
 from adapt_utils.tracer.desalination.solver import AdaptiveDesalinationProblem
@@ -21,10 +19,6 @@ parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 
 args = parser.parse_args()
 
 
-# Create directories and check if spun-up solution exists
-ramp_dir = os.path.join(os.path.dirname(__file__), "data", "ramp")
-spun = np.all([os.path.isfile(os.path.join(ramp_dir, f + ".h5")) for f in ('velocity', 'elevation')])
-
 # --- Set parameters
 
 approach = 'fixed_mesh'
@@ -35,7 +29,6 @@ kwargs = {
     'level': level,
     'num_meshes': int(args.num_meshes or 1),
     'plot_pvd': plot_pvd,
-    'spun': bool(spun),
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
@@ -44,11 +37,7 @@ op = IdealisedDesalinationOutfallOptions(**kwargs)
 
 # --- Run model
 
-if not op.spun:
-    raise ValueError("Spin-up data not found.")
-swp = AdaptiveDesalinationProblem(op, ramp_dir=ramp_dir)
-
-# Solve forward problem
+swp = AdaptiveDesalinationProblem(op)
 cpu_timestamp = perf_counter()
 swp.solve_forward()
 cpu_time = perf_counter() - cpu_timestamp

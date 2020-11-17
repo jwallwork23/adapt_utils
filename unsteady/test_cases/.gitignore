@@ -13,6 +13,7 @@ bubble_shear/videos/
 bubble_shear/__pycache__/
 cosine_prescribed_velocity/outputs/
 idealised_desalination/TODO
+idealised_desalination/data/
 idealised_desalination/outputs/
 idealised_desalination/plots/
 idealised_desalination/resources/
