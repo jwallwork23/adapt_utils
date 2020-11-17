@@ -34,7 +34,7 @@ kwargs = {
 
     # Mesh adaptation
     'approach': args.approach or 'dwr',
-    'num_meshes': int(args.num_meshes or 20),
+    'num_meshes': int(args.num_meshes or 100),
     'target': float(args.target or 1.0e+04),
     'norm_order': p,
     'min_adapt': int(args.min_adapt or 3),
