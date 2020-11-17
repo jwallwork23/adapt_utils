@@ -37,6 +37,7 @@ kwargs = {
 if args.end_time is not None:
     kwargs['end_time'] = float(args.end_time)
 op = DesalinationOutfallOptions(**kwargs)
+op.end_time = op.T_ramp
 op.di = os.path.join(os.path.dirname(__file__), "data", "ramp")
 
 

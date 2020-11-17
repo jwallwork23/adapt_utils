@@ -7,12 +7,20 @@ from adapt_utils.options import CoupledOptions
 
 
 class DesalinationOutfallOptions(CoupledOptions):
-    # TODO: doc
+    """
+    Parameters for an idealised desalination plant outfall scenario. The simulation has two phases:
+
+    * Spin-up: hydrodynamics only, driven by a tidal forcing;
+    * Run:     hydrodynamics + salinity (interpreted as a passive tracer).
+    """
     resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
 
     # Domain specification
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
+
+    # Tide specification
+    T_tide = PositiveFloat(1.24*3600).tag(config=False)
 
     def __init__(self, level=0, aligned=False, spun=False, **kwargs):
         super(DesalinationOutfallOptions, self).__init__(**kwargs)
@@ -25,19 +33,19 @@ class DesalinationOutfallOptions(CoupledOptions):
 
         # Hydrodynamics
         self.base_viscosity = 3.0
-        self.base_diffusivity = 1.0
+        self.base_diffusivity = 10.0
         self.friction_coeff = 0.0025  # TODO: Increased drag at pipes?
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
         self.characteristic_speed = Constant(1.0)
-        self.characteristic_diffusion = Constant(1.0)
+        self.characteristic_diffusion = Constant(self.base_diffusivity)
 
         # Time integration
         self.timestepper = 'CrankNicolson'
         self.start_time = 0.0
-        self.T_tide = 1.24*3600
-        self.T_ramp = 3.855*self.T_tide
-        self.end_time = self.T_tide
+        # self.T_ramp = 3.855*self.T_tide
+        self.T_ramp = self.T_tide
+        self.end_time = self.T_tide if spun else self.T_ramp
         self.dt = 2.232
         self.dt_per_export = 10
 
@@ -55,16 +63,15 @@ class DesalinationOutfallOptions(CoupledOptions):
         self.lax_friedrichs_velocity_scaling_factor = Constant(1.0)
 
         # Source (outlet pipe)
-        self.source_value = 100.0
-        self.source_discharge = 0.1  # TODO: UNUSED
-        outlet_x = 0.0
-        outlet_y = 250.0
-        self.source_loc = [(outlet_x, outlet_y, 50.0)]  # Outlet
+        self.source_value = 0.1  # Discharge rate
+        outlet_x = 0.0 if aligned else -500.0
+        outlet_y = 150.0
+        self.source_loc = [(outlet_x, outlet_y, 25.0)]  # Outlet
 
         # Receiver (inlet pipe)
-        inlet_x = outlet_x if aligned else 750.0
-        inlet_y = -250.0
-        self.region_of_interest = [(inlet_x, inlet_y, 5.0)]  # Inlet
+        inlet_x = 0.0 if aligned else 500.0
+        inlet_y = -150.0
+        self.region_of_interest = [(inlet_x, inlet_y, 25.0)]  # Inlet
 
         # Boundary forcing
         self.max_amplitude = 0.5
@@ -97,6 +104,17 @@ class DesalinationOutfallOptions(CoupledOptions):
         return Constant(self.friction_coeff)
 
     def set_boundary_conditions(self, prob, i):
+        """
+        Domain
+        ======
+                3
+            ---------
+          4 |       | 2
+            ---------
+                1
+
+        We interpret segment 1 as open ocean, {2, 4} as tidally forced and 3 as coast.
+        """
         self.elev_in[i] = Function(prob.V[i].sub(1))
         self.elev_out[i] = Function(prob.V[i].sub(1))
         bottom_tag = 1
@@ -122,6 +140,12 @@ class DesalinationOutfallOptions(CoupledOptions):
         return boundary_conditions
 
     def get_update_forcings(self, prob, i, **kwargs):
+        """
+        Simple tidal forcing with frequency :attr:`omega` and amplitude :attr:`max_amplitude`.
+
+        :arg prob: :class:`AdaptiveDesalinationProblem` object.
+        :arg i: mesh index.
+        """
         tc = Constant(0.0)
         hmax = Constant(self.max_amplitude)
         offset = self.T_ramp if self.spun else 0.0
@@ -134,6 +158,12 @@ class DesalinationOutfallOptions(CoupledOptions):
         return update_forcings
 
     def set_initial_condition(self, prob):
+        """
+        Specify elevation at the start of the spin-up period so that it satisfies the boundary
+        forcing and set an arbitrary small velocity.
+
+        :arg prob: :class:`AdaptiveDesalinationProblem` object.
+        """
         assert not self.spun
         u, eta = prob.fwd_solutions[0].split()
         x, y = SpatialCoordinate(prob.meshes[0])
