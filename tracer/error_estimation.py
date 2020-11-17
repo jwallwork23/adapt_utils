@@ -54,8 +54,7 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
 
         # Apply SUPG stabilisation
         if not self.horizontal_dg and self.stabilisation in ('su', 'supg'):
-            tau = self.supg_stabilisation
-            arg = arg + tau*dot(uv, grad(arg))
+            arg = arg + self.supg_stabilisation*dot(uv, grad(arg))
 
         return -self.p0test*arg*inner(uv, grad(solution))*self.dx
 
@@ -141,8 +140,7 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
             uv = self.corr_factor*uv
-            tau = self.supg_stabilisation
-            arg = arg + tau*dot(uv, grad(arg))
+            arg = arg + self.supg_stabilisation*dot(uv, grad(arg))
 
         return self.p0test*arg*div(dot(diff_tensor, grad(solution)))*self.dx
 
@@ -231,8 +229,7 @@ class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
             self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
             uv = self.corr_factor*uv
-            tau = self.supg_stabilisation
-            arg = arg + tau*dot(uv, grad(arg))
+            arg = arg + self.supg_stabilisation*dot(uv, grad(arg))
 
         f += self.p0test*inner(source, arg)*self.dx
         return f
@@ -275,7 +272,7 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         Account for SUPG stabilisation in mass term.
         """
         if self.stabilisation == 'supg':
-            arg = arg + tau*dot(velocity, grad(arg))
+            arg = arg + self.supg_stabilisation*dot(velocity, grad(arg))
         return self.p0test*inner(solution, arg)*dx
 
     def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):

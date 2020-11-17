@@ -1,5 +1,6 @@
 from thetis import AttrDict
 
+from adapt_utils.io import index_string
 from adapt_utils.tracer.desalination.callback import DesalinationOutfallCallback
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
@@ -10,6 +11,9 @@ __all__ = ["AdaptiveDesalinationProblem"]
 class AdaptiveDesalinationProblem(AdaptiveProblem):
     """General solver object for adaptive desalination outfall problems."""
     # TODO: doc
+
+    # --- Setup
+
     def __init__(self, *args, **kwargs):
         super(AdaptiveDesalinationProblem, self).__init__(*args, **kwargs)
         self.callback_dir = kwargs.get('callback_dir', self.op.di)
@@ -30,10 +34,37 @@ class AdaptiveDesalinationProblem(AdaptiveProblem):
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
         return fields
 
+    # --- Quantity of Interest
+
     def add_callbacks(self, i):
         super(AdaptiveDesalinationProblem, self).add_callbacks(i)
         cb = DesalinationOutfallCallback(self, i, callback_dir=self.callback_dir)
         self.callbacks[i].add(cb, 'timestep')
+
+    def load_qoi_timeseries(self, di=None):
+        """
+        Load power output timeseries data stored in directory `di` into the :attr:`timeseries`
+        attributes of the :attr:`callbacks`.
+        """
+        di = di or self.callback_dir
+        tag = 'inlet_salinity_diff'
+        for i in range(self.num_meshes):
+            fname = os.path.join(di, '{:s}_{:s}.npy'.format(tag, index_string(i)))
+            if not os.path.exists(fname):
+                raise IOError("Need to run the model in order to get QoI timeseries.")
+            self.callbacks[i]['timestep'][tag].timeseries = np.load(fname)
+
+    def quantity_of_interest(self):
+        """
+        Time integrate inlet salinty differential.
+        """
+        self.qoi = 0.0
+        for i in range(self.num_meshes):
+            tag = 'inlet_salinity_diff_{:s}'.format(index_string(i))
+            self.qoi += self.callbacks[i]['timestep'][tag].time_integrate()
+        return self.qoi
+
+    # --- Restarts
 
     def set_initial_condition(self):
         if self.op.spun:
