@@ -2149,7 +2149,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
             base_space = self.get_function_space(adapt_field)
             fwd_solutions = self.get_solutions(adapt_field, adjoint=False)
-            hessian_kwargs = dict(normalise=False, enforce_constraints=False, adjoint=False)
+            hessian_kwargs = dict(normalise=False, enforce_constraints=False)
             for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 fwd_solutions_step_old = []
@@ -2192,8 +2192,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 fwd = Function(base_space[i])
                 fwd_old = Function(base_space[i])
                 adj = Function(base_space[i])
-                bcs = self.boundary_conditions[i][adapt_field]
-                ts.setup_strong_residual(fwd, fwd_old, adj)
+                ts.setup_strong_residual(fwd, fwd_old)
 
                 # Loop over exported timesteps
                 for j in range(len(fwd_solutions_step)):
@@ -2214,8 +2213,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         strong_residual = abs(ts.error_estimator.strong_residual)
                         strong_residual_cts = project(strong_residual, self.P1[i])
 
-                        # Recover Hessian
-                        self.recover_hessian_metric(**hessian_kwargs)  # Sets metrics[i]
+                        # Recover Hessian as self.metrics[i]
+                        self.recover_hessian_metric(adjoint=True, **hessian_kwargs)
 
                         # Accumulate weighted Hessian
                         metrics[i] += w*interpolate(strong_residual_cts*self.metrics[i], self.P1_ten[i])
