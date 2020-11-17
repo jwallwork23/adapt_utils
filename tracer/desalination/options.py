@@ -28,3 +28,6 @@ class DesalinationOutfallOptions(CoupledOptions):
         self.solve_swe = True
         self.solve_tracer = spun
         self.spun = spun
+
+        self.h_min = 1.0e-03
+        self.h_max = 1.0e+03
