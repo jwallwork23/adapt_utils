@@ -518,3 +518,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             if np.abs(num_cells[-1][0] - num_cells[-2][0]) <= op.element_rtol*num_cells[-2][0]:
                 self.print("Converged number of mesh elements!")
                 break
+
+    def run_no_dwr(self, **kwargs):
+        self.run_dwr(**kwargs)
