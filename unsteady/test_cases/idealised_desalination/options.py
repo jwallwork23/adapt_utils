@@ -28,7 +28,9 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         self.adapt_field = 'tracer'
 
         # Domain
-        self.default_mesh = Mesh(os.path.join(self.resource_dir, 'channel_{:d}.msh'.format(level)))
+        mesh_file = os.path.join(self.resource_dir, 'channel_{:d}.msh'.format(level))
+        if os.path.exists(mesh_file):
+            self.default_mesh = Mesh(mesh_file)
 
         # Hydrodynamics
         self.base_diffusivity = 10.0
