@@ -22,7 +22,7 @@ class DesalinationOutfallCallback(TimeseriesCallback):
         :arg i: mesh index.
         """
         self.label = "inlet salinity diff"
-        ks = prob.op.set_qoi_kernel(prob.meshes[i])  # Kernel in space
+        ks = prob.op.set_qoi_kernel_tracer(prob, i)  # Kernel in space
         kt = Constant(0.0)                           # Kernel in time
         c = prob.fwd_solutions_tracer[i]
         c_b = prob.op.background_salinity

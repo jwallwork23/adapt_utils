@@ -24,6 +24,8 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         super(IdealisedDesalinationOutfallOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
+        self.solve_flags = (False, True, False, False)
+        self.adapt_field = 'tracer'
 
         # Domain
         self.default_mesh = Mesh(os.path.join(self.resource_dir, 'channel_{:d}.msh'.format(level)))
@@ -47,6 +49,7 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         self.degree_tracer = 1
         self.tracer_family = 'cg'
         self.stabilisation_tracer = 'supg'
+        self.anisotropic_stabilisation = True
         self.use_limiter_for_tracers = False
 
         # Source (outlet pipe)
