@@ -1882,7 +1882,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Solve forward to get checkpoints
 
-            self.solve_forward()  # TODO: Don't need to solve final window
+            self.solve_forward()
 
             # --- Convergence criteria
 
@@ -1890,7 +1890,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             qoi = self.quantity_of_interest()
             self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
             self.qois.append(qoi)
-            if len(self.qois) > 1:
+            if len(self.qois) > 1 and n >= op.min_adapt:
                 if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
                     self.print("Converged quantity of interest!")
                     break
@@ -2030,6 +2030,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 else:
                     raise NotImplementedError  # TODO: anisotropic_dwr
 
+            # TODO: Check convergence of error estimator
+
             del adj_error
             del indicator_enriched
             del ep
@@ -2086,6 +2088,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 sum(self.num_cells[n+1])*self.dt_per_mesh,
             ))
 
+            # Ensure minimum number of adaptations met
+            if n < op.min_adapt:
+                continue
+
             # Check convergence of *all* element counts
             converged = True
             for i, num_cells_ in enumerate(self.num_cells[n-1]):
@@ -2117,7 +2123,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Solve forward to get checkpoints
 
-            self.solve_forward()  # TODO: Don't need to solve final window
+            self.solve_forward()
 
             # --- Convergence criteria
 
@@ -2125,7 +2131,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             qoi = self.quantity_of_interest()
             self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
             self.qois.append(qoi)
-            if len(self.qois) > 1:
+            if len(self.qois) > 1 and n >= op.min_adapt:
                 if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
                     self.print("Converged quantity of interest!")
                     break
@@ -2259,6 +2265,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 sum(self.num_vertices[n+1])*self.dt_per_mesh,
                 sum(self.num_cells[n+1])*self.dt_per_mesh,
             ))
+
+            # Ensure minimum number of adaptations met
+            if n < op.min_adapt:
+                continue
 
             # Check convergence of *all* element counts
             converged = True
