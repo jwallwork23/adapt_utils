@@ -12,9 +12,6 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 __all__ = ["AdaptiveSteadyProblem"]
 
 
-# TODO:
-#  * PressureProjectionPicard
-
 class AdaptiveSteadyProblem(AdaptiveProblem):
     """
     Default steady state model: 2D coupled shallow water + tracer transport.
@@ -29,8 +26,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         if self.num_meshes > 1:
             raise ValueError("`AdaptiveSteadyProblem` only supports single meshes.")
         ts = op.timestepper
-        # if ts not in ["SteadyState", "PressureProjectionPicard"]:  # TODO
-        if ts not in ["SteadyState", ]:
+        if ts != "SteadyState":
             raise ValueError("Timestepper {:s} not allowed for steady-state problems.".format(ts))
         if op.solve_tracer:
             self.equation_set = 'tracer'
@@ -44,7 +40,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         return self.V[0] if self.solve_swe else self.Q[0]
 
     @property
-    def timestepper(self):  # TODO: PressureProjectionPicard
+    def timestepper(self):
         steppers = self.timesteppers[0]
         return steppers.shallow_water if self.op.solve_swe else steppers.tracer
 
@@ -70,7 +66,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def _solve_continuous_adjoint(self, **kwargs):
         super(AdaptiveSteadyProblem, self).solve_adjoint(**kwargs)
 
-    def _solve_discrete_adjoint(self, **kwargs):  # TODO: PressureProjectionPicard
+    def _solve_discrete_adjoint(self, **kwargs):
         fs = self.function_space
         F = self.timestepper.F
 

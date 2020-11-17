@@ -37,7 +37,7 @@ class Options(FrozenConfigurable):
 
     # Time discretisation
     timestepper = Enum(
-        ['SteadyState', 'CrankNicolson', 'PressureProjectionPicard'],
+        ['SteadyState', 'CrankNicolson'],
         default_value='CrankNicolson',
         help="Time integration scheme used.").tag(config=True)
     dt = PositiveFloat(0.1, help="Timestep").tag(config=True)
@@ -247,12 +247,6 @@ class Options(FrozenConfigurable):
                 set_log_level(INFO)
             else:
                 set_log_level(DEBUG)
-
-        # Extract the default PressureProjectionPicard parameters
-        pressure_op = options.PressureProjectionTimestepperOptions2d()
-        self.solver_parameters_pressure = pressure_op.solver_parameters_pressure
-        self.solver_parameters_momentum = pressure_op.solver_parameters_momentum
-        self.picard_iterations = pressure_op.picard_iterations
 
     def set_all_rtols(self, tol):
         """Set all relative tolerances to a single value, `tol`."""

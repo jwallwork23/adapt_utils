@@ -13,7 +13,7 @@ import thetis.timeintegrator as thetis_ts
 CFL_UNCONDITIONALLY_STABLE = np.inf
 
 
-__all__ = ["SteadyState", "CrankNicolson", "PressureProjectionPicard"]
+__all__ = ["SteadyState", "CrankNicolson"]
 
 
 class SteadyState(thetis_ts.SteadyState):
@@ -198,23 +198,3 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
 
         # Pass forms back to error estimator
         ee.strong_residual_termss = residual
-
-
-class PressureProjectionPicard(thetis_ts.PressureProjectionPicard):
-    """
-    Extension of Thetis PressureProjectionPicard time integrator for error estimation.
-
-    See `thetis/timeintegrator.py` for original version.
-    """
-    def __init__(self, *args, error_estimator=None, adjoint=False, **kwargs):
-        super(PressureProjectionPicard, self).__init__(*args, **kwargs)
-        self.semi_implicit = kwargs.get('semi_implicit')
-        self.theta = kwargs.get('theta')
-        self.adjoint = adjoint
-        if adjoint:
-            raise NotImplementedError
-        self.error_estimator = error_estimator
-        if error_estimator is not None:
-            raise NotImplementedError
-        # TODO: Setup strong residual for Picard iteration
-        # TODO: Setup error estimators for Picard iteration
