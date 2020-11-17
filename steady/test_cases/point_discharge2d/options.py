@@ -57,7 +57,6 @@ class PointDischarge2dOptions(CoupledOptions):
 
         # Source / receiver
         self.source_value = 100.0
-        self.source_discharge = 0.1
         self.region_of_interest = [(20.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 0.5)]
 
         # Goal-oriented error estimation

@@ -32,7 +32,7 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         self.friction_coeff = 0.0025  # TODO: Increased drag at pipes?
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
-        self.characteristic_speed = Constant(2.4)  # Max observed fluid speed
+        self.characteristic_speed = Constant(1.15)  # Max observed fluid speed
         self.characteristic_diffusion = Constant(self.base_diffusivity)
 
         # Time integration
@@ -42,7 +42,7 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         self.T_tide = 0.05*self.M2_tide_period
         # self.T_ramp = 3.855*self.T_tide
         self.T_ramp = self.T_tide
-        self.end_time = self.T_tide if spun else self.T_ramp
+        self.end_time = 2*self.T_tide if spun else self.T_ramp
         self.dt = 2.232
         self.dt_per_export = 10
 
@@ -61,13 +61,13 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
 
         # Source (outlet pipe)
         self.source_value = 2.0  # Discharge rate
-        outlet_x = 0.0 if aligned else -500.0
-        outlet_y = 150.0
+        outlet_x = 0.0
+        outlet_y = 100.0
         self.source_loc = [(outlet_x, outlet_y, 25.0)]  # Outlet
 
         # Receiver (inlet pipe)
-        inlet_x = 0.0 if aligned else 500.0
-        inlet_y = -150.0
+        inlet_x = 0.0 if aligned else 400.0
+        inlet_y = -100.0
         self.region_of_interest = [(inlet_x, inlet_y, 25.0)]  # Inlet
 
         # Boundary forcing
@@ -152,8 +152,9 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         if self.spun:
             u, eta = prob.fwd_solutions[i].split()
             velocity = Function(prob.P1[i])
-            with open(os.path.join(self.di, "speed"), 'w') as outfile:
-                outfile.write("t      min    max    mean   var\n")
+            fname = os.path.join(os.path.dirname(__file__), "data", "x-velocity.log")
+            with open(fname, 'w') as outfile:
+                outfile.write("t      min    max    mean   sd\n")
 
         def update_forcings(t):
             tt = t + offset
@@ -167,9 +168,9 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
             if self.spun:
                 velocity.interpolate(u[0])
                 data = velocity.vector().gather()
-                msg = "{:7.4f} {:7.4f} {:7.4f} {:7.4f} {:7.4f}\n"
-                with open(os.path.join(self.di, "speed"), 'a') as outfile:
-                    outfile.write(msg.format(tt, data.min(), data.max(), np.mean(data), np.var(data))
+                msg = "{:7.1f} {:7.4f} {:7.4f} {:7.4f} {:7.4f}\n"
+                with open(fname, 'a') as outfile:
+                    outfile.write(msg.format(tt, data.min(), data.max(), np.mean(data), np.sqrt(np.var(data))))
 
         return update_forcings
 
