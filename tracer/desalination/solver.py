@@ -1,3 +1,4 @@
+from adapt_utils.tracer.desalination.callback import DesalinationOutfallCallback
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
@@ -9,8 +10,14 @@ class AdaptiveDesalinationProblem(AdaptiveProblem):
     # TODO: doc
     def __init__(self, *args, **kwargs):
         super(AdaptiveDesalinationProblem, self).__init__(*args, **kwargs)
+        self.callback_dir = kwargs.get('callback_dir', self.op.di)
         self.ramp_dir = kwargs.get('ramp_dir')
         self.load_mesh = kwargs.get('load_mesh')
+
+    def add_callbacks(self, i):
+        super(AdaptiveDesalinationProblem, self).add_callbacks(i)
+        cb = DesalinationOutfallCallback(self, i, callback_dir=self.callback_dir)
+        self.callbacks[i].add(cb, 'timestep')
 
     def set_initial_condition(self):
         if self.op.spun:
