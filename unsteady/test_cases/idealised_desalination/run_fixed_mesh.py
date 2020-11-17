@@ -11,8 +11,7 @@ from adapt_utils.unsteady.test_cases.idealised_desalination.options import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-level", help="Mesh resolution level in turbine region")
-parser.add_argument("-num_meshes", help="Number of meshes (for debugging)")
-parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
+parser.add_argument('-num_meshes', help="Number of meshes in sequence")
 parser.add_argument("-debug", help="Print all debugging statements")
 parser.add_argument("-debug_mode", help="Choose debugging mode from 'basic' and 'full'")
 
@@ -23,12 +22,11 @@ args = parser.parse_args()
 
 approach = 'fixed_mesh'
 level = int(args.level or 0)
-plot_pvd = bool(args.plot_pvd or False)
 kwargs = {
     'approach': approach,
     'level': level,
     'num_meshes': int(args.num_meshes or 1),
-    'plot_pvd': plot_pvd,
+    'plot_pvd': True,
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
