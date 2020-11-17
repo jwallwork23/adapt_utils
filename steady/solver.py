@@ -152,8 +152,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def get_strong_residual_forward(self, **kwargs):
         ts = self.timesteppers[0][self.op.adapt_field]
         strong_residual = abs(ts.error_estimator.strong_residual)
-        # strong_residual_cts = project(strong_residual, self.P1[0])
-        strong_residual_cts = interpolate(strong_residual, self.P1[0])
+        strong_residual_cts = project(strong_residual, self.P1[0])
         return strong_residual_cts
 
     def get_strong_residual_adjoint(self, **kwargs):
@@ -325,7 +324,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         strong_residual = self.get_strong_residual(adjoint=adjoint)
         self.recover_hessian_metric(normalise=False, enforce_constraints=False, adjoint=not adjoint)
-        scaled_hessian = interpolate(strong_residual*self.metrics[0], self.P1_ten[0])
+        scaled_hessian = project(strong_residual*self.metrics[0], self.P1_ten[0])
         return steady_metric(H=scaled_hessian, normalise=True, enforce_constraints=True, op=self.op)
 
     def get_weighted_gradient_metric(self, adjoint=False, source=True):
