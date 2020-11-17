@@ -1865,7 +1865,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """
         Main script for goal-oriented mesh adaptation routines.
 
-        A number of isotropic and anisotropic metrics are considered, as described in
+        Both isotropic and anisotropic metrics are considered, as described in
         [Wallwork et al. 2021].
 
         [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
@@ -1876,6 +1876,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         adapt_field = op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
+        assert self.approach in ('dwr', 'anisotropic_dwr')
         for n in range(op.max_adapt):
             self.outer_iteration = n
 
@@ -1984,7 +1985,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     raise ValueError(msg.format(n_fwd, n_adj))
                 adj_solutions_step = list(reversed(adj_solutions_step))
                 enriched_adj_solutions_step = list(reversed(enriched_adj_solutions_step))
-                op.print_debug("DWR indicators on mesh {:2d}".format(i))
+                op.print_debug("GO: Computing DWR indicators on mesh {:2d}".format(i))
 
                 # Various work fields
                 indicator_enriched = Function(ep.P0[i])
@@ -2000,10 +2001,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 # Loop over exported timesteps
                 for j in range(len(fwd_solutions_step)):
-                    if self.op.timestepper == 'CrankNicolson':
-                        scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
+                    if op.timestepper == 'CrankNicolson':
+                        w = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
                     else:
                         raise NotImplementedError  # TODO: Other integrators
+                    w *= op.dt*op.dt_per_export
 
                     # Prolong forward solution at current and previous timestep
                     tm.prolong(fwd_solutions_step[j], fwd_proj)
@@ -2019,7 +2021,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                     # Time-integrate
                     tmp.project(indicator_enriched)
-                    indicator_enriched_cts += op.dt*self.op.dt_per_export*scaling*tmp
+                    indicator_enriched_cts += w*tmp
 
                 # Inject into the base space and construct an isotropic metric
                 tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
@@ -2094,4 +2096,175 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 break
 
     def run_no_dwr(self, **kwargs):
-        raise NotImplementedError
+        """
+        Main script for goal-oriented mesh adaptation routines which do not use the dual-weighted
+        residual.
+
+        'Weighted Hessian' and 'weighted gradient' metrics are considered, as described in
+        [Wallwork et al. 2021].
+
+        [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
+            Error Estimation and Mesh Adaptation for Tracer Transport Problems", to be submitted to
+            Computer Aided Design.
+        """
+        op = self.op
+        adapt_field = op.adapt_field
+        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
+            adapt_field = 'shallow_water'
+        assert self.approach in ('weighted_hessian', 'weighted_gradient')
+        for n in range(op.max_adapt):
+            self.outer_iteration = n
+
+            # --- Solve forward to get checkpoints
+
+            self.solve_forward()  # TODO: Don't need to solve final window
+
+            # --- Convergence criteria
+
+            # Check QoI convergence
+            qoi = self.quantity_of_interest()
+            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+            self.qois.append(qoi)
+            if len(self.qois) > 1:
+                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
+                    self.print("Converged quantity of interest!")
+                    break
+
+            # Check maximum number of iterations
+            if n == op.max_adapt - 1:
+                break
+
+            # --- Loop over mesh windows *in reverse*
+
+            for i, P1 in enumerate(self.P1):
+                self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
+            metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            base_space = self.get_function_space(adapt_field)
+            fwd_solutions = self.get_solutions(adapt_field, adjoint=False)
+            hessian_kwargs = dict(normalise=False, enforce_constraints=False, adjoint=False)
+            for i in reversed(range(self.num_meshes)):
+                fwd_solutions_step = []
+                fwd_solutions_step_old = []
+                adj_solutions_step = []
+
+                # --- Solve forward on current window
+
+                ts = self.timesteppers[i][adapt_field]
+
+                def export_func():
+                    fwd_solutions_step.append(ts.solution.copy(deepcopy=True))
+                    fwd_solutions_step_old.append(ts.solution_old.copy(deepcopy=True))
+                    # TODO: Also need store fields at each export (in general case)
+
+                self.simulation_time = i*op.dt*self.dt_per_mesh
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward_step(i)
+                self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
+
+                # --- Solve adjoint on current window
+
+                def export_func():
+                    adj = self.get_solutions(adapt_field, adjoint=True)[i].copy(deepcopy=True)
+                    adj_solutions_step.append(adj)
+
+                self.transfer_adjoint_solution(i)
+                self.setup_solver_adjoint_step(i)
+                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
+
+                # --- Assemble indicators and metrics
+
+                n_fwd = len(fwd_solutions_step)
+                n_adj = len(adj_solutions_step)
+                if n_fwd != n_adj:
+                    msg = "Mismatching number of indicators ({:d} vs {:d})"
+                    raise ValueError(msg.format(n_fwd, n_adj))
+                adj_solutions_step = list(reversed(adj_solutions_step))
+
+                # Setup error estimator
+                fwd = Function(base_space[i])
+                fwd_old = Function(base_space[i])
+                adj = Function(base_space[i])
+                bcs = self.boundary_conditions[i][adapt_field]
+                ts.setup_error_estimator(fwd, fwd_old, adj, bcs)
+
+                # Loop over exported timesteps
+                for j in range(len(fwd_solutions_step)):
+                    if op.timestepper == 'CrankNicolson':
+                        w = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
+                    else:
+                        raise NotImplementedError  # TODO: Other integrators
+                    w *= op.dt*op.dt_per_export
+                    fwd.assign(fwd_solutions_step[i])
+                    fwd_old.assign(fwd_solutions_step_old[i])
+                    adj.assign(adj_solutions_step[i])
+                    fwd_solutions[i].assign(fwd)
+
+                    # Construct metric at each timestep
+                    if self.approach == 'weighted_hessian':
+
+                        # Compute strong residual
+                        strong_residual = abs(ts.error_estimator.strong_residual)
+                        strong_residual_cts = project(strong_residual, self.P1[i])
+
+                        # Recover Hessian
+                        self.recover_hessian_metric(**hessian_kwargs)  # Sets metrics[i]
+
+                        # Accumulate weighted Hessian
+                        metrics[i] += w*interpolate(strong_residual_cts*self.metrics[i], self.P1_ten[i])
+                    else:
+                        raise NotImplementedError  # TODO: weighted gradient
+
+            # --- Normalise metrics
+
+            if op.debug and op.plot_pvd:
+                metric_file = File(os.path.join(self.di, 'metric_before_normalisation.pvd'))
+                for i, M in enumerate(metrics):
+                    metric_file._topology = None
+                    metric_file.write(M)
+
+            space_time_normalise(metrics, op=op)
+
+            # Output to .pvd and .vtu
+            if op.plot_pvd:
+                metric_file = File(os.path.join(self.di, 'metric.pvd'))
+            complexities = []
+            for i, M in enumerate(metrics):
+                if op.plot_pvd:
+                    metric_file._topology = None
+                    metric_file.write(M)
+                complexities.append(metric_complexity(M))
+            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
+
+            # --- Adapt meshes
+
+            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
+            for i, M in enumerate(metrics):
+                self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
+                self.meshes[i] = adapt(self.meshes[i], M)
+            del metrics
+
+            # ---  Setup for next run / logging
+
+            self.set_meshes(self.meshes)
+            self.setup_all()
+            self.dofs.append([np.sum(fs.dof_count) for fs in base_space])
+
+            self.print("\nResulting meshes")
+            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
+            for i, c in enumerate(complexities):
+                self.print(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
+            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
+            self.print(msg.format(
+                self.st_complexities[-1],
+                sum(self.num_vertices[n+1])*self.dt_per_mesh,
+                sum(self.num_cells[n+1])*self.dt_per_mesh,
+            ))
+
+            # Check convergence of *all* element counts
+            converged = True
+            for i, num_cells_ in enumerate(self.num_cells[n-1]):
+                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
+                    converged = False
+            if converged:
+                self.print("Converged number of mesh elements!")
+                break
