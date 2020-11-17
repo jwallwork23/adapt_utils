@@ -75,7 +75,6 @@ class AdaptiveProblemBase(object):
         implemented_steppers = {
             'CrankNicolson': CrankNicolson,
             'SteadyState': SteadyState,
-            'PressureProjectionPicard': PressureProjectionPicard,
         }
         try:
             assert op.timestepper in implemented_steppers

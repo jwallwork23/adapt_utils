@@ -74,10 +74,7 @@ class SteadyShallowWaterProblem(SteadyProblem):
         options.simulation_end_time = op.end_time
         options.timestepper_type = op.timestepper
         if op.solver_parameters != {}:
-            if op.timestepper == 'PressureProjectionPicard':
-                options.timestepper_options.solver_parameters_momentum = op.solver_parameters  # LU by default
-            else:
-                options.timestepper_options.solver_parameters = op.solver_parameters
+            options.timestepper_options.solver_parameters = op.solver_parameters
         op.print_debug(options.timestepper_options.solver_parameters)
         if hasattr(options.timestepper_options, 'implicitness_theta'):
             options.timestepper_options.implicitness_theta = op.implicitness_theta

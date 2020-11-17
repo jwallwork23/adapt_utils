@@ -1080,27 +1080,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def create_forward_shallow_water_timestepper_step(self, i, integrator):
         fields = self._get_fields_for_shallow_water_timestepper(i)
         bcs = self.boundary_conditions[i]['shallow_water']
-        kwargs = {'bnd_conditions': bcs}
-        if self.op.timestepper == 'PressureProjectionPicard':
-            from ..swe.equation import ShallowWaterMomentumEquation
-
-            self.equations[i].shallow_water_momentum = ShallowWaterMomentumEquation(
-                TestFunction(self.V[i].sub(0)),
-                self.V[i].sub(0),
-                self.V[i].sub(1),
-                self.depth[i],
-                self.shallow_water_options[i],
-            )
-            self.equations[i].shallow_water_momentum.bnd_functions = bcs
-            args = (self.equations[i].shallow_water, self.equations[i].shallow_water_momentum,
-                    self.fwd_solutions[i], fields, self.op.dt, )
-            kwargs['solver_parameters'] = self.op.solver_parameters_pressure
-            kwargs['solver_parameters_mom'] = self.op.solver_parameters_momentum
-            kwargs['iterations'] = self.op.picard_iterations
-        else:
-            args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, self.op.dt, )
-            kwargs['solver_parameters'] = self.op.solver_parameters['shallow_water']
-        if self.op.timestepper in ('CrankNicolson', 'PressureProjectionPicard'):
+        args = (self.equations[i].shallow_water, self.fwd_solutions[i], fields, self.op.dt, )
+        kwargs = {
+            'bnd_conditions': bcs,
+            'solver_parameters': self.op.solver_parameters['shallow_water'],
+        }
+        if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
         if 'shallow_water' in self.error_estimators[i]:
@@ -1204,9 +1189,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'solver_parameters': self.op.adjoint_solver_parameters['shallow_water'],
             'adjoint': True,  # Makes sure fields are updated according to appropriate timesteps
         }
-        if self.op.timestepper == 'PressureProjectionPicard':
-            raise NotImplementedError  # TODO
-        if self.op.timestepper in ('CrankNicolson', 'PressureProjectionPicard'):
+        if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
         self.timesteppers[i].adjoint_shallow_water = integrator(*args, **kwargs)
