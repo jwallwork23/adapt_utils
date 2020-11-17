@@ -14,9 +14,10 @@ class AdaptiveDesalinationProblem(AdaptiveProblem):
 
     def set_initial_condition(self):
         if self.op.spun:
+
+            # Load hydrodynamics from file
             self.op.solve_tracer = False
             self.load_state(0, self.ramp_dir)
-            self.op.solve_tracer = True
             if self.load_mesh is not None:
                 tmp = self.fwd_solutions[0].copy(deepcopy=True)
                 u_tmp, eta_tmp = tmp.split()
@@ -25,5 +26,9 @@ class AdaptiveDesalinationProblem(AdaptiveProblem):
                 u, eta = self.fwd_solutions[0].split()
                 u.project(u_tmp)
                 eta.project(eta_tmp)
+
+            # Set background salinity
+            self.op.solve_tracer = True
+            self.fwd_solution_tracer.assign(self.op.background_salinity)
         else:
             super(AdaptiveDesalinationProblem, self).set_initial_condition()

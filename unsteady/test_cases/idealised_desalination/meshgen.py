@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from adapt_utils.unsteady.test_cases.desalination.options import DesalinationOutfallOptions
+from adapt_utils.unsteady.test_cases.idealised_desalination.options import *
 
 
 # Parse for refinement level
@@ -16,7 +16,7 @@ code = "//" + 80*"*" + """
 """.format(level) + "//" + 80*"*" + "\n\n"
 
 # Domain and turbine specification
-op = DesalinationOutfallOptions(1.0)
+op = IdealisedDesalinationOutfallOptions(1.0)
 code += "// Domain and turbine specification\n"
 code += "L = {:.0f};\n".format(op.domain_length)
 code += "W = {:.0f};\n".format(op.domain_width)

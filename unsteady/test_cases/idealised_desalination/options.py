@@ -1,17 +1,18 @@
 from thetis import *
 from thetis.configuration import *
 
+import numpy as np
 import os
 
-from adapt_utils.options import CoupledOptions
+from adapt_utils.tracer.desalination.options import DesalinationOutfallOptions
 
 
-class DesalinationOutfallOptions(CoupledOptions):
+__all__ = ["IdealisedDesalinationOutfallOptions"]
+
+
+class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
     """
-    Parameters for an idealised desalination plant outfall scenario. The simulation has two phases:
-
-    * Spin-up: hydrodynamics only, driven by a tidal forcing;
-    * Run:     hydrodynamics + salinity (interpreted as a passive tracer).
+    Parameters for an idealised desalination plant outfall scenario.
     """
     resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
 
@@ -19,14 +20,8 @@ class DesalinationOutfallOptions(CoupledOptions):
     domain_length = PositiveFloat(3000.0).tag(config=False)
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
-    # Tide specification
-    T_tide = PositiveFloat(1.24*3600).tag(config=False)
-
     def __init__(self, level=0, aligned=False, spun=False, **kwargs):
-        super(DesalinationOutfallOptions, self).__init__(**kwargs)
-        self.solve_swe = True
-        self.solve_tracer = spun
-        self.spun = spun
+        super(IdealisedDesalinationOutfallOptions, self).__init__(spun=spun, **kwargs)
 
         # Domain
         self.default_mesh = Mesh(os.path.join(self.resource_dir, 'channel_{:d}.msh'.format(level)))
@@ -37,12 +32,14 @@ class DesalinationOutfallOptions(CoupledOptions):
         self.friction_coeff = 0.0025  # TODO: Increased drag at pipes?
         self.grad_div_viscosity = False
         self.grad_depth_viscosity = True
-        self.characteristic_speed = Constant(1.0)
+        self.characteristic_speed = Constant(2.4)  # Max observed fluid speed
         self.characteristic_diffusion = Constant(self.base_diffusivity)
 
         # Time integration
         self.timestepper = 'CrankNicolson'
         self.start_time = 0.0
+        # self.T_tide = 0.1*self.M2_tide_period
+        self.T_tide = 0.05*self.M2_tide_period
         # self.T_ramp = 3.855*self.T_tide
         self.T_ramp = self.T_tide
         self.end_time = self.T_tide if spun else self.T_ramp
@@ -63,7 +60,7 @@ class DesalinationOutfallOptions(CoupledOptions):
         self.lax_friedrichs_velocity_scaling_factor = Constant(1.0)
 
         # Source (outlet pipe)
-        self.source_value = 0.1  # Discharge rate
+        self.source_value = 2.0  # Discharge rate
         outlet_x = 0.0 if aligned else -500.0
         outlet_y = 150.0
         self.source_loc = [(outlet_x, outlet_y, 25.0)]  # Outlet
@@ -122,6 +119,7 @@ class DesalinationOutfallOptions(CoupledOptions):
         top_tag = 3
         inflow_tag = 4
         zero = Constant(0.0)
+        bg = Constant(self.background_salinity)
         boundary_conditions = {
             'shallow_water': {
                 # bottom_tag: {???},
@@ -132,9 +130,9 @@ class DesalinationOutfallOptions(CoupledOptions):
             'tracer': {
                 # bottom_tag: {},                   # open
                 bottom_tag: {'diff_flux': zero},  # Neumann
-                outflow_tag: {'value': zero},     # Dirichlet
+                outflow_tag: {'value': bg},       # Dirichlet
                 top_tag: {'diff_flux': zero},     # Neumann
-                inflow_tag: {'value': zero},      # Dirichlet
+                inflow_tag: {'value': bg},        # Dirichlet
             },
         }
         return boundary_conditions
@@ -143,19 +141,44 @@ class DesalinationOutfallOptions(CoupledOptions):
         """
         Simple tidal forcing with frequency :attr:`omega` and amplitude :attr:`max_amplitude`.
 
+        In addition, write data for the x-component of velocity to file.
+
         :arg prob: :class:`AdaptiveDesalinationProblem` object.
         :arg i: mesh index.
         """
         tc = Constant(0.0)
         hmax = Constant(self.max_amplitude)
         offset = self.T_ramp if self.spun else 0.0
+        if self.spun:
+            u, eta = prob.fwd_solutions[i].split()
+            velocity = Function(prob.P1[i])
+            with open(os.path.join(self.di, "speed"), 'w') as outfile:
+                outfile.write("t      min    max    mean   var\n")
 
         def update_forcings(t):
-            tc.assign(t + offset)
+            tt = t + offset
+
+            # Update tidal forcing
+            tc.assign(tt)
             self.elev_in[i].assign(hmax*cos(self.omega*tc))
             self.elev_out[i].assign(hmax*cos(self.omega*tc + pi))
 
+            # Write x-velocity to file
+            if self.spun:
+                velocity.interpolate(u[0])
+                data = velocity.vector().gather()
+                msg = "{:7.4f} {:7.4f} {:7.4f} {:7.4f} {:7.4f}\n"
+                with open(os.path.join(self.di, "speed"), 'a') as outfile:
+                    outfile.write(msg.format(tt, data.min(), data.max(), np.mean(data), np.var(data))
+
         return update_forcings
+
+    def get_export_func(self, prob, i, **kwargs):
+
+        def export_func():
+            return
+
+        return export_func
 
     def set_initial_condition(self, prob):
         """

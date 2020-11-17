@@ -5,12 +5,12 @@ import numpy as np
 import os
 
 from adapt_utils.plotting import *
-from adapt_utils.unsteady.test_cases.desalination.options import DesalinationOutfallOptions
+from adapt_utils.unsteady.test_cases.idealised_desalination.options import *
 
 
 # Set parameters
 plt.rc('font', **{'size': 16})
-op = DesalinationOutfallOptions(1.0)
+op = IdealisedDesalinationOutfallOptions(1.0)
 
 # Create parameter object and get time periods
 time_seconds = np.linspace(0.0, 2*op.T_tide, 1001)

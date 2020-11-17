@@ -36,6 +36,9 @@ class TurbineOptions(CoupledOptions):
     # Physics
     sea_water_density = PositiveFloat(1030.0).tag(config=True)
 
+    # Tidal forcing
+    M2_tide_period = PositiveFloat(12.4*3600).tag(config=False)
+
     # --- Setup
 
     def __init__(self, **kwargs):
@@ -50,7 +53,6 @@ class TurbineOptions(CoupledOptions):
         self.timestepper = 'CrankNicolson'
 
         # Boundary forcing
-        self.M2_tide_period = 12.4*3600.0
         self.T_tide = self.M2_tide_period
         self.dt_per_export = 10
 
