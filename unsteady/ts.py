@@ -94,7 +94,6 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
                   )
 
         self.update_solver()
-        # TODO: Setup strong residual for Crank-Nicolson
 
     def update_solver(self):
         """
@@ -169,6 +168,9 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
         ee.residual_terms = residual_terms
         ee.inter_element_flux_terms = inter_element_flux_terms
         ee.bnd_flux_terms = bnd_flux_terms
+
+    def setup_strong_residual(self, solution, solution_old, adjoint):
+        raise NotImplementedError  # TODO
 
 
 class PressureProjectionPicard(thetis_ts.PressureProjectionPicard):

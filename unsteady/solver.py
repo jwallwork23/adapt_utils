@@ -2123,6 +2123,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # --- Solve forward to get checkpoints
 
+            for i in range(self.num_meshes):
+                self.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
             self.solve_forward()
 
             # --- Convergence criteria
@@ -2191,7 +2193,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 fwd_old = Function(base_space[i])
                 adj = Function(base_space[i])
                 bcs = self.boundary_conditions[i][adapt_field]
-                ts.setup_error_estimator(fwd, fwd_old, adj, bcs)
+                ts.setup_strong_residual(fwd, fwd_old, adj)
 
                 # Loop over exported timesteps
                 for j in range(len(fwd_solutions_step)):
