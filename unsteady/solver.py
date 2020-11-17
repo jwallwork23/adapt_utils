@@ -1362,9 +1362,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             msg = "FORWARD SOLVE  time {:8.2f}  ({:6.2f}) seconds"
             self.print(msg.format(self.simulation_time, 0.0))
         else:
-            msg = "{:2d} {:s} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f}) seconds"
-            indent = '' if op.debug else '  '*i
-            self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+            msg = "{:2d} FORWARD SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f}) seconds"
+            self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
                                   self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
@@ -1457,8 +1456,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.num_meshes == 1:
                     self.print(msg.format(self.simulation_time, cpu_time))
                 else:
-                    indent = '' if op.debug else '  '*i
-                    self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                    self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
                                           self.simulation_time, cpu_time))
                 cpu_timestamp = perf_counter()
                 if op.solve_swe and plot_pvd:
@@ -1554,9 +1552,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             msg = "ADJOINT SOLVE time {:8.2f}  ({:6.2f} seconds)"
             self.print(msg.format(self.simulation_time, 0.0))
         else:
-            indent = '' if op.debug else '  '*i
-            msg = "{:2d} {:s}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
-            self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+            msg = "{:2d}  ADJOINT SOLVE mesh {:2d}/{:2d}  time {:8.2f}  ({:6.2f} seconds)"
+            self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
                                   self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
 
@@ -1619,8 +1616,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.num_meshes == 1:
                     self.print(msg.format(self.simulation_time, cpu_time))
                 else:
-                    indent = '' if op.debug else '  '*i
-                    self.print(msg.format(self.outer_iteration, indent, i+1, self.num_meshes,
+                    self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
                                           self.simulation_time, cpu_time))
                 if op.solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
