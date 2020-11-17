@@ -46,9 +46,9 @@ for alignment in ('aligned', 'offset'):
     # Plot convergence curves
     for approach in approaches:
         filename = 'qoi_{:s}'.format(ext)
+        if anisotropic_stabilisation:
+            filename += '_anisotropic'
         if approach != 'fixed_mesh':
-            if anisotropic_stabilisation:
-                filename += '_anisotropic'
             if approach == 'anisotropic_dwr':
                 filename += '_{:.0f}'.format(alpha)
             else:
