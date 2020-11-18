@@ -45,7 +45,7 @@ if args.locations is None:  # TODO: Parse as list
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)
-plot_pvd = bool(args.plot_pvd or False)
+plot_pvd = False if args.plot_pvd == '0' else True
 kwargs = {
     'approach': 'fixed_mesh',
 
