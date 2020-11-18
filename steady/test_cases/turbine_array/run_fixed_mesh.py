@@ -6,7 +6,7 @@ import matplotlib.patches as ptch
 import os
 
 from adapt_utils.steady.test_cases.turbine_array.options import TurbineArrayOptions
-from adapt_utils.steady.swe.turbine.solver import AdaptiveSteadyTurbineProblem
+from adapt_utils.swe.turbine.solver import AdaptiveSteadyTurbineProblem
 from adapt_utils.swe.utils import speed
 from adapt_utils.plotting import *
 

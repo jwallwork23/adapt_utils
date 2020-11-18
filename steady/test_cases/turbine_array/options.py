@@ -4,7 +4,7 @@ from thetis.configuration import *
 import numpy as np
 import os
 
-from adapt_utils.steady.swe.turbine.options import SteadyTurbineOptions
+from adapt_utils.swe.turbine.options import SteadyTurbineOptions
 
 
 __all__ = ["TurbineArrayOptions"]

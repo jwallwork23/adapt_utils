@@ -5,7 +5,25 @@ from adapt_utils.options import CoupledOptions
 from adapt_utils.swe.utils import speed
 
 
-__all__ = ["TurbineOptions"]
+__all__ = ["TurbineOptions", "SteadyTurbineOptions"]
+
+
+# Default solve parameters for steady state case:
+#   Newton with line search; solve linear system exactly with LU factorisation
+lu_params = {
+    'mat_type': 'aij',
+    'snes_type': 'newtonls',
+    'snes_rtol': 1e-8,
+    'snes_max_it': 100,
+    'snes_linesearch_type': 'bt',
+    'snes_monitor': None,
+    'snes_converged_reason': None,
+    'ksp_type': 'preonly',
+    'ksp_converged_reason': None,
+    'pc_type': 'lu',
+    'pc_factor_mat_solver_type': 'mumps',
+}
+default_params = lu_params
 
 
 class TurbineOptions(CoupledOptions):
@@ -178,3 +196,25 @@ class TurbineOptions(CoupledOptions):
         k_u, k_eta = prob.kernels[i].split()
         # k_u.interpolate(Constant(1/3)*prob.turbine_densities[i]*speed(u)*u)
         k_u.interpolate(prob.turbine_densities[i]*speed(u)*u)
+
+
+class SteadyTurbineOptions(TurbineOptions):
+    """
+    Base class holding parameters for steady state tidal turbine problems.
+    """
+    thrust_coefficient = NonNegativeFloat(0.8).tag(config=True)
+
+    # --- Setup
+
+    def __init__(self, num_iterations=1, **kwargs):
+        super(SteadyTurbineOptions, self).__init__(**kwargs)
+
+        # Timestepping
+        self.timestepper = 'SteadyState'
+        self.dt = 20.0
+        self.dt_per_export = 1
+        self.end_time = num_iterations*self.dt - 0.2
+
+        # Solver parameters
+        self.solver_parameters = {'shallow_water': default_params}
+        self.adjoint_solver_parameters = {'shallow_water': default_params}
