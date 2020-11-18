@@ -15,6 +15,7 @@ tohoku/resources/log
 tohoku/resources/boundaries_old
 tohoku/resources/boundaries_curved
 tohoku/resources/meshes_old
+tohoku/resources/meshes/curved_boundary
 tohoku/notebooks/plotting.ipynb
 tohoku/notebooks/02-okada/*.npy
 tohoku/notebooks/02-okada/old/

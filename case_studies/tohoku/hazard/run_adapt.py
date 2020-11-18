@@ -63,7 +63,7 @@ p = args.norm_order
 
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
-plot_pvd = bool(args.plot_pvd or False)
+plot_pvd = False if args.plot_pvd == '0' else True
 plot_all = bool(args.plot_all or False)
 if plot_all:
     plot_pvd = plot_pdf = plot_png = True
