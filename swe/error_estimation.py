@@ -10,6 +10,9 @@ for details on the formulation.
 from __future__ import absolute_import
 from thetis.utility import *
 from thetis.shallowwater_eq import ShallowWaterTerm
+
+import numpy as np
+
 from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
 from .utils import speed
 
@@ -637,6 +640,7 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
         u_space, eta_space = function_space.split()
         self.add_momentum_terms(u_space, eta_space, depth, options)
         self.add_continuity_terms(eta_space, u_space, depth, options)
+        self.P0P0 = VectorFunctionSpace(self.mesh, "DG", 0)*self.P0
 
     def add_momentum_terms(self, *args):
         self.add_term(ExternalPressureGradientGOErrorEstimatorTerm(*args), 'implicit')
@@ -656,14 +660,13 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
         self.add_term(ContinuitySourceGOErrorEstimatorTerm(*args), 'source')
 
     def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):
-        P0P0 = VectorFunctionSpace(self.mesh, "DG", 0)*self.P0
-        self._strong_residual = Function(P0P0, name="Strong residual for shallow water equations")
+        self._strong_residual = Function(self.P0P0)
         residual_u, residual_eta = self._strong_residual.split()
         residual_u.rename("Strong residual for momentum equation")
         residual_eta.rename("Strong residual for continuity equation")
 
         # Strong residual for u-component of momentum equation
-        adj_u = Function(P0P0)
+        adj_u = Function(self.P0P0)
         adj_u1, adj_u2 = adj_u.split()
         adj_u1.interpolate(as_vector([1.0, 0.0]))
         args = (solution, solution_old, adj_u, adj_u, fields, fields_old)
@@ -672,7 +675,7 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
             self.strong_residual_terms_u += term.element_residual(*args)
 
         # Strong residual for v-component of momentum equation
-        adj_v = Function(P0P0)
+        adj_v = Function(self.P0P0)
         adj_v1, adj_v2 = adj_v.split()
         adj_v1.interpolate(as_vector([0.0, 1.0]))
         args = (solution, solution_old, adj_v, adj_v, fields, fields_old)
@@ -681,13 +684,36 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
             self.strong_residual_terms_v += term.element_residual(*args)
 
         # Strong residual for continuity equation
-        adj_eta = Function(P0P0)
+        adj_eta = Function(self.P0P0)
         adj_eta1, adj_eta2 = adj_eta.split()
         adj_eta2.assign(1.0)
         args = (solution, solution_old, adj_eta, adj_eta, fields, fields_old)
         self.strong_residual_terms_eta = 0
         for term in self.select_terms(label):
             self.strong_residual_terms_eta += term.element_residual(*args)
+
+        # Strong residual components as NumPy array
+        self.strong_residual_terms = np.array([
+            self.strong_residual_terms_u,
+            self.strong_residual_terms_v,
+            self.strong_residual_terms_eta,
+        ])
+
+    def mass_term(self, solution, arg, vector=False, **kwargs):
+        """
+        Returns an UFL form of the solution weighted by the argument.
+
+        :arg arg: argument :class:`.Function` to take inner product with.
+        """
+        if vector:
+            assert isinstance(solution, Function)
+            assert isinstance(arg, Function)
+            u, eta = solution.split()
+            z, zeta = arg.split()
+            mass = [self.p0test*u[0]*z[0]*dx, self.p0test*u[1]*z[1]*dx, self.p0test*eta*zeta*dx]
+            return np.array(mass)
+        else:
+            return self.p0test*inner(solution, arg)*dx
 
     @property
     def strong_residual(self):

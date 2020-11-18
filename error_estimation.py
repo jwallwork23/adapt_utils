@@ -55,13 +55,17 @@ class GOErrorEstimator(Equation):
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
 
-    def mass_term(self, solution, arg):
+    def mass_term(self, solution, arg, vector=False, **kwargs):
         """
         Returns an UFL form of the solution weighted by the argument.
 
         :arg arg: argument :class:`.Function` to take inner product with.
         """
-        return self.p0test*inner(solution, arg)*dx
+        mass = self.p0test*inner(solution, arg)*dx
+        if vector:
+            import numpy as np
+            mass = np.array([mass])
+        return mass
 
     def _create_element_residual(self, label, *args):
         self.residual_terms = 0

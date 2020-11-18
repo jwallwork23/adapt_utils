@@ -267,13 +267,17 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         self.terms[key].su_stabilisation = self.su_stabilisation
         self.terms[key].supg_stabilisation = self.supg_stabilisation
 
-    def mass_term(self, solution, arg, velocity=None):
+    def mass_term(self, solution, arg, vector=False, velocity=None, **kwargs):
         """
         Account for SUPG stabilisation in mass term.
         """
         if self.stabilisation == 'supg':
             arg = arg + self.supg_stabilisation*dot(velocity, grad(arg))
-        return self.p0test*inner(solution, arg)*dx
+        mass = self.p0test*inner(solution, arg)*dx
+        if vector:
+            import numpy as np
+            mass = np.array([mass])
+        return mass
 
     def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):
         adj = Function(self.P0).assign(1.0)
