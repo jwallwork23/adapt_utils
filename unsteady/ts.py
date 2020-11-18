@@ -197,4 +197,4 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
         residual += -self.dt_const*(1-self.theta_const)*ee.strong_residual_terms
 
         # Pass forms back to error estimator
-        ee.strong_residual_termss = residual
+        ee.strong_residual_terms = residual
