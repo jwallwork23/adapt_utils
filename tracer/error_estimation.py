@@ -290,11 +290,3 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         """
         self._strong_residual.assign(assemble(self.strong_residual_terms))
         return self._strong_residual
-
-    def evaluate_flux_jump(self, sol):
-        """
-        Evaluate flux jump as element-wise indicator functions.
-        """
-        flux_jump = Function(VectorFunctionSpace(self.mesh, "DG", 0)*self.P0)
-        solve(self.p0test*self.p0trial*dx == jump(self.p0test*sol)*dS, flux_jump)
-        return flux_jump

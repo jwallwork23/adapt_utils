@@ -656,8 +656,8 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
 
     def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):
         P0P0 = VectorFunctionSpace(self.mesh, "DG", 0)*self.P0
-        self.strong_residual = Function(P0P0, name="Strong residual for shallow water equations")
-        residual_u, residual_eta = self.strong_residual.split()
+        self._strong_residual = Function(P0P0, name="Strong residual for shallow water equations")
+        residual_u, residual_eta = self._strong_residual.split()
         residual_u.rename("Strong residual for momentum equation")
         residual_eta.rename("Strong residual for continuity equation")
 
@@ -688,32 +688,13 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
         for term in self.select_terms(label):
             self.strong_residual_terms_eta += term.element_residual(*args)
 
-    def evaluate_strong_residual(self):
+    @property
+    def strong_residual(self):
         """
         Evaluate strong residual of shallow water equations.
         """
-        residual_u, residual_eta = self.strong_residual.split()
-        residual_u.interpolate(as_vector([abs(assemble(self.strong_residual_terms_u)),
-                                          abs(assemble(self.strong_residual_terms_v))]))
-        residual_eta.interpolate(abs(assemble(self.strong_residual_terms_eta)))
-        return self.strong_residual
-
-    def evaluate_flux_jump(self, sol):
-        """
-        Evaluate flux jump as element-wise indicator functions.
-        """
-        sol_u, sol_eta = sol.split()
-        flux_jump = Function(VectorFunctionSpace(self.mesh, "DG", 0)*self.P0)
-        flux_jump_1 = Function(self.P0)
-        flux_jump_2 = Function(self.P0)
-        flux_jump_3 = Function(self.P0)
-
-        mass_term = self.p0test*self.p0trial*dx
-        solve(mass_term == jump(self.p0test*sol_u[0])*dS, flux_jump_1)  # TODO: Solver parameters?
-        solve(mass_term == jump(self.p0test*sol_u[1])*dS, flux_jump_2)
-        solve(mass_term == jump(self.p0test*sol_eta)*dS, flux_jump_3)
-
-        flux_jump_u, flux_jump_eta = flux_jump.split()
-        flux_jump_u.interpolate(as_vector([flux_jump_1, flux_jump_2]))
-        flux_jump_eta.assign(flux_jump_3)
-        return flux_jump
+        residual_u, residual_eta = self._strong_residual.split()
+        residual_u.interpolate(as_vector([assemble(self.strong_residual_terms_u),
+                                          assemble(self.strong_residual_terms_v)]))
+        residual_eta.interpolate(assemble(self.strong_residual_terms_eta))
+        return self._strong_residual
