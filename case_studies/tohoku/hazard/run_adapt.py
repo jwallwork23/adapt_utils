@@ -78,7 +78,7 @@ if args.locations is None:
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)
-family = args.family or 'cg-cg'  # FIXME: what's wrong with dg-cg?
+family = args.family or 'cg-cg'
 nonlinear = bool(args.nonlinear or False)
 stabilisation = args.stabilisation or 'lax_friedrichs'
 if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
@@ -108,6 +108,7 @@ kwargs = {
     'normalisation': args.normalisation or 'complexity',
     'norm_order': 1 if p is None else None if p == 'inf' else float(p),
     'target': float(args.target or 5.0e+03),
+    'min_adapt': 3,
     'h_min': float(args.h_min or 1.0e+02),
     'h_max': float(args.h_max or 1.0e+06),
 

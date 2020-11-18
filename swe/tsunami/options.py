@@ -16,7 +16,6 @@ class TsunamiOptions(CoupledOptions):
     """
     Parameter class for general tsunami propagation problems.
     """
-    # TODO: more doc details
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
     bathymetry_cap = NonNegativeFloat(30.0, allow_none=True, help="Minimum depth").tag(config=True)
 
@@ -36,17 +35,12 @@ class TsunamiOptions(CoupledOptions):
         self.rotational = True
 
         # Bathymetry shift
-        # ================
         self.shift_bathymetry = True
         self.shift_bathymetry_flag = False
 
         # Stabilisation
-        # =============
-        # In some cases qmesh generated meshes can have tiny elements with sharp angles
-        # near the coast. To account for this, we set a large SIPG parameter value. (If
-        # we use the automatic SIPG functionality then it would return an enormous value.)
         self.base_viscosity = 1.0e-03
-        self.sipg_parameter = Constant(100.0)
+        self.use_automatic_sipg_parameter = True
 
         # Quantity of interest
         self.regularisation = regularisation

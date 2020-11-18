@@ -59,7 +59,7 @@ kwargs = {
     # 'bathymetry_cap': None,
 
     # Solver
-    'family': args.family or 'dg-cg',
+    'family': args.family or 'cg-cg',
     'stabilsation': args.stabilisation,
     # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
