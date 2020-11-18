@@ -1636,7 +1636,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
             return [steady_metric(sol, mesh=self.meshes[i], **kwargs)]
         else:
             fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
-            return [recover_hessian_metric(sol, fields=fields, **kwargs)]
+            return [
+                recover_hessian_metric(sol, adapt_field='velocity_x', fields=fields, **kwargs),
+                recover_hessian_metric(sol, adapt_field='velocity_y', fields=fields, **kwargs),
+                recover_hessian_metric(sol, adapt_field='elevation', fields=fields, **kwargs),
+            ]
 
     def get_recovery(self, i, **kwargs):
         op = self.op
@@ -2112,6 +2116,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Computer Aided Design.
         """
         op = self.op
+        dt_per_mesh = self.dt_per_mesh
+
+        # Process parameters
         adapt_field = op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
@@ -2162,7 +2169,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     fwd_solutions_step_old.append(ts.solution_old.copy(deepcopy=True))
                     # TODO: Also need store fields at each export (in general case)
 
-                self.simulation_time = i*op.dt*self.dt_per_mesh
+                self.simulation_time = i*op.dt*dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
                 self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
@@ -2261,8 +2268,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
             self.print(msg.format(
                 self.st_complexities[-1],
-                sum(self.num_vertices[n+1])*self.dt_per_mesh,
-                sum(self.num_cells[n+1])*self.dt_per_mesh,
+                sum(self.num_vertices[n+1])*dt_per_mesh,
+                sum(self.num_cells[n+1])*dt_per_mesh,
             ))
 
             # Ensure minimum number of adaptations met
