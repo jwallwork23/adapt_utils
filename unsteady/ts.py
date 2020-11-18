@@ -169,7 +169,7 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
         ee.inter_element_flux_terms = inter_element_flux_terms
         ee.bnd_flux_terms = bnd_flux_terms
 
-    def setup_strong_residual(self, solution, solution_old):  # TODO: Account for non-scalar spaces
+    def setup_strong_residual(self, solution, solution_old):
         ee = self.error_estimator
         assert ee is not None
         u = solution
@@ -179,11 +179,9 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
         f_old = self.fields_old
 
         # Time derivative
-        kwargs = {}
-        if 'Tracer' in self.equation.__class__.__name__:
-            uv = f_old.get('uv_2d', None)
-            uv = f_old.get('uv_3d', uv)
-            kwargs['velocity'] = uv
+        uv = f_old.get('uv_2d', None)
+        uv = f_old.get('uv_3d', uv)
+        kwargs = dict(velocity=uv, vector=True)
         one = Function(solution.function_space()).assign(1.0)
         residual = ee.mass_term(u, one, **kwargs)
         residual += -ee.mass_term(u_old, one, **kwargs)
