@@ -365,7 +365,7 @@ class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
         if uv is None:
             raise Exception('Adjoint equation does not have access to forward solution velocity')
 
-        unorm = speed(uv smoother=self.options.norm_smoother)
+        unorm = speed(uv, smoother=self.options.norm_smoother)
         f += C_D*unorm*inner(self.u_star_test, u_star)*self.dx
         f += C_D*inner(self.u_star_test, uv)*inner(u_star, uv)/unorm*self.dx
         return -f
