@@ -9,6 +9,7 @@ from adapt_utils.io import load_mesh
 from adapt_utils.mesh import *
 from adapt_utils.plotting import *
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
+from adapt_utils.swe.utils import speed
 
 
 # Parse arguments
@@ -58,7 +59,7 @@ if args.family == 'cg':
 
     # Calculate stabilisation parameter
     uv = Constant(as_vector(op.base_velocity))
-    unorm = sqrt(dot(uv, uv))
+    unorm = speed(uv)
     tau = 0.5*h/unorm
     Pe = 0.5*h*unorm/op.base_diffusivity
     tau *= min_value(1, Pe/3)

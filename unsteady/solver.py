@@ -1631,8 +1631,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if supg:
                 cell_size = anisotropic_cell_size if op.anisotropic_stabilisation else CellSize
                 h = cell_size(self.meshes[i])
-                u, eta = self.fwd_solutions[i].split()
-                unorm = sqrt(dot(u, u))
+                unorm = speed(self.fwd_solutions[i])
                 tau = 0.5*h/unorm
                 D = self.fields[i].horizontal_diffusivity
                 if D is not None:

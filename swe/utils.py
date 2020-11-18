@@ -179,12 +179,21 @@ class L2ProjectorVorticity(L2Projector):
 
 # --- Misc
 
-def speed(sol):
+def speed(sol, smoother=None):
     """
     Fluid velocity magnitude, i.e. fluid speed.
+
+    :arg sol: solution tuple or velocity field from which to extract speed.
+    :kwarg smoother: optional smoother for square root.
     """
-    uv, elev = sol.split()
-    return sqrt(inner(uv, uv))
+    try:
+        uv, elev = sol.split()
+    except Exception:
+        uv = sol
+    speed_sq = dot(uv, uv)
+    if smoother is not None:
+        speed_sq = speed_sq + smoother**2
+    return sqrt(speed_sq)
 
 
 def heaviside_approx(H, alpha):

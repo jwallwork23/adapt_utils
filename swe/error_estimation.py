@@ -9,8 +9,9 @@ for details on the formulation.
 """
 from __future__ import absolute_import
 from thetis.utility import *
-from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
 from thetis.shallowwater_eq import ShallowWaterTerm
+from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
+from .utils import speed
 
 
 __all__ = ['ShallowWaterGOErrorEstimator']
@@ -511,7 +512,7 @@ class QuadraticDragGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMomentumTerm
             C_D = g_grav * manning_drag_coefficient**2 / total_h**(1./3.)
 
         if C_D is not None:
-            unorm = sqrt(dot(uv_old, uv_old) + self.options.norm_smoother**2)
+            unorm = speed(solution_old, smoother=self.options.norm_smoother)
             f += self.p0test*C_D*unorm*inner(z, uv)/total_h*self.dx
 
         return -f
@@ -571,7 +572,7 @@ class TurbineDragGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMomentumTerm):
             C_T = farm_options.turbine_options.thrust_coefficient
             A_T = pi * (farm_options.turbine_options.diameter/2.)**2
             C_D = (C_T * A_T * density)/2.
-            unorm = sqrt(dot(uv_old, uv_old))
+            unorm = speed(solution_old)
             f += self.p0test*C_D*unorm*inner(z, uv)/total_h*self.dx(subdomain_id)
 
         return -f
