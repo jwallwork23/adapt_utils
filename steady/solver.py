@@ -319,9 +319,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         for the adjoint PDE.
         """
         strong_residual = self.get_strong_residual(adjoint=adjoint)
-        self.recover_hessian_metric(normalise=False, enforce_constraints=False, adjoint=not adjoint)
-        scaled_hessian = project(strong_residual*self.metrics[0], self.P1_ten[0])
-        return steady_metric(H=scaled_hessian, normalise=True, enforce_constraints=True, op=self.op)
+        hessian = self.recover_hessian_metric(
+            0, normalise=False, enforce_constraints=False, adjoint=not adjoint
+        )
+        scaled_hessian = project(strong_residual*hessian, self.P1_ten[0])
+        metric = steady_metric(
+            H=scaled_hessian, normalise=True, enforce_constraints=True, op=self.op
+        )
+        return metric
 
     def get_weighted_gradient_metric(self, adjoint=False, source=True):
         """

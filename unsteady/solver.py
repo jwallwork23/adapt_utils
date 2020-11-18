@@ -1617,37 +1617,33 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Metric
 
-    def recover_hessian_metric(self, adjoint=False, **kwargs):
+    def recover_hessian_metric(self, i, adjoint=False, **kwargs):
         op = self.op
         kwargs.setdefault('normalise', True)
         kwargs['op'] = op
-        self.metrics = []
-        solutions = self.get_solutions(self.op.adapt_field, adjoint=adjoint)
+        sol = self.get_solutions(self.op.adapt_field, adjoint=adjoint)[i]
         if op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
             from adapt_utils.mesh import anisotropic_cell_size
 
-            for i, sol in enumerate(solutions):
+            # Account for SUPG stabilisation
+            supg = op.adapt_field == 'tracer' and op.stabilisation_tracer == 'supg'
+            supg |= op.adapt_field == 'sediment' and op.stabilisation_sediment == 'supg'
+            if supg:
+                cell_size = anisotropic_cell_size if op.anisotropic_stabilisation else CellSize
+                h = cell_size(self.meshes[i])
+                u, eta = self.fwd_solutions[i].split()
+                unorm = sqrt(dot(u, u))
+                tau = 0.5*h/unorm
+                D = self.fields[i].horizontal_diffusivity
+                if D is not None:
+                    Pe = 0.5*h*unorm/D
+                    tau *= min_value(1, Pe/3)
+                sol = sol + tau*dot(u, grad(sol))
 
-                # Account for SUPG stabilisation
-                supg = op.adapt_field == 'tracer' and op.stabilisation_tracer == 'supg'
-                supg |= op.adapt_field == 'sediment' and op.stabilisation_sediment == 'supg'
-                if supg:
-                    cell_size = anisotropic_cell_size if op.anisotropic_stabilisation else CellSize
-                    h = cell_size(self.meshes[i])
-                    u, eta = self.fwd_solutions[i].split()
-                    unorm = sqrt(dot(u, u))
-                    tau = 0.5*h/unorm
-                    D = self.fields[i].horizontal_diffusivity
-                    if D is not None:
-                        Pe = 0.5*h*unorm/D
-                        tau *= min_value(1, Pe/3)
-                    sol = sol + tau*dot(u, grad(sol))
-
-                self.metrics.append(steady_metric(sol, mesh=self.meshes[i], **kwargs))
+            return steady_metric(sol, mesh=self.meshes[i], **kwargs)
         else:
-            for i, sol in enumerate(solutions):
-                fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
-                self.metrics.append(recover_hessian_metric(sol, fields=fields, **kwargs))
+            fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
+            return recover_hessian_metric(sol, fields=fields, **kwargs)
 
     def get_recovery(self, i, **kwargs):
         op = self.op
@@ -2197,10 +2193,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         strong_residual_cts = project(strong_residual, self.P1[i])
 
                         # Recover Hessian as self.metrics[i]
-                        self.recover_hessian_metric(adjoint=True, **hessian_kwargs)
+                        H = self.recover_hessian_metric(i, adjoint=True, **hessian_kwargs)
 
                         # Accumulate weighted Hessian
-                        metrics[i] += w*interpolate(strong_residual_cts*self.metrics[i], self.P1_ten[i])
+                        metrics[i] += w*interpolate(strong_residual_cts*H, self.P1_ten[i])
                     else:
                         raise NotImplementedError  # TODO: weighted gradient
 
