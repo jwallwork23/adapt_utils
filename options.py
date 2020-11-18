@@ -695,7 +695,7 @@ class CoupledOptions(Options):
         if nu is None:
             Re_h = None
             self.print_debug("INIT: Cannot compute mesh Reynolds number for inviscid problems")
-            return
+            return None, None, None
         u = characteristic_velocity or self.characteristic_velocity
         if u is None:
             raise ValueError("Cannot enforce mesh Reynolds number without characteristic velocity!")

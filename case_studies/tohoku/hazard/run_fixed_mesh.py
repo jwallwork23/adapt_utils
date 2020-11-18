@@ -127,8 +127,6 @@ if plot_pvd:
         msg = "level {:d}  mesh {:d}  kernel volume {:.8e}"
         print_output(msg.format(op.level, i, assemble(k_eta*dx)))
 
-exit(0)  # TODO: TEMP
-
 # Load or generate QoI timeseries
 fname = 'qoi_timeseries'
 if plot_only:

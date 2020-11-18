@@ -519,6 +519,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # u, eta = self.fwd_solutions[i].split()
         u = self.op.characteristic_velocity or self.fwd_solutions[i].split()[0]
         nu = self.fields[i].horizontal_viscosity
+        if nu is None:
+            return
         self.reynolds_number[i] = (u, nu)
         if self.op.plot_pvd:
             if not hasattr(self, 'reynolds_number_file'):

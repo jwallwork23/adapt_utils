@@ -8,11 +8,15 @@ __all__ = ["TohokuHazardOptions"]
 
 
 class TohokuHazardOptions(TohokuOptions):
-    # TODO: doc
+    """
+    Parameter class for hazard assessment applications for the Tohoku tsunami case study.
+
+    The hazard being assessed is determined by the QoI.
+    """
     def __init__(self, *args, kernel_shape='gaussian', **kwargs):
         """
-        :kwarg radius: distance indicating radii around the locations of interest, thereby
-            determining regions of interest for use in hazard assessment QoIs.
+        :kwarg kernel_shape: shape to use for region of interest, from
+            {'gaussian', 'circular_bump', 'ball'}.
         """
         super(TohokuHazardOptions, self).__init__(*args, **kwargs)
 
