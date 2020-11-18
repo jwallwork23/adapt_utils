@@ -1,3 +1,12 @@
+"""
+***************************************************************************************************
+*   NOTE: Much of the code presented here is copied directly from the code associated with [1].   *
+***************************************************************************************************
+
+[1] A.T.T. McRae, C.J. Cotter, and C.J. Budd, "Optimal-transport--based mesh adaptivity on the
+    plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
+    A1121-A1148.
+"""
 from thetis import *
 
 import os
@@ -25,12 +34,7 @@ class MeshMover():
     normalising constant and :math:`H(\phi)` denotes the Hessian of :math:`\phi` with respect to
     coordinates on the computational mesh.
 
-    The implementation is an objective-oriented version of that given in [1]. Most of the code
-    presented here is copied directly from that associated with [1].
-
-    [1] A.T.T. McRae, C.J. Cotter, and C.J. Budd, "Optimal-transport--based mesh adaptivity on the
-        plane and sphere using finite elements." SIAM Journal on Scientific Computing 40.2 (2018):
-        A1121-A1148.
+    The implementation is an objective-oriented version of that given in [1].
     """
     def __init__(self, mesh, monitor_function, method='monge_ampere', bc=None, bbc=None, op=Options()):
         self.mesh = mesh
