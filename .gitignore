@@ -1,7 +1,7 @@
 # Directories
 __pycache__/
 swe/tsunami/tsunami1d/
-steady/swe/spacetime/
+steady/spacetime/
 
 # Specific files
 TODO
