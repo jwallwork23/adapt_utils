@@ -2184,9 +2184,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     else:
                         raise NotImplementedError  # TODO: Other integrators
                     w *= op.dt*op.dt_per_export
-                    fwd.assign(fwd_solutions_step[i])
-                    fwd_old.assign(fwd_solutions_step_old[i])
-                    adj.assign(adj_solutions_step[i])
+                    fwd.assign(fwd_solutions_step[j])
+                    fwd_old.assign(fwd_solutions_step_old[j])
+                    adj.assign(adj_solutions_step[j])
                     fwd_solutions[i].assign(fwd)
 
                     # Construct metric at each timestep
