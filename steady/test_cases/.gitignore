@@ -9,8 +9,8 @@ point_discharge2d/uniform_convergence_log
 point_discharge3d/outputs/
 point_discharge3d/screenshots/
 point_discharge3d/__pycache__/
-spacetime_ripple/outputs/
-spacetime_ripple/__pycache__/
+spacetime_ripple/
+spacetime_ripple/
 turbine_array/outputs/
 turbine_array/resources/
 turbine_array/screenshots/
