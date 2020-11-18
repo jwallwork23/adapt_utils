@@ -473,9 +473,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     op.print_debug(msg.format(model, i, v.min()[1], v.max()[1]))
 
         # Stabilisation
-        eq_options[i]['lax_friedrichs_tracer_scaling_factor'] = None
-        eq_options[i]['su_stabilisation'] = None
-        eq_options[i]['supg_stabilisation'] = None
+        eq_options[i].lax_friedrichs_tracer_scaling_factor = None
+        eq_options[i].su_stabilisation = None
+        eq_options[i].supg_stabilisation = None
         if stabilisation is None:
             return
         elif stabilisation == 'lax_friedrichs':
@@ -494,9 +494,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 Pe = 0.5*h*U/D
                 tau *= min_value(1, Pe/3)
             if stabilisation == 'su':
-                eq_options[i]['su_stabilisation'] = tau
+                eq_options[i].su_stabilisation = tau
             else:
-                eq_options[i]['supg_stabilisation'] = tau
+                eq_options[i].supg_stabilisation = tau
         else:
             msg = "Stabilisation method {:s} not recognised for {:s}"
             raise ValueError(msg.format(stabilisation, self.__class__.__name__))
@@ -1623,21 +1623,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         kwargs['op'] = op
         sol = self.get_solutions(self.op.adapt_field, adjoint=adjoint)[i]
         if op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
-            from adapt_utils.mesh import anisotropic_cell_size
 
-            # Account for SUPG stabilisation
-            supg = op.adapt_field == 'tracer' and op.stabilisation_tracer == 'supg'
-            supg |= op.adapt_field == 'sediment' and op.stabilisation_sediment == 'supg'
-            if supg:
-                cell_size = anisotropic_cell_size if op.anisotropic_stabilisation else CellSize
-                h = cell_size(self.meshes[i])
-                unorm = speed(self.fwd_solutions[i])
-                tau = 0.5*h/unorm
-                D = self.fields[i].horizontal_diffusivity
-                if D is not None:
-                    Pe = 0.5*h*unorm/D
-                    tau *= min_value(1, Pe/3)
-                sol = sol + tau*dot(u, grad(sol))
+            # Account for SUPG stabilisation in weighted Hessian metric
+            if op.adapt_field in ('tracer', 'sediment') and op.stabilisation_tracer == 'supg':
+                if self.approach == 'weighted_hessian':
+                    eq_options = self.__getattribute__('{:s}_options'.format(op.adapt_field))
+                    u, eta = self.fwd_solutions[i].split()
+                    sol = sol + eq_options[i].supg_stabilisation*dot(u, grad(sol))
 
             return steady_metric(sol, mesh=self.meshes[i], **kwargs)
         else:
@@ -2191,7 +2183,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         strong_residual = abs(ts.error_estimator.strong_residual)
                         strong_residual_cts = project(strong_residual, self.P1[i])
 
-                        # Recover Hessian as self.metrics[i]
+                        # Recover Hessian
                         H = self.recover_hessian_metric(i, adjoint=True, **hessian_kwargs)
 
                         # Accumulate weighted Hessian
