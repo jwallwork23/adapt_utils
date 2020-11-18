@@ -16,7 +16,7 @@ __all__ = ["recover_hessian_metric", "ShallowWaterHessianRecoverer",
 
 # --- Hessian
 
-def recover_hessian_metric(sol, adapt_field, **kwargs):
+def recover_hessian_metric(sol, **kwargs):
     """
     Recover the Hessian of some scalar field Hessian from the shallow water solution tuple.
 
@@ -25,7 +25,7 @@ def recover_hessian_metric(sol, adapt_field, **kwargs):
     """
     op = kwargs.get('op', CoupledOptions())
     rec = ShallowWaterHessianRecoverer(sol.function_space(), op=op)
-    return rec.construct_metric(sol, adapt_field, **kwargs)
+    return rec.construct_metric(sol, **kwargs)
 
 
 class ShallowWaterHessianRecoverer():
