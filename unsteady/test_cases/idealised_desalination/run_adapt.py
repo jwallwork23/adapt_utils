@@ -46,8 +46,6 @@ kwargs = {
 }
 op = IdealisedDesalinationOutfallOptions(**kwargs)
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
-op.end_time = 0.25*op.T_tide  # TODO: TEMP
-op.num_meshes = 5  # TODO:TEMP
 
 
 # --- Solve

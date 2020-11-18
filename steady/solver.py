@@ -299,17 +299,22 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         for the forward PDE. Otherwise, weight the Hessian of the forward solution with a residual
         for the adjoint PDE.
         """
+
+        # Compute strong residual
         strong_residual_cts = self.get_strong_residual(0, adjoint=adjoint)
-        if self.op.adapt_field not in ('tracer', 'sediment', 'exner'):
-            raise NotImplementedError  # TODO
-        metrics = []
-        hessian_kwargs = dict(normalise=False, enforce_constraints=False)
-        metric_kwargs = dict(normalise=True, enforce_constraints=True)
-        for j, res in enumerate(strong_residual_cts):
-            H = self.recover_hessian_metric(0, adjoint=not adjoint, **hessian_kwargs)
-            scaled_hessian = project(res*H, self.P1_ten[0])
-            metrics.append(steady_metric(H=scaled_hessian, op=self.op, **metric_kwargs))
-        return combine_metrics(*metrics, average=average)
+
+        # Recover Hessian
+        kwargs = dict(normalise=False, enforce_constraints=False)
+        hessians = self.recover_hessian_metrics(0, adjoint=not adjoint, **kwargs)
+
+        # Weight
+        kwargs = dict(normalise=True, enforce_constraints=True, op=self.op, V=self.P1_ten[0])
+        metrics = [
+            steady_metric(H=abs(res)*H, **kwargs) for res, H in zip(strong_residual_cts, hessians)
+        ]
+
+        # Combine
+        return metrics[0] if len(metrics) == 1 else combine_metrics(*metrics, average=average)
 
     def get_weighted_gradient_metric(self, adjoint=False, source=True):
         """

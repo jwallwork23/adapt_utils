@@ -29,7 +29,7 @@ def metric_complexity(M, boundary=False):
         return assemble(sqrt(det(M))*dx)
 
 
-def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
+def steady_metric(f=None, H=None, projector=None, mesh=None, V=None, **kwargs):
     r"""
     Computes the steady metric for mesh adaptation.
 
@@ -55,11 +55,13 @@ def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
             raise ValueError("Please supply either field for recovery, or Hessian thereof.")
     elif H is None:
         H = recover_hessian(f, mesh=mesh, op=op) if projector is None else projector.project(f)
-    V = H.function_space()
+    V = V or H.function_space()
+    if not hasattr(H, 'function_space'):
+        H = interpolate(H, V)
     if mesh is None:
         mesh = V.mesh()
     dim = mesh.topological_dimension()
-    assert dim in (2, 3)  # TODO: test 3d case works
+    assert dim in (2, 3)
 
     # Functions to hold metric and its determinant
     M = Function(V).assign(0.0)
