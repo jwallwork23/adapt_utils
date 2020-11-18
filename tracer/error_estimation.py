@@ -9,6 +9,9 @@ on the formulation.
 from __future__ import absolute_import
 from thetis.utility import *
 from thetis.tracer_eq_2d import TracerTerm
+
+import numpy as np
+
 from ..error_estimation import GOErrorEstimatorTerm, GOErrorEstimator
 
 
@@ -275,22 +278,16 @@ class TracerGOErrorEstimator(GOErrorEstimator):
             arg = arg + self.supg_stabilisation*dot(velocity, grad(arg))
         mass = self.p0test*inner(solution, arg)*dx
         if vector:
-            import numpy as np
             mass = np.array([mass])
         return mass
 
     def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):
+        """
+        Setup strong residual for tracer transport model.
+        """
         adj = Function(self.P0).assign(1.0)
         args = (solution, solution_old, adj, adj, fields, fields_old)
-        self.strong_residual_terms = 0
+        self._strong_residual_terms = 0
         for term in self.select_terms(label):
-            self.strong_residual_terms += term.element_residual(*args)
-        self._strong_residual = Function(self.P0, name="Strong residual")
-
-    @property
-    def strong_residual(self):
-        """
-        Evaluate strong residual of 2D tracer equation.
-        """
-        self._strong_residual.assign(assemble(self.strong_residual_terms))
-        return self._strong_residual
+            self._strong_residual_terms += term.element_residual(*args)
+        self._strong_residual_terms = np.array([self._strong_residual_terms])

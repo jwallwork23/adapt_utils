@@ -1833,6 +1833,31 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
         run_scripts[self.approach](**kwargs)
 
+    def get_strong_residual(self, i, adjoint=False, **kwargs):
+        """
+        Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
+        boolean kwarg.
+        """
+        if adjoint:
+            return self.get_strong_residual_adjoint(i, **kwargs)
+        else:
+            return self.get_strong_residual_forward(i, **kwargs)
+
+    def get_strong_residual_forward(self, i, **kwargs):
+        ts = self.timesteppers[i][kwargs.get('adapt_field', self.op.adapt_field)]
+        strong_residual = ts.error_estimator.strong_residual
+
+        # Project into P1 space
+        strong_residual_cts = [project(res, self.P1[i]) for res in list(strong_residual)]
+
+        # Take modulus
+        for res in strong_residual_cts:
+            res.interpolate(abs(res))
+        return strong_residual_cts
+
+    def get_strong_residual_adjoint(self, i, **kwargs):
+        raise NotImplementedError  # TODO
+
     def run_dwr(self, **kwargs):
         """
         Main script for goal-oriented mesh adaptation routines.
@@ -2180,18 +2205,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     fwd_solutions[i].assign(fwd)
 
                     # Construct metric at each timestep
-                    if self.approach == 'weighted_hessian':  # TODO: Account for non-scalar case
+                    if self.approach == 'weighted_hessian':
 
                         # Compute strong residual
-                        strong_residual = ts.error_estimator.strong_residual
-                        strong_residual_cts = project(strong_residual, self.P1[i])
-                        strong_residual_cts.interpolate(abs(strong_residual_cts))
+                        strong_residual_cts = self.get_strong_residual(i, adapt_field=adapt_field)
 
-                        # Recover Hessian
-                        H = self.recover_hessian_metric(i, adjoint=True, **hessian_kwargs)
-
-                        # Accumulate weighted Hessian
-                        metrics[i] += w*interpolate(strong_residual_cts*H, self.P1_ten[i])
+                        # Recover Hessian, weight and accumulate
+                        if op.adapt_field not in ('tracer', 'sediment', 'exner'):
+                            raise NotImplementedError  # TODO: Account for SW case
+                        for k, res in enumerate(strong_residual_cts):
+                            H = self.recover_hessian_metric(i, adjoint=True, **hessian_kwargs)
+                            metrics[i] += w*interpolate(res*H, self.P1_ten[i])
                     else:
                         raise NotImplementedError  # TODO: weighted gradient
 

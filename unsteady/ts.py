@@ -188,11 +188,11 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
 
         # Term from current timestep
         ee.setup_strong_residual('all', u, u_nl, f, f)
-        residual += -self.dt_const*self.theta_const*ee.strong_residual_terms
+        residual += -self.dt_const*self.theta_const*ee._strong_residual_terms
 
         # Term from previous timestep
         ee.setup_strong_residual('all', u_old, u_old, f_old, f_old)
-        residual += -self.dt_const*(1-self.theta_const)*ee.strong_residual_terms
+        residual += -self.dt_const*(1-self.theta_const)*ee._strong_residual_terms
 
         # Pass forms back to error estimator
-        ee.strong_residual_terms = residual
+        ee._strong_residual_terms = residual

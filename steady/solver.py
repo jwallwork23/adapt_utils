@@ -135,25 +135,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         raise NotImplementedError  # TODO
 
-    def get_strong_residual(self, adjoint=False, **kwargs):
-        """
-        Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
-        boolean kwarg.
-        """
-        if adjoint:
-            return self.get_strong_residual_adjoint(**kwargs)
-        else:
-            return self.get_strong_residual_forward(**kwargs)
-
-    def get_strong_residual_forward(self, **kwargs):
-        ts = self.timesteppers[0][self.op.adapt_field]
-        strong_residual = abs(ts.error_estimator.strong_residual)
-        strong_residual_cts = project(strong_residual, self.P1[0])
-        return strong_residual_cts
-
-    def get_strong_residual_adjoint(self, **kwargs):
-        raise NotImplementedError  # TODO
-
     def get_flux(self, adjoint=False, **kwargs):
         """
         Evaluate flux terms for forward or adjoint PDE, as specified by the `adjoint` boolean kwarg.
@@ -310,7 +291,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         metric.assign(isotropic_metric(indicator, normalise=True, op=self.op))
         return metric
 
-    def get_weighted_hessian_metric(self, adjoint=False):
+    def get_weighted_hessian_metric(self, adjoint=False, average=True):
         """
         Construct an anisotropic metric using an approach inspired by [Power et al. 2006].
 
@@ -318,15 +299,17 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         for the forward PDE. Otherwise, weight the Hessian of the forward solution with a residual
         for the adjoint PDE.
         """
-        strong_residual = self.get_strong_residual(adjoint=adjoint)
-        hessian = self.recover_hessian_metric(
-            0, normalise=False, enforce_constraints=False, adjoint=not adjoint
-        )
-        scaled_hessian = project(strong_residual*hessian, self.P1_ten[0])
-        metric = steady_metric(
-            H=scaled_hessian, normalise=True, enforce_constraints=True, op=self.op
-        )
-        return metric
+        strong_residual_cts = self.get_strong_residual(0, adjoint=adjoint)
+        if self.op.adapt_field not in ('tracer', 'sediment', 'exner'):
+            raise NotImplementedError  # TODO
+        metrics = []
+        hessian_kwargs = dict(normalise=False, enforce_constraints=False)
+        metric_kwargs = dict(normalise=True, enforce_constraints=True)
+        for j, res in enumerate(strong_residual_cts):
+            H = self.recover_hessian_metric(0, adjoint=not adjoint, **hessian_kwargs)
+            scaled_hessian = project(res*H, self.P1_ten[0])
+            metrics.append(steady_metric(H=scaled_hessian, op=self.op, **metric_kwargs))
+        return combine_metrics(*metrics, average=average)
 
     def get_weighted_gradient_metric(self, adjoint=False, source=True):
         """

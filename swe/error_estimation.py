@@ -660,43 +660,42 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
         self.add_term(ContinuitySourceGOErrorEstimatorTerm(*args), 'source')
 
     def setup_strong_residual(self, label, solution, solution_old, fields, fields_old):
-        self._strong_residual = Function(self.P0P0)
-        residual_u, residual_eta = self._strong_residual.split()
-        residual_u.rename("Strong residual for momentum equation")
-        residual_eta.rename("Strong residual for continuity equation")
+        """
+        Setup strong residual for shallow water model.
+        """
 
         # Strong residual for u-component of momentum equation
         adj_u = Function(self.P0P0)
         adj_u1, adj_u2 = adj_u.split()
         adj_u1.interpolate(as_vector([1.0, 0.0]))
         args = (solution, solution_old, adj_u, adj_u, fields, fields_old)
-        self.strong_residual_terms_u = 0
+        self._strong_residual_terms_u = 0
         for term in self.select_terms(label):
-            self.strong_residual_terms_u += term.element_residual(*args)
+            self._strong_residual_terms_u += term.element_residual(*args)
 
         # Strong residual for v-component of momentum equation
         adj_v = Function(self.P0P0)
         adj_v1, adj_v2 = adj_v.split()
         adj_v1.interpolate(as_vector([0.0, 1.0]))
         args = (solution, solution_old, adj_v, adj_v, fields, fields_old)
-        self.strong_residual_terms_v = 0
+        self._strong_residual_terms_v = 0
         for term in self.select_terms(label):
-            self.strong_residual_terms_v += term.element_residual(*args)
+            self._strong_residual_terms_v += term.element_residual(*args)
 
         # Strong residual for continuity equation
         adj_eta = Function(self.P0P0)
         adj_eta1, adj_eta2 = adj_eta.split()
         adj_eta2.assign(1.0)
         args = (solution, solution_old, adj_eta, adj_eta, fields, fields_old)
-        self.strong_residual_terms_eta = 0
+        self._strong_residual_terms_eta = 0
         for term in self.select_terms(label):
-            self.strong_residual_terms_eta += term.element_residual(*args)
+            self._strong_residual_terms_eta += term.element_residual(*args)
 
         # Strong residual components as NumPy array
-        self.strong_residual_terms = np.array([
-            self.strong_residual_terms_u,
-            self.strong_residual_terms_v,
-            self.strong_residual_terms_eta,
+        self._strong_residual_terms = np.array([
+            self._strong_residual_terms_u,
+            self._strong_residual_terms_v,
+            self._strong_residual_terms_eta,
         ])
 
     def mass_term(self, solution, arg, vector=False, **kwargs):
@@ -714,14 +713,3 @@ class ShallowWaterGOErrorEstimator(GOErrorEstimator):
             return np.array(mass)
         else:
             return self.p0test*inner(solution, arg)*dx
-
-    @property
-    def strong_residual(self):
-        """
-        Evaluate strong residual of shallow water equations.
-        """
-        residual_u, residual_eta = self._strong_residual.split()
-        residual_u.interpolate(as_vector([assemble(self.strong_residual_terms_u),
-                                          assemble(self.strong_residual_terms_v)]))
-        residual_eta.interpolate(assemble(self.strong_residual_terms_eta))
-        return self._strong_residual
