@@ -144,6 +144,19 @@ class GOErrorEstimator(Equation):
         wr += self.boundary_flux()
         return wr
 
+    def setup_strong_residual(self, *args, **kwargs):
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    @property
+    def strong_residual(self):
+        """
+        Evaluate the strong residual.
+        """
+        import numpy as np
+        if not hasattr(self, '_strong_residual_terms'):
+            raise ValueError("Cannot evaluate strong residual. Need to set it up first.")
+        return np.array([assemble(sr) for sr in list(self._strong_residual_terms)])
+
     def residual(self):
         raise AttributeError("This method is inherited but unused.")
 
