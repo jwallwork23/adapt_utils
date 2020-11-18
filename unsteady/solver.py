@@ -1827,11 +1827,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Metric-based goal-oriented using DWR
             'dwr': self.run_dwr,
-            'anisotropic_dwr': self.run_dwr,  # TODO
+            'anisotropic_dwr': self.run_dwr,  # TODO: Unsteady case
 
             # Metric-based goal-oriented *not* using DWR
-            'weighted_hessian': self.run_no_dwr,  # TODO
-            'weighted_gradient': self.run_no_dwr,  # TODO
+            'weighted_hessian': self.run_no_dwr,
+            'weighted_gradient': self.run_no_dwr,  # TODO: Unsteady case
         }
         if self.approach not in run_scripts:
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))

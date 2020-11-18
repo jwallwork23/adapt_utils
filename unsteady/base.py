@@ -540,29 +540,6 @@ class AdaptiveProblemBase(object):
             self.load_state(i, fpath, index_str=chk, delete=delete)
         self.op.print_debug("CHECKPOINT LOAD: {:3d} currently stored".format(len(self.checkpoint)))
 
-    def run(self, **kwargs):
-        """
-        Run simulation using mesh adaptation approach specified by `self.approach`.
-
-        For metric-based approaches, a fixed point iteration loop is used.
-        """
-        run_scripts = {
-
-            # Non-adaptive
-            'fixed_mesh': self.solve_forward,
-
-            # Metric-based, no adjoint
-            'hessian': self.run_hessian_based,
-
-            # Metric-based with adjoint
-            'dwp': self.run_dwp,
-            'dwr': self.run_dwr,
-        }
-        try:
-            run_scripts[self.approach](**kwargs)
-        except KeyError:
-            raise ValueError("Approach '{:s}' not recognised".format(self.approach))
-
     def get_qoi_kernels(self, i):
         """
         Define kernels associated with the quantity of interest from the corresponding
