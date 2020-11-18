@@ -1,3 +1,8 @@
+"""
+**********************************************************************************************
+*  NOTE: Much of the code in this file is based on https://github.com/taupalosaurus/darwin.  *
+**********************************************************************************************
+"""
 from firedrake import *
 
 import numpy as np
@@ -26,8 +31,7 @@ def metric_complexity(M, boundary=False):
 
 def steady_metric(f=None, H=None, projector=None, mesh=None, **kwargs):
     r"""
-    Computes the steady metric for mesh adaptation. Based on Nicolas Barral's function
-    ``computeSteadyMetric``, from ``adapt.py``, 2016.
+    Computes the steady metric for mesh adaptation.
 
     Clearly at least one of `f` and `H` must not be provided.
 
