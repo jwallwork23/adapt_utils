@@ -1997,6 +1997,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 # Inject into the base space and construct an isotropic metric
                 tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
+                self.indicators[i]['dwr'].interpolate(abs(self.indicators[i]['dwr']))  # Ensure +ve
                 if self.approach == 'dwr':
                     metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
                 else:
@@ -2179,11 +2180,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     fwd_solutions[i].assign(fwd)
 
                     # Construct metric at each timestep
-                    if self.approach == 'weighted_hessian':
+                    if self.approach == 'weighted_hessian':  # TODO: Account for non-scalar case
 
                         # Compute strong residual
-                        strong_residual = abs(ts.error_estimator.strong_residual)
+                        strong_residual = ts.error_estimator.strong_residual
                         strong_residual_cts = project(strong_residual, self.P1[i])
+                        strong_residual_cts.interpolate(abs(strong_residual_cts))
 
                         # Recover Hessian
                         H = self.recover_hessian_metric(i, adjoint=True, **hessian_kwargs)
