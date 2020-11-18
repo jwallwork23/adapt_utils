@@ -1619,7 +1619,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Metric
 
-    def recover_hessian_metric(self, i, adjoint=False, **kwargs):
+    def recover_hessian_metrics(self, i, adjoint=False, **kwargs):
         op = self.op
         kwargs.setdefault('normalise', True)
         kwargs['op'] = op
@@ -1633,10 +1633,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     u, eta = self.fwd_solutions[i].split()
                     sol = sol + eq_options[i].supg_stabilisation*dot(u, grad(sol))
 
-            return steady_metric(sol, mesh=self.meshes[i], **kwargs)
+            return [steady_metric(sol, mesh=self.meshes[i], **kwargs)]
         else:
             fields = {'bathymetry': self.bathymetry[i], 'inflow': self.inflow[i]}
-            return recover_hessian_metric(sol, fields=fields, **kwargs)
+            return [recover_hessian_metric(sol, fields=fields, **kwargs)]
 
     def get_recovery(self, i, **kwargs):
         op = self.op
@@ -1848,12 +1848,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         strong_residual = ts.error_estimator.strong_residual
 
         # Project into P1 space
-        strong_residual_cts = [project(res, self.P1[i]) for res in list(strong_residual)]
-
-        # Take modulus
-        for res in strong_residual_cts:
-            res.interpolate(abs(res))
-        return strong_residual_cts
+        return [project(res, self.P1[i]) for res in list(strong_residual)]
 
     def get_strong_residual_adjoint(self, i, **kwargs):
         raise NotImplementedError  # TODO
@@ -2107,6 +2102,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         'Weighted Hessian' and 'weighted gradient' metrics are considered, as described in
         [Wallwork et al. 2021].
 
+        Stopping criteria:
+          * iteration count > self.op.max_adapt;
+          * relative change in element count < self.op.element_rtol;
+          * relative change in quantity of interest < self.op.qoi_rtol.
+
         [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
             Error Estimation and Mesh Adaptation for Tracer Transport Problems", to be submitted to
             Computer Aided Design.
@@ -2210,12 +2210,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         # Compute strong residual
                         strong_residual_cts = self.get_strong_residual(i, adapt_field=adapt_field)
 
-                        # Recover Hessian, weight and accumulate
-                        if op.adapt_field not in ('tracer', 'sediment', 'exner'):
-                            raise NotImplementedError  # TODO: Account for SW case
-                        for k, res in enumerate(strong_residual_cts):
-                            H = self.recover_hessian_metric(i, adjoint=True, **hessian_kwargs)
-                            metrics[i] += w*interpolate(res*H, self.P1_ten[i])
+                        # Recover Hessian
+                        hessians = self.recover_hessian_metrics(i, adjoint=True, **hessian_kwargs)
+
+                        # Accumulate weighted Hessian  # TODO: Allow for intersection
+                        for residual, hessian in zip(strong_residual_cts, hessians):
+                            metrics[i] += w*interpolate(abs(residual)*hessian, self.P1_ten[i])
                     else:
                         raise NotImplementedError  # TODO: weighted gradient
 
