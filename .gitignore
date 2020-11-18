@@ -6,6 +6,7 @@ TODO
 FIXME
 .DS_Store
 condition.py
+steady/swe/solver.py
 
 # File endings
 *_old.py

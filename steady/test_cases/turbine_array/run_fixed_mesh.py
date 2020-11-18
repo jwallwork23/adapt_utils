@@ -7,6 +7,7 @@ import os
 
 from adapt_utils.steady.test_cases.turbine_array.options import TurbineArrayOptions
 from adapt_utils.steady.swe.turbine.solver import AdaptiveSteadyTurbineProblem
+from adapt_utils.swe.utils import speed
 from adapt_utils.plotting import *
 
 
@@ -134,8 +135,7 @@ op.print_debug("Power output: {:.4e}kW".format(tp.quantity_of_interest()/1000)) 
 if plot_any:
 
     # Compute fluid speed
-    u, eta = tp.fwd_solution.split()
-    spd = interpolate(sqrt(dot(u, u)), tp.P1[0])
+    spd = interpolate(speed(tp.fwd_solution), tp.P1[0])
 
     # Plot
     fig, axes = plt.subplots(figsize=(12, 5))

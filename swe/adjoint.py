@@ -44,6 +44,7 @@ from __future__ import absolute_import
 from thetis.shallowwater_eq import ShallowWaterTerm
 from thetis.utility import *
 from ..equation import Equation
+from .utils import speed
 
 
 __all__ = ["AdjointShallowWaterEquations"]
@@ -364,7 +365,7 @@ class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
         if uv is None:
             raise Exception('Adjoint equation does not have access to forward solution velocity')
 
-        unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
+        unorm = speed(uv smoother=self.options.norm_smoother)
         f += C_D*unorm*inner(self.u_star_test, u_star)*self.dx
         f += C_D*inner(self.u_star_test, uv)*inner(u_star, uv)/unorm*self.dx
         return -f
@@ -405,7 +406,7 @@ class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
         if self.options.get('use_wetting_and_drying'):
             C_D = C_D*self.depth.heaviside_approx(self.options.get('elev_2d'))
 
-        unorm = sqrt(dot(uv, uv) + self.options.norm_smoother**2)
+        unorm = speed(uv, smoother=self.options.norm_smoother)
         f += -C_D*unorm*inner(u_star, uv)*self.eta_star_test/total_h**2*self.dx
         return -f
 
