@@ -6,20 +6,21 @@ Exner equation
 The equation reads
 
 .. math::
-    \frac{\partial z_b}{\partial t} + (morfac/(1-p)) \nabla_h \cdot (Q_b)
-    = (morfac/(1-p)) H ((Sink S) - Source)
+    \frac{\partial z_b}{\partial t} + (m/(1-p)) \nabla_h \cdot \textbf{Q_b}
+    = (m/(1-p)) H ((F_{sink} S) - F_{source})
     :label: exner_eq
 
-where :math:'z_b' is the bedlevel, :math:'S' is :math:'q=HT' for conservative
-and :math:'T' for non-conservative, :math:`\nabla_h` denotes horizontal gradient,
-:math:'morfac' is the morphological scale factor, :math:'p' is the porosity and
-:math:'Q_b' is the bedload transport vector
+where :math:`z_b` is the bedlevel, :math:`S` is :math:`HT` for conservative (where H is depth
+and T is the sediment field) and :math:`T` for non-conservative (where T is the sediment field),
+:math:`\nabla_h` denotes horizontal gradient, :math:`m` is the morphological scale factor,
+:math:`p` is the porosity and :math:`\textbf{Q_b}` is the bedload transport vector
 
 **********************************************************************************************
 *  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
 *        some copied code.                                                                   *
 **********************************************************************************************
 """
+
 from __future__ import absolute_import
 from thetis.equation import Term, Equation
 from thetis.utility import *
@@ -128,14 +129,14 @@ class ExnerSourceTerm(ExnerTerm):
 
 class ExnerBedloadTerm(ExnerTerm):
     r"""
-    Bedload transport term, \nabla_h \cdot \textbf{qb}
+    Bedload transport term, \nabla_h \cdot \textbf{Q_b}
 
     The weak form is
 
     .. math::
-        \int_\Omega  \nabla_h \cdot \textbf{qb} \psi  dx
-        = - \int_\Omega (\textbf{qb} \cdot \nabla) \psi dx
-        + \int_\Gamma \psi \textbf{qb} \cdot \textbf{n} dS
+        \int_\Omega  \nabla_h \cdot \textbf{Q_b} \psi  dx
+        = - \int_\Omega (\textbf{Q_b} \cdot \nabla) \psi dx
+        + \int_\Gamma \psi \textbf{Q_b} \cdot \textbf{n} dS
 
     where :math:`\textbf{n}` is the unit normal of the element interfaces.
 
