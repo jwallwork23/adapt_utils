@@ -822,10 +822,8 @@ class AdaptiveProblemBase(object):
                 update_forcings = update_forcings or op.get_update_forcings(self, i, adjoint=False)
                 export_func = export_func or op.get_export_func(self, i)
 
-                # Transfer the solution from the previous mesh / apply initial condition
+                self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
-
-                # Setup solver on mesh i
                 self.setup_solver_forward_step(i)
 
                 # Create double L2 projection operator which will be repeatedly used
@@ -843,9 +841,12 @@ class AdaptiveProblemBase(object):
                 # Array to hold time-integrated Hessian UFL expression
                 H_window = [0 for f in adapt_fields]
 
-                # TODO: Other timesteppers
                 def update_forcings_wrapper(t):
-                    """Time-integrate Hessian using Trapezium Rule."""
+                    """
+                    Time-integrate Hessian using Trapezium Rule.
+                    """
+                    if self.op.timestepper != 'CrankNicolson':
+                        raise NotImplementedError  # TODO: Other timesteppers
                     update_forcings(t)
                     iteration = int(np.round(self.simulation_time/op.dt))
                     if iteration % op.hessian_timestep_lag != 0:
@@ -876,20 +877,20 @@ class AdaptiveProblemBase(object):
                                 H_window[j] *= op.dt*dt_per_mesh
                             H_windows[j][i].interpolate(H_window[j])
 
-            # Solve step for current mesh iteration
-            kwargs = {
-                'export_func': export_func_wrapper,
-                'update_forcings': update_forcings_wrapper,
-                'plot_pvd': op.plot_pvd,
-            }
-            self.solve_forward_step(i, **kwargs)
+                # Solve step for current mesh iteration
+                kwargs = {
+                    'export_func': export_func_wrapper,
+                    'update_forcings': update_forcings_wrapper,
+                    'plot_pvd': op.plot_pvd,
+                }
+                self.solve_forward_step(i, **kwargs)
 
-            # Delete objects to free memory
-            self.free_solver_forward_step(i)
-            H_window = None
-            recoverer = None
-            export_func = None
-            update_forcings = None
+                # Delete objects to free memory
+                self.free_solver_forward_step(i)
+                H_window = None
+                recoverer = None
+                export_func = None
+                update_forcings = None
 
             # Check convergence
             if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
@@ -905,18 +906,17 @@ class AdaptiveProblemBase(object):
                 H_window = [H_windows[j][i] for j in range(len(adapt_fields))]
                 if 'int' in op.adapt_field:
                     if 'avg' in op.adapt_field:
-                        raise NotImplementedError  # TODO: mixed case
+                        msg = "Simultaneous intersection and averaging not supported"
+                        raise NotImplementedError(msg)
                     self.metrics[i].assign(metric_intersection(*H_window))
                 elif 'avg' in op.adapt_field:
                     self.metrics[i].assign(metric_average(*H_window))
-                else:
-                    if len(adapt_fields) != 1:
-                        msg = "Field for adaptation '{:s}' not recognised"
-                        raise ValueError(msg.format(op.adapt_field))
+                elif len(adapt_fields) == 1:
                     self.metrics[i].assign(H_window[0])
+                else:
+                    raise ValueError("adapt_field '{:s}' not recognised".format(op.adapt_field))
             H_window = None
             H_windows = [[None for P1_ten in self.P1_ten] for f in adapt_fields]
-
             self.plot_metrics(normalised=True)
             self.log_complexities()
 
@@ -937,10 +937,11 @@ class AdaptiveProblemBase(object):
         self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
         self.qois.append(qoi)
         converged = False
-        if len(self.qois) > 1 and n >= self.op.min_adapt:
-            if np.abs(self.qois[-1] - self.qois[-2]) < self.op.qoi_rtol*self.qois[-2]:
-                self.print("Converged quantity of interest!")
-                converged = True
+        if len(self.qois) == 1:
+            return False
+        if np.abs(self.qois[-1] - self.qois[-2]) < self.op.qoi_rtol*self.qois[-2]:
+            self.print("Converged quantity of interest!")
+            converged = True
         return converged
 
     @property
@@ -948,14 +949,21 @@ class AdaptiveProblemBase(object):
         return self._check_qoi_convergence()
 
     def _check_maximum_adaptations(self):
-        return self.outer_iteration >= self.op.max_adapt-1
+        chk = self.outer_iteration >= self.op.max_adapt-1
+        msg = "Maximum number of adaptations{:s} met"
+        print_func = self.print if chk else self.op.print_debug
+        print_func(msg.format('' if chk else ' not'))
+        return chk
 
     @property
     def maximum_adaptations_met(self):
         return self._check_maximum_adaptations()
 
     def _check_minimum_adaptations(self):
-        return len(self.num_cells) > 3 and self.outer_iteration > self.op.min_adapt
+        chk = self.outer_iteration >= self.op.min_adapt
+        msg = "Minimum number of adaptations{:s} met"
+        self.op.print_debug(msg.format('' if chk else ' not'))
+        return chk
 
     @property
     def minimum_adaptations_met(self):
