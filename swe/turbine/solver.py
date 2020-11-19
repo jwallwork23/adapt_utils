@@ -31,7 +31,7 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
         self.smooth_indicators = kwargs.pop('smooth_indicators', True)
         self.remove_turbines = kwargs.pop('remove_turbines', False)
         self.load_mesh = kwargs.pop('load_mesh', None)
-        self.callback_dir = kwargs.pop('callback_dir', None)
+        self.callback_dir = kwargs.pop('callback_dir', op.di)
         self.ramp_dir = kwargs.pop('ramp_dir', None)
         if self.ramp_dir is None and not op.spun:
             raise ValueError("Spin-up data directory not found.")
@@ -87,8 +87,6 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
     def add_callbacks(self, i, **kwargs):
         super(AdaptiveTurbineProblem, self).add_callbacks(i, **kwargs)
         di = self.callback_dir
-        if di is None:
-            return
         for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
             self.callbacks[i].add(PowerOutputCallback(self, i, farm_id, callback_dir=di), 'timestep')
 
@@ -197,7 +195,7 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
 
     # --- Setup
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, op, **kwargs):
         """
         :kwarg discrete_turbines: toggle whether to use a discrete or continuous representation
             for the turbine array.
@@ -211,7 +209,7 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
         self.smooth_indicators = kwargs.pop('smooth_indicators', True)
         self.remove_turbines = kwargs.pop('remove_turbines', False)
         self.load_mesh = kwargs.pop('load_mesh', None)
-        self.callback_dir = kwargs.pop('callback_dir', None)
+        self.callback_dir = kwargs.pop('callback_dir', op.di)
         super(AdaptiveSteadyTurbineProblem, self).__init__(*args, **kwargs)
 
     def setup_all(self):
@@ -266,8 +264,6 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
     def add_callbacks(self, i, **kwargs):
         super(AdaptiveSteadyTurbineProblem, self).add_callbacks(i, **kwargs)
         di = self.callback_dir
-        if di is None:
-            return
         for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
             self.callbacks[i].add(PowerOutputCallback(self, i, farm_id, callback_dir=di), 'timestep')
 

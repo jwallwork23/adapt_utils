@@ -17,7 +17,7 @@ class TimeseriesCallback(object):
     Generic callback object for storing timseries extracted during a
     simulation and integrating in time.
     """
-    def __init__(self, prob, func, i, name, callback_dir=None):
+    def __init__(self, prob, func, i, name, callback_dir=None, **kwargs):
         """
         :arg prob: :class:`AdaptiveProblem` object.
         :arg func: user-provided function to be evaluated.
@@ -124,7 +124,7 @@ class VorticityNormCallback(TimeseriesCallback):
     """
     Callback for evaluating the L2 norm of the fluid vorticity at each timestep/export.
     """
-    def __init__(self, prob, i):
+    def __init__(self, prob, i, **kwargs):
         self.label = "vorticity norm"
         rec = L2ProjectorVorticity(prob.V[i], op=prob.op)
         prob.vorticity[i] = Function(prob.P1[i], name="Vorticity")
@@ -150,7 +150,7 @@ class QoICallback(TimeseriesCallback):
     :math:`\mathbf q=\mathbf q(\mathbf x,t)` is the prognostic solution
     tuple for the forward problem.
     """
-    def __init__(self, prob, i):
+    def __init__(self, prob, i, **kwargs):
         """
         :arg prob: :class:`AdaptiveProblem` object.
         :arg i: mesh index.
@@ -173,7 +173,7 @@ class GaugeCallback(TimeseriesCallback):
     spatial location stored in the :class:`Options` parameter class
     associated with the :class:`AdaptiveProblem` object.
     """
-    def __init__(self, prob, i, gauge):
+    def __init__(self, prob, i, gauge, **kwargs):
         """
         :arg prob: :class:`AdaptiveProblem` object.
         :arg i: mesh index.

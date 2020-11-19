@@ -537,7 +537,7 @@ class CoupledOptions(Options):
         # P = ---------------- ------------ ----------------.
         #     | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
         #     ---------------- ------------ ----------------
-        self.solver_parameters = {
+        self.default_solver_parameters = {
             "shallow_water": {
                 "ksp_type": "gmres",
                 "pc_type": "fieldsplit",
@@ -569,6 +569,7 @@ class CoupledOptions(Options):
                 "pc_type": "sor",
             }
         }
+        self.solver_parameters = self.default_solver_parameters
         self.adjoint_solver_parameters.update(self.solver_parameters)
         super(CoupledOptions, self).__init__(**kwargs)
 
