@@ -35,6 +35,9 @@ class TimeseriesCallback(object):
         self.callback_dir = callback_dir
 
     def evaluate(self, **kwargs):
+        """
+        Evaluate callback at current time and append it to timeseries.
+        """
         t = self.prob.simulation_time
         value = self.func(t)
         self.prob.print(self.msg.format(t, value))
@@ -43,6 +46,9 @@ class TimeseriesCallback(object):
             np.save(os.path.join(self.callback_dir, self.name), self.timeseries)
 
     def time_integrate(self):
+        """
+        Integrate the timeseries using a quadrature routine appropriate for the timestepper.
+        """
         N = len(self.timeseries)
         op = self.prob.op
         assert N >= 2
@@ -55,47 +61,69 @@ class TimeseriesCallback(object):
 
 
 class VelocityNormCallback(TimeseriesCallback):
-    """Callback for evaluating the L2 norm of the velocity field at each timestep/export."""
-    def __init__(self, prob, i):
-        self.label = "velocity norm"
-        u, eta = prob.fwd_solutions[i].split()
-        super(VelocityNormCallback, self).__init__(prob, lambda t: norm(u), i, "velocity_norm")
+    """
+    Callback for evaluating the L2 norm of the velocity field at each timestep/export.
+    """
+    def __init__(self, prob, i, adjoint=False):
+        self.label = "adjoint " if adjoint else ""
+        self.label += "velocity norm"
+        name = self.label.replace(" ", "_")
+        u, eta = prob.get_solutions("shallow_water", adjoint=adjoint)[i].split()
+        super(VelocityNormCallback, self).__init__(prob, lambda t: norm(u), i, name)
 
 
 class ElevationNormCallback(TimeseriesCallback):
-    """Callback for evaluating the L2 norm of the elevation field at each timestep/export."""
-    def __init__(self, prob, i):
-        self.label = "elevation norm"
-        u, eta = prob.fwd_solutions[i].split()
-        super(ElevationNormCallback, self).__init__(prob, lambda t: norm(eta), i, "elevation_norm")
+    """
+    Callback for evaluating the L2 norm of the elevation field at each timestep/export.
+    """
+    def __init__(self, prob, i, adjoint=False):
+        self.label = "adjoint " if adjoint else ""
+        self.label += "elevation norm"
+        name = self.label.replace(" ", "_")
+        u, eta = prob.get_solutions("shallow_water", adjoint=adjoint)[i].split()
+        super(ElevationNormCallback, self).__init__(prob, lambda t: norm(eta), i, name)
 
 
 class TracerNormCallback(TimeseriesCallback):
-    """Callback for evaluating the L2 norm of the tracer concentration at each timestep/export."""
-    def __init__(self, prob, i):
-        self.label = "tracer norm"
-        c = prob.fwd_solutions_tracer[i]
-        super(TracerNormCallback, self).__init__(prob, lambda t: norm(c), i, "tracer_norm")
+    """
+    Callback for evaluating the L2 norm of the tracer concentration at each timestep/export.
+    """
+    def __init__(self, prob, i, adjoint=False):
+        self.label = "adjoint " if adjoint else ""
+        self.label += "tracer norm"
+        name = self.label.replace(" ", "_")
+        c = prob.get_solutions("tracer", adjoint=adjoint)[i]
+        super(TracerNormCallback, self).__init__(prob, lambda t: norm(c), i, name)
 
 
 class SedimentNormCallback(TimeseriesCallback):
-    """Callback for evaluating the L2 norm of the sediment at each timestep/export."""
-    def __init__(self, prob, i):
-        self.label = "sediment norm"
-        s = prob.fwd_solutions_sediment[i]
-        super(SedimentNormCallback, self).__init__(prob, lambda t: norm(s), i, "sediment_norm")
+    """
+    Callback for evaluating the L2 norm of the sediment at each timestep/export.
+    """
+    def __init__(self, prob, i, adjoint=False):
+        self.label = "adjoint " if adjoint else ""
+        self.label += "sediment norm"
+        name = self.label.replace(" ", "_")
+        s = prob.get_solutions("sediment", adjoint=adjoint)[i]
+        super(SedimentNormCallback, self).__init__(prob, lambda t: norm(s), i, name)
 
 
 class ExnerNormCallback(TimeseriesCallback):
-    """Callback for evaluating the L2 norm of the modified bathymetry at each timestep/export."""
-    def __init__(self, prob, i):
-        self.label = "bathymetry norm"
-        b = prob.fwd_solutions_bathymetry[i]
-        super(ExnerNormCallback, self).__init__(prob, lambda t: norm(b), i, "bathymetry_norm")
+    """
+    Callback for evaluating the L2 norm of the modified bathymetry at each timestep/export.
+    """
+    def __init__(self, prob, i, adjoint=False):
+        self.label = "adjoint " if adjoint else ""
+        self.label += "bathymetry norm"
+        name = self.label.replace(" ", "_")
+        b = prob.get_solutions("bathymetry", adjoint=adjoint)[i]
+        super(ExnerNormCallback, self).__init__(prob, lambda t: norm(b), i, name)
 
 
 class VorticityNormCallback(TimeseriesCallback):
-    """Callback for evaluating the L2 norm of the fluid vorticity at each timestep/export."""
+    """
+    Callback for evaluating the L2 norm of the fluid vorticity at each timestep/export.
+    """
     def __init__(self, prob, i):
         self.label = "vorticity norm"
         rec = L2ProjectorVorticity(prob.V[i], op=prob.op)

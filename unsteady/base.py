@@ -107,7 +107,7 @@ class AdaptiveProblemBase(object):
         if not hasattr(self, 'fields'):
             self.fields = [AttrDict() for i in range(self.num_meshes)]
 
-    def print(self, msg):
+    def print(self, msg):  # TODO: Write to log file
         if self.print_progress:
             print_output(msg)
 

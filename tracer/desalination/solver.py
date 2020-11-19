@@ -39,8 +39,8 @@ class AdaptiveDesalinationProblem(AdaptiveProblem):
 
     # --- Quantity of Interest
 
-    def add_callbacks(self, i):
-        super(AdaptiveDesalinationProblem, self).add_callbacks(i)
+    def add_callbacks(self, i, **kwargs):
+        super(AdaptiveDesalinationProblem, self).add_callbacks(i, **kwargs)
         cb = DesalinationOutfallCallback(self, i, callback_dir=self.callback_dir)
         self.callbacks[i].add(cb, 'timestep')
 

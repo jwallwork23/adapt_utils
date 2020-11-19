@@ -1197,7 +1197,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Solvers
 
-    def add_callbacks(self, i):
+    def add_callbacks(self, i, **kwargs):
         from thetis.callback import CallbackManager
 
         # Create a new CallbackManager object on every mesh
@@ -1205,20 +1205,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.op.print_debug("SETUP: Creating CallbackManagers...")
         self.callbacks[i] = CallbackManager()
 
+        # Get label
+        mode = 'export'
+        adjoint = kwargs.get('adjoint', False)
+        if adjoint:
+            mode += '_adjoint'
+
         # Add default callbacks
         if self.op.solve_swe:
-            self.callbacks[i].add(VelocityNormCallback(self, i), 'export')
-            self.callbacks[i].add(ElevationNormCallback(self, i), 'export')
+            self.callbacks[i].add(VelocityNormCallback(self, i, **kwargs), mode)
+            self.callbacks[i].add(ElevationNormCallback(self, i, **kwargs), mode)
         if self.op.solve_tracer:
-            self.callbacks[i].add(TracerNormCallback(self, i), 'export')
+            self.callbacks[i].add(TracerNormCallback(self, i, **kwargs), mode)
         if self.op.solve_sediment:
-            self.callbacks[i].add(SedimentNormCallback(self, i), 'export')
+            self.callbacks[i].add(SedimentNormCallback(self, i, **kwargs), mode)
         if self.op.solve_exner:
-            self.callbacks[i].add(ExnerNormCallback(self, i), 'export')
-        if self.op.recover_vorticity:
+            self.callbacks[i].add(ExnerNormCallback(self, i, **kwargs), mode)
+        if self.op.recover_vorticity and not adjoint:
             if not hasattr(self, 'vorticity'):
                 self.vorticity = [None for mesh in self.meshes]
-            self.callbacks[i].add(VorticityNormCallback(self, i), 'export')
+            self.callbacks[i].add(VorticityNormCallback(self, i, **kwargs), mode)
 
     def setup_solver_forward_step(self, i):
         """
@@ -1261,7 +1267,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             prob = NonlinearVariationalProblem(ts.F, ts.solution, bcs=dbcs)
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_exner")
         op.print_debug("SETUP: Adding callbacks on mesh {:d}...".format(i))
-        self.add_callbacks(i)
+        self.add_callbacks(i, adjoint=False)
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False):
         """
@@ -1284,8 +1290,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
         except AssertionError:
             msg = "Mismatching start time: {:.2f} vs {:.2f}"
             raise ValueError(msg.format(self.simulation_time, start_time))
-        # update_forcings(self.simulation_time)
+
+        # Exports and callbacks
         self.print(80*'=')
+        update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
+        # update_forcings(self.simulation_time)
+        export_func = export_func or self.op.get_export_func(self, i)
+        if i == 0 or export_initial:
+            if export_func is not None:
+                export_func()
+            self.callbacks[i].evaluate(mode='export')
+            self.callbacks[i].evaluate(mode='timestep')
+
+        # Print time to screen
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         if self.num_meshes == 1:
             msg = "FORWARD SOLVE  time {:8.2f}  ({:6.2f}) seconds"
@@ -1295,15 +1312,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
                                   self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
-
-        # Callbacks
-        update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
-        export_func = export_func or self.op.get_export_func(self, i)
-        if i == 0 or export_initial:
-            if export_func is not None:
-                export_func()
-            self.callbacks[i].evaluate(mode='export')
-            self.callbacks[i].evaluate(mode='timestep')
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
@@ -1379,7 +1387,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             self.iteration += 1
             self.simulation_time += op.dt
+            self.callbacks[i].evaluate(mode='timestep')
             if self.iteration % op.dt_per_export == 0:
+
+                # Exports and callbacks
+                if export_func is not None:
+                    export_func()
+                self.callbacks[i].evaluate(mode='export')
 
                 # Print time to screen
                 cpu_time = perf_counter() - cpu_timestamp
@@ -1406,12 +1420,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     b = self.fwd_solutions_bathymetry[i] if op.solve_exner else self.bathymetry[i]
                     proj_bath.project(b)
                     self.exner_file.write(proj_bath)
-
-                # Exports and callbacks
-                if export_func is not None:
-                    export_func()
-                self.callbacks[i].evaluate(mode='export')
-            self.callbacks[i].evaluate(mode='timestep')
         if update_forcings is not None:
             update_forcings(self.simulation_time + op.dt)
         self.print(80*'=')
@@ -1450,6 +1458,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         if op.solve_exner:
             raise NotImplementedError
+        self.add_callbacks(i, adjoint=True)
 
     def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
@@ -1472,8 +1481,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         except AssertionError:
             msg = "Mismatching start time: {:f} vs {:f}"
             raise ValueError(msg.format(self.simulation_time, start_time))
-        # update_forcings(self.simulation_time)
+
+        # Exports and callbacks
         self.print(80*'=')
+        update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
+        # update_forcings(self.simulation_time)
+        export_func = export_func or self.op.get_export_func(self, i)
+        if export_func is not None:
+            export_func()
+            self.callbacks[i].evaluate(mode='export_adjoint')
+
+        # Print time to screen
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
         if self.num_meshes == 1:
             msg = "ADJOINT SOLVE time {:8.2f}  ({:6.2f} seconds)"
@@ -1483,12 +1501,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
                                   self.simulation_time, 0.0))
         cpu_timestamp = perf_counter()
-
-        # Callbacks
-        update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
-        export_func = export_func or self.op.get_export_func(self, i)
-        if export_func is not None:
-            export_func()
 
         # We need to project to P1 for vtk outputs
         if op.solve_swe and plot_pvd:
@@ -1536,6 +1548,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.simulation_time -= op.dt
             if self.iteration % op.dt_per_export == 0:
 
+                # Exports and callbacks
+                if export_func is not None:
+                    export_func()
+                self.callbacks[i].evaluate(mode='export_adjoint')
+
                 # Print time to screen
                 cpu_time = perf_counter() - cpu_timestamp
                 if self.num_meshes == 1:
@@ -1554,10 +1571,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if op.solve_tracer and plot_pvd:
                     proj_tracer.project(self.adj_solutions_tracer[i])
                     self.adjoint_tracer_file.write(proj_tracer)
-
-                # Exports and callbacks
-                if export_func is not None:
-                    export_func()
             self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
         if update_forcings is not None:
             update_forcings(self.simulation_time - op.dt)

@@ -21,8 +21,8 @@ class AdaptiveTsunamiProblem(AdaptiveProblem):
         except AssertionError:
             raise ValueError("This class is for problems with hydrodynamics only.")
 
-    def add_callbacks(self, i):
-        super(AdaptiveTsunamiProblem, self).add_callbacks(i)
+    def add_callbacks(self, i, **kwargs):
+        super(AdaptiveTsunamiProblem, self).add_callbacks(i, **kwargs)
         self.get_qoi_kernels(i)
         self.callbacks[i].add(QoICallback(self, i), 'timestep')
 
