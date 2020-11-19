@@ -34,7 +34,7 @@ geo:
 	@echo "Generating geometry files..."
 	@python3 generate_geo.py
 
-mesh:
+mesh: geo
 	@echo "Generating all meshes..."
 	@gmsh -2 resources/meshes/xcoarse_0.geo
 	@gmsh -2 resources/meshes/coarse_0.geo
@@ -56,7 +56,7 @@ geo_xcoarse:
 	@echo "Generating xcoarse geometry files..."
 	@python3 generate_geo.py -level xcoarse
 
-mesh_xcoarse:
+mesh_xcoarse: geo_xcoarse
 	@echo "Generating xcoarse meshes..."
 	@gmsh -2 resources/meshes/xcoarse_0.geo
 	@gmsh -2 resources/meshes/xcoarse_1.geo

@@ -83,6 +83,19 @@ class TurbineOptions(CoupledOptions):
         """We do not use the Manning friction formulation for tidal turbine modelling."""
         return
 
+    def set_viscosity(self, fs):
+        nu = Function(fs, name="Horizontal viscosity")
+        nu.assign(self.base_viscosity)
+
+        # Enforce maximum Reynolds number
+        if hasattr(self, 'max_reynolds_number'):
+            Re_h, Re_h_min, Re_h_max = self.check_mesh_reynolds_number(nu)
+            target = self.max_reynolds_number
+            if Re_h_max > target:
+                nu_enforce = self.enforce_mesh_reynolds_number(fs, target)
+                nu.interpolate(conditional(Re_h > target, nu_enforce, nu))
+        return nu
+
     def get_thrust_coefficient(self, correction=True):
         """
         Correction to account for the fact that the thrust coefficient is based on an upstream

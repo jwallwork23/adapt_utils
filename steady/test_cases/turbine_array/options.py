@@ -83,8 +83,8 @@ class TurbineArrayOptions(SteadyTurbineOptions):
         self.grad_depth_viscosity = False
 
         # Mesh adaptation
-        self.h_min = 1e-5
-        self.h_max = 500.0
+        self.h_min = 1.0e-05
+        self.h_max = 5.0e+02
 
     def set_inflow(self, fs):
         return interpolate(as_vector(self.inflow_velocity), fs)
