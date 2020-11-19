@@ -84,8 +84,8 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
 
     # --- Quantity of Interest
 
-    def add_callbacks(self, i):
-        super(AdaptiveTurbineProblem, self).add_callbacks(i)
+    def add_callbacks(self, i, **kwargs):
+        super(AdaptiveTurbineProblem, self).add_callbacks(i, **kwargs)
         di = self.callback_dir
         if di is None:
             return
@@ -263,8 +263,8 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
 
     # --- Quantity of Interest
 
-    def add_callbacks(self, i):
-        super(AdaptiveSteadyTurbineProblem, self).add_callbacks(i)
+    def add_callbacks(self, i, **kwargs):
+        super(AdaptiveSteadyTurbineProblem, self).add_callbacks(i, **kwargs)
         di = self.callback_dir
         if di is None:
             return
