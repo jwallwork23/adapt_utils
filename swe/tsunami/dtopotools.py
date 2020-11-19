@@ -1,9 +1,11 @@
 """
-****************************************************************************************************
-THIS FILE HAS LARGELY BEEN COPIED FROM GEOCLAW FOR THE PURPOSES OF AUTOMATIC DIFFERENTIATION.
+Extension of GeoClaw's :class:`Fault` to allow automatic differentiation using ADOL-C. See
+GeoClaw dtopotools Module `$CLAW/geoclaw/src/python/geoclaw/dtopotools.py` for original version.
 
-See GeoClaw dtopotools Module `$CLAW/geoclaw/src/python/geoclaw/dtopotools.py` for original version.
-****************************************************************************************************
+**********************************************************************************************
+*  NOTE: This file is based on GeoClaw (http://www.clawpack.org/geoclaw) and contains some   *
+*        copied code.                                                                        *
+**********************************************************************************************
 """
 try:
     import adolc
@@ -20,7 +22,9 @@ from clawpack.geoclaw.dtopotools import *
 
 
 class Fault(clawpack.geoclaw.dtopotools.Fault):
-    """Subclass of the CLAWPACK Fault class allowing automatic differentation using pyadolc."""
+    """
+    Subclass of the CLAWPACK Fault class allowing automatic differentation using pyadolc.
+    """
     def __init__(self, x, y, times=[1.0], **kwargs):
         super(Fault, self).__init__(**kwargs)
         self.dtopo = DTopography()
@@ -32,7 +36,9 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
         self.dtopo.times = times
 
     def create_dtopography(self, active=True, verbose=False):
-        """Annotated version of topography method."""
+        """
+        Annotated version of topography method.
+        """
         if active and not have_adolc:
             raise ValueError("Cannot annotate the rupture process without an appropriate AD tool.")
         if self.rupture_type != 'static':
