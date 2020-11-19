@@ -1377,10 +1377,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.save_to_checkpoint(self.fwd_solutions_bathymetry[i])
                 # TODO: Checkpoint mesh if moving
 
-            # Export
             self.iteration += 1
             self.simulation_time += op.dt
             if self.iteration % op.dt_per_export == 0:
+
+                # Print time to screen
                 cpu_time = perf_counter() - cpu_timestamp
                 if self.num_meshes == 1:
                     self.print(msg.format(self.simulation_time, cpu_time))
@@ -1388,6 +1389,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
                                           self.simulation_time, cpu_time))
                 cpu_timestamp = perf_counter()
+
+                # Plot to .pvd
                 if op.solve_swe and plot_pvd:
                     u, eta = self.fwd_solutions[i].split()
                     proj_u.project(u)
@@ -1403,6 +1406,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     b = self.fwd_solutions_bathymetry[i] if op.solve_exner else self.bathymetry[i]
                     proj_bath.project(b)
                     self.exner_file.write(proj_bath)
+
+                # Exports and callbacks
                 if export_func is not None:
                     export_func()
                 self.callbacks[i].evaluate(mode='export')
@@ -1527,19 +1532,20 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if self.tracer_options[i].use_limiter_for_tracers:
                     self.tracer_limiters[i].apply(self.adj_solutions_tracer[i])
 
-            # Increment counters
             self.iteration -= 1
             self.simulation_time -= op.dt
-
-            # Export
             if self.iteration % op.dt_per_export == 0:
+
+                # Print time to screen
                 cpu_time = perf_counter() - cpu_timestamp
-                cpu_timestamp = perf_counter()
                 if self.num_meshes == 1:
                     self.print(msg.format(self.simulation_time, cpu_time))
                 else:
                     self.print(msg.format(self.outer_iteration, i+1, self.num_meshes,
                                           self.simulation_time, cpu_time))
+                cpu_timestamp = perf_counter()
+
+                # Plot to .pvd
                 if op.solve_swe and plot_pvd:
                     z, zeta = self.adj_solutions[i].split()
                     proj_z.project(z)
@@ -1548,10 +1554,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 if op.solve_tracer and plot_pvd:
                     proj_tracer.project(self.adj_solutions_tracer[i])
                     self.adjoint_tracer_file.write(proj_tracer)
+
+                # Exports and callbacks
                 if export_func is not None:
                     export_func()
-        self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
-        update_forcings(self.simulation_time - op.dt)
+            self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
+        if update_forcings is not None:
+            update_forcings(self.simulation_time - op.dt)
         self.print(80*'=')
 
     # --- Error estimation
