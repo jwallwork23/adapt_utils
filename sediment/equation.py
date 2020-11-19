@@ -13,6 +13,11 @@ for a separate source and sink term. The equation reads
 where :math:'S' is :math:'q' for conservative and :math:'T' for non-conservative,
 :math:`\nabla_h` denotes horizontal gradient, :math:`\textbf{u}` are the horizontal
 velocities, and :math:`\mu_h` denotes horizontal diffusivity.
+
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
 """
 from __future__ import absolute_import
 from thetis.utility import *

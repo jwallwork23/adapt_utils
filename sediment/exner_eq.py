@@ -15,8 +15,11 @@ and :math:'T' for non-conservative, :math:`\nabla_h` denotes horizontal gradient
 :math:'morfac' is the morphological scale factor, :math:'p' is the porosity and
 :math:'Q_b' is the bedload transport vector
 
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
 """
-
 from __future__ import absolute_import
 from thetis.equation import Term, Equation
 from thetis.utility import *

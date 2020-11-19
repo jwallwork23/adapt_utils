@@ -1,5 +1,10 @@
 """
 3D non-conservative and conservative tracer equations. Note that only the CG case is considered.
+
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
 """
 from __future__ import absolute_import
 from thetis.utility import *

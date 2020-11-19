@@ -3,6 +3,11 @@
     1. Allow for CG discretisations and either SU or SUPG stabilisation.
     2. Account for mesh movement under a prescribed mesh velocity.
     3. Enable choice of anisotropic cell size measure.
+
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
 """
 from __future__ import absolute_import
 from thetis.utility import *

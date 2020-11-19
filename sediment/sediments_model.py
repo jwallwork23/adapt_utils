@@ -1,7 +1,14 @@
+"""
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
+"""
 from thetis.utility import *
 
 
 class Corrective_Velocity_Factor:
+    # TODO: documentation
     def __init__(self, depth, ksp, ks, settling_velocity, ustar):
         self.ksp = ksp
         self.ks = ks
