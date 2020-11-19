@@ -70,7 +70,7 @@ class TrenchSedimentOptions(CoupledOptions):
     def set_up_morph_model(self, input_dir, mesh = None):
 
         # Physical
-        self.base_diffusivity = 0.18161630470135287
+        self.base_diffusivity = 0.18011042551606954
 
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)
@@ -206,10 +206,10 @@ class TrenchSedimentOptions(CoupledOptions):
         Initialise simulation with results from a previous simulation
         """
         from firedrake.petsc import PETSc
-        try:
-            import firedrake.cython.dmplex as dmplex
-        except:
-            import firedrake.dmplex as dmplex  # Older version
+        #try:
+        #    import firedrake.cython.dmplex as dmplex
+        #except:
+        #    import firedrake.dmplex as dmplex  # Older version
         # mesh
         with timed_stage('mesh'):
             # Load

@@ -15,8 +15,8 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.1
-alpha = 17
+nx = 1
+alpha = 2
 tol = 1e-3
 
 inputdir = 'hydrodynamics_trench_' + str(nx)
@@ -66,10 +66,6 @@ def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
     n = FacetNormal(mesh)
 
     mon_init = project(Constant(1.0) + alpha * norm_two_proj, P1)
-    #K = 10*(0.2**2)/4
-    #a = (inner(tau, H)*dx)+(K*inner(grad(tau), grad(H))*dx) - (K*(tau*inner(grad(H), n)))*ds
-    #a -= inner(tau, mon_init)*dx
-    #solve(a == 0, H)
 
     return mon_init
 
@@ -107,7 +103,6 @@ datathetis = []
 bathymetrythetis1 = []
 diff_thetis = []
 for i in range(len(data[0].dropna())):
-    print(i)
     datathetis.append(data[0].dropna()[i])
     bathymetrythetis1.append(-bath.at([np.round(data[0].dropna()[i], 3), 0.55]))
     diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
@@ -128,11 +123,7 @@ print(t2-t1)
 df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c4.csv')
 print("Mesh error: ")
 print(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
-#f = open("adapt_output/output_frob_norm_" + str(nx) + '_' + str(alpha) + '.txt', "w+")
-#f.write(str(np.sqrt(sum(diff_thetis))))
-#f.write("\n")
-#f.write(str(t2-t1))
-#f.close()
+
 print('tolerance')
 print(tol)
 

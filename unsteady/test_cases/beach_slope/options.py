@@ -81,8 +81,8 @@ class BeachOptions(CoupledOptions):
 
         self.dt = 0.5
         self.end_time = float(self.num_hours*3600.0/self.morphological_acceleration_factor)
-        self.dt_per_mesh_movement = 1296
-        self.dt_per_export = 1296
+        self.dt_per_mesh_movement = 48
+        self.dt_per_export = 48
         self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
 
@@ -246,10 +246,7 @@ class BeachOptions(CoupledOptions):
         Initialise simulation with results from a previous simulation
         """
         from firedrake.petsc import PETSc
-        try:
-            import firedrake.cython.dmplex as dmplex
-        except:
-            import firedrake.dmplex as dmplex  # Older version        
+
         # mesh
         with timed_stage('mesh'):
             # Load

@@ -27,17 +27,15 @@ def initialise_fields(mesh2d, inputdir):
 
 new_mesh = th.RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
-bath1 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.1')
-bath1a = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.125')
-bath1b = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.15')
-bath2 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.2')
-bath3 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.4')
-bath3a = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.5')
-bath4 = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_0.8')
-bath4a = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_1')
-bath4b = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_1.6')
-bath5 =  initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_2.0')
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
+bath1 = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.1')
+bath2 = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.2')
+bath3 = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.4')
+bath3a = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.5')
+bath4 = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_0.8')
+bath4a = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_1')
+bath4b = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_1.6')
+bath5 =  initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_2.0')
+bath_real = initialise_fields(new_mesh, '../hydrodynamics_trench_slant_bath_new_4.0')
 
 errorlist = []
 errorlist.append(fire.errornorm(bath5, bath_real))
@@ -47,19 +45,17 @@ errorlist.append(fire.errornorm(bath4, bath_real))
 errorlist.append(fire.errornorm(bath3a, bath_real))
 errorlist.append(fire.errornorm(bath3, bath_real))
 errorlist.append(fire.errornorm(bath2, bath_real))
-errorlist.append(fire.errornorm(bath1b, bath_real))
-errorlist.append(fire.errornorm(bath1a, bath_real))
 errorlist.append(fire.errornorm(bath1, bath_real))
 
 
 print(errorlist)
 
-plt.loglog([0.1, 0.25, 0.5, 1, 2], errorlist, '-o')
+plt.loglog([0.1, 0.125, 0.2, 0.25, 0.4, 0.5, 1, 2], errorlist, '-o')
 plt.ylabel('Error norm (m)')
 plt.xlabel(r'$\Delta x$ (m)')
 plt.show()
 
-logx = np.log([0.1, 0.25, 0.5, 1, 2])
+logx = np.log([0.1, 0.125, 0.2, 0.25, 0.4, 0.5, 1, 2])
 log_error = np.log(errorlist)
 poly = np.polyfit(logx, log_error, 1)
 print(poly[0])

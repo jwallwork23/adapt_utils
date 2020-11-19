@@ -4,6 +4,7 @@ import firedrake as fire
 
 import numpy as np
 
+from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.unsteady.test_cases.trench_slant.options import TrenchSlantOptions
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.adapt import recovery
@@ -17,10 +18,10 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 0.8
-ny = 0.8
-alpha = 18
-beta = 1
+nx = 0.5
+ny = 0.5
+alpha = 7
+beta = 0
 gamma = 1
 
 inputdir = 'hydrodynamics_trench_slant_'  + str(nx)
@@ -89,40 +90,9 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-def initialise_fields(mesh2d, inputdir):
-    """
-    Initialise simulation with results from a previous simulation
-    """
-    V = FunctionSpace(mesh2d, 'CG', 1)
-    # elevation
-    with timed_stage('initialising bathymetry'):
-        chk = DumbCheckpoint(inputdir + "/bathymetry", mode=FILE_READ)
-        bath = Function(V, name="bathymetry")
-        chk.load(bath)
-        chk.close()
-        
-    return bath
+export_bathymetry(bath, "adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx))
 
-def export_final_state(inputdir, bathymetry_2d):
-    """
-    Export fields to be used in a subsequent simulation
-    """
-    if not os.path.exists(inputdir):
-        os.makedirs(inputdir)
-    print_output("Exporting fields for subsequent simulation")
-
-    chk = DumbCheckpoint(inputdir + "/bathymetry", mode=FILE_CREATE)
-    chk.store(bathymetry_2d, name="bathymetry")
-    File(inputdir + '/bathout.pvd').write(bathymetry_2d)
-    chk.close()
-    
-    plex = bathymetry_2d.function_space().mesh()._plex
-    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
-    viewer(plex)        
-
-export_final_state("adapt_output/hydrodynamics_trench_slant_bath_"+str(alpha) + "_" + str(beta) + '_' + str(gamma) + '-' + str(nx), bath)
-
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 
 print(nx)
 print(ny)

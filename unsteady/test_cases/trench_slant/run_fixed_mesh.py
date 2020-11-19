@@ -8,46 +8,16 @@ from firedrake.petsc import PETSc
 import pandas as pd
 import time
 import datetime
+from adapt_utils.io import initialise_bathymetry, export_bathymetry
 
 import firedrake as fire
-
-def export_final_state(inputdir, bathymetry_2d):
-    """
-    Export fields to be used in a subsequent simulation
-    """
-    if not os.path.exists(inputdir):
-        os.makedirs(inputdir)
-    print_output("Exporting fields for subsequent simulation")
-
-    chk = DumbCheckpoint(inputdir + "/bathymetry", mode=FILE_CREATE)
-    chk.store(bathymetry_2d, name="bathymetry")
-    File(inputdir + '/bathout.pvd').write(bathymetry_2d)
-    chk.close()
-
-    plex = bathymetry_2d.function_space().mesh()._plex
-    viewer = PETSc.Viewer().createHDF5(inputdir + '/myplex.h5', 'w')
-    viewer(plex)
-
-def initialise_fields(mesh2d, inputdir):
-    """
-    Initialise simulation with results from a previous simulation
-    """
-    V = FunctionSpace(mesh2d, 'CG', 1)
-    # elevation
-    with timed_stage('initialising bathymetry'):
-        chk = DumbCheckpoint(inputdir + "/bathymetry", mode=FILE_READ)
-        bath = Function(V, name="bathymetry")
-        chk.load(bath)
-        chk.close()
-        
-    return bath
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 outputdir = 'outputs' + st
 
-nx = 2.0
-ny = 2.0
+nx = 1.6
+ny = 1.6
 
 inputdir = 'hydrodynamics_trench_slant_' + str(nx)
 
@@ -75,12 +45,12 @@ new_mesh = RectangleMesh(16*5*4, 5*4, 16, 1.1)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-export_final_state("hydrodynamics_trench_slant_bath_new_"+str(nx), bath)
+export_bathymetry(bath, "hydrodynamics_trench_slant_bath_new_"+str(nx))
 
 print("total time: ")
 print(t2-t1)
 print(nx)
-bath_real = initialise_fields(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
+bath_real = initialise_bathymetry(new_mesh, 'hydrodynamics_trench_slant_bath_new_4.0')
 
 
 print('L2')
