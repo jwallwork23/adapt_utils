@@ -1,8 +1,32 @@
+"""
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
+"""
 from thetis.utility import *
 
 
 class Corrective_Velocity_Factor:
     def __init__(self, depth, ksp, ks, settling_velocity, ustar):
+        """
+        Set up advective velocity factor `self.corr_factor_model.corr_vel_factor`
+        which accounts for mismatch between depth-averaged product of
+        velocity with sediment and product of depth-averaged velocity
+        with depth-averaged sediment.
+
+        :arg depth: Depth of fluid
+        :type depth: :class:`Function`
+        :arg ksp: Grain roughness coefficient
+        :type ksp: :class:`Constant`
+        :arg ks: Bottom bed reference height
+        :type ks: :class:`Constant`
+        :arg settling_velocity: Settling velocity of the sediment particles
+        :type settling_velocity: :class:`Constant`
+        :arg ustar: Shear velocity
+        :type ustar: :class:`Expression of functions`
+        """
+
         self.ksp = ksp
         self.ks = ks
         self.settling_velocity = settling_velocity

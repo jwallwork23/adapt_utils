@@ -7,6 +7,11 @@ Depth averaged shallow water equations as in Thetis, with a few minor modificati
     3. Do not include friction terms if the `use_nonlinear_equations` option is set to false.
     4. Do not include 3D bottom drag or atmospheric pressure terms.
     5. Enable choice of anisotropic cell size measure.
+
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
 """
 from __future__ import absolute_import
 from thetis.equation import *

@@ -7,12 +7,17 @@ for a separate source and sink term. The equation reads
 .. math::
     \frac{\partial S}{\partial t}
     + \nabla_h \cdot (\textbf{u} S)
-    = \nabla_h \cdot (\mu_h \nabla_h S) + Source - (Sink S)
+    = \nabla_h \cdot (\mu_h \nabla_h S) + F_{source} - (F_{sink} S)
     :label: sediment_eq_2d
 
 where :math:'S' is :math:'q' for conservative and :math:'T' for non-conservative,
 :math:`\nabla_h` denotes horizontal gradient, :math:`\textbf{u}` are the horizontal
 velocities, and :math:`\mu_h` denotes horizontal diffusivity.
+
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
 """
 from __future__ import absolute_import
 from thetis.utility import *
@@ -46,7 +51,7 @@ class SedimentSourceTerm(SedimentTerm):
     The weak form reads
 
     .. math::
-        F_s = \int_\Omega \sigma \phi dx
+        F_{source} = \int_\Omega \sigma \phi dx
 
     where :math:`\sigma` is a user defined scalar :class:`Function`.
 
@@ -83,7 +88,7 @@ class SedimentSinkTerm(SedimentTerm):
     The weak form reads
 
     .. math::
-        F_s = - \int_\Omega \sigma solution \phi dx
+        F_{sink} = - \int_\Omega \sigma solution \phi dx
 
     where :math:`\sigma` is a user defined scalar :class:`Function`.
 

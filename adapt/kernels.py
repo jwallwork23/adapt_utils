@@ -1,8 +1,10 @@
+"""
+**********************************************************************************************
+*  NOTE: Much of the code in this file is based on https://github.com/taupalosaurus/darwin.  *
+**********************************************************************************************
+"""
 from firedrake import op2
-
 import os
-
-from adapt_utils.options import Options
 
 
 __all__ = ["eigen_kernel", "get_eigendecomposition", "get_reordered_eigendecomposition",
@@ -443,10 +445,12 @@ def metric_from_hessian(d):
     return metric_from_hessian_str % (d*d, d, d, d, d, d, d, d, d, d, d, d, d)
 
 
-def postproc_metric(d, op=Options()):
+def postproc_metric(d, **kwargs):
     """
     Post-process a metric field in order to enforce max/min element sizes and anisotropy.
     """
+    from adapt_utils.options import Options
+    op = kwargs.get('op', Options())
     return postproc_metric_str % (d*d, d, d, d, d, d, d, d, d, op.h_min, op.h_max, d, op.max_anisotropy)
 
 

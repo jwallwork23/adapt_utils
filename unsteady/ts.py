@@ -1,3 +1,12 @@
+"""
+Extend some of Thetis' time integration schemes to incorporate goal-oriented error estimation
+functionality.
+
+**********************************************************************************************
+*  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
+*        some copied code.                                                                   *
+**********************************************************************************************
+"""
 from thetis.utility import *
 import thetis.timeintegrator as thetis_ts
 

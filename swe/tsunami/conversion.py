@@ -1,15 +1,19 @@
 """
-Based on the UTM conversion code by [Tobias Bieniek, 2012]. This version of the code is modified to
-account for UFL.
+Convert between latitude-longitude and UTM coordinates. An extension of the code by Tobias
+Bieniek to account for UFL expressions and NumPy arrays.
+
+**********************************************************************************************
+*  NOTE: This file is based on utm 0.4.0 (https://pypi.org/project/utm/0.4.0/) and contains  *
+*        some copied code.                                                                   *
+**********************************************************************************************
 """
-import ufl
-import numpy as np
-from math import pi, sqrt
 from thetis import print_output
+import ufl
 
-
-class OutOfRangeError(ValueError):
-    pass
+from math import pi, sqrt
+import numpy as np
+from utm.conversion import latitude_to_zone_letter, latlon_to_zone_number, zone_number_to_central_longitude
+from utm.error import OutOfRangeError
 
 
 __all__ = ["to_latlon", "from_latlon", "lonlat_to_utm", "utm_to_lonlat", "degrees", "radians"]
@@ -41,17 +45,19 @@ P5 = 1097.0/512*_E4
 
 R = 6378137  # Mean radius of the Earth
 
-ZONE_LETTERS = "CDEFGHJKLMNPQRSTUVWXX"
-
 
 def degrees(rad):
-    rad *= 180.0/pi
-    return rad
+    """
+    Convert from radians to degrees.
+    """
+    return rad*180.0/pi
 
 
 def radians(deg):
-    deg *= pi/180.0
-    return deg
+    """
+    Convert from degrees to radians.
+    """
+    return deg*pi/180.0
 
 
 def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, force_longitude=False, coords=None):
@@ -234,50 +240,6 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False, co
         return easting, northing, zone_number, latitude_to_zone_letter(latitude)
     else:
         return easting, northing
-
-
-def latitude_to_zone_letter(latitude):
-    """
-    Convert latitude UTM letter, courtesy of Tobias Bieniek, 2012.
-
-    :arg latitude: northward anglular position, origin at the Equator.
-    :return: UTM zone letter (increasing alphabetically northward).
-    """
-    return ZONE_LETTERS[int(latitude + 80) >> 3] if -80 <= latitude <= 84 else None
-
-
-def latlon_to_zone_number(latitude, longitude):
-    """
-    Convert a latitude-longitude coordinate pair to UTM zone, courtesy of Tobias Bieniek, 2012.
-
-    :arg latitude: northward anglular position, origin at the Equator.
-    :arg longitude: eastward angular position, with origin at the Grenwich Meridian.
-    :return: UTM zone number (increasing eastward).
-    """
-    if 56 <= latitude < 64 and 3 <= longitude < 12:
-        return 32
-
-    if 72 <= latitude <= 84 and longitude >= 0:
-        if longitude <= 9:
-            return 31
-        elif longitude <= 21:
-            return 33
-        elif longitude <= 33:
-            return 35
-        elif longitude <= 42:
-            return 37
-
-    return int((longitude + 180)/6) + 1
-
-
-def zone_number_to_central_longitude(zone_number):
-    """
-    Convert a UTM zone number to the corresponding central longitude, courtesy of Tobias Bieniek, 2012.
-
-    :arg zone_number: UTM zone number (increasing eastward).
-    :return: central eastward angular position of the UTM zone, with origin at the Grenwich Meridian.
-    """
-    return (zone_number - 1)*6 - 180 + 3
 
 
 def lonlat_to_utm(longitude, latitude, force_zone_number, **kwargs):
