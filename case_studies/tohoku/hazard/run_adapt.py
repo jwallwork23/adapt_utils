@@ -102,7 +102,7 @@ kwargs = {
     'use_wetting_and_drying': False,
 
     # Mesh adaptation
-    'adapt_field': args.adapt_field or 'elevation',
+    'adapt_field': args.adapt_field or 'all_int',
     'hessian_time_combination': args.time_combine or 'integrate',
     'hessian_timestep_lag': float(args.hessian_lag or 1),
     'normalisation': args.normalisation or 'complexity',
