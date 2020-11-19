@@ -92,7 +92,8 @@ class AdaptiveProblemBase(object):
 
         # Storage for diagnostics over mesh adaptation loop
         self.indicators = [{} for i in range(self.num_meshes)]
-        self.estimators = [{} for i in range(self.num_meshes)]
+        self.estimators = {}
+        self.metrics = [None for P1_ten in self.P1_ten]
         self.qois = []
         self.st_complexities = [np.nan]
         self.outer_iteration = 0
@@ -737,8 +738,8 @@ class AdaptiveProblemBase(object):
         self.st_complexities.append(np.sum(complexities)*self.num_timesteps)
         self.print("\nRiemannian metrics\n==================")
         for i, c in enumerate(complexities):
-            self.print("  {:2d}: static complexity {:13.4e}".format(i, c))
-        self.print("  space-time complexity {:13.4e}".format(self.st_complexities[-1]))
+            self.print("  metric {:2d}: static complexity {:13.4e}".format(i, c))
+        self.print("         space-time complexity {:13.4e}".format(self.st_complexities[-1]))
 
     def adapt_meshes(self, save=False):
         """
@@ -746,7 +747,8 @@ class AdaptiveProblemBase(object):
         """
         self.print("\nStarting mesh adaptation for iteration {:d}...".format(self.outer_iteration+1))
         for i, M in enumerate(self.metrics):
-            self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
+            if self.num_meshes > 1:
+                self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
             self.meshes[i] = adapt(self.meshes[i], M)
         self.metrics = [None for P1_ten in self.P1_ten]
         self.set_meshes(self.meshes)
@@ -768,7 +770,8 @@ class AdaptiveProblemBase(object):
         self.dofs.append([np.sum(fs.dof_count) for fs in base_space])
         self.print("\nResulting meshes\n================")
         for i, (nv, nc) in enumerate(zip(self.num_vertices[-1], self.num_cells[-1])):
-            self.print("  {:2d}: vertices {:7d} elements {:7d}".format(i, nv, nc))
+            self.print("  mesh {:2d}: vertices {:7d} elements {:7d}".format(i, nv, nc))
+        self.print("\n")
 
     def run_hessian_based(self, update_forcings=None, export_func=None, **kwargs):
         """
@@ -784,10 +787,10 @@ class AdaptiveProblemBase(object):
         first intersecting the Hessians recovered from the x-component of velocity and bathymetry
         and then averaging the result with the Hessian recovered from the elevation.
 
-        Stopping criteria:
-          * iteration count > self.op.max_adapt;
-          * relative change in element count < self.op.element_rtol;
-          * relative change in quantity of interest < self.op.qoi_rtol.
+        Convergence criteria:
+          * Convergence of quantity of interest (relative tolerance `op.qoi_rtol`);
+          * Convergence of mesh element count (relative tolerance `op.element_rtol`);
+          * Maximum number of iterations reached (`op.max_adapt`).
 
         :kwarg save_mesh: save all adapted meshes to HDF5 after every adaptation step. They will
             exist in :attr:`di`, with the name 'plex_', followed by the integer specifying the place
@@ -934,13 +937,15 @@ class AdaptiveProblemBase(object):
     def _check_qoi_convergence(self):
         n = self.outer_iteration
         qoi = self.quantity_of_interest()
-        self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
+        self.print("\nQuantity of interest\n====================")
+        self.print("  iteration {:d}: {:.4e}\n".format(n+1, qoi))
         self.qois.append(qoi)
         converged = False
         if len(self.qois) == 1:
             return False
         if np.abs(self.qois[-1] - self.qois[-2]) < self.op.qoi_rtol*self.qois[-2]:
-            self.print("Converged quantity of interest!")
+            n = self.outer_iteration
+            self.print("Converged quantity of interest after {:d} iterations!".format(n+1))
             converged = True
         return converged
 
@@ -948,11 +953,33 @@ class AdaptiveProblemBase(object):
     def qoi_converged(self):
         return self._check_qoi_convergence()
 
+    def _check_estimator_convergence(self):
+        n = self.outer_iteration
+        if 'dwr' in self.op.approach:
+            estimators = self.estimators['dwr']
+        else:
+            return  # TODO: Other estimators than DWR
+        self.print("\nError estimator\n===============")
+        self.print("  iteration {:d}: {:.4e}".format(n+1, estimators[-1]))
+        if len(estimators) == 1:
+            return
+        converged = False
+        if np.abs(estimators[-1] - estimators[-2]) <= self.op.estimator_rtol*estimators[-2]:
+            n = self.outer_iteration
+            self.print("Converged error estimator after {:d} iterations!".format(n+1))
+            converged = True
+        return converged
+
+    @property
+    def estimator_converged(self):
+        return self._check_estimator_convergence()
+
     def _check_maximum_adaptations(self):
-        chk = self.outer_iteration >= self.op.max_adapt-1
-        msg = "Maximum number of adaptations{:s} met"
+        n = self.outer_iteration
+        chk = n >= self.op.max_adapt-1
+        msg = "Maximum number of adaptations{:s} met ({:d}/{:d})."
         print_func = self.print if chk else self.op.print_debug
-        print_func(msg.format('' if chk else ' not'))
+        print_func(msg.format('' if chk else ' not', n+1, self.op.max_adapt))
         return chk
 
     @property
@@ -960,9 +987,10 @@ class AdaptiveProblemBase(object):
         return self._check_maximum_adaptations()
 
     def _check_minimum_adaptations(self):
-        chk = self.outer_iteration >= self.op.min_adapt
-        msg = "Minimum number of adaptations{:s} met"
-        self.op.print_debug(msg.format('' if chk else ' not'))
+        n = self.outer_iteration
+        chk = n >= self.op.min_adapt
+        msg = "Minimum number of adaptations{:s} met ({:d}/{:d})."
+        self.op.print_debug(msg.format('' if chk else ' not', n+1, self.op.max_adapt))
         return chk
 
     @property
@@ -972,11 +1000,12 @@ class AdaptiveProblemBase(object):
     def _check_element_convergence(self):
         converged = True
         for i, num_cells_ in enumerate(self.num_cells[-3]):
-            diff = np.abs(self.num_cells[self.outer_iteration][-2] - num_cells_)
+            diff = np.abs(self.num_cells[self.outer_iteration][i] - num_cells_)
             if diff > self.op.element_rtol*num_cells_:
                 converged = False
         if converged:
-            self.print("Converged number of mesh elements!")
+            n = self.outer_iteration
+            self.print("Converged number of mesh elements after {:d} iterations!".format(n+1))
         return converged
 
     @property

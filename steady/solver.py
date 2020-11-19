@@ -1,6 +1,5 @@
 from thetis import *
 
-import numpy as np
 import os
 
 from adapt_utils.adapt.kernels import *
@@ -54,8 +53,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         return self.indicators[0]
 
     @property
-    def estimator(self):
-        return self.estimators[0]
+    def metric(self):
+        return self.metrics[0]
 
     def solve_adjoint(self, **kwargs):
         if self.discrete_adjoint:
@@ -195,7 +194,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         A P1 field to be used for isotropic mesh adaptation is stored as `self.indicator`.
         """
         op = self.op
-        self.indicator[op.approach] = Function(self.P1[0], name=op.approach + " indicator")
+        self.indicator['dwr'] = Function(self.P1[0], name="DWR indicator")
 
         # Setup problem on enriched space
         hierarchy = MeshHierarchy(self.mesh, 1)
@@ -240,13 +239,16 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         # Compute dual weighted residual
         dwr = ets.error_estimator.weighted_residual()
-        self.estimator[op.approach].append(dwr.vector().gather().sum())
         indicator_enriched.interpolate(abs(dwr))
-        # indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
-        indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
-        # self.indicator[op.approach].project(indicator_enriched_cts)
-        tm.inject(indicator_enriched_cts, self.indicator[op.approach])
-        return self.indicator[op.approach]
+
+        # Estimate error
+        self.estimators['dwr'].append(indicator_enriched.vector().gather().sum())
+
+        # Project into P1 space and inject into base mesh
+        indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
+        indicator_enriched_cts.interpolate(abs(indicator_enriched_cts))  # Ensure positive
+        tm.inject(indicator_enriched_cts, self.indicator['dwr'])
+        return self.indicator['dwr']
 
     def get_hessian_metric(self, adjoint=False, **kwargs):
         """
@@ -436,6 +438,13 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         M_p1.project(M)
         return M_p1
 
+    def log_complexities(self):
+        """
+        Log metric complexity.
+        """
+        self.print("\nRiemannian metric\n=================")
+        self.print("  complexity {:13.4e}".format(metric_complexity(self.metrics[0])))
+
     def run_dwr(self, **kwargs):
         """
         Apply a goal-oriented mesh adaptation loop, until a convergence criterion is met.
@@ -452,7 +461,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         adapt_field = op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
-        self.estimator[op.approach] = []
+        if 'dwr' in op.approach:
+            self.estimators['dwr'] = []
         for n in range(op.max_adapt):
             self.outer_iteration = n
             self.create_error_estimators_step(0)
@@ -460,56 +470,28 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # Solve forward in base space
             self.solve_forward()
 
-            # Check QoI convergence
-            qoi = self.quantity_of_interest()
-            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-            self.qois.append(qoi)
-            if len(self.qois) > 1 and n >= op.min_adapt:
-                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    self.print("Converged quantity of interest!")
-                    break
-
-            # Check maximum number of iterations
-            if n == op.max_adapt - 1:
+            # Check convergence
+            if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
                 break
 
             # Solve adjoint equation in base space
             self.solve_adjoint()
 
             # Construct metric
-            metric = self.get_metric(adapt_field)
+            self.metrics[0] = self.get_metric(adapt_field)
+            self.log_complexities()
 
             # Check convergence of error estimator
-            if 'dwr' in op.approach:
-                estimators = self.estimator[op.approach]
-                if len(estimators) > 1 and n >= op.min_adapt:
-                    if np.abs(estimators[-1] - estimators[-2]) <= op.estimator_rtol*estimators[-2]:
-                        self.print("Converged error estimator!")
-                        break
-
-            # TODO: Log complexities
+            if self.estimator_converged:
+                break
 
             # Adapt mesh
-            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            self.meshes[0] = adapt(self.mesh, metric)
-
-            # Setup for next run
-            self.set_meshes(self.mesh)
-            self.setup_all()
-            self.dofs.append(np.sum(self.get_function_space(adapt_field)[0].dof_count))
-
-            # Print to screen
-            msg = "\nResulting mesh: {:7d} vertices, {:7d} elements"
-            num_cells = self.num_cells
-            self.print(msg.format(self.num_vertices[-1][0], num_cells[-1][0]))
-
-            # Ensure minimum number of adaptations met
-            if n < op.min_adapt:
-                continue
+            self.adapt_meshes()
 
             # Check convergence of element count
-            if np.abs(num_cells[-1][0] - num_cells[-2][0]) <= op.element_rtol*num_cells[-2][0]:
-                self.print("Converged number of mesh elements!")
+            if not self.minimum_adaptations_met:
+                continue
+            if self.elements_converged:
                 break
 
     def run_no_dwr(self, **kwargs):

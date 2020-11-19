@@ -30,7 +30,7 @@ parser.add_argument('-offset', help="Toggle between aligned or offset region of 
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
-alpha = float(args.convergence_rate or 10)
+alpha = float(args.convergence_rate or 2)
 
 
 # --- Set parameters

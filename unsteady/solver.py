@@ -1656,6 +1656,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         This motivates using error indicators of the form :math:`|q \cdot \hat q|`.
 
+        Convergence criteria:
+          * Convergence of quantity of interest (relative tolerance `op.qoi_rtol`);
+          * Convergence of mesh element count (relative tolerance `op.element_rtol`);
+          * Maximum number of iterations reached (`op.max_adapt`).
+
         [1] B. Davis & R. LeVeque, "Adjoint Methods for Guiding Adaptive Mesh Refinement in
             Tsunami Modelling", Pure and Applied Geophysics, 173, Springer International
             Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
@@ -1736,6 +1741,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         Both isotropic and anisotropic metrics are considered, as described in
         [Wallwork et al. 2021].
 
+        Convergence criteria:
+          * Convergence of quantity of interest (relative tolerance `op.qoi_rtol`);
+          * Convergence of mesh element count (relative tolerance `op.element_rtol`);
+          * Convergence of error estimator (relative tolerance `op.estimator_rtol`);
+          * Maximum number of iterations reached (`op.max_adapt`).
+
         [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
             Error Estimation and Mesh Adaptation for Tracer Transport Problems", to be submitted to
             Computer Aided Design.
@@ -1785,6 +1796,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for i, P1 in enumerate(self.P1):
                 self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
             self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            self.estimators['dwr'].append(0.0)
             for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 fwd_solutions_step_old = []
@@ -1884,18 +1896,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # Inject into the base space and construct an isotropic metric
                 tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
                 self.indicators[i]['dwr'].interpolate(abs(self.indicators[i]['dwr']))  # Ensure +ve
+                self.estimators['dwr'][-1] += self.indicators[i]['dwr'].vector().gather().sum()
                 if self.approach == 'dwr':
                     self.metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
                 else:
                     raise NotImplementedError  # TODO: anisotropic_dwr
-
-            # TODO: Check convergence of error estimator
 
             del adj_error
             del indicator_enriched
             del ep
             del refined_meshes
             del hierarchy
+
+            # Check convergence of error estimator
+            if self.estimator_converged:
+                break
 
             # Normalise metrics
             self.space_time_normalise()
@@ -1917,10 +1932,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
         'Weighted Hessian' and 'weighted gradient' metrics are considered, as described in
         [Wallwork et al. 2021].
 
-        Stopping criteria:
-          * iteration count > self.op.max_adapt;
-          * relative change in element count < self.op.element_rtol;
-          * relative change in quantity of interest < self.op.qoi_rtol.
+        Convergence criteria:
+          * Convergence of quantity of interest (relative tolerance `op.qoi_rtol`);
+          * Convergence of mesh element count (relative tolerance `op.element_rtol`);
+          * Maximum number of iterations reached (`op.max_adapt`).
 
         [Wallwork et al. 2021] J. G. Wallwork, N. Barral, D. A. Ham, M. D. Piggott, "Goal-Oriented
             Error Estimation and Mesh Adaptation for Tracer Transport Problems", to be submitted to
