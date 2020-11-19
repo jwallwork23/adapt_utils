@@ -1,3 +1,9 @@
+"""
+**********************************************************************************************
+*  NOTE: This file is based on the SciPy project (https://scipy.org) and contains some       *
+*        copied code.                                                                        *
+**********************************************************************************************
+"""
 from thetis import ConvergenceError, print_output
 from pyadjoint.reduced_functional import ReducedFunctional
 from pyadjoint.reduced_functional_numpy import ReducedFunctionalNumPy
