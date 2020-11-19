@@ -1661,33 +1661,20 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Publishing (2016), p.4055--4074, DOI 10.1007/s00024-016-1412-y.
         """
         op = self.op
+        wq = Constant(1.0)  # Quadrature weight
+        assert op.min_adapt < op.max_adapt
         for n in range(op.max_adapt):
             self.outer_iteration = n
 
-            # --- Solve forward to get checkpoints
-
+            # Solve forward to get checkpoints
             self.solve_forward()
 
-            # --- Convergence criteria
-
-            # Check QoI convergence
-            qoi = self.quantity_of_interest()
-            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-            self.qois.append(qoi)
-            if len(self.qois) > 1:
-                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    self.print("Converged quantity of interest!")
-                    break
-
-            # Check maximum number of iterations
-            if n == op.max_adapt - 1:
+            # Check convergence
+            if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
                 break
 
-            # --- Loop over mesh windows *in reverse*
-
-            for i, P1 in enumerate(self.P1):
-                self.indicators[i]['dwp'] = Function(P1, name="DWP indicator")
-            metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            # Loop over mesh windows *in reverse*
+            self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
             for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 adj_solutions_step = []
@@ -1711,79 +1698,35 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.setup_solver_adjoint_step(i)
                 self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
 
-                # --- Assemble indicators and metrics
-
+                # Assemble indicator
                 n_fwd = len(fwd_solutions_step)
                 n_adj = len(adj_solutions_step)
                 if n_fwd != n_adj:
                     msg = "Mismatching number of indicators ({:d} vs {:d})"
                     raise ValueError(msg.format(n_fwd, n_adj))
-                I = 0
+                self.indicators[i]['dwp'] = Function(self.P1[i], name="DWP indicator")
                 op.print_debug("DWP indicators on mesh {:2d}".format(i))
                 for j, solutions in enumerate(zip(fwd_solutions_step, reversed(adj_solutions_step))):
-                    scaling = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule  # TODO: Other integrators
-                    fwd_dot_adj = abs(inner(*solutions))
-                    op.print_debug("    ||<q, q*>||_L2 = {:.4e}".format(assemble(fwd_dot_adj*fwd_dot_adj*dx)))
-                    I += op.dt*self.dt_per_mesh*scaling*fwd_dot_adj
-                self.indicators[i]['dwp'].interpolate(I)
-                metrics[i].assign(isotropic_metric(self.indicators[i]['dwp'], normalise=False))
+                    if op.timestepper == 'CrankNicolson':
+                        w = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
+                    else:
+                        raise NotImplementedError  # TODO: Other integrators
+                    wq.assign(w*op.dt*self.dt_per_mesh)
+                    self.indicators[i]['dwp'] += interpolate(wq*abs(inner(*solutions)), self.P1[i])
 
-            # --- Normalise metrics
+                # Construct isotropic metric
+                self.metrics[i].assign(isotropic_metric(self.indicators[i]['dwp'], normalise=False))
 
-            if op.debug and op.plot_pvd:
-                metric_file = File(os.path.join(self.di, 'metric_before_normalisation.pvd'))
-                for i, M in enumerate(metrics):
-                    metric_file._topology = None
-                    metric_file.write(M)
+            # Normalise metrics
+            self.space_time_normalise()
 
-            space_time_normalise(metrics, op=op)
+            # Adapt meshes
+            self.adapt_meshes()
 
-            # Output to .pvd and .vtu
-            if op.plot_pvd:
-                self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
-                metric_file = File(os.path.join(self.di, 'metric.pvd'))
-            complexities = []
-            for i, M in enumerate(metrics):
-                if op.plot_pvd:
-                    self.indicator_file._topology = None
-                    self.indicator_file.write(self.indicators[i]['dwp'])
-                    metric_file._topology = None
-                    metric_file.write(M)
-                complexities.append(metric_complexity(M))
-            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
-
-            # --- Adapt meshes
-
-            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            for i, M in enumerate(metrics):
-                self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = adapt(self.meshes[i], M)
-            del metrics
-
-            # ---  Setup for next run / logging
-
-            self.set_meshes(self.meshes)
-            self.setup_all()
-            self.dofs.append([np.array(V.dof_count).sum() for V in self.V])
-
-            self.print("\nResulting meshes")
-            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-            for i, c in enumerate(complexities):
-                self.print(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
-            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
-            self.print(msg.format(
-                self.st_complexities[-1],
-                sum(self.num_vertices[n+1])*self.dt_per_mesh,
-                sum(self.num_cells[n+1])*self.dt_per_mesh,
-            ))
-
-            # Check convergence of *all* element counts
-            converged = True
-            for i, num_cells_ in enumerate(self.num_cells[n-1]):
-                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
-                    converged = False
-            if converged:
-                self.print("Converged number of mesh elements!")
+            # Check convergence
+            if not self.minimum_adaptations_met:
+                continue
+            if self.elements_converged:
                 break
 
     def run_dwr(self, **kwargs):
@@ -1798,34 +1741,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Computer Aided Design.
         """
         op = self.op
+        wq = Constant(1.0)  # Quadrature weight
+
+        # Process parameters
         adapt_field = op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
         assert self.approach in ('dwr', 'anisotropic_dwr')
+        assert op.min_adapt < op.max_adapt
         for n in range(op.max_adapt):
             self.outer_iteration = n
 
-            # --- Solve forward to get checkpoints
-
+            # Solve forward to get checkpoints
             self.solve_forward()
 
-            # --- Convergence criteria
-
-            # Check QoI convergence
-            qoi = self.quantity_of_interest()
-            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-            self.qois.append(qoi)
-            if len(self.qois) > 1 and n >= op.min_adapt:
-                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    self.print("Converged quantity of interest!")
-                    break
-
-            # Check maximum number of iterations
-            if n == op.max_adapt - 1:
+            # Check convergence
+            if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
                 break
 
-            # --- Setup problem on enriched space
-
+            # Setup problem on enriched space
             same_mesh = True
             for mesh in self.meshes:
                 if mesh != self.meshes[0]:
@@ -1847,11 +1781,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             ep.outer_iteration = n
             enriched_space = ep.get_function_space(adapt_field)
 
-            # --- Loop over mesh windows *in reverse*
-
+            # Loop over mesh windows *in reverse*
             for i, P1 in enumerate(self.P1):
                 self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
-            metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
             for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 fwd_solutions_step_old = []
@@ -1930,7 +1863,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         w = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
                     else:
                         raise NotImplementedError  # TODO: Other integrators
-                    w *= op.dt*op.dt_per_export
+                    wq.assign(w*op.dt*op.dt_per_export)
 
                     # Prolong forward solution at current and previous timestep
                     tm.prolong(fwd_solutions_step[j], fwd_proj)
@@ -1946,13 +1879,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                     # Time-integrate
                     tmp.project(indicator_enriched)
-                    indicator_enriched_cts += w*tmp
+                    indicator_enriched_cts += wq*tmp
 
                 # Inject into the base space and construct an isotropic metric
                 tm.inject(indicator_enriched_cts, self.indicators[i]['dwr'])
                 self.indicators[i]['dwr'].interpolate(abs(self.indicators[i]['dwr']))  # Ensure +ve
                 if self.approach == 'dwr':
-                    metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
+                    self.metrics[i].assign(isotropic_metric(self.indicators[i]['dwr'], normalise=False))
                 else:
                     raise NotImplementedError  # TODO: anisotropic_dwr
 
@@ -1964,67 +1897,16 @@ class AdaptiveProblem(AdaptiveProblemBase):
             del refined_meshes
             del hierarchy
 
-            # --- Normalise metrics
+            # Normalise metrics
+            self.space_time_normalise()
 
-            if op.debug and op.plot_pvd:
-                metric_file = File(os.path.join(self.di, 'metric_before_normalisation.pvd'))
-                for i, M in enumerate(metrics):
-                    metric_file._topology = None
-                    metric_file.write(M)
+            # Adapt meshes
+            self.adapt_meshes()
 
-            space_time_normalise(metrics, op=op)
-
-            # Output to .pvd and .vtu
-            if op.plot_pvd:
-                self.indicator_file = File(os.path.join(self.di, 'indicator.pvd'))
-                metric_file = File(os.path.join(self.di, 'metric.pvd'))
-            complexities = []
-            for i, M in enumerate(metrics):
-                if op.plot_pvd:
-                    self.indicator_file._topology = None
-                    self.indicator_file.write(self.indicators[i]['dwr'])
-                    metric_file._topology = None
-                    metric_file.write(M)
-                complexities.append(metric_complexity(M))
-            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
-
-            # --- Adapt meshes
-
-            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            for i, M in enumerate(metrics):
-                self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = adapt(self.meshes[i], M)
-            del metrics
-
-            # ---  Setup for next run / logging
-
-            self.set_meshes(self.meshes)
-            self.setup_all()
-            base_space = self.get_function_space(adapt_field)
-            self.dofs.append([np.sum(fs.dof_count) for fs in base_space])
-
-            self.print("\nResulting meshes")
-            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-            for i, c in enumerate(complexities):
-                self.print(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
-            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
-            self.print(msg.format(
-                self.st_complexities[-1],
-                sum(self.num_vertices[n+1])*self.dt_per_mesh,
-                sum(self.num_cells[n+1])*self.dt_per_mesh,
-            ))
-
-            # Ensure minimum number of adaptations met
-            if n < op.min_adapt:
+            # Check convergence
+            if not self.minimum_adaptations_met:
                 continue
-
-            # Check convergence of *all* element counts
-            converged = True
-            for i, num_cells_ in enumerate(self.num_cells[n-1]):
-                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
-                    converged = False
-            if converged:
-                self.print("Converged number of mesh elements!")
+            if self.elements_converged:
                 break
 
     def run_no_dwr(self, **kwargs):
@@ -2045,45 +1927,34 @@ class AdaptiveProblem(AdaptiveProblemBase):
             Computer Aided Design.
         """
         op = self.op
-        dt_per_mesh = self.dt_per_mesh
+        wq = Constant(1.0)  # Quadrature weight
 
         # Process parameters
         adapt_field = op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
         assert self.approach in ('weighted_hessian', 'weighted_gradient')
+        assert op.min_adapt < op.max_adapt
+        hessian_kwargs = dict(normalise=False, enforce_constraints=False)
         for n in range(op.max_adapt):
             self.outer_iteration = n
 
-            # --- Solve forward to get checkpoints
-
+            # Solve forward to get checkpoints
             for i in range(self.num_meshes):
                 self.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
             self.solve_forward()
 
-            # --- Convergence criteria
-
-            # Check QoI convergence
-            qoi = self.quantity_of_interest()
-            self.print("Quantity of interest {:d}: {:.4e}".format(n+1, qoi))
-            self.qois.append(qoi)
-            if len(self.qois) > 1 and n >= op.min_adapt:
-                if np.abs(self.qois[-1] - self.qois[-2]) < op.qoi_rtol*self.qois[-2]:
-                    self.print("Converged quantity of interest!")
-                    break
-
-            # Check maximum number of iterations
-            if n == op.max_adapt - 1:
+            # Check convergence
+            if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
                 break
 
             # --- Loop over mesh windows *in reverse*
 
             for i, P1 in enumerate(self.P1):
                 self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
-            metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
             base_space = self.get_function_space(adapt_field)
             fwd_solutions = self.get_solutions(adapt_field, adjoint=False)
-            hessian_kwargs = dict(normalise=False, enforce_constraints=False)
             for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 fwd_solutions_step_old = []
@@ -2098,7 +1969,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     fwd_solutions_step_old.append(ts.solution_old.copy(deepcopy=True))
                     # TODO: Also need store fields at each export (in general case)
 
-                self.simulation_time = i*op.dt*dt_per_mesh
+                self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
                 self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
@@ -2134,7 +2005,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         w = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
                     else:
                         raise NotImplementedError  # TODO: Other integrators
-                    w *= op.dt*op.dt_per_export
+                    wq.assign(w*op.dt*op.dt_per_export)
+
                     fwd.assign(fwd_solutions_step[j])
                     fwd_old.assign(fwd_solutions_step_old[j])
                     adj.assign(adj_solutions_step[j])
@@ -2151,65 +2023,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                         # Accumulate weighted Hessian  # TODO: Allow for intersection
                         for residual, hessian in zip(strong_residual_cts, hessians):
-                            metrics[i] += w*interpolate(abs(residual)*hessian, self.P1_ten[i])
+                            self.metrics[i] += wq*interpolate(abs(residual)*hessian, self.P1_ten[i])
                     else:
                         raise NotImplementedError  # TODO: weighted gradient
 
-            # --- Normalise metrics
+            # Normalise metrics
+            self.space_time_normalise()
 
-            if op.debug and op.plot_pvd:
-                metric_file = File(os.path.join(self.di, 'metric_before_normalisation.pvd'))
-                for i, M in enumerate(metrics):
-                    metric_file._topology = None
-                    metric_file.write(M)
+            # Adapt meshes
+            self.adapt_meshes()
 
-            space_time_normalise(metrics, op=op)
-
-            # Output to .pvd and .vtu
-            if op.plot_pvd:
-                metric_file = File(os.path.join(self.di, 'metric.pvd'))
-            complexities = []
-            for i, M in enumerate(metrics):
-                if op.plot_pvd:
-                    metric_file._topology = None
-                    metric_file.write(M)
-                complexities.append(metric_complexity(M))
-            self.st_complexities.append(sum(complexities)*op.end_time/op.dt)
-
-            # --- Adapt meshes
-
-            self.print("\nStarting mesh adaptation for iteration {:d}...".format(n+1))
-            for i, M in enumerate(metrics):
-                self.print("Adapting mesh {:d}/{:d}...".format(i+1, self.num_meshes))
-                self.meshes[i] = adapt(self.meshes[i], M)
-            del metrics
-
-            # ---  Setup for next run / logging
-
-            self.set_meshes(self.meshes)
-            self.setup_all()
-            self.dofs.append([np.sum(fs.dof_count) for fs in base_space])
-
-            self.print("\nResulting meshes")
-            msg = "  {:2d}: complexity {:8.1f} vertices {:7d} elements {:7d}"
-            for i, c in enumerate(complexities):
-                self.print(msg.format(i, c, self.num_vertices[n+1][i], self.num_cells[n+1][i]))
-            msg = "  total:            {:8.1f}          {:7d}          {:7d}\n"
-            self.print(msg.format(
-                self.st_complexities[-1],
-                sum(self.num_vertices[n+1])*dt_per_mesh,
-                sum(self.num_cells[n+1])*dt_per_mesh,
-            ))
-
-            # Ensure minimum number of adaptations met
-            if n < op.min_adapt:
+            # Check convergence
+            if not self.minimum_adaptations_met:
                 continue
-
-            # Check convergence of *all* element counts
-            converged = True
-            for i, num_cells_ in enumerate(self.num_cells[n-1]):
-                if np.abs(self.num_cells[n][i] - num_cells_) > op.element_rtol*num_cells_:
-                    converged = False
-            if converged:
-                self.print("Converged number of mesh elements!")
+            if self.elements_converged:
                 break
