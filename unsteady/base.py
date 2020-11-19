@@ -451,14 +451,20 @@ class AdaptiveProblemBase(object):
     def setup_solver_forward_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
-    def free_solver_forward_step(self, i):
-        raise NotImplementedError("To be implemented in derived class")
-
     def setup_solver_adjoint_step(self, i):
         raise NotImplementedError("To be implemented in derived class")
 
+    def free_solver_forward_step(self, i):
+        self.op.print_debug("FREE: Removing forward timesteppers on mesh {:d}...".format(i))
+        self.free_forward_timesteppers_step(i)
+        self.op.print_debug("FREE: Removing forward equations on mesh {:d}...".format(i))
+        self.free_forward_equations_step(i)
+
     def free_solver_adjoint_step(self, i):
-        raise NotImplementedError("To be implemented in derived class")
+        self.op.print_debug("FREE: Removing adjoint timesteppers on mesh {:d}...".format(i))
+        self.free_adjoint_timesteppers_step(i)
+        self.op.print_debug("FREE: Removing adjoint equations on mesh {:d}...".format(i))
+        self.free_adjoint_equations_step(i)
 
     def solve(self, adjoint=False, **kwargs):
         """
@@ -678,6 +684,22 @@ class AdaptiveProblemBase(object):
 
     def get_recovery(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
+
+    def get_strong_residual(self, i, adjoint=False, **kwargs):
+        """
+        Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
+        boolean kwarg.
+        """
+        if adjoint:
+            return self.get_strong_residual_adjoint(i, **kwargs)
+        else:
+            return self.get_strong_residual_forward(i, **kwargs)
+
+    def get_strong_residual_forward(self, i, **kwargs):
+        raise NotImplementedError("Should be implemented in derived class.")
+
+    def get_strong_residual_adjoint(self, i, **kwargs):
+        raise NotImplementedError("Should be implemented in derived class.")
 
     # NOTE: kwargs currently unused
     def run_hessian_based(self, update_forcings=None, export_func=None, save_mesh=True, **kwargs):
