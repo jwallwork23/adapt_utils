@@ -22,7 +22,6 @@ __all__ = ["AdaptiveProblem"]
 # TODO:
 #  * Mesh movement ALE formulation
 #  * Allow mesh dependent Lax-Friedrichs parameter(s)
-#  * Move SU/SUPG parameter computations from equations to here
 
 class AdaptiveProblem(AdaptiveProblemBase):
     """
@@ -844,25 +843,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def free_forward_equations_step(self, i):
         if self.op.solve_swe:
-            self.free_forward_shallow_water_equations_step(i)
+            delattr(self.equations[i], 'shallow_water')
         if self.op.solve_tracer:
-            self.free_forward_tracer_equation_step(i)
+            delattr(self.equations[i], 'tracer')
         if self.op.solve_sediment:
-            self.free_forward_sediment_equation_step(i)
+            delattr(self.equations[i], 'sediment')
         if self.op.solve_exner:
-            self.free_forward_exner_equation_step(i)
-
-    def free_forward_shallow_water_equations_step(self, i):
-        delattr(self.equations[i], 'shallow_water')
-
-    def free_forward_tracer_equation_step(self, i):
-        delattr(self.equations[i], 'tracer')
-
-    def free_forward_sediment_equation_step(self, i):
-        delattr(self.equations[i], 'sediment')
-
-    def free_forward_exner_equation_step(self, i):
-        delattr(self.equations[i], 'exner')
+            delattr(self.equations[i], 'exner')
 
     def create_adjoint_equations_step(self, i):
         if self.op.solve_swe:
@@ -911,25 +898,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def free_adjoint_equations_step(self, i):
         if self.op.solve_swe:
-            self.free_adjoint_shallow_water_equations_step(i)
+            delattr(self.equations[i], 'adjoint_shallow_water')
         if self.op.solve_tracer:
-            self.free_adjoint_tracer_equation_step(i)
+            delattr(self.equations[i], 'adjoint_tracer')
         if self.op.solve_sediment:
-            self.free_adjoint_sediment_equation_step(i)
+            delattr(self.equations[i], 'adjoint_sediment')
         if self.op.solve_exner:
-            self.free_adjoint_exner_equation_step(i)
-
-    def free_adjoint_shallow_water_equations_step(self, i):
-        delattr(self.equations[i], 'adjoint_shallow_water')
-
-    def free_adjoint_tracer_equation_step(self, i):
-        delattr(self.equations[i], 'adjoint_tracer')
-
-    def free_adjoint_sediment_equation_step(self, i):
-        raise NotImplementedError("Continuous adjoint sediment equation not implemented")
-
-    def free_adjoint_exner_equation_step(self, i):
-        raise NotImplementedError("Continuous adjoint Exner equation not implemented")
+            delattr(self.equations[i], 'adjoint_exner')
 
     # --- Error estimators
 
@@ -1139,25 +1114,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def free_forward_timesteppers_step(self, i):
         if self.op.solve_swe:
-            self.free_forward_shallow_water_timestepper_step(i)
+            delattr(self.timesteppers[i], 'shallow_water')
         if self.op.solve_tracer:
-            self.free_forward_tracer_timestepper_step(i)
+            delattr(self.timesteppers[i], 'tracer')
         if self.op.solve_sediment:
-            self.free_forward_sediment_timestepper_step(i)
+            delattr(self.timesteppers[i], 'sediment')
         if self.op.solve_exner:
-            self.free_forward_exner_timestepper_step(i)
-
-    def free_forward_shallow_water_timestepper_step(self, i):
-        delattr(self.timesteppers[i], 'shallow_water')
-
-    def free_forward_tracer_timestepper_step(self, i):
-        delattr(self.timesteppers[i], 'tracer')
-
-    def free_forward_sediment_timestepper_step(self, i):
-        delattr(self.timesteppers[i], 'sediment')
-
-    def free_forward_exner_timestepper_step(self, i):
-        delattr(self.timesteppers[i], 'exner')
+            delattr(self.timesteppers[i], 'exner')
 
     def create_adjoint_timesteppers_step(self, i):
         if i == self.num_meshes-1:
@@ -1224,25 +1187,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def free_adjoint_timesteppers_step(self, i):
         if self.op.solve_swe:
-            self.free_adjoint_shallow_water_timestepper_step(i)
+            delattr(self.timesteppers[i], 'adjoint_shallow_water')
         if self.op.solve_tracer:
-            self.free_adjoint_tracer_timestepper_step(i)
+            delattr(self.timesteppers[i], 'adjoint_tracer')
         if self.op.solve_sediment:
-            self.free_adjoint_sediment_timestepper_step(i)
+            delattr(self.timesteppers[i], 'adjoint_sediment')
         if self.op.solve_exner:
-            self.free_adjoint_exner_timestepper_step(i)
-
-    def free_adjoint_shallow_water_timestepper_step(self, i):
-        delattr(self.timesteppers[i], 'adjoint_shallow_water')
-
-    def free_adjoint_tracer_timestepper_step(self, i):
-        delattr(self.timesteppers[i], 'adjoint_tracer')
-
-    def free_adjoint_sediment_timestepper_step(self, i):
-        raise NotImplementedError("Continuous adjoint sediment timestepping not implemented")
-
-    def free_adjoint_exner_timestepper_step(self, i):
-        raise NotImplementedError("Continuous adjoint Exner timestepping not implemented")
+            delattr(self.timesteppers[i], 'adjoint_exner')
 
     # --- Solvers
 
@@ -1311,13 +1262,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             ts.solver = NonlinearVariationalSolver(prob, solver_parameters=ts.solver_parameters, options_prefix="forward_exner")
         op.print_debug("SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i)
-
-    def free_solver_forward_step(self, i):
-        op = self.op
-        op.print_debug("FREE: Removing forward timesteppers on mesh {:d}...".format(i))
-        self.free_forward_timesteppers_step(i)
-        op.print_debug("FREE: Removing forward equations on mesh {:d}...".format(i))
-        self.free_forward_equations_step(i)
 
     def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False):
         """
@@ -1502,13 +1446,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if op.solve_exner:
             raise NotImplementedError
 
-    def free_solver_adjoint_step(self, i):
-        op = self.op
-        op.print_debug("FREE: Removing adjoint timesteppers on mesh {:d}...".format(i))
-        self.free_adjoint_timesteppers_step(i)
-        op.print_debug("FREE: Removing adjoint equations on mesh {:d}...".format(i))
-        self.free_adjoint_equations_step(i)
-
     def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.
@@ -1617,6 +1554,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
         update_forcings(self.simulation_time - op.dt)
         self.print(80*'=')
 
+    # --- Error estimation
+
+    def get_strong_residual_forward(self, i, **kwargs):
+        ts = self.timesteppers[i][kwargs.get('adapt_field', self.op.adapt_field)]
+        strong_residual = ts.error_estimator.strong_residual
+
+        # Project into P1 space
+        return [project(res, self.P1[i]) for res in list(strong_residual)]
+
+    def get_strong_residual_adjoint(self, i, **kwargs):
+        raise NotImplementedError  # TODO
+
     # --- Metric
 
     def recover_hessian_metrics(self, i, adjoint=False, **kwargs):
@@ -1644,7 +1593,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def get_recovery(self, i, **kwargs):
         op = self.op
-        if (not op.solve_swe) or op.solve_tracer or op.solve_sediment or op.solve_exner:
+        if op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
             raise NotImplementedError  # TODO: allow Hessians of tracer fields, etc.
         if op.approach == 'vorticity':  # TODO: Use recoverer stashed in callback
             recoverer = L2ProjectorVorticity(self.V[i], op=op)
@@ -1656,6 +1605,36 @@ class AdaptiveProblem(AdaptiveProblemBase):
         return recoverer
 
     # --- Run scripts
+
+    def run(self, **kwargs):
+        """
+        Run simulation using mesh adaptation approach specified by `self.approach`.
+
+        For metric-based approaches, a fixed point iteration loop is used.
+        """
+        run_scripts = {
+
+            # Non-adaptive
+            'fixed_mesh': self.solve_forward,
+
+            # Metric-based using forward solution fields
+            'hessian': self.run_hessian_based,
+            'vorticity': self.run_hessian_based,  # TODO: Change name and update docs
+
+            # Metric-based using forward *and* adjoint solution fields
+            'dwp': self.run_dwp,
+
+            # Metric-based goal-oriented using DWR
+            'dwr': self.run_dwr,
+            'anisotropic_dwr': self.run_dwr,  # TODO: Unsteady case
+
+            # Metric-based goal-oriented *not* using DWR
+            'weighted_hessian': self.run_no_dwr,
+            'weighted_gradient': self.run_no_dwr,  # TODO: Unsteady case
+        }
+        if self.approach not in run_scripts:
+            raise ValueError("Approach '{:s}' not recognised".format(self.approach))
+        run_scripts[self.approach](**kwargs)
 
     def run_dwp(self, **kwargs):  # TODO: Modify indicator for time interval
         r"""
@@ -1806,56 +1785,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if converged:
                 self.print("Converged number of mesh elements!")
                 break
-
-    def run(self, **kwargs):
-        """
-        Run simulation using mesh adaptation approach specified by `self.approach`.
-
-        For metric-based approaches, a fixed point iteration loop is used.
-        """
-        run_scripts = {
-
-            # Non-adaptive
-            'fixed_mesh': self.solve_forward,
-
-            # Metric-based using forward solution fields
-            'hessian': self.run_hessian_based,
-            'vorticity': self.run_hessian_based,  # TODO: Change name and update docs
-
-            # Metric-based using forward *and* adjoint solution fields
-            'dwp': self.run_dwp,
-
-            # Metric-based goal-oriented using DWR
-            'dwr': self.run_dwr,
-            'anisotropic_dwr': self.run_dwr,  # TODO: Unsteady case
-
-            # Metric-based goal-oriented *not* using DWR
-            'weighted_hessian': self.run_no_dwr,
-            'weighted_gradient': self.run_no_dwr,  # TODO: Unsteady case
-        }
-        if self.approach not in run_scripts:
-            raise ValueError("Approach '{:s}' not recognised".format(self.approach))
-        run_scripts[self.approach](**kwargs)
-
-    def get_strong_residual(self, i, adjoint=False, **kwargs):
-        """
-        Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
-        boolean kwarg.
-        """
-        if adjoint:
-            return self.get_strong_residual_adjoint(i, **kwargs)
-        else:
-            return self.get_strong_residual_forward(i, **kwargs)
-
-    def get_strong_residual_forward(self, i, **kwargs):
-        ts = self.timesteppers[i][kwargs.get('adapt_field', self.op.adapt_field)]
-        strong_residual = ts.error_estimator.strong_residual
-
-        # Project into P1 space
-        return [project(res, self.P1[i]) for res in list(strong_residual)]
-
-    def get_strong_residual_adjoint(self, i, **kwargs):
-        raise NotImplementedError  # TODO
 
     def run_dwr(self, **kwargs):
         """
