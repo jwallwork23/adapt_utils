@@ -1597,16 +1597,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def get_strong_residual_forward(self, i, **kwargs):
         ts = self.get_timestepper(i, self.op.adapt_field)
         strong_residual = ts.error_estimator.strong_residual
-
-        # Project into P1 space
-        return [project(res, self.P1[i]) for res in list(strong_residual)]
+        return [project(res, self.P1[i]) for res in list(strong_residual)]  # Project into P1 space
 
     def get_strong_residual_adjoint(self, i, **kwargs):
         raise NotImplementedError  # TODO
 
     # --- Metric
 
-    def recover_hessian_metrics(self, i, adjoint=False, **kwargs):
+    def recover_hessian_metrics(self, i, adjoint=False, **kwargs):  # TODO: USEME
         op = self.op
         kwargs.setdefault('normalise', True)
         kwargs['op'] = op
@@ -2011,7 +2009,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Arrays to hold Hessians for each field on each window
             self._H_windows = [[[
-                self.minimum_metric(i) for j in range(self.export_per_mesh)]
+                self.maximum_metric(i) for j in range(self.export_per_mesh)]
                 for i in range(self.num_meshes)]
                 for f in adapt_fields
             ]
@@ -2047,12 +2045,20 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 ts.solution_old.assign(self.get_solutions(op.adapt_field)[i])
                 # TODO: Should assign *previous* value from *previous* mesh
 
-                # Create double L2 projection operator which will be repeatedly used
-                recoverer = self.get_recovery(i, **hessian_kwargs)
+                if op.adapt_field == 'tracer' and op.stabilisation_tracer == 'SUPG':
+                    # Cannot repeatedly project because we are not projecting a Function
 
-                def hessian(sol, adapt_field):
-                    fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
-                    return recoverer.construct_metric(sol, **fields, **hessian_kwargs)
+                    def hessian(sol, adapt_field):
+                        assert adapt_field == 'tracer'
+                        return self.recover_hessian_metrics(i, adjoint=True, **hessian_kwargs)[0]
+
+                else:
+                    # Create double L2 projection operator which will be repeatedly used
+                    recoverer = self.get_recovery(i, **hessian_kwargs)
+
+                    def hessian(sol, adapt_field):
+                        fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
+                        return recoverer.construct_metric(sol, **fields, **hessian_kwargs)
 
                 def export_func_wrapper():
                     export_func()
@@ -2096,13 +2102,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                     # Combine as appropriate
                     for f, field in enumerate(adapt_fields):
-                        H = hessian(adj_solutions[i], field)
+                        H = hessian(adj_solutions[i], field)  # TODO: Account for SUPG tracer
                         if field == 'bathymetry':  # TODO: account for non-fixed bathymetry
                             self._H_windows[f][i][j] = H
                         elif op.hessian_time_combination == 'integrate':
                             self._H_windows[f][i][j] += wq*H
                         else:
-                            self._H_windows[f][i][j] = H if first_ts else metric_intersection(H, self._H_windows[f][i][j])
+                            self._H_windows[f][i][j] = metric_intersection(H, self._H_windows[f][i][j])
                     self.counter += 1
 
                 def export_func():
