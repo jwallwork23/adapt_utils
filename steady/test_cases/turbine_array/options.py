@@ -21,11 +21,11 @@ class TurbineArrayOptions(SteadyTurbineOptions):
     num_turbines = PositiveInteger(2).tag(config=False)
 
     # Domain specification
-    mesh_file = os.path.join(os.path.dirname(__file__), 'resources', 'meshes', 'xcoarse_{:d}.msh')
+    mesh_dir = os.path.join(os.path.dirname(__file__), 'resources', 'meshes')
     domain_length = PositiveFloat(1200.0).tag(config=False)
     domain_width = PositiveFloat(500.0).tag(config=False)
 
-    def __init__(self, level=0, offset=0, separation=8, generate_geo=False, **kwargs):
+    def __init__(self, level=0, offset=0, separation=8, meshgen=False, **kwargs):
         """
         :kwarg level: number of iso-P2 refinements to apply to the base mesh.
         :kwarg offset: offset of the turbines to the south and north in terms of turbine diameters.
@@ -56,23 +56,19 @@ class TurbineArrayOptions(SteadyTurbineOptions):
         assert len(self.region_of_interest) == self.num_turbines
 
         # Gmsh specification
-        outer_res = 40.0
-        inner_res = 8.0
-        self.resolution = {'xcoarse': {'outer': outer_res, 'inner': inner_res}}  # TODO: needed?
-        for res in ('coarse', 'medium', 'fine', 'xfine'):
-            self.resolution[res] = {'outer': outer_res, 'inner': inner_res}
-            outer_res /= 2
-            inner_res /= 2
-        if generate_geo:
+        self.base_outer_res = 40.0
+        self.base_inner_res = 8.0
+        self.mesh_file = 'channel_{:d}_{:d}.msh'.format(level, self.offset)
+        self.mesh_file = os.path.join(self.mesh_dir, self.mesh_file)
+        if meshgen:
             return
 
         # Domain and mesh
-        self.mesh_path = os.path.join(os.path.dirname(__file__), self.mesh_file.format(self.offset))
-        if os.path.exists(self.mesh_path):
-            self.default_mesh = Mesh(self.mesh_path)
-        if level > 0:
-            self.hierarchy = MeshHierarchy(self.default_mesh, level)
-            self.default_mesh = self.hierarchy[-1]
+        if os.path.isfile(self.mesh_file):
+            self.default_mesh = Mesh(self.mesh_file)
+        # if level > 0:
+        #     self.hierarchy = MeshHierarchy(self.default_mesh, level)
+        #     self.default_mesh = self.hierarchy[-1]
 
         # Solver parameters and discretisation
         self.family = 'dg-cg'
