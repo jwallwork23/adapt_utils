@@ -21,7 +21,7 @@ args = parser.parse_args()
 # Set parameters
 kwargs = {
     'approach': 'fixed_mesh',
-    'level': int(args.level or 1),
+    'level': int(args.level or 2),
     'box': True,
     'plot_pvd': True,
     'debug': False if args.debug == "0" else True,
@@ -41,10 +41,10 @@ op.update({
     'end_time': 600.0,
 
     # Crank down viscosity and plot vorticity
-    'base_viscosity': 0.00005,
+    'base_viscosity': 1.0e-05,
     'characteristic_velocity': Constant(op.inflow_velocity),
     'grad_depth_viscosity': True,
-    'max_reynolds_number': 10000.0,
+    'max_reynolds_number': 5.0e+05,
     'recover_vorticity': True,
 
     # Only consider the first turbine
