@@ -702,12 +702,12 @@ class AdaptiveProblemBase(object):
 
     # --- Metric based
 
-    def minimum_metric(self, i):
+    def maximum_metric(self, i):
         """
-        Get an isotropic metric with the minimum prescribed sizes.
+        Get an isotropic metric with the maximum prescribed sizes.
         """
         I = Identity(self.dim)
-        return interpolate(Constant(pow(self.op.h_min, -2))*I, self.P1_ten[i])
+        return interpolate(Constant(pow(self.op.h_max, -2))*I, self.P1_ten[i])
 
     def get_recovery(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
