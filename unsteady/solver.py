@@ -1310,9 +1310,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Exports and callbacks
         self.print(80*'=')
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
-        # update_forcings(self.simulation_time)
         export_func = export_func or self.op.get_export_func(self, i)
         if i == 0 or export_initial:
+            update_forcings(self.simulation_time)  # TODO: CHECK
             if export_func is not None:
                 export_func()
             self.callbacks[i].evaluate(mode='export')
@@ -1476,7 +1476,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         self.add_callbacks(i, adjoint=True)
 
-    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, **kwargs):
+    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False, **kwargs):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.
 
@@ -1501,11 +1501,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Exports and callbacks
         self.print(80*'=')
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
-        # update_forcings(self.simulation_time)
         export_func = export_func or self.op.get_export_func(self, i)
-        if export_func is not None:
+        if export_initial:
+            update_forcings(self.simulation_time)
             export_func()
-            self.callbacks[i].evaluate(mode='export_adjoint')
+        self.callbacks[i].evaluate(mode='export_adjoint')
 
         # Print time to screen
         op.print_debug("SOLVE: Entering forward timeloop on mesh {:d}...".format(i))
@@ -2008,11 +2008,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         for n in range(op.max_adapt):
             self.outer_iteration = n
             export_func_wrapper = None
-            update_forcings_wrapper = None
-            fwd_solutions = self.get_solutions(op.adapt_field, adjoint=False)
 
             # Arrays to hold Hessians for each field on each window
-            self._H_windows = [[[] for P1_ten in self.P1_ten] for f in adapt_fields]
+            self._H_windows = [[[
+                self.minimum_metric(i) for j in range(self.export_per_mesh)]
+                for i in range(self.num_meshes)]
+                for f in adapt_fields
+            ]
 
             # Solve forward to get checkpoints
             for i in range(self.num_meshes):
@@ -2050,9 +2052,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
                     return recoverer.construct_metric(sol, **fields, **hessian_kwargs)
 
-                # Array to hold time-integrated Hessian UFL expression
-                H_window = [self.minimum_metric(i) for f in adapt_fields]
-
                 def export_func_wrapper():
                     export_func()
                     fwd_solutions_step.append(ts.solution.copy(deepcopy=True))
@@ -2064,7 +2063,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     'export_func': export_func_wrapper,
                     'update_forcings': update_forcings,
                     'plot_pvd': False,
-                    'export_initial': True,  # NOTE: May cause issues in adjoint?
+                    'export_initial': True,
                 }
                 self.solve_forward_step(i, **solve_kwargs)
 
@@ -2072,17 +2071,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint_step(i)
+                self.counter = 0
 
                 def update_forcings(t):
                     """
                     Time-combine Hessians according to :attr:`op.hessian_time_combination` and
                     the time integrator.
                     """
-                    iteration = int(np.round(self.simulation_time/op.dt))
-                    if iteration % op.hessian_timestep_lag != 0:
+                    if self.iteration % op.hessian_timestep_lag != 0:
                         return
-                    first_ts = iteration == i*dt_per_mesh
-                    final_ts = iteration == (i+1)*dt_per_mesh
+                    first_ts = self.iteration == i*dt_per_mesh
+                    final_ts = self.iteration == (i+1)*dt_per_mesh
+                    j = self.counter
 
                     # Get quadrature weights
                     if op.hessian_time_combination == 'integrate':
@@ -2093,40 +2093,40 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         wq.assign(w*op.dt*op.hessian_timestep_lag)
 
                     # Combine as appropriate
-                    for j, f in enumerate(adapt_fields):
-                        H = hessian(adj_solutions[i], f)
-                        if f == 'bathymetry':  # TODO: account for non-fixed bathymetry
-                            H_window[j] = H
+                    for f, field in enumerate(adapt_fields):
+                        H = hessian(adj_solutions[i], field)
+                        if field == 'bathymetry':  # TODO: account for non-fixed bathymetry
+                            self._H_windows[f][i][j] = H
                         elif op.hessian_time_combination == 'integrate':
-                            H_window[j] += wq*H
+                            self._H_windows[f][i][j] += wq*H
                         else:
-                            H_window[j] = H if first_ts else metric_intersection(H, H_window[j])
+                            self._H_windows[f][i][j] = H if first_ts else metric_intersection(H, self._H_windows[f][i][j])
+                    self.counter += 1
 
                 def export_func():
                     """
                     Extract time-combined Hessians.
                     """
-                    adj = adj_solutions[i].copy(deepcopy=True)
-                    for j, H in enumerate(H_window):
-                        if op.hessian_time_combination == 'intersect':
-                            H_window[j] *= op.dt*dt_per_mesh
-                        self._H_windows[j][i].append(interpolate(H_window[j], self.P1_ten[i]))
-                        H_window[j] = self.minimum_metric(i)
+                    if op.hessian_time_combination == 'intersect':
+                        for f in range(len(adapt_fields)):
+                            self._H_windows[f][i][-1] *= op.dt*dt_per_mesh
 
                 # Solve step for current mesh iteration
                 solve_kwargs = {
                     'export_func': export_func,
                     'update_forcings': update_forcings,
                     'plot_pvd': op.plot_pvd,
+                    'export_initial': False,
                 }
                 self.solve_adjoint_step(i, **solve_kwargs)
+                for f in range(len(adapt_fields)):
+                    self._H_windows[f][i] = list(reversed(self._H_windows[f][i]))
 
                 # --- Assemble indicators and metrics
 
                 # Setup error estimator
                 fwd = Function(base_space[i])
                 fwd_old = Function(base_space[i])
-                adj = Function(base_space[i])
                 ts.setup_strong_residual(fwd, fwd_old)
 
                 # Loop over exported timesteps
@@ -2138,26 +2138,27 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 for j in range(len(fwd_solutions_step)):
                     fwd.assign(fwd_solutions_step[j])
                     fwd_old.assign(fwd_solutions_step_old[j])
-                    fwd_solutions[i].assign(fwd)
+                    # fwd_solutions[i].assign(fwd)
 
                     # Weight Hessians
                     strong_residual_cts = self.get_strong_residual(i)
                     assert len(strong_residual_cts) == len(adapt_fields)
-                    for residual, field in zip(strong_residual_cts, range(len(adapt_fields))):
-                        self._H_windows[field][i][j].interpolate(
-                                abs(residual)*self._H_windows[field][i][j]
-                        )
+                    for residual, f in zip(strong_residual_cts, range(len(adapt_fields))):
+                        self._H_windows[f][i][j].interpolate(
+                            abs(residual)*self._H_windows[f][i][j]
+                        )  # FIXME: residual is O(10^8), but H[0][0] is O(10^{-4}) -> it dominates
 
                 # Combine metrics over exports for each field
-                kwargs = dict(average=not '__int__' in op.adapt_field)
-                for field in range(len(adapt_fields)):
-                    self._H_windows[field][i] = combine_metrics(*self._H_windows[field][i], **kwargs)
+                kwargs = dict(average='__int__' not in op.adapt_field)
+                for f in range(len(adapt_fields)):
+                    self._H_windows[f][i] = combine_metrics(*self._H_windows[f][i], **kwargs)
 
                 # Delete objects to free memory
                 self.free_solver_forward_step(i)
                 self.free_solver_adjoint_step(i)
 
             # Normalise metrics
+            self.plot_metrics(normalised=False, hessians=True)
             for H_window in self._H_windows:
                 space_time_normalise(H_window, op=op)
 

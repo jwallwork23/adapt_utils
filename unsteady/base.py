@@ -63,6 +63,7 @@ class AdaptiveProblemBase(object):
         except AssertionError:
             msg = "Timesteps per export {:d} should divide timesteps per mesh iteration {:d}."
             raise ValueError(msg.format(op.dt_per_export, self.dt_per_mesh))
+        self.export_per_mesh = self.dt_per_mesh//op.dt_per_export + 1
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
@@ -711,22 +712,27 @@ class AdaptiveProblemBase(object):
     def get_recovery(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
 
-    def plot_metrics(self, normalised=True):
+    def plot_metrics(self, normalised=True, hessians=False):
         """
         Plot all :attr:`metrics`.
         """
         if not self.op.plot_pvd:
             return
-        fname = 'metric'
-        if not normalised:
-            if not self.op.debug:
-                return
-            fname += '_before_normalisation'
-        fname += '.pvd'
-        metric_file = File(os.path.join(self.di, fname))
-        for i, M in enumerate(self.metrics):
-            metric_file._topology = None
-            metric_file.write(M)
+        if hessians:
+            assert hasattr(self, '_H_windows')
+            fnames = ['metric_{:d}'.format(i) for i in range(len(self._H_windows))]
+        else:
+            fnames = ['metric']
+        for fname in fnames:
+            if not normalised:
+                if not self.op.debug:
+                    return
+                fname += '_before_normalisation'
+            fname += '.pvd'
+            metric_file = File(os.path.join(self.di, fname))
+            for i, M in enumerate(self.metrics):
+                metric_file._topology = None
+                metric_file.write(M)
 
     def space_time_normalise(self):
         """
@@ -869,11 +875,10 @@ class AdaptiveProblemBase(object):
                     the time integrator.
                     """
                     update_forcings(t)
-                    iteration = int(np.round(self.simulation_time/op.dt))
-                    if iteration % op.hessian_timestep_lag != 0:
+                    if self.iteration % op.hessian_timestep_lag != 0:
                         return
-                    first_ts = iteration == i*dt_per_mesh
-                    final_ts = iteration == (i+1)*dt_per_mesh
+                    first_ts = self.iteration == i*dt_per_mesh
+                    final_ts = self.iteration == (i+1)*dt_per_mesh
 
                     # Get quadrature weights
                     if op.hessian_time_integration == 'integrate':
@@ -884,14 +889,14 @@ class AdaptiveProblemBase(object):
                         wq.assign(w*op.dt*op.hessian_timestep_lag)
 
                     # Combine as appropriate
-                    for j, f in enumerate(adapt_fields):
-                        H = hessian(fwd_solutions[i], f)
-                        if f == 'bathymetry':  # TODO: account for non-fixed bathymetry
-                            H_window[j] = H
+                    for f, field in enumerate(adapt_fields):
+                        H = hessian(fwd_solutions[i], field)
+                        if field == 'bathymetry':  # TODO: account for non-fixed bathymetry
+                            H_window[f] = H
                         elif op.hessian_time_combination == 'integrate':
-                            H_window[j] += wq*H
+                            H_window[f] += wq*H
                         else:
-                            H_window[j] = H if first_ts else metric_intersection(H, H_window[j])
+                            H_window[f] = H if first_ts else metric_intersection(H, H_window[f])
 
                 def export_func_wrapper():
                     """
@@ -911,6 +916,7 @@ class AdaptiveProblemBase(object):
                     'export_func': export_func_wrapper,
                     'update_forcings': update_forcings_wrapper,
                     'plot_pvd': op.plot_pvd,
+                    'export_initial': False,
                 }
                 self.solve_forward_step(i, **solve_kwargs)
 

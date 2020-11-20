@@ -28,7 +28,7 @@ def recover_hessian_metric(sol, **kwargs):
     return rec.construct_metric(sol, **kwargs)
 
 
-class ShallowWaterHessianRecoverer():
+class ShallowWaterHessianRecoverer(object):
     """
     Class which allows the repeated recovery of Hessians for shallow water problems.
 
