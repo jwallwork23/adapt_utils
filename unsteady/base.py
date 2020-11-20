@@ -701,6 +701,13 @@ class AdaptiveProblemBase(object):
 
     # --- Metric based
 
+    def minimum_metric(self, i):
+        """
+        Get an isotropic metric with the minimum prescribed sizes.
+        """
+        I = Identity(self.dim)
+        return interpolate(Constant(pow(self.op.h_min, -2))*I, self.P1_ten[i])
+
     def get_recovery(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
 
@@ -773,7 +780,28 @@ class AdaptiveProblemBase(object):
             self.print("  mesh {:2d}: vertices {:7d} elements {:7d}".format(i, nv, nc))
         self.print("\n")
 
-    def run_hessian_based(self, update_forcings=None, export_func=None, **kwargs):
+    def combine_over_windows(self, adapt_fields):
+        """
+        Given a number of Hessians on each mesh, combine according to `adapt_fields`.
+        """
+        if not hasattr(self, '_H_windows'):
+            raise ValueError("Cannot combine Hessian metrics if they do not exist!")
+        self.metrics = [Function(P1_ten, name="Hessian metric") for P1_ten in self.P1_ten]
+        for i in range(self.num_meshes):
+            H_window = [self._H_windows[j][i] for j in range(len(adapt_fields))]
+            if 'int' in self.op.adapt_field:
+                if 'avg' in self.op.adapt_field:
+                    msg = "Simultaneous intersection and averaging not supported"
+                    raise NotImplementedError(msg)
+                self.metrics[i].assign(metric_intersection(*H_window))
+            elif 'avg' in self.op.adapt_field:
+                self.metrics[i].assign(metric_average(*H_window))
+            elif len(adapt_fields) == 1:
+                self.metrics[i].assign(H_window[0])
+            else:
+                raise ValueError("adapt_field '{:s}' not recognised".format(self.op.adapt_field))
+
+    def run_hessian_based(self, **kwargs):
         """
         Adaptation loop for Hessian based approach.
 
@@ -797,7 +825,9 @@ class AdaptiveProblemBase(object):
             in the sequence.
         """
         op = self.op
+        wq = Constant(1.0)  # Quadrature weight
         dt_per_mesh = self.dt_per_mesh
+        assert self.approach == 'hessian'
 
         # Process parameters
         if op.adapt_field in ('all_avg', 'all_int'):
@@ -810,18 +840,15 @@ class AdaptiveProblemBase(object):
         hessian_kwargs = dict(normalise=False, enforce_constraints=False)
         for n in range(op.max_adapt):
             self.outer_iteration = n
-            export_func_wrapper = None
-            update_forcings_wrapper = None
             fwd_solutions = self.get_solutions(op.adapt_field, adjoint=False)
 
             # Arrays to hold Hessians for each field on each window
-            H_windows = [[Function(P1_ten) for P1_ten in self.P1_ten] for f in adapt_fields]
+            self._H_windows = [[Function(P1_ten) for P1_ten in self.P1_ten] for f in adapt_fields]
 
-            # Loop over meshes
+            # Solve forward, accumulating Hessians
             for i in range(self.num_meshes):
-                update_forcings = update_forcings or op.get_update_forcings(self, i, adjoint=False)
-                export_func = export_func or op.get_export_func(self, i)
-
+                update_forcings = op.get_update_forcings(self, i, adjoint=False)
+                export_func = op.get_export_func(self, i)
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
@@ -838,39 +865,46 @@ class AdaptiveProblemBase(object):
 
                 def update_forcings_wrapper(t):
                     """
-                    Time-integrate Hessian using Trapezium Rule.
+                    Time-combine Hessians according to :attr:`op.hessian_time_combination` and
+                    the time integrator.
                     """
-                    if op.timestepper != 'CrankNicolson':
-                        raise NotImplementedError  # TODO: Other timesteppers
                     update_forcings(t)
                     iteration = int(np.round(self.simulation_time/op.dt))
                     if iteration % op.hessian_timestep_lag != 0:
-                        iteration += 1
                         return
                     first_ts = iteration == i*dt_per_mesh
                     final_ts = iteration == (i+1)*dt_per_mesh
-                    dt = op.dt*op.hessian_timestep_lag
+
+                    # Get quadrature weights
+                    if op.hessian_time_integration == 'integrate':
+                        if op.timestepper == 'CrankNicolson':
+                            w = 0.5 if first_ts or final_ts else 1.0
+                        else:
+                            raise NotImplementedError  # TODO: Other timesteppers
+                        wq.assign(w*op.dt*op.hessian_timestep_lag)
+
+                    # Combine as appropriate
                     for j, f in enumerate(adapt_fields):
                         H = hessian(fwd_solutions[i], f)
-                        if f == 'bathymetry':
+                        if f == 'bathymetry':  # TODO: account for non-fixed bathymetry
                             H_window[j] = H
                         elif op.hessian_time_combination == 'integrate':
-                            H_window[j] += (0.5 if first_ts or final_ts else 1.0)*dt*H
+                            H_window[j] += wq*H
                         else:
                             H_window[j] = H if first_ts else metric_intersection(H, H_window[j])
 
                 def export_func_wrapper():
                     """
-                    Extract time-averaged Hessian.
+                    Extract time-combined Hessians.
 
-                    NOTE: We only care about the final export in each mesh iteration
+                    NOTE: We only care about the final export in each mesh iteration.
                     """
                     export_func()
-                    if np.allclose(self.simulation_time, (i+1)*op.dt*dt_per_mesh):
+                    if np.isclose(self.simulation_time, (i+1)*op.dt*dt_per_mesh):
                         for j, H in enumerate(H_window):
                             if op.hessian_time_combination == 'intersect':
                                 H_window[j] *= op.dt*dt_per_mesh
-                            H_windows[j][i].interpolate(H_window[j])
+                            self._H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
                 solve_kwargs = {
@@ -882,36 +916,17 @@ class AdaptiveProblemBase(object):
 
                 # Delete objects to free memory
                 self.free_solver_forward_step(i)
-                H_window = None
-                recoverer = None
-                export_func = None
-                update_forcings = None
 
             # Check convergence
             if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
                 break
 
             # Normalise metrics
-            for j in range(len(adapt_fields)):
-                space_time_normalise(H_windows[j], op=op)
+            for H_window in self._H_windows:
+                space_time_normalise(H_window, op=op)
 
-            # Combine metrics (if appropriate)
-            self.metrics = [Function(P1_ten, name="Hessian metric") for P1_ten in self.P1_ten]
-            for i in range(self.num_meshes):
-                H_window = [H_windows[j][i] for j in range(len(adapt_fields))]
-                if 'int' in op.adapt_field:
-                    if 'avg' in op.adapt_field:
-                        msg = "Simultaneous intersection and averaging not supported"
-                        raise NotImplementedError(msg)
-                    self.metrics[i].assign(metric_intersection(*H_window))
-                elif 'avg' in op.adapt_field:
-                    self.metrics[i].assign(metric_average(*H_window))
-                elif len(adapt_fields) == 1:
-                    self.metrics[i].assign(H_window[0])
-                else:
-                    raise ValueError("adapt_field '{:s}' not recognised".format(op.adapt_field))
-            H_window = None
-            H_windows = [[None for P1_ten in self.P1_ten] for f in adapt_fields]
+            # Combine metrics
+            self.combine_over_windows(adapt_fields)
             self.plot_metrics(normalised=True)
             self.log_complexities()
 
