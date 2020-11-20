@@ -1,4 +1,8 @@
-all: dir clean geo base_mesh uniform table adapt plot screenshot
+all: base uniform table adapt plot screenshot
+
+base: dir clean base_geo base_mesh
+
+box: box_geo box_mesh
 
 adapt: isotropic anisotropic
 
@@ -26,11 +30,22 @@ clean:
 
 # --- Initial meshes
 
-geo:
-	@echo "Generating geometry files..."
+base_geo:
+	@echo "Generating base geometry files..."
 	@python3 meshgen.py 0 0
 	@python3 meshgen.py 0 1
 	@python3 meshgen.py 0 2
+
+box_geo:
+	@echo "Generating refined box geometry files..."
+	@python3 meshgen.py 0 0 -dx_refined 1
+	@python3 meshgen.py 1 0 -dx_refined 1
+	@python3 meshgen.py 2 0 -dx_refined 1
+	@python3 meshgen.py 3 0 -dx_refined 1
+	@python3 meshgen.py 4 0 -dx_refined 1
+
+geo: base_geo
+	@echo "Generating other geometry files..."
 	@python3 meshgen.py 1 0
 	@python3 meshgen.py 1 1
 	@python3 meshgen.py 1 2
@@ -50,11 +65,16 @@ base_mesh:
 	@gmsh -2 resources/meshes/channel_0_1.geo
 	@gmsh -2 resources/meshes/channel_0_2.geo
 
-mesh:
-	@echo "Generating all meshes..."
-	@gmsh -2 resources/meshes/channel_0_0.geo
-	@gmsh -2 resources/meshes/channel_0_1.geo
-	@gmsh -2 resources/meshes/channel_0_2.geo
+box_mesh:
+	@echo "Generating refined box meshes..."
+	@gmsh -2 resources/meshes/channel_refined_0.geo
+	@gmsh -2 resources/meshes/channel_refined_1.geo
+	@gmsh -2 resources/meshes/channel_refined_2.geo
+	@gmsh -2 resources/meshes/channel_refined_3.geo
+	@gmsh -2 resources/meshes/channel_refined_4.geo
+
+mesh: base_mesh
+	@echo "Generating other meshes..."
 	@gmsh -2 resources/meshes/channel_1_0.geo
 	@gmsh -2 resources/meshes/channel_1_1.geo
 	@gmsh -2 resources/meshes/channel_1_2.geo
