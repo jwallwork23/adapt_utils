@@ -1614,17 +1614,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
             ]
 
     def get_recovery(self, i, **kwargs):
+        """
+        Create an :class:`L2Projector` object which can repeatedly project fields specified in
+        :attr:`op.adapt_field`.
+        """
         op = self.op
         if op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
-            raise NotImplementedError  # TODO: allow Hessians of tracer fields, etc.
-        if op.approach == 'vorticity':  # TODO: Use recoverer stashed in callback
-            recoverer = L2ProjectorVorticity(self.V[i], op=op)
+            fs = self.get_function_space(op.adapt_field)[i]
+            return HessianMetricRecoverer(fs, op=op)
+        elif op.approach == 'vorticity':  # TODO: Use recoverer stashed in callback
+            return L2ProjectorVorticity(self.V[i], op=op)
         else:
-            recoverer = ShallowWaterHessianRecoverer(
+            return ShallowWaterHessianRecoverer(
                 self.V[i], op=op,
                 constant_fields={'bathymetry': self.bathymetry[i]}, **kwargs,
             )
-        return recoverer
 
     # --- Run scripts
 

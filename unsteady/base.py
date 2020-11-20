@@ -816,6 +816,7 @@ class AdaptiveProblemBase(object):
             update_forcings_wrapper = None
             if hasattr(self, 'hessian_func'):
                 delattr(self, 'hessian_func')
+            fwd_solutions = self.get_solutions(op.adapt_field, adjoint=False)
 
             # Arrays to hold Hessians for each field on each window
             H_windows = [[Function(P1_ten) for P1_ten in self.P1_ten] for f in adapt_fields]
@@ -859,7 +860,7 @@ class AdaptiveProblemBase(object):
                     final_ts = iteration == (i+1)*dt_per_mesh
                     dt = op.dt*op.hessian_timestep_lag
                     for j, f in enumerate(adapt_fields):
-                        H = hessian(self.fwd_solutions[i], f)
+                        H = hessian(fwd_solutions[i], f)
                         if f == 'bathymetry':
                             H_window[j] = H
                         elif op.hessian_time_combination == 'integrate':
