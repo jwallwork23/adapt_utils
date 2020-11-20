@@ -37,13 +37,14 @@ op.update({
 
     # Extend to time-dependent case
     'timestepper': 'CrankNicolson',
-    'dt': 1.0,
+    'dt': 5.0,
     'dt_per_export': 1,
-    'end_time': 120.0,
+    'end_time': 600.0,
 
     # Crank down viscosity and plot vorticity
-    'base_viscosity': 0.001,
+    'base_viscosity': 0.00005,
     'characteristic_velocity': Constant(op.inflow_velocity),
+    'grad_depth_viscosity': True,
     'max_reynolds_number': 10000.0,
     'recover_vorticity': True,
 

@@ -1,8 +1,4 @@
-all: xcoarse uniform table adapt plot screenshot
-
-xcoarse: dir clean geo_xcoarse mesh_xcoarse
-
-allmesh: dir clean geo mesh
+all: dir clean geo base_mesh uniform table adapt plot screenshot
 
 adapt: isotropic anisotropic
 
@@ -25,42 +21,52 @@ dir:
 
 clean:
 	@echo "Cleaning directory..."
-	@rm -Rf *.geo *.msh
+	@cd resources/meshes && rm -Rf *.geo *.msh
 
 
 # --- Initial meshes
 
 geo:
 	@echo "Generating geometry files..."
-	@python3 generate_geo.py
+	@python3 meshgen.py 0 0
+	@python3 meshgen.py 0 1
+	@python3 meshgen.py 0 2
+	@python3 meshgen.py 1 0
+	@python3 meshgen.py 1 1
+	@python3 meshgen.py 1 2
+	@python3 meshgen.py 2 0
+	@python3 meshgen.py 2 1
+	@python3 meshgen.py 2 2
+	@python3 meshgen.py 3 0
+	@python3 meshgen.py 3 1
+	@python3 meshgen.py 3 2
+	@python3 meshgen.py 4 0
+	@python3 meshgen.py 4 1
+	@python3 meshgen.py 4 2
 
-mesh: geo
+base_mesh:
+	@echo "Generating base meshes..."
+	@gmsh -2 resources/meshes/channel_0_0.geo
+	@gmsh -2 resources/meshes/channel_0_1.geo
+	@gmsh -2 resources/meshes/channel_0_2.geo
+
+mesh:
 	@echo "Generating all meshes..."
-	@gmsh -2 resources/meshes/xcoarse_0.geo
-	@gmsh -2 resources/meshes/coarse_0.geo
-	@gmsh -2 resources/meshes/medium_0.geo
-	@gmsh -2 resources/meshes/fine_0.geo
-	@gmsh -2 resources/meshes/xfine_0.geo
-	@gmsh -2 resources/meshes/xcoarse_1.geo
-	@gmsh -2 resources/meshes/coarse_1.geo
-	@gmsh -2 resources/meshes/medium_1.geo
-	@gmsh -2 resources/meshes/fine_1.geo
-	@gmsh -2 resources/meshes/xfine_1.geo
-	@gmsh -2 resources/meshes/xcoarse_2.geo
-	@gmsh -2 resources/meshes/coarse_2.geo
-	@gmsh -2 resources/meshes/medium_2.geo
-	@gmsh -2 resources/meshes/fine_2.geo
-	@gmsh -2 resources/meshes/xfine_2.geo
-
-geo_xcoarse:
-	@echo "Generating xcoarse geometry files..."
-	@python3 generate_geo.py -level xcoarse
-
-mesh_xcoarse: geo_xcoarse
-	@echo "Generating xcoarse meshes..."
-	@gmsh -2 resources/meshes/xcoarse_0.geo
-	@gmsh -2 resources/meshes/xcoarse_1.geo
-	@gmsh -2 resources/meshes/xcoarse_2.geo
+	@gmsh -2 resources/meshes/channel_0_0.geo
+	@gmsh -2 resources/meshes/channel_0_1.geo
+	@gmsh -2 resources/meshes/channel_0_2.geo
+	@gmsh -2 resources/meshes/channel_1_0.geo
+	@gmsh -2 resources/meshes/channel_1_1.geo
+	@gmsh -2 resources/meshes/channel_1_2.geo
+	@gmsh -2 resources/meshes/channel_2_0.geo
+	@gmsh -2 resources/meshes/channel_2_1.geo
+	@gmsh -2 resources/meshes/channel_2_2.geo
+	@gmsh -2 resources/meshes/channel_3_0.geo
+	@gmsh -2 resources/meshes/channel_3_1.geo
+	@gmsh -2 resources/meshes/channel_3_2.geo
+	@gmsh -2 resources/meshes/channel_4_0.geo
+	@gmsh -2 resources/meshes/channel_4_1.geo
+	@gmsh -2 resources/meshes/channel_4_2.geo
 
 
 # --- Convergence runs
