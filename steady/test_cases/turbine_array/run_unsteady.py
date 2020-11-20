@@ -21,11 +21,10 @@ args = parser.parse_args()
 # Set parameters
 kwargs = {
     'approach': 'fixed_mesh',
-    'level': int(args.level or 2),
-
-    # I/O and debugging
+    'level': int(args.level or 1),
+    'box': True,
     'plot_pvd': True,
-    'debug': bool(args.debug or False),
+    'debug': False if args.debug == "0" else True,
     'debug_mode': args.debug_mode or 'basic',
 }
 discrete_turbines = True

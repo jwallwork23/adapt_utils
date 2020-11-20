@@ -210,7 +210,7 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
         self.remove_turbines = kwargs.pop('remove_turbines', False)
         self.load_mesh = kwargs.pop('load_mesh', None)
         self.callback_dir = kwargs.pop('callback_dir', op.di)
-        super(AdaptiveSteadyTurbineProblem, self).__init__(*args, **kwargs)
+        super(AdaptiveSteadyTurbineProblem, self).__init__(op, **kwargs)
 
     def setup_all(self):
         super(AdaptiveSteadyTurbineProblem, self).setup_all()

@@ -25,7 +25,7 @@ class TurbineArrayOptions(SteadyTurbineOptions):
     domain_length = PositiveFloat(1200.0).tag(config=False)
     domain_width = PositiveFloat(500.0).tag(config=False)
 
-    def __init__(self, level=0, offset=0, separation=8, meshgen=False, **kwargs):
+    def __init__(self, level=0, offset=0, separation=8, meshgen=False, box=False, **kwargs):
         """
         :kwarg level: number of iso-P2 refinements to apply to the base mesh.
         :kwarg offset: offset of the turbines to the south and north in terms of turbine diameters.
@@ -40,6 +40,7 @@ class TurbineArrayOptions(SteadyTurbineOptions):
 
         # Physics
         self.inflow_velocity = [5.0, 0.0]  # Typical fast flow in Pentland Firth
+        self.base_velocity = self.inflow_velocity
         self.base_viscosity = 0.5          # Chosen to give a moderately advection-dominated problem
         self.base_bathymetry = 40.0        # Typical depth in Pentland Firth
         self.friction_coeff = 0.0025
@@ -58,7 +59,11 @@ class TurbineArrayOptions(SteadyTurbineOptions):
         # Gmsh specification
         self.base_outer_res = 40.0
         self.base_inner_res = 8.0
-        self.mesh_file = 'channel_{:d}_{:d}.msh'.format(level, self.offset)
+        if box:
+            assert self.offset == 0
+            self.mesh_file = 'channel_refined_{:d}.msh'.format(level)
+        else:
+            self.mesh_file = 'channel_{:d}_{:d}.msh'.format(level, self.offset)
         self.mesh_file = os.path.join(self.mesh_dir, self.mesh_file)
         if meshgen:
             return
@@ -100,5 +105,5 @@ class TurbineArrayOptions(SteadyTurbineOptions):
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solution.split()
-        u.interpolate(as_vector(self.inflow_velocity))
+        u.interpolate(as_vector(self.base_velocity))
         eta.assign(0.0)
