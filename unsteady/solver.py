@@ -2044,6 +2044,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
                 ts = self.get_timestepper(i, op.adapt_field)
+                ts.solution_old.assign(self.get_solutions(op.adapt_field)[i])
+                # TODO: Should assign *previous* value from *previous* mesh
 
                 # Create double L2 projection operator which will be repeatedly used
                 recoverer = self.get_recovery(i, **hessian_kwargs)
