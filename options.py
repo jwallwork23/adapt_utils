@@ -201,7 +201,6 @@ class Options(FrozenConfigurable):
     region_of_interest = List(default_value=[], help="""
         Spatial region related to quantity of interest.
         """).tag(config=True)
-    estimate_error = Bool(False, help="For use in Thetis solver object.").tag(config=True)  # TODO: UNUSED
 
     # Adaptation loop
     min_adapt = NonNegativeInteger(0, help="""

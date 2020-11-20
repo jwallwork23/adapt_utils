@@ -86,7 +86,6 @@ if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
 approach = args.approach or 'hessian'
 kwargs = {
     'approach': approach,
-    'estimate_error': approach == 'dwr',  # TODO: Redundant?
 
     # Space-time domain
     'level': int(args.level or 0),
@@ -102,7 +101,7 @@ kwargs = {
     'use_wetting_and_drying': False,
 
     # Mesh adaptation
-    'adapt_field': args.adapt_field or 'all_int',
+    'adapt_field': args.adapt_field or 'all_avg',
     'hessian_time_combination': args.time_combine or 'integrate',
     'hessian_timestep_lag': float(args.hessian_lag or 1),
     'normalisation': args.normalisation or 'complexity',
