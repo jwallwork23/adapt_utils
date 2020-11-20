@@ -804,18 +804,14 @@ class AdaptiveProblemBase(object):
             c = op.adapt_field[-3:]
             op.adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
         adapt_fields = ('__int__'.join(op.adapt_field.split('__avg__'))).split('__int__')
-        if op.hessian_time_combination not in ('integrate', 'intersect'):
-            msg = "Hessian time combination method '{:s}' not recognised."
-            raise ValueError(msg.format(op.hessian_time_combination))
 
         # Loop until we hit the maximum number of iterations, max_adapt
         assert op.min_adapt < op.max_adapt
+        hessian_kwargs = dict(normalise=False, enforce_constraints=False)
         for n in range(op.max_adapt):
             self.outer_iteration = n
             export_func_wrapper = None
             update_forcings_wrapper = None
-            if hasattr(self, 'hessian_func'):
-                delattr(self, 'hessian_func')
             fwd_solutions = self.get_solutions(op.adapt_field, adjoint=False)
 
             # Arrays to hold Hessians for each field on each window
@@ -831,16 +827,11 @@ class AdaptiveProblemBase(object):
                 self.setup_solver_forward_step(i)
 
                 # Create double L2 projection operator which will be repeatedly used
-                kwargs = {
-                    'enforce_constraints': False,
-                    'normalise': False,
-                    'noscale': True,
-                }
-                recoverer = self.get_recovery(i, **kwargs)
+                recoverer = self.get_recovery(i, **hessian_kwargs)
 
                 def hessian(sol, adapt_field):
                     fields = {'adapt_field': adapt_field, 'fields': self.fields[i]}
-                    return recoverer.construct_metric(sol, **fields, **kwargs)
+                    return recoverer.construct_metric(sol, **fields, **hessian_kwargs)
 
                 # Array to hold time-integrated Hessian UFL expression
                 H_window = [0 for f in adapt_fields]
@@ -849,7 +840,7 @@ class AdaptiveProblemBase(object):
                     """
                     Time-integrate Hessian using Trapezium Rule.
                     """
-                    if self.op.timestepper != 'CrankNicolson':
+                    if op.timestepper != 'CrankNicolson':
                         raise NotImplementedError  # TODO: Other timesteppers
                     update_forcings(t)
                     iteration = int(np.round(self.simulation_time/op.dt))
@@ -882,12 +873,12 @@ class AdaptiveProblemBase(object):
                             H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
-                kwargs = {
+                solve_kwargs = {
                     'export_func': export_func_wrapper,
                     'update_forcings': update_forcings_wrapper,
                     'plot_pvd': op.plot_pvd,
                 }
-                self.solve_forward_step(i, **kwargs)
+                self.solve_forward_step(i, **solve_kwargs)
 
                 # Delete objects to free memory
                 self.free_solver_forward_step(i)

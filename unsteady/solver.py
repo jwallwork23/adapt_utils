@@ -906,6 +906,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.solve_exner:
             delattr(self.equations[i], 'adjoint_exner')
 
+    def get_boundary_conditions(self, i):
+        field = self.op.adapt_field
+        if field not in ('tracer', 'sediment', 'bathymetry'):
+            field = 'shallow_water'
+        return self.boundary_conditions[i][field]
+
     # --- Error estimators
 
     def create_error_estimators_step(self, i):
@@ -1194,6 +1200,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
             delattr(self.timesteppers[i], 'adjoint_sediment')
         if self.op.solve_exner:
             delattr(self.timesteppers[i], 'adjoint_exner')
+
+    def get_timesteppers(self, field, adjoint=False):
+        if field not in ('tracer', 'sediment', 'bathymetry'):
+            field = 'shallow_water'
+        if adjoint:
+            field = '_'.join(['adjoint', field])
+        return self.timesteppers[i][field]
 
     # --- Solvers
 
@@ -1579,7 +1592,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
     # --- Error estimation
 
     def get_strong_residual_forward(self, i, **kwargs):
-        ts = self.timesteppers[i][kwargs.get('adapt_field', self.op.adapt_field)]
+        ts = self.get_timesteppers(self.op.adapt_field)[i]
         strong_residual = ts.error_estimator.strong_residual
 
         # Project into P1 space
@@ -1693,6 +1706,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """
         op = self.op
         wq = Constant(1.0)  # Quadrature weight
+
+        # Loop until we hit the maximum number of iterations, max_adapt
         assert op.min_adapt < op.max_adapt
         for n in range(op.max_adapt):
             self.outer_iteration = n
@@ -1779,12 +1794,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """
         op = self.op
         wq = Constant(1.0)  # Quadrature weight
-
-        # Process parameters
-        adapt_field = op.adapt_field
-        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
-            adapt_field = 'shallow_water'
         assert self.approach in ('dwr', 'anisotropic_dwr')
+
+        # Loop until we hit the maximum number of iterations, max_adapt
         assert op.min_adapt < op.max_adapt
         for n in range(op.max_adapt):
             self.outer_iteration = n
@@ -1816,7 +1828,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 nonlinear=self.nonlinear,
             )
             ep.outer_iteration = n
-            enriched_space = ep.get_function_space(adapt_field)
+            enriched_space = ep.get_function_space(op.adapt_field)
 
             # Loop over mesh windows *in reverse*
             for i, P1 in enumerate(self.P1):
@@ -1835,11 +1847,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # TODO: Need to transfer fwd sol in nonlinear case
                 ep.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
                 ep.setup_solver_forward_step(i)
-                ets = ep.timesteppers[i][adapt_field]
+                ets = ep.get_timesteppers(op.adapt_field)[i]
 
                 # --- Solve forward on current window
 
-                ts = self.timesteppers[i][adapt_field]
+                ts = self.get_timesteppers(op.adapt_field)[i]
 
                 def export_func():
                     fwd_solutions_step.append(ts.solution.copy(deepcopy=True))
@@ -1854,7 +1866,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # --- Solve adjoint on current window
 
                 def export_func():
-                    adj = self.get_solutions(adapt_field, adjoint=True)[i].copy(deepcopy=True)
+                    adj = self.get_solutions(op.adapt_field, adjoint=True)[i].copy(deepcopy=True)
                     adj_solutions_step.append(adj)
 
                 self.transfer_adjoint_solution(i)
@@ -1864,7 +1876,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # --- Solve adjoint on current window in enriched space
 
                 def export_func():
-                    adj = ep.get_solutions(adapt_field, adjoint=True)[i].copy(deepcopy=True)
+                    adj = ep.get_solutions(op.adapt_field, adjoint=True)[i].copy(deepcopy=True)
                     enriched_adj_solutions_step.append(adj)
 
                 ep.simulation_time = (i+1)*op.dt*self.dt_per_mesh  # TODO: Shouldn't be needed
@@ -1892,7 +1904,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 adj_error = Function(enriched_space[i])
 
                 # Setup error estimator
-                bcs = self.boundary_conditions[i][adapt_field]
+                bcs = self.get_boundary_conditions(i)
                 ets.setup_error_estimator(fwd_proj, fwd_old_proj, adj_error, bcs)
 
                 # Loop over exported timesteps
@@ -1969,16 +1981,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """
         op = self.op
         wq = Constant(1.0)  # Quadrature weight
+        assert self.approach in ('weighted_hessian', 'weighted_gradient')
 
         # Process parameters
-        adapt_field = op.adapt_field
-        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
-            adapt_field = 'shallow_water'
-        assert self.approach in ('weighted_hessian', 'weighted_gradient')
+        if op.adapt_field in ('all_avg', 'all_int'):
+            c = op.adapt_field[-3:]
+            op.adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
+        adapt_fields = ('__int__'.join(op.adapt_field.split('__avg__'))).split('__int__')
+
+        # Loop until we hit the maximum number of iterations, max_adapt
         assert op.min_adapt < op.max_adapt
         hessian_kwargs = dict(normalise=False, enforce_constraints=False)
         for n in range(op.max_adapt):
             self.outer_iteration = n
+            export_func_wrapper = None
+            update_forcings_wrapper = None
+            fwd_solutions = self.get_solutions(op.adapt_field, adjoint=False)
+
+            # Arrays to hold Hessians for each field on each window
+            H_windows = [[Function(P1_ten) for P1_ten in self.P1_ten] for f in adapt_fields]
 
             # Solve forward to get checkpoints
             for i in range(self.num_meshes):
@@ -1994,8 +2015,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for i, P1 in enumerate(self.P1):
                 self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
             self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
-            base_space = self.get_function_space(adapt_field)
-            fwd_solutions = self.get_solutions(adapt_field, adjoint=False)
+            base_space = self.get_function_space(op.adapt_field)
             for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 fwd_solutions_step_old = []
@@ -2003,7 +2023,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 # --- Solve forward on current window
 
-                ts = self.timesteppers[i][adapt_field]
+                ts = self.get_timesteppers[op.adapt_field][i]
 
                 def export_func():
                     fwd_solutions_step.append(ts.solution.copy(deepcopy=True))
@@ -2018,7 +2038,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 # --- Solve adjoint on current window
 
                 def export_func():
-                    adj = self.get_solutions(adapt_field, adjoint=True)[i].copy(deepcopy=True)
+                    adj = self.get_solutions(op.adapt_field, adjoint=True)[i].copy(deepcopy=True)
                     adj_solutions_step.append(adj)
 
                 self.transfer_adjoint_solution(i)
@@ -2057,7 +2077,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     if self.approach == 'weighted_hessian':
 
                         # Compute strong residual
-                        strong_residual_cts = self.get_strong_residual(i, adapt_field=adapt_field)
+                        strong_residual_cts = self.get_strong_residual(i)
 
                         # Recover Hessian
                         hessians = self.recover_hessian_metrics(i, adjoint=True, **hessian_kwargs)
