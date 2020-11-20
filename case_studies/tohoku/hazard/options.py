@@ -1,6 +1,7 @@
 import numpy as np
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.misc import box
 from adapt_utils.swe.tsunami.conversion import from_latlon
 
 
@@ -141,6 +142,17 @@ class TohokuHazardOptions(TohokuOptions):
 
     def get_regularisation_term(self, prob):
         raise NotImplementedError
+
+    def set_initial_surface(self, fs=None, **kwargs):
+        """
+        Multiply by a rotated kernel function to remove spurious lines introduced by rectangular
+        spline interpolation.
+        """
+        initial_surface = super(TohokuHazardOptions, self).set_initial_surface(fs=fs, **kwargs)
+        k = box([(0.7e+06, 4.2e+06, 300.0e+03, 140.0e+03)], fs.mesh(), rotation=7*np.pi/12)
+        initial_surface.interpolate(k*initial_surface)
+        return initial_surface
+
 
     def annotate_plot(self, axes, coords="utm", fontsize=12):
         """
