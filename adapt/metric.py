@@ -8,14 +8,15 @@ from firedrake import *
 import numpy as np
 
 from adapt_utils.adapt.kernels import *
-from adapt_utils.adapt.recovery import recover_hessian
+import adapt_utils.adapt.recovery as recovery
 from adapt_utils.linalg import check_spd
 from adapt_utils.options import Options
 
 
 __all__ = ["metric_complexity", "cell_size_metric", "volume_and_surface_contributions",
            "steady_metric", "isotropic_metric", "space_normalise", "space_time_normalise",
-           "boundary_steady_metric", "combine_metrics", "metric_intersection", "metric_average"]
+           "boundary_steady_metric", "combine_metrics", "metric_intersection", "metric_average",
+           "HessianMetricRecoverer"]
 
 
 def metric_complexity(M, boundary=False):
@@ -54,7 +55,7 @@ def steady_metric(f=None, H=None, projector=None, mesh=None, V=None, **kwargs):
         except AssertionError:
             raise ValueError("Please supply either field for recovery, or Hessian thereof.")
     elif H is None:
-        H = recover_hessian(f, mesh=mesh, op=op) if projector is None else projector.project(f)
+        H = recovery.recover_hessian(f, mesh=mesh, op=op) if projector is None else projector.project(f)
     V = V or H.function_space()
     if not hasattr(H, 'function_space'):
         H = interpolate(H, V)
@@ -134,6 +135,16 @@ def boundary_steady_metric(H, mesh=None, boundary_tag='on_boundary', **kwargs):
         check_spd(M)
 
     return M
+
+
+class HessianMetricRecoverer(recovery.DoubleL2ProjectorHessian):
+    """
+    Subclass of :class:`DoubleL2RecovererHessian` which enables metric construction.
+    """
+    def construct_metric(self, sol, **kwargs):
+        kwargs['op'] = self.op
+        kwargs.pop('fields')
+        return steady_metric(H=self.project(sol), **kwargs)
 
 
 # TODO: Check equivalent to normalising in space and time separately

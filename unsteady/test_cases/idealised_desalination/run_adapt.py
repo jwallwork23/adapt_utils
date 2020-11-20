@@ -38,7 +38,7 @@ kwargs = {
     'target': float(args.target or 1.0e+04),
     'norm_order': p,
     'min_adapt': int(args.min_adapt or 3),
-    'max_adapt': int(args.max_adapt or 4),  # TODO: Increase?
+    'hessian_timestep_lag': 10,
 
     # I/O and debugging
     'plot_pvd': True,
