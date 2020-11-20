@@ -2140,7 +2140,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 for j in range(len(fwd_solutions_step)):
                     fwd.assign(fwd_solutions_step[j])
                     fwd_old.assign(fwd_solutions_step_old[j])
-                    # fwd_solutions[i].assign(fwd)
 
                     # Weight Hessians
                     strong_residual_cts = self.get_strong_residual(i)
