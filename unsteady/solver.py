@@ -1873,7 +1873,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint_step(i)
-                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
+                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
 
                 # --- Solve adjoint on current window in enriched space
 
