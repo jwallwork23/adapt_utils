@@ -1799,6 +1799,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Loop until we hit the maximum number of iterations, max_adapt
         assert op.min_adapt < op.max_adapt
+        self.estimators['dwr'] = []
         for n in range(op.max_adapt):
             self.outer_iteration = n
 
