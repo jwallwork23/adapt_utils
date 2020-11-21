@@ -1884,7 +1884,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 ep.simulation_time = (i+1)*op.dt*self.dt_per_mesh  # TODO: Shouldn't be needed
                 ep.transfer_adjoint_solution(i)
                 ep.setup_solver_adjoint_step(i)
-                ep.solve_adjoint_step(i, export_func=export_func, plot_pvd=False)
+                ep.solve_adjoint_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
 
                 # --- Assemble indicators and metrics
 
