@@ -43,14 +43,14 @@ class MeshMover(object):
         if self.method != 'monge_ampere':
             raise NotImplementedError  # TODO: Other options, e.g. MMPDE
         self.op = kwargs.get('op', Options())
-        assert op.nonlinear_method in ('quasi_newton', 'relaxation')
+        assert self.op.nonlinear_method in ('quasi_newton', 'relaxation')
         self.bc = kwargs.get('bc')
         self.bbc = kwargs.get('bbc')
         self.ξ = Function(self.mesh.coordinates)  # Computational coordinates
         self.x = Function(self.mesh.coordinates)  # Physical coordinates
         self.I = Identity(self.dim)
-        self.dt = Constant(op.dt)
-        self.pseudo_dt = Constant(op.pseudo_dt)
+        self.dt = Constant(self.op.dt)
+        self.pseudo_dt = Constant(self.op.pseudo_dt)
 
         # Create functions and solvers
         self._create_function_spaces()
@@ -64,9 +64,9 @@ class MeshMover(object):
         # Outputs
         if self.op.debug and self.op.debug_mode == 'full':
             import os
-            self.monitor_file = File(os.path.join(op.di, 'monitor_debug.pvd'))
+            self.monitor_file = File(os.path.join(self.op.di, 'monitor_debug.pvd'))
             self.monitor_file.write(self.monitor)
-            self.volume_file = File(os.path.join(op.di, 'volume_debug.pvd'))
+            self.volume_file = File(os.path.join(self.op.di, 'volume_debug.pvd'))
             self.volume_file.write(self.volume)
         self.msg = "{:4d}   Min/Max {:10.4e}   Residual {:10.4e}   Equidistribution {:10.4e}"
 

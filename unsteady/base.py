@@ -881,7 +881,7 @@ class AdaptiveProblemBase(object):
                     final_ts = self.iteration == (i+1)*dt_per_mesh
 
                     # Get quadrature weights
-                    if op.hessian_time_integration == 'integrate':
+                    if op.hessian_time_combination == 'integrate':
                         if op.timestepper == 'CrankNicolson':
                             w = 0.5 if first_ts or final_ts else 1.0
                         else:
