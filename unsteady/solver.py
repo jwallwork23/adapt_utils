@@ -2009,7 +2009,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Arrays to hold Hessians for each field on each window
             self._H_windows = [[[
-                self.maximum_metric(i) for j in range(self.export_per_mesh)]
+                self.maximum_metric(i) for j in range(self.dt_per_mesh//op.hessian_timestep_lag + 1)]
                 for i in range(self.num_meshes)]
                 for f in adapt_fields
             ]

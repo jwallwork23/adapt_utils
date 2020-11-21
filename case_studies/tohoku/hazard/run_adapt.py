@@ -103,7 +103,7 @@ kwargs = {
     # Mesh adaptation
     'adapt_field': args.adapt_field or 'all_avg',
     'hessian_time_combination': args.time_combine or 'integrate',
-    'hessian_timestep_lag': float(args.hessian_lag or 1),
+    'hessian_timestep_lag': int(args.hessian_lag or 1),
     'normalisation': args.normalisation or 'complexity',
     'norm_order': 1 if p is None else None if p == 'inf' else float(p),
     'target': float(args.target or 5.0e+03),
