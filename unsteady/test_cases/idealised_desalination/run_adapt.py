@@ -38,7 +38,7 @@ kwargs = {
     'approach': args.approach or 'dwr',
     'adapt_field': 'tracer',
     'hessian_time_combination': args.time_combine or 'integrate',
-    'hessian_timestep_lag': float(args.hessian_lag or 10),
+    'hessian_timestep_lag': int(args.hessian_lag or 10),
     'num_meshes': int(args.num_meshes or 100),
     'target': float(args.target or 1.0e+04),
     'norm_order': p,
