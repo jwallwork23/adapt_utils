@@ -1804,14 +1804,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.outer_iteration = n
 
             # Solve forward to get checkpoints
-            base_space = self.get_function_space(op.adapt_field)
-            fwd_solutions_old = [Function(bs) for bs in base_space]
-            for i in range(self.num_meshes):
-                self.transfer_forward_solution(i)
-                self.setup_solver_forward_step(i)
-                self.solve_forward_step(i)
-                ts = self.get_timestepper(i, op.adapt_field)
-                fwd_solutions_old[i].assign(ts.solution_old)
+            self.solve_forward()
 
             # Check convergence
             if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
@@ -1870,12 +1863,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
-                if i == 0:
-                    ts.solution_old.assign(self.get_solutions(op.adapt_field)[i])
-                else:
-                    for fnext, fprev in zip(ts.solution_old.split(), fwd_solutions_old[i-1].split()):
-                        fnext.project(fprev)
-                self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
+                self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=False)
 
                 # --- Solve adjoint on current window
 
@@ -1900,13 +1888,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 # --- Assemble indicators and metrics
 
+                adj_solutions_step = list(reversed(adj_solutions_step[:-1]))
+                enriched_adj_solutions_step = list(reversed(enriched_adj_solutions_step[:-1]))
                 n_fwd = len(fwd_solutions_step)
                 n_adj = len(adj_solutions_step)
                 if n_fwd != n_adj:
                     msg = "Mismatching number of indicators ({:d} vs {:d})"
                     raise ValueError(msg.format(n_fwd, n_adj))
-                adj_solutions_step = list(reversed(adj_solutions_step))
-                enriched_adj_solutions_step = list(reversed(enriched_adj_solutions_step))
                 op.print_debug("GO: Computing DWR indicators on mesh {:2d}".format(i))
 
                 # Various work fields
@@ -2025,21 +2013,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Arrays to hold Hessians for each field on each window
             self._H_windows = [[[
-                self.maximum_metric(i) for j in range(self.export_per_mesh)]
+                self.maximum_metric(i) for j in range(self.export_per_mesh-1)]
                 for i in range(self.num_meshes)]
                 for f in adapt_fields
             ]
 
             # Solve forward to get checkpoints
             base_space = self.get_function_space(op.adapt_field)
-            fwd_solutions_old = [Function(bs) for bs in base_space]
             for i in range(self.num_meshes):
                 self.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
                 self.solve_forward_step(i)
-                ts = self.get_timestepper(i, op.adapt_field)
-                fwd_solutions_old[i].assign(ts.solution_old)
 
             # Check convergence
             if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
@@ -2063,11 +2048,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
                 ts = self.get_timestepper(i, op.adapt_field)
-                if i == 0:
-                    ts.solution_old.assign(self.get_solutions(op.adapt_field)[i])
-                else:
-                    for fnext, fprev in zip(ts.solution_old.split(), fwd_solutions_old[i-1].split()):
-                        fnext.project(fprev)
 
                 if op.adapt_field == 'tracer' and op.stabilisation_tracer == 'SUPG':
                     # Cannot repeatedly project because we are not projecting a Function
@@ -2095,7 +2075,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     'export_func': export_func_wrapper,
                     'update_forcings': update_forcings,
                     'plot_pvd': False,
-                    'export_initial': True,
+                    'export_initial': False,
                 }
                 self.solve_forward_step(i, **solve_kwargs)
 
@@ -2112,8 +2092,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     """
                     if self.iteration % op.hessian_timestep_lag != 0:
                         return
-                    first_ts = self.iteration == i*dt_per_mesh
-                    final_ts = self.iteration == (i+1)*dt_per_mesh
+                    first_ts = np.isclose(t, i*dt_per_mesh*op.dt)
+                    if first_ts:
+                        return
+                    first_ts = np.isclose(t, (i*dt_per_mesh + op.dt_per_export)*op.dt)
+                    final_ts = np.isclose(t, (i+1)*dt_per_mesh*op.dt)
                     j = self.counter
 
                     # Get quadrature weights
@@ -2126,7 +2109,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                     # Combine as appropriate
                     for f, field in enumerate(adapt_fields):
-                        H = hessian(adj_solutions[i], field)  # TODO: Account for SUPG tracer
+                        H = hessian(adj_solutions[i], field)
                         if field == 'bathymetry':  # TODO: account for non-fixed bathymetry
                             self._H_windows[f][i][j] = H
                         elif op.hessian_time_combination == 'integrate':
@@ -2148,7 +2131,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     'export_func': export_func,
                     'update_forcings': update_forcings,
                     'plot_pvd': op.plot_pvd,
-                    'export_initial': False,
+                    'export_initial': True,
                 }
                 self.solve_adjoint_step(i, **solve_kwargs)
                 for f in range(len(adapt_fields)):
