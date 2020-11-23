@@ -94,6 +94,9 @@ class CrankNicolson(thetis_ts.TimeIntegrator):
                   )
 
         self.update_solver()
+        if self.error_estimator is not None:
+            if hasattr(self.error_estimator, 'setup_strong_residual'):
+                self.setup_strong_residual(self.solution, self.solution_old)
 
     def update_solver(self):
         """

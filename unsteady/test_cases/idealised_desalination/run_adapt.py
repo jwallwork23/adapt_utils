@@ -35,13 +35,13 @@ kwargs = {
     'level': int(args.level or 0),
 
     # Timestepping
-    'dt_per_export': 10,
+    'dt_per_export': 1,
 
     # Mesh adaptation
     'approach': args.approach or 'dwr',
     'adapt_field': 'tracer',
     'hessian_time_combination': args.time_combine or 'integrate',
-    'hessian_timestep_lag': int(args.hessian_lag or 10),
+    'hessian_timestep_lag': int(args.hessian_lag or 1),
     'num_meshes': int(args.num_meshes or 100),
     'target': float(args.target or 1.0e+04),
     'norm_order': p,

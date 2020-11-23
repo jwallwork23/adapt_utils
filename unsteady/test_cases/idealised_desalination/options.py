@@ -45,7 +45,6 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         self.T_tide = 0.05*self.M2_tide_period
         self.end_time = 2*self.T_tide
         self.dt = 2.232
-        self.dt_per_export = 10
 
         # FEM
         self.degree_tracer = 1
