@@ -153,7 +153,6 @@ class TohokuHazardOptions(TohokuOptions):
         initial_surface.interpolate(k*initial_surface)
         return initial_surface
 
-
     def annotate_plot(self, axes, coords="utm", fontsize=12):
         """
         Annotate `axes` in coordinate system `coords` with all locations of interest.

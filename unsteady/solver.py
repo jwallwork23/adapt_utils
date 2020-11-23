@@ -1888,8 +1888,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 # --- Assemble indicators and metrics
 
-                adj_solutions_step = list(reversed(adj_solutions_step[:-1]))
-                enriched_adj_solutions_step = list(reversed(enriched_adj_solutions_step[:-1]))
+                # Reverse adjoint solution arrays and take pairwise averages
+                adj_solutions_step = list(reversed(adj_solutions_step))
+                enriched_adj_solutions_step = list(reversed(enriched_adj_solutions_step))
+                for j in range(len(adj_solutions_step)):
+                    adj_solutions_step[j] *= 0.5
+                    enriched_adj_solutions_step[j] *= 0.5
+                for j in range(len(adj_solutions_step)-1):
+                    adj_solutions_step[j] += adj_solutions_step[j+1]
+                    enriched_adj_solutions_step[j] += adj_solutions_step[j+1]
+                adj_solutions_step = adj_solutions_step[:-1]
+                enriched_adj_solutions_step = enriched_adj_solutions_step[:-1]
+
+                # Checks
                 n_fwd = len(fwd_solutions_step)
                 n_adj = len(adj_solutions_step)
                 if n_fwd != n_adj:
@@ -1988,7 +1999,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _run_weighted_hessian(self, **kwargs):
         op = self.op
-        dt_per_mesh = self.dt_per_mesh
         n = self.export_per_mesh
         assert self.approach == 'weighted_hessian'
 

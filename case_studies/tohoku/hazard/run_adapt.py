@@ -92,6 +92,7 @@ kwargs = {
     'end_time': float(args.end_time or 1440.0),
     'num_meshes': int(args.num_meshes or 12),
 
+    # Timestepping
     'dt_per_export': 1,
 
     # Physics
