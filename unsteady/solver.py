@@ -1804,7 +1804,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.outer_iteration = n
 
             # Solve forward to get checkpoints
-            self.solve_forward()
+            base_space = self.get_function_space(op.adapt_field)
+            fwd_solutions_old = [Function(bs) for bs in base_space]
+            for i in range(self.num_meshes):
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward_step(i)
+                self.solve_forward_step(i)
+                ts = self.get_timestepper(i, op.adapt_field)
+                fwd_solutions_old[i].assign(ts.solution_old)
 
             # Check convergence
             if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
@@ -1863,6 +1870,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.simulation_time = i*op.dt*self.dt_per_mesh
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
+                if i == 0:
+                    ts.solution_old.assign(self.get_solutions(op.adapt_field)[i])
+                else:
+                    for fnext, fprev in zip(ts.solution_old.split(), fwd_solutions_old[i-1].split()):
+                        fnext.project(fprev)
                 self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
 
                 # --- Solve adjoint on current window
