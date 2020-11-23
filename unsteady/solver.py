@@ -2051,7 +2051,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
                 ts = self.get_timestepper(i, op.adapt_field)
-                if i > 0:
+                if i == 0:
+                    ts.solution_old.assign(self.get_solutions(op.adapt_field)[i])
+                else:
                     for fnext, fprev in zip(ts.solution_old.split(), fwd_solutions_old[i-1].split()):
                         fnext.project(fprev)
 

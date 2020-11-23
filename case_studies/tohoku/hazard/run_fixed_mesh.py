@@ -126,6 +126,12 @@ if plot_pvd:
         kernel_file.write(kernel)
         msg = "level {:d}  mesh {:d}  kernel volume {:.8e}"
         print_output(msg.format(op.level, i, assemble(k_eta*dx)))
+    bathymetry_file = File(os.path.join(op.di, 'bathymetry.pvd'))
+    for i, P1 in enumerate(swp.P1):
+        b = Function(P1, name="Bathymetry [m]")
+        b.project(swp.bathymetry[i])
+        bathymetry_file._topology = None
+        bathymetry_file.write(b)
 
 # Load or generate QoI timeseries
 fname = 'qoi_timeseries'
