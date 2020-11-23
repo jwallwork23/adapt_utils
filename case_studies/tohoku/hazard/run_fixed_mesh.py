@@ -92,7 +92,7 @@ kwargs = {
 
     # Solver
     'family': family,
-    'stabilsation': stabilisation,
+    'stabilisation': stabilisation,
     'use_wetting_and_drying': False,
 
     # QoI

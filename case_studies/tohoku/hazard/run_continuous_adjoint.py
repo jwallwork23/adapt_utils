@@ -60,7 +60,7 @@ kwargs = {
 
     # Solver
     'family': args.family or 'cg-cg',
-    'stabilsation': args.stabilisation,
+    'stabilisation': args.stabilisation,
     # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
     'wetting_and_drying_alpha': Constant(10.0),

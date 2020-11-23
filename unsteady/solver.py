@@ -2001,6 +2001,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
             op.adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
         adapt_fields = ('__int__'.join(op.adapt_field.split('__avg__'))).split('__int__')
 
+        if self.dt_per_mesh//op.hessian_timestep_lag + 1 != self.export_per_mesh:
+            print_output("WARNING: `hessian_timestep_lag` overridden by `export_per_mesh`.")
+
         # Loop until we hit the maximum number of iterations, max_adapt
         assert op.min_adapt < op.max_adapt
         hessian_kwargs = dict(normalise=False, enforce_constraints=False)
@@ -2010,15 +2013,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Arrays to hold Hessians for each field on each window
             self._H_windows = [[[
-                self.maximum_metric(i) for j in range(self.dt_per_mesh//op.hessian_timestep_lag + 1)]
+                self.maximum_metric(i) for j in range(self.export_per_mesh)]
                 for i in range(self.num_meshes)]
                 for f in adapt_fields
             ]
 
             # Solve forward to get checkpoints
+            base_space = self.get_function_space(op.adapt_field)
+            fwd_solutions_old = [Function(bs) for bs in base_space]
             for i in range(self.num_meshes):
                 self.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
-            self.solve_forward()
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward_step(i)
+                self.solve_forward_step(i)
+                ts = self.get_timestepper(i, op.adapt_field)
+                fwd_solutions_old[i].assign(ts.solution_old)
 
             # Check convergence
             if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
@@ -2029,7 +2038,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             for i, P1 in enumerate(self.P1):
                 self.indicators[i]['dwr'] = Function(P1, name="DWR indicator")
             self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
-            base_space = self.get_function_space(op.adapt_field)
             for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 fwd_solutions_step_old = []
@@ -2043,8 +2051,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.transfer_forward_solution(i)
                 self.setup_solver_forward_step(i)
                 ts = self.get_timestepper(i, op.adapt_field)
-                ts.solution_old.assign(self.get_solutions(op.adapt_field)[i])
-                # TODO: Should assign *previous* value from *previous* mesh
+                if i > 0:
+                    ts.solution_old.project(fwd_solutions_old[i-1])
 
                 if op.adapt_field == 'tracer' and op.stabilisation_tracer == 'SUPG':
                     # Cannot repeatedly project because we are not projecting a Function

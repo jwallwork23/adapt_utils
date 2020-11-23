@@ -97,13 +97,13 @@ kwargs = {
 
     # Solver
     'family': family,
-    'stabilsation': stabilisation,
+    'stabilisation': stabilisation,
     'use_wetting_and_drying': False,
 
     # Mesh adaptation
     'adapt_field': args.adapt_field or 'all_avg',
     'hessian_time_combination': args.time_combine or 'integrate',
-    'hessian_timestep_lag': int(args.hessian_lag or 1),
+    'hessian_timestep_lag': int(args.hessian_lag or 1),  # NOTE: Not used in weighted Hessian
     'normalisation': args.normalisation or 'complexity',
     'norm_order': 1 if p is None else None if p == 'inf' else float(p),
     'target': float(args.target or 5.0e+03),
