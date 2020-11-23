@@ -1311,7 +1311,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.print(80*'=')
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
         export_func = export_func or self.op.get_export_func(self, i)
-        if i == 0 or export_initial:
+        if export_initial:
             update_forcings(self.simulation_time)  # TODO: CHECK
             if export_func is not None:
                 export_func()
@@ -2097,6 +2097,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                         return
                     first_ts = np.isclose(t, (i*dt_per_mesh + op.dt_per_export)*op.dt)
                     final_ts = np.isclose(t, (i+1)*dt_per_mesh*op.dt)
+                    if t < (i+1)*dt_per_mesh*op.dt:
+                        return
                     j = self.counter
 
                     # Get quadrature weights
