@@ -1988,8 +1988,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def _run_weighted_hessian(self, **kwargs):
         op = self.op
-        wq = Constant(1.0)  # Quadrature weight
         dt_per_mesh = self.dt_per_mesh
+        n = self.export_per_mesh
         assert self.approach == 'weighted_hessian'
 
         # Process parameters
@@ -2001,7 +2001,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             op.adapt_field = "velocity_x__{:s}__velocity_y__{:s}__elevation".format(c, c)
         adapt_fields = ('__int__'.join(op.adapt_field.split('__avg__'))).split('__int__')
 
-        if self.dt_per_mesh//op.hessian_timestep_lag + 1 != self.export_per_mesh:
+        if self.dt_per_mesh//op.hessian_timestep_lag != n-1:
             print_output("WARNING: `hessian_timestep_lag` overridden by `export_per_mesh`.")
 
         # Loop until we hit the maximum number of iterations, max_adapt
@@ -2013,7 +2013,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Arrays to hold Hessians for each field on each window
             self._H_windows = [[[
-                self.maximum_metric(i) for j in range(self.export_per_mesh-1)]
+                self.maximum_metric(i) for j in range(n)]
                 for i in range(self.num_meshes)]
                 for f in adapt_fields
             ]
@@ -2085,59 +2085,29 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.setup_solver_adjoint_step(i)
                 self.counter = 0
 
-                def update_forcings(t):
-                    """
-                    Time-combine Hessians according to :attr:`op.hessian_time_combination` and
-                    the time integrator.
-                    """
-                    if self.iteration % op.hessian_timestep_lag != 0:
-                        return
-                    first_ts = np.isclose(t, i*dt_per_mesh*op.dt)
-                    if first_ts:
-                        return
-                    first_ts = np.isclose(t, (i*dt_per_mesh + op.dt_per_export)*op.dt)
-                    final_ts = np.isclose(t, (i+1)*dt_per_mesh*op.dt)
-                    if t < (i+1)*dt_per_mesh*op.dt:
-                        return
-                    j = self.counter
-
-                    # Get quadrature weights
-                    if op.hessian_time_combination == 'integrate':
-                        if op.timestepper == 'CrankNicolson':
-                            w = 0.5 if first_ts or final_ts else 1.0
-                        else:
-                            raise NotImplementedError  # TODO: Other timesteppers
-                        wq.assign(w*op.dt*op.hessian_timestep_lag)
-
-                    # Combine as appropriate
-                    for f, field in enumerate(adapt_fields):
-                        H = hessian(adj_solutions[i], field)
-                        if field == 'bathymetry':  # TODO: account for non-fixed bathymetry
-                            self._H_windows[f][i][j] = H
-                        elif op.hessian_time_combination == 'integrate':
-                            self._H_windows[f][i][j] += wq*H
-                        else:
-                            self._H_windows[f][i][j] = metric_intersection(H, self._H_windows[f][i][j])
-                    self.counter += 1
-
                 def export_func():
                     """
-                    Extract time-combined Hessians.
+                    Extract Hessians at each export time.
                     """
-                    if op.hessian_time_combination == 'intersect':
-                        for f in range(len(adapt_fields)):
-                            self._H_windows[f][i][-1] *= op.dt*dt_per_mesh
+                    if self.counter <= n:
+                        for f, field in enumerate(adapt_fields):
+                            self._H_windows[f][i][self.counter] = hessian(adj_solutions[i], field)
+                    self.counter += 1
 
                 # Solve step for current mesh iteration
                 solve_kwargs = {
                     'export_func': export_func,
-                    'update_forcings': update_forcings,
+                    'update_forcings': None,
                     'plot_pvd': op.plot_pvd,
                     'export_initial': True,
                 }
                 self.solve_adjoint_step(i, **solve_kwargs)
+
+                # Reverse order of Hessians and take pairwise averages
                 for f in range(len(adapt_fields)):
                     self._H_windows[f][i] = list(reversed(self._H_windows[f][i]))
+                    for j in range(n-1):
+                        self._H_windows[f][i][j] = metric_average(*self._H_windows[f][i][j:j+2])
 
                 # --- Assemble indicators and metrics
 
@@ -2148,7 +2118,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 # Loop over exported timesteps
                 n_fwd = len(fwd_solutions_step)
-                n_adj = len(self._H_windows[0][i])
+                n_adj = len(self._H_windows[0][i]) - 1
                 if n_fwd != n_adj:
                     msg = "Mismatching number of exports ({:d} vs {:d})"
                     raise ValueError(msg.format(n_fwd, n_adj))
@@ -2157,17 +2127,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     fwd_old.assign(fwd_solutions_step_old[j])
 
                     # Weight Hessians
-                    strong_residual_cts = self.get_strong_residual(i)
+                    strong_residual_cts = self.get_strong_residual(i)  # TODO: Do this earlier (save residuals instead of fwd solutions)
                     assert len(strong_residual_cts) == len(adapt_fields)
                     for residual, f in zip(strong_residual_cts, range(len(adapt_fields))):
                         self._H_windows[f][i][j].interpolate(
                             abs(residual)*self._H_windows[f][i][j]
-                        )  # FIXME: residual is O(10^8), but H[0][0] is O(10^{-4}) -> it dominates
+                        )
 
                 # Combine metrics over exports for each field
-                kwargs = dict(average='__int__' not in op.adapt_field)
+                kwargs = dict(average=op.hessian_time_combination == 'integrate', weights=np.ones(n-1))
                 for f in range(len(adapt_fields)):
-                    self._H_windows[f][i] = combine_metrics(*self._H_windows[f][i], **kwargs)
+                    for j in range(n-1):
+                        self._H_windows[f][i][j] *= op.dt*op.dt_per_export
+                    if op.hessian_time_combination == 'integrate':
+                        if op.timestepper == 'CrankNicolson':
+                            self._H_windows[f][i][0] *= 0.5
+                            self._H_windows[f][i][-1] *= 0.5
+                        else:
+                            raise NotImplementedError  # TODO: Other timesteppers
+                        self._H_windows[f][i][j] *= n-1
+                    self._H_windows[f][i] = combine_metrics(*self._H_windows[f][i][:-1], **kwargs)
 
                 # Delete objects to free memory
                 self.free_solver_forward_step(i)

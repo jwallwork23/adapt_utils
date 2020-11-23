@@ -422,7 +422,7 @@ def metric_intersection(*metrics, **kwargs):
     return M
 
 
-def _metric_intersection_pair(M1, M2, boundary_tag=None):
+def _metric_intersection_pair(M1, M2, boundary_tag=None, **kwargs):
     V = M1.function_space()
     node_set = V.node_set if boundary_tag is None else DirichletBC(V, 0, boundary_tag).node_set
     dim = V.mesh().topological_dimension()
@@ -464,7 +464,7 @@ def metric_average(*metrics, **kwargs):
 
 
 def combine_metrics(*metrics, average=True, **kwargs):
-    return metric_average(*metrics, **kwargs) if average else metric_intersection(*metrics, **kwargs)
+    return metric_relaxation(*metrics, **kwargs) if average else metric_intersection(*metrics, **kwargs)
 
 
 def volume_and_surface_contributions(interior_hessian, boundary_hessian, op=Options(), **kwargs):

@@ -92,6 +92,8 @@ kwargs = {
     'end_time': float(args.end_time or 1440.0),
     'num_meshes': int(args.num_meshes or 12),
 
+    'dt_per_export': 1,
+
     # Physics
     'bathymetry_cap': 30.0,  # FIXME
 
