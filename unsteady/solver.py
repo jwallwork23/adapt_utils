@@ -2052,7 +2052,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.setup_solver_forward_step(i)
                 ts = self.get_timestepper(i, op.adapt_field)
                 if i > 0:
-                    ts.solution_old.project(fwd_solutions_old[i-1])
+                    for fnext, fprev in zip(ts.solution_old.split(), fwd_solutions_old[i-1].split()):
+                        fnext.project(fprev)
 
                 if op.adapt_field == 'tracer' and op.stabilisation_tracer == 'SUPG':
                     # Cannot repeatedly project because we are not projecting a Function
