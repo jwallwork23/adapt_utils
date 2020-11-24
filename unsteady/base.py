@@ -974,9 +974,9 @@ class AdaptiveProblemBase(object):
             return  # TODO: Other estimators than DWR
         self.print("\nError estimator\n===============")
         self.print("  iteration {:d}: {:.4e}".format(n+1, estimators[-1]))
-        if len(estimators) == 1:
-            return
         converged = False
+        if len(estimators) == 1:
+            return converged
         if np.abs(estimators[-1] - estimators[-2]) <= self.op.estimator_rtol*estimators[-2]:
             n = self.outer_iteration
             self.print("Converged error estimator after {:d} iterations!".format(n+1))
@@ -1012,9 +1012,8 @@ class AdaptiveProblemBase(object):
 
     def _check_element_convergence(self):
         converged = True
-        for i, num_cells_ in enumerate(self.num_cells[-3]):
-            diff = np.abs(self.num_cells[self.outer_iteration][i] - num_cells_)
-            if diff > self.op.element_rtol*num_cells_:
+        for i, (num_cells, num_cells_) in enumerate(zip(self.num_cells[-1], self.num_cells[-2])):
+            if np.abs(num_cells - num_cells_) > self.op.element_rtol*num_cells_:
                 converged = False
         if converged:
             n = self.outer_iteration

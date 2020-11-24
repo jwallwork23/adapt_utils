@@ -114,7 +114,7 @@ for n in range(op.outer_iterations):
     qois.append(tp.qois[-1])
     print("QoIs:          ", qois)
     if 'dwr' in op.approach:
-        estimators.append(tp.estimator[op.approach][-1])
+        estimators.append(tp.estimators['dwr'][-1])
         print("Estimators:    ", estimators)
 
 # Store element count and QoI to HDF5

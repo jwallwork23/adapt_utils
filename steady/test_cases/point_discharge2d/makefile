@@ -4,17 +4,9 @@ dir:
 	@echo "Making directories..."
 	@mkdir -p outputs/fixed_mesh/hdf5
 	@mkdir -p outputs/dwr/hdf5
-	@# mkdir -p outputs/dwr_averaged/hdf5
-	@# mkdir -p outputs/dwr_superposed/hdf5
 	@mkdir -p outputs/anisotropic_dwr/hdf5
-	@# mkdir -p outputs/anisotropic_dwr_averaged/hdf5
-	@# mkdir -p outputs/anisotropic_dwr_superposed/hdf5
 	@mkdir -p outputs/weighted_hessian/hdf5
-	@# mkdir -p outputs/weighted_hessian_averaged/hdf5
-	@# mkdir -p outputs/weighted_hessian_superposed/hdf5
 	@mkdir -p outputs/weighted_gradient/hdf5
-	@# mkdir -p outputs/weighted_gradient_averaged/hdf5
-	@# mkdir -p outputs/weighted_gradient_superposed/hdf5
 	@mkdir -p data
 	@mkdir -p plots
 

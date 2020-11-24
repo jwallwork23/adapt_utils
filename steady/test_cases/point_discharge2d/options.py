@@ -64,7 +64,7 @@ class PointDischarge2dOptions(CoupledOptions):
         self.adapt_field = 'tracer'
 
         # Mesh adaptation
-        rtol = 0.001
+        rtol = 0.005
         self.element_rtol = rtol
         self.estimator_rtol = rtol
         self.qoi_rtol = rtol
@@ -73,14 +73,14 @@ class PointDischarge2dOptions(CoupledOptions):
 
         # Solver parameters
         self.solver_parameters['tracer'] = {
-            'ksp_type': 'gmres',
-            'pc_type': 'sor',
+            'mat_type': 'aij',
+            'ksp_type': 'preonly',
+            'pc_type': 'lu',
+            'pc_factor_mat_solver_type': 'mumps',
         }
         # self.solver_parameters['tracer'] = {
-        #     'mat_type': 'aij',
-        #     'ksp_type': 'preonly',
-        #     'pc_type': 'lu',
-        #     'pc_factor_mat_solver_type': 'mumps',
+        #     'ksp_type': 'gmres',
+        #     'pc_type': 'sor',
         # }
 
     def set_boundary_conditions(self, prob, i):
