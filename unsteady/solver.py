@@ -1604,7 +1604,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Metric
 
-    def recover_hessian_metrics(self, i, adjoint=False, **kwargs):  # TODO: USEME
+    def recover_hessian_metrics(self, i, adjoint=False, **kwargs):  # TODO: USEME more
         op = self.op
         kwargs.setdefault('normalise', True)
         kwargs['op'] = op
@@ -1615,7 +1615,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if op.adapt_field in ('tracer', 'sediment') and op.stabilisation_tracer == 'supg':
                 if self.approach == 'weighted_hessian':
                     eq_options = self.__getattribute__('{:s}_options'.format(op.adapt_field))
-                    u, eta = self.fwd_solutions[i].split()
+                    u = op.get_velocity(self.simulation_time)
                     sol = sol + eq_options[i].supg_stabilisation*dot(u, grad(sol))
 
             return [steady_metric(sol, mesh=self.meshes[i], **kwargs)]

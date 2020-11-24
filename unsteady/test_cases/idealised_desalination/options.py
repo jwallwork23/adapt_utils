@@ -107,10 +107,13 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         }
         return boundary_conditions
 
-    def set_initial_condition(self, prob, i=0, t=0):
+    def get_velocity(self, t):
         self.tc.assign(t)
+        return as_vector([self.characteristic_speed*sin(self.omega*self.tc), 0.0])
+
+    def set_initial_condition(self, prob, i=0, t=0):
         u, eta = prob.fwd_solutions[i].split()
-        u.interpolate(as_vector([self.characteristic_speed*sin(self.omega*self.tc), 0.0]))
+        u.interpolate(self.get_velocity(t))
 
     def get_update_forcings(self, prob, i, **kwargs):
         """

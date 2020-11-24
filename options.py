@@ -668,6 +668,9 @@ class CoupledOptions(Options):
         if self.friction == 'manning':
             return Constant(self.friction_coeff or 0.02)
 
+    def get_velocity(self, t):
+        raise NotImplementedError("Should be implemented in derived class.")
+
     def get_eta_tilde(self, prob, i):
         u, eta = prob.fwd_solutions[i].split()
         if not self.wetting_and_drying:
