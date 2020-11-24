@@ -46,6 +46,9 @@ class PowerOptions(TracerOptions):
         }
         return boundary_conditions
 
+    def get_velocity(self, t):
+        return as_vector(self.base_velocity)
+
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
         u.interpolate(as_vector(self.base_velocity))

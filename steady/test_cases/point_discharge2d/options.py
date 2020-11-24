@@ -132,6 +132,9 @@ class PointDischarge2dOptions(CoupledOptions):
     def set_tracer_source(self, fs):
         return self.gaussian(fs.mesh(), source=True, scale=self.source_value)
 
+    def get_velocity(self, t):
+        return as_vector(self.base_velocity)
+
     def set_qoi_kernel_tracer(self, prob, i):
         return self.set_qoi_kernel(prob.meshes[i])
 
