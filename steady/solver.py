@@ -343,8 +343,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             u, eta = split(self.fwd_solutions[0])
             D = self.fields[0].horizontal_diffusivity
             F = [u[i]*c - D*c.dx(i) for i in dims]
-            # kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=mesh, op=op)
-            kwargs = dict(normalise=False, enforce_constraints=False, mesh=mesh, op=op)
+            kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=mesh, op=op)
             interior_hessians = [
                 interpolate(steady_metric(F[i], **kwargs)*abs(grad_c_star[i]), P1_ten) for i in dims
             ]
@@ -359,7 +358,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
             # Boundary Hessian
             n = FacetNormal(mesh)
-            # Fbar = c*dot(u, n) - D*dot(grad(c), n)
             Fbar = -D*dot(grad(c), n)  # NOTE: Minus zero (imposed boundary value)
             # TODO: weakly imposed Dirichlet conditions
             bcs = self.boundary_conditions[0]['tracer']
