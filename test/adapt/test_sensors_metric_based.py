@@ -39,12 +39,11 @@ def norm_order(request):
 def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False, **kwargs):
     if os.environ.get('FIREDRAKE_ADAPT') == '0':
         pytest.xfail("Firedrake installation does not include Pragmatic")
+    interp = kwargs.get('interp', False)
 
     # Set parameters
     kwargs = {
         'approach': 'hessian',
-        'h_min': 1.0e-06,
-        'h_max': 1.0e-01,
         'max_adapt': kwargs.get('max_adapt', 4),
         'normalisation': normalisation,
         'norm_order': norm_order,
@@ -62,13 +61,17 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False, **kwar
 
     # Adapt the mesh
     for i in range(op.max_adapt):
-        P1 = FunctionSpace(mesh, "CG", 1)
-        M = steady_metric(sensor(mesh), mesh=mesh, op=op)
+        f = sensor(mesh)
+        if interp:
+            f = interpolate(f, FunctionSpace(mesh, "CG", 1))
+        M = steady_metric(f, mesh=mesh, op=op, enforce_contraints=False)
         mesh = adapt(mesh, M)
 
     # Plot mesh
     if plot_mesh:
-        fig, axes = plt.subplots()
+        print("Number of elements = {:d}".format(mesh.num_cells()))
+        print("Number of vertices = {:d}".format(mesh.num_vertices()))
+        fig, axes = plt.subplots(figsize=(5, 5))
         triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
         axes.axis('off')
         plt.tight_layout()
@@ -99,6 +102,7 @@ if __name__ == '__main__':
     parser.add_argument("-norm_order", help="Norm order for normalisation.")
     parser.add_argument("-target", help="Target complexity/error.")
     parser.add_argument("-num_adapt", help="Number of adaptations.")
+    parser.add_argument("-interpolate", help="Toggle whether to interpolate sensor into P1 space.")
     args = parser.parse_args()
     f = args.sensor or 'bowl'
     sensor = {
@@ -111,5 +115,7 @@ if __name__ == '__main__':
     p = None if args.norm_order in ('none', 'inf') else int(args.norm_order or 1)
     target = float(args.target or 100.0)
     max_adapt = int(args.num_adapt or 4)
+    interp = bool(args.interpolate or False)
 
-    test_metric_based(sensor, normalisation, p, plot_mesh=True, target=target, max_adapt=max_adapt)
+    kwargs = dict(target=target, max_adapt=max_adapt, interp=interp)
+    test_metric_based(sensor, normalisation, p, plot_mesh=True, **kwargs)

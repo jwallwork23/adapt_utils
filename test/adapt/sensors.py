@@ -11,7 +11,7 @@ __all__ = ["bowl", "hyperbolic", "multiscale", "interweaved"]
 
 def bowl(mesh):
     x, y = SpatialCoordinate(mesh)
-    return x*x + y*y
+    return 0.5*(x*x + y*y)
 
 
 def hyperbolic(mesh):
