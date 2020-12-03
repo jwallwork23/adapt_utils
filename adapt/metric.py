@@ -55,7 +55,7 @@ def steady_metric(f=None, H=None, projector=None, mesh=None, V=None, **kwargs):
         except AssertionError:
             raise ValueError("Please supply either field for recovery, or Hessian thereof.")
     elif H is None:
-        H = recovery.recover_hessian(f, mesh=mesh, op=op) if projector is None else projector.project(f)
+        H = recovery.recover_hessian(f, mesh=mesh, V=V, op=op) if projector is None else projector.project(f)
     V = V or H.function_space()
     if not hasattr(H, 'function_space'):
         H = interpolate(H, V)

@@ -39,6 +39,8 @@ def norm_order(request):
 def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False, **kwargs):
     if os.environ.get('FIREDRAKE_ADAPT') == '0':
         pytest.xfail("Firedrake installation does not include Pragmatic")
+    if sensor == multiscale and normalisation == 'error' and norm_order is None:
+        pytest.xfail("L-infinity normalisation cannot cope with this problem!")
     interp = kwargs.get('interp', False)
 
     # Set parameters
@@ -73,9 +75,8 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False, **kwar
         print("Number of vertices = {:d}".format(mesh.num_vertices()))
         fig, axes = plt.subplots(figsize=(5, 5))
         triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
-        axes.axis('off')
-        plt.tight_layout()
-        plt.savefig(os.path.join(fpath, 'outputs', op.approach, fname + '.png'))
+        axes.axis(False)
+        savefig(fname, os.path.join(fpath, 'outputs', op.approach), extensions=['png'])
         plt.close()
         return
 

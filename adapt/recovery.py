@@ -82,7 +82,9 @@ def recover_hessian(f, **kwargs):
     # Argument is a UFL expression
     bcs = kwargs.get('bcs')
     mesh = kwargs.get('mesh', op.default_mesh)
-    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    if kwargs.get('V') is not None:
+        mesh = kwargs.get('V').mesh()
+    P1_ten = kwargs.get('V') or TensorFunctionSpace(mesh, "CG", 1)
     n = FacetNormal(mesh)
     solver_parameters = op.hessian_solver_parameters[op.hessian_recovery]
     if op.debug:
