@@ -63,8 +63,7 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False, **kwar
     # Adapt the mesh
     for i in range(op.max_adapt):
         P1 = FunctionSpace(mesh, "CG", 1)
-        f = interpolate(sensor(mesh), P1)
-        M = steady_metric(f, op=op, enforce_constraints=False, normalise=False)
+        M = steady_metric(sensor(mesh), mesh=mesh, op=op)
         mesh = adapt(mesh, M)
 
     # Plot mesh
