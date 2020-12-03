@@ -29,10 +29,10 @@ for mode in data:
         x, y = SpatialCoordinate(mesh)
         P1_ten = TensorFunctionSpace(mesh, "CG", 1)
 
-        f = exp(-alpha*abs(0.5 - x**2 - (0.8*y)**2))
+        f = exp(-alpha*abs(0.5 - x**2 - y**2))
         M1 = steady_metric(f, V=P1_ten, op=op, enforce_constraints=True)
 
-        g = exp(-alpha*abs(0.5 - x**2 - (1.2*y)**2))
+        g = exp(-alpha*abs(0.5 - (1 - x)**2 - y**2))
         M2 = steady_metric(g, V=P1_ten, op=op, enforce_constraints=True)
 
         M = {1: M1, 2: M2, 'avg': metric_average(M1, M2), 'int': metric_intersection(M1, M2)}[mode]
