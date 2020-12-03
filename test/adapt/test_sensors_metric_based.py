@@ -36,7 +36,7 @@ def norm_order(request):
     return request.param
 
 
-def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False):
+def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False, **kwargs):
     if os.environ.get('FIREDRAKE_ADAPT') == '0':
         pytest.xfail("Firedrake installation does not include Pragmatic")
 
@@ -45,43 +45,44 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False):
         'approach': 'hessian',
         'h_min': 1.0e-06,
         'h_max': 1.0e-01,
-        'max_adapt': 4,
+        'max_adapt': kwargs.get('max_adapt', 4),
         'normalisation': normalisation,
         'norm_order': norm_order,
-        'target': 100.0 if normalisation == 'complexity' else 10.0
+        'target': kwargs.get('target', 100.0 if normalisation == 'complexity' else 10.0),
     }
     op = Options(**kwargs)
     fname = '_'.join([sensor.__name__, normalisation, str(norm_order or 'inf')])
     fpath = os.path.dirname(__file__)
 
-    # Create domain
+    # Setup initial mesh
     n = 100
     mesh = SquareMesh(n, n, 2, 2)
     x, y = SpatialCoordinate(mesh)
     mesh.coordinates.interpolate(as_vector([x-1, y-1]))
 
     # Adapt the mesh
-    P1 = FunctionSpace(mesh, "CG", 1)
-    f = interpolate(sensor(mesh), P1)
-    M = steady_metric(f, op=op)
-    newmesh = adapt(mesh, M)
+    for i in range(op.max_adapt):
+        P1 = FunctionSpace(mesh, "CG", 1)
+        f = interpolate(sensor(mesh), P1)
+        M = steady_metric(f, op=op, enforce_constraints=False, normalise=False)
+        mesh = adapt(mesh, M)
 
     # Plot mesh
     if plot_mesh:
         fig, axes = plt.subplots()
-        triplot(newmesh, axes=axes)
+        triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
         axes.axis('off')
         plt.tight_layout()
         plt.savefig(os.path.join(fpath, 'outputs', op.approach, fname + '.png'))
         plt.close()
+        return
 
     # Save mesh coordinates to file
     if not os.path.exists(os.path.join(fpath, 'data', fname + '.npy')):
-        np.save(os.path.join(fpath, 'data', fname), newmesh.coordinates.dat.data)
-        if not plot_mesh:
-            pytest.xfail("Needed to set up the test. Please try again.")
+        np.save(os.path.join(fpath, 'data', fname), mesh.coordinates.dat.data)
+        pytest.xfail("Needed to set up the test. Please try again.")
     loaded = np.load(os.path.join(fpath, 'data', fname + '.npy'))
-    assert np.allclose(newmesh.coordinates.dat.data, loaded), "Mesh does not match data"
+    assert np.allclose(mesh.coordinates.dat.data, loaded), "Mesh does not match data"
 
 
 # ---------------------------
@@ -89,7 +90,27 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False):
 # ---------------------------
 
 if __name__ == '__main__':
-    for f in (bowl, hyperbolic, multiscale, interweaved):
-        for n in ('complexity', 'error'):
-            for p in (1, 2, None):
-                test_metric_based(f, n, p, plot_mesh=True)
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-sensor", help="""
+        Choice of sensor function, from {'bowl', 'hyperbolic', 'multiscale', 'interweaved'}.
+        """)
+    parser.add_argument("-normalisation", help="Normalise by complexity or error.")
+    parser.add_argument("-norm_order", help="Norm order for normalisation.")
+    parser.add_argument("-target", help="Target complexity/error.")
+    parser.add_argument("-num_adapt", help="Number of adaptations.")
+    args = parser.parse_args()
+    f = args.sensor or 'bowl'
+    sensor = {
+        'bowl': bowl,
+        'hyperbolic': hyperbolic,
+        'multiscale': multiscale,
+        'interweaved': interweaved
+    }[f]
+    normalisation = args.normalisation or 'complexity'
+    p = None if args.norm_order in ('none', 'inf') else int(args.norm_order or 1)
+    target = float(args.target or 100.0)
+    max_adapt = int(args.num_adapt or 4)
+
+    test_metric_based(sensor, normalisation, p, plot_mesh=True, target=target, max_adapt=max_adapt)
