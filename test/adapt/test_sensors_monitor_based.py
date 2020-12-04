@@ -14,6 +14,7 @@ import matplotlib.pyplot as plt
 
 from adapt_utils.adapt.metric import steady_metric, get_density_and_quotients
 from adapt_utils.adapt.r import MeshMover
+from adapt_utils.adapt.recovery import recover_gradient
 from adapt_utils.norms import local_frobenius_norm
 from adapt_utils.options import Options
 from adapt_utils.plotting import *
@@ -29,55 +30,64 @@ def sensor(request):
     return request.param
 
 
-@pytest.fixture(params=['shift_and_scale', 'frobenius', 'density'])
+@pytest.fixture(params=['shift_and_scale', 'gradient', 'frobenius', 'density'])
 def monitor_type(request):
     return request.param
 
 
-@pytest.fixture(params=['quasi_newton', 'relaxation'])
+@pytest.fixture(params=['quasi_newton'])
+# @pytest.fixture(params=['quasi_newton', 'relaxation'])  # NOTE: Unnecessary
 def method(request):
     return request.param
 
 
-def test_mesh_movement(sensor, monitor_type, method, plot_mesh=False):
-    alpha = Constant(1.0)
+def test_sensors(sensor, monitor_type, method, plot_mesh=False):
+    alpha = Constant(5.0)
     hessian_kwargs = dict(enforce_constraints=False, normalise=True, noscale=True)
 
     def shift_and_scale(mesh):
         """
         Adapt to the scaled and shifted sensor magnitude.
         """
-        alpha.assign(5.0)
-        return 1.0 + alpha*abs(sensor(mesh))
+        f = interpolate(abs(sensor(mesh)), FunctionSpace(mesh, "CG", 1))
+        return 1.0 + alpha*abs(sensor(mesh))/f.vector().gather().max()
+
+    def gradient(mesh):
+        """
+        Adapt to a recovered gradient for the sensor.
+        """
+        g = recover_gradient(sensor(mesh), mesh=mesh, op=op)
+        gmax = g.vector().gather().max()
+        return 1.0 + alpha*dot(g, g)/dot(gmax, gmax)
 
     def frobenius(mesh):
         """
         Adapt to the Frobenius norm of an L1-normalised
         Hessian metric for the sensor.
         """
-        alpha.assign(1.0)
         P1 = FunctionSpace(mesh, "CG", 1)
         M = steady_metric(sensor(mesh), mesh=mesh, op=op, **hessian_kwargs)
-        return 1.0 + alpha*local_frobenius_norm(M, space=P1)
+        M_F = local_frobenius_norm(M, space=P1)
+        return 1.0 + alpha*M_F/interpolate(M_F, P1).vector().gather().max()
 
     def density(mesh):
         """
         Adapt to the density of an L1-normalised
         Hessian metric for the sensor.
         """
-        alpha.assign(0.1)
         M = steady_metric(sensor(mesh), mesh=mesh, op=op, **hessian_kwargs)
-        return 1.0 + alpha*get_density_and_quotients(M)[0]
+        rho = get_density_and_quotients(M)[0]
+        return 1.0 + alpha*rho/rho.vector().gather().max()
 
+    rtol = 1.0e-03
     if monitor_type == 'shift_and_scale':
         monitor = shift_and_scale
-        rtol = 1.0e-03
+    elif monitor_type == 'gradient':
+        monitor = gradient
     elif monitor_type == 'frobenius':
         monitor = frobenius
-        rtol = 1.0e-03
     elif monitor_type == 'density':
         monitor = density
-        rtol = 1.0e-02
     else:
         raise ValueError("Monitor function type {:s} not recognised.".format(monitor_type))
 
@@ -134,10 +144,14 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     parser.add_argument("-sensor", help="""
-        Choice of sensor function, from {'bowl', 'hyperbolic', 'multiscale', 'interweaved'}.
+        Choice of sensor function from {'bowl', 'hyperbolic', 'multiscale', 'interweaved'}.
         """)
-    parser.add_argument("-monitor", help="Monitor function.")
-    parser.add_argument("-nonlinear_method", help="Nonlinear solver method.")
+    parser.add_argument("-monitor", help="""
+        Choice of monitor function from {'shift_and_scale', 'gradient', 'frobenius', density'}.
+        """)
+    parser.add_argument("-nonlinear_method", help="""
+        Nonlinear solver method from {'quasi_newton', 'relaxation'}.
+        """)
     args = parser.parse_args()
     f = {
         'bowl': bowl,
@@ -146,4 +160,4 @@ if __name__ == '__main__':
         'interweaved': interweaved
     }[args.sensor or 'bowl']
     m = args.monitor or 'frobenius'
-    test_mesh_movement(f, m, args.nonlinear_method or 'quasi_newton', plot_mesh=True)
+    test_sensors(f, m, args.nonlinear_method or 'quasi_newton', plot_mesh=True)

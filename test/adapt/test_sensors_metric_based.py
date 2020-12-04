@@ -35,7 +35,7 @@ def norm_order(request):
     return request.param
 
 
-def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False, **kwargs):
+def test_sensors(sensor, normalisation, norm_order, plot_mesh=False, **kwargs):
     if os.environ.get('FIREDRAKE_ADAPT') == '0':
         pytest.xfail("Firedrake installation does not include Pragmatic")
     if sensor == multiscale and normalisation == 'error' and norm_order is None:
@@ -117,4 +117,4 @@ if __name__ == '__main__':
     interp = bool(args.interpolate or False)
 
     kwargs = dict(target=target, max_adapt=max_adapt, interp=interp)
-    test_metric_based(f, args.normalisation or 'complexity', p, plot_mesh=True, **kwargs)
+    test_sensors(f, args.normalisation or 'complexity', p, plot_mesh=True, **kwargs)
