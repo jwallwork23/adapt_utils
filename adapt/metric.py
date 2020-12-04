@@ -10,6 +10,7 @@ import numpy as np
 from adapt_utils.adapt.kernels import *
 import adapt_utils.adapt.recovery as recovery
 from adapt_utils.linalg import check_spd
+from adapt_utils.misc import prod
 from adapt_utils.options import Options
 
 
@@ -285,7 +286,6 @@ def enforce_element_constraints(M, op=Options(), boundary_tag=None):
     op2.par_loop(kernel, node_set, M.dat(op2.RW))
 
 
-# TODO: Test identities hold
 def get_density_and_quotients(M):
     r"""
     Since metric fields are symmetric, they admit an orthogonal eigendecomposition,
@@ -313,14 +313,14 @@ def get_density_and_quotients(M):
     """
     fs_ten = M.function_space()
     mesh = fs_ten.mesh()
-    fs_vec = VectorFunctionSpace(mesh, fs_ten.ufl_element())
-    fs = FunctionSpace(mesh, fs_ten.ufl_element())
+    fe = (fs_ten.ufl_element().family(), fs_ten.ufl_element().degree())
+    fs_vec = VectorFunctionSpace(mesh, *fe)
+    fs = FunctionSpace(mesh, *fe)
     dim = mesh.topological_dimension()
 
     # Setup fields
     V = Function(fs_ten, name="Eigenvectors")
     Λ = Function(fs_vec, name="Eigenvalues")
-    h = Function(fs_vec, name="Sizes")
     density = Function(fs, name="Metric density")
     quotients = Function(fs_vec, name="Anisotropic quotients")
 
@@ -329,12 +329,9 @@ def get_density_and_quotients(M):
     op2.par_loop(kernel, fs_ten.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
 
     # Extract density and quotients
-    h.interpolate(as_vector([1/sqrt(Λ[i]) for i in range(dim)]))
-    d = Constant(1.0)
-    for i in range(dim):
-        d = d/h[i]
-    density.interpolate(d)
-    quotients.interpolate(as_vector([h[i]**3/d for i in range(dim)]))
+    h = [1/sqrt(Λ[i]) for i in range(dim)]
+    density.interpolate(1/prod(h))
+    quotients.interpolate(as_vector([density*h[i]**dim for i in range(dim)]))
     return density, quotients
 
 
