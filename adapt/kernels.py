@@ -152,7 +152,7 @@ void set_eigendecomposition(double M_[%d], const double * EVecs_, const double *
   Map<Vector%dd> EVals((double *)EVals_);
 
   // Compute metric from eigendecomposition
-  M = EVecs.transpose() * EVals.asDiagonal() * EVecs;
+  M = EVecs * EVals.asDiagonal() * EVecs.transpose();
 }
 """
 
@@ -169,7 +169,7 @@ void set_eigendecomposition_transpose(double M_[%d], const double * EVecs_, cons
   Map<Vector%dd> EVals((double *)EVals_);
 
   // Compute metric from transpose eigendecomposition
-  M = EVecs * EVals.asDiagonal() * EVecs.transpose();
+  M = EVecs.transpose() * EVals.asDiagonal() * EVecs;
 }
 """
 

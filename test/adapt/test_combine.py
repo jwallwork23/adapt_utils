@@ -82,7 +82,7 @@ def test_intersection_boundary(dim):
     assert np.allclose(M[bnodes], M2[bnodes])
 
 
-def test_complexity(plot=False):
+def test_complexity(plot_mesh=False):
     """
     The complexity of the metric intersection
     should be greater than or equal to the
@@ -140,7 +140,7 @@ def test_complexity(plot=False):
         data[mode]['num_vertices'] = mesh.num_vertices()
 
         # Plot
-        if plot:
+        if plot_mesh:
             fig, axes = plt.subplots(figsize=(5, 5))
             triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
             axes.axis(False)
@@ -159,7 +159,7 @@ def test_complexity(plot=False):
             assert data[j][i] <= data['int'][i], msg.format(j, 'fewer', i, 'int')
 
     # Print mesh data to screen
-    if plot:
+    if plot_mesh:
         for mode in data:
             print("Mode M_{:}".format(mode))
             print("number of elements = {:d}".format(data[mode]['num_cells']))
@@ -171,4 +171,4 @@ def test_complexity(plot=False):
 # ---------------------------
 
 if __name__ == "__main__":
-    test_complexity(plot=True)
+    test_complexity(plot_mesh=True)
