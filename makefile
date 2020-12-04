@@ -1,4 +1,6 @@
-all: lint test_all
+.PHONY: test
+
+test: lint test_all
 
 lint:
 	@echo "Checking lint..."

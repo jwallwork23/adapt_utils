@@ -1,6 +1,7 @@
 from firedrake import *
 
 import matplotlib.pyplot as plt
+import pytest
 from wurlitzer import pipes
 
 from adapt_utils.adapt.metric import *

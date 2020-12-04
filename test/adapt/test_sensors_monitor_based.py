@@ -12,8 +12,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
+from adapt_utils.adapt.metric import steady_metric, get_density_and_quotients
 from adapt_utils.adapt.r import MeshMover
-from adapt_utils.adapt.recovery import recover_hessian
 from adapt_utils.norms import local_frobenius_norm
 from adapt_utils.options import Options
 from adapt_utils.plotting import *
@@ -29,7 +29,7 @@ def sensor(request):
     return request.param
 
 
-@pytest.fixture(params=['shift_and_scale', 'frobenius'])
+@pytest.fixture(params=['shift_and_scale', 'frobenius', 'density'])
 def monitor_type(request):
     return request.param
 
@@ -41,6 +41,7 @@ def method(request):
 
 def test_mesh_movement(sensor, monitor_type, method, plot_mesh=False):
     alpha = Constant(1.0)
+    hessian_kwargs = dict(enforce_constraints=False, normalise=True, noscale=True)
 
     def shift_and_scale(mesh):
         """
@@ -51,28 +52,42 @@ def test_mesh_movement(sensor, monitor_type, method, plot_mesh=False):
 
     def frobenius(mesh):
         """
-        Adapt to the Frobenius norm of the sensor Hessian.
+        Adapt to the Frobenius norm of an L1-normalised
+        Hessian metric for the sensor.
+        """
+        alpha.assign(1.0)
+        P1 = FunctionSpace(mesh, "CG", 1)
+        M = steady_metric(sensor(mesh), mesh=mesh, op=op, **hessian_kwargs)
+        return 1.0 + alpha*local_frobenius_norm(M, space=P1)
+
+    def density(mesh):
+        """
+        Adapt to the density of an L1-normalised
+        Hessian metric for the sensor.
         """
         alpha.assign(0.1)
-        P1 = FunctionSpace(mesh, "CG", 1)
-        f = sensor(mesh)
-        # f = interpolate(f, P1)
-        H = recover_hessian(f, mesh=mesh, op=op)
-        return 1.0 + alpha*local_frobenius_norm(H, space=P1)
+        M = steady_metric(sensor(mesh), mesh=mesh, op=op, **hessian_kwargs)
+        return 1.0 + alpha*get_density_and_quotients(M)[0]
 
     if monitor_type == 'shift_and_scale':
         monitor = shift_and_scale
+        rtol = 1.0e-03
     elif monitor_type == 'frobenius':
         monitor = frobenius
+        rtol = 1.0e-03
+    elif monitor_type == 'density':
+        monitor = density
+        rtol = 1.0e-02
     else:
         raise ValueError("Monitor function type {:s} not recognised.".format(monitor_type))
 
     # Set parameters
     kwargs = {
         'approach': 'monge_ampere',
-        'r_adapt_rtol': 1.0e-03,
+        'r_adapt_rtol': rtol,
         'nonlinear_method': method,
-        'debug': plot_mesh,
+        'normalisation': 'complexity',
+        'norm_order': None,
     }
     op = Options(**kwargs)
     fname = '_'.join([sensor.__name__, monitor_type, method])
@@ -123,7 +138,6 @@ if __name__ == '__main__':
         """)
     parser.add_argument("-monitor", help="Monitor function.")
     parser.add_argument("-nonlinear_method", help="Nonlinear solver method.")
-    # parser.add_argument("-interpolate", help="Toggle whether to interpolate sensor into P1 space.")
     args = parser.parse_args()
     f = {
         'bowl': bowl,
@@ -131,6 +145,5 @@ if __name__ == '__main__':
         'multiscale': multiscale,
         'interweaved': interweaved
     }[args.sensor or 'bowl']
-    # interp = bool(args.interpolate or False)
     m = args.monitor or 'frobenius'
     test_mesh_movement(f, m, args.nonlinear_method or 'quasi_newton', plot_mesh=True)
