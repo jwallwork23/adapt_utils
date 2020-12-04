@@ -3,8 +3,7 @@ from firedrake import *
 import pytest
 
 from adapt_utils.adapt.kernels import *
-from adapt_utils.adapt.metric import steady_metric
-# from adapt_utils.adapt.metric import get_density_and_quotients
+from adapt_utils.adapt.metric import get_density_and_quotients, steady_metric
 from adapt_utils.linalg import check_spd
 from adapt_utils.misc import prod
 
@@ -34,22 +33,46 @@ def test_eigendecomposition(dim):
 
     # Recover Hessian for some arbitrary sensor
     f = prod([sin(pi*xi) for xi in SpatialCoordinate(mesh)])
-    H = steady_metric(f, mesh=mesh, V=P1_ten, normalise=False, enforce_constraints=False)
+    M = steady_metric(f, mesh=mesh, V=P1_ten, normalise=False, enforce_constraints=False)
 
     # Extract the eigendecomposition
     V = Function(P1_ten, name="Eigenvectors")
     Λ = Function(P1_vec, name="Eigenvalues")
-    VΛVT = Function(P1_ten)
     kernel = eigen_kernel(get_eigendecomposition, dim)
-    op2.par_loop(kernel, P1_ten.node_set, V.dat(op2.RW), Λ.dat(op2.RW), H.dat(op2.READ))
+    op2.par_loop(kernel, P1_ten.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
 
     # Reassemble it and check the two match
+    VΛVT = Function(P1_ten, name="Reassembled matrix")
     kernel = eigen_kernel(set_eigendecomposition, dim)
     op2.par_loop(kernel, P1_ten.node_set, VΛVT.dat(op2.RW), V.dat(op2.READ), Λ.dat(op2.READ))
-    assert np.allclose(H.dat.data, VΛVT.dat.data, rtol=1.0e-3)
+    # assert np.allclose(M.dat.data, VΛVT.dat.data, rtol=1.0e-5)
+    assert np.allclose(M.dat.data, VΛVT.dat.data)
 
 
-# TODO: Test density/anisotropy quotient decomposition
+def test_density_quotients_decomposition(dim):
+    mesh = uniform_mesh(dim, 20, l=2)
+    P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+
+    # Recover Hessian for some arbitrary sensor
+    f = prod([sin(pi*xi) for xi in SpatialCoordinate(mesh)])
+    M = steady_metric(f, mesh=mesh, V=P1_ten, normalise=False, enforce_constraints=False)
+
+    # Extract the eigendecomposition
+    V = Function(P1_ten, name="Eigenvectors")
+    Λ = Function(P1_vec, name="Eigenvalues")
+    kernel = eigen_kernel(get_eigendecomposition, dim)
+    op2.par_loop(kernel, P1_ten.node_set, V.dat(op2.RW), Λ.dat(op2.RW), M.dat(op2.READ))
+
+    # Extract the density and anisotropy quotients
+    d, Q = get_density_and_quotients(M)
+    Λ.interpolate(as_vector([pow(d/Q[i], 2/dim) for i in range(dim)]))
+
+    # Reassemble the matrix and check the two match
+    dVQVT = Function(P1_ten, name="Reassembled matrix")
+    kernel = eigen_kernel(set_eigendecomposition, dim)
+    op2.par_loop(kernel, P1_ten.node_set, dVQVT.dat(op2.RW), V.dat(op2.READ), Λ.dat(op2.READ))
+    assert np.allclose(M.dat.data, dVQVT.dat.data, rtol=1.0e-3)
 
 
 def test_polar_decomposition_cell_jacobian(dim):
@@ -78,4 +101,4 @@ def test_polar_decomposition_cell_jacobian(dim):
 
 
 if __name__ == "__main__":
-    test_eigendecomposition_hyperbolic()
+    test_density_quotients_decomposition(2)
