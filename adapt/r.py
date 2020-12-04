@@ -65,9 +65,7 @@ class MeshMover(object):
         if self.op.debug and self.op.debug_mode == 'full':
             import os
             self.monitor_file = File(os.path.join(self.op.di, 'monitor_debug.pvd'))
-            self.monitor_file.write(self.monitor)
             self.volume_file = File(os.path.join(self.op.di, 'volume_debug.pvd'))
-            self.volume_file.write(self.volume)
         self.msg = "{:4d}   Min/Max {:10.4e}   Residual {:10.4e}   Equidistribution {:10.4e}"
 
     def _create_function_spaces(self):
@@ -177,9 +175,7 @@ class MeshMover(object):
             # L += (τ[0, 0]*n[0]*self.φ_new.dx(0) + τ[1, 1]*n[1]*self.φ_new.dx(1))*ds
             L += (τ[0, 1]*n[1]*self.φ_new.dx(0) + τ[1, 0]*n[0]*self.φ_new.dx(1))*ds
             prob = LinearVariationalProblem(a, L, self.σ_new)
-            params = {
-                'ksp_type': 'cg',
-            }
+            params = {'ksp_type': 'cg'}
             self.equidistribution = LinearVariationalSolver(prob, solver_parameters=params)
         else:
             φ, σ = TrialFunctions(self.W)
@@ -262,7 +258,7 @@ class MeshMover(object):
                 self.mesh.coordinates.assign(self.ξ)
 
                 # Convergence criteria
-                self.op.print_debug(self.msg.format(i, *self.get_diagnostics()))
+                print_output(self.msg.format(i, *self.get_diagnostics()))
 
             self.fakemonitor = fakemonitor
 
@@ -370,7 +366,7 @@ class MeshMover(object):
             minmax, residual_l2_norm, equi = self.get_diagnostics()
             if i == 0:
                 initial_norm = residual_l2_norm  # Store to check for divergence
-            self.op.print_debug(self.msg.format(i, minmax, residual_l2_norm, equi))
+            print_output(self.msg.format(i, minmax, residual_l2_norm, equi))
             if residual_l2_norm < self.op.r_adapt_rtol:
                 print_output("r-adaptation converged in {:2d} iterations.".format(i+1))
                 break
