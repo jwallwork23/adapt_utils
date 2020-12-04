@@ -1,17 +1,16 @@
 r"""
 Test mesh movement and metric based adaptation in the steady state case for analytically defined
-sensor functions.
+sensor functions defined in [Olivier 2011].
 
-Sensors as defined in
-
-Olivier, Géraldine. Anisotropic metric-based mesh adaptation for unsteady CFD simulations involving
-moving geometries. Diss. 2011.
+[Olivier 2011] Olivier, Géraldine. Anisotropic metric-based mesh adaptation for unsteady CFD
+    simulations involving moving geometries. Diss. 2011.
 """
 from firedrake import *
 
-import pytest
-import os
 import matplotlib.pyplot as plt
+import os
+import pytest
+from wurlitzer import pipes
 
 from adapt_utils import *
 from adapt_utils.test.adapt.sensors import *
@@ -57,7 +56,7 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False, **kwar
 
     # Setup initial mesh
     n = 100
-    mesh = SquareMesh(n, n, 2, 2)
+    mesh = SquareMesh(n, n, 2)
     x, y = SpatialCoordinate(mesh)
     mesh.coordinates.interpolate(as_vector([x-1, y-1]))
 
@@ -67,7 +66,8 @@ def test_metric_based(sensor, normalisation, norm_order, plot_mesh=False, **kwar
         if interp:
             f = interpolate(f, FunctionSpace(mesh, "CG", 1))
         M = steady_metric(f, mesh=mesh, op=op, enforce_contraints=False)
-        mesh = adapt(mesh, M)
+        with pipes() as (out, err):
+            mesh = adapt(mesh, M)
 
     # Plot mesh
     if plot_mesh:
@@ -105,18 +105,16 @@ if __name__ == '__main__':
     parser.add_argument("-num_adapt", help="Number of adaptations.")
     parser.add_argument("-interpolate", help="Toggle whether to interpolate sensor into P1 space.")
     args = parser.parse_args()
-    f = args.sensor or 'bowl'
-    sensor = {
+    f = {
         'bowl': bowl,
         'hyperbolic': hyperbolic,
         'multiscale': multiscale,
         'interweaved': interweaved
-    }[f]
-    normalisation = args.normalisation or 'complexity'
+    }[args.sensor or 'bowl']
     p = None if args.norm_order in ('none', 'inf') else int(args.norm_order or 1)
     target = float(args.target or 100.0)
     max_adapt = int(args.num_adapt or 4)
     interp = bool(args.interpolate or False)
 
     kwargs = dict(target=target, max_adapt=max_adapt, interp=interp)
-    test_metric_based(sensor, normalisation, p, plot_mesh=True, **kwargs)
+    test_metric_based(f, args.normalisation or 'complexity', p, plot_mesh=True, **kwargs)

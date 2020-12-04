@@ -8,11 +8,92 @@ from adapt_utils.options import Options
 from adapt_utils.plotting import *
 
 
+def uniform_mesh(dim, n):
+    if dim == 2:
+        return UnitSquareMesh(n, n)
+    elif dim == 3:
+        return UnitCubeMesh(n, n, n)
+    else:
+        raise ValueError("Dimension {:d} not supported".format(dim))
+
+
+def combine(metric1, metric2, mode):
+    return {
+        1: metric1,
+        2: metric2,
+        'avg': metric_average(metric1, metric2),
+        'int': metric_intersection(metric1, metric2),
+    }[mode]
+
+
 # ---------------------------
 # standard tests for pytest
 # ---------------------------
 
+@pytest.fixture(params=[2, 3])
+def dim(request):
+    return request.param
+
+
+def test_intersection(dim):
+    """
+    Check that metric intersection DTRT when
+    applied to two isotropic metrics.
+    """
+    mesh = uniform_mesh(dim, 3)
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    I = Identity(dim)
+    M1 = interpolate(2*I, P1_ten)
+    M2 = interpolate(1*I, P1_ten)
+    M = metric_intersection(M1, M2)
+    assert np.allclose(M.dat.data, M1.dat.data)
+    M2.interpolate(2*I)
+    M = metric_intersection(M1, M2)
+    assert np.allclose(M.dat.data, M1.dat.data)
+    assert np.allclose(M.dat.data, M2.dat.data)
+    M2.interpolate(4*I)
+    M = metric_intersection(M1, M2)
+    assert np.allclose(M.dat.data, M2.dat.data)
+
+
+def test_intersection_boundary(dim):
+    """
+    Check that metric intersection DTRT when
+    applied to two isotropic metrics on the
+    boundary alone.
+    """
+    mesh = uniform_mesh(dim, 3)
+    P1_ten = TensorFunctionSpace(mesh, "CG", 1)
+    I = Identity(dim)
+    M1 = interpolate(2*I, P1_ten)
+    M2 = interpolate(4*I, P1_ten)
+    M = metric_intersection(M1, M2, boundary_tag='on_boundary')
+
+    # Get underlying arrays
+    M = M.dat.data
+    M1 = M1.dat.data
+    M2 = M2.dat.data
+
+    # Check intersection did what we expected
+    bnodes = DirichletBC(P1_ten, 0, 'on_boundary').nodes
+    nodes = set(range(mesh.num_vertices()))
+    inodes = np.array(list(nodes.difference(set(bnodes))))
+    assert np.allclose(M[inodes], M1[inodes])
+    assert np.allclose(M[bnodes], M2[bnodes])
+
+
 def test_complexity(plot=False):
+    """
+    The complexity of the metric intersection
+    should be greater than or equal to the
+    complexity of the constituent metrics.
+
+    The same can be said for the number of
+    elements and vertices in the resulting
+    mesh. We observe that the number of
+    elements and vertices in the metric
+    average is usually lower.
+    """
     kwargs = {
         'approach': 'hessian',
         'max_adapt': 4,
@@ -23,29 +104,32 @@ def test_complexity(plot=False):
         'h_max': 1.0,
     }
     op = Options(**kwargs)
-    n = 100
-    alpha = 1
+    kwargs = {
+        'op': op,
+        'enforce_constraints': True,
+    }
 
     # Loop over different metric construction modes
     data = {1: {}, 2: {}, 'avg': {}, 'int': {}}
     for mode in data:
 
         # Create domain [0, 1]²
-        mesh = UnitSquareMesh(n, n)
+        mesh = uniform_mesh(2, 100)
         for i in range(op.max_adapt):
             x, y = SpatialCoordinate(mesh)
             P1_ten = TensorFunctionSpace(mesh, "CG", 1)
 
             # Create a metric focused around the arc x² + y² = ½
-            f = exp(-alpha*abs(0.5 - x**2 - y**2))
-            M1 = steady_metric(f, V=P1_ten, op=op, enforce_constraints=True)
+            f = exp(-abs(0.5 - x**2 - y**2))
+            M1 = steady_metric(f, V=P1_ten, **kwargs)
 
             # Create a metric focused around the arc (1 - x)² + y² = ½
-            g = exp(-alpha*abs(0.5 - (1 - x)**2 - y**2))
-            M2 = steady_metric(g, V=P1_ten, op=op, enforce_constraints=True)
+            g = exp(-abs(0.5 - (1 - x)**2 - y**2))
+            M2 = steady_metric(g, V=P1_ten, **kwargs)
 
             # Choose metric according to mode
-            M = {1: M1, 2: M2, 'avg': metric_average(M1, M2), 'int': metric_intersection(M1, M2)}[mode]
+            M = combine(M1, M2, mode)
+
             # Adapt mesh
             with pipes() as (out, err):
                 mesh = adapt(mesh, M)
@@ -82,5 +166,9 @@ def test_complexity(plot=False):
             print("number of vertices = {:d}".format(data[mode]['num_vertices']))
 
 
+# ---------------------------
+# mesh plotting
+# ---------------------------
+
 if __name__ == "__main__":
-    test_complexity()
+    test_complexity(plot=True)
