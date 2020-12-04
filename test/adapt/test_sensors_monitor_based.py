@@ -69,7 +69,7 @@ def test_mesh_movement(sensor, monitor_type, method, plot_mesh=False):
 
     # Create domain
     n = 100
-    mesh = SquareMesh(n, n, 2, 2)
+    mesh = SquareMesh(n, n, 2)
     x, y = SpatialCoordinate(mesh)
     mesh.coordinates.interpolate(as_vector([x-1, y-1]))
     orig_vol = assemble(Constant(1.0)*dx(domain=mesh))

@@ -1,18 +1,19 @@
 from firedrake import *
 
-import pytest
+import matplotlib.pyplot as plt
 import numpy as np
+import pytest
 
 from adapt_utils.adapt.recovery import *
+from adapt_utils.options import Options
 from adapt_utils.swe.utils import recover_vorticity
-from adapt_utils.options import CoupledOptions
 
 
-def get_mesh(dim, n):
+def uniform_mesh(dim, n, l=1):
     if dim == 2:
-        return UnitSquareMesh(n, n)
+        return SquareMesh(n, n, l)
     elif dim == 3:
-        return UnitCubeMesh(n, n, n)
+        return CubeMesh(n, n, n, l)
     else:
         raise ValueError("Dimension {:d} not supported".format(dim))
 
@@ -26,18 +27,24 @@ def dim(request):
     return request.param
 
 
-# @pytest.fixture(params=['parts', 'dL2'])  # FIXME
+@pytest.fixture(params=[True, False])
+def interp(request):
+    return request.param
+
+
+# @pytest.fixture(params=['parts', 'dL2'])
 @pytest.fixture(params=['dL2'])
 def hessian_recovery(request):
     return request.param
 
 
-def test_gradient(dim):
+def test_gradient_linear(dim):
     r"""
-    Given a simple field :math:`f = x`, we check that the recovered gradient matches the analytical
-    gradient, :math:`\nabla f=(1, 0)`.
+    Given a simple linear field :math:`f = x`, we
+    check that the recovered gradient matches the
+    analytical gradient, :math:`\nabla f = (1, 0)`.
     """
-    mesh = get_mesh(dim, 3)
+    mesh = uniform_mesh(dim, 3)
     x = SpatialCoordinate(mesh)
     P1 = FunctionSpace(mesh, "CG", 1)
 
@@ -54,17 +61,24 @@ def test_gradient(dim):
     assert np.allclose(g.dat.data, analytical)
 
 
-def test_vorticity():
+def test_vorticity_anticlockwise():
     r"""
-    Given a velocity field :math:`\mathbf u = (u,v)`, the curl is defined by
+    Given a velocity field :math:`\mathbf u = (u,v)`,
+    the curl is defined by
 
   ..math::
-        \mathrm{curl}(\mathbf u) := \frac{\partial v}{\partial x} - \frac{\partial u}{\partial y}.
+        \mathrm{curl}(\mathbf u) :=
+            \frac{\partial v}{\partial x}
+            - \frac{\partial u}{\partial y}.
 
-    For a simple velocity field :math:`\mathbf u = 0.5* (-y, x)` the vorticity should be unity
-    everywhere.
+    For a simple velocity field,
+
+  ..math::
+        \mathbf u = 0.5* (-y, x),
+
+    the vorticity should be unity everywhere.
     """
-    mesh = get_mesh(2, 3)
+    mesh = uniform_mesh(2, 3)
     x, y = SpatialCoordinate(mesh)
     P1_vec = VectorFunctionSpace(mesh, "CG", 1)
 
@@ -82,28 +96,67 @@ def test_vorticity():
     assert np.allclose(zeta.dat.data, analytical)
 
 
-# TODO: Do not consider nodes next to boundary either, then reduce atol
-def test_hessian(dim, hessian_recovery):
+def test_hessian_bowl(dim, interp, hessian_recovery, plot=False):
     r"""
-    Given a simple field :math:`f = 0.5 \mathbf x \cdot \mathbf x`, we check that the recovered
-    Hessian matches the analytical Hessian: the identity matrix.
+    Check that the recovered Hessian of the quadratic
+    function
+
+  ..math::
+        u(\mathbf x) = \frac12(\mathbf x \cdot \mathbf x)
+
+    is the identity matrix.
+
+    :arg interp: toggle whether or not to interpolate
+        into :math:`\mathbb P1` space before recovering
+        the Hessian.
     """
-    mesh = get_mesh(dim, 10)
+    op = Options(hessian_recovery=hessian_recovery)
+    n = 100 if dim == 2 else 40
+    if dim == 3 and interp:
+        pytest.xfail("We cannot expect recovery to be good here.")
+    mesh = uniform_mesh(dim, n, 2)
     x = SpatialCoordinate(mesh)
-    P1 = FunctionSpace(mesh, "CG", 1)
+    mesh.coordinates.interpolate(as_vector([xi - 1 for xi in x]))
 
-    # Define test function
-    f = interpolate(0.5*sum(xi**2 for xi in x), P1)
+    # Construct Hessian
+    f = 0.5*dot(x, x)
+    if interp:
+        f = interpolate(f, FunctionSpace(mesh, "CG", 1))
+    H = recover_hessian(f, mesh=mesh, op=op)
 
-    # Recover Hessian using double L2 projection
-    op = CoupledOptions(hessian_recovery=hessian_recovery)
-    H = recover_hessian(f, op=op)
+    # Construct analytical solution
+    I = interpolate(Identity(dim), H.function_space())
 
-    # Do not consider boundary nodes
-    bnd_nodes = DirichletBC(P1, 0, 'on_boundary').nodes
-    H_interior = [Hi for i, Hi in enumerate(H.dat.data) if i not in bnd_nodes]
+    # Check correspondence
+    tol = 1.0e-5 if dim == 3 else 0.8 if interp else 1.0e-6
+    assert np.allclose(H.dat.data, I.dat.data, atol=tol)
+    if not plot:
+        return
+    if dim != 2:
+        raise ValueError("Cannot plot in {:d} dimensions".format(dim))
 
-    # Compare with analytical solution
-    d2fdx2 = np.identity(dim)
-    analytical = [d2fdx2 for i in H_interior]
-    assert np.allclose(H_interior, analytical, atol=0.15)
+    # Plot errors on scatterplot
+    H_arr = np.abs(H.dat.data - I.dat.data)
+    ones = np.ones(len(H_arr))
+    fig, axes = plt.subplots(figsize=(5, 6))
+    for i in range(2):
+        for j in range(2):
+            axes.scatter((2*i + j + 1)*ones, H_arr[:, i, j], marker='x')
+    axes.set_yscale('log')
+    axes.set_xlim([0, 5])
+    axes.set_xticks([1, 2, 3, 4])
+    axes.set_xticklabels(["(0,0)", "(0,1)", "(1,0)", "(1,1)"])
+    axes.set_xlabel("Hessian component")
+    if interp:
+        axes.set_yticks([1e-15, 1e-10, 1e-5, 1])
+    axes.set_ylabel("Absolute error")
+    savefig("hessian_errors_bowl", "outputs/hessian", extensions=["pdf"])
+
+
+# ---------------------------
+# plotting
+# ---------------------------
+
+if __name__ == "__main__":
+    test_hessian_bowl(2, True, 'dL2', plot=True)
+    test_hessian_bowl(2, False, 'dL2', plot=True)
