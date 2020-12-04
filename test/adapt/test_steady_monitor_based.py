@@ -1,21 +1,22 @@
 r"""
-Test mesh movement in the steady state case for analytically defined monitor functions.
+Test mesh movement in the steady state case for analytically defined monitor functions
+from [Weller et al. 2016].
 
-The monitor functions are modified from those found in
-
-H. Weller, P. Browne, C. Budd, and M. Cullen, Mesh adaptation on the sphere using op-
-timal transport and the numerical solution of a Monge--Amp\ère type equation, J. Comput.
-Phys., 308 (2016), pp. 102--123, https://doi.org/10.1016/j.jcp.2015.12.018.
+[Weller et al. 2016] H. Weller, P. Browne, C. Budd, and M. Cullen, Mesh adaptation on the
+    sphere using optimal transport and the numerical solution of a Monge-Amp\ère type
+    equation, J. Comput. Phys., 308 (2016), pp. 102--123,
+    https://doi.org/10.1016/j.jcp.2015.12.018.
 """
 from firedrake import *
 
-import pytest
-import os
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import os
+import pytest
 
 from adapt_utils.adapt.r import MeshMover
 from adapt_utils.options import Options
+from adapt_utils.plotting import *
 
 
 def ring(mesh):
@@ -55,11 +56,11 @@ def method(request):
     return request.param
 
 
-def test_mesh_movement(monitor, method, plot_mesh=False):
+def test_analytical(monitor, method, plot_mesh=False):
     fname = '_'.join([monitor.__name__, method])
     fpath = os.path.dirname(__file__)
 
-    op = Options(approach='monge_ampere', r_adapt_rtol=1.0e-03, nonlinear_method=method, debug=plot_mesh)
+    op = Options(approach='monge_ampere', r_adapt_rtol=1.0e-03, nonlinear_method=method)
 
     mesh = UnitSquareMesh(20, 20)
     orig_vol = assemble(Constant(1.0)*dx(domain=mesh))
@@ -71,11 +72,10 @@ def test_mesh_movement(monitor, method, plot_mesh=False):
     assert np.allclose(orig_vol, vol), "Volume is not conserved!"
 
     if plot_mesh:
-        fig, axes = plt.subplots()
-        triplot(mesh, axes=axes)
-        axes.axis('off')
-        plt.tight_layout()
-        plt.savefig(os.path.join(fpath, 'outputs', fname + '.png'))
+        fig, axes = plt.subplots(figsize=(5, 5))
+        triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
+        axes.axis(False)
+        savefig(fname, os.path.join(fpath, 'outputs'), extensions=['png']))
 
     if not os.path.exists(os.path.join(fpath, 'data', fname + '.npy')):
         np.save(os.path.join(fpath, 'data', fname), mm.x.dat.data)
@@ -91,4 +91,4 @@ def test_mesh_movement(monitor, method, plot_mesh=False):
 
 if __name__ == '__main__':
     for m in [ring, bell]:
-        test_mesh_movement(m, 'quasi_newton', plot_mesh=True)
+        test_analytical(m, 'quasi_newton', plot_mesh=True)
