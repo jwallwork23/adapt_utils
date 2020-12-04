@@ -428,7 +428,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             evalues.interpolate(as_vector([abs(K_hat/K_opt*s), abs(K_hat/K_opt/s)]))
         else:
             raise NotImplementedError  # TODO
-        kernel = eigen_kernel(set_eigendecomposition_transpose, dim)
+        # kernel = eigen_kernel(set_eigendecomposition_transpose, dim)
+        kernel = eigen_kernel(set_eigendecomposition, dim)
         op2.par_loop(kernel, self.P0_ten[0].node_set, M.dat(op2.RW), evectors.dat(op2.READ), evalues.dat(op2.READ))
 
         # Project metric

@@ -96,7 +96,7 @@ def test_vorticity_anticlockwise():
     assert np.allclose(zeta.dat.data, analytical)
 
 
-def test_hessian_bowl(dim, interp, hessian_recovery, plot=False):
+def test_hessian_bowl(dim, interp, hessian_recovery, plot_mesh=False):
     r"""
     Check that the recovered Hessian of the quadratic
     function
@@ -130,7 +130,7 @@ def test_hessian_bowl(dim, interp, hessian_recovery, plot=False):
     # Check correspondence
     tol = 1.0e-5 if dim == 3 else 0.8 if interp else 1.0e-6
     assert np.allclose(H.dat.data, I.dat.data, atol=tol)
-    if not plot:
+    if not plot_mesh:
         return
     if dim != 2:
         raise ValueError("Cannot plot in {:d} dimensions".format(dim))
@@ -158,5 +158,5 @@ def test_hessian_bowl(dim, interp, hessian_recovery, plot=False):
 # ---------------------------
 
 if __name__ == "__main__":
-    test_hessian_bowl(2, True, 'dL2', plot=True)
-    test_hessian_bowl(2, False, 'dL2', plot=True)
+    test_hessian_bowl(2, True, 'dL2', plot_mesh=True)
+    test_hessian_bowl(2, False, 'dL2', plot_mesh=True)
