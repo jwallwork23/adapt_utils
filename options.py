@@ -626,11 +626,11 @@ class CoupledOptions(Options):
 
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
-        return None if np.allclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
+        return None if np.isclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
-        return None if np.allclose(self.base_diffusivity, 0.0) else Constant(self.base_diffusivity)
+        return None if np.isclose(self.base_diffusivity, 0.0) else Constant(self.base_diffusivity)
 
     def set_inflow(self, fs):
         """Should be implemented in derived class."""

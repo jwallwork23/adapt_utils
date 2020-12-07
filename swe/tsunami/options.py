@@ -232,7 +232,7 @@ class TsunamiOptions(CoupledOptions):
         # # TODO: Normalise by area computed on fine reference mesh
         # # area = assemble(b*dx)
         # # area_fine_mesh = ...
-        # # rescaling = 1.0 if np.allclose(area, 0.0) else area_fine_mesh/area
+        # # rescaling = 1.0 if np.isclose(area, 0.0) else area_fine_mesh/area
         # rescaling = 1.0
 
         # z, zeta = prob.adj_solutions[-1].split()

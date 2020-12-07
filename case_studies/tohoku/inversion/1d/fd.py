@@ -55,7 +55,7 @@ op.save_timeseries = False
 op.control_parameters[0].assign(kwargs['control_parameters'][0])
 swp.solve_forward()
 J = op.J
-assert not np.allclose(J, 0.0)
+assert not np.isclose(J, 0.0)
 
 # --- Finite differences
 

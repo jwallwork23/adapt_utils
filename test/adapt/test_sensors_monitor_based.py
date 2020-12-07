@@ -115,7 +115,7 @@ def test_sensors(sensor, monitor_type, method, plot_mesh=False):
     mm.adapt()
     mesh.coordinates.assign(mm.x)
     vol = assemble(Constant(1.0)*dx(domain=mesh))
-    assert np.allclose(orig_vol, vol), "Volume is not conserved!"
+    assert np.isclose(orig_vol, vol), "Volume is not conserved!"
 
     # Plot mesh
     if plot_mesh:
