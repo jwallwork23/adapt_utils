@@ -69,9 +69,15 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         return boundary_conditions
 
     def set_calibrated_radius(self):
+        """
+        Set radius for source term using results from `calibrate_radius.py` script.
+
+        NOTE: Bounds of (0.001, 1) were applied because the iteration went to zero if zero was the
+        lower bound.
+        """
         # r = 9.954470e-02  # (Level 0, anisotropic SUPG)
-        r = 6.97574750e-02  # (Level 1, anisotropic SUPG)
-        # TODO: Level 2
+        # r = 6.97574750e-02  # (Level 1, anisotropic SUPG)
+        r = 6.51537538e-02  # (Level 2, anisotropic SUPG)
         return [(1.0 + self.shift, 5.0, 5.0, r)]
 
     def analytical_solution(self, fs):
