@@ -9,7 +9,9 @@ __all__ = ["lp_norm", "total_variation", "vecnorm", "timeseries_error",
 
 
 def _split_by_nan(f):
-    """Split a list containing NaNs into separate lists."""
+    """
+    Split a list containing NaNs into separate lists.
+    """
     f_split = [[], ]
     nan_slots = []
     for i, fi in enumerate(f):
@@ -23,7 +25,9 @@ def _split_by_nan(f):
 
 
 def _lp_norm_clean(f, p):
-    r""":math:`\ell_p` norm of a 1D array which does not contain NaNs"""
+    r"""
+    :math:`\ell_p` norm of a 1D array which does not contain NaNs.
+    """
     if p is None or 'inf' in p:
         return f.max()
     elif p.startswith('l'):
@@ -38,12 +42,14 @@ def _lp_norm_clean(f, p):
 
 
 def _total_variation_clean(f):
-    """Calculate the total variation of a 1D array which does not contain NaNs."""
+    """
+    Calculate the total variation of a 1D array which does not contain NaNs.
+    """
     n, tv, i0 = len(f), 0.0, 0
     if n == 0:
         return 0.0
     elif n == 1:
-        # assert np.allclose(f[0], 0.0)  # TODO: TEMPORARY
+        # assert np.isclose(f[0], 0.0)
         return 0.0
     sign_ = np.sign(f[1] - f[i0])
     for i in range(2, n):
@@ -71,12 +77,16 @@ def lp_norm(f, p='l2'):
 
 
 def total_variation(f):
-    """Calculate the total variation of a 1D array which may contain NaNs."""
+    """
+    Calculate the total variation of a 1D array which may contain NaNs.
+    """
     return timeseries_error(f, norm_type='tv')
 
 
 def vecnorm(x, order=2):
-    """Consistent with the norm used in `scipy/optimize.py`."""
+    """
+    Consistent with the norm used in `scipy/optimize.py`.
+    """
     if order == np.Inf:
         return np.amax(np.abs(x))
     elif order == -np.Inf:
@@ -86,7 +96,9 @@ def vecnorm(x, order=2):
 
 
 def timeseries_error(f, g=None, relative=False, norm_type='tv'):
-    """Helper function for evaluating error of a 1D array."""
+    """
+    Helper function for evaluating error of a 1D array.
+    """
     if norm_type != 'tv' and norm_type[0] != 'l':
         raise ValueError("Error type '{:s}' not recognised.".format(norm_type))
     n = len(f)
@@ -115,7 +127,9 @@ def timeseries_error(f, g=None, relative=False, norm_type='tv'):
 
 
 def local_norm(f, norm_type='L2'):
-    """Calculate the `norm_type`-norm of `f` separately on each element of the mesh."""
+    """
+    Calculate the `norm_type`-norm of `f` separately on each element of the mesh.
+    """
     typ = norm_type.lower()
     mesh = f.function_space().mesh()
     i = TestFunction(FunctionSpace(mesh, "DG", 0))
@@ -154,7 +168,9 @@ def local_norm(f, norm_type='L2'):
 
 
 def frobenius_norm(matrix, mesh=None):
-    """Calculate the Frobenius norm of `matrix`."""
+    """
+    Calculate the Frobenius norm of `matrix`.
+    """
     mesh = mesh or matrix.function_space().mesh()
     dim = mesh.topological_dimension()
     f = 0
@@ -165,7 +181,9 @@ def frobenius_norm(matrix, mesh=None):
 
 
 def local_frobenius_norm(matrix, mesh=None, space=None):
-    """Calculate the Frobenius norm of `matrix` separately on each element of the mesh."""
+    """
+    Calculate the Frobenius norm of `matrix` separately on each element of the mesh.
+    """
     mesh = mesh or matrix.function_space().mesh()
     space = space or FunctionSpace(mesh, "DG", 0)
     dim = mesh.topological_dimension()
@@ -177,7 +195,9 @@ def local_frobenius_norm(matrix, mesh=None, space=None):
 
 
 def local_edge_integral(f, mesh=None):
-    """Integrate `f` over all edges elementwise, giving a P0 field."""
+    """
+    Integrate `f` over all edges elementwise, giving a P0 field.
+    """
     mesh = mesh or f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
     test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
@@ -186,7 +206,9 @@ def local_edge_integral(f, mesh=None):
 
 
 def local_interior_edge_integral(f, mesh=None):
-    """Integrate `f` over all interior edges elementwise, giving a P0 field."""
+    """
+    Integrate `f` over all interior edges elementwise, giving a P0 field.
+    """
     mesh = mesh or f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
     test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)
@@ -195,7 +217,9 @@ def local_interior_edge_integral(f, mesh=None):
 
 
 def local_boundary_integral(f, mesh=None):
-    """Integrate `f` over all exterior edges elementwise, giving a P0 field."""
+    """
+    Integrate `f` over all exterior edges elementwise, giving a P0 field.
+    """
     mesh = mesh or f.function_space().mesh()
     P0 = FunctionSpace(mesh, 'DG', 0)
     test, trial, integral = TestFunction(P0), TrialFunction(P0), Function(P0)

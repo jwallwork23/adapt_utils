@@ -108,7 +108,7 @@ class TohokuHazardOptions(TohokuOptions):
                 'gaussian': 4.18761028e+09,
             }[self.kernel_shape]
             area = assemble(b*dx)
-            rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
+            rescaling = Constant(1.0 if np.isclose(area, 0.0) else area_fine_mesh/area)
         elif locations == ['Fukushima Daiichi', ] and np.isclose(r, 100e+03):
             area_fine_mesh = {
                 'ball': 1.73829649e+10,
@@ -116,7 +116,7 @@ class TohokuHazardOptions(TohokuOptions):
                 'gaussian': 1.66879811e+10,
             }[self.kernel_shape]
             area = assemble(b*dx)
-            rescaling = Constant(1.0 if np.allclose(area, 0.0) else area_fine_mesh/area)
+            rescaling = Constant(1.0 if np.isclose(area, 0.0) else area_fine_mesh/area)
         else:
             rescaling = Constant(1.0)
 

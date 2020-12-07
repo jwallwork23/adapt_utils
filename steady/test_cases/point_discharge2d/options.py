@@ -142,7 +142,7 @@ class PointDischarge2dOptions(CoupledOptions):
         b = self.ball(mesh, source=False)
         area = assemble(b*dx)
         area_analytical = pi*self.region_of_interest[0][2]**2
-        rescaling = 1.0 if np.allclose(area, 0.0) else area_analytical/area
+        rescaling = 1.0 if np.isclose(area, 0.0) else area_analytical/area
         return rescaling*b
 
     def analytical_solution(self, fs):

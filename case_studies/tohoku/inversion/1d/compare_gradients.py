@@ -113,7 +113,7 @@ swp.save_adjoint_trajectory()
 g_by_hand_discrete = assemble(inner(op.basis_functions[0], swp.adj_solutions[0])*dx)
 print_output("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
 relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
-assert np.allclose(relative_error, 0.0)
+assert np.isclose(relative_error, 0.0)
 swp.clear_tape()
 del swp
 stop_annotating()
