@@ -75,7 +75,7 @@ def test_analytical(monitor, method, plot_mesh=False):
         fig, axes = plt.subplots(figsize=(5, 5))
         triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
         axes.axis(False)
-        savefig(fname, os.path.join(fpath, 'outputs'), extensions=['png']))
+        savefig(fname, os.path.join(fpath, 'outputs'), extensions=['png'])
 
     if not os.path.exists(os.path.join(fpath, 'data', fname + '.npy')):
         np.save(os.path.join(fpath, 'data', fname), mm.x.dat.data)
