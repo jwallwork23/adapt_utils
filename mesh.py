@@ -1,9 +1,11 @@
 from thetis import *
 
 import matplotlib.pyplot as plt
+import numpy as np
 
 
-__all__ = ["MeshStats", "isotropic_cell_size", "anisotropic_cell_size"]
+__all__ = ["MeshStats", "isotropic_cell_size", "anisotropic_cell_size", "make_consistent",
+           "get_patch"]
 
 
 class MeshStats(object):
@@ -107,6 +109,74 @@ def anisotropic_cell_size(mesh):
 
     # Return minimum eigenvalue
     return interpolate(evalues[-1], FunctionSpace(mesh, "DG", 0))
+
+
+def make_consistent(mesh):
+    """
+    Make the coordinates associated with a Firedrake mesh and its underlying PETSc DMPlex
+    use a consistent numbering.
+    """
+    import firedrake.cython.dmcommon as dmplex
+
+    # Create section
+    dim = mesh.topological_dimension()
+    gdim = mesh.geometric_dimension()
+    entity_dofs = np.zeros(dim+1, dtype=np.int32)
+    entity_dofs[0] = gdim
+    try:
+        coord_section = dmplex.create_section(mesh, entity_dofs)
+    except AttributeError:
+        P0 = FunctionSpace(mesh, "DG", 0)  # NOQA
+        coord_section = dmplex.create_section(mesh, entity_dofs)
+
+    # Set plex coords to mesh coords
+    plex = mesh._topology_dm
+    dm_coords = plex.getCoordinateDM()
+    dm_coords.setDefaultSection(coord_section)
+    coords_local = dm_coords.createLocalVec()
+    coords_local.array[:] = np.reshape(mesh.coordinates.dat.data, coords_local.array.shape)
+    plex.setCoordinatesLocal(coords_local)
+
+    # Functions for getting offsets of entities and coordinates of vertices
+    offset = lambda index: coord_section.getOffset(index)//dim
+    coordinates = lambda index: mesh.coordinates.dat.data[offset(index)]
+    return plex, offset, coordinates
+
+
+def get_patch(vertex, mesh=None, plex=None, coordinates=None, extend=set([])):
+    """
+    Generate an element patch around a vertex.
+
+    :kwarg extend: optionally take the union with an existing patch.
+    """
+    elements = extend
+    if coordinates is None:
+        assert mesh is not None
+        plex, offset, coordinates = make_consistent(mesh)
+    plex = plex or mesh._topology_dm
+    dim = plex.getDimension()
+    assert dim in (2, 3)
+    n = 3 if dim == 2 else 4
+    if mesh is not None:
+        cell = mesh.ufl_cell()
+        if (dim == 2 and cell != triangle) or (dim == 3 and cell != tetrahedron):
+            raise ValueError("Element type {:} not supported".format(cell))
+
+    # Get patch of neighbouring elements
+    for e in set(plex.getSupport(vertex)):
+        elements = elements.union(set(plex.getSupport(e)))
+    patch = {'elements': {k: {'centroid': 0.0, 'vertices': []} for k in elements}}
+
+    # Get vertices and centroids in patch
+    vertices = set(range(*plex.getDepthStratum(0)))
+    patch['vertices'] = set([])
+    for k in elements:
+        closure = set(plex.getTransitiveClosure(k)[0])
+        patch['elements'][k]['vertices'] = vertices.intersection(closure)
+        coords = [coordinates(v) for v in patch['elements'][k]['vertices']]
+        patch['elements'][k]['centroid'] = np.sum(coords, axis=0)/n
+        patch['vertices'] = patch['vertices'].union(set(patch['elements'][k]['vertices']))
+    return patch
 
 
 # FIXME: Why do rotations of the same element not have the same quality?
