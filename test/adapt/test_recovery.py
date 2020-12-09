@@ -50,6 +50,7 @@ def recover_gradient(n, plot=False):
     # Exact gradient interpolated into P1 space
     sigma = Function(P1_vec)
     sigma.interpolate(gradient(x, y))
+    sigma_l2 = np.sqrt(np.sum([np.dot(s, s) for s in sigma.dat.data]))
 
     # Direct differentiation
     sigma_h = interpolate(grad(u_h), P0_vec)
@@ -115,7 +116,10 @@ def recover_gradient(n, plot=False):
         # Solve local system
         a = np.linalg.solve(A, b)
         sigma_ZZ.dat.data[offset(vvv)] = np.dot(vandermonde(*coordinates(vvv)), a)
-    relative_error_sigma_ZZ = errornorm(sigma, sigma_ZZ)/norm(sigma)
+    # relative_error_sigma_ZZ = errornorm(sigma, sigma_ZZ)/norm(sigma)
+    e_ZZ = sigma.copy(deepcopy=True)
+    e_ZZ -= sigma_ZZ
+    relative_error_sigma_ZZ = np.sqrt(np.sum([np.dot(e, e) for e in e_ZZ.dat.data]))/sigma_l2
 
     # Global L2 projection
     p1trial = TrialFunction(P1_vec)
@@ -124,7 +128,10 @@ def recover_gradient(n, plot=False):
     a = inner(p1test, p1trial)*dx
     L = inner(p1test, sigma_h)*dx
     solve(a == L, sigma_L, solver_parameters={'ksp_type': 'cg'})
-    relative_error_sigma_L = errornorm(sigma, sigma_L)/norm(sigma)
+    # relative_error_sigma_L = errornorm(sigma, sigma_L)/norm(sigma)
+    e_L = sigma.copy(deepcopy=True)
+    e_L -= sigma_L
+    relative_error_sigma_L = np.sqrt(np.sum([np.dot(e, e) for e in e_L.dat.data]))/sigma_l2
 
     # Plotting
     if plot:
