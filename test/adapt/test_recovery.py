@@ -5,7 +5,9 @@ import numpy as np
 import pytest
 
 from adapt_utils.adapt.recovery import *
+from adapt_utils.mesh import get_patch, make_consistent
 from adapt_utils.options import Options
+from adapt_utils.plotting import *
 from adapt_utils.swe.utils import recover_vorticity
 
 
@@ -16,6 +18,144 @@ def uniform_mesh(dim, n, l=1):
         return CubeMesh(n, n, n, l)
     else:
         raise ValueError("Dimension {:d} not supported".format(dim))
+
+
+def recover_gradient(n, plot=False):
+    """
+    Apply Zienkiewicz-Zhu recovery for the gradient of a sinusoidal function.
+    """
+    plotted = {vertex_type: not plot for vertex_type in ('interior', 'boundary', 'corner')}
+    kwargs = dict(levels=np.linspace(0, 6.4, 50), cmap='coolwarm')
+
+    # Function of interest and its exact gradient
+    k = 2*pi
+    func = lambda xx, yy: sin(k*xx)*sin(k*yy)
+    gradient = lambda xx, yy: as_vector([k*cos(k*xx)*sin(k*y), k*sin(k*xx)*cos(k*yy)])
+    vandermonde = lambda xx, yy: np.array([1.0, xx, yy])
+
+    # Domain
+    mesh = uniform_mesh(2, n)
+    x, y = SpatialCoordinate(mesh)
+    plex, offset, coordinates = make_consistent(mesh)
+
+    # Spaces
+    P1_vec = VectorFunctionSpace(mesh, "CG", 1)
+    P0_vec = VectorFunctionSpace(mesh, "DG", 0)
+    P1 = FunctionSpace(mesh, "CG", 1)
+
+    # P1 interpolant
+    u_h = Function(P1)
+    u_h.interpolate(func(x, y))
+
+    # Exact gradient interpolated into P1 space
+    sigma = Function(P1_vec)
+    sigma.interpolate(gradient(x, y))
+
+    # Direct differentiation
+    sigma_h = interpolate(grad(u_h), P0_vec)
+
+    # Zienkiewicz-Zhu
+    sigma_ZZ = Function(P1_vec)
+    if plot:
+        fig, axes = plt.subplots(ncols=3, figsize=(16, 5))
+    for vvv in range(*plex.getDepthStratum(0)):
+        patch = get_patch(vvv, plex=plex, coordinates=coordinates)
+        elements = set(patch['elements'].keys())
+        orig_elements = set(patch['elements'].keys())
+
+        # Classify vertex
+        vertex_type = None
+        if len(elements) == 6:
+            vertex_type = 'interior'
+        elif len(elements) == 3:
+            vertex_type = 'boundary'
+        elif len(elements) in (1, 2):
+            vertex_type = 'corner'
+        else:
+            raise ValueError
+
+        # Extend patch for boundary cases
+        if len(elements) == 1:
+            for v in patch['vertices']:
+                if len(plex.getSupport(v)) == 4:
+                    patch = get_patch(v, plex=plex, coordinates=coordinates, extend=elements)
+                    break
+            elements = set(patch['elements'].keys())
+        if len(elements) != 6:
+            for v in patch['vertices']:
+                if len(plex.getSupport(v)) == 6:
+                    patch = get_patch(v, plex=plex, coordinates=coordinates, extend=elements)
+                    break
+            elements = set(patch['elements'].keys())
+
+        # Plot one example of each patch type
+        if not plotted[vertex_type]:
+            ax = axes[{'interior': 0, 'boundary': 1, 'corner': 2}[vertex_type]]
+            ax.set_title(vertex_type.capitalize())
+            triplot(mesh, axes=ax)
+            for v in patch['vertices']:
+                colour = 'C4' if v == vvv else 'C2'
+                marker = 'o' if v == vvv else 'x'
+                ax.plot(*coordinates(v), marker, color=colour)
+            for k in elements:
+                colour = 'C1' if k in orig_elements else 'C5'
+                ax.plot(*patch['elements'][k]['centroid'], '^', color=colour)
+            ax.axis(False)
+            plotted[vertex_type] = True
+
+        # Assemble local system
+        A = np.zeros((3, 3))
+        b = np.zeros((3, 2))
+        for k in elements:
+            c = patch['elements'][k]['centroid']
+            P = vandermonde(*c)
+            A += np.tensordot(P, P, axes=0)
+            b += np.tensordot(P, sigma_h.at(c), axes=0)
+
+        # Solve local system
+        a = np.linalg.solve(A, b)
+        sigma_ZZ.dat.data[offset(vvv)] = np.dot(vandermonde(*coordinates(vvv)), a)
+    relative_error_sigma_ZZ = errornorm(sigma, sigma_ZZ)/norm(sigma)
+
+    # Global L2 projection
+    p1trial = TrialFunction(P1_vec)
+    p1test = TestFunction(P1_vec)
+    sigma_L = Function(P1_vec)
+    a = inner(p1test, p1trial)*dx
+    L = inner(p1test, sigma_h)*dx
+    solve(a == L, sigma_L, solver_parameters={'ksp_type': 'cg'})
+    relative_error_sigma_L = errornorm(sigma, sigma_L)/norm(sigma)
+
+    # Plotting
+    if plot:
+        plt.show()
+
+        # Plot exact gradient
+        fig, axes = plt.subplots(ncols=3, figsize=(16, 5))
+        axes[0].set_title("Exact")
+        fig.colorbar(tricontourf(sigma, axes=axes[0], **kwargs), ax=axes[0])
+        triplot(mesh, axes=axes[0])
+        axes[0].axis(False)
+        axes[0].set_xlim([-0.1, 1.1])
+        axes[0].set_ylim([-0.1, 1.1])
+
+        # Plot L2 projected gradient
+        axes[1].set_title("Global L2 projection")
+        fig.colorbar(tricontourf(sigma_L, axes=axes[1], **kwargs), ax=axes[1])
+        triplot(mesh, axes=axes[1])
+        axes[1].axis(False)
+        axes[1].set_xlim([-0.1, 1.1])
+        axes[1].set_ylim([-0.1, 1.1])
+
+        # Plot ZZ recovered gradient
+        axes[2].set_title("Zienkiewicz-Zhu")
+        fig.colorbar(tricontourf(sigma_ZZ, axes=axes[2], **kwargs), ax=axes[2])
+        triplot(mesh, axes=axes[2], boundary_kw={'color': 'k'})
+        axes[2].axis(False)
+        axes[2].set_xlim([-0.1, 1.1])
+        axes[2].set_ylim([-0.1, 1.1])
+        plt.show()
+    return relative_error_sigma_ZZ, relative_error_sigma_L
 
 
 # ---------------------------
@@ -153,10 +293,52 @@ def test_hessian_bowl(dim, interp, hessian_recovery, plot_mesh=False):
     savefig("hessian_errors_bowl", "outputs/hessian", extensions=["pdf"])
 
 
+def test_gradient_recovery(plot=False):
+    """
+    Check convergence rate of global L2 projection and Zienkiewicz-Zhu recovery.
+    """
+    relative_error_zz = []
+    relative_error_l2 = []
+    istart, iend = 2, 7
+    for i in range(istart, iend):
+        errors = recover_gradient(2**i)
+        relative_error_zz.append(errors[0])
+        relative_error_l2.append(errors[1])
+        if i > istart:
+            rate, expected = relative_error_zz[-2]/relative_error_zz[-1], 3
+            msg = "Zienkiewicz-Zhu convergence rate {:.2f} < {:.2f}"
+            assert rate > expected, msg.format(rate, expected)
+            rate, expected = relative_error_l2[-2]/relative_error_l2[-1], 2
+            assert rate > expected, msg.format(rate, expected)
+            msg = "L2 projection convergence rate {:.2f} < {:.2f}"
+    if plot:
+        fig, axes = plt.subplots(figsize=(5, 5))
+        elements = [2**(2*i+1) for i in range(istart, iend)]
+        axes.loglog(elements, relative_error_zz, '--x', label='ZZ')
+        axes.loglog(elements, relative_error_l2, '--x', label='L2')
+        axes.set_xlabel("Element count")
+        axes.set_ylabel("Relative error")
+        axes.set_yticks([0.01, 0.1, 1])
+        axes.set_yticklabels([r"{{{:.0f}}}\%".format(100*e) for e in axes.get_yticks()])
+        axes.legend()
+        axes.grid(True)
+        savefig('gradient_recovery_convergence', 'outputs', extensions=['pdf'])
+
+
 # ---------------------------
 # plotting
 # ---------------------------
 
 if __name__ == "__main__":
-    test_hessian_bowl(2, True, 'dL2', plot_mesh=True)
-    test_hessian_bowl(2, False, 'dL2', plot_mesh=True)
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-level', help="Mesh resolution level in each direction.")
+    parser.add_argument('-convergence', help="Check convergence.")
+    parser.add_argument('-plot', help="Toggle plotting.")
+    args = parser.parse_args()
+    if bool(args.convergence or False):
+        test_gradient_recovery(plot=True)
+    else:
+        recover_gradient(2**int(args.level or 3), bool(args.plot or False))
+    # test_hessian_bowl(2, True, 'dL2', plot_mesh=True)
+    # test_hessian_bowl(2, False, 'dL2', plot_mesh=True)
