@@ -1,5 +1,8 @@
 from firedrake import *
 
+import numpy as np
+
+from adapt_utils.mesh import get_patch, make_consistent
 from adapt_utils.options import Options
 
 
@@ -9,7 +12,7 @@ __all__ = ["recover_gradient", "recover_hessian", "recover_boundary_hessian",
 
 # --- Use the following drivers if only doing a single L2 projection on the current mesh
 
-def recover_gradient(f, **kwargs):
+def recover_gradient(f, method='L2', **kwargs):
     r"""
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
@@ -25,6 +28,8 @@ def recover_gradient(f, **kwargs):
     :return: reconstructed gradient associated with `f`.
     """
     kwargs.setdefault('op', Options())
+    if method.upper() == 'ZZ':
+        return recover_gradient_zz(f, **kwargs)
 
     # Argument is a Function
     if isinstance(f, Function):
@@ -47,6 +52,67 @@ def recover_gradient(f, **kwargs):
     l2_proj = Function(P1_vec, name="Recovered gradient")
     solve(a == L, l2_proj, bcs=bcs, solver_parameters=op.gradient_solver_parameters)
     return l2_proj
+
+
+# TODO: Account for Hessian case
+def recover_gradient_zz(f, V=None, offset=None, coordinates=None, **kwargs):
+    """
+    Recover the gradient of a field `f` using the approach of [Zienkiewicz and Zhu 1987].
+    """
+    if V is not None:
+        f = interpolate(f, V)
+    fs = f.function_space()
+    mesh = fs.mesh()
+    if offset is None and coordinates is None:
+        plex, offset, coordinates = make_consistent(mesh)
+    else:
+        plex = mesh._topology_dm
+    shape = len(fs.shape)
+    if shape == 0:
+        constructor = VectorFunctionSpace
+    elif shape == 1:
+        constructor = TensorFunctionSpace
+    else:
+        raise NotImplementedError
+    P0 = constructor(mesh, "DG", 0)
+    P1 = constructor(mesh, "CG", 1)
+    sigma_h = interpolate(grad(f), P0)
+    sigma_ZZ = Function(P1)
+
+    vandermonde = lambda xx, yy: np.array([1.0, xx, yy])
+
+    # Loop over all vertices
+    for vvv in range(*plex.getDepthStratum(0)):
+        patch = get_patch(vvv, plex=plex, coordinates=coordinates)
+        elements = set(patch['elements'].keys())
+
+        # Extend patch for boundary cases
+        if len(elements) == 1:
+            for v in patch['vertices']:
+                if len(plex.getSupport(v)) == 4:
+                    patch = get_patch(v, plex=plex, coordinates=coordinates, extend=elements)
+                    break
+            elements = set(patch['elements'].keys())
+        if len(elements) != 6:
+            for v in patch['vertices']:
+                if len(plex.getSupport(v)) == 6:
+                    patch = get_patch(v, plex=plex, coordinates=coordinates, extend=elements)
+                    break
+            elements = set(patch['elements'].keys())
+
+        # Assemble local system
+        A = np.zeros((3, 3))
+        b = np.zeros((3, 2))
+        for k in elements:
+            c = patch['elements'][k]['centroid']
+            P = vandermonde(*c)
+            A += np.tensordot(P, P, axes=0)
+            b += np.tensordot(P, sigma_h.at(c), axes=0)
+
+        # Solve local system
+        a = np.linalg.solve(A, b)
+        sigma_ZZ.dat.data[offset(vvv)] = np.dot(vandermonde(*coordinates(vvv)), a)
+    return sigma_ZZ
 
 
 def recover_hessian(f, **kwargs):
