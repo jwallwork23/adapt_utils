@@ -1,7 +1,18 @@
 from ufl import *
 
+import numpy as np
 
-__all__ = ["bessi0", "bessk0"]
+
+__all__ = ["vandermonde", "bessi0", "bessk0"]
+
+
+def vandermonde(x, order=1):
+    """
+    Return Vandermonde matrix. In 2D, with order p, :math:`V = [1, x, y]`.
+    """
+    if order > 1:
+        raise NotImplementedError
+    return np.array([1.0, *x])
 
 
 def bessi0(x):

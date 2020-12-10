@@ -47,7 +47,7 @@ class BeachOptions(CoupledOptions):
 
         # Models
         self.set_up_morph_model(self.default_mesh)
-        self.hessian_recovery = 'dL2'
+        self.hessian_recovery = 'L2'
         self.grad_depth_viscosity = True
         self.stabilisation = 'lax_friedrichs'
         self.stabilisation_sediment = 'lax_friedrichs'

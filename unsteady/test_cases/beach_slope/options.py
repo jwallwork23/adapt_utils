@@ -38,7 +38,7 @@ class BeachOptions(CoupledOptions):
         self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
 
         self.plot_pvd = True
-        self.hessian_recovery = 'dL2'
+        self.hessian_recovery = 'L2'
 
         self.grad_depth_viscosity = True
 
