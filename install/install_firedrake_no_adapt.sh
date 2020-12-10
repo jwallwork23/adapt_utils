@@ -47,5 +47,5 @@ make
 python3 helmholtz/helmholtz.py
 
 # Install pip dependencies for adapt_utils
-python3 -m pip install matplotlib netCDF4 numpy pandas pyvista scipy utide utm
+python3 -m pip install matplotlib mpltools netCDF4 numpy pandas pyvista scipy utide utm
 # python3 -m pip install jupyter qmesh
