@@ -40,7 +40,7 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         self.h_min = 1.0e-30
         self.h_max = 1.0e+06
         # self.hessian_recovery = 'parts'
-        self.hessian_recovery = 'dL2'
+        self.hessian_recovery = 'L2'
 
         # Solver parameters
         self.solver_parameters['tracer'] = {

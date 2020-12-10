@@ -2,7 +2,9 @@ from firedrake import *
 
 import numpy as np
 
+from adapt_utils.maths import vandermonde
 from adapt_utils.mesh import get_patch, make_consistent
+from adapt_utils.misc import prod
 from adapt_utils.options import Options
 
 
@@ -12,7 +14,7 @@ __all__ = ["recover_gradient", "recover_hessian", "recover_boundary_hessian",
 
 # --- Use the following drivers if only doing a single L2 projection on the current mesh
 
-def recover_gradient(f, method='L2', **kwargs):
+def recover_gradient(f, **kwargs):
     r"""
     Assuming the function `f` is P1 (piecewise linear and continuous), direct differentiation will
     give a gradient which is P0 (piecewise constant and discontinuous). Since we would prefer a
@@ -27,14 +29,13 @@ def recover_gradient(f, method='L2', **kwargs):
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed gradient associated with `f`.
     """
-    kwargs.setdefault('op', Options())
-    if method.upper() == 'ZZ':
-        return recover_gradient_zz(f, **kwargs)
+    op = kwargs.get('op', Options())
+    if op.gradient_recovery == 'ZZ':
+        return recover_zz(f, **kwargs)
 
     # Argument is a Function
     if isinstance(f, Function):
         return L2ProjectorGradient(f.function_space(), **kwargs).project(f)
-    op = kwargs.get('op')
     op.print_debug("RECOVERY: Recovering gradient on domain interior...")
     if op.debug:
         op.gradient_solver_parameters['ksp_monitor'] = None
@@ -54,64 +55,69 @@ def recover_gradient(f, method='L2', **kwargs):
     return l2_proj
 
 
-# TODO: Account for Hessian case
-def recover_gradient_zz(f, V=None, offset=None, coordinates=None, **kwargs):
+def recover_zz(f, offset=None, coordinates=None, **kwargs):
     """
-    Recover the gradient of a field `f` using the approach of [Zienkiewicz and Zhu 1987].
+    Recover the gradient of a :class:`Function` `f` using the approach of [Zienkiewicz and Zhu 1987].
+    Note that `f` can be either a scalar or a vector function. In the latter case, the recovered
+    gradient is a matrix function.
+
+    :kwarg offset: function to go from DMPlex numbering to Firedrake numbering.
+    :kwarg coordinates: function to go from DMPlex numbering to mesh coordinates.
     """
-    if V is not None:
-        f = interpolate(f, V)
     fs = f.function_space()
     mesh = fs.mesh()
-    if offset is None and coordinates is None:
+    dim = mesh.topological_dimension()
+    if offset is None:
         plex, offset, coordinates = make_consistent(mesh)
     else:
         plex = mesh._topology_dm
+    if coordinates is None:
+        coordinates = lambda index: mesh.coordinates.dat.data[offset(index)]
+
+    # Construct FunctionSpaces for the direct and recovered gradients
     shape = len(fs.shape)
-    if shape == 0:
-        constructor = VectorFunctionSpace
-    elif shape == 1:
-        constructor = TensorFunctionSpace
-    else:
-        raise NotImplementedError
+    assert shape in (0, 1)
+    constructor = VectorFunctionSpace if shape == 0 else TensorFunctionSpace
     P0 = constructor(mesh, "DG", 0)
     P1 = constructor(mesh, "CG", 1)
+    shape = (dim, ) if shape == 0 else (dim, dim)
+
+    # Create Functions to hold the direct and recovered gradients
     sigma_h = interpolate(grad(f), P0)
     sigma_ZZ = Function(P1)
 
-    vandermonde = lambda xx, yy: np.array([1.0, xx, yy])
-
     # Loop over all vertices
+    kwargs = dict(plex=plex, coordinates=coordinates)
+    bnodes = DirichletBC(P1, 0, 'on_boundary').nodes
     for vvv in range(*plex.getDepthStratum(0)):
-        patch = get_patch(vvv, plex=plex, coordinates=coordinates)
-        elements = set(patch['elements'].keys())
+        patch = get_patch(vvv, **kwargs)
 
-        # Extend patch for boundary cases
-        if len(elements) == 1:
+        # Extend patch for corner case
+        if len(patch['elements'].keys()) <= 2 if dim == 2 else 6:
             for v in patch['vertices']:
-                if len(plex.getSupport(v)) == 4:
-                    patch = get_patch(v, plex=plex, coordinates=coordinates, extend=elements)
+                if v != vvv and offset(v) in bnodes:
+                    patch = get_patch(v, extend=patch['elements'].keys(), **kwargs)
                     break
-            elements = set(patch['elements'].keys())
-        if len(elements) != 6:
+
+        # Extend patch for boundary case
+        if offset(vvv) in bnodes:
             for v in patch['vertices']:
-                if len(plex.getSupport(v)) == 6:
-                    patch = get_patch(v, plex=plex, coordinates=coordinates, extend=elements)
+                if offset(v) not in bnodes:
+                    patch = get_patch(v, extend=patch['elements'].keys(), **kwargs)
                     break
-            elements = set(patch['elements'].keys())
 
         # Assemble local system
-        A = np.zeros((3, 3))
-        b = np.zeros((3, 2))
-        for k in elements:
+        A = np.zeros((dim+1, dim+1))
+        b = np.zeros((dim+1, prod(shape)))
+        for k in patch['elements']:
             c = patch['elements'][k]['centroid']
-            P = vandermonde(*c)
+            P = vandermonde(c)
             A += np.tensordot(P, P, axes=0)
-            b += np.tensordot(P, sigma_h.at(c), axes=0)
+            b += np.tensordot(P, sigma_h.at(c).flatten(), axes=0)
 
         # Solve local system
         a = np.linalg.solve(A, b)
-        sigma_ZZ.dat.data[offset(vvv)] = np.dot(vandermonde(*coordinates(vvv)), a)
+        sigma_ZZ.dat.data[offset(vvv)] = np.dot(vandermonde(coordinates(vvv)), a).reshape(shape)
     return sigma_ZZ
 
 
@@ -129,7 +135,7 @@ def recover_hessian(f, **kwargs):
     Monge-Amp\`ere tutorial provided on the Firedrake website:
     https://firedrakeproject.org/demos/ma-demo.py.html.
 
-    (2) "Double L2 projection" ('dL2'):
+    (2) "Double L2 projection" ('L2'):
     This involves two applications of the L2 projection operator. In this mode, we are permitted
     to recover the Hessian of a P0 field, since no derivatives of `f` are required.
 
@@ -137,12 +143,16 @@ def recover_hessian(f, **kwargs):
     :param op: `Options` class object providing min/max cell size values.
     :return: reconstructed Hessian associated with `f`.
     """
-    kwargs.setdefault('op', Options())
+    op = kwargs.get('op', Options())
+    if op.hessian_recovery == 'ZZ':
+        op.print_debug("RECOVERY: Recovering gradient...")
+        g = recover_zz(f, **kwargs)
+        op.print_debug("RECOVERY: Recovering Hessian from gradient...")
+        return recover_zz(g, **kwargs)
 
     # Argument  is a Function
     if isinstance(f, Function):
         return DoubleL2ProjectorHessian(f.function_space(), boundary=False, **kwargs).project(f)
-    op = kwargs.get('op')
     op.print_debug("RECOVERY: Recovering Hessian on domain interior...")
 
     # Argument is a UFL expression
@@ -348,7 +358,7 @@ class DoubleL2ProjectorHessian(L2Projector):
 
     This can either be achieved by a direct integration by parts, or by a double L2 projection, with
     the gradient as an intermediate variable. The former approach may be specified by setting
-    `op.hessian_recovery = 'parts'` and the latter by setting `op.hessian_recovery = 'dL2'`. For
+    `op.hessian_recovery = 'parts'` and the latter by setting `op.hessian_recovery = 'L2'`. For
     double L2 projection, a mixed finite element method is used.
 
     Note that the field itself need not be continuously differentiable at all.
@@ -380,7 +390,7 @@ class DoubleL2ProjectorHessian(L2Projector):
             L += dot(grad(self.field), dot(τ, self.n))*ds
 
         # Double L2 projection, using a mixed formulation for the gradient and Hessian
-        elif self.op.hessian_recovery == 'dL2':
+        elif self.op.hessian_recovery == 'L2':
             P1_vec = VectorFunctionSpace(self.mesh, "CG", 1)
             W = P1_vec*P1_ten
             g, H = TrialFunctions(W)
@@ -429,7 +439,7 @@ class DoubleL2ProjectorHessian(L2Projector):
     def project(self, f):
         assert f.function_space() == self.field.function_space()
         self.field.assign(f)
-        if not self.boundary and self.op.hessian_recovery == 'dL2':
+        if not self.boundary and self.op.hessian_recovery == 'L2':
             return self._project_interior()
         else:
             return super(DoubleL2ProjectorHessian, self).project(f)

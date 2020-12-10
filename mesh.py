@@ -143,13 +143,13 @@ def make_consistent(mesh):
     return plex, offset, coordinates
 
 
-def get_patch(vertex, mesh=None, plex=None, coordinates=None, extend=set([])):
+def get_patch(vertex, mesh=None, plex=None, coordinates=None, extend=[]):
     """
     Generate an element patch around a vertex.
 
     :kwarg extend: optionally take the union with an existing patch.
     """
-    elements = extend
+    elements = set(extend)
     if coordinates is None:
         assert mesh is not None
         plex, offset, coordinates = make_consistent(mesh)

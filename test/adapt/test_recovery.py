@@ -31,11 +31,12 @@ def l2_norm(array, nodes=None):
     return lp_norm(array)
 
 
-def recover_gradients(n, plot=False, no_boundary=False):
+def recover_gradient_sinusoidal(n, recovery, no_boundary, plot=False):
     """
     Apply Zienkiewicz-Zhu and global L2 projection to recover
     the gradient of a sinusoidal function.
     """
+    op = Options(gradient_recovery=recovery)
     kwargs = dict(levels=np.linspace(0, 6.4, 50), cmap='coolwarm')
 
     # Function of interest and its exact gradient
@@ -65,43 +66,27 @@ def recover_gradients(n, plot=False, no_boundary=False):
     sigma = interpolate(gradient(x, y), P1_vec)
     sigma_l2 = l2_norm(sigma.dat.data, nodes=nodes)
 
-    # Zienkiewicz-Zhu
-    sigma_ZZ = recover_gradient(u_h, method='ZZ')
-    relative_error_sigma_ZZ = l2_norm(sigma.dat.data - sigma_ZZ.dat.data, nodes=nodes)/sigma_l2
-
-    # Global L2 projection
-    sigma_L = recover_gradient(u_h, method='L2')
-    relative_error_sigma_L = l2_norm(sigma.dat.data - sigma_L.dat.data, nodes=nodes)/sigma_l2
+    # Recovered gradient
+    sigma_rec = recover_gradient(u_h, op=op)
+    relative_error = l2_norm(sigma.dat.data - sigma_rec.dat.data, nodes=nodes)/sigma_l2
 
     # Plotting
     if plot:
-
-        # Plot exact gradient
-        fig, axes = plt.subplots(ncols=3, figsize=(16, 5))
+        fig, axes = plt.subplots(ncols=2, figsize=(11, 5))
         axes[0].set_title("Exact")
         fig.colorbar(tricontourf(sigma, axes=axes[0], **kwargs), ax=axes[0])
         triplot(mesh, axes=axes[0])
         axes[0].axis(False)
         axes[0].set_xlim([-0.1, 1.1])
         axes[0].set_ylim([-0.1, 1.1])
-
-        # Plot L2 projected gradient
-        axes[1].set_title("Global L2 projection")
-        fig.colorbar(tricontourf(sigma_L, axes=axes[1], **kwargs), ax=axes[1])
+        axes[1].set_title("Global L2 projection" if method == 'L2' else "Zienkiewicz-Zhu")
+        fig.colorbar(tricontourf(sigma_rec, axes=axes[1], **kwargs), ax=axes[1])
         triplot(mesh, axes=axes[1])
         axes[1].axis(False)
         axes[1].set_xlim([-0.1, 1.1])
         axes[1].set_ylim([-0.1, 1.1])
-
-        # Plot ZZ recovered gradient
-        axes[2].set_title("Zienkiewicz-Zhu")
-        fig.colorbar(tricontourf(sigma_ZZ, axes=axes[2], **kwargs), ax=axes[2])
-        triplot(mesh, axes=axes[2], boundary_kw={'color': 'k'})
-        axes[2].axis(False)
-        axes[2].set_xlim([-0.1, 1.1])
-        axes[2].set_ylim([-0.1, 1.1])
         plt.show()
-    return relative_error_sigma_ZZ, relative_error_sigma_L
+    return relative_error
 
 
 # ---------------------------
@@ -118,9 +103,8 @@ def interp(request):
     return request.param
 
 
-# @pytest.fixture(params=['parts', 'dL2'])
-@pytest.fixture(params=['dL2'])
-def hessian_recovery(request):
+@pytest.fixture(params=['L2', 'ZZ'])
+def recovery(request):
     return request.param
 
 
@@ -129,21 +113,22 @@ def no_boundary(request):
     return request.param
 
 
-def test_gradient_linear(dim):
+def test_gradient_linear(dim, recovery):
     r"""
     Given a simple linear field :math:`f = x`, we
     check that the recovered gradient matches the
     analytical gradient, :math:`\nabla f = (1, 0)`.
     """
+    op = Options(gradient_recovery=recovery)
+
+    # Define test function
     mesh = uniform_mesh(dim, 3)
     x = SpatialCoordinate(mesh)
     P1 = FunctionSpace(mesh, "CG", 1)
-
-    # Define test function
     f = interpolate(x[0], P1)
 
-    # Recover gradient using L2 projection
-    g = recover_gradient(f)
+    # Recover gradient using specified method
+    g = recover_gradient(f, op=op)
 
     # Compare with analytical solution
     dfdx = np.zeros(dim)
@@ -187,7 +172,7 @@ def test_vorticity_anticlockwise():
     assert np.allclose(zeta.dat.data, analytical)
 
 
-def test_hessian_bowl(dim, interp, hessian_recovery, plot_mesh=False):  # TODO: TEMP
+def test_hessian_bowl(dim, interp, recovery, plot_mesh=False):
     r"""
     Check that the recovered Hessian of the quadratic
     function
@@ -201,7 +186,9 @@ def test_hessian_bowl(dim, interp, hessian_recovery, plot_mesh=False):  # TODO: 
         into :math:`\mathbb P1` space before recovering
         the Hessian.
     """
-    op = Options(hessian_recovery=hessian_recovery)
+    if not interp and recovery == 'ZZ':
+        pytest.xfail("Zienkiewicz-Zhu requires a Function, rather than an expression.")
+    op = Options(hessian_recovery=recovery)
     n = 100 if dim == 2 else 40
     if dim == 3 and interp:
         pytest.xfail("We cannot expect recovery to be good here.")
@@ -241,10 +228,10 @@ def test_hessian_bowl(dim, interp, hessian_recovery, plot_mesh=False):  # TODO: 
     if interp:
         axes.set_yticks([1e-15, 1e-10, 1e-5, 1])
     axes.set_ylabel("Absolute error")
-    savefig("hessian_errors_bowl", "outputs/hessian", extensions=["pdf"])
+    savefig("hessian_errors_bowl_{:s}".format(recovery), "outputs/hessian", extensions=["pdf"])
 
 
-def test_gradient_recovery(no_boundary, plot=False):
+def test_gradient_convergence(recovery, no_boundary):
     r"""
     Check l2 convergence rate of global L2 projection and Zienkiewicz-Zhu recovery.
 
@@ -253,37 +240,38 @@ def test_gradient_recovery(no_boundary, plot=False):
     that we can only hope for :math:`\mathcal O(h^2)` convergence. This latter rate
     is also expected for L2 projection.
     """
-    relative_error_zz = []
-    relative_error_l2 = []
+    relative_error = []
     istart, iend = 3, 7
     tol = 0.1
-    order_zz = 4 if no_boundary else 2
-    order_l2 = 2
+    order = 2 if recovery == 'L2' else 4 if no_boundary else 2
+    name = 'Zienkiewicz-Zhu' if recovery == 'ZZ' else 'L2 projection'
     for i in range(istart, iend):
-        errors = recover_gradients(2**i, no_boundary=no_boundary)
-        relative_error_zz.append(errors[0])
-        relative_error_l2.append(errors[1])
+        relative_error.append(recover_gradient_sinusoidal(2**i, recovery, no_boundary))
         if i > istart:
-            rate, expected = relative_error_zz[-2]/relative_error_zz[-1], 2**order_zz
-            msg = "Zienkiewicz-Zhu convergence rate {:.2f} < {:.2f}"
-            assert rate > (2 - tol)**order_zz, msg.format(rate, expected)
-            rate, expected = relative_error_l2[-2]/relative_error_l2[-1], 2**order_l2
-            assert rate > (2 - tol)**order_l2, msg.format(rate, expected)
-            msg = "L2 projection convergence rate {:.2f} < {:.2f}"
-    if plot:
-        fig, axes = plt.subplots(figsize=(5, 5))
-        elements = [2**(2*i+1) for i in range(istart, iend)]
-        axes.loglog(elements, relative_error_zz, '--x', label=r'$Z^2$')
-        axes.loglog(elements, relative_error_l2, '--x', label=r'$\mathcal L_2$')
-        axes.set_xlabel("Element count")
-        axes.set_xticks([100, 1000, 10000])
-        axes.set_ylabel("Relative error")
-        axes.legend()
-        axes.grid(True)
-        fname = 'gradient_recovery_convergence'
-        if no_boundary:
-            fname += '_interior'
-        savefig(fname, 'outputs', extensions=['pdf'])
+            rate, expected = relative_error[-2]/relative_error[-1], 2**order
+            msg = "{:s} convergence rate {:.2f} < {:.2f}"
+            assert rate > (2 - tol)**order, msg.format(name, rate, expected)
+    return relative_error
+
+
+def plot_gradient_convergence(relative_error_zz, relative_error_l2, no_boundary):
+    """
+    Plot convergence curves for both Zienkiewicz-Zhu and L2 projection recovery methods applied to
+    the sinusoidal test case.
+    """
+    fig, axes = plt.subplots(figsize=(5, 5))
+    elements = [2**(2*i+1) for i in range(istart, iend)]
+    axes.loglog(elements, relative_error_zz, '--x', label=r'$Z^2$')
+    axes.loglog(elements, relative_error_l2, '--x', label=r'$\mathcal L_2$')
+    axes.set_xlabel("Element count")
+    axes.set_xticks([100, 1000, 10000])
+    axes.set_ylabel("Relative error")
+    axes.legend()
+    axes.grid(True)
+    fname = 'gradient_recovery_convergence'
+    if no_boundary:
+        fname += '_interior'
+    savefig(fname, 'outputs', extensions=['pdf'])
 
 
 # ---------------------------
@@ -300,8 +288,11 @@ if __name__ == "__main__":
     args = parser.parse_args()
     no_bdy = bool(0 if args.no_boundary == "0" else args.no_boundary or False)
     if bool(args.convergence or False):
-        test_gradient_recovery(no_boundary=no_bdy, plot=True)
+        zz = test_gradient_convergence('ZZ', no_bdy)
+        l2 = test_gradient_convergence('L2', no_bdy)
+        plot_gradient_convergence(zz, l2, no_bdy)
     else:
-        recover_gradients(2**int(args.level or 3), no_boundary=no_bdy, plot=bool(args.plot or False))
-    # test_hessian_bowl(2, True, 'dL2', plot_mesh=True)
-    # test_hessian_bowl(2, False, 'dL2', plot_mesh=True)
+        recover_gradient_sinusoidal(2**int(args.level or 3), no_bdy, plot=bool(args.plot or False))
+    # test_hessian_bowl(2, True, 'L2', plot_mesh=True)
+    # test_hessian_bowl(2, False, 'L2', plot_mesh=True)
+    # test_hessian_bowl(2, True, 'ZZ', plot_mesh=True)

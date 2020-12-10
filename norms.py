@@ -36,7 +36,7 @@ def _lp_norm_clean(f, p):
             assert p >= 1
         except AssertionError:
             raise ValueError("Norm type l{:} not recognised.".format(p))
-        return pow(np.sum(pow(np.abs(fi), p) for fi in f), 1/p)
+        return pow(np.sum([pow(np.abs(fi), p) for fi in f]), 1/p)
     else:
         raise ValueError("Norm type {:} not recognised.".format(p))
 

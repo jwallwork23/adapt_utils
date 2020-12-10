@@ -135,10 +135,11 @@ class Options(FrozenConfigurable):
         """).tag(config=True)
 
     # Recovery
-    hessian_recovery = Enum(
-        ['dL2', 'parts'],
-        default_value='dL2',
-        help="Hessian recovery technique, from {'dL2', 'parts'}.").tag(config=True)
+    gradient_recovery = Enum(['L2', 'ZZ'], default_value='L2', help="""
+        Hessian recovery technique, from:
+          'L2':    global L2 projection;
+          'ZZ':    recovery a la [Zienkiewicz and Zhu 1987].
+        """).tag(config=True)
     gradient_solver_parameters = PETScSolverParameters(
         {
             'snes_rtol': 1e8,
@@ -147,6 +148,12 @@ class Options(FrozenConfigurable):
             'pc_type': 'sor',
         },
         help="Solver parameters for gradient recovery.").tag(config=True)
+    hessian_recovery = Enum(['parts', 'L2', 'ZZ'], default_value='L2', help="""
+        Hessian recovery technique, from:
+          'L2':    global double L2 projection;
+          'parts': direct application of integration by parts;
+          'ZZ':    recovery a la [Zienkiewicz and Zhu 1987].
+        """).tag(config=True)
     hessian_solver_parameters = PETScSolverParameters(
         {
             # Integration by parts
@@ -162,7 +169,7 @@ class Options(FrozenConfigurable):
             },
 
             # Double L2 projection
-            'dL2': {
+            'L2': {
                 'mat_type': 'aij',
 
                 # Use stationary preconditioners in the Schur complement, to get away with applying
