@@ -226,7 +226,10 @@ def test_hessian_bowl(dim, interp, recovery, plot_mesh=False):
     axes.set_xticklabels(["(0,0)", "(0,1)", "(1,0)", "(1,1)"])
     axes.set_xlabel("Hessian component")
     if interp:
-        axes.set_yticks([1e-15, 1e-10, 1e-5, 1])
+        if recovery == 'ZZ':
+            axes.set_yticks([1e-30, 1e-25, 1e-20, 1e-15, 1e-10, 1e-5, 1])
+        else:
+            axes.set_yticks([1e-15, 1e-10, 1e-5, 1])
     axes.set_ylabel("Absolute error")
     savefig("hessian_errors_bowl_{:s}".format(recovery), "outputs/hessian", extensions=["pdf"])
 
@@ -251,23 +254,33 @@ def test_gradient_convergence(recovery, no_boundary):
             rate, expected = relative_error[-2]/relative_error[-1], 2**order
             msg = "{:s} convergence rate {:.2f} < {:.2f}"
             assert rate > (2 - tol)**order, msg.format(name, rate, expected)
-    return relative_error
+    return [2**(2*i+1) for i in range(istart, iend)], relative_error
 
 
-def plot_gradient_convergence(relative_error_zz, relative_error_l2, no_boundary):
+def plot_gradient_convergence(elements, relative_error_zz, relative_error_l2, no_boundary):
     """
     Plot convergence curves for both Zienkiewicz-Zhu and L2 projection recovery methods applied to
     the sinusoidal test case.
     """
+    from mpltools import annotation
+
+    # Plot convergence curves on a log-log axis
     fig, axes = plt.subplots(figsize=(5, 5))
-    elements = [2**(2*i+1) for i in range(istart, iend)]
     axes.loglog(elements, relative_error_zz, '--x', label=r'$Z^2$')
     axes.loglog(elements, relative_error_l2, '--x', label=r'$\mathcal L_2$')
     axes.set_xlabel("Element count")
     axes.set_xticks([100, 1000, 10000])
-    axes.set_ylabel("Relative error")
+    axes.set_ylabel(r"Relative $\ell_2$ error")
     axes.legend()
     axes.grid(True)
+
+    # Add slope markers
+    xy = (300, 2.0e-04) if no_boundary else (300, 1.8e-03)
+    annotation.slope_marker(xy, -1, invert=True, ax=axes)
+    xy = (200, 2.0e-03) if no_boundary else (200, 1.2e-02)
+    annotation.slope_marker(xy, -2 if no_boundary else -1, ax=axes)
+
+    # Save to file
     fname = 'gradient_recovery_convergence'
     if no_boundary:
         fname += '_interior'
@@ -279,20 +292,24 @@ def plot_gradient_convergence(relative_error_zz, relative_error_l2, no_boundary)
 # ---------------------------
 
 if __name__ == "__main__":
+
     import argparse
+
     parser = argparse.ArgumentParser()
+    parser.add_argument('recover', help="Choose 'gradient' or 'hessian'")
     parser.add_argument('-level', help="Mesh resolution level in each direction.")
     parser.add_argument('-convergence', help="Check convergence.")
     parser.add_argument('-no_boundary', help="Only compute l2 error at interior nodes.")
-    parser.add_argument('-plot', help="Toggle plotting.")
     args = parser.parse_args()
     no_bdy = bool(0 if args.no_boundary == "0" else args.no_boundary or False)
-    if bool(args.convergence or False):
-        zz = test_gradient_convergence('ZZ', no_bdy)
-        l2 = test_gradient_convergence('L2', no_bdy)
-        plot_gradient_convergence(zz, l2, no_bdy)
+    if args.recover == 'gradient':
+        if bool(args.convergence or False):
+            elements, zz = test_gradient_convergence('ZZ', no_bdy)
+            elements, l2 = test_gradient_convergence('L2', no_bdy)
+            plot_gradient_convergence(elements, zz, l2, no_bdy)
+        else:
+            recover_gradient_sinusoidal(2**int(args.level or 3), no_bdy, plot=True)
     else:
-        recover_gradient_sinusoidal(2**int(args.level or 3), no_bdy, plot=bool(args.plot or False))
-    # test_hessian_bowl(2, True, 'L2', plot_mesh=True)
-    # test_hessian_bowl(2, False, 'L2', plot_mesh=True)
-    # test_hessian_bowl(2, True, 'ZZ', plot_mesh=True)
+        test_hessian_bowl(2, True, 'L2', plot_mesh=True)
+        # test_hessian_bowl(2, False, 'L2', plot_mesh=True)
+        test_hessian_bowl(2, True, 'ZZ', plot_mesh=True)

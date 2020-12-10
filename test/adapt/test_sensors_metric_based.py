@@ -25,6 +25,11 @@ def sensor(request):
     return request.param
 
 
+@pytest.fixture(params=['L2', 'ZZ'])
+def recovery(request):
+    return request.param
+
+
 @pytest.fixture(params=['complexity', 'error'])
 def normalisation(request):
     return request.param
@@ -35,7 +40,7 @@ def norm_order(request):
     return request.param
 
 
-def test_sensors(sensor, normalisation, norm_order, plot_mesh=False, **kwargs):
+def test_sensors(sensor, recovery, normalisation, norm_order, plot_mesh=False, **kwargs):
     if os.environ.get('FIREDRAKE_ADAPT') == '0':
         pytest.xfail("Firedrake installation does not include Pragmatic")
     if sensor == multiscale and normalisation == 'error' and norm_order is None:
@@ -48,6 +53,7 @@ def test_sensors(sensor, normalisation, norm_order, plot_mesh=False, **kwargs):
         'max_adapt': kwargs.get('max_adapt', 4),
         'normalisation': normalisation,
         'norm_order': norm_order,
+        'hessian_recovery': recovery,
         'target': kwargs.get('target', 100.0 if normalisation == 'complexity' else 10.0),
     }
     op = Options(**kwargs)
@@ -99,6 +105,7 @@ if __name__ == '__main__':
     parser.add_argument("-sensor", help="""
         Choice of sensor function, from {'bowl', 'hyperbolic', 'multiscale', 'interweaved'}.
         """)
+    parser.add_argument("-recovery", help="Choose from 'L2' and 'ZZ'.")
     parser.add_argument("-normalisation", help="Normalise by complexity or error.")
     parser.add_argument("-norm_order", help="Norm order for normalisation.")
     parser.add_argument("-target", help="Target complexity/error.")
@@ -117,4 +124,4 @@ if __name__ == '__main__':
     interp = bool(args.interpolate or False)
 
     kwargs = dict(target=target, max_adapt=max_adapt, interp=interp)
-    test_sensors(f, args.normalisation or 'complexity', p, plot_mesh=True, **kwargs)
+    test_sensors(f, args.recovery, args.normalisation or 'complexity', p, plot_mesh=True, **kwargs)
