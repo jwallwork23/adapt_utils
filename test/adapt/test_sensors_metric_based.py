@@ -51,7 +51,7 @@ def test_sensors(sensor, recovery, normalisation, norm_order, plot_mesh=False, *
     if sensor == multiscale and normalisation == 'error' and norm_order is None:
         pytest.xfail("L-infinity normalisation cannot cope with this problem!")
     if sensor == hyperbolic and recovery == 'ZZ':
-        pytest.xfail("Zienkiewicz-Zhu gives singular matrices for this sensor.")  # FIXME
+        pytest.xfail("Zienkiewicz-Zhu gives singular matrices for this sensor.")  # FIXME: Add condition for sufficient number of elements in patch
     interp = kwargs.get('interp', recovery == 'ZZ')
 
     # Set parameters

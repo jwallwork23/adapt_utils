@@ -55,7 +55,7 @@ def recover_gradient(f, **kwargs):
     return l2_proj
 
 
-def recover_zz(f, offset=None, coordinates=None, **kwargs):
+def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs):
     """
     Recover the gradient of a :class:`Function` `f` using the approach of [Zienkiewicz and Zhu 1987].
     Note that `f` can be either a scalar or a vector function. In the latter case, the recovered
@@ -64,7 +64,12 @@ def recover_zz(f, offset=None, coordinates=None, **kwargs):
     :kwarg offset: function to go from DMPlex numbering to Firedrake numbering.
     :kwarg coordinates: function to go from DMPlex numbering to mesh coordinates.
     """
+    assert to_recover in ('field', 'gradient')
     fs = f.function_space()
+    p = fs.ufl_element().degree()
+    assert p > 0
+    if p != 1:
+        raise NotImplementedError  # TODO
     mesh = fs.mesh()
     dim = mesh.topological_dimension()
     if offset is None:
@@ -77,18 +82,21 @@ def recover_zz(f, offset=None, coordinates=None, **kwargs):
     # Construct FunctionSpaces for the direct and recovered gradients
     shape = len(fs.shape)
     assert shape in (0, 1)
-    constructor = VectorFunctionSpace if shape == 0 else TensorFunctionSpace
-    P0 = constructor(mesh, "DG", 0)
-    P1 = constructor(mesh, "CG", 1)
+    if to_recover == 'field':
+        constructor = FunctionSpace if shape == 0 else VectorFunctionSpace
+    else:
+        constructor = VectorFunctionSpace if shape == 0 else TensorFunctionSpace
+    Pp_ = constructor(mesh, "DG", p-1)
+    Pp = constructor(mesh, "CG", p)
     shape = (dim, ) if shape == 0 else (dim, dim)
 
     # Create Functions to hold the direct and recovered gradients
-    sigma_h = interpolate(grad(f), P0)
+    sigma_h = interpolate(grad(f), Pp_)
     sigma_ZZ = Function(P1)
 
     # Loop over all vertices
     kwargs = dict(plex=plex, coordinates=coordinates)
-    bnodes = DirichletBC(P1, 0, 'on_boundary').nodes
+    bnodes = DirichletBC(Pp, 0, 'on_boundary').nodes
     for vvv in range(*plex.getDepthStratum(0)):
         patch = get_patch(vvv, **kwargs)
 
@@ -105,6 +113,8 @@ def recover_zz(f, offset=None, coordinates=None, **kwargs):
                 if offset(v) not in bnodes:
                     patch = get_patch(v, extend=patch['elements'].keys(), **kwargs)
                     break
+
+        # TODO: Add condition for interior patches with insufficient DOFs
 
         # Assemble local system
         A = np.zeros((dim+1, dim+1))
