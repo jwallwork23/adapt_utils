@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from adapt_utils.adapt.recovery import *
+from adapt_utils.linalg import rotation_matrix
 from adapt_utils.mesh import make_consistent
 from adapt_utils.norms import lp_norm
 from adapt_utils.options import Options
@@ -111,6 +112,24 @@ def recovery(request):
 @pytest.fixture(params=[True, False])
 def no_boundary(request):
     return request.param
+
+
+def test_field_linear(dim):
+    r"""
+    Given a simple linear field :math:`f = \sum_{i=1}^n x_i`
+    projected into P0 space, check that the recovered
+    P1 field matches the uninterpolated field.
+    """
+    if dim == 3:
+        pytest.xfail("Needs tweaking")  # FIXME
+    mesh = uniform_mesh(dim, 6)
+    x = SpatialCoordinate(mesh)
+    P0 = FunctionSpace(mesh, "DG", 0)
+    P1 = FunctionSpace(mesh, "CG", 1)
+    f = interpolate(sum(x), P0)
+    exact = interpolate(sum(x), P1)
+    f_zz = recover_zz(f, to_recover='field')
+    assert np.isclose(lp_norm(f_zz.dat.data - exact.dat.data)/lp_norm(exact.dat.data), 0.0)
 
 
 def test_gradient_linear(dim, recovery):

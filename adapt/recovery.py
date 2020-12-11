@@ -8,7 +8,7 @@ from adapt_utils.misc import prod
 from adapt_utils.options import Options
 
 
-__all__ = ["recover_gradient", "recover_hessian", "recover_boundary_hessian",
+__all__ = ["recover_gradient", "recover_hessian", "recover_boundary_hessian", "recover_zz",
            "L2ProjectorGradient", "DoubleL2ProjectorHessian"]
 
 
@@ -68,6 +68,7 @@ def recover_zz(f, to_recover='gradient', **kwargs):
     NOTE that P2 approximations tend to break down on axis-aligned uniform meshes. However, a minor
     rotation of the axes should be sufficient to fix it.
     """
+    tol = kwargs.get('tolerance', None)
     assert to_recover in ('field', 'gradient')
     fs = f.function_space()
     p = fs.ufl_element().degree()
@@ -93,7 +94,10 @@ def recover_zz(f, to_recover='gradient', **kwargs):
         constructor = VectorFunctionSpace if shape == 0 else TensorFunctionSpace
     Pp_ = constructor(mesh, "DG", p-1)
     Pp = constructor(mesh, "CG", p)
-    shape = (dim, ) if shape == 0 else (dim, dim)
+    if to_recover == 'gradient':
+        shape = [dim for i in range(shape+1)]
+    else:
+        shape = [1] if shape == 0 else [dim for i in range(shape)]
 
     # Create Functions to hold the direct and recovered fields/gradients
     sigma_h = interpolate(f if to_recover == 'field' else grad(f), Pp_)
@@ -135,7 +139,7 @@ def recover_zz(f, to_recover='gradient', **kwargs):
                 c = patch['elements'][k]['centroid']
                 P = monomials(c)
                 A += np.tensordot(P, P, axes=0)
-                b += np.tensordot(P, sigma_h.at(c).flatten(), axes=0)
+                b += np.tensordot(P, sigma_h.at(c, tolerance=tol).flatten(), axes=0)
         elif p == 2:
             N = 1 + dim + dim*(dim + 1)//2
             A = np.zeros((N, N))
@@ -144,7 +148,7 @@ def recover_zz(f, to_recover='gradient', **kwargs):
                 c = patch['facets'][e]['midfacet']
                 P = monomials(c, 2)
                 A += np.tensordot(P, P, axes=0)
-                b += np.tensordot(P, sigma_h.at(c).flatten(), axes=0)
+                b += np.tensordot(P, sigma_h.at(c, tolerance=tol).flatten(), axes=0)
 
         # Solve local system and insert where appropriate
         a = np.linalg.solve(A, b)
