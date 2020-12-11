@@ -2,7 +2,7 @@ from firedrake import *
 
 import numpy as np
 
-from adapt_utils.maths import vandermonde
+from adapt_utils.maths import monomials
 from adapt_utils.mesh import get_patch, make_consistent
 from adapt_utils.misc import prod
 from adapt_utils.options import Options
@@ -61,15 +61,21 @@ def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs
     Note that `f` can be either a scalar or a vector function. In the latter case, the recovered
     gradient is a matrix function.
 
+    If :kwarg:`to_recover` is set to 'field' then the field itself is recovered in a higher order
+    space, as opposed to its gradient being recovered in the same order space.
+
     :kwarg offset: function to go from DMPlex numbering to Firedrake numbering.
     :kwarg coordinates: function to go from DMPlex numbering to mesh coordinates.
     """
     assert to_recover in ('field', 'gradient')
     fs = f.function_space()
     p = fs.ufl_element().degree()
-    assert p > 0
-    if p != 1:
-        raise NotImplementedError  # TODO
+    if to_recover == 'gradient':
+        assert p > 0
+    elif to_recover == 'field':
+        p += 1
+    if p not in (1, 2):
+        raise NotImplementedError
     mesh = fs.mesh()
     dim = mesh.topological_dimension()
     if offset is None:
@@ -81,21 +87,22 @@ def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs
 
     # Construct FunctionSpaces for the direct and recovered gradients
     shape = len(fs.shape)
-    assert shape in (0, 1)
     if to_recover == 'field':
-        constructor = FunctionSpace if shape == 0 else VectorFunctionSpace
+        assert shape in (0, 1, 2)
+        constructor = FunctionSpace if shape == 0 else VectorFunctionSpace if shape == 1 else TensorFunctionSpace
     else:
+        assert shape in (0, 1)
         constructor = VectorFunctionSpace if shape == 0 else TensorFunctionSpace
     Pp_ = constructor(mesh, "DG", p-1)
     Pp = constructor(mesh, "CG", p)
     shape = (dim, ) if shape == 0 else (dim, dim)
 
     # Create Functions to hold the direct and recovered gradients
-    sigma_h = interpolate(grad(f), Pp_)
-    sigma_ZZ = Function(P1)
+    sigma_h = interpolate(f if to_recover == 'field' else grad(f), Pp_)
+    sigma_ZZ = Function(Pp)
 
     # Loop over all vertices
-    kwargs = dict(plex=plex, coordinates=coordinates)
+    kwargs = dict(plex=plex, coordinates=coordinates, midfacets=p == 2)
     bnodes = DirichletBC(Pp, 0, 'on_boundary').nodes
     for vvv in range(*plex.getDepthStratum(0)):
         patch = get_patch(vvv, **kwargs)
@@ -104,30 +111,43 @@ def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs
         if len(patch['elements'].keys()) <= 2 if dim == 2 else 6:
             for v in patch['vertices']:
                 if v != vvv and offset(v) in bnodes:
-                    patch = get_patch(v, extend=patch['elements'].keys(), **kwargs)
+                    patch = get_patch(v, extend=patch, **kwargs)
                     break
 
         # Extend patch for boundary case
         if offset(vvv) in bnodes:
             for v in patch['vertices']:
                 if offset(v) not in bnodes:
-                    patch = get_patch(v, extend=patch['elements'].keys(), **kwargs)
+                    patch = get_patch(v, extend=patch, **kwargs)
                     break
 
         # TODO: Add condition for interior patches with insufficient DOFs
 
         # Assemble local system
-        A = np.zeros((dim+1, dim+1))
-        b = np.zeros((dim+1, prod(shape)))
-        for k in patch['elements']:
-            c = patch['elements'][k]['centroid']
-            P = vandermonde(c)
-            A += np.tensordot(P, P, axes=0)
-            b += np.tensordot(P, sigma_h.at(c).flatten(), axes=0)
+        if p == 1:
+            A = np.zeros((1+dim, 1+dim))
+            b = np.zeros((1+dim, prod(shape)))
+            for k in patch['elements']:
+                c = patch['elements'][k]['centroid']
+                P = monomials(c)
+                A += np.tensordot(P, P, axes=0)
+                b += np.tensordot(P, sigma_h.at(c).flatten(), axes=0)
+        elif p == 2:
+            N = 1 + dim + dim*(dim + 1)//2
+            A = np.zeros((N, N))
+            b = np.zeros((N, prod(shape)))
+            for e in patch['facets']:
+                m = patch['facets'][e]['midfacet']
+                P = monomials(m)
+                A += np.tensordot(P, P, axes=0)
+                b += np.tensordot(P, sigma_h.at(m).flatten(), axes=0)
 
         # Solve local system
         a = np.linalg.solve(A, b)
-        sigma_ZZ.dat.data[offset(vvv)] = np.dot(vandermonde(coordinates(vvv)), a).reshape(shape)
+        interpolant = lambda vertex: np.dot(monomials(coordinates(vertex)), a).reshape(shape)
+        sigma_ZZ.dat.data[offset(vvv)] = interpolant(vvv)
+        if p == 2:
+            raise NotImplementedError  # TODO: need offset for non-vertex nodes. These should be averaged if the existing value is nonzero
     return sigma_ZZ
 
 
