@@ -67,8 +67,13 @@ def recover_zz(f, to_recover='gradient', **kwargs):
 
     NOTE that P2 approximations tend to break down on axis-aligned uniform meshes. However, a minor
     rotation of the axes should be sufficient to fix it.
+
+    :kwarg tolerance: see point evaluation method :attr:`at` for :class:`Function`.
+    :kwarg alpha: distance to point evaluate to one side of a facet, as a fraction of the distance
+        from mid-facet to element centroid.
     """
     tol = kwargs.get('tolerance', None)
+    alpha = kwargs.get('alpha', 1.0e-08)
     assert to_recover in ('field', 'gradient')
     fs = f.function_space()
     p = fs.ufl_element().degree()
@@ -141,14 +146,18 @@ def recover_zz(f, to_recover='gradient', **kwargs):
                 A += np.tensordot(P, P, axes=0)
                 b += np.tensordot(P, sigma_h.at(c, tolerance=tol).flatten(), axes=0)
         elif p == 2:
+            # NOTE: If the source field is P1DG then the midfacet values are not well-defined.
+            #       Therefore, we take the value just to one side, as specified by alpha.
             N = 1 + dim + dim*(dim + 1)//2
             A = np.zeros((N, N))
             b = np.zeros((N, prod(shape)))
-            for e in patch['facets']:
-                c = patch['facets'][e]['midfacet']
-                P = monomials(c, 2)
-                A += np.tensordot(P, P, axes=0)
-                b += np.tensordot(P, sigma_h.at(c, tolerance=tol).flatten(), axes=0)
+            for k in patch['elements']:
+                c = patch['elements'][k]['centroid']
+                for e in patch['elements'][k]['facets']:
+                    m = (1-alpha)*patch['facets'][e]['midfacet'] + alpha*c
+                    P = monomials(m, 2)
+                    A += np.tensordot(P, P, axes=0)
+                    b += np.tensordot(P, sigma_h.at(m, tolerance=tol).flatten(), axes=0)
 
         # Solve local system and insert where appropriate
         a = np.linalg.solve(A, b)
