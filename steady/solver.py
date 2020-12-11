@@ -186,7 +186,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         else:
             raise NotImplementedError  # TODO
 
-    def dwr_indicator(self, adapt_field, adjoint=False):
+    def dwr_indicator(self, adapt_field, adjoint=False, mode='GE_h'):
         """
         Indicate errors in the quantity of interest by the 'Dual Weighted Residual' (DWR) method of
         [Becker and Rannacher, 2001].
@@ -196,22 +196,25 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         op = self.op
         self.indicator['dwr'] = Function(self.P1[0], name="DWR indicator")
 
-        # Setup problem on enriched space
-        hierarchy = MeshHierarchy(self.mesh, 1)
-        refined_mesh = hierarchy[1]
-        ep = type(self)(
-            op,
-            meshes=refined_mesh,
-            nonlinear=self.nonlinear,
-        )
-        ep.outer_iteration = self.outer_iteration
-        enriched_space = ep.get_function_space(adapt_field)
-        tm = dmhooks.get_transfer_manager(self.get_plex(0))
-
-        # Setup forward solver for enriched problem
         if adjoint:
             raise NotImplementedError  # TODO
-        else:
+
+        # Setup problem on enriched space
+        if mode == 'GE_hp':
+            raise NotImplementedError  # TODO: use degree_increase
+        if mode == 'GE_h':
+            hierarchy = MeshHierarchy(self.mesh, 1)
+            refined_mesh = hierarchy[1]
+            ep = type(self)(
+                op,
+                meshes=refined_mesh,
+                nonlinear=self.nonlinear,
+            )
+            ep.outer_iteration = self.outer_iteration
+            enriched_space = ep.get_function_space(adapt_field)
+            tm = dmhooks.get_transfer_manager(self.get_plex(0))
+
+            # Setup forward solver for enriched problem
             ep.create_error_estimators_step(0)
             ep.solve_adjoint()
             enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
@@ -236,12 +239,22 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             tm.prolong(adj_solution, adj_error)
             adj_error *= -1
             adj_error += enriched_adj_solution
+        elif mode == 'GE_p':
+            raise NotImplementedError  # TODO: Use degree_increase
+        elif mode == 'LE_p':
+            raise NotImplementedError  # TODO: Use recover_zz
+        elif mode == 'DQ':
+            raise NotImplementedError  # TODO
+        else:
+            raise ValueError("Enrichment mode {:s} not recognised.".format(mode))
 
         # Compute dual weighted residual
         dwr = ets.error_estimator.weighted_residual()
         indicator_enriched.interpolate(abs(dwr))
 
         # Estimate error
+        if 'dwr' not in self.estimators:
+            self.estimators['dwr'] = []
         self.estimators['dwr'].append(indicator_enriched.vector().gather().sum())
 
         # Project into P1 space and inject into base mesh

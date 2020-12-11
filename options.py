@@ -435,10 +435,10 @@ class CoupledOptions(Options):
     degree_tracer = NonNegativeInteger(1, help="""
         Polynomial order for tracer finite element pair :attr:`tracer_family'.
         """).tag(config=True)
-    degree_increase_tracer = NonNegativeInteger(1, help="""
+    degree_increase_tracer = NonNegativeInteger(0, help="""
         When defining an enriched tracer finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
-        """).tag(config=True)  # TODO: UNUSED
+        """).tag(config=True)
     stabilisation_tracer = Unicode(None, allow_none=True, help="""
         Stabilisation approach for tracer model, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if
         not None.
@@ -463,10 +463,10 @@ class CoupledOptions(Options):
     degree_sediment = NonNegativeInteger(1, help="""
         Polynomial order for sediment finite element pair :attr:`sediment_family'.
         """).tag(config=True)
-    degree_increase_sediment = NonNegativeInteger(1, help="""
+    degree_increase_sediment = NonNegativeInteger(0, help="""
         When defining an enriched sediment finite element space, how much should the
         polynomial order of the finite element space by incremented? (NOTE: zero is an option)
-        """).tag(config=True)  # TODO: UNUSED
+        """).tag(config=True)
     stabilisation_sediment = Unicode(None, allow_none=True, help="""
         Stabilisation approach for sediment model, set to 'lax_friedrichs', if not None.
         """).tag(config=True)
@@ -514,35 +514,35 @@ class CoupledOptions(Options):
        """).tag(config=True)
 
     def __init__(self, **kwargs):
-        self.degree_increase = 0  # TODO: UNUSED
+        """
+        Solver
+        =====
+        The time-dependent shallow water system looks like
 
-        # Solver
-        # =====
-        # The time-dependent shallow water system looks like
-        #
-        #                             ------------------------- -----   -----
-        #       ------------- -----   |                 |     | |   |   |   |
-        #       | A00 | A01 | | U |   |  T + C + V + D  |  G  | | U |   | 0 |
-        # A x = ------------- ----- = |                 |     | |   | = |   |  = b,
-        #       | A10 | A11 | | H |   ------------------------- -----   -----
-        #       ------------- -----   |        B        |  T  | | H |   | 0 |
-        #                             ------------------------- -----   -----
-        #
-        # where:
-        #  * T - time derivative;
-        #  * C - Coriolis;
-        #  * V - viscosity;
-        #  * D - quadratic drag;
-        #  * G - gravity;
-        #  * B - bathymetry.
-        #
-        # We apply a multiplicative fieldsplit preconditioner, i.e. block Gauss-Seidel:
-        #
-        #     ---------------- ------------ ----------------
-        #     | I |     0    | |   I  | 0 | | A00^{-1} | 0 |
-        # P = ---------------- ------------ ----------------.
-        #     | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
-        #     ---------------- ------------ ----------------
+                                    ------------------------- -----   -----
+              ------------- -----   |                 |     | |   |   |   |
+              | A00 | A01 | | U |   |  T + C + V + D  |  G  | | U |   | 0 |
+        A x = ------------- ----- = |                 |     | |   | = |   |  = b,
+              | A10 | A11 | | H |   ------------------------- -----   -----
+              ------------- -----   |        B        |  T  | | H |   | 0 |
+                                    ------------------------- -----   -----
+
+        where:
+         * T - time derivative;
+         * C - Coriolis;
+         * V - viscosity;
+         * D - quadratic drag;
+         * G - gravity;
+         * B - bathymetry.
+
+        We apply a multiplicative fieldsplit preconditioner, i.e. block Gauss-Seidel:
+
+            ---------------- ------------ ----------------
+            | I |     0    | |   I  | 0 | | A00^{-1} | 0 |
+        P = ---------------- ------------ ----------------.
+            | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
+            ---------------- ------------ ----------------
+        """
         self.default_solver_parameters = {
             "shallow_water": {
                 "ksp_type": "gmres",
