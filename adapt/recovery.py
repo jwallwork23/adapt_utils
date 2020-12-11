@@ -71,9 +71,12 @@ def recover_zz(f, to_recover='gradient', **kwargs):
     :kwarg tolerance: see point evaluation method :attr:`at` for :class:`Function`.
     :kwarg alpha: distance to point evaluate to one side of a facet, as a fraction of the distance
         from mid-facet to element centroid.
+    :kwarg weight: weighting for facets which do not support the vertex in question (only relevant
+        for recovery in P2 space).
     """
     tol = kwargs.get('tolerance', None)
     alpha = kwargs.get('alpha', 1.0e-08)
+    weight = kwargs.get('weight', 1.0)
     assert to_recover in ('field', 'gradient')
     fs = f.function_space()
     p = fs.ufl_element().degree()
@@ -118,6 +121,7 @@ def recover_zz(f, to_recover='gradient', **kwargs):
     bnodes = DirichletBC(Pp, 0, 'on_boundary').nodes
     for vvv in range(*plex.getDepthStratum(0)):
         patch = get_patch(vvv, **kwargs)
+        vvv_facets = set(plex.getSupport(vvv))
 
         # Extend patch for corner case
         if len(patch['elements'].keys()) <= 2 if dim == 2 else 6:
@@ -154,10 +158,11 @@ def recover_zz(f, to_recover='gradient', **kwargs):
             for k in patch['elements']:
                 c = patch['elements'][k]['centroid']
                 for e in patch['elements'][k]['facets']:
+                    w = 1 if e in vvv_facets else weight
                     m = (1-alpha)*patch['facets'][e]['midfacet'] + alpha*c
                     P = monomials(m, 2)
-                    A += np.tensordot(P, P, axes=0)
-                    b += np.tensordot(P, sigma_h.at(m, tolerance=tol).flatten(), axes=0)
+                    A += w*np.tensordot(P, P, axes=0)
+                    b += w*np.tensordot(P, sigma_h.at(m, tolerance=tol).flatten(), axes=0)
 
         # Solve local system and insert where appropriate
         a = np.linalg.solve(A, b)
