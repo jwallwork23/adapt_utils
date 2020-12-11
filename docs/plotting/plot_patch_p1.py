@@ -35,7 +35,7 @@ orig_elements = set(patch['elements'].keys())
 orig_vertices = patch['vertices']
 for v in patch['vertices']:
     if offset(v) not in bnodes:
-        patch = get_patch(v, plex=plex, coordinates=coordinates, extend=elements)
+        patch = get_patch(v, plex=plex, coordinates=coordinates, extend=patch)
         break
 elements = set(patch['elements'].keys())
 triplot(mesh, axes=axes, boundary_kw={'color': 'k'})
@@ -58,12 +58,12 @@ orig_elements = set(patch['elements'].keys())
 orig_vertices = patch['vertices']
 for v in patch['vertices']:
     if v != vvv and offset(v) in bnodes:
-        patch = get_patch(v, plex=plex, coordinates=coordinates, extend=elements)
+        patch = get_patch(v, plex=plex, coordinates=coordinates, extend=patch)
         break
 elements = set(patch['elements'].keys())
 for v in patch['vertices']:
     if offset(v) not in bnodes:
-        patch = get_patch(v, plex=plex, coordinates=coordinates, extend=elements)
+        patch = get_patch(v, plex=plex, coordinates=coordinates, extend=patch)
         break
 elements = set(patch['elements'].keys())
 triplot(mesh, axes=axes, boundary_kw={'color': 'k'})
