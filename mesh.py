@@ -111,26 +111,28 @@ def anisotropic_cell_size(mesh):
     return interpolate(evalues[-1], FunctionSpace(mesh, "DG", 0))
 
 
-def make_consistent(mesh):
+def make_consistent(mesh, h_mesh=None):
     """
     Make the coordinates associated with a Firedrake mesh and its underlying PETSc DMPlex
     use a consistent numbering.
+
+    :kwarg h_mesh: uniformly refined mesh for if base mesh is not linear.
     """
     import firedrake.cython.dmcommon as dmplex
+
+    if h_mesh is not None:
+        assert len(mesh.coordinates.dat.data) == len(h_mesh.coordinates.dat.data)
 
     # Create section
     dim = mesh.topological_dimension()
     gdim = mesh.geometric_dimension()
     entity_dofs = np.zeros(dim+1, dtype=np.int32)
     entity_dofs[0] = gdim
-    try:
-        coord_section = dmplex.create_section(mesh, entity_dofs)
-    except AttributeError:
-        P0 = FunctionSpace(mesh, "DG", 0)  # NOQA
-        coord_section = dmplex.create_section(mesh, entity_dofs)
+    P0 = FunctionSpace(mesh, "DG", 0)  # NOQA
+    coord_section = dmplex.create_section(h_mesh or mesh, entity_dofs)
 
     # Set plex coords to mesh coords
-    plex = mesh._topology_dm
+    plex = (h_mesh or mesh)._topology_dm
     dm_coords = plex.getCoordinateDM()
     dm_coords.setDefaultSection(coord_section)
     coords_local = dm_coords.createLocalVec()
