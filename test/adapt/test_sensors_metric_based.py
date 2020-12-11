@@ -30,6 +30,7 @@ def recovery(request):
     return request.param
 
 
+# @pytest.fixture(params=['complexity', 'error'])
 @pytest.fixture(params=['complexity', 'error'])
 def normalisation(request):
     return request.param
@@ -41,11 +42,17 @@ def norm_order(request):
 
 
 def test_sensors(sensor, recovery, normalisation, norm_order, plot_mesh=False, **kwargs):
+    """
+    For each sensor function and each configuration of the adaptation parameters, construct a
+    metric, adapt the mesh and check that its coordinates match those computed previously.
+    """
     if os.environ.get('FIREDRAKE_ADAPT') == '0':
-        pytest.xfail("Firedrake installation does not include Pragmatic")
+        pytest.xfail("Firedrake installation doesn't include Pragmatic.")
     if sensor == multiscale and normalisation == 'error' and norm_order is None:
         pytest.xfail("L-infinity normalisation cannot cope with this problem!")
-    interp = kwargs.get('interp', False)
+    if sensor == hyperbolic and recovery == 'ZZ':
+        pytest.xfail("Zienkiewicz-Zhu gives singular matrices for this sensor.")  # FIXME
+    interp = kwargs.get('interp', recovery == 'ZZ')
 
     # Set parameters
     kwargs = {
@@ -57,14 +64,13 @@ def test_sensors(sensor, recovery, normalisation, norm_order, plot_mesh=False, *
         'target': kwargs.get('target', 100.0 if normalisation == 'complexity' else 10.0),
     }
     op = Options(**kwargs)
-    fname = '_'.join([sensor.__name__, normalisation, str(norm_order or 'inf')])
+    fname = '_'.join([sensor.__name__, recovery.lower(), normalisation, str(norm_order or 'inf')])
     fpath = os.path.dirname(__file__)
 
     # Setup initial mesh
     n = 100
     mesh = SquareMesh(n, n, 2)
-    x, y = SpatialCoordinate(mesh)
-    mesh.coordinates.interpolate(as_vector([x-1, y-1]))
+    mesh.coordinates.interpolate(as_vector([xi-1 for xi in SpatialCoordinate(mesh)]))
 
     # Adapt the mesh
     for i in range(op.max_adapt):
@@ -99,6 +105,7 @@ def test_sensors(sensor, recovery, normalisation, norm_order, plot_mesh=False, *
 # ---------------------------
 
 if __name__ == '__main__':
+
     import argparse
 
     parser = argparse.ArgumentParser()
@@ -121,7 +128,6 @@ if __name__ == '__main__':
     p = None if args.norm_order in ('none', 'inf') else int(args.norm_order or 1)
     target = float(args.target or 100.0)
     max_adapt = int(args.num_adapt or 4)
-    interp = bool(args.interpolate or False)
-
+    interp = args.recovery == 'ZZ' or bool(args.interpolate or False)
     kwargs = dict(target=target, max_adapt=max_adapt, interp=interp)
     test_sensors(f, args.recovery, args.normalisation or 'complexity', p, plot_mesh=True, **kwargs)
