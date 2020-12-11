@@ -55,7 +55,8 @@ def recover_gradient(f, **kwargs):
     return l2_proj
 
 
-def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs):
+# TODO: Stash patch?
+def recover_zz(f, to_recover='gradient', **kwargs):
     """
     Recover the gradient of a :class:`Function` `f` using the approach of [Zienkiewicz and Zhu 1987].
     Note that `f` can be either a scalar or a vector function. In the latter case, the recovered
@@ -64,8 +65,8 @@ def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs
     If :kwarg:`to_recover` is set to 'field' then the field itself is recovered in a higher order
     space, as opposed to its gradient being recovered in the same order space.
 
-    :kwarg offset: function to go from DMPlex numbering to Firedrake numbering.
-    :kwarg coordinates: function to go from DMPlex numbering to mesh coordinates.
+    NOTE that P2 approximations tend to break down on axis-aligned uniform meshes. However, a minor
+    rotation of the axes should be sufficient to fix it.
     """
     assert to_recover in ('field', 'gradient')
     fs = f.function_space()
@@ -78,12 +79,9 @@ def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs
         raise NotImplementedError
     mesh = fs.mesh()
     dim = mesh.topological_dimension()
-    if offset is None:
-        plex, offset, coordinates = make_consistent(mesh)
-    else:
-        plex = mesh._topology_dm
-    if coordinates is None:
-        coordinates = lambda index: mesh.coordinates.dat.data[offset(index)]
+    if p == 2:
+        h_mesh = kwargs.get('h_mesh') or MeshHierarchy(mesh, 1)[1]
+    plex, offset, coordinates = make_consistent(mesh)
 
     # Construct FunctionSpaces for the direct and recovered gradients
     shape = len(fs.shape)
@@ -97,9 +95,14 @@ def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs
     Pp = constructor(mesh, "CG", p)
     shape = (dim, ) if shape == 0 else (dim, dim)
 
-    # Create Functions to hold the direct and recovered gradients
+    # Create Functions to hold the direct and recovered fields/gradients
     sigma_h = interpolate(f if to_recover == 'field' else grad(f), Pp_)
     sigma_ZZ = Function(Pp)
+
+    # Create a higher order mesh in order to get offsets for non-vertex nodes in P2 space
+    if p == 2:
+        p_mesh = Mesh(interpolate(mesh.coordinates, VectorFunctionSpace(mesh, "CG", 2)))
+        p_plex, p_offset, p_coordinates = make_consistent(p_mesh, h_mesh)
 
     # Loop over all vertices
     kwargs = dict(plex=plex, coordinates=coordinates, midfacets=p == 2)
@@ -125,8 +128,9 @@ def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs
 
         # Assemble local system
         if p == 1:
-            A = np.zeros((1+dim, 1+dim))
-            b = np.zeros((1+dim, prod(shape)))
+            N = 1 + dim
+            A = np.zeros((N, N))
+            b = np.zeros((N, prod(shape)))
             for k in patch['elements']:
                 c = patch['elements'][k]['centroid']
                 P = monomials(c)
@@ -137,17 +141,36 @@ def recover_zz(f, to_recover='gradient', offset=None, coordinates=None, **kwargs
             A = np.zeros((N, N))
             b = np.zeros((N, prod(shape)))
             for e in patch['facets']:
-                m = patch['facets'][e]['midfacet']
-                P = monomials(m)
+                c = patch['facets'][e]['midfacet']
+                P = monomials(c, 2)
                 A += np.tensordot(P, P, axes=0)
-                b += np.tensordot(P, sigma_h.at(m).flatten(), axes=0)
+                b += np.tensordot(P, sigma_h.at(c).flatten(), axes=0)
 
-        # Solve local system
+        # Solve local system and insert where appropriate
         a = np.linalg.solve(A, b)
-        interpolant = lambda vertex: np.dot(monomials(coordinates(vertex)), a).reshape(shape)
-        sigma_ZZ.dat.data[offset(vvv)] = interpolant(vvv)
-        if p == 2:
-            raise NotImplementedError  # TODO: need offset for non-vertex nodes. These should be averaged if the existing value is nonzero
+        if p == 1:
+            interpolant = lambda vtx: np.dot(monomials(coordinates(vtx)), a).reshape(shape)
+            sigma_ZZ.dat.data[offset(vvv)] = interpolant(vvv)
+        elif p == 2:
+            zero = np.zeros(shape)
+            interpolant = lambda vtx: np.dot(monomials(p_coordinates(vtx), 2), a).reshape(shape)
+            assert dim == 2  # TODO
+            vvv_coords = coordinates(vvv)
+            immediate_midfacets = [0.5*(vvv_coords + coordinates(v)) for v in patch['vertices']]
+            # FIXME: HACKY IMPLEMENTATION
+            #        ====================
+            #        * This code loops over midfacets and all nodes and determines if they lie
+            #          are adjacent to the vertex by comparing coordinates.
+            #        * A cleaner implementation requires knowledge of which nodes lie in the patch.
+            for c in immediate_midfacets:
+                for node in range(*p_plex.getDepthStratum(0)):  # FIXME: HACKY!
+                    if np.allclose(c, p_coordinates(node)):
+                        off = p_offset(node)
+                        if np.allclose(sigma_ZZ.dat.data[off], zero):
+                            sigma_ZZ.dat.data[off] = interpolant(node)
+                        else:
+                            sigma_ZZ.dat.data[off] = 0.5*(interpolant(node) + sigma_ZZ.dat.data[off])
+                        break
     return sigma_ZZ
 
 
