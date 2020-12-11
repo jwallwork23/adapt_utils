@@ -156,8 +156,7 @@ def get_patch(vertex, mesh=None, plex=None, coordinates=None, midfacets=False, e
         facets = set([])
     else:
         elements = set(extend['elements'].keys())
-        if midfacets:
-            facets = set(extend['facets'].keys())
+        facets = set(extend['facets'].keys())
     if coordinates is None:
         assert mesh is not None
         plex, offset, coordinates = make_consistent(mesh)
@@ -174,31 +173,27 @@ def get_patch(vertex, mesh=None, plex=None, coordinates=None, midfacets=False, e
         elements = elements.union(set(plex.getSupport(e)))
     patch = {'elements': {k: {'vertices': []} for k in elements}}
 
-    # Get vertices and centroids in patch
-    vertices = set(range(*plex.getDepthStratum(0)))
+    # Get vertices, facets and centroids in patch
+    all_vertices = set(range(*plex.getDepthStratum(0)))
+    all_facets = set(range(*plex.getDepthStratum(1)))
     patch['vertices'] = set([])
+    patch_facets = set([])
     for k in elements:
         closure = set(plex.getTransitiveClosure(k)[0])
-        patch['elements'][k]['vertices'] = vertices.intersection(closure)
+        patch['elements'][k]['vertices'] = all_vertices.intersection(closure)
+        patch['elements'][k]['facets'] = all_facets.intersection(closure)
+        patch_facets = patch_facets.union(patch['elements'][k]['facets'])
         coords = [coordinates(v) for v in patch['elements'][k]['vertices']]
         patch['elements'][k]['centroid'] = np.sum(coords, axis=0)/(dim + 1)
         patch['vertices'] = patch['vertices'].union(set(patch['elements'][k]['vertices']))
+    patch_facets.union(facets)
+    patch['facets'] = {e: {} for e in patch_facets}
 
+    # Get facet centroids
     if midfacets:
-
-        # Get facets in patch
-        all_facets = set(range(*plex.getDepthStratum(1)))
-        patch_facets = set([])
-        for k in elements:
-            closure = set(plex.getTransitiveClosure(k)[0])
-            patch_facets = patch_facets.union(all_facets.intersection(closure))
-        patch_facets.union(facets)
-        patch['facets'] = {e: {} for e in patch_facets}
-
-        # Get their centroids
         for e in patch['facets']:
             closure = set(plex.getTransitiveClosure(e)[0])
-            patch['facets'][e] = {'vertices': vertices.intersection(closure)}
+            patch['facets'][e] = {'vertices': all_vertices.intersection(closure)}
             coords = [coordinates(v) for v in plex.getCone(e)]
             patch['facets'][e]['midfacet'] = np.sum(coords, axis=0)/dim
 
