@@ -2,7 +2,6 @@ from firedrake import *
 
 from time import perf_counter
 
-from adapt_utils.adapt.recovery import recover_zz
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 

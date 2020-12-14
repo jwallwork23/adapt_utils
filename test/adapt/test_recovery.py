@@ -5,7 +5,6 @@ import numpy as np
 import pytest
 
 from adapt_utils.adapt.recovery import *
-from adapt_utils.linalg import rotation_matrix
 from adapt_utils.mesh import make_consistent
 from adapt_utils.norms import lp_norm
 from adapt_utils.options import Options
