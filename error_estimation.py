@@ -16,6 +16,12 @@ class GOErrorEstimatorTerm(object):
         self.p0test = TestFunction(self.P0)
         self.p0trial = TrialFunction(self.P0)
 
+    def restrict(self, arg):
+        """
+        Restrict a discontinuous object to an element.
+        """
+        return jump(arg, self.p0test)
+
     def element_residual(self, solution, solution_old, arg, arg_old, fields, fields_old):
         """
         Returns an UFL form of the dx terms.
