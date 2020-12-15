@@ -79,7 +79,7 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
             un_av = dot(avg(uv), self.normal('-'))
             s = 0.5*(sign(un_av) + 1.0)
             c_up = c('-')*s + c('+')*(1-s)
-            flux_terms += -c_up*self.restrict(e_star*dot(uv, self.normal))*self.dS
+            flux_terms += -c_up*self.restrict(e_star)*jump(uv, self.normal)*self.dS
 
             # Lax-Friedrichs stabilization
             if self.use_lax_friedrichs:
