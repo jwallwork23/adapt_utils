@@ -113,12 +113,10 @@ class ExternalPressureGradientGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorM
                 head_star = avg(head) + sqrt(avg(total_h)/g_grav)*jump(uv, self.normal)
             else:
                 head_star = avg(head)
-            loc = -self.p0test*g_grav*dot(z, self.normal)
-            flux_terms += head_star*(loc('+') + loc('-'))*self.dS
+            flux_terms += -head_star*self.restrict(g_grav*dot(z, self.normal))*self.dS
 
             # Term arising from integration by parts
-            loc = self.p0test*g_grav*eta*dot(z, self.normal)
-            flux_terms += (loc('+') + loc('-'))*self.dS
+            flux_terms += self.restrict(g_grav*eta*dot(z, self.normal))*self.dS
 
         return flux_terms
 
@@ -188,13 +186,13 @@ class HUDivGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorContinuityTerm):
         total_h = self.depth.get_total_depth(eta_old)
 
         # Term arising from integration by parts
-        flux_terms = self.restrict(zeta*dot(total_h*uv, self.normal))*self.dS
+        flux_terms = self.restrict(inner(dot(total_h*uv, self.normal)), zeta)*self.dS
 
         # Terms arising from DG discretisation
         if self.eta_is_dg:
             h = avg(total_h)
             uv_rie = avg(uv) + sqrt(g_grav/h)*jump(eta, self.normal)
-            flux_terms += -self.restrict(dot(h*uv_rie, self.normal)*zeta)*self.dS
+            flux_terms += -self.restrict(inner(dot(h*uv_rie, self.normal), zeta))*self.dS
 
         return flux_terms
 
@@ -206,7 +204,7 @@ class HUDivGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorContinuityTerm):
         total_h = self.depth.get_total_depth(eta_old)
 
         # Term arising from integration by parts
-        flux_terms = self.p0test*zeta*dot(total_h*uv, self.normal)*ds
+        flux_terms = self.p0test*inner(total_h*dot(uv, self.normal), zeta)*ds
         # NOTE: Assumes freeslip conditions on whole boundary!
 
         # Terms arising from boundary conditions
@@ -224,7 +222,7 @@ class HUDivGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorContinuityTerm):
                 un_jump = inner(uv_old - uv_ext_old, self.normal)
                 eta_rie = 0.5*(eta_old + eta_ext_old) + sqrt(h_av/g_grav)*un_jump
                 h_rie = self.depth.bathymetry_2d + eta_rie
-                flux_terms += -self.p0test*h_rie*un_rie*zeta*ds_bnd
+                flux_terms += -self.p0test*inner(h_rie*un_rie, zeta)*ds_bnd
 
         return flux_terms
 
@@ -255,9 +253,15 @@ class HorizontalAdvectionGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
         uv_old, eta_old = split(solution_old)
         z, zeta = split(arg)
 
+        # Term arising from integration by parts
+        flux_terms = inner(self.restrict(dot(uv, self.normal)*uv), self.restrict(z))*self.dS
+
         if self.u_continuity in ['dg', 'hdiv']:
 
             # Terms arising from DG discretisation
+            flux_terms += -inner(jump(uv, self.normal)*avg(uv), self.restrict(z))*self.dS
+
+            # Terms arising from Lax-Friedrichs
             if self.options.use_lax_friedrichs_velocity:
                 uv_lax_friedrichs = fields_old.get('lax_friedrichs_velocity_scaling_factor')
                 gamma = 0.5*abs(dot(avg(uv_old), self.normal('-')))*uv_lax_friedrichs
@@ -265,9 +269,6 @@ class HorizontalAdvectionGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
 
         else:
             raise NotImplementedError  # TODO
-
-        # Term arising from integration by parts
-        flux_terms += 0.5*self.restrict(inner(dot(uv, self.normal)*uv, z))*self.dS
 
         return flux_terms
 
@@ -352,21 +353,20 @@ class HorizontalViscosityGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
 
         if self.options.use_grad_div_viscosity_term:
             stress = 2.0*nu*sym(grad(uv))
-            stress_jump = 2.0*nu*sym(outer(uv, n))
+            stress_jump = 2.0*avg(nu)*jump(sym(outer(uv, n)))
         else:
             stress = nu*grad(uv)
-            stress_jump = nu*outer(uv, n)
+            stress_jump = avg(nu)*jump(outer(uv, n))
 
-        # Terms arising from DG discretisation
+        # Term arising from DG and discretisation and integration by parts
+        flux_terms += -inner(avg(stress, n), self.restrict(z))*self.dS
+
+        # Terms arising from SIPG
         alpha = self.options.sipg_parameter
         assert alpha is not None
         sigma = avg(alpha/self.cellsize)
-        flux_terms += 0.5*self.restrict(inner(dot(stress, n), z))*self.dS      # DG
-        flux_terms += -0.5*self.restrict(inner(sigma*dot(nu, uv), z))*self.dS  # Penalisation
-        flux_terms += 0.5*self.restrict(inner(stress_jump, grad(z)))*self.dS   # Symmetrisation
-
-        # Term arising from integration by parts
-        flux_terms += -0.5*self.restrict(inner(dot(stress, n), z))*self.dS
+        flux_terms += -2*inner(sigma*dot(avg(nu), avg(uv)), self.restrict(z))*self.dS  # Penalisation
+        flux_terms += 0.5*inner(stress_jump, self.restrict(grad(z)))*self.dS   # Symmetrisation
 
         return flux_terms
 
