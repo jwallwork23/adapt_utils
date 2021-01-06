@@ -60,6 +60,7 @@ for alignment in ('aligned', 'offset'):
             continue
         with h5py.File(fname, 'r') as outfile:
             elements = np.array(outfile['elements'])
+            dofs = np.array(outfile['dofs'])
             qoi = np.array(outfile['qoi'])
             if approach == 'fixed_mesh':
                 # qoi_exact = np.array(outfile['qoi_exact'][-1])
@@ -74,20 +75,16 @@ for alignment in ('aligned', 'offset'):
             # print("Effectivity indices: ", effectivity/elements)
         label = approaches[approach]['label']
         marker = approaches[approach]['marker']
-        axes.semilogx(elements, relative_error, '--', label=label, marker=marker)
-    axes.set_xlabel("Element count")
+        axes.semilogx(dofs, relative_error, '--', label=label, marker=marker)
+    axes.set_xlabel("Degrees of Freedom")
     axes.set_ylabel("Relative error")
-    axes.set_xticks([1.0e+03, 1.0e+04, 1.0e+05, 1.0e+06])
     yticks = np.linspace(0, 0.5, 6)
     axes.set_yticks(yticks)
     axes.set_yticklabels([r"{{{:d}}}\%".format(int(yt*100)) for yt in yticks])
     axes.set_ylim([-0.01, 0.31])
-    # xlim = axes.get_xlim()
-    xlim = [0.8e+03, 1.2e+06]
+    xlim = axes.get_xlim()
     axes.hlines(y=0.01, xmin=xlim[0], xmax=xlim[1], color='k', linestyle='-', label=r'1.0\% error')
     axes.set_xlim(xlim)
-    if alignment == 'aligned':
-        axes.legend(bbox_to_anchor=(0.5, 0.3), fontsize=18)
     axes.grid(True)
     axes.grid(True, which='minor', axis='y')
 
@@ -98,3 +95,16 @@ for alignment in ('aligned', 'offset'):
     filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
     filename += '_{:.0f}'.format(alpha)
     savefig('_'.join([filename, alignment]), plot_dir, extensions=['pdf', 'png'])
+
+    # Save legend to file
+    if alignment == 'aligned':
+        fig2, axes2 = plt.subplots()
+        lines, labels = axes.get_legend_handles_labels()
+        lines = [lines[-1]] + lines[:-1]
+        labels = [labels[-1]] + labels[:-1]
+        legend = axes2.legend(lines, labels, fontsize=18, frameon=False, ncol=3)
+        fig2.canvas.draw()
+        axes2.set_axis_off()
+        bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
+        fig2.savefig(os.path.join(plot_dir, 'legend.png'), dpi='figure', bbox_inches=bbox)
+        fig2.savefig(os.path.join(plot_dir, 'legend.pdf'), dpi='figure', bbox_inches=bbox)

@@ -36,6 +36,7 @@ num_levels = 5
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'fixed_mesh', 'hdf5'))
 qois = {'aligned': [], 'offset': []}
 num_cells = []
+dofs = []
 qois_exact = {'aligned': [], 'offset': []}
 
 # Loop over mesh hierarchy
@@ -53,6 +54,7 @@ for level in range(num_levels):
 
     # Print element count
     num_cells.append(tp.mesh.num_cells())
+    dofs.append(tp.mesh.num_vertices())
     print_output("\nMesh {:d} in the hierarchy".format(level+1))
     print_output("    Number of elements  : {:d}".format(num_cells[-1]))
 
@@ -81,5 +83,6 @@ for index, alignment in enumerate(('aligned', 'offset')):
 for alignment in qois:
     with h5py.File(os.path.join(di, '{:s}_{:s}.h5'.format(fname, alignment)), 'w') as outfile:
         outfile.create_dataset('elements', data=num_cells)
+        outfile.create_dataset('dofs', data=dofs)
         outfile.create_dataset('qoi', data=qois[alignment])
         outfile.create_dataset('qoi_exact', data=qois_exact[alignment])

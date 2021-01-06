@@ -102,6 +102,7 @@ di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', op.appr
 # --- Solve
 
 elements = []
+dofs = []
 qois = []
 estimators = []
 for n in range(op.outer_iterations):
@@ -111,6 +112,8 @@ for n in range(op.outer_iterations):
     tp.run()
     elements.append(tp.num_cells[-1][0])
     print("Element count: ", elements)
+    dofs.append(tp.num_vertices[-1][0])
+    print("DoF count: ", dofs)
     qois.append(tp.qois[-1])
     print("QoIs:          ", qois)
     if 'dwr' in op.approach:
@@ -121,6 +124,7 @@ for n in range(op.outer_iterations):
 alignment = 'offset' if offset else 'aligned'
 with h5py.File(os.path.join(di, '{:s}_{:s}.h5'.format(fname, alignment)), 'w') as outfile:
     outfile.create_dataset('elements', data=elements)
+    outfile.create_dataset('dofs', data=dofs)
     outfile.create_dataset('qoi', data=qois)
     if 'dwr' in op.approach:
         outfile.create_dataset('estimators', data=estimators)
