@@ -431,17 +431,22 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         kernel = eigen_kernel(get_reordered_eigendecomposition, dim)
         op2.par_loop(kernel, self.P0_ten[0].node_set, evectors.dat(op2.RW), evalues.dat(op2.RW), H.dat(op2.READ))
 
-        # Compute stretching factor
-        s = sqrt(abs(evalues[0]/evalues[-1]))
+        # Compute stretching factors, in descending order
+        if dim == 2:
+            S = as_vector([
+                sqrt(abs(evalues[0]/evalues[1])),
+                sqrt(abs(evalues[1]/evalues[0])),
+            ])
+        else:
+            S = as_vector([
+                pow(abs((evalues[0]*evalues[0])/(evalues[1]*evalues[2])), 1/3),
+                pow(abs((evalues[1]*evalues[1])/(evalues[2]*evalues[0])), 1/3),
+                pow(abs((evalues[2]*evalues[2])/(evalues[0]*evalues[1])), 1/3),
+            ])
 
         # Build metric
         M = Function(self.P0_ten[0], name="Elementwise metric")
-        if dim == 2:
-            # NOTE: Here the abs replaces a squared square root
-            evalues.interpolate(as_vector([abs(K_hat/K_opt*s), abs(K_hat/K_opt/s)]))
-        else:
-            raise NotImplementedError  # TODO
-        # kernel = eigen_kernel(set_eigendecomposition_transpose, dim)
+        evalues.interpolate(abs(K_hat/K_opt)*S)
         kernel = eigen_kernel(set_eigendecomposition, dim)
         op2.par_loop(kernel, self.P0_ten[0].node_set, M.dat(op2.RW), evectors.dat(op2.READ), evalues.dat(op2.READ))
 
