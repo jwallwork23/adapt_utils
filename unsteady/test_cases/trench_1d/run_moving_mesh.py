@@ -3,11 +3,10 @@ Migrating Trench Test case
 =======================
 
 Solves the hydro-morphodynamic simulation of a migrating trench using mesh movement methods
-
 """
-
 from thetis import *
 
+import argparse
 import datetime
 import numpy as np
 import os
@@ -19,14 +18,19 @@ from adapt_utils.norms import local_frobenius_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.trench_1d.options import TrenchSedimentOptions
 
+parser = argparse.ArgumentParser()
+parser.add_argument("-alpha", help="Scaling factor for Hessian.")
+parser.add_argument("-res", help="Mesh resolution factor (default 0.5).")
+parser.add_argument("-rtol", help="Relative tolerance for relaxation method (default 1.0e-03).")
+args = parser.parse_args()
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
 
-res = 0.5
-alpha = 2
+alpha = float(args.alpha or 2.0)
+res = float(args.res or 0.5)
 
 # to create the input hydrodynamics directiory please run trench_hydro.py
 # setting res to be the same values as above
@@ -43,7 +47,8 @@ kwargs = {
     'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
-    'r_adapt_rtol': 1.0e-3,
+    'r_adapt_rtol': float(args.rtol or 1.0e-03),
+
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': 'lax_friedrichs',
