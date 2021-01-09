@@ -14,24 +14,24 @@ setup_hydrodynamics:
 
 rtol:
 	mkdir -p outputs/rtol
-	python3 run_moving_mesh.py -res 0.5 -rtol 1e-1 > outputs/rtol/1e-1
-	python3 run_moving_mesh.py -res 0.5 -rtol 1e-2 > outputs/rtol/1e-2
-	python3 run_moving_mesh.py -res 0.5 -rtol 1e-3 > outputs/rtol/1e-3
-	python3 run_moving_mesh.py -res 0.5 -rtol 1e-4 > outputs/rtol/1e-4
-	python3 run_moving_mesh.py -res 0.5 -rtol 1e-5 > outputs/rtol/1e-5
-	python3 run_moving_mesh.py -res 0.5 -rtol 1e-6 > outputs/rtol/1e-6
-	python3 run_moving_mesh.py -res 0.5 -rtol 1e-7 > outputs/rtol/1e-7
-	python3 run_moving_mesh.py -res 0.5 -rtol 1e-8 > outputs/rtol/1e-8
+	python3 run_moving_mesh.py -res 0.5 -rtol 1e-1 > outputs/rtol/1e-01
+	python3 run_moving_mesh.py -res 0.5 -rtol 1e-2 > outputs/rtol/1e-02
+	python3 run_moving_mesh.py -res 0.5 -rtol 1e-3 > outputs/rtol/1e-03
+	python3 run_moving_mesh.py -res 0.5 -rtol 1e-4 > outputs/rtol/1e-04
+	python3 run_moving_mesh.py -res 0.5 -rtol 1e-5 > outputs/rtol/1e-05
+	python3 run_moving_mesh.py -res 0.5 -rtol 1e-6 > outputs/rtol/1e-06
+	python3 run_moving_mesh.py -res 0.5 -rtol 1e-7 > outputs/rtol/1e-07
+	python3 run_moving_mesh.py -res 0.5 -rtol 1e-8 > outputs/rtol/1e-08
 
 res:
 	mkdir -p outputs/res
-	python3 run_moving_mesh.py -res 0.0625 > outputs/res/0.0625
-	# python3 run_moving_mesh.py -res 0.1 > outputs/res/0.1
-	python3 run_moving_mesh.py -res 0.125 > outputs/res/0.125
-	python3 run_moving_mesh.py -res 0.25 > outputs/res/0.25
-	# python3 run_moving_mesh.py -res 0.375 > outputs/res/0.375
-	python3 run_moving_mesh.py -res 0.5 > outputs/res/0.5
-	# python3 run_moving_mesh.py -res 0.75 > outputs/res/0.75
-	python3 run_moving_mesh.py -res 1 > outputs/res/1
-	python3 run_moving_mesh.py -res 2 > outputs/res/2
-	python3 run_moving_mesh.py -res 4 > outputs/res/4
+	python3 run_fixed_mesh.py -res 0.0625 > outputs/res/0.0625
+	# python3 run_fixed_mesh.py -res 0.1 > outputs/res/0.1
+	python3 run_fixed_mesh.py -res 0.125 > outputs/res/0.125
+	python3 run_fixed_mesh.py -res 0.25 > outputs/res/0.25
+	# python3 run_fixed_mesh.py -res 0.375 > outputs/res/0.375
+	python3 run_fixed_mesh.py -res 0.5 > outputs/res/0.5
+	# python3 run_fixed_mesh.py -res 0.75 > outputs/res/0.75
+	python3 run_fixed_mesh.py -res 1 > outputs/res/1
+	python3 run_fixed_mesh.py -res 2 > outputs/res/2
+	python3 run_fixed_mesh.py -res 4 > outputs/res/4

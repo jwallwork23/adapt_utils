@@ -83,7 +83,7 @@ options.horizontal_viscosity = Constant(1e-6)
 options.timestepper_type = 'CrankNicolson'
 options.timestepper_options.implicitness_theta = 1.0  # i.e. Implicit Euler
 if not hasattr(options.timestepper_options, 'use_automatic_timestep'):
-    options.timestep = 0.25
+    options.timestep = 0.25 if res < 4 else 0.125
 left_bnd_id = 1
 right_bnd_id = 2
 swe_bnd = {}

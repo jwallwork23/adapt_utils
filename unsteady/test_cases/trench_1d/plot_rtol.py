@@ -5,6 +5,8 @@ import mpl_toolkits.axisartist as AA
 from adapt_utils.plotting import *
 
 
+# TODO: Combine with gather_rtol
+
 tol = []
 err = []
 time = []
@@ -13,8 +15,8 @@ for i, line in enumerate(open('outputs/rtol/err.csv', 'r')):
         continue
     words = line.split(',')
     tol.append(int(words[0][-1]))
-    err.append(float(words[1]))
-    time.append(float(words[2]))
+    err.append(float(words[2]))
+    time.append(float(words[3]))
 x = list(range(len(tol)))
 
 host = host_subplot(111, axes_class=AA.Axes)
