@@ -95,5 +95,5 @@ solver_obj.assign_initial_conditions(uv=uv_init, elev=elev_init)
 # Run model
 solver_obj.iterate()
 uv, elev = solver_obj.fields.solution_2d.split()
-fpath = "hydrodynamics_trench_{:.f}".format(res)
+fpath = "hydrodynamics_trench_{:.1f}".format(res)
 export_hydrodynamics(uv, elev, fpath)

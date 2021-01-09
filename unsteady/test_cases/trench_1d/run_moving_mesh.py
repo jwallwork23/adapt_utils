@@ -33,7 +33,7 @@ args = parser.parse_args()
 
 alpha = float(args.alpha or 2.0)
 res = float(args.res or 0.5)
-
+rtol = float(args.rtol or 1.0e-03)
 
 # --- Set parameters
 
@@ -50,7 +50,7 @@ kwargs = {
     'input_dir': inputdir,
     'output_dir': outputdir,
     'nonlinear_method': 'relaxation',
-    'r_adapt_rtol': float(args.rtol or 1.0e-03),
+    'r_adapt_rtol': rtol,
 
     # Spatial discretisation
     'family': 'dg-dg',
@@ -89,32 +89,32 @@ t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
 
-# Load experimental data
+# Save solution data
 new_mesh = RectangleMesh(16*5*5, 5*1, 16, 1.1)
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
-data = pd.read_csv('experimental_data.csv', header=None)
 bathymetrythetis1 = []
 diff_thetis = []
 datathetis = np.linspace(0, 15.9, 160)
 bathymetrythetis1 = [-bath.at([i, 0.55]) for i in datathetis]
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-df.to_csv('adapt_output/bed_trench_output_uni_s' + str(res) + '_' + str(alpha) + '.csv')
+df.to_csv('adapt_output/bed_trench_output_uni_s_{:.1f}_{:.1f}_{:.1e}.csv'.format(res, alpha, rtol))
 
-# Plot l2 error
+# Compute l2 error against experimental data
 datathetis = []
 bathymetrythetis1 = []
 diff_thetis = []
+data = pd.read_csv('experimental_data.csv', header=None)
 for i in range(len(data[0].dropna())):
     datathetis.append(data[0].dropna()[i])
     bathymetrythetis1.append(-bath.at([np.round(data[0].dropna()[i], 3), 0.55]))
     diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
 df_exp = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-df_exp.to_csv('adapt_output/bed_trench_output_s_{:.1f}_{:.1f}.csv'.format(res, alpha))
+df_exp.to_csv('adapt_output/bed_trench_output_s_{:.1f}_{:.1f}_{:.1e}.csv'.format(res, alpha, rtol))
 
 # Print to screen
 print("Total error L2 norm: {:.4e}".format(np.sqrt(sum(diff_thetis))))
 print("res = {:.1f}".format(res))
 print("alpha = {:.1f}".format(alpha))
 print("total time: {:.1f}s".format(t2 - t1))
-df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.csv')
+df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0.csv')
 print_output("Mesh error: {:.1f}".format(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))
