@@ -90,6 +90,6 @@ df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetry
 df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_c_{:.1f}.csv'.format(res)))
 
 # Print to screen
-print_output("Total error L2 norm: {:.4e}".format(np.sqrt(sum(diff_thetis))))
-print_output("res = {:.1f}".format(res))
-print_output("total time: {:.1f}s".format(t2 - t1))
+print("res = {:.1f}".format(res))
+print("Time: {:.1f}s".format(t2 - t1))
+print("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))

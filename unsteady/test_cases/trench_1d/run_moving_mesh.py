@@ -112,9 +112,10 @@ df_exp = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathym
 df_exp.to_csv('adapt_output/bed_trench_output_s_{:.1f}_{:.1f}_{:.1e}.csv'.format(res, alpha, rtol))
 
 # Print to screen
-print("Total error L2 norm: {:.4e}".format(np.sqrt(sum(diff_thetis))))
 print("res = {:.1f}".format(res))
 print("alpha = {:.1f}".format(alpha))
-print("total time: {:.1f}s".format(t2 - t1))
+print("rtol = {:.1e}".format(rtol))
+print("Time: {:.1f}s".format(t2 - t1))
+print("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))
 df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0.csv')
-print_output("Mesh error: {:.1f}".format(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))
+print("Discretisation error: {:.1f}".format(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))
