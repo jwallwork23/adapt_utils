@@ -35,6 +35,7 @@ args = parser.parse_args()
 alpha = float(args.alpha or 2.0)
 res = float(args.res or 0.5)
 rtol = float(args.rtol or 1.0e-04)
+freq = int(args.dt_per_mesh_movement or 40)
 
 # --- Set parameters
 
@@ -60,7 +61,7 @@ kwargs = {
     'use_automatic_sipg_parameter': True,
 }
 op = TrenchSedimentOptions(**kwargs)
-op.dt_per_mesh_movement = int(args.dt_per_mesh_movement or 40)
+op.dt_per_mesh_movement = freq
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 swp.shallow_water_options[0]['mesh_velocity'] = None
@@ -99,7 +100,7 @@ diff_thetis = []
 datathetis = np.linspace(0, 15.9, 160)
 bathymetrythetis1 = [-bath.at([i, 0.55]) for i in datathetis]
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-df.to_csv('adapt_output/bed_trench_output_uni_s_{:.4f}_{:.1f}_{:.1e}.csv'.format(res, alpha, rtol))
+df.to_csv('adapt_output/bed_trench_output_uni_s_{:.4f}_{:.1f}_{:.1e}_{:d}.csv'.format(res, alpha, rtol, freq))
 
 # Compute l2 error against experimental data
 datathetis = []
@@ -111,7 +112,7 @@ for i in range(len(data[0].dropna())):
     bathymetrythetis1.append(-bath.at([np.round(data[0].dropna()[i], 3), 0.55]))
     diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
 df_exp = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-df_exp.to_csv('adapt_output/bed_trench_output_s_{:.4f}_{:.1f}_{:.1e}.csv'.format(res, alpha, rtol))
+df_exp.to_csv('adapt_output/bed_trench_output_s_{:.4f}_{:.1f}_{:.1e}_{:d}.csv'.format(res, alpha, rtol, freq))
 
 # Print to screen
 print("res = {:.4f}".format(res))
@@ -120,4 +121,4 @@ print("rtol = {:.1e}".format(rtol))
 print("Time: {:.1f}s".format(t2 - t1))
 print("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))
 df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
-print("Discretisation error: {:.4f}".format(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))
+print("Discretisation error: {:.4f}".format(np.sqrt(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))))
