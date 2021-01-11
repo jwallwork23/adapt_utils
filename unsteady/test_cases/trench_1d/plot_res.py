@@ -20,12 +20,11 @@ N = len(data)
 total_err = []
 for res in resolutions:
     df = pd.read_csv('fixed_output/bed_trench_output_c_{:.4f}.csv'.format(res))
-    total_err.append(sum([(df['bath'][i] - data[0].dropna()[i])**2 for i in range(N)]))
+    total_err.append(np.sqrt(sum([(df['bath'][i] - data[1].dropna()[i])**2 for i in range(N)])))
 
 # Plot total error against element count
 fig, axes = plt.subplots(figsize=(6, 5))
-axes.loglog(nx, total_err, '--x')
-axes.yaxis.set_minor_formatter(mticker.ScalarFormatter())
+axes.semilogx(nx, total_err, '--x')
 axes.set_xlabel(r"Element count in $x$-direction")
 axes.set_ylabel(r"$\ell_2$ error")
 axes.grid(True)
@@ -46,7 +45,7 @@ N = len(df_real)
 disc_err = []
 for res in resolutions:
     df = pd.read_csv('fixed_output/bed_trench_output_uni_c_{:.4f}.csv'.format(res))
-    disc_err.append(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(N)]))
+    disc_err.append(np.sqrt(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(N)])))
 
 # Plot discretisation error against element count
 fig, axes = plt.subplots(figsize=(6, 5))
@@ -55,8 +54,8 @@ axes.set_xlabel(r"Element count in $x$-direction")
 axes.set_ylabel(r"$\ell_2$ error")
 
 # Add slope markers
-annotation.slope_marker((20, 1.0e-02), -3, ax=axes, size_frac=0.2)
-annotation.slope_marker((14, 1.0e-05), -4, invert=True, ax=axes, size_frac=0.2)
+annotation.slope_marker((20, 1.0e-01), -3, ax=axes, size_frac=0.2)
+annotation.slope_marker((16, 1.0e-03), -4, invert=True, ax=axes, size_frac=0.2)
 
 axes.grid(True)
 axes.grid(b=True, which='minor')
