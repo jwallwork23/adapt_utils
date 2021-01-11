@@ -60,6 +60,4 @@ annotation.slope_marker((14, 1.0e-05), -4, invert=True, ax=axes, size_frac=0.2)
 
 axes.grid(True)
 axes.grid(b=True, which='minor')
-plt.tight_layout()
-plt.show()
 savefig("discretisation_error", "plots", extensions=['pdf', 'png'])
