@@ -40,7 +40,7 @@ inputdir = os.path.join(di, 'hydrodynamics_trench_{:.1f}'.format(res))
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': res,
-    'ny': 1,
+    'ny': 1 if res < 4 else 2,
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
