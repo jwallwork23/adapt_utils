@@ -54,8 +54,6 @@ kwargs = {
 op = TrenchSedimentOptions(**kwargs)
 if os.getenv('REGRESSION_TEST') is not None:
     op.end_time = op.dt*op.dt_per_export
-if res >= 4.0:
-    op.dt *= 0.5
 swp = AdaptiveProblem(op)
 
 
