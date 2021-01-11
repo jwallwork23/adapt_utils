@@ -21,7 +21,7 @@ for fname in fnames:
         time.append(float(f.readline().split(':')[-1][:-2]))
 assert np.isclose(0.5, np.average(res))  # TODO
 assert np.isclose(2.0, np.average(alpha))  # TODO
-x = list(range(len(tol)))
+x = list(range(1, len(tol)+1))
 
 # Get high resolution data
 df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
@@ -29,7 +29,7 @@ df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
 # Get discretisation errors
 disc_err = []
 for rtol in range(1, 9):
-    df = pd.read_csv('adapt_output/bed_trench_output_uni_s_0.5000_2.0_1.0e-0{:1d}.csv'.format(rtol))
+    df = pd.read_csv('adapt_output/bed_trench_output_uni_s_0.5000_2.0_1.0e-0{:1d}_40.csv'.format(rtol))
     disc_err.append(np.sqrt(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))
 
 # Plot both error and time against rtol
