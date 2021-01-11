@@ -28,7 +28,7 @@ res = float(args.res or 0.5)
 lx = 16
 ly = 1.1
 nx = np.int(16*5*res)
-ny = 5
+ny = 5 if res < 4 else 10
 mesh2d = RectangleMesh(nx, ny, lx, ly)
 x, y = SpatialCoordinate(mesh2d)
 
