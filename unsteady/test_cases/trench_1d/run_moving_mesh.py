@@ -29,11 +29,12 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-alpha", help="Scaling factor for Hessian.")
 parser.add_argument("-res", help="Mesh resolution factor (default 0.5).")
 parser.add_argument("-rtol", help="Relative tolerance for relaxation method (default 1.0e-03).")
+parser.add_argument("-dt_per_mesh_movement", help="Number of timesteps per mesh movement.")
 args = parser.parse_args()
 
 alpha = float(args.alpha or 2.0)
 res = float(args.res or 0.5)
-rtol = float(args.rtol or 1.0e-03)
+rtol = float(args.rtol or 1.0e-04)
 
 # --- Set parameters
 
@@ -59,6 +60,7 @@ kwargs = {
     'use_automatic_sipg_parameter': True,
 }
 op = TrenchSedimentOptions(**kwargs)
+op.dt_per_mesh_movement = int(args.dt_per_mesh_movement or 40)
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 swp.shallow_water_options[0]['mesh_velocity'] = None
