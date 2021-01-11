@@ -15,7 +15,9 @@ setup_hydrodynamics:
 benchmark:
 	python3 run_fixed_mesh.py -res 4 > outputs/res/4.0000
 
-rtol:
+rtol: rtol_40 rtol_80
+
+rtol_40:
 	mkdir -p outputs/rtol/0.5000
 	python3 run_moving_mesh.py -res 0.5 -rtol 1e-1 > outputs/rtol/0.5000/1e-01
 	python3 run_moving_mesh.py -res 0.5 -rtol 1e-2 > outputs/rtol/0.5000/1e-02
@@ -25,6 +27,17 @@ rtol:
 	python3 run_moving_mesh.py -res 0.5 -rtol 1e-6 > outputs/rtol/0.5000/1e-06
 	python3 run_moving_mesh.py -res 0.5 -rtol 1e-7 > outputs/rtol/0.5000/1e-07
 	python3 run_moving_mesh.py -res 0.5 -rtol 1e-8 > outputs/rtol/0.5000/1e-08
+
+rtol_80:
+	mkdir -p outputs/rtol/1.0000
+	python3 run_moving_mesh.py -res 1 -rtol 1e-1 > outputs/rtol/1.0000/1e-01
+	python3 run_moving_mesh.py -res 1 -rtol 1e-2 > outputs/rtol/1.0000/1e-02
+	python3 run_moving_mesh.py -res 1 -rtol 1e-3 > outputs/rtol/1.0000/1e-03
+	python3 run_moving_mesh.py -res 1 -rtol 1e-4 > outputs/rtol/1.0000/1e-04
+	python3 run_moving_mesh.py -res 1 -rtol 1e-5 > outputs/rtol/1.0000/1e-05
+	python3 run_moving_mesh.py -res 1 -rtol 1e-6 > outputs/rtol/1.0000/1e-06
+	python3 run_moving_mesh.py -res 1 -rtol 1e-7 > outputs/rtol/1.0000/1e-07
+	python3 run_moving_mesh.py -res 1 -rtol 1e-8 > outputs/rtol/1.0000/1e-08
 
 freq:
 	mkdir -p outputs/freq
