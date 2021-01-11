@@ -36,7 +36,7 @@ ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
 di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
-inputdir = os.path.join(di, 'hydrodynamics_trench_{:.1f}'.format(res))
+inputdir = os.path.join(di, 'hydrodynamics_trench_{:.4f}'.format(res))
 kwargs = {
     'approach': 'fixed_mesh',
     'nx': res,
@@ -75,7 +75,7 @@ diff_thetis = []
 datathetis = np.linspace(0, 15.9, 160)
 bathymetrythetis1 = [-bath.at([i, 0.55]) for i in datathetis]
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_uni_c_{:.1f}.csv'.format(res)))
+df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_uni_c_{:.4f}.csv'.format(res)))
 
 # Compute l2 error against experimental data
 datathetis = []
@@ -87,11 +87,9 @@ for i in range(len(data[0].dropna())):
     bathymetrythetis1.append(-bath.at([np.round(data[0].dropna()[i], 3), 0.55]))
     diff_thetis.append((data[1].dropna()[i] - bathymetrythetis1[-1])**2)
 df = pd.concat([pd.DataFrame(datathetis, columns=['x']), pd.DataFrame(bathymetrythetis1, columns=['bath'])], axis=1)
-df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_c_{:.1f}.csv'.format(res)))
+df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_c_{:.4f}.csv'.format(res)))
 
 # Print to screen
-print("res = {:.1f}".format(res))
+print("res = {:.4f}".format(res))
 print("Time: {:.1f}s".format(t2 - t1))
 print("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))
-df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0.csv')
-print("Discretisation error: {:.1f}".format(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))

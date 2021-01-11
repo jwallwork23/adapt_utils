@@ -1,7 +1,8 @@
+import math
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import host_subplot
 import mpl_toolkits.axisartist as AA
-import math
+import pandas as pd
 
 from adapt_utils.plotting import *
 
@@ -11,21 +12,27 @@ from adapt_utils.plotting import *
 alpha = 2.0
 res = 0.5
 
+# Read time data from output logs
 tol = []
-total_err = []
 time = []
-for i, line in enumerate(open('outputs/rtol/err_{:.1f}_{:.1f}.csv'.format(res, alpha), 'r')):
+for i, line in enumerate(open('outputs/rtol/err_{:.4f}_{:.1f}.csv'.format(res, alpha), 'r')):
     if i == 0:
         continue
     words = line.split(',')
     tol.append(int(words[0][-1]))
-    total_err.append(float(words[1]))
     time.append(float(words[3]))
-tol = tol[:-1]
 x = list(range(len(tol)))
-disc_err = [err - total_err[-1] for err in total_err[:-1]]
-time = time[:-1]
 
+# Get high resolution data
+df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
+
+# Get discretisation errors
+disc_err = []
+for rtol in range(1, 9):
+    df = pd.read_csv('adapt_output/bed_trench_output_uni_s_0.5000_2.0_1.0e-0{:1d}.csv'.format(rtol))
+    disc_err.append(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+
+# Plot both error and time against rtol
 fig, axes = plt.subplots(figsize=(10, 5))
 host = host_subplot(111, axes_class=AA.Axes)
 par1 = host.twinx()
@@ -35,8 +42,6 @@ axes.set_yticks([])
 axes = plt.gca()
 axes.set_xticks(x)
 axes.set_xticklabels(["$10^{{-{:d}}}$".format(t) for t in tol])
-axes.set_yticks([0, 5.0e-05, 1.0e-04])
-axes.set_yticklabels(["0", r"$5\times10^{-5}$", r"$10^{-4}$"])
 p1, = host.plot(x, disc_err, '--x')
 p2, = par1.plot(x, time, '--x')
 host.set_xlabel("Relative solver tolerance")
@@ -46,6 +51,4 @@ host.axis["left"].label.set_color(p1.get_color())
 par1.axis["right"].label.set_color(p2.get_color())
 plt.draw()
 axes.grid(True)
-plt.tight_layout()
-plt.show()
-# savefig("rtol", "plots", extensions=[])
+savefig("rtol", "plots", extensions=['pdf'])
