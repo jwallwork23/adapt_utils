@@ -12,6 +12,9 @@ setup_hydrodynamics:
 	python3 trench_hydro.py -res 2
 	python3 trench_hydro.py -res 4
 
+benchmark:
+	python3 run_fixed_mesh.py -res 4 > outputs/res/4
+
 rtol:
 	mkdir -p outputs/rtol
 	python3 run_moving_mesh.py -res 0.5 -rtol 1e-1 > outputs/rtol/1e-01
@@ -34,4 +37,3 @@ res:
 	# python3 run_fixed_mesh.py -res 0.75 > outputs/res/0.75
 	python3 run_fixed_mesh.py -res 1 > outputs/res/1
 	python3 run_fixed_mesh.py -res 2 > outputs/res/2
-	python3 run_fixed_mesh.py -res 4 > outputs/res/4
