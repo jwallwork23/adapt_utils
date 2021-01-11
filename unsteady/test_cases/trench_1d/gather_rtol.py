@@ -1,6 +1,7 @@
 import numpy as np
 import os
 
+
 # TODO: Combine with plot_rtol
 
 di = os.path.join(os.path.dirname(__file__), 'outputs', 'rtol')
@@ -16,7 +17,7 @@ for fname in fnames:
         discretisation_error.append(float(f.readline().split(':')[-1]))
 res = np.average(res)
 alpha = np.average(alpha)
-with open(os.path.join(di, 'err_{:.1f}_{:.1f}.csv'.format(res, alpha)), 'w+') as f:
+with open(os.path.join(di, 'err_{:.4f}_{:.1f}.csv'.format(res, alpha)), 'w+') as f:
     f.write('tolerance,total error,discretisation error,time\n')
     for tol, terr, derr, t in zip(rtol, total_error, discretisation_error, time):
         f.write('{:.1e},{:.4e},{:.4e},{:1f}\n'.format(tol, terr, derr, t))
