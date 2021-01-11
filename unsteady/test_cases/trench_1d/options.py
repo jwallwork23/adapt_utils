@@ -51,7 +51,7 @@ class TrenchSedimentOptions(CoupledOptions):
         self.morphological_acceleration_factor = Constant(100)
 
         # Time integration
-        self.dt = 0.25 if nx < 4 else 0.125
+        self.dt = 0.25 if nx < 4 else 0.1
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 40
         self.dt_per_export = 40

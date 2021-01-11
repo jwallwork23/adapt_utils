@@ -93,3 +93,5 @@ df.to_csv(os.path.join(di, 'fixed_output/bed_trench_output_c_{:.1f}.csv'.format(
 print("res = {:.1f}".format(res))
 print("Time: {:.1f}s".format(t2 - t1))
 print("Total error: {:.4e}".format(np.sqrt(sum(diff_thetis))))
+df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0.csv')
+print("Discretisation error: {:.1f}".format(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))
