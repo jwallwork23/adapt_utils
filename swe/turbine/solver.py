@@ -278,9 +278,9 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
                 self.qoi += self.callbacks[i]['timestep'][tag].timeseries[-1]
         return self.qoi
 
-    def quantity_of_interest_form(self, i):
+    def quantity_of_interest_form(self):
         """
         Power output quantity of interest expressed as a UFL form.
         """
-        u, eta = split(self.fwd_solutions[i])
-        return self.turbine_drag_coefficients[i]*pow(inner(u, u), 1.5)*dx
+        u, eta = split(self.fwd_solution)
+        return self.turbine_drag_coefficient*pow(inner(u, u), 1.5)*dx

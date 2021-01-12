@@ -36,7 +36,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
     @property
     def function_space(self):
-        return self.V[0] if self.solve_swe else self.Q[0]
+        return self.V[0] if self.op.solve_swe else self.Q[0]
 
     @property
     def timestepper(self):
@@ -209,31 +209,37 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                 op,
                 meshes=refined_mesh,
                 nonlinear=self.nonlinear,
+                discrete_adjoint=self.discrete_adjoint,
             )
             ep.outer_iteration = self.outer_iteration
             enriched_space = ep.get_function_space(adapt_field)
             tm = dmhooks.get_transfer_manager(self.get_plex(0))
 
-            # Setup forward solver for enriched problem
-            ep.create_error_estimators_step(0)
-            ep.solve_adjoint()
-            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
-
             # Create solution fields
             fwd_solution = self.get_solutions(adapt_field)[0]
+            fwd_proj = Function(enriched_space[0])
             adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
             indicator_enriched = Function(ep.P0[0])
-            fwd_proj = Function(enriched_space[0])
             adj_error = Function(enriched_space[0])
             bcs = self.boundary_conditions[0][adapt_field]
 
-            # Setup error estimator
+            # Prolong forward solution at current timestep
+            tm.prolong(fwd_solution, fwd_proj)
+            if self.nonlinear:
+                ep.fwd_solution.assign(fwd_proj)
+
+            # Setup forward solver for enriched problem
+            ep.create_error_estimators_step(0)
             ep.setup_solver_forward_step(0)  # Needed to create timestepper
+            ep.solve_adjoint()
+            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
+
+            # Setup error estimator
             ets = ep.timesteppers[0][adapt_field]
             ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
 
-            # Prolong forward solution at current timestep
-            tm.prolong(fwd_solution, fwd_proj)
+            # # Prolong forward solution at current timestep
+            # tm.prolong(fwd_solution, fwd_proj)
 
             # Approximate adjoint error in enriched space
             tm.prolong(adj_solution, adj_error)
@@ -249,7 +255,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             raise ValueError("Enrichment mode {:s} not recognised.".format(mode))
 
         # Compute dual weighted residual
-        dwr = ets.error_estimator.weighted_residual()
+        self.indicator['dwr_cell'] = ets.error_estimator.element_residual()
+        self.indicator['dwr_flux'] = ets.error_estimator.inter_element_flux()
+        self.indicator['dwr_flux'] += ets.error_estimator.boundary_flux()
+        dwr = self.indicator['dwr_cell'] + self.indicator['dwr_flux']
         indicator_enriched.interpolate(abs(dwr))
 
         # Estimate error
@@ -286,6 +295,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             metric = self.get_weighted_hessian_metric(adjoint=False)
         elif self.op.approach == 'weighted_gradient':
             metric = self.get_weighted_gradient_metric(adjoint=False)
+        elif self.op.approach == 'isotropic_dwr':
+            metric = self.get_isotropic_dwr_metric(adjoint=False)
         elif self.op.approach == 'anisotropic_dwr':
             metric = self.get_anisotropic_dwr_metric(adjoint=False)
         else:
@@ -389,6 +400,40 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         else:
             raise NotImplementedError  # TODO
 
+    def get_isotropic_dwr_metric(self, adjoint=False):
+        """
+        Construct an isotropic metric using an approach inspired by [Carpio et al. 2013].
+        """
+        dim = self.mesh.topological_dimension()
+        adapt_field = self.op.adapt_field
+        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
+            adapt_field = 'shallow_water'
+        fwd_solution = self.get_solutions(adapt_field)[0]
+
+        # Compute error indicators
+        dwr = self.indicate_error(adapt_field, approach='dwr_adjoint' if adjoint else 'dwr')
+
+        # Get current element volume
+        K = Function(self.P0[0], name="Element volume")
+        K_hat = 0.5  # Area of a triangular reference element
+        K.interpolate(K_hat*abs(JacobianDeterminant(self.mesh)))
+
+        # Get optimal element volume
+        K_opt = Function(self.P0[0], name="Optimal element volume")
+        alpha = self.op.convergence_rate
+        K_opt.interpolate(pow(dwr, 1/(alpha + 1)))
+        Sum = K_opt.vector().gather().sum()
+        if self.op.normalisation == 'error':
+            scaling = pow(Sum*self.op.target, -1/alpha)  # FIXME
+        else:
+            scaling = Sum/self.op.target
+        K_opt.interpolate(min_value(max_value(scaling*K/K_opt, self.op.h_min**2), self.op.h_max**2))
+
+        # Build metric
+        indicator = project(K_hat/K_opt, self.P1[0])
+        kwargs = dict(mesh=self.mesh, normalise=True, enforce_constrants=True, op=self.op)
+        return isotropic_metric(indicator, **kwargs)
+
     def get_anisotropic_dwr_metric(self, adjoint=False):
         """
         Construct an anisotropic metric using an approach inspired by [Carpio et al. 2013].
@@ -400,7 +445,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         fwd_solution = self.get_solutions(adapt_field)[0]
 
         # Compute error indicators
-        dwr = self.indicate_error('tracer', approach='dwr_adjoint' if adjoint else 'dwr')
+        dwr = self.indicate_error(adapt_field, approach='dwr_adjoint' if adjoint else 'dwr')
 
         # Get current element volume
         K = Function(self.P0[0], name="Element volume")

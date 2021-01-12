@@ -186,7 +186,7 @@ class HUDivGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorContinuityTerm):
         total_h = self.depth.get_total_depth(eta_old)
 
         # Term arising from integration by parts
-        flux_terms = self.restrict(inner(dot(total_h*uv, self.normal)), zeta)*self.dS
+        flux_terms = self.restrict(inner(dot(total_h*uv, self.normal), zeta))*self.dS
 
         # Terms arising from DG discretisation
         if self.eta_is_dg:
@@ -254,7 +254,7 @@ class HorizontalAdvectionGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
         z, zeta = split(arg)
 
         # Term arising from integration by parts
-        flux_terms = inner(self.restrict(dot(uv, self.normal)*uv), self.restrict(z))*self.dS
+        flux_terms = self.restrict(inner(dot(uv, self.normal)*uv, z))*self.dS
 
         if self.u_continuity in ['dg', 'hdiv']:
 
@@ -284,7 +284,7 @@ class HorizontalAdvectionGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
         z, zeta = split(arg)
 
         # Term arising from integration by parts
-        flux_terms = self.restrict(inner(dot(uv, self.normal)*uv, z))*ds
+        flux_terms = self.p0test*dot(uv, self.normal)*inner(uv, z)*ds(degree=self.quad_degree)  # TODO
 
         # Terms arising from boundary conditions
         for bnd_marker in self.boundary_markers:
@@ -294,11 +294,11 @@ class HorizontalAdvectionGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
             if funcs is not None:
                 eta_ext, uv_ext = self.get_bnd_functions(eta, uv, bnd_marker, bnd_conditions)
                 eta_ext_old, uv_ext_old = self.get_bnd_functions(eta_old, uv_old, bnd_marker, bnd_conditions)
-                # Compute linear riemann solution with eta, eta_ext, uv, uv_ext
+                # Compute linear riemann solution with eta, eta_ext, uv, uv_ext  # TODO
                 eta_jump = eta_old - eta_ext_old
                 total_h = self.depth.get_total_depth(eta_old)
                 un_rie = 0.5*inner(uv_old + uv_ext_old, self.normal) + sqrt(g_grav/total_h)*eta_jump
-                flux_terms += -self.p0test*dot(0.5*(uv_ext + uv)*un_rie, z)*ds_bnd
+                flux_terms += -self.p0test*un_rie*dot(0.5*(uv_ext + uv), z)*ds_bnd
 
             # Impermeability is imposed with mirror velocity
             if self.options.use_lax_friedrichs_velocity and funcs is None:
@@ -306,7 +306,7 @@ class HorizontalAdvectionGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
                 gamma = 0.5*abs(un_av)*uv_lax_friedrichs
                 uv_ext = uv - 2*dot(uv, self.normal)*self.normal
                 gamma = 0.5*abs(dot(uv_old, self.normal))*uv_lax_friedrichs
-                flux_terms += -self.p0test*gamma*dot(uv - uv_ext, z)*ds_bnd
+                flux_terms += -self.p0test*gamma*dot(uv - uv_ext, z)*ds_bnd  # TODO
 
         return flux_terms
 
@@ -359,13 +359,13 @@ class HorizontalViscosityGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
             stress_jump = avg(nu)*jump(outer(uv, n))
 
         # Term arising from DG and discretisation and integration by parts
-        flux_terms += -inner(avg(stress, n), self.restrict(z))*self.dS
+        flux_terms += -inner(avg(dot(stress, n)), self.restrict(z))*self.dS
 
         # Terms arising from SIPG
         alpha = self.options.sipg_parameter
         assert alpha is not None
         sigma = avg(alpha/self.cellsize)
-        flux_terms += -2*inner(sigma*dot(avg(nu), avg(uv)), self.restrict(z))*self.dS  # Penalisation
+        flux_terms += -2*inner(sigma*avg(nu)*avg(uv), self.restrict(z))*self.dS  # Penalisation
         flux_terms += 0.5*inner(stress_jump, self.restrict(grad(z)))*self.dS   # Symmetrisation
 
         return flux_terms
@@ -382,6 +382,8 @@ class HorizontalViscosityGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
         uv, eta = split(solution)
         uv_old, eta_old = split(solution_old)
         z, zeta = split(arg)
+
+        n = self.normal
 
         # Terms arising from boundary conditions
         alpha = self.options.sipg_parameter
@@ -404,7 +406,7 @@ class HorizontalViscosityGOErrorEstimatorTerm(ShallowWaterGOErrorEstimatorMoment
                 else:
                     stress_jump = nu*outer(delta_uv, self.normal)
 
-                flux_terms += -self.p0test*sigma*inner(dot(nu, delta_uv), z)*ds_bnd  # Penalisation
+                flux_terms += -self.p0test*sigma*inner(nu*delta_uv, z)*ds_bnd  # Penalisation
                 flux_terms += self.p0test*inner(stress_jump, grad(z))*ds_bnd         # Symmetrisation
 
         return flux_terms

@@ -1682,6 +1682,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Metric-based goal-oriented using DWR
             'dwr': self.run_dwr,
+            'isotropic_dwr': self.run_dwr,  # TODO: Unsteady case
             'anisotropic_dwr': self.run_dwr,  # TODO: Unsteady case
 
             # Metric-based goal-oriented *not* using DWR
