@@ -30,8 +30,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             raise ValueError("Timestepper {:s} not allowed for steady-state problems.".format(ts))
         if op.solve_tracer:
             self.equation_set = 'tracer'
+            self.nonlinear = False
         elif op.solve_swe:
             self.equation_set = 'shallow_water'
+            self.nonlinear = True
         else:
             raise ValueError("Steady-state solver only supports one of hydrodynamics and tracers.")
 
@@ -197,13 +199,13 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         op = self.op
         self.indicator['dwr'] = Function(self.P1[0], name="DWR indicator")
 
-        if adjoint:
+        if adjoint and self.discrete_adjoint:
             raise NotImplementedError  # TODO
 
         # Setup problem on enriched space
         if mode == 'GE_hp':
             raise NotImplementedError  # TODO: use degree_increase
-        if mode == 'GE_h':
+        elif mode == 'GE_h':
             hierarchy = MeshHierarchy(self.mesh, 1)
             refined_mesh = hierarchy[1]
             ep = type(self)(
@@ -217,23 +219,29 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             tm = dmhooks.get_transfer_manager(self.get_plex(0))
 
             # Create solution fields
-            fwd_solution = self.get_solutions(adapt_field)[0]
+            fwd_solution = self.get_solutions(adapt_field, adjoint=adjoint)[0]
             fwd_proj = Function(enriched_space[0])
-            adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
+            adj_solution = self.get_solutions(adapt_field, adjoint=not adjoint)[0]
             indicator_enriched = Function(ep.P0[0])
             adj_error = Function(enriched_space[0])
             bcs = self.boundary_conditions[0][adapt_field]
 
             # Prolong forward solution at current timestep
             tm.prolong(fwd_solution, fwd_proj)
-            if self.nonlinear:
-                ep.fwd_solution.assign(fwd_proj)
+            if not adjoint and self.nonlinear:
+                if op.solve_enriched_forward:
+                    ep.solve_forward()
+                else:
+                    ep.fwd_solution.assign(fwd_proj)
 
             # Setup forward solver for enriched problem
-            ep.create_error_estimators_step(0)
-            ep.setup_solver_forward_step(0)  # Needed to create timestepper
-            ep.solve_adjoint()
-            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
+            ep.create_error_estimators_step(0, adjoint=adjoint)
+            if adjoint:
+                ep.solve_forward()
+            else:
+                ep.setup_solver_forward_step(0)  # Needed to create timestepper
+                ep.solve_adjoint()
+            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=not adjoint)[0]
 
             # Setup error estimator
             ets = ep.timesteppers[0][adapt_field]
@@ -248,7 +256,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             adj_error += enriched_adj_solution
         elif mode == 'GE_p':
             raise NotImplementedError  # TODO: Use degree_increase
-        elif mode == 'LE_p':
+        elif mode == 'PR':
             raise NotImplementedError  # TODO: Use recover_zz
         elif mode == 'DQ':
             raise NotImplementedError  # TODO

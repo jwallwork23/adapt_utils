@@ -208,6 +208,10 @@ class Options(FrozenConfigurable):
     region_of_interest = List(default_value=[], help="""
         Spatial region related to quantity of interest.
         """).tag(config=True)
+    solve_enriched_forward = Bool(False, help="""
+        Toggle whether the forward problem should be solved in the enriched space or simply
+        prolonged from the base space for nonlinear problems.
+        """).tag(config=True)
 
     # Adaptation loop
     min_adapt = NonNegativeInteger(0, help="""
