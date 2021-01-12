@@ -14,8 +14,7 @@ parser.add_argument("-res", help="Resolution in x-direction")
 args = parser.parse_args()
 
 res = float(args.res or 0.5)
-alpha  = 2.0  # TODO
-
+alpha = 2.0  # TODO
 
 di = os.path.join(os.path.dirname(__file__), 'outputs', 'rtol', '{:.4f}'.format(res))
 fnames = ["{:.0e}".format(10**(-i)) for i in range(1, 9)]
@@ -38,7 +37,6 @@ disc_err = []
 for rtol in range(1, 9):
     df = pd.read_csv('adapt_output/bed_trench_output_uni_s_{:.4f}_2.0_1.0e-0{:1d}_40.csv'.format(res, rtol))
     disc_err.append(np.sqrt(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))
-print(disc_err)
 
 # Plot both error and time against rtol
 fig, axes = plt.subplots(figsize=(10, 5))

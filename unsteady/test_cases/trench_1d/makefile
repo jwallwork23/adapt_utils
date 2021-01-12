@@ -36,15 +36,27 @@ rtol_80:
 	python3 run_moving_mesh.py -res 1 -rtol 1e-7 > outputs/rtol/1.0000/1e-07
 	python3 run_moving_mesh.py -res 1 -rtol 1e-8 > outputs/rtol/1.0000/1e-08
 
-freq:
-	mkdir -p outputs/freq
-	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 5 > outputs/freq/5
-	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 10 > outputs/freq/10
-	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 20 > outputs/freq/20
-	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 40 > outputs/freq/40
-	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 120 > outputs/freq/120
-	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 360 > outputs/freq/360
-	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 1080 > outputs/freq/1080
+freq_40:
+	mkdir -p outputs/freq/0.5000
+	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 5 > outputs/freq/0.5000/5
+	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 10 > outputs/freq/0.5000/10
+	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 20 > outputs/freq/0.5000/20
+	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 40 > outputs/freq/0.5000/40
+	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 120 > outputs/freq/0.5000/120
+	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 360 > outputs/freq/0.5000/360
+	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 1080 > outputs/freq/0.5000/1080
+	python3 run_fixed_mesh.py -res 0.5 > outputs/res/0.5000
+
+freq_80:
+	mkdir -p outputs/freq/1.0000
+	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 5 > outputs/freq/1.0000/5
+	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 10 > outputs/freq/1.0000/10
+	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 20 > outputs/freq/1.0000/20
+	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 40 > outputs/freq/1.0000/40
+	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 120 > outputs/freq/1.0000/120
+	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 360 > outputs/freq/1.0000/360
+	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 1080 > outputs/freq/1.0000/1080
+	python3 run_fixed_mesh.py -res 1 > outputs/res/1.0000
 
 res:
 	mkdir -p outputs/res
