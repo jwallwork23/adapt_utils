@@ -71,9 +71,6 @@ class TurbineArrayOptions(SteadyTurbineOptions):
         # Domain and mesh
         if os.path.isfile(self.mesh_file):
             self.default_mesh = Mesh(self.mesh_file)
-        # if level > 0:
-        #     self.hierarchy = MeshHierarchy(self.default_mesh, level)
-        #     self.default_mesh = self.hierarchy[-1]
 
         # Solver parameters and discretisation
         self.family = 'dg-cg'
