@@ -84,11 +84,12 @@ class TrenchSedimentOptions(CoupledOptions):
 
         self.eta_d = Function(self.P1DG).project(self.elev_init)
         self.sediment_model = SedimentModel(
-                ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
-                bedload=self.bedload, angle_correction=self.angle_correction,
-                slope_eff=self.slope_eff, seccurrent=False, mesh2d=mesh, bathymetry_2d=bathymetry,
-                uv_init=self.uv_d, elev_init=self.eta_d, ks=self.ks, average_size=self.average_size,
-                cons_tracer=self.conservative, wetting_and_drying=self.wetting_and_drying)
+            ModelOptions2d, suspendedload=self.suspended, convectivevel=self.convective_vel_flag,
+            bedload=self.bedload, angle_correction=self.angle_correction,
+            slope_eff=self.slope_eff, seccurrent=False, mesh2d=mesh, bathymetry_2d=bathymetry,
+            uv_init=self.uv_d, elev_init=self.eta_d, ks=self.ks, average_size=self.average_size,
+            cons_tracer=self.conservative, wetting_and_drying=self.wetting_and_drying
+        )
 
     def set_quadratic_drag_coefficient(self, fs):
         self.depth = Function(fs).interpolate(self.set_bathymetry(fs) + Constant(0.397))
@@ -112,10 +113,10 @@ class TrenchSedimentOptions(CoupledOptions):
         depth_diff = depth_trench - depth_riv
         x, y = SpatialCoordinate(fs.mesh())
         trench = conditional(
-                le(x, 5), depth_riv, conditional(
-                    le(x, 6.5), (1/1.5)*depth_diff*(x-6.5) + depth_trench, conditional(
-                        le(x, 9.5), depth_trench, conditional(
-                            le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
+            le(x, 5), depth_riv, conditional(
+                le(x, 6.5), (1/1.5)*depth_diff*(x-6.5) + depth_trench, conditional(
+                    le(x, 9.5), depth_trench, conditional(
+                        le(x, 11), -(1/1.5)*depth_diff*(x-11) + depth_riv, depth_riv))))
         return interpolate(-trench, fs)
 
     def set_viscosity(self, fs):
@@ -165,7 +166,7 @@ class TrenchSedimentOptions(CoupledOptions):
 
     def set_initial_condition_bathymetry(self, prob):
         prob.fwd_solutions_bathymetry[0].interpolate(
-                self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space())
+            self.set_bathymetry(prob.fwd_solutions_bathymetry[0].function_space())
         )
 
     def get_export_func(self, prob, i):

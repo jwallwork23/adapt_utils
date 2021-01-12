@@ -1,5 +1,4 @@
 import matplotlib.pyplot as plt
-import matplotlib.ticker as mticker
 from mpltools import annotation
 import numpy as np
 import pandas as pd
