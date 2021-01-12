@@ -1,4 +1,4 @@
-from thetis import create_directory
+from thetis import create_directory, MeshHierarchy
 
 import argparse
 import h5py
@@ -15,7 +15,6 @@ parser.add_argument('-offset', help="""
     Number of turbine diameters by which to offset turbines in y-direction.
     'Aligned' configuration given by offset=0, 'Offset' configuration given by offset=1.
     (Default 0)""")
-parser.add_argument('-save_plex', help="Save DMPlex to HDF5 (default False)")
 parser.add_argument('-debug', help="Toggle debugging mode (default False).")
 parser.add_argument('-debug_mode', help="""
     Choose debugging mode from 'basic' and 'full' (default 'basic').""")
@@ -24,8 +23,7 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-levels = 3
-# levels = 5
+levels = 5
 offset = int(args.offset or 0)
 kwargs = {
     'plot_pvd': False,
@@ -37,13 +35,14 @@ kwargs = {
 qois, num_cells, dofs = [], [], []
 discrete_turbines = True
 # discrete_turbines = False
-op = TurbineArrayOptions(level=levels, **kwargs)
+op = TurbineArrayOptions(**kwargs)
+hierarchy = MeshHierarchy(op.default_mesh, levels)
 
 
 # --- Loop over mesh hierarchy
 
 for level in range(levels):
-    op.default_mesh = op.hierarchy[level]
+    op.default_mesh = hierarchy[level]
     callback_dir = 'uniform_level{:d}_offset{:d}'.format(level, offset)
     callback_dir = create_directory(os.path.join(op.di, callback_dir))
     tp = AdaptiveSteadyTurbineProblem(op, discrete_turbines=discrete_turbines, callback_dir=callback_dir)
@@ -54,11 +53,12 @@ for level in range(levels):
     # Store diagnostics
     num_cells.append(tp.meshes[0].num_cells())
     dofs.append(sum(tp.V[0].dof_count))
-    qois.append(tp.quantity_of_interest())
+    J = tp.quantity_of_interest()*1.030e-03
+    qois.append(J)
     op.print_debug("\nMesh {:d} in the hierarchy, offset = {:d}".format(level+1, op.offset))
     op.print_debug("    Number of elements  : {:d}".format(num_cells[-1]))
     op.print_debug("    Number of dofs      : {:d}".format(dofs[-1]))
-    op.print_debug("    Power output        : {:.4f} kW".format(qois[-1]/1000.0))
+    op.print_debug("    Power output        : {:.4f} MW".format(qois[-1]))
 
 # Print to screen
 op.print_debug("="*80 + "\nLevel  Elements     DOFs        J{:d}".format(op.offset))
@@ -69,8 +69,7 @@ for i in range(levels):
 # --- Save to file
 
 # Store QoI and element and DOF counts to HDF5
-if bool(args.save_plex or False):
-    with h5py.File('data/qoi_offset_{:d}.h5'.format(op.offset), 'w') as outfile:
-        outfile.create_dataset('elements', data=num_cells)
-        outfile.create_dataset('dofs', data=dofs)
-        outfile.create_dataset('qoi', data=qois)
+with h5py.File('data/qoi_offset_{:d}.h5'.format(op.offset), 'w') as outfile:
+    outfile.create_dataset('elements', data=num_cells)
+    outfile.create_dataset('dofs', data=dofs)
+    outfile.create_dataset('qoi', data=qois)
