@@ -1,4 +1,4 @@
-all: setup_hydrodynamics rtol res
+all: setup_hydrodynamics benchmark rtol freq res plot
 
 setup_hydrodynamics:
 	python3 trench_hydro.py -res 0.0625
@@ -36,6 +36,8 @@ rtol_80:
 	python3 run_moving_mesh.py -res 1 -rtol 1e-7 > outputs/rtol/1.0000/1e-07
 	python3 run_moving_mesh.py -res 1 -rtol 1e-8 > outputs/rtol/1.0000/1e-08
 
+freq: freq_40 freq_80
+
 freq_40:
 	mkdir -p outputs/freq/0.5000
 	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 5 > outputs/freq/0.5000/5
@@ -68,3 +70,11 @@ res:
 	python3 run_fixed_mesh.py -res 0.5000 > outputs/res/0.5000
 	python3 run_fixed_mesh.py -res 1.0000 > outputs/res/1.0000
 	python3 run_fixed_mesh.py -res 2.0000 > outputs/res/2.0000
+
+plot:
+	mkdir plots
+	python3 plot_rtol.py -res 0.5
+	python3 plot_rtol.py -res 1.0
+	python3 plot_freq.py -res 0.5
+	python3 plot_freq.py -res 1.0
+	python3 plot_res.py
