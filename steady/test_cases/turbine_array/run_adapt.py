@@ -1,4 +1,4 @@
-from firedrake import *
+from thetis import *
 
 import argparse
 import matplotlib
@@ -115,13 +115,13 @@ fontsizes = {
     'tick': 24,
     'cbar': 20,
 }
-plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'screenshots'))
+plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 
 
 # --- Solve forward problem within a mesh adaptation loop
 
 tp = AdaptiveSteadyTurbineProblem(op, discrete_adjoint=True)
-tp.adaptation_loop()
+tp.run()
 if save_plex:
     tp.store_plexes('{:s}_{:d}.h5'.format(op.approach, op.offset))
 if not plot_any:
@@ -143,41 +143,37 @@ axes.set_xlim([0.0, op.domain_length])
 axes.set_ylim([0.0, op.domain_width])
 axes.add_patch(turbine1)
 axes.add_patch(turbine2)
-plt.tight_layout()
-fname = os.path.join(plot_dir, '{:s}__offset{:d}__target{:d}__elem{:d}.{:3s}')
-for ext in extensions:
-    plt.savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1], ext))
+fname = '{:s}__offset{:d}__target{:d}__elem{:d}'
+savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1][0]), plot_dir, extensions=extensions)
 
 # Magnify turbine region
 axes.set_xlim(loc[0][0] - 2*D, loc[1][0] + 2*D)
 axes.set_ylim(op.domain_width/2 - 3.5*D, op.domain_width/2 + 3.5*D)
-fname = os.path.join(plot_dir, '{:s}__offset{:d}__target{:d}__elem{:d}__zoom.{:3s}')
-for ext in extensions:
-    plt.savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1], ext))
+fname = '{:s}__offset{:d}__target{:d}__elem{:d}__zoom'
+savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1][0]), plot_dir, extensions=extensions)
 
 
 # --- Plot goal-oriented error indicators
 
+if op.approach not in ('dwr', 'isotropic_dwr', 'anisotropic_dwr'):
+    sys.exit(0)
+
 # Plot dwr cell residual
-fs = tp.indicators['dwr_cell'].function_space()
-residual = interpolate(abs(tp.indicators['dwr_cell']), fs)
+fs = tp.indicator['dwr_cell'].function_space()
+residual = interpolate(abs(tp.indicator['dwr_cell']), fs)
 fig, axes = plt.subplots(figsize=(12, 5))
 tricontourf(residual, axes=axes, **tricontourf_kwargs)
 axes.set_xlim([0, op.domain_length])
 axes.set_ylim([0, op.domain_width])
-plt.tight_layout()
-fname = os.path.join(plot_dir, 'cell_residual__offset{:d}__elem{:d}.{:3s}')
-for ext in extensions:
-    plt.savefig(fname.format(op.offset, tp.mesh.num_cells(), ext))
+fname = 'cell_residual__offset{:d}__elem{:d}'
+savefig(fname.format(op.offset, tp.num_cells[-1][0]), plot_dir, extensions=extensions)
 
 # Plot dwr flux
-fs = tp.indicators['dwr_flux'].function_space()
-flux = interpolate(abs(tp.indicators['dwr_flux']), fs)
+fs = tp.indicator['dwr_flux'].function_space()
+flux = interpolate(abs(tp.indicator['dwr_flux']), fs)
 fig, axes = plt.subplots(figsize=(12, 5))
 tricontourf(flux, axes=axes, **tricontourf_kwargs)
 axes.set_xlim([0, op.domain_length])
 axes.set_ylim([0, op.domain_width])
-plt.tight_layout()
-fname = os.path.join(plot_dir, 'flux__offset{:d}__elem{:d}.{:3s}')
-for ext in extensions:
-    plt.savefig(fname.format(op.offset, tp.mesh.num_cells(), ext))
+fname = 'flux__offset{:d}__elem{:d}'
+savefig(fname.format(op.offset, tp.num_cells[-1][0]), plot_dir, extensions=extensions)

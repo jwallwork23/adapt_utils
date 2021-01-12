@@ -14,16 +14,12 @@ from adapt_utils.plotting import *
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
-
-# Problem setup
 parser.add_argument('-level', help="""
     Number of uniform refinements to apply to the initial mesh (default 0)""")
 parser.add_argument('-offset', help="""
     Number of turbine diameters by which to offset turbines in y-direction.
     'Aligned' configuration given by offset=0, 'Offset' configuration given by offset=1.
     (Default 0)""")
-
-# I/O and debugging
 parser.add_argument('-plot_pdf', help="Save plots to .pdf (default False).")
 parser.add_argument('-plot_png', help="Save plots to .png (default False).")
 parser.add_argument('-plot_pvd', help="Save plots to .pvd (default False).")
@@ -31,7 +27,6 @@ parser.add_argument('-plot_all', help="Plot to .pdf, .png and .pvd (default Fals
 parser.add_argument('-debug', help="Toggle debugging mode (default False).")
 parser.add_argument('-debug_mode', help="""
     Choose debugging mode from 'basic' and 'full' (default 'basic').""")
-
 args = parser.parse_args()
 
 
@@ -90,7 +85,7 @@ fontsizes = {
     'tick': 24,
     'cbar': 20,
 }
-plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'screenshots'))
+plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 
 
 # --- Plot initial mesh
@@ -98,8 +93,9 @@ plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'screenshots
 if plot_any:
     fig, axes = plt.subplots(figsize=(12, 5))
     triplot(op.default_mesh, axes=axes, **triplot_kwargs)
-    axes.set_xlim([0, op.domain_length])
-    axes.set_ylim([0, op.domain_width])
+    eps = 1
+    axes.set_xlim([-eps, op.domain_length + eps])
+    axes.set_ylim([-eps, op.domain_width + eps])
     for axis in (axes.xaxis, axes.yaxis):
         for tick in axis.get_major_ticks():
             tick.label.set_fontsize(fontsizes['tick'])
@@ -117,17 +113,15 @@ if plot_any:
     axes.legend(handles, labels, loc='upper right', fontsize=fontsizes['legend'])
 
     # Save to file
-    plt.tight_layout()
-    fname = os.path.join(plot_dir, 'inital_mesh__offset{:d}__elem{:d}.{:3s}')
-    for ext in extensions:
-        plt.savefig(fname.format(op.offset, num_cells, ext))
+    fname = 'inital_mesh__offset{:d}__elem{:d}'
+    savefig(fname.format(op.offset, num_cells), plot_dir, extensions=extensions)
 
 
 # --- Solve forward problem
 
 tp = AdaptiveSteadyTurbineProblem(op, discrete_turbines=discrete_turbines, callback_dir=op.di)
 tp.solve_forward()
-op.print_debug("Power output: {:.4e}kW".format(tp.quantity_of_interest()/1000))  # TODO: MegaWatts?
+op.print_debug("Power output: {:.4e}MW".format(tp.quantity_of_interest()*1.030e-03))
 
 
 # --- Plot fluid speed
@@ -147,9 +141,5 @@ if plot_any:
     for axis in (axes.xaxis, axes.yaxis):
         for tick in axis.get_major_ticks():
             tick.label.set_fontsize(fontsizes['tick'])
-
-    # Save to file
-    plt.tight_layout()
-    fname = os.path.join(plot_dir, 'fluid_speed__offset{:d}__elem{:d}.{:3s}')
-    for ext in extensions:
-        plt.savefig(fname.format(op.offset, num_cells, ext))
+    fname = 'fluid_speed__offset{:d}__elem{:d}'
+    savefig(fname.format(op.offset, num_cells), plot_dir, extensions=extensions)
