@@ -23,7 +23,7 @@ for res in resolutions:
 
 # Plot total error against element count
 fig, axes = plt.subplots(figsize=(6, 5))
-axes.semilogx(nx, total_err, '--x')
+axes.semilogx(nx, total_err, '-o')
 axes.set_xlabel(r"Element count in $x$-direction")
 axes.set_ylabel(r"$\ell_2$ error")
 axes.grid(True)
@@ -48,13 +48,12 @@ for res in resolutions:
 
 # Plot discretisation error against element count
 fig, axes = plt.subplots(figsize=(6, 5))
-axes.loglog(nx, disc_err, '--x')
+axes.loglog(nx, disc_err, '-o')
 axes.set_xlabel(r"Element count in $x$-direction")
 axes.set_ylabel(r"$\ell_2$ error")
 
 # Add slope markers
-annotation.slope_marker((20, 1.0e-01), -3, ax=axes, size_frac=0.2)
-annotation.slope_marker((16, 1.0e-03), -4, invert=True, ax=axes, size_frac=0.2)
+annotation.slope_marker((20, 1.0e-03), -2, invert=True, ax=axes, size_frac=0.2)
 
 axes.grid(True)
 axes.grid(b=True, which='minor')

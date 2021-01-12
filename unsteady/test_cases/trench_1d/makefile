@@ -95,9 +95,11 @@ res:
 	python3 run_fixed_mesh.py -res 2.0000 > outputs/res/2.0000
 
 plot:
-	mkdir plots
+	mkdir -p plots
+	python3 plot_rtol.py -res 0.125
 	python3 plot_rtol.py -res 0.5
 	python3 plot_rtol.py -res 1.0
+	python3 plot_freq.py -res 0.125
 	python3 plot_freq.py -res 0.5
 	python3 plot_freq.py -res 1.0
 	python3 plot_res.py
