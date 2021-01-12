@@ -14,6 +14,7 @@ steady/swe/solver.py
 *_old.py
 
 # File types
+*.csv
 *.swp
 *.msh
 *.pvd

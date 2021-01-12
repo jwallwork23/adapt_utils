@@ -45,6 +45,7 @@ freq_40:
 	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 120 > outputs/freq/0.5000/120
 	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 360 > outputs/freq/0.5000/360
 	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 1080 > outputs/freq/0.5000/1080
+	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 2160 > outputs/freq/0.5000/2160
 	python3 run_fixed_mesh.py -res 0.5 > outputs/res/0.5000
 
 freq_80:
@@ -56,6 +57,7 @@ freq_80:
 	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 120 > outputs/freq/1.0000/120
 	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 360 > outputs/freq/1.0000/360
 	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 1080 > outputs/freq/1.0000/1080
+	python3 run_moving_mesh.py -res 1 -alpha 2 -dt_per_mesh_movement 2160 > outputs/freq/1.0000/2160
 	python3 run_fixed_mesh.py -res 1 > outputs/res/1.0000
 
 res:
