@@ -933,7 +933,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Error estimators
 
-    def create_error_estimators_step(self, i):
+    def create_error_estimators_step(self, i, adjoint=False):
+        if adjoint:
+            raise NotImplementedError  # TODO
         if self.op.solve_swe:
             self.create_shallow_water_error_estimator_step(i)
         if self.op.solve_tracer:
@@ -1682,6 +1684,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Metric-based goal-oriented using DWR
             'dwr': self.run_dwr,
+            'dwr_adjoint': self.run_dwr,
             'isotropic_dwr': self.run_dwr,  # TODO: Unsteady case
             'anisotropic_dwr': self.run_dwr,  # TODO: Unsteady case
 

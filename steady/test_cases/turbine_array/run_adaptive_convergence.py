@@ -17,15 +17,15 @@ approach = args.approach or 'isotropic_dwr'
 
 kwargs = {
     'approach': approach,
-    'debug': True,
 
     # Adaptation parameters
     'target': 800.0,
     'adapt_field': 'all_int',
     'normalisation': 'complexity',
     'convergence_rate': 1,
-    'norm_order': 1,
-    'h_max': 500.0,
+    'norm_order': None,  # i.e. infinity norm
+    'h_min': 1.0e-05,
+    'h_max': 5.0e+02,
 
     # Optimisation parameters
     'max_adapt': 35,  # Maximum iterations
