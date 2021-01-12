@@ -18,6 +18,7 @@ alpha = 2.0
 
 di = os.path.join(os.path.dirname(__file__), 'outputs', 'freq', '{:.4f}'.format(res))
 freqs = [5, 10, 20, 40, 120, 360, 1080, 2160]
+N = len(freqs)
 resolutions, alphas, tol, time = [], [], [], []
 for freq in freqs:
     with open(os.path.join(di, str(freq)), 'r') as f:
@@ -25,9 +26,9 @@ for freq in freqs:
         alphas.append(float(f.readline().split('=')[-1]))
         tol.append(float(f.readline().split('=')[-1]))
         time.append(float(f.readline().split(':')[-1][:-2]))
-assert np.allclose(res*np.ones(7), resolutions)
-assert np.allclose(alpha*np.ones(7), alphas)
-assert np.allclose(1.0e-04*np.ones(7), tol)
+assert np.allclose(res*np.ones(N), resolutions)
+assert np.allclose(alpha*np.ones(N), alphas)
+assert np.allclose(1.0e-04*np.ones(N), tol)
 
 # Get high resolution data
 df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
@@ -46,7 +47,7 @@ with open(fname, 'r') as f:
     assert np.isclose(res, float(f.readline().split('=')[-1]))
     fixed_time = float(f.readline().split(':')[-1][:-2])
 
-# Plot both error and time against rtol
+# Plot both error and time against frequency
 fig, axes = plt.subplots(figsize=(10, 5))
 host = host_subplot(111, axes_class=AA.Axes)
 par1 = host.twinx()
@@ -54,21 +55,25 @@ par1.axis["right"].toggle(all=True)
 axes.set_xticks([])
 axes.set_yticks([])
 axes = plt.gca()
-p1, = host.semilogx(freqs, disc_err, '--x')
-p2, = par1.semilogx(freqs, time, '--x')
-xlim = host.get_xlim()
-host.hlines(y=fixed_err, xmin=xlim[0], xmax=xlim[1], color=p1.get_color(), linestyle=':')
-par1.hlines(y=fixed_time, xmin=xlim[0], xmax=xlim[1], color=p2.get_color(), linestyle=':')
-host.set_xlim(xlim)
+freqs = 1.0/np.array(freqs)
+disc_err = 100*np.array(disc_err)/fixed_err
+time = 100*np.array(time)/fixed_time
+p1, = host.plot(freqs, disc_err, '--x')
+p2, = par1.plot(freqs, time, '--x')
+plt.xscale('log')
+host.set_xticks(list(freqs))
+host.set_xticklabels([r"$\frac1{{{:d}}}$".format(int(f)) for f in 1.0/freqs])
 if np.isclose(res, 0.5):
-    host.set_yticks([0.0013, 0.0014, 0.0015, 0.0016, 0.0017, 0.0018, 0.0019, 0.0020, 0.0021])
-    host.set_ylim([0.0013, 0.0021])
+    host.set_yticks([60, 70, 80, 90])
+    host.set_ylim([60, 90])
+    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900])
+    par1.set_ylim([100, 900])
 elif np.isclose(res, 1.0):
-    host.set_yticks([0.00090, 0.00095, 0.00100, 0.00105, 0.00110])
-    host.set_ylim([0.00090, 0.00110])
-host.set_xlabel("Timesteps per mesh movement")
-host.set_ylabel(r"Absolute $\ell_2$ error")
-par1.set_ylabel(r"Time $[\mathrm s]$")
+    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800])
+    par1.set_ylim([200, 800])
+host.set_xlabel("Mesh movement frequency")
+host.set_ylabel(r"$\ell_2$ error increase ($\%$)")
+par1.set_ylabel(r"Time increase ($\%$)")
 host.axis["left"].label.set_color(p1.get_color())
 par1.axis["right"].label.set_color(p2.get_color())
 plt.draw()

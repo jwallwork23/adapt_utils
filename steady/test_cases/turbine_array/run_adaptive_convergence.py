@@ -20,11 +20,11 @@ kwargs = {
     'debug': True,
 
     # Adaptation parameters
-    'target': 800.0 if 'isotropic' in approach else 400.0,
+    'target': 800.0,
     'adapt_field': 'all_int',
     'normalisation': 'complexity',
     'convergence_rate': 1,
-    'norm_order': None,
+    'norm_order': 1,
     'h_max': 500.0,
 
     # Optimisation parameters
