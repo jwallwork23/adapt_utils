@@ -11,7 +11,6 @@ from adapt_utils.plotting import *
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-loglog")
-parser.add_argument("-round")
 parser.add_argument("-errorline")
 parser.add_argument('-plot_pdf', help="Save plots to .pdf (default False).")
 parser.add_argument('-plot_png', help="Save plots to .png (default False).")
@@ -38,7 +37,7 @@ if len(extensions) == 0:
 fontsize = 18
 fontsize_legend = 16
 loglog = bool(args.loglog)
-xlabel = "Degrees of freedom (DOFs)"
+xlabel = "Degrees of freedom"
 ylabel = r"Power output $(\mathrm{MW})$"
 ylabel2 = r"Relative error (\%)"
 if loglog:
@@ -66,8 +65,6 @@ for offset in (0, 1):
     # Read converged QoI value from file
     with h5py.File(os.path.join(di, 'fixed_mesh/hdf5/qoi_offset_{:d}.h5'.format(offset)), 'r') as f:
         exact = np.array(f['qoi'])[-1]
-        if bool(args.round or False):
-            exact = np.around(exact, decimals=-2)
 
     # Conversion functions
     power2error = lambda x: 100*(x - exact)/exact
@@ -87,7 +84,7 @@ for offset in (0, 1):
 
         # Plot convergence curves
         if loglog:
-            axes.loglog(dofs, 0.01*power2error(qois), **characteristics[approach])
+            axes.loglog(dofs, power2error(qois), **characteristics[approach])
         else:
             axes.semilogx(dofs, qois, **characteristics[approach])
 
@@ -105,8 +102,6 @@ for offset in (0, 1):
     if not loglog:
         secax = axes.secondary_yaxis('right', functions=(power2error, error2power))
         secax.set_ylabel(ylabel2, fontsize=fontsize)
-        yticks = [r"{:.2f}\%".format(i) for i in secax.get_yticks().tolist()]
-        secax.set_yticklabels(yticks)
 
     # Save to file
     axes.set_xlabel(xlabel, fontsize=fontsize)
