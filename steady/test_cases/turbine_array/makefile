@@ -98,11 +98,19 @@ uniform:
 
 isotropic:
 	@echo "Running isotropic adaptive convergence test..."
-	@python3 run_adaptive_convergence.py -approach carpio_isotropic
+	@python3 run_adaptive_convergence.py -approach isotropic_dwr
 
 anisotropic:
 	@echo "Running anisotropic adaptive convergence test..."
-	@python3 run_adaptive_convergence.py -approach carpio
+	@python3 run_adaptive_convergence.py -approach anisotropic_dwr
+
+weighted_hessian:
+	@echo "Running WH adaptive convergence test..."
+	@python3 run_adaptive_convergence.py -approach weighted_hessian
+
+weighted_gradient:
+	@echo "Running WG adaptive convergence test..."
+	@python3 run_adaptive_convergence.py -approach weighted_gradient
 
 
 # --- Screenshots

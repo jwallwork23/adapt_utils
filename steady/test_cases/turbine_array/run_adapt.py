@@ -96,7 +96,7 @@ triplot_kwargs = {
     },
     "boundary_kw": {
         "linewidth": 3.0,
-        "colors": ["C0", "C2", "C1"],
+        "colors": ["k", "k", "k"],
     },
 }
 tricontourf_kwargs = {

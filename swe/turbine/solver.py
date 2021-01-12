@@ -269,13 +269,12 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
 
     def quantity_of_interest(self):
         self.qoi = 0.0
-        for i in range(self.num_meshes):
-            for farm_id in self.shallow_water_options[i].tidal_turbine_farms:
-                tag = 'power_output'
-                if farm_id != 'everywhere':
-                    tag += '_{:d}'.format(farm_id)
-                tag += '_{:5s}'.format(index_string(i))
-                self.qoi += self.callbacks[i]['timestep'][tag].timeseries[-1]
+        for farm_id in self.shallow_water_options[0].tidal_turbine_farms:
+            tag = 'power_output'
+            if farm_id != 'everywhere':
+                tag += '_{:d}'.format(farm_id)
+            tag += '_00000'
+            self.qoi += self.callbacks[0]['timestep'][tag].timeseries[-1]
         return self.qoi
 
     def quantity_of_interest_form(self):
