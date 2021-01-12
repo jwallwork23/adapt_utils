@@ -38,6 +38,14 @@ for freq in freqs:
     df = pd.read_csv('adapt_output/bed_trench_output_uni_s_{:.4f}_2.0_1.0e-04_{:d}.csv'.format(res, freq))
     disc_err.append(np.sqrt(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))
 
+# Get fixed mesh data
+df_fixed = pd.read_csv('fixed_output/bed_trench_output_uni_c_{:.4f}.csv'.format(res))
+fixed_err = np.sqrt(sum([(df_fixed['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+fname = os.path.join(os.path.dirname(__file__), 'outputs', 'res', '{:.4f}'.format(res))
+with open(fname, 'r') as f:
+    assert np.isclose(res, float(f.readline().split('=')[-1]))
+    fixed_time = float(f.readline().split(':')[-1][:-2])
+
 # Plot both error and time against rtol
 fig, axes = plt.subplots(figsize=(10, 5))
 host = host_subplot(111, axes_class=AA.Axes)
@@ -48,7 +56,13 @@ axes.set_yticks([])
 axes = plt.gca()
 p1, = host.semilogx(freqs, disc_err, '--x')
 p2, = par1.semilogx(freqs, time, '--x')
-host.set_xlabel("Relative solver tolerance")
+xlim = host.get_xlim()
+host.hlines(y=fixed_err, xmin=xlim[0], xmax=xlim[1], color=p1.get_color(), linestyle=':')
+par1.hlines(y=fixed_time, xmin=xlim[0], xmax=xlim[1], color=p2.get_color(), linestyle=':')
+host.set_xlim(xlim)
+if np.isclose(res, 0.5):
+    host.set_yticks([0.0013, 0.0014, 0.0015, 0.0016, 0.0017, 0.0018, 0.0019, 0.0020, 0.0021])
+host.set_xlabel("Timesteps per mesh movement")
 host.set_ylabel(r"Absolute $\ell_2$ error")
 par1.set_ylabel(r"Time $[\mathrm s]$")
 host.axis["left"].label.set_color(p1.get_color())
