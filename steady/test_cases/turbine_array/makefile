@@ -4,11 +4,11 @@ base: dir clean base_geo base_mesh
 
 box: box_geo box_mesh
 
-adapt: isotropic anisotropic
+adapt: isotropic anisotropic weighted_hessian
 
 screenshot: screenshot_uniform screenshot_adapt
 
-screenshot_adapt: screenshot_isotropic screenshot_anisotropic
+screenshot_adapt: screenshot_isotropic screenshot_anisotropic screenshot_weighted_hessian
 
 plot: semilog loglog
 
@@ -108,10 +108,6 @@ weighted_hessian:
 	@echo "Running WH adaptive convergence test..."
 	@python3 run_adaptive_convergence.py -approach weighted_hessian
 
-weighted_gradient:
-	@echo "Running WG adaptive convergence test..."
-	@python3 run_adaptive_convergence.py -approach weighted_gradient
-
 
 # --- Screenshots
 
@@ -136,11 +132,6 @@ screenshot_weighted_hessian:
 	@echo "Individual run for WH adaptation screenshots..."
 	@python3 run_adapt.py weighted_hessian -offset 0 -plot_png 1
 	@python3 run_adapt.py weighted_hessian -offset 1 -plot_png 1
-
-screenshot_weighted_gradient:
-	@echo "Individual run for WG adaptation screenshots..."
-	@python3 run_adapt.py weighted_gradient -offset 0 -plot_png 1
-	@python3 run_adapt.py weighted_gradient -offset 1 -plot_png 1
 
 
 # --- Convergence plots
