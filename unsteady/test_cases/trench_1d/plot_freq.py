@@ -17,7 +17,7 @@ res = float(args.res or 0.5)
 alpha = 2.0
 
 di = os.path.join(os.path.dirname(__file__), 'outputs', 'freq', '{:.4f}'.format(res))
-freqs = [5, 10, 20, 40, 120, 360, 1080]
+freqs = [5, 10, 20, 40, 120, 360, 1080, 2160]
 resolutions, alphas, tol, time = [], [], [], []
 for freq in freqs:
     with open(os.path.join(di, str(freq)), 'r') as f:
@@ -62,6 +62,10 @@ par1.hlines(y=fixed_time, xmin=xlim[0], xmax=xlim[1], color=p2.get_color(), line
 host.set_xlim(xlim)
 if np.isclose(res, 0.5):
     host.set_yticks([0.0013, 0.0014, 0.0015, 0.0016, 0.0017, 0.0018, 0.0019, 0.0020, 0.0021])
+    host.set_ylim([0.0013, 0.0021])
+elif np.isclose(res, 1.0):
+    host.set_yticks([0.00090, 0.00095, 0.00100, 0.00105, 0.00110])
+    host.set_ylim([0.00090, 0.00110])
 host.set_xlabel("Timesteps per mesh movement")
 host.set_ylabel(r"Absolute $\ell_2$ error")
 par1.set_ylabel(r"Time $[\mathrm s]$")
