@@ -138,11 +138,11 @@ screenshot_weighted_hessian:
 
 semilog:
 	@echo "Plotting convergence curves..."
-	@python3 plot_convergence.py
+	@python3 plot_convergence.py -plot_pdf 1
 
 loglog:
 	@echo "Plotting convergence curves..."
-	@python3 plot_convergence.py -loglog 1
+	@python3 plot_convergence.py -loglog 1 -plot_pdf 1
 
 table:
 	@echo "Writing to LaTeX formatted table..."
