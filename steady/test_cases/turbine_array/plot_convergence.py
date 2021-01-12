@@ -39,24 +39,21 @@ fontsize = 18
 fontsize_legend = 16
 loglog = bool(args.loglog)
 xlabel = "Degrees of freedom (DOFs)"
-ylabel = r"Power output $(\mathrm{kW})$"
-ylabel2 = r"Relative error in power output (\%)"
+ylabel = r"Power output $(\mathrm{MW})$"
+ylabel2 = r"Relative error (\%)"
 if loglog:
     ylabel = ylabel2
 errorline = float(args.errorline or 0.0)
 
-# Conversion functions
-power2error = lambda x: 100*(x - exact)/exact
-error2power = lambda x: x*exact/100 + exact
-
 # Curve plotting kwargs
 characteristics = {
-    'fixed_mesh': {'label': 'Uniform refinement', 'marker': 'o', 'color': 'cornflowerblue'},
-    'carpio_isotropic': {'label': 'Isotropic adaptation', 'marker': '^', 'color': 'orange'},
-    'carpio': {'label': 'Anisotropic adaptation', 'marker': 'x', 'color': 'g'},
+    'fixed_mesh': {'label': 'Uniform refinement', 'marker': 'x', 'color': 'cornflowerblue'},
+    'isotropic_dwr': {'label': 'Isotropic DWR', 'marker': '^', 'color': 'orange'},
+    'anisotropic_dwr': {'label': 'Anisotropic DWR', 'marker': 'o', 'color': 'g'},
+    'weighted_hessian': {'label': 'Weighted Hessian', 'marker': 's', 'color': 'magenta'},
 }
-for approach in characteristics:
-    characteristics['linestyle'] = '-'
+for approach in list(characteristics.keys()):
+    characteristics[approach]['linestyle'] = '-'
 
 
 # --- Plot convergence curves
@@ -72,8 +69,12 @@ for offset in (0, 1):
         if bool(args.round or False):
             exact = np.around(exact, decimals=-2)
 
+    # Conversion functions
+    power2error = lambda x: 100*(x - exact)/exact
+    error2power = lambda x: x*exact/100 + exact
+
     # Plot convergence curves
-    for approach in ('fixed_mesh', 'carpio_isotropic', 'carpio'):
+    for approach in characteristics:
 
         # Read data from file
         fname = os.path.join(di, '{:s}/hdf5/qoi_offset_{:d}.h5'.format(approach, offset))
@@ -86,7 +87,7 @@ for offset in (0, 1):
 
         # Plot convergence curves
         if loglog:
-            axes.loglog(dofs, power2error(qois), **characteristics[approach])
+            axes.loglog(dofs, 0.01*power2error(qois), **characteristics[approach])
         else:
             axes.semilogx(dofs, qois, **characteristics[approach])
 
@@ -99,14 +100,6 @@ for offset in (0, 1):
         label = r'{:.1f}\% relative error'.format(errorline)
         plt.hlines(hlines, *xlim, linestyles='dashed', label=label)
     axes.set_xlim(xlim)
-    ax.set_xlim(xlim)
-    ytick = r"{:.2f}\%" if loglog else "{:.2f}"
-    scale = 1.0 if loglog else 1e-3
-    yticks = [ytick.format(scale*i) for i in ax.get_yticks().tolist()]
-    axes.set_yticklabels(yticks)
-    plt.xlabel(xlabel, fontsize=fontsize)
-    plt.ylabel(ylabel, fontsize=fontsize)
-    plt.legend(fontsize=fontsize_legend)
 
     # Add a secondary axis
     if not loglog:
@@ -116,11 +109,10 @@ for offset in (0, 1):
         secax.set_yticklabels(yticks)
 
     # Save to file
-    plt.tight_layout()
-    fname = os.path.join(di, 'convergence_{:d}'.format(offset))
+    axes.set_xlabel(xlabel, fontsize=fontsize)
+    axes.set_ylabel(ylabel, fontsize=fontsize)
+    axes.legend(fontsize=fontsize_legend)
+    fname = 'convergence_{:d}'.format(offset)
     if loglog:
         fname = '_'.join([fname, 'loglog'])
-    for ext in extensions:
-        plt.savefig('.'.join([fname, ext]))
-
-plt.show()
+    savefig(fname, 'plots', extensions=extensions)
