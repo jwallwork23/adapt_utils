@@ -43,15 +43,15 @@ hierarchy = MeshHierarchy(op.default_mesh, levels)
 
 for level in range(levels):
     op.default_mesh = hierarchy[level]
-    callback_dir = 'uniform_level{:d}_offset{:d}'.format(level, offset)
-    callback_dir = create_directory(os.path.join(op.di, callback_dir))
-    tp = AdaptiveSteadyTurbineProblem(op, discrete_turbines=discrete_turbines, callback_dir=callback_dir)
+    di = 'uniform_level{:d}_offset{:d}'.format(level, offset)
+    di = create_directory(os.path.join(op.di, di))
+    tp = AdaptiveSteadyTurbineProblem(op, discrete_turbines=discrete_turbines, callback_dir=di)
 
     # Solve forward problem
     tp.solve_forward()
 
     # Store diagnostics
-    num_cells.append(tp.meshes[0].num_cells())
+    num_cells.append(tp.num_cells[-1][0])
     dofs.append(sum(tp.V[0].dof_count))
     J = tp.quantity_of_interest()*1.030e-03
     qois.append(J)
@@ -62,9 +62,9 @@ for level in range(levels):
 
 # Print to screen
 op.print_debug("="*80 + "\nLevel  Elements     DOFs        J{:d}".format(op.offset))
-msg = "{:5d}  {:8d}  {:7d}  {:6.4f}kW"
+msg = "{:5d}  {:8d}  {:7d}  {:6.4f}MW"
 for i in range(levels):
-    op.print_debug(msg.format(i+1, num_cells[i], dofs[i], qois[i]/1000.0))
+    op.print_debug(msg.format(i+1, num_cells[i], dofs[i], qois[i]))
 
 # --- Save to file
 
