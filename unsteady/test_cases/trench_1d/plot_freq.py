@@ -48,7 +48,7 @@ with open(fname, 'r') as f:
     fixed_time = float(f.readline().split(':')[-1][:-2])
 
 # Plot both error and time against frequency
-fig, axes = plt.subplots(figsize=(10, 5))
+fig, axes = plt.subplots(figsize=(8, 5))
 host = host_subplot(111, axes_class=AA.Axes)
 par1 = host.twinx()
 par1.axis["right"].toggle(all=True)
@@ -58,8 +58,8 @@ axes = plt.gca()
 freqs = 1.0/np.array(freqs)
 disc_err = 100*np.array(disc_err)/fixed_err
 time = 100*np.array(time)/fixed_time
-p1, = host.plot(freqs, disc_err, '--x')
-p2, = par1.plot(freqs, time, '--x')
+p1, = host.plot(freqs, disc_err, '-o', linewidth=2)
+p2, = par1.plot(freqs, time, '-o', linewidth=2)
 plt.xscale('log')
 host.set_xticks(list(freqs))
 host.set_xticklabels([r"$\frac1{{{:d}}}$".format(int(f)) for f in 1.0/freqs])
