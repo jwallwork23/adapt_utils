@@ -109,18 +109,30 @@ anisotropic:
 
 screenshot_uniform:
 	@echo "Individual run for uniform refinement screenshots..."
-	@python3 run_fixed_mesh.py -approach fixed_mesh -offset 0 -level 3
-	@python3 run_fixed_mesh.py -approach fixed_mesh -offset 1 -level 3
+	@python3 run_fixed_mesh.py -offset 0 -level 0 -plot_png 1
+	@python3 run_fixed_mesh.py -offset 1 -level 0 -plot_png 1
+	@python3 run_fixed_mesh.py -offset 0 -level 3 -plot_png 1
+	@python3 run_fixed_mesh.py -offset 1 -level 3 -plot_png 1
 
 screenshot_isotropic:
 	@echo "Individual run for isotropic adaptation screenshots..."
-	@python3 run_adapt.py -approach carpio_isotropic -offset 0
-	@python3 run_adapt.py -approach carpio_isotropic -offset 1
+	@python3 run_adapt.py isotropic_dwr -offset 0 -plot_png 1
+	@python3 run_adapt.py isotropic_dwr -offset 1 -plot_png 1
 
 screenshot_anisotropic:
 	@echo "Individual run for anisotropic adaptation screenshots..."
-	@python3 run_adapt.py -approach carpio -offset 0
-	@python3 run_adapt.py -approach carpio -offset 1
+	@python3 run_adapt.py anisotropic_dwr -offset 0 -plot_png 1
+	@python3 run_adapt.py anisotropic_dwr -offset 1 -plot_png 1
+
+screenshot_weighted_hessian:
+	@echo "Individual run for WH adaptation screenshots..."
+	@python3 run_adapt.py weighted_hessian -offset 0 -plot_png 1
+	@python3 run_adapt.py weighted_hessian -offset 1 -plot_png 1
+
+screenshot_weighted_gradient:
+	@echo "Individual run for WG adaptation screenshots..."
+	@python3 run_adapt.py weighted_gradient -offset 0 -plot_png 1
+	@python3 run_adapt.py weighted_gradient -offset 1 -plot_png 1
 
 
 # --- Convergence plots
