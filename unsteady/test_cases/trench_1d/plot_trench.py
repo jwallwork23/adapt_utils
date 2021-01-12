@@ -15,6 +15,7 @@ depth_diff = depth_trench - depth_riv
 N = 1000
 X = np.linspace(0.0, 16.0, N)
 
+
 def trench(x):
     if x <= 5.0:
         return depth_riv
@@ -26,6 +27,7 @@ def trench(x):
         return depth_diff*(11.0 - x)/1.5 + depth_riv
     else:
         return depth_riv
+
 
 fig, axes = plt.subplots(figsize=(10, 3))
 axes.plot(X, [trench(Xi) for Xi in X])
