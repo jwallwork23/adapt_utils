@@ -100,15 +100,12 @@ triplot_kwargs = {
     },
 }
 tricontourf_kwargs = {
-    'vmin': 3.5,
-    'vmax': 5.2,
     'cmap': 'coolwarm',
-    'colorbar': {
-        'orientation': 'horizontal',
-        'norm': matplotlib.colors.LogNorm(),
-    },
-    'shading': 'gouraud',
+    'locator': matplotlib.ticker.LogLocator(base=10),
     'levels': 50,
+}
+colourbar_kwargs = {
+    'orientation': 'horizontal',
 }
 fontsizes = {
     'legend': 20,
@@ -139,8 +136,9 @@ turbine2 = ptch.Rectangle((loc[1][0]-D/2, loc[1][1]-D/2), D, D, **patch_kwargs)
 # Plot mesh and annotate with turbine footprint
 fig, axes = plt.subplots(figsize=(12, 5))
 triplot(tp.mesh, axes=axes, **triplot_kwargs)
-axes.set_xlim([0.0, op.domain_length])
-axes.set_ylim([0.0, op.domain_width])
+eps = 1
+axes.set_xlim([-eps, op.domain_length+eps])
+axes.set_ylim([-eps, op.domain_width+eps])
 axes.add_patch(turbine1)
 axes.add_patch(turbine2)
 fname = '{:s}__offset{:d}__target{:d}__elem{:d}'
@@ -159,21 +157,21 @@ if op.approach not in ('dwr', 'isotropic_dwr', 'anisotropic_dwr'):
     sys.exit(0)
 
 # Plot dwr cell residual
-fs = tp.indicator['dwr_cell'].function_space()
-residual = interpolate(abs(tp.indicator['dwr_cell']), fs)
+residual = interpolate(abs(tp.indicator['dwr_cell']), tp.indicator['dwr_cell'].function_space())
 fig, axes = plt.subplots(figsize=(12, 5))
-tricontourf(residual, axes=axes, **tricontourf_kwargs)
-axes.set_xlim([0, op.domain_length])
-axes.set_ylim([0, op.domain_width])
+fig.colorbar(tricontourf(residual, axes=axes, **tricontourf_kwargs), ax=axes, **colourbar_kwargs)
+axes.set_yticks([0, 100, 200, 300, 400, 500])
+axes.set_xlim([-eps, op.domain_length+eps])
+axes.set_ylim([-eps, op.domain_width+eps])
 fname = 'cell_residual__offset{:d}__elem{:d}'
 savefig(fname.format(op.offset, tp.num_cells[-1][0]), plot_dir, extensions=extensions)
 
 # Plot dwr flux
-fs = tp.indicator['dwr_flux'].function_space()
-flux = interpolate(abs(tp.indicator['dwr_flux']), fs)
+flux = interpolate(abs(tp.indicator['dwr_flux']), tp.indicator['dwr_flux'].function_space())
 fig, axes = plt.subplots(figsize=(12, 5))
-tricontourf(flux, axes=axes, **tricontourf_kwargs)
-axes.set_xlim([0, op.domain_length])
-axes.set_ylim([0, op.domain_width])
+fig.colorbar(tricontourf(flux, axes=axes, **tricontourf_kwargs), ax=axes, **colourbar_kwargs)
+axes.set_yticks([0, 100, 200, 300, 400, 500])
+axes.set_xlim([-eps, op.domain_length+eps])
+axes.set_ylim([-eps, op.domain_width+eps])
 fname = 'flux__offset{:d}__elem{:d}'
 savefig(fname.format(op.offset, tp.num_cells[-1][0]), plot_dir, extensions=extensions)
