@@ -5,6 +5,7 @@ import os
 from adapt_utils.adapt.kernels import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.norms import *
+from adapt_utils.swe.utils import recover_hessian_metric
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
@@ -258,8 +259,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         self.indicator['dwr_cell'] = ets.error_estimator.element_residual()
         self.indicator['dwr_flux'] = ets.error_estimator.inter_element_flux()
         self.indicator['dwr_flux'] += ets.error_estimator.boundary_flux()
-        dwr = self.indicator['dwr_cell'] + self.indicator['dwr_flux']
-        indicator_enriched.interpolate(abs(dwr))
+        indicator_enriched.interpolate(abs(self.indicator['dwr_cell'] + self.indicator['dwr_flux']))
 
         # Estimate error
         if 'dwr' not in self.estimators:
@@ -272,21 +272,17 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         tm.inject(indicator_enriched_cts, self.indicator['dwr'])
         return self.indicator['dwr']
 
-    def get_hessian_metric(self, adjoint=False, **kwargs):
-        """
-        Compute an appropriate Hessian metric for the problem at hand. This is inherently
-        problem-dependent, since the choice of field for adaptation is not universal.
-
-        Hessian metric should be computed and stored as `self.M`.
-        """
-        raise NotImplementedError  # TODO
-
-    def get_hessian(self, adjoint=False):
+    def get_hessian_metric(self, adjoint=False):
         """
         Compute an appropriate Hessian for the problem at hand. This is inherently
         problem-dependent, since the choice of field for adaptation is not universal.
         """
-        raise NotImplementedError  # TODO
+        hessian_kwargs = dict(normalise=False, enforce_constraints=False)
+        hessians = self.recover_hessian_metrics(0, adjoint=adjoint, **hessian_kwargs)
+        if self.op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
+            return hessians[0]
+        else:
+            return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
 
     def get_metric(self, adapt_field):
         if self.op.approach in ('dwr', 'dwr_adjoint'):
@@ -465,12 +461,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         # Recover Hessian and compute eigendecomposition
         H = Function(self.P0_ten[0], name="Elementwise Hessian")
-        kwargs = dict(mesh=self.mesh, normalise=False, enforce_constrants=False, op=self.op)
-        if self.op.adapt_field == 'shallow_water':
-            raise NotImplementedError  # TODO
-        else:
-            # TODO: Could the Hessian not be recovered in P0 space?
-            H.project(steady_metric(fwd_solution, **kwargs))
+        H.project(self.get_hessian_metric(adjoint=adjoint))
         evectors = Function(self.P0_ten[0], name="Elementwise Hessian eigenvectors")
         evalues = Function(self.P0_vec[0], name="Elementwise Hessian eigenvalues")
         kernel = eigen_kernel(get_reordered_eigendecomposition, dim)
