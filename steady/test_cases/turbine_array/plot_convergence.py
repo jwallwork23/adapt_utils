@@ -39,7 +39,7 @@ fontsize_legend = 16
 loglog = bool(args.loglog)
 xlabel = "Degrees of freedom"
 ylabel = r"Power output $(\mathrm{MW})$"
-ylabel2 = r"Relative error (\%)"
+ylabel2 = r"Relative discretisation error (\%)"
 if loglog:
     ylabel = ylabel2
 errorline = float(args.errorline or 0.0)
