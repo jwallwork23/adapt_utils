@@ -424,7 +424,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 nu = self.fields[i].horizontal_viscosity
                 if nu is not None:
                     p = self.V[i].sub(0).ufl_element().degree()
-                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                    alpha = Constant(5.0*p*(p+1) if p != 0 else 1.5)
                     alpha = alpha*get_sipg_ratio(nu)*cot_theta
                     sipg = interpolate(alpha, self.P0[i])
 
@@ -473,7 +473,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 nu = self.fields[i].horizontal_diffusivity
                 if nu is not None:
                     p = self.Q[i].ufl_element().degree()
-                    alpha = Constant(5.0*p*(p+1)) if p != 0 else 1.5
+                    alpha = Constant(5.0*p*(p+1) if p != 0 else 1.5)
                     alpha = alpha*get_sipg_ratio(nu)*cot_theta
                     sipg = interpolate(alpha, self.P0[i])
 
@@ -993,7 +993,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
         raise NotImplementedError("Error estimators for adjoint shallow water not implemented.")
 
     def create_adjoint_tracer_error_estimator_step(self, i):
-        raise NotImplementedError("Error estimators for adjoint tracer not implemented.")
+        from ..tracer.error_estimation import TracerGOErrorEstimator
+
+        op = self.tracer_options[i]
+        self.error_estimators[i].adjoint_tracer = TracerGOErrorEstimator(
+            self.Q[i],
+            self.depth[i],
+            stabilisation=self.stabilisation_tracer,
+            anisotropic=self.op.anisotropic_stabilisation,
+            sipg_parameter=op.sipg_parameter,
+            su_stabilisation=op.su_stabilisation,
+            supg_stabilisation=op.supg_stabilisation,
+            conservative=not op.use_tracer_conservative_form,
+        )
 
     def create_adjoint_sediment_error_estimator_step(self, i):
         raise NotImplementedError("Error estimators for adjoint sediment not implemented.")
@@ -1207,6 +1219,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
+        if 'adjoint_shallow_water' in self.error_estimators[i]:
+            kwargs['error_estimator'] = self.error_estimators[i].adjoint_shallow_water
         self.timesteppers[i].adjoint_shallow_water = integrator(*args, **kwargs)
 
     def create_adjoint_tracer_timestepper_step(self, i, integrator):
@@ -1227,6 +1241,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if self.op.timestepper == 'CrankNicolson':
             kwargs['semi_implicit'] = self.op.use_semi_implicit_linearisation
             kwargs['theta'] = self.op.implicitness_theta
+        if 'adjoint_tracer' in self.error_estimators[i]:
+            kwargs['error_estimator'] = self.error_estimators[i].adjoint_tracer
         self.timesteppers[i].adjoint_tracer = integrator(*args, **kwargs)
 
     def create_adjoint_sediment_timestepper_step(self, i, integrator):
@@ -1708,6 +1724,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Metric-based goal-oriented using DWR
             'dwr': self.run_dwr,
             'dwr_adjoint': self.run_dwr,
+            'dwr_both': self.run_dwr,
             'isotropic_dwr': self.run_dwr,  # TODO: Unsteady case
             'anisotropic_dwr': self.run_dwr,  # TODO: Unsteady case
 

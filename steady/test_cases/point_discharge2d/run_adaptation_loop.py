@@ -62,7 +62,7 @@ approach = args.approach or 'dwr'
 if approach == 'fixed_mesh':
     print_output("Nothing to run.")
     sys.exit(0)
-elif approach == 'anisotropic_dwr':
+elif 'isotropic_dwr' in approach:
     ext += '_{:.0f}'.format(alpha)
 else:
     ext += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
@@ -117,7 +117,10 @@ for n in range(op.outer_iterations):
     print("DoF count: ", dofs)
     qois.append(tp.qois[-1])
     print("QoIs:          ", qois)
-    if 'dwr' in op.approach:
+    if op.approach in ('dwr_adjoint', 'dwr_both'):
+        estimators.append(tp.estimators[op.approach][-1])
+        print("Estimators:    ", estimators)
+    elif 'dwr' in op.approach:
         estimators.append(tp.estimators['dwr'][-1])
         print("Estimators:    ", estimators)
 

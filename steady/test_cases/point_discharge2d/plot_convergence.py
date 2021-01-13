@@ -39,6 +39,8 @@ approaches = {
     'anisotropic_dwr': {'label': 'Anisotropic DWR', 'marker': 'h'},
     'weighted_hessian': {'label': 'Weighted Hessian', 'marker': 's'},
     'weighted_gradient': {'label': 'Weighted Gradient', 'marker': 'x'},
+    # 'dwr_adjoint': {'label': 'Isotropic DWR adjoint', 'marker': 'v'},
+    # 'dwr_both': {'label': 'Isotropic DWR adjoint', 'marker': '>'},
 }
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
@@ -69,10 +71,10 @@ for alignment in ('aligned', 'offset'):
                 estimators = np.abs(np.array(outfile['estimators']))
         absolute_error = np.abs(qoi - qoi_exact)
         relative_error = absolute_error/np.abs(qoi_exact)
-        if approach == 'dwr':
+        if approach in ('dwr', 'dwr_adjoint', 'dwr_both'):
             effectivity = estimators/absolute_error
-            print("Effectivity indices: ", effectivity)  # FIXME
-            # print("Effectivity indices: ", effectivity/elements)
+            print(approach, " effectivity indices: ", effectivity)  # FIXME
+            # print(approach, "effectivity indices: ", effectivity/elements)
         label = approaches[approach]['label']
         marker = approaches[approach]['marker']
         axes.semilogx(dofs, relative_error, '--', label=label, marker=marker)

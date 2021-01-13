@@ -65,7 +65,6 @@ op.di = os.path.join(op.di, op.stabilisation_tracer or family)
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
 op.print_debug(op)
 
-
 # --- Solve
 
 tp = AdaptiveSteadyProblem(op)
