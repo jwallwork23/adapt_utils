@@ -40,7 +40,7 @@ approaches = {
     'weighted_hessian': {'label': 'Weighted Hessian', 'marker': 's'},
     'weighted_gradient': {'label': 'Weighted Gradient', 'marker': 'x'},
     # 'dwr_adjoint': {'label': 'Isotropic DWR adjoint', 'marker': 'v'},
-    # 'dwr_both': {'label': 'Isotropic DWR adjoint', 'marker': '>'},
+    # 'dwr_avg': {'label': 'Isotropic DWR adjoint', 'marker': '>'},
 }
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
@@ -71,7 +71,7 @@ for alignment in ('aligned', 'offset'):
                 estimators = np.abs(np.array(outfile['estimators']))
         absolute_error = np.abs(qoi - qoi_exact)
         relative_error = absolute_error/np.abs(qoi_exact)
-        if approach in ('dwr', 'dwr_adjoint', 'dwr_both'):
+        if approach in ('dwr', 'dwr_adjoint', 'dwr_avg'):
             effectivity = estimators/absolute_error
             print(approach, " effectivity indices: ", effectivity)  # FIXME
             # print(approach, "effectivity indices: ", effectivity/elements)

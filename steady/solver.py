@@ -181,12 +181,12 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def indicate_error(self, adapt_field, approach=None):
         op = self.op
         approach = approach or op.approach
-        if approach == 'dwr':
-            return self.dwr_indicator(adapt_field, forward=True)
-        elif approach == 'dwr_adjoint':
+        if 'dwr_adjoint' in approach:
             return self.dwr_indicator(adapt_field, adjoint=True)
-        elif approach == 'dwr_both':
+        elif 'dwr_avg' in approach:
             return self.dwr_indicator(adapt_field, forward=True, adjoint=True)
+        elif 'dwr' in approach:
+            return self.dwr_indicator(adapt_field, forward=True)
         else:
             raise NotImplementedError  # TODO
 
@@ -246,7 +246,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                 enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
 
                 # Setup forward error estimator
-                ets = ep.timesteppers[0][adapt_field]
+                ets = ep.get_timestepper(0, adapt_field, adjoint=False)
                 ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
 
                 # Approximate adjoint error in enriched space
@@ -275,7 +275,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                 enriched_fwd_solution = ep.get_solutions(adapt_field, adjoint=False)[0]
 
                 # Setup adjoint error estimator
-                ets = ep.timesteppers[0]['_'.join(['adjoint', adapt_field])]
+                ets = ep.get_timestepper(0, adapt_field, adjoint=True)
                 ets.setup_error_estimator(adj_proj, adj_proj, fwd_error, bcs)
 
                 # Approximate forward error in enriched space
@@ -290,12 +290,16 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                 self.indicator['cell'] += self.indicator['dwr_adjoint_cell']
                 self.indicator['flux'] += self.indicator['dwr_adjoint_flux']
 
+            if both:
+                self.indicator['cell'] *= 0.5
+                self.indicator['flux'] *= 0.5
+
             # Assemble error indicator
             indicator_enriched = Function(ep.P0[0])
             indicator_enriched.interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
 
             # Estimate error
-            label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
+            label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
             if label not in self.estimators:
                 self.estimators[label] = []
             self.estimators[label].append(indicator_enriched.vector().gather().sum())
@@ -329,15 +333,17 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
 
     def get_metric(self, adapt_field):
-        if self.op.approach == 'isotropic_dwr':
-            metric = self.get_isotropic_dwr_metric(adjoint=False)
-        elif self.op.approach == 'anisotropic_dwr':
-            metric = self.get_anisotropic_dwr_metric(adjoint=False)
-        elif self.op.approach == 'weighted_hessian':
-            metric = self.get_weighted_hessian_metric(adjoint=False)
-        elif self.op.approach == 'weighted_gradient':
-            metric = self.get_weighted_gradient_metric(adjoint=False)
-        elif 'dwr' in self.op.approach:
+        approach = self.op.approach
+        adjoint = 'adjoint' in self.op.approach
+        if 'isotropic_dwr' in approach:
+            metric = self.get_isotropic_dwr_metric(adjoint=adjoint)
+        elif 'anisotropic_dwr' in approach:
+            metric = self.get_anisotropic_dwr_metric(adjoint=adjoint)
+        elif 'weighted_hessian' in approach:
+            metric = self.get_weighted_hessian_metric(adjoint=adjoint)
+        elif 'weighted_gradient' in approach:
+            metric = self.get_weighted_gradient_metric(adjoint=adjoint)
+        elif 'dwr' in approach:
             metric = self.get_isotropic_metric(self.op.adapt_field)
         else:
             raise NotImplementedError  # TODO
@@ -388,6 +394,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         from adapt_utils.adapt.recovery import recover_gradient, recover_boundary_hessian
 
+        if adjoint:
+            raise NotImplementedError  # TODO
         op = self.op
         mesh = self.mesh
         dim = mesh.topological_dimension()
