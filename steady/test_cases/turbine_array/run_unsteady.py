@@ -1,9 +1,10 @@
-from thetis import create_directory, Constant, File
+from firedrake import Constant
 
 import argparse
 import numpy as np
 import os
 
+from adapt_utils.io import create_directory, File
 from adapt_utils.steady.test_cases.turbine_array.options import TurbineArrayOptions
 from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
 

@@ -1,11 +1,9 @@
-from thetis import create_directory
-
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.io import index_string
+from adapt_utils.io import create_directory, index_string
 from adapt_utils.plotting import *
 from adapt_utils.unsteady.test_cases.idealised_desalination.options import *
 
