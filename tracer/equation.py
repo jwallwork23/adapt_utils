@@ -61,6 +61,7 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
         if self.horizontal_dg:
             args = (solution, solution_old, fields, fields_old, )
             f += -super(HorizontalDiffusionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
+            # TODO: adjoint diff_flux representation for DG
         else:
 
             # Get diffusion tensor etc.
@@ -79,9 +80,12 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
                     ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
                 if funcs is not None:
                     if 'diff_flux' in funcs:
-                        f += -self.test*funcs['diff_flux']*ds_bnd
+                        if funcs['diff_flux'] == 'adjoint':
+                            f += self.test*solution*dot(uv, self.normal)*ds_bnd
+                        else:
+                            f += -self.test*funcs['diff_flux']*ds_bnd
                     else:
-                        f += -self.test*solution*ds_bnd
+                        f += -self.test*dot(diff_flux, self.normal)*ds_bnd
 
             # Apply SUPG stabilisation
             uv = fields_old.get('uv_2d')

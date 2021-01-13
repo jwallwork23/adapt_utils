@@ -67,9 +67,11 @@ class Options(FrozenConfigurable):
 
     # Boundary conditions
     boundary_conditions = PETScSolverParameters({}, help="""
-        Boundary conditions expressed as a dictionary.""").tag(config=True)
+        Boundary conditions expressed as a dictionary.
+        """).tag(config=True)
     adjoint_boundary_conditions = PETScSolverParameters({}, help="""
-        Boundary conditions for adjoint problem expressed as a dictionary.""").tag(config=True)
+        Boundary conditions for continuous adjoint problem expressed as a dictionary.
+        """).tag(config=True)
 
     # Stabilisation
     stabilisation = Unicode(None, allow_none=True, help="""
