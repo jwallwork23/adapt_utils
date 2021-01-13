@@ -65,7 +65,6 @@ class HorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         if fields_old.get('uv_2d') is None:
             return 0
         self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
-
         uv = self.corr_factor*fields_old['uv_2d']
         uv_p1 = fields_old.get('uv_p1')
         uv_mag = fields_old.get('uv_mag')
@@ -73,6 +72,8 @@ class HorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         lax_friedrichs_factor = fields_old.get('lax_friedrichs_tracer_scaling_factor')
 
         flux_terms = 0
+        if self.adjoint:
+            flux_terms += self.restrict(inner(c*dot(uv, self.normal), e_star))*self.dS
         if self.horizontal_dg:
 
             # Interface term
@@ -140,10 +141,12 @@ class ConservativeHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimator
     def inter_element_flux(self, c, _, e_star, __, ___, fields_old):
         if fields_old.get('uv_2d') is None:
             return 0
-        # self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
-        # uv = self.corr_factor*fields_old['uv_2d']
+        self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
+        uv = self.corr_factor*fields_old['uv_2d']
 
         flux_terms = 0
+        if self.adjoint:
+            flux_terms += self.restrict(inner(c*dot(uv, self.normal), e_star))*self.dS
         if self.horizontal_dg:
             raise NotImplementedError  # TODO
 
@@ -243,7 +246,10 @@ class HorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
                     diff_flux_up = dot(diff_tensor, grad(c_up))
                     flux_terms += -self.p0test*e_star*dot(diff_flux_up, self.normal)*ds_bnd
                 elif 'diff_flux' in funcs:
-                    flux_terms += -self.p0test*e_star*funcs['diff_flux']*ds_bnd
+                    if funcs['diff_flux'] == 'adjoint':
+                        flux_terms += self.p0test*e_star*dot(c, self.normal)*ds_bnd
+                    else:
+                        flux_terms += -self.p0test*e_star*funcs['diff_flux']*ds_bnd
         return flux_terms
 
 
@@ -280,10 +286,12 @@ class TracerGOErrorEstimator(GOErrorEstimator):
                  sipg_parameter=Constant(10.0),
                  su_stabilisation=None,
                  supg_stabilisation=None,
-                 conservative=False):
+                 conservative=False,
+                 adjoint=False):
         self.stabilisation = stabilisation
         self.su_stabilisation = su_stabilisation
         self.supg_stabilisation = supg_stabilisation
+        self.adjoint = adjoint
         super(TracerGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
         args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_parameter)
         if conservative:
@@ -304,6 +312,7 @@ class TracerGOErrorEstimator(GOErrorEstimator):
         self.terms[key].stabilisation = self.stabilisation
         self.terms[key].su_stabilisation = self.su_stabilisation
         self.terms[key].supg_stabilisation = self.supg_stabilisation
+        self.terms[key].adjoint = self.adjoint
 
     def mass_term(self, c, e_star, vector=False, velocity=None, **kwargs):
         """

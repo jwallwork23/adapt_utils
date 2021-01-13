@@ -907,7 +907,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
         )
         if op.use_limiter_for_tracers and self.Q[i].ufl_element().degree() > 0:
             self.tracer_limiters[i] = VertexBasedP1DGLimiter(self.Q[i])
-        self.equations[i].adjoint_tracer.bnd_functions = self.boundary_conditions[i]['tracer']
+        adjoint_boundary_conditions = {}
+        zero = Constant(0.0)
+        for segment in self.boundary_conditions[i]['tracer']:
+            adjoint_boundary_conditions[segment] = {}
+            if 'diff_flux' not in self.boundary_conditions[i]['tracer'][segment]:
+                adjoint_boundary_conditions[segment]['value'] = zero
+            if 'value' not in self.boundary_conditions[i]['tracer'][segment]:
+                adjoint_boundary_conditions[segment]['diff_flux'] = 'adjoint'
+        self.equations[i].adjoint_tracer.bnd_functions = adjoint_boundary_conditions
 
     def create_adjoint_sediment_equation_step(self, i):
         raise NotImplementedError("Continuous adjoint sediment equation not implemented")
@@ -981,6 +989,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             su_stabilisation=op.su_stabilisation,
             supg_stabilisation=op.supg_stabilisation,
             conservative=op.use_tracer_conservative_form,
+            adjoint=False,
         )
 
     def create_forward_sediment_error_estimator_step(self, i):
@@ -1005,6 +1014,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             su_stabilisation=op.su_stabilisation,
             supg_stabilisation=op.supg_stabilisation,
             conservative=not op.use_tracer_conservative_form,
+            adjoint=True,
         )
 
     def create_adjoint_sediment_error_estimator_step(self, i):
