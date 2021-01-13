@@ -28,7 +28,7 @@ axes.set_xlabel(r"Element count in $x$-direction")
 axes.set_ylabel(r"$\ell_2$ error")
 axes.grid(True)
 axes.grid(b=True, which='minor')
-savefig("total_error", "plots", extensions=['pdf', 'png'])
+savefig("total_error", "plots", extensions=['pdf'])
 
 
 # --- Discretisation error
@@ -57,4 +57,4 @@ annotation.slope_marker((20, 1.0e-03), -2, invert=True, ax=axes, size_frac=0.2)
 
 axes.grid(True)
 axes.grid(b=True, which='minor')
-savefig("discretisation_error", "plots", extensions=['pdf', 'png'])
+savefig("discretisation_error", "plots", extensions=['pdf'])
