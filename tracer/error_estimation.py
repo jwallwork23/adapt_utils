@@ -44,7 +44,7 @@ class TracerGOErrorEstimatorTerm(GOErrorEstimatorTerm, TracerTerm):
         return 0
 
 
-class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
+class HorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
     """
     :class:`TracerGOErrorEstimatorTerm` object associated with the :class:`HorizontalAdvectionTerm`
     term of the 2D tracer model.
@@ -120,7 +120,50 @@ class TracerHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         return flux_terms
 
 
-class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
+class ConservativeHorizontalAdvectionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
+    """
+    :class:`TracerGOErrorEstimatorTerm` object associated with the
+    :class:`ConservativeHorizontalAdvectionTerm` term of the 2D conservative tracer model.
+    """
+    def element_residual(self, c, _, e_star, __, ___, fields_old):
+        if fields_old.get('uv_2d') is None:
+            return 0
+        self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
+        uv = self.corr_factor*fields_old['uv_2d']
+
+        # Apply SUPG stabilisation
+        if not self.horizontal_dg and self.stabilisation in ('su', 'supg'):
+            e_star = e_star + self.supg_stabilisation*dot(uv, grad(e_star))
+
+        return -self.p0test*e_star*div(uv*c)*self.dx
+
+    def inter_element_flux(self, c, _, e_star, __, ___, fields_old):
+        if fields_old.get('uv_2d') is None:
+            return 0
+        # self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
+        # uv = self.corr_factor*fields_old['uv_2d']
+
+        flux_terms = 0
+        if self.horizontal_dg:
+            raise NotImplementedError  # TODO
+
+        return flux_terms
+
+    def boundary_flux(self, c, _, e_star, __, ___, fields_old, bnd_conditions):
+        if fields_old.get('uv_2d') is None:
+            return 0
+        # elev = fields_old['elev_2d']
+        # self.corr_factor = fields_old.get('tracer_advective_velocity_factor')
+        # uv = self.corr_factor*fields_old['uv_2d']
+
+        flux_terms = 0
+        if self.horizontal_dg and bnd_conditions is not None:
+            raise NotImplementedError  # TODO
+
+        return flux_terms
+
+
+class HorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
     """
     :class:`TracerGOErrorEstimatorTerm` object associated with the :class:`HorizontalDiffusionTerm`
     term of the 2D tracer model.
@@ -204,7 +247,7 @@ class TracerHorizontalDiffusionGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
         return flux_terms
 
 
-class TracerSourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
+class SourceGOErrorEstimatorTerm(TracerGOErrorEstimatorTerm):
     """
     :class:`TracerGOErrorEstimatorTerm` object associated with the :class:`SourceTerm` term of the
     2D tracer model.
@@ -236,15 +279,19 @@ class TracerGOErrorEstimator(GOErrorEstimator):
                  anisotropic=False,
                  sipg_parameter=Constant(10.0),
                  su_stabilisation=None,
-                 supg_stabilisation=None):
+                 supg_stabilisation=None,
+                 conservative=False):
         self.stabilisation = stabilisation
         self.su_stabilisation = su_stabilisation
         self.supg_stabilisation = supg_stabilisation
         super(TracerGOErrorEstimator, self).__init__(function_space, anisotropic=anisotropic)
         args = (function_space, depth, stabilisation == 'lax_friedrichs', sipg_parameter)
-        self.add_term(TracerHorizontalAdvectionGOErrorEstimatorTerm(*args), 'explicit')
-        self.add_term(TracerHorizontalDiffusionGOErrorEstimatorTerm(*args), 'explicit')
-        self.add_term(TracerSourceGOErrorEstimatorTerm(*args), 'source')
+        if conservative:
+            self.add_term(ConservativeHorizontalAdvectionGOErrorEstimatorTerm(*args), 'explicit')
+        else:
+            self.add_term(HorizontalAdvectionGOErrorEstimatorTerm(*args), 'explicit')
+        self.add_term(HorizontalDiffusionGOErrorEstimatorTerm(*args), 'explicit')
+        self.add_term(SourceGOErrorEstimatorTerm(*args), 'source')
 
     def add_term(self, term, label):
         """

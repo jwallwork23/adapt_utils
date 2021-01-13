@@ -935,17 +935,31 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def create_error_estimators_step(self, i, adjoint=False):
         if adjoint:
-            raise NotImplementedError  # TODO
-        if self.op.solve_swe:
-            self.create_shallow_water_error_estimator_step(i)
-        if self.op.solve_tracer:
-            self.create_tracer_error_estimator_step(i)
-        if self.op.solve_sediment:
-            self.create_sediment_error_estimator_step(i)
-        if self.op.solve_exner:
-            self.create_exner_error_estimator_step(i)
+            self.create_adjoint_error_estimators_step(i)
+        else:
+            self.create_forward_error_estimators_step(i)
 
-    def create_shallow_water_error_estimator_step(self, i):
+    def create_forward_error_estimators_step(self, i):
+        if self.op.solve_swe:
+            self.create_forward_shallow_water_error_estimator_step(i)
+        if self.op.solve_tracer:
+            self.create_forward_tracer_error_estimator_step(i)
+        if self.op.solve_sediment:
+            self.create_forward_sediment_error_estimator_step(i)
+        if self.op.solve_exner:
+            self.create_forward_exner_error_estimator_step(i)
+
+    def create_adjoint_error_estimators_step(self, i):
+        if self.op.solve_swe:
+            self.create_adjoint_shallow_water_error_estimator_step(i)
+        if self.op.solve_tracer:
+            self.create_adjoint_tracer_error_estimator_step(i)
+        if self.op.solve_sediment:
+            self.create_adjoint_sediment_error_estimator_step(i)
+        if self.op.solve_exner:
+            self.create_adjoint_exner_error_estimator_step(i)
+
+    def create_forward_shallow_water_error_estimator_step(self, i):
         from ..swe.error_estimation import ShallowWaterGOErrorEstimator
 
         self.error_estimators[i].shallow_water = ShallowWaterGOErrorEstimator(
@@ -954,15 +968,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.shallow_water_options[i],
         )
 
-    def create_tracer_error_estimator_step(self, i):
+    def create_forward_tracer_error_estimator_step(self, i):
         from ..tracer.error_estimation import TracerGOErrorEstimator
 
-        if self.tracer_options[i].use_tracer_conservative_form:
-            raise NotImplementedError("Error estimation for conservative tracers not implemented.")
-        else:
-            estimator = TracerGOErrorEstimator
         op = self.tracer_options[i]
-        self.error_estimators[i].tracer = estimator(
+        self.error_estimators[i].tracer = TracerGOErrorEstimator(
             self.Q[i],
             self.depth[i],
             stabilisation=self.stabilisation_tracer,
@@ -970,13 +980,26 @@ class AdaptiveProblem(AdaptiveProblemBase):
             sipg_parameter=op.sipg_parameter,
             su_stabilisation=op.su_stabilisation,
             supg_stabilisation=op.supg_stabilisation,
+            conservative=op.use_tracer_conservative_form,
         )
 
-    def create_sediment_error_estimator_step(self, i):
+    def create_forward_sediment_error_estimator_step(self, i):
         raise NotImplementedError("Error estimators for sediment not implemented.")
 
-    def create_exner_error_estimator_step(self, i):
+    def create_forward_exner_error_estimator_step(self, i):
         raise NotImplementedError("Error estimators for Exner not implemented.")
+
+    def create_adjoint_shallow_water_error_estimator_step(self, i):
+        raise NotImplementedError("Error estimators for adjoint shallow water not implemented.")
+
+    def create_adjoint_tracer_error_estimator_step(self, i):
+        raise NotImplementedError("Error estimators for adjoint tracer not implemented.")
+
+    def create_adjoint_sediment_error_estimator_step(self, i):
+        raise NotImplementedError("Error estimators for adjoint sediment not implemented.")
+
+    def create_adjoint_exner_error_estimator_step(self, i):
+        raise NotImplementedError("Error estimators for adjoint Exner not implemented.")
 
     # --- Timestepping
 

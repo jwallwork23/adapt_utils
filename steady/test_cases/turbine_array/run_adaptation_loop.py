@@ -1,5 +1,6 @@
 import argparse
 import h5py
+import os
 
 from adapt_utils.io import create_directory
 from adapt_utils.steady.test_cases.turbine_array.options import *
