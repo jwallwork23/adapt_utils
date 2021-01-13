@@ -5,7 +5,6 @@ import os
 from adapt_utils.adapt.kernels import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.norms import *
-from adapt_utils.swe.utils import recover_hessian_metric
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
 
@@ -408,11 +407,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         Construct an isotropic metric using an approach inspired by [Carpio et al. 2013].
         """
-        dim = self.mesh.topological_dimension()
         adapt_field = self.op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
-        fwd_solution = self.get_solutions(adapt_field)[0]
 
         # Compute error indicators
         dwr = self.indicate_error(adapt_field, approach='dwr_adjoint' if adjoint else 'dwr')
@@ -446,7 +443,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         adapt_field = self.op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
-        fwd_solution = self.get_solutions(adapt_field)[0]
 
         # Compute error indicators
         dwr = self.indicate_error(adapt_field, approach='dwr_adjoint' if adjoint else 'dwr')
