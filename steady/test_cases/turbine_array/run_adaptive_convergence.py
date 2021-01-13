@@ -1,6 +1,7 @@
 import argparse
 import h5py
 
+from adapt_utils.io import create_directory
 from adapt_utils.steady.test_cases.turbine_array.options import *
 from adapt_utils.swe.turbine.solver import AdaptiveSteadyTurbineProblem
 
@@ -56,7 +57,8 @@ for offset in (0, 1):
         qois.append(tp.qoi*1.030e-03)
 
     # Store element count and QoI to HDF5
-    outfile = h5py.File('outputs/{:s}/hdf5/qoi_offset_{:d}.h5'.format(op.approach, op.offset), 'w')
+    di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', op.approach, 'hdf5'))
+    outfile = h5py.File(os.path.join(di, 'qoi_offset_{:d}.h5'.format(op.offset)), 'w')
     outfile.create_dataset('elements', data=num_cells)
     outfile.create_dataset('dofs', data=dofs)
     outfile.create_dataset('qoi', data=qois)
