@@ -93,6 +93,7 @@ class AdaptiveProblemBase(object):
 
         # Storage for diagnostics over mesh adaptation loop
         self.indicators = [{} for i in range(self.num_meshes)]
+        self._have_indicated_error = False
         self.estimators = {}
         self.metrics = [None for P1_ten in self.P1_ten]
         self.qois = []
@@ -957,12 +958,17 @@ class AdaptiveProblemBase(object):
 
     def _check_estimator_convergence(self):
         n = self.outer_iteration
-        if self.op.approach in ('dwr_adjoint', 'dwr_avg'):
-            estimators = self.estimators[self.op.approach]
-        elif 'dwr' in self.op.approach:
+        approach = self.op.approach
+        if 'dwr_int' in approach:
+            approach = 'dwr_avg'
+        if 'dwr_adjoint' in approach:
+            estimators = self.estimators['dwr_adjoint']
+        elif 'dwr_avg' in approach:
+            estimators = self.estimators['dwr_avg']
+        elif 'dwr' in approach:
             estimators = self.estimators['dwr']
         else:
-            return  # TODO: Other estimators than DWR
+            raise NotImplementedError  # TODO
         self.print("\nError estimator\n===============")
         self.print("  iteration {:d}: {:.4e}".format(n+1, estimators[-1]))
         converged = False

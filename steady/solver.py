@@ -182,13 +182,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         op = self.op
         approach = approach or op.approach
         if 'dwr_adjoint' in approach:
-            return self.dwr_indicator(adapt_field, adjoint=True)
-        elif 'dwr_avg' in approach:
-            return self.dwr_indicator(adapt_field, forward=True, adjoint=True)
+            indicator = self.dwr_indicator(adapt_field, adjoint=True)
+        elif 'dwr_avg' in approach or 'dwr_int' in approach:
+            indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=True)
         elif 'dwr' in approach:
-            return self.dwr_indicator(adapt_field, forward=True)
+            indicator = self.dwr_indicator(adapt_field, forward=True)
         else:
             raise NotImplementedError  # TODO
+        self._have_indicated_error = True
 
     def dwr_indicator(self, adapt_field, forward=False, adjoint=False, mode='GE_h'):
         """
@@ -197,8 +198,12 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         A P1 field to be used for isotropic mesh adaptation is stored as `self.indicator`.
         """
+        if self._have_indicated_error:
+            return
+
         op = self.op
-        self.indicator['dwr'] = Function(self.P1[0], name="DWR indicator")
+        self.indicator['cell'] = Function(self.P0[0], name="DWR cell indicator")
+        self.indicator['flux'] = Function(self.P0[0], name="DWR flux indicator")
         if not forward and not adjoint:
             raise ValueError("Specify either forward or adjoint model.")
         both = forward and adjoint
@@ -222,8 +227,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             enriched_space = ep.get_function_space(adapt_field)
             tm = dmhooks.get_transfer_manager(self.get_plex(0))
             bcs = self.boundary_conditions[0][adapt_field]
-            self.indicator['cell'] = Function(ep.P0[0])
-            self.indicator['flux'] = Function(ep.P0[0])
+            cell = Function(ep.P0[0])
+            flux = Function(ep.P0[0])
             fwd_solution = self.get_solutions(adapt_field, adjoint=False)[0]
             adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
 
@@ -255,11 +260,16 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                 adj_error += enriched_adj_solution
 
                 # Compute dual weighted residual
-                self.indicator['dwr_cell'] = ets.error_estimator.element_residual()
-                self.indicator['dwr_flux'] = ets.error_estimator.inter_element_flux()
-                self.indicator['dwr_flux'] += ets.error_estimator.boundary_flux()
-                self.indicator['cell'] += self.indicator['dwr_cell']
-                self.indicator['flux'] += self.indicator['dwr_flux']
+                dwr_cell = ets.error_estimator.element_residual()
+                dwr_flux = ets.error_estimator.inter_element_flux()
+                dwr_flux += ets.error_estimator.boundary_flux()
+                cell += dwr_cell
+                flux += dwr_flux
+                if both:
+                    indicator_enriched = interpolate(abs(cell + flux), ep.P0[0])
+                    indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
+                    self.indicator['dwr'] = Function(self.P1[0])
+                    tm.inject(indicator_enriched_cts, self.indicator['dwr'])
 
             if adjoint:
 
@@ -284,21 +294,30 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                 fwd_error += enriched_fwd_solution
 
                 # Compute dual weighted residual
-                self.indicator['dwr_adjoint_cell'] = ets.error_estimator.element_residual()
-                self.indicator['dwr_adjoint_flux'] = ets.error_estimator.inter_element_flux()
-                self.indicator['dwr_adjoint_flux'] += ets.error_estimator.boundary_flux()
-                self.indicator['cell'] += self.indicator['dwr_adjoint_cell']
-                self.indicator['flux'] += self.indicator['dwr_adjoint_flux']
+                dwr_cell = ets.error_estimator.element_residual()
+                dwr_flux = ets.error_estimator.inter_element_flux()
+                dwr_flux += ets.error_estimator.boundary_flux()
+                cell += dwr_cell
+                flux += dwr_flux
+                if both:
+                    indicator_enriched = interpolate(abs(cell + flux), ep.P0[0])
+                    indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
+                    self.indicator['dwr_adjoint'] = Function(self.P1[0])
+                    tm.inject(indicator_enriched_cts, self.indicator['dwr_adjoint'])
 
             if both:
-                self.indicator['cell'] *= 0.5
-                self.indicator['flux'] *= 0.5
+                cell *= 0.5
+                flux *= 0.5
 
-            # Assemble error indicator
+            # Error indicator components on base space
+            tm.inject(cell, self.indicator['cell'])
+            tm.inject(flux, self.indicator['flux'])
+
+            # Indicate error on enriched space
             indicator_enriched = Function(ep.P0[0])
-            indicator_enriched.interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
+            indicator_enriched.interpolate(abs(cell + flux))
 
-            # Estimate error
+            # Global error estimate
             label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
             if label not in self.estimators:
                 self.estimators[label] = []
@@ -335,8 +354,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def get_metric(self, adapt_field, approach=None):
         approach = approach or self.op.approach
         adjoint = 'adjoint' in self.op.approach
+        if 'dwr' in approach:
+            self.indicate_error(adapt_field)
         if approach in ('dwr', 'dwr_adjoint', 'dwr_avg'):
-            metric = self.get_isotropic_metric(self.op.adapt_field)
+            metric = self.get_isotropic_metric(self.op.adapt_field, approach=approach)
         elif approach in ('isotropic_dwr', 'isotropic_dwr_adjoint'):
             metric = self.get_isotropic_dwr_metric(adjoint=adjoint)
         elif approach in ('anisotropic_dwr', 'anisotropic_dwr_adjoint'):
@@ -355,12 +376,13 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             File(os.path.join(self.di, 'metric.pvd')).write(metric)
         return metric
 
-    def get_isotropic_metric(self, adapt_field):
+    def get_isotropic_metric(self, adapt_field, approach=None):
         """
         Scale an identity matrix by the indicator field in order to drive
         isotropic mesh refinement.
         """
-        indicator = self.indicate_error(adapt_field)
+        approach = approach or self.op.approach
+        indicator = self.indicator[approach]
         if self.op.plot_pvd:
             File(os.path.join(self.di, 'indicator.pvd')).write(indicator)
         metric = Function(self.P1_ten[0], name="Metric")
@@ -459,9 +481,11 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         adapt_field = self.op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
+        approach = 'dwr_adjoint' if adjoint else 'dwr'
 
         # Compute error indicators
-        dwr = self.indicate_error(adapt_field, approach='dwr_adjoint' if adjoint else 'dwr')
+        self.indicate_error(adapt_field, approach=approach)
+        dwr = self.indicator[approach]
 
         # Get current element volume
         K = Function(self.P0[0], name="Element volume")
@@ -492,9 +516,11 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         adapt_field = self.op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
+        approach = 'dwr_adjoint' if adjoint else 'dwr'
 
         # Compute error indicators
-        dwr = self.indicate_error(adapt_field, approach='dwr_adjoint' if adjoint else 'dwr')
+        self.indicate_error(adapt_field, approach=approach)
+        dwr = self.indicator[approach]
 
         # Get current element volume
         K = Function(self.P0[0], name="Element volume")
@@ -570,6 +596,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         if 'dwr' in op.approach:
             self.estimators['dwr'] = []
         for n in range(op.max_adapt):
+            self._have_indicated_error = False
             self.outer_iteration = n
             self.create_error_estimators_step(0, adjoint='adjoint' in op.approach)
 
