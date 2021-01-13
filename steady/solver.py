@@ -190,6 +190,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         else:
             raise NotImplementedError  # TODO
         self._have_indicated_error = True
+        return indicator
 
     def dwr_indicator(self, adapt_field, forward=False, adjoint=False, mode='GE_h'):
         """
@@ -339,17 +340,32 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         else:
             raise ValueError("Enrichment mode {:s} not recognised.".format(mode))
 
-    def get_hessian_metric(self, adjoint=False):
+    def get_hessian_metric(self, adapt_field, adjoint=False, elementwise=False):
         """
         Compute an appropriate Hessian for the problem at hand. This is inherently
         problem-dependent, since the choice of field for adaptation is not universal.
         """
-        hessian_kwargs = dict(normalise=False, enforce_constraints=False)
-        hessians = self.recover_hessian_metrics(0, adjoint=adjoint, **hessian_kwargs)
-        if self.op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
-            return hessians[0]
+        if elementwise:
+            from adapt_utils.adapt.recovery import recover_gradient
+
+            sol = self.get_solutions(adapt_field, adjoint=adjoint)[0]
+            if adapt_field == 'shallow_water':
+                u, eta = sol.split()
+                hessians = [
+                    interpolate(grad(recover_gradient(u[0], self.op)), self.P0_ten[0]),
+                    interpolate(grad(recover_gradient(u[1], self.op)), self.P0_ten[0]),
+                    interpolate(grad(recover_gradient(eta, self.op)), self.P0_ten[0]),
+                ]
+                return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
+            else:
+                return interpolate(grad(recover_gradient(sol, op=self.op)), self.P0_ten[0])
         else:
-            return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
+            hessian_kwargs = dict(normalise=False, enforce_constraints=False)
+            hessians = self.recover_hessian_metrics(0, adjoint=adjoint, **hessian_kwargs)
+            if self.op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
+                return hessians[0]
+            else:
+                return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
 
     def get_metric(self, adapt_field, approach=None):
         approach = approach or self.op.approach
@@ -539,8 +555,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         K_opt.interpolate(min_value(max_value(scaling*K/K_opt, self.op.h_min**2), self.op.h_max**2))
 
         # Recover Hessian and compute eigendecomposition
-        H = Function(self.P0_ten[0], name="Elementwise Hessian")
-        H.project(self.get_hessian_metric(adjoint=adjoint))
+        H = self.get_hessian_metric(adapt_field, adjoint=adjoint, elementwise=True)
         evectors = Function(self.P0_ten[0], name="Elementwise Hessian eigenvectors")
         evalues = Function(self.P0_vec[0], name="Elementwise Hessian eigenvalues")
         kernel = eigen_kernel(get_reordered_eigendecomposition, dim)

@@ -120,7 +120,7 @@ for n in range(op.outer_iterations):
     if op.approach in ('dwr_adjoint', 'dwr_avg'):
         estimators.append(tp.estimators[op.approach][-1])
         print("Estimators:    ", estimators)
-    elif 'dwr' in op.approach:
+    elif op.approach == 'dwr':
         estimators.append(tp.estimators['dwr'][-1])
         print("Estimators:    ", estimators)
 
