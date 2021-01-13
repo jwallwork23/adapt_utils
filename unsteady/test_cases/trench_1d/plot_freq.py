@@ -63,7 +63,10 @@ p2, = par1.plot(freqs, time, '-o', linewidth=2)
 plt.xscale('log')
 host.set_xticks(list(freqs))
 host.set_xticklabels([r"$\frac1{{{:d}}}$".format(int(f)) for f in 1.0/freqs])
-if np.isclose(res, 0.5):
+if np.isclose(res, 0.125):
+    par1.set_yticks([100, 250, 500, 750, 1000])
+    par1.set_ylim([100, 1000])
+elif np.isclose(res, 0.5):
     host.set_yticks([60, 70, 80, 90])
     host.set_ylim([60, 90])
     par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900])

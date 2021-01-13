@@ -11,7 +11,7 @@ __all__ = ["save_mesh", "load_mesh", "initialise_field", "export_field",
            "initialise_bathymetry", "export_bathymetry",
            "initialise_hydrodynamics", "export_hydrodynamics",
            "OuterLoopLogger", "TimeDependentAdaptationLogger",
-           "readfile", "index_string", "get_date"]
+           "readfile", "index_string", "get_date", "create_directory"]
 
 
 def get_filename(fname, index_str):
@@ -418,6 +418,8 @@ def index_string(index, n=5):
 
 
 def get_date():
-    """Get the date in year-month-day format."""
+    """
+    Get the date in year-month-day format.
+    """
     today = datetime.date.today()
     return '{:d}-{:d}-{:d}'.format(today.year, today.month, today.day)
