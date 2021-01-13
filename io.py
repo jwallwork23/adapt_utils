@@ -7,11 +7,10 @@ import os
 from adapt_utils.options import CoupledOptions
 
 
-__all__ = ["save_mesh", "load_mesh", "initialise_field", "export_field",
-           "initialise_bathymetry", "export_bathymetry",
-           "initialise_hydrodynamics", "export_hydrodynamics",
-           "OuterLoopLogger", "TimeDependentAdaptationLogger",
-           "readfile", "index_string", "get_date", "create_directory"]
+__all__ = ["save_mesh", "load_mesh", "initialise_field", "export_field", "initialise_bathymetry",
+           "export_bathymetry", "initialise_hydrodynamics", "export_hydrodynamics",
+           "OuterLoopLogger", "TimeDependentAdaptationLogger", "readfile", "index_string",
+           "get_date", "create_directory", "print_output", "COMM_WORLD", "File"]
 
 
 def get_filename(fname, index_str):

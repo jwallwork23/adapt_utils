@@ -1,10 +1,11 @@
-from thetis import create_directory, print_output, RectangleMesh
+from firedrake import RectangleMesh
 
 import argparse
 import h5py
 import os
 import sys
 
+from adapt_utils.io import create_directory, print_output
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 
