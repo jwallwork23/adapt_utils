@@ -24,7 +24,7 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-levels = 5
+levels = 6
 offset = int(args.offset or 0)
 kwargs = {
     'plot_pvd': False,
