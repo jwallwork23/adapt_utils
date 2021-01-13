@@ -9,18 +9,25 @@ from adapt_utils.plotting import *
 
 # Parse arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('family', help="Finite element family.")
+parser.add_argument('mode', help="""
+    Choose from {'forward', 'adjoint', 'avg', 'int', 'dwr', 'anisotropic_dwr, 'weighed_hessian',
+    'weighted_gradient'}.
+    """)
+parser.add_argument('-family', help="Finite element family.")
 parser.add_argument('-stabilisation', help="Stabilisation method to use.")
 parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-norm_order', help="Metric normalisation order.")
 parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
 args = parser.parse_args()
+mode = args.mode
+assert mode in ('forward', 'adjoint', 'avg', 'int', 'dwr', 'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient')
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 10)
 
 # Get filenames
-ext = args.family
-assert ext in ('cg', 'dg')
+family = args.family or 'cg'
+assert family in ('cg', 'dg')
+ext = family
 anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
 if ext == 'dg':
     if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
@@ -33,15 +40,26 @@ else:
 di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
+label_ext = ''
+if mode == 'adjoint':
+    label_ext = '_adjoint'
+elif mode == 'avg':
+    label_ext = '_int'
+elif mode == 'int':
+    label_ext = '_int'
 approaches = {
     'fixed_mesh': {'label': 'Uniform', 'marker': '*'},
-    'dwr': {'label': 'Isotropic DWR', 'marker': '^'},
-    'anisotropic_dwr': {'label': 'Anisotropic DWR', 'marker': 'h'},
-    'weighted_hessian': {'label': 'Weighted Hessian', 'marker': 's'},
-    'weighted_gradient': {'label': 'Weighted Gradient', 'marker': 'x'},
-    # 'dwr_adjoint': {'label': 'Isotropic DWR adjoint', 'marker': 'v'},
-    # 'dwr_avg': {'label': 'Isotropic DWR adjoint', 'marker': '>'},
+    'dwr' + label_ext: {'label': 'Isotropic DWR', 'marker': '^'},
+    'anisotropic_dwr' + label_ext: {'label': 'Anisotropic DWR', 'marker': 'h'},
+    'weighted_hessian' + label_ext: {'label': 'Weighted Hessian', 'marker': 's'},
+    'weighted_gradient' + label_ext: {'label': 'Weighted Gradient', 'marker': 'x'},
 }
+if mode in ('dwr', 'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient'):
+    approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
+    approaches[mode] = {'label': 'Forward', 'marker': '^'}
+    approaches[mode + '_adjoint'] = {'label': 'Adjoint', 'marker': 'h'}
+    approaches[mode + '_avg'] = {'label': 'Averaged', 'marker': 's'}
+    approaches[mode + '_int'] = {'label': 'Intersected', 'marker': 'x'}
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
 
@@ -67,7 +85,7 @@ for alignment in ('aligned', 'offset'):
             if approach == 'fixed_mesh':
                 # qoi_exact = np.array(outfile['qoi_exact'][-1])
                 qoi_exact = np.array(outfile['qoi'][-1])
-            if approach == 'dwr':
+            if approach in ('dwr', 'dwr_adjoint', 'dwr_avg'):
                 estimators = np.abs(np.array(outfile['estimators']))
         absolute_error = np.abs(qoi - qoi_exact)
         relative_error = absolute_error/np.abs(qoi_exact)
@@ -91,12 +109,12 @@ for alignment in ('aligned', 'offset'):
     axes.grid(True, which='minor', axis='y')
 
     # Save to file
-    filename = 'qoi_{:s}'.format(ext)
+    filename = 'qoi_{:s}_{:s}'.format(mode, ext)
     if anisotropic_stabilisation:
         filename += '_anisotropic'
     filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
     filename += '_{:.0f}'.format(alpha)
-    savefig('_'.join([filename, alignment]), plot_dir, extensions=['pdf', 'png'])
+    savefig('_'.join([filename, alignment]), plot_dir, extensions=['pdf'])
 
     # Save legend to file
     if alignment == 'aligned':
@@ -108,5 +126,4 @@ for alignment in ('aligned', 'offset'):
         fig2.canvas.draw()
         axes2.set_axis_off()
         bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
-        fig2.savefig(os.path.join(plot_dir, 'legend.png'), dpi='figure', bbox_inches=bbox)
-        fig2.savefig(os.path.join(plot_dir, 'legend.pdf'), dpi='figure', bbox_inches=bbox)
+        fig2.savefig(os.path.join(plot_dir, 'legend_{:s}.pdf'.format(mode)), dpi='figure', bbox_inches=bbox)

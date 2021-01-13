@@ -55,16 +55,16 @@ table:
 
 # --- Adaptation runs based on 1st order forward result
 
-adaptive_forward: isotropic anisotropic weighted_hessian weighted_gradient
+adaptive_forward: dwr anisotropic_dwr weighted_hessian weighted_gradient
 
-isotropic:
+dwr:
 	@echo "Running isotropic DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach dwr
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach dwr -offset 1
 
-anisotropic:
+anisotropic_dwr:
 	@echo "Running anisotropic DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-convergence_rate 2 -approach anisotropic_dwr
@@ -87,16 +87,16 @@ weighted_gradient:
 
 # --- Adaptation runs based on 1st order adjoint result
 
-adaptive_forward: isotropic_adjoint anisotropic_adjoint weighted_hessian_adjoint
+adaptive_adjoint: dwr_adjoint anisotropic_dwr_adjoint weighted_hessian_adjoint
 
-isotropic_adjoint:
+dwr_adjoint:
 	@echo "Running isotropic adjoint DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach dwr_adjoint
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach dwr_adjoint -offset 1
 
-anisotropic_adjoint:
+anisotropic_dwr_adjoint:
 	@echo "Running anisotropic adjoint DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-convergence_rate 2 -approach anisotropic_dwr_adjoint
@@ -114,33 +114,70 @@ weighted_hessian_adjoint:
 
 # --- Adaptation runs based on 2nd order result
 
-adaptive_forward: isotropic_avg
+adaptive_avg: dwr_avg
 
-isotropic_avg:
+dwr_avg:
 	@echo "Running isotropic second order DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach dwr_avg
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach dwr_avg -offset 1
 
-# TODO: anisotropic_avg
+# TODO: anisotropic_dwr_avg
 # TODO: weighted_hessian_avg
 # TODO: weighted_gradient_avg
-# TODO: isotropic_int
-# TODO: anisotropic_int
+# TODO: dwr_int
+# TODO: anisotropic_dwr_int
 # TODO: weighted_hessian_int
 # TODO: weighted_gradient_int
+# TODO: adaptive_int
 
-plot:
-	@echo "Plotting convergence curves..."
-	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-norm_order 1 -convergence_rate 2
+# --- Convergence plots
 
-plot_norms:
-	@echo "Plotting convergence curves across norm orders..."
-	@python3 plot_convergence_norms.py dwr cg -stabilisation supg
-	@python3 plot_convergence_norms.py weighted_hessian cg -stabilisation supg
-	@python3 plot_convergence_norms.py weighted_gradient cg -stabilisation supg
-	@python3 plot_convergence_norms.py anisotropic_dwr cg -stabilisation supg
+plot: plot_by_estimator plot_by_approach
 
-convergence: uniform table adaptive plot
+plot_by_estimator: plot_forward plot_adjoint plot_avg plot_int
+
+plot_by_approach: plot_dwr plot_anisotropic_dwr plot_weighted_hessian plot_weighted_gradient
+
+plot_forward:
+	@echo "Plotting forward convergence curves..."
+	@python3 plot_convergence.py forward -family cg -stabilisation supg \
+		-anisotropic_stabilisation 1 -norm_order 1 -convergence_rate 2
+
+plot_adjoint:
+	@echo "Plotting adjoint convergence curves..."
+	@python3 plot_convergence.py adjoint -family cg -stabilisation supg \
+		-anisotropic_stabilisation 1 -norm_order 1 -convergence_rate 2
+
+plot_avg:
+	@echo "Plotting averaged convergence curves..."
+	@python3 plot_convergence.py avg -family cg -stabilisation supg \
+		-anisotropic_stabilisation 1 -norm_order 1 -convergence_rate 2
+
+plot_int:
+	@echo "Plotting intersected convergence curves..."
+	@python3 plot_convergence.py int -family cg -stabilisation supg \
+		-anisotropic_stabilisation 1 -norm_order 1 -convergence_rate 2
+
+plot_dwr:
+	@echo "Plotting dwr convergence curves..."
+	@python3 plot_convergence.py dwr -family cg -stabilisation supg \
+		-anisotropic_stabilisation 1 -norm_order 1 -convergence_rate 2
+
+plot_anisotropic_dwr:
+	@echo "Plotting anisotropic_dwr convergence curves..."
+	@python3 plot_convergence.py anisotropic_dwr -family cg -stabilisation supg \
+		-anisotropic_stabilisation 1 -norm_order 1 -convergence_rate 2
+
+plot_weighted_hessian:
+	@echo "Plotting weighted_hessian convergence curves..."
+	@python3 plot_convergence.py weighted_hessian -family cg -stabilisation supg \
+		-anisotropic_stabilisation 1 -norm_order 1 -convergence_rate 2
+
+plot_weighted_gradient:
+	@echo "Plotting weighted_gradient convergence curves..."
+	@python3 plot_convergence.py weighted_hessian -family cg -stabilisation supg \
+		-anisotropic_stabilisation 1 -norm_order 1 -convergence_rate 2
+
+convergence: uniform table adaptive_forward plot_forward

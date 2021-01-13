@@ -117,7 +117,7 @@ for n in range(op.outer_iterations):
     print("DoF count: ", dofs)
     qois.append(tp.qois[-1])
     print("QoIs:          ", qois)
-    if op.approach in ('dwr_adjoint', 'dwr_both'):
+    if op.approach in ('dwr_adjoint', 'dwr_avg'):
         estimators.append(tp.estimators[op.approach][-1])
         print("Estimators:    ", estimators)
     elif 'dwr' in op.approach:
