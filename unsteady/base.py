@@ -685,20 +685,9 @@ class AdaptiveProblemBase(object):
     # --- Error estimation
 
     def get_strong_residual(self, i, adjoint=False, **kwargs):
-        """
-        Compute the strong residual for the forward or adjoint PDE, as specified by the `adjoint`
-        boolean kwarg.
-        """
-        if adjoint:
-            return self.get_strong_residual_adjoint(i, **kwargs)
-        else:
-            return self.get_strong_residual_forward(i, **kwargs)
-
-    def get_strong_residual_forward(self, i, **kwargs):
-        raise NotImplementedError("Should be implemented in derived class.")
-
-    def get_strong_residual_adjoint(self, i, **kwargs):
-        raise NotImplementedError("Should be implemented in derived class.")
+        ts = self.get_timestepper(i, self.op.adapt_field, adjoint=adjoint)
+        strong_residual = ts.error_estimator.strong_residual
+        return [project(res, self.P1[i]) for res in list(strong_residual)]  # Project into P1 space
 
     # --- Metric based
 

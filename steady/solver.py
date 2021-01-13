@@ -332,19 +332,23 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         else:
             return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
 
-    def get_metric(self, adapt_field):
-        approach = self.op.approach
+    def get_metric(self, adapt_field, approach=None):
+        approach = approach or self.op.approach
         adjoint = 'adjoint' in self.op.approach
-        if 'isotropic_dwr' in approach:
-            metric = self.get_isotropic_dwr_metric(adjoint=adjoint)
-        elif 'anisotropic_dwr' in approach:
-            metric = self.get_anisotropic_dwr_metric(adjoint=adjoint)
-        elif 'weighted_hessian' in approach:
-            metric = self.get_weighted_hessian_metric(adjoint=adjoint)
-        elif 'weighted_gradient' in approach:
-            metric = self.get_weighted_gradient_metric(adjoint=adjoint)
-        elif 'dwr' in approach:
+        if approach in ('dwr', 'dwr_adjoint', 'dwr_avg'):
             metric = self.get_isotropic_metric(self.op.adapt_field)
+        elif approach in ('isotropic_dwr', 'isotropic_dwr_adjoint'):
+            metric = self.get_isotropic_dwr_metric(adjoint=adjoint)
+        elif approach in ('anisotropic_dwr', 'anisotropic_dwr_adjoint'):
+            metric = self.get_anisotropic_dwr_metric(adjoint=adjoint)
+        elif approach in ('weighted_hessian', 'weighted_hessian_adjoint'):
+            metric = self.get_weighted_hessian_metric(adjoint=adjoint)
+        elif approach in ('weighted_gradient', 'weighted_gradient_adjoint'):
+            metric = self.get_weighted_gradient_metric(adjoint=adjoint)
+        elif approach[-3:] in ('int', 'avg'):
+            fwd_metric = self.get_metric(adapt_field, approach[:-4])
+            adj_metric = self.get_metric(adapt_field, approach[:-3] + 'adjoint')
+            metric = combine_metrics(fwd_metric, adj_metric, average=approach[-3:] == 'avg')
         else:
             raise NotImplementedError  # TODO
         if self.op.plot_pvd:

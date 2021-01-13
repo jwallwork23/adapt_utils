@@ -1659,16 +1659,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             update_forcings(self.simulation_time - op.dt)
         self.print(80*'=')
 
-    # --- Error estimation
-
-    def get_strong_residual_forward(self, i, adjoint=False, **kwargs):
-        ts = self.get_timestepper(i, self.op.adapt_field, adjoint=adjoint)
-        strong_residual = ts.error_estimator.strong_residual
-        return [project(res, self.P1[i]) for res in list(strong_residual)]  # Project into P1 space
-
-    def get_strong_residual_adjoint(self, i, **kwargs):
-        raise NotImplementedError  # TODO
-
     # --- Metric
 
     def recover_hessian_metrics(self, i, adjoint=False, **kwargs):  # TODO: USEME more
@@ -1735,16 +1725,25 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'dwr': self.run_dwr,
             'dwr_adjoint': self.run_dwr,
             'dwr_avg': self.run_dwr,
+            'dwr_int': self.run_dwr,
             'isotropic_dwr': self.run_dwr,                 # TODO: Unsteady case
             'isotropic_dwr_adjoint': self.run_dwr,         # TODO: Unsteady case
+            'isotropic_dwr_avg': self.run_dwr,             # TODO: Unsteady case
+            'isotropic_dwr_int': self.run_dwr,             # TODO: Unsteady case
             'anisotropic_dwr': self.run_dwr,               # TODO: Unsteady case
             'anisotropic_dwr_adjoint': self.run_dwr,       # TODO: Unsteady case
+            'anisotropic_dwr_avg': self.run_dwr,           # TODO: Unsteady case
+            'anisotropic_dwr_int': self.run_dwr,           # TODO: Unsteady case
 
             # Metric-based goal-oriented *not* using DWR
             'weighted_hessian': self.run_no_dwr,
-            'weighted_hessian_adjoint': self.run_no_dwr,
+            'weighted_hessian_adjoint': self.run_no_dwr,   # TODO: Unsteady case
+            'weighted_hessian_avg': self.run_no_dwr,       # TODO: Unsteady case
+            'weighted_hessian_int': self.run_no_dwr,       # TODO: Unsteady case
             'weighted_gradient': self.run_no_dwr,          # TODO: Unsteady case
             'weighted_gradient_adjoint': self.run_no_dwr,  # TODO: Unsteady case
+            'weighted_gradient_avg': self.run_no_dwr,      # TODO: Unsteady case
+            'weighted_gradient_int': self.run_no_dwr,      # TODO: Unsteady case
         }
         if self.approach not in run_scripts:
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
