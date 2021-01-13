@@ -53,7 +53,9 @@ table:
 	@echo "Writing to LaTeX formatted table..."
 	@python3 write_table.py
 
-adaptive: isotropic anisotropic weighted_hessian weighted_gradient
+# --- Adaptation runs based on 1st order forward result
+
+adaptive_forward: isotropic anisotropic weighted_hessian weighted_gradient
 
 isotropic:
 	@echo "Running isotropic DWR adaptation convergence test..."
@@ -83,6 +85,10 @@ weighted_gradient:
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach weighted_gradient -offset 1
 
+# --- Adaptation runs based on 1st order adjoint result
+
+adaptive_forward: isotropic_adjoint anisotropic_adjoint weighted_hessian_adjoint
+
 isotropic_adjoint:
 	@echo "Running isotropic adjoint DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
@@ -90,12 +96,40 @@ isotropic_adjoint:
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach dwr_adjoint -offset 1
 
-isotropic_both:
+anisotropic_adjoint:
+	@echo "Running anisotropic adjoint DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-convergence_rate 2 -approach anisotropic_dwr_adjoint
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-convergence_rate 2 -approach anisotropic_dwr_adjoint -offset 1
+
+weighted_hessian_adjoint:
+	@echo "Running adjoint 'weighted Hessian' anisotropic adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_hessian_adjoint
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_hessian_adjoint -offset 1
+
+# TODO: weighted_gradient_adjoint
+
+# --- Adaptation runs based on 2nd order result
+
+adaptive_forward: isotropic_avg
+
+isotropic_avg:
 	@echo "Running isotropic second order DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-norm_order 1 -approach dwr_both
+		-norm_order 1 -approach dwr_avg
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
-		-norm_order 1 -approach dwr_both -offset 1
+		-norm_order 1 -approach dwr_avg -offset 1
+
+# TODO: anisotropic_avg
+# TODO: weighted_hessian_avg
+# TODO: weighted_gradient_avg
+# TODO: isotropic_int
+# TODO: anisotropic_int
+# TODO: weighted_hessian_int
+# TODO: weighted_gradient_int
 
 plot:
 	@echo "Plotting convergence curves..."
