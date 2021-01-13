@@ -83,6 +83,20 @@ weighted_gradient:
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach weighted_gradient -offset 1
 
+isotropic_adjoint:
+	@echo "Running isotropic adjoint DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr_adjoint
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr_adjoint -offset 1
+
+isotropic_both:
+	@echo "Running isotropic second order DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr_both
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr_both -offset 1
+
 plot:
 	@echo "Plotting convergence curves..."
 	@python3 plot_convergence.py cg -stabilisation supg -anisotropic_stabilisation 1 \

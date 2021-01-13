@@ -182,13 +182,15 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         op = self.op
         approach = approach or op.approach
         if approach == 'dwr':
-            return self.dwr_indicator(adapt_field, adjoint=False)
+            return self.dwr_indicator(adapt_field, forward=True)
         elif approach == 'dwr_adjoint':
             return self.dwr_indicator(adapt_field, adjoint=True)
+        elif approach == 'dwr_both':
+            return self.dwr_indicator(adapt_field, forward=True, adjoint=True)
         else:
             raise NotImplementedError  # TODO
 
-    def dwr_indicator(self, adapt_field, adjoint=False, mode='GE_h'):
+    def dwr_indicator(self, adapt_field, forward=False, adjoint=False, mode='GE_h'):
         """
         Indicate errors in the quantity of interest by the 'Dual Weighted Residual' (DWR) method of
         [Becker and Rannacher, 2001].
@@ -197,6 +199,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         op = self.op
         self.indicator['dwr'] = Function(self.P1[0], name="DWR indicator")
+        if not forward and not adjoint:
+            raise ValueError("Specify either forward or adjoint model.")
+        both = forward and adjoint
 
         if adjoint and self.discrete_adjoint:
             raise NotImplementedError  # TODO
@@ -216,43 +221,92 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             ep.outer_iteration = self.outer_iteration
             enriched_space = ep.get_function_space(adapt_field)
             tm = dmhooks.get_transfer_manager(self.get_plex(0))
-
-            # Create solution fields
-            fwd_solution = self.get_solutions(adapt_field, adjoint=adjoint)[0]
-            fwd_proj = Function(enriched_space[0])
-            adj_solution = self.get_solutions(adapt_field, adjoint=not adjoint)[0]
-            indicator_enriched = Function(ep.P0[0])
-            adj_error = Function(enriched_space[0])
             bcs = self.boundary_conditions[0][adapt_field]
+            self.indicator['cell'] = Function(ep.P0[0])
+            self.indicator['flux'] = Function(ep.P0[0])
+            fwd_solution = self.get_solutions(adapt_field, adjoint=False)[0]
+            adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
 
-            # Prolong forward solution at current timestep
-            tm.prolong(fwd_solution, fwd_proj)
-            if not adjoint and self.nonlinear:
-                if op.solve_enriched_forward:
-                    ep.solve_forward()
-                else:
-                    ep.fwd_solution.assign(fwd_proj)
+            if forward:
 
-            # Setup forward solver for enriched problem
-            ep.create_error_estimators_step(0, adjoint=adjoint)
-            if adjoint:
-                ep.solve_forward()
-            else:
+                # Prolong forward solution and solve, if requested
+                fwd_proj = Function(enriched_space[0])
+                adj_error = Function(enriched_space[0])
+                tm.prolong(fwd_solution, fwd_proj)
+                if self.nonlinear:
+                    if op.solve_enriched_forward:
+                        ep.solve_forward()
+                    else:
+                        ep.fwd_solution.assign(fwd_proj)
+
+                # Setup forward solver for enriched problem
+                ep.create_error_estimators_step(0, adjoint=False)
                 ep.setup_solver_forward_step(0)  # Needed to create timestepper
                 ep.solve_adjoint()
-            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=not adjoint)[0]
+                enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
 
-            # Setup error estimator
-            ets = ep.timesteppers[0][adapt_field]
-            ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
+                # Setup forward error estimator
+                ets = ep.timesteppers[0][adapt_field]
+                ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
 
-            # # Prolong forward solution at current timestep
-            # tm.prolong(fwd_solution, fwd_proj)
+                # Approximate adjoint error in enriched space
+                tm.prolong(adj_solution, adj_error)
+                adj_error *= -1
+                adj_error += enriched_adj_solution
 
-            # Approximate adjoint error in enriched space
-            tm.prolong(adj_solution, adj_error)
-            adj_error *= -1
-            adj_error += enriched_adj_solution
+                # Compute dual weighted residual
+                self.indicator['dwr_cell'] = ets.error_estimator.element_residual()
+                self.indicator['dwr_flux'] = ets.error_estimator.inter_element_flux()
+                self.indicator['dwr_flux'] += ets.error_estimator.boundary_flux()
+                self.indicator['cell'] += self.indicator['dwr_cell']
+                self.indicator['flux'] += self.indicator['dwr_flux']
+
+            if adjoint:
+
+                # Prolong adjoint solution
+                adj_proj = Function(enriched_space[0])
+                fwd_error = Function(enriched_space[0])
+                tm.prolong(adj_solution, adj_proj)
+
+                # Setup adjoint solver for enriched problem
+                ep.create_error_estimators_step(0, adjoint=True)
+                ep.setup_solver_adjoint_step(0)  # Needed to create timestepper
+                ep.solve_forward()
+                enriched_fwd_solution = ep.get_solutions(adapt_field, adjoint=False)[0]
+
+                # Setup adjoint error estimator
+                ets = ep.timesteppers[0]['_'.join(['adjoint', adapt_field])]
+                ets.setup_error_estimator(adj_proj, adj_proj, fwd_error, bcs)
+
+                # Approximate forward error in enriched space
+                tm.prolong(fwd_solution, fwd_error)
+                fwd_error *= -1
+                fwd_error += enriched_fwd_solution
+
+                # Compute dual weighted residual
+                self.indicator['dwr_adjoint_cell'] = ets.error_estimator.element_residual()
+                self.indicator['dwr_adjoint_flux'] = ets.error_estimator.inter_element_flux()
+                self.indicator['dwr_adjoint_flux'] += ets.error_estimator.boundary_flux()
+                self.indicator['cell'] += self.indicator['dwr_adjoint_cell']
+                self.indicator['flux'] += self.indicator['dwr_adjoint_flux']
+
+            # Assemble error indicator
+            indicator_enriched = Function(ep.P0[0])
+            indicator_enriched.interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
+
+            # Estimate error
+            label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
+            if label not in self.estimators:
+                self.estimators[label] = []
+            self.estimators[label].append(indicator_enriched.vector().gather().sum())
+
+            # Project into P1 space and inject into base mesh
+            indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
+            indicator_enriched_cts.interpolate(abs(indicator_enriched_cts))  # Ensure positive
+            self.indicator[label] = Function(self.P1[0], name=label)
+            tm.inject(indicator_enriched_cts, self.indicator[label])
+            return self.indicator[label]
+
         elif mode == 'GE_p':
             raise NotImplementedError  # TODO: Use degree_increase
         elif mode == 'PR':
@@ -261,23 +315,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             raise NotImplementedError  # TODO
         else:
             raise ValueError("Enrichment mode {:s} not recognised.".format(mode))
-
-        # Compute dual weighted residual
-        self.indicator['dwr_cell'] = ets.error_estimator.element_residual()
-        self.indicator['dwr_flux'] = ets.error_estimator.inter_element_flux()
-        self.indicator['dwr_flux'] += ets.error_estimator.boundary_flux()
-        indicator_enriched.interpolate(abs(self.indicator['dwr_cell'] + self.indicator['dwr_flux']))
-
-        # Estimate error
-        if 'dwr' not in self.estimators:
-            self.estimators['dwr'] = []
-        self.estimators['dwr'].append(indicator_enriched.vector().gather().sum())
-
-        # Project into P1 space and inject into base mesh
-        indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
-        indicator_enriched_cts.interpolate(abs(indicator_enriched_cts))  # Ensure positive
-        tm.inject(indicator_enriched_cts, self.indicator['dwr'])
-        return self.indicator['dwr']
 
     def get_hessian_metric(self, adjoint=False):
         """
@@ -292,16 +329,16 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
 
     def get_metric(self, adapt_field):
-        if self.op.approach in ('dwr', 'dwr_adjoint'):
-            metric = self.get_isotropic_metric(self.op.adapt_field)
+        if self.op.approach == 'isotropic_dwr':
+            metric = self.get_isotropic_dwr_metric(adjoint=False)
+        elif self.op.approach == 'anisotropic_dwr':
+            metric = self.get_anisotropic_dwr_metric(adjoint=False)
         elif self.op.approach == 'weighted_hessian':
             metric = self.get_weighted_hessian_metric(adjoint=False)
         elif self.op.approach == 'weighted_gradient':
             metric = self.get_weighted_gradient_metric(adjoint=False)
-        elif self.op.approach == 'isotropic_dwr':
-            metric = self.get_isotropic_dwr_metric(adjoint=False)
-        elif self.op.approach == 'anisotropic_dwr':
-            metric = self.get_anisotropic_dwr_metric(adjoint=False)
+        elif 'dwr' in self.op.approach:
+            metric = self.get_isotropic_metric(self.op.adapt_field)
         else:
             raise NotImplementedError  # TODO
         if self.op.plot_pvd:
@@ -522,7 +559,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.estimators['dwr'] = []
         for n in range(op.max_adapt):
             self.outer_iteration = n
-            self.create_error_estimators_step(0)
+            self.create_error_estimators_step(0, adjoint='adjoint' in op.approach)
 
             # Solve forward in base space
             self.solve_forward()
