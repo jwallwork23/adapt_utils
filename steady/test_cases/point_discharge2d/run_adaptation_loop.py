@@ -130,5 +130,5 @@ with h5py.File(os.path.join(di, '{:s}_{:s}.h5'.format(fname, alignment)), 'w') a
     outfile.create_dataset('elements', data=elements)
     outfile.create_dataset('dofs', data=dofs)
     outfile.create_dataset('qoi', data=qois)
-    if 'dwr' in op.approach:
+    if op.approach in ('dwr', 'dwr_adjoint', 'dwr_avg'):
         outfile.create_dataset('estimators', data=estimators)

@@ -110,27 +110,74 @@ weighted_hessian_adjoint:
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach weighted_hessian_adjoint -offset 1
 
-# TODO: weighted_gradient_adjoint
+weighted_gradient_adjoint:
+	@echo "Running adjoint 'weighted gradient' anisotropic adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_gradient_adjoint
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_gradient_adjoint -offset 1
 
-# --- Adaptation runs based on 2nd order result
+# --- Adaptation runs based on 2nd order result / combinations of first order results
 
-adaptive_avg: dwr_avg
+adaptive_avg: dwr_avg anisotropic_dwr_avg weighted_hessian_avg weighted_gradient_avg
+
+adaptive_int: dwr_int anisotropic_dwr_int weighted_hessian_int weighted_gradient_int
 
 dwr_avg:
-	@echo "Running isotropic second order DWR adaptation convergence test..."
+	@echo "Running second order isotropic DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach dwr_avg
 	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
 		-norm_order 1 -approach dwr_avg -offset 1
 
-# TODO: anisotropic_dwr_avg
-# TODO: weighted_hessian_avg
-# TODO: weighted_gradient_avg
-# TODO: dwr_int
-# TODO: anisotropic_dwr_int
-# TODO: weighted_hessian_int
-# TODO: weighted_gradient_int
-# TODO: adaptive_int
+anisotropic_dwr_avg:
+	@echo "Running averaged first order anisotropic DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach anisotropic_dwr_avg
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach anisotropic_dwr_avg -offset 1
+
+weighted_hessian_avg:
+	@echo "Running averaged 'weighted Hessian' adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_hessian_avg
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_hessian_avg -offset 1
+
+weighted_gradient_avg:
+	@echo "Running averaged 'weighted gradient' adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_gradient_avg
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_gradient_avg -offset 1
+
+dwr_int:
+	@echo "Running intersected first order isotropic DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr_int
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr_int -offset 1
+
+anisotropic_dwr_int:
+	@echo "Running intersected first order anisotropic DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach anisotropic_dwr_int
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach anisotropic_dwr_int -offset 1
+
+weighted_hessian_int:
+	@echo "Running intersected 'weighted Hessian' adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_hessian_int
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_hessian_int -offset 1
+
+weighted_gradient_int:
+	@echo "Running intersected 'weighted gradient' adaptation convergence test..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_gradient_int
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach weighted_gradient_int -offset 1
 
 # --- Convergence plots
 
