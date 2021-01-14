@@ -586,7 +586,100 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         Indicate DWR errors using an enriched space obtained by patch recovery.
         """
-        raise NotImplementedError  # TODO
+        from adapt_utils.adapt.recovery import recover_zz
+
+        op = self.op
+        both = forward and adjoint
+
+        # Generate enriched space
+        eop = op.copy()
+        eop.increase_degree(adapt_field)  # Apply p-refinement
+        ep = type(self)(
+            eop,
+            meshes=self.mesh,
+            nonlinear=self.nonlinear,
+            discrete_adjoint=self.discrete_adjoint,
+        )
+        ep.outer_iteration = self.outer_iteration
+        enriched_space = ep.get_function_space(adapt_field)
+        bcs = self.boundary_conditions[0][adapt_field]
+        self.indicator['cell'] = Function(self.P0[0])
+        self.indicator['flux'] = Function(self.P0[0])
+        fwd_solution = self.get_solutions(adapt_field, adjoint=False)[0]
+        adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
+
+        if forward:
+
+            # Setup forward solver for enriched problem
+            ep.create_error_estimators_step(0, adjoint=False)
+            ep.setup_solver_forward_step(0)  # Needed to create timestepper
+            # ep.solve_adjoint()
+            enriched_adj_solution = recover_zz(adj_solution, to_recover='field')
+
+            # Approximate adjoint error in enriched space
+            adj_error = interpolate(adj_solution, enriched_space[0])
+            adj_error *= -1
+            adj_error += enriched_adj_solution
+
+            # Setup forward error estimator
+            ets = ep.get_timestepper(0, adapt_field, adjoint=False)
+            ets.setup_error_estimator(fwd_solution, fwd_solution, adj_error, bcs)
+
+            # Compute dual weighted residual
+            dwr_cell = ets.error_estimator.element_residual()
+            dwr_flux = ets.error_estimator.inter_element_flux()
+            dwr_flux += ets.error_estimator.boundary_flux()
+            self.indicator['cell'] += dwr_cell
+            self.indicator['flux'] += dwr_flux
+            if both:
+                indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
+                self.indicator['dwr'] = interpolate(indicator, self.P1[0])
+
+        if adjoint:
+
+            # Setup adjoint solver for enriched problem
+            ep.create_error_estimators_step(0, adjoint=True)
+            ep.setup_solver_adjoint_step(0)  # Needed to create timestepper
+            # ep.solve_forward()
+            enriched_fwd_solution = recover_zz(fwd_solution, to_recover='field')
+
+            # Approximate forward error in enriched space
+            fwd_error = interpolate(fwd_solution, enriched_space[0])
+            fwd_error *= -1
+            fwd_error += enriched_fwd_solution
+
+            # Setup adjoint error estimator
+            ets = ep.get_timestepper(0, adapt_field, adjoint=True)
+            ets.setup_error_estimator(adj_solution, adj_solution, fwd_error, bcs)
+
+            # Compute dual weighted residual
+            dwr_cell = ets.error_estimator.element_residual()
+            dwr_flux = ets.error_estimator.inter_element_flux()
+            dwr_flux += ets.error_estimator.boundary_flux()
+            self.indicator['cell'] += dwr_cell
+            self.indicator['flux'] += dwr_flux
+            if both:
+                indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
+                self.indicator['dwr_adjoint'] = interpolate(indicator, self.P1[0])
+
+        if both:
+            self.indicator['cell'] *= 0.5
+            self.indicator['flux'] *= 0.5
+
+        # Indicate error
+        indicator = interpolate(abs(self.indicator['cell'] + self.indicator['flux']), self.P0[0])
+
+        # Global error estimate
+        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
+        if label not in self.estimators:
+            self.estimators[label] = []
+        self.estimators[label].append(indicator.vector().gather().sum())
+
+        # Project into P1 space
+        self.indicator[label] = Function(self.P1[0], name=label)
+        self.indicator[label].project(indicator)
+        self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
+        return self.indicator[label]
 
     def dwr_indicator_DQ(self, adapt_field, forward=False, adjoint=False):
         """
