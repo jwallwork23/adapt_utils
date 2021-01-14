@@ -214,6 +214,17 @@ class Options(FrozenConfigurable):
         Toggle whether the forward problem should be solved in the enriched space or simply
         prolonged from the base space for nonlinear problems.
         """).tag(config=True)
+    enrichment_method = Enum(['GE_hp', 'GE_h', 'GE_p', 'PR', 'DQ'], default_value='GE_h', help="""
+        Method used to construct an enriched space for the higher order approximation of the
+        adjoint and/or forward error term in the DWR residual.
+
+        Options:
+          * 'GE_hp': global h-refinement and global p-refinement;
+          * 'GE_h' : global h-refinement alone;
+          * 'GE_p' : global p-refinement alone;
+          * 'PR'   : patch recovery;
+          * 'DQ'   : difference quotients.
+        """).tag(config=True)
 
     # Adaptation loop
     min_adapt = NonNegativeInteger(0, help="""
@@ -345,6 +356,11 @@ class Options(FrozenConfigurable):
             print_output(self.indent + msg)
         except TypeError:
             print(msg)
+
+    def copy(self):
+        op = self.__class__()
+        op.update(self)
+        return op
 
 
 # TODO: Improve doc
@@ -779,6 +795,20 @@ class CoupledOptions(Options):
         nu.project(stats.dx*sqrt(dot(u, u))/Re_h)
         # nu.interpolate(stats.dx*sqrt(dot(u, u))/Re_h)
         return nu
+
+    def increase_degree(self, adapt_field):
+        if adapt_field == 'tracer':
+            assert self.degree_increase_tracer != 0
+            self.degree_tracer += self.degree_increase_tracer
+        elif adapt_field == 'sediment':
+            assert self.degree_increase_sediment != 0
+            self.degree_sediment += self.degree_increase_sediment
+        elif adapt_field == 'bathymetry':
+            assert self.degree_increase_bathymetry != 0
+            self.degree_bathymetry += self.degree_increase_bathymetry
+        else:
+            assert self.degree_increase != 0
+            self.degree += self.degree_increase
 
 
 class ReynoldsNumberArray(object):

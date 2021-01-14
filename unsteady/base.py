@@ -968,7 +968,7 @@ class AdaptiveProblemBase(object):
         elif 'dwr' in approach:
             estimators = self.estimators['dwr']
         else:
-            raise NotImplementedError  # TODO
+            return False
         self.print("\nError estimator\n===============")
         self.print("  iteration {:d}: {:.4e}".format(n+1, estimators[-1]))
         converged = False
