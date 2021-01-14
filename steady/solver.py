@@ -4,6 +4,7 @@ import os
 
 from adapt_utils.adapt.kernels import *
 from adapt_utils.adapt.metric import *
+from adapt_utils.adapt.recovery import *
 from adapt_utils.norms import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
@@ -241,6 +242,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             meshes=refined_mesh,
             nonlinear=self.nonlinear,
             discrete_adjoint=self.discrete_adjoint,
+            print_progress=self.print_progress,
         )
         ep.outer_iteration = self.outer_iteration
         enriched_space = ep.get_function_space(adapt_field)
@@ -331,6 +333,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # Error indicator components on base space
         tm.inject(cell, self.indicator['cell'])
         tm.inject(flux, self.indicator['flux'])
+        self.indicator['GE_hp'] = Function(self.P0[0])
+        self.indicator['GE_hp'].interpolate(abs(self.indicator['cell'] + self.indicator['flux'])) 
 
         # Indicate error on enriched space
         indicator_enriched = Function(ep.P0[0])
@@ -340,7 +344,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
-        self.estimators[label].append(indicator_enriched.vector().gather().sum())
+        self.estimators[label].append(self.indicator['GE_hp'].vector().gather().sum())
 
         # Project into P1 space and inject into base mesh
         indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
@@ -364,6 +368,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             meshes=refined_mesh,
             nonlinear=self.nonlinear,
             discrete_adjoint=self.discrete_adjoint,
+            print_progress=self.print_progress,
         )
         ep.outer_iteration = self.outer_iteration
         enriched_space = ep.get_function_space(adapt_field)
@@ -454,6 +459,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # Error indicator components on base space
         tm.inject(cell, self.indicator['cell'])
         tm.inject(flux, self.indicator['flux'])
+        self.indicator['GE_h'] = Function(self.P0[0])
+        self.indicator['GE_h'].interpolate(abs(self.indicator['cell'] + self.indicator['flux'])) 
 
         # Indicate error on enriched space
         indicator_enriched = Function(ep.P0[0])
@@ -463,7 +470,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
-        self.estimators[label].append(indicator_enriched.vector().gather().sum())
+        self.estimators[label].append(self.indicator['GE_h'].vector().gather().sum())
 
         # Project into P1 space and inject into base mesh
         indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
@@ -489,6 +496,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             meshes=self.mesh,
             nonlinear=self.nonlinear,
             discrete_adjoint=self.discrete_adjoint,
+            print_progress=self.print_progress,
         )
         ep.outer_iteration = self.outer_iteration
         enriched_space = ep.get_function_space(adapt_field)
@@ -568,17 +576,18 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.indicator['flux'] *= 0.5
 
         # Indicate error
-        indicator = interpolate(abs(self.indicator['cell'] + self.indicator['flux']), self.P0[0])
+        self.indicator['GE_p'] = Function(self.P0[0])
+        self.indicator['GE_p'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
 
         # Global error estimate
         label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
-        self.estimators[label].append(indicator.vector().gather().sum())
+        self.estimators[label].append(self.indicator['GE_p'].vector().gather().sum())
 
         # Project into P1 space
         self.indicator[label] = Function(self.P1[0], name=label)
-        self.indicator[label].project(indicator)
+        self.indicator[label].project(self.indicator['GE_p'])
         self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
         return self.indicator[label]
 
@@ -586,8 +595,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         Indicate DWR errors using an enriched space obtained by patch recovery.
         """
-        from adapt_utils.adapt.recovery import recover_zz
-
         op = self.op
         both = forward and adjoint
 
@@ -667,17 +674,18 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.indicator['flux'] *= 0.5
 
         # Indicate error
-        indicator = interpolate(abs(self.indicator['cell'] + self.indicator['flux']), self.P0[0])
+        self.indicator['PR'] = Function(self.P0[0])
+        self.indicator['PR'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
 
         # Global error estimate
         label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
-        self.estimators[label].append(indicator.vector().gather().sum())
+        self.estimators[label].append(self.indicator['PR'].vector().gather().sum())
 
         # Project into P1 space
         self.indicator[label] = Function(self.P1[0], name=label)
-        self.indicator[label].project(indicator)
+        self.indicator[label].project(self.indicator['PR'])
         self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
         return self.indicator[label]
 
@@ -720,8 +728,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         # Sum cell and flux contributions
         h = anisotropic_cell_size(self.mesh) if op.anisotropic_stabilisation else CellSize(self.mesh)
-        indicator = Function(self.P0[0])
-        indicator.interpolate(sqrt(self.indicator['cell']) + sqrt(self.indicator['flux']/h))
+        self.indicator['DQ'] = Function(self.P0[0])
+        self.indicator['DQ'].interpolate(sqrt(abs(self.indicator['cell'])) + sqrt(abs(self.indicator['flux']/h)))
 
         # Account for stabilisation
         if op.stabilisation == 'su':
@@ -730,18 +738,20 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             tau = self.tracer_options[0].supg_stabilisation
             c_star.interpolate(c_star + tau*dot(u, grad(c_star)))
 
-        # Multiply by gradient of adjoint solution
-        indicator *= sqrt(interpolate(dot(grad(c_star), grad(c_star)), self.P0[0]))
+        # Multiply by Laplacian of adjoint solution
+        g = recover_gradient(c_star, op=self.op)
+        self.indicator['DQ'] *= sqrt(interpolate(abs(inner(div(g), div(g))), self.P0[0]))
 
         # Global error estimate
         label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
+        indicator = interpolate(self.indicator['DQ']/sqrt(h), self.P0[0])
         self.estimators[label].append(indicator.vector().gather().sum())
 
         # Interpolate into P1 space
         self.indicator[label] = Function(self.P1[0], name=label)
-        self.indicator[label].interpolate(abs(indicator))
+        self.indicator[label].interpolate(self.indicator['DQ'])
         # self.indicator[label].project(indicator)
         # self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
         return self.indicator[label]
@@ -753,8 +763,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         hessian_kwargs = dict(normalise=False, enforce_constraints=False, op=self.op)
         if elementwise:
-            from adapt_utils.adapt.recovery import recover_gradient
-
             sol = self.get_solutions(adapt_field, adjoint=adjoint)[0]
             hessian_kwargs['V'] = self.P0_ten[0]
             gradient_kwargs = dict(mesh=self.mesh, op=self.op)
@@ -850,8 +858,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             return self.get_forward_weighted_gradient_metric(self, **kwargs)
 
     def get_forward_weighted_gradient_metric(self, source=True):
-        from adapt_utils.adapt.recovery import recover_gradient, recover_boundary_hessian
-
         op = self.op
         mesh = self.mesh
         dim = mesh.topological_dimension()
@@ -902,8 +908,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         return metric_intersection(interior_metric, boundary_metric, boundary_tag=tags)
 
     def get_adjoint_weighted_gradient_metric(self, source=True):
-        from adapt_utils.adapt.recovery import recover_gradient, recover_boundary_hessian
-
         op = self.op
         mesh = self.mesh
         dim = mesh.topological_dimension()
