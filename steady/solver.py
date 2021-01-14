@@ -741,13 +741,13 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # Multiply by Laplacian of adjoint solution
         g = recover_gradient(c_star, op=self.op)
         self.indicator['DQ'] *= sqrt(interpolate(abs(inner(div(g), div(g))), self.P0[0]))
+        # TODO: Flux version
 
         # Global error estimate
         label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
-        indicator = interpolate(self.indicator['DQ']/sqrt(h), self.P0[0])
-        self.estimators[label].append(indicator.vector().gather().sum())
+        self.estimators[label].append(self.indicator['DQ'].vector().gather().sum())
 
         # Interpolate into P1 space
         self.indicator[label] = Function(self.P1[0], name=label)
