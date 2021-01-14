@@ -462,22 +462,22 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         Compute an appropriate Hessian for the problem at hand. This is inherently
         problem-dependent, since the choice of field for adaptation is not universal.
         """
+        hessian_kwargs = dict(normalise=False, enforce_constraints=False, op=self.op)
         if elementwise:
             from adapt_utils.adapt.recovery import recover_gradient
 
             sol = self.get_solutions(adapt_field, adjoint=adjoint)[0]
+            hessian_kwargs['V'] = self.P0_ten[0]
+            gradient_kwargs = dict(mesh=self.mesh, op=self.op)
             if adapt_field == 'shallow_water':
                 u, eta = sol.split()
-                hessians = [
-                    interpolate(grad(recover_gradient(u[0], op=self.op)), self.P0_ten[0]),
-                    interpolate(grad(recover_gradient(u[1], op=self.op)), self.P0_ten[0]),
-                    interpolate(grad(recover_gradient(eta, op=self.op)), self.P0_ten[0]),
-                ]
+                fields = [u[0], u[1], eta]
+                gradients = [recover_gradient(f, **gradient_kwargs) for f in fields]
+                hessians = [steady_metric(H=grad(g), **hessian_kwargs) for g in gradients]
                 return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
             else:
-                return interpolate(grad(recover_gradient(sol, op=self.op)), self.P0_ten[0])
+                return steady_metric(H=grad(recover_gradient(sol, op=self.op)), **hessian_kwargs)
         else:
-            hessian_kwargs = dict(normalise=False, enforce_constraints=False)
             hessians = self.recover_hessian_metrics(0, adjoint=adjoint, **hessian_kwargs)
             if self.op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
                 return hessians[0]

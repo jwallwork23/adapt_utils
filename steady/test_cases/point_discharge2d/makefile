@@ -254,7 +254,7 @@ plot_weighted_hessian:
 
 plot_weighted_gradient:
 	@echo "Plotting weighted_gradient convergence curves..."
-	@python3 plot_convergence.py weighted_hessian -family cg -stabilisation supg \
+	@python3 plot_convergence.py weighted_gradient -family cg -stabilisation supg \
 		-anisotropic_stabilisation 1 -norm_order 1 -convergence_rate 2
 
 plot_isotropic:
