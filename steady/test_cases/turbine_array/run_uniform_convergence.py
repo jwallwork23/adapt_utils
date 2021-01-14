@@ -24,7 +24,7 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-levels = 6
+levels = 5  # NOTE: PC_FAILED due to FACTOR_OUTMEMORY if levels = 6
 offset = int(args.offset or 0)
 kwargs = {
     'plot_pvd': False,

@@ -116,6 +116,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.bathymetry = [None for i in range(op.num_meshes)]
         self.inflow = [None for i in range(op.num_meshes)]
         self.minimum_angles = [None for i in range(op.num_meshes)]
+        self.kernels_tracer = [None for i in range(op.num_meshes)]
 
         super(AdaptiveProblem, self).__init__(op, nonlinear=nonlinear, **kwargs)
 
@@ -1237,9 +1238,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         fields = self._get_fields_for_tracer_timestepper(i)
 
         # Account for dJdc
-        dJdc = self.op.set_qoi_kernel_tracer(self, i)  # TODO: Store this kernel somewhere
+        self.kernels_tracer[i] = self.op.set_qoi_kernel_tracer(self, i)
         self.time_kernel = Constant(1.0 if self.simulation_time >= self.op.start_time else 0.0)
-        fields['source'] = self.time_kernel*dJdc
+        fields['source'] = self.time_kernel*self.kernels_tracer[i]
 
         # Construct time integrator
         args = (self.equations[i].adjoint_tracer, self.adj_solutions_tracer[i], fields, self.op.dt, )

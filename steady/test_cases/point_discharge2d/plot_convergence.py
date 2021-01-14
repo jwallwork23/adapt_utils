@@ -11,7 +11,7 @@ from adapt_utils.plotting import *
 parser = argparse.ArgumentParser()
 parser.add_argument('mode', help="""
     Choose from {'forward', 'adjoint', 'avg', 'int', 'dwr', 'anisotropic_dwr, 'weighed_hessian',
-    'weighted_gradient'}.
+    'weighted_gradient', 'isotropic'}.
     """)
 parser.add_argument('-family', help="Finite element family.")
 parser.add_argument('-stabilisation', help="Stabilisation method to use.")
@@ -20,7 +20,10 @@ parser.add_argument('-norm_order', help="Metric normalisation order.")
 parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
 args = parser.parse_args()
 mode = args.mode
-assert mode in ('forward', 'adjoint', 'avg', 'int', 'dwr', 'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient')
+assert mode in (
+    'forward', 'adjoint', 'avg', 'int', 'dwr',
+    'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient', 'isotropic'
+)
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 10)
 
@@ -60,6 +63,10 @@ if mode in ('dwr', 'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient'):
     approaches[mode + '_adjoint'] = {'label': 'Adjoint', 'marker': 'h'}
     approaches[mode + '_avg'] = {'label': 'Averaged', 'marker': 's'}
     approaches[mode + '_int'] = {'label': 'Intersected', 'marker': 'x'}
+elif mode == 'isotropic':
+    approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
+    approaches['dwr'] = {'label': 'Vertex-based', 'marker': '^'}
+    approaches['isotropic_dwr'] = {'label': 'Element-based', 'marker': 'h'}
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
 
@@ -69,12 +76,13 @@ for alignment in ('aligned', 'offset'):
         if anisotropic_stabilisation:
             filename += '_anisotropic'
         if approach != 'fixed_mesh':
-            if approach == 'anisotropic_dwr':
+            if 'isotropic_dwr' in approach:
                 filename += '_{:.0f}'.format(alpha)
             else:
                 filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
         fname = os.path.join(di.format(approach), '{:s}_{:s}.h5'.format(filename, alignment))
         if not os.path.isfile(fname):
+            print(fname)
             msg = "Cannot find convergence data for {:}-norm {:s} adaptation in the {:s} setup."
             print(msg.format(p, approach, alignment))
             continue

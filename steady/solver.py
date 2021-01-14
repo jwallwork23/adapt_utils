@@ -368,14 +368,18 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                 return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
 
     def get_metric(self, adapt_field, approach=None):
+        """
+        Compute metric associated with adaptation approach of choice.
+        """
         approach = approach or self.op.approach
-        adjoint = 'adjoint' in self.op.approach
+        adjoint = 'adjoint' in approach
+        forward = 'adjoint' not in approach
         if 'dwr' in approach:
             self.indicate_error(adapt_field)
         if approach in ('dwr', 'dwr_adjoint', 'dwr_avg'):
             metric = self.get_isotropic_metric(self.op.adapt_field, approach=approach)
-        elif approach in ('isotropic_dwr', 'isotropic_dwr_adjoint'):
-            metric = self.get_isotropic_dwr_metric(adjoint=adjoint)
+        elif approach in ('isotropic_dwr', 'isotropic_dwr_adjoint', 'isotropic_dwr_avg'):
+            metric = self.get_isotropic_dwr_metric(forward=forward, adjoint=adjoint)
         elif approach in ('anisotropic_dwr', 'anisotropic_dwr_adjoint'):
             metric = self.get_anisotropic_dwr_metric(adjoint=adjoint)
         elif approach in ('weighted_hessian', 'weighted_hessian_adjoint'):
@@ -430,74 +434,129 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # Combine
         return metrics[0] if len(metrics) == 1 else combine_metrics(*metrics, average=average)
 
-    def get_weighted_gradient_metric(self, adjoint=False, source=True):
+    def get_weighted_gradient_metric(self, adjoint=False, **kwargs):
         """
-        Construct an anisotropic metric using an approach inspired by [Loseille et al. 2009].
+        Construct an anisotropic metric using an approach inspired by [Loseille et al. 2010].
         """
+        if adjoint:
+            self.get_adjoint_weighted_gradient_metric(self, **kwargs)
+        else:
+            self.get_forward_weighted_gradient_metric(self, **kwargs)
+
+    def get_forward_weighted_gradient_metric(self, source=True):
         from adapt_utils.adapt.recovery import recover_gradient, recover_boundary_hessian
 
-        if adjoint:
-            raise NotImplementedError  # TODO
         op = self.op
         mesh = self.mesh
         dim = mesh.topological_dimension()
         dims = range(dim)
         P1_ten = self.P1_ten[0]
-        adapt_field = op.adapt_field
-        if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
-            adapt_field = 'shallow_water'
-        if op.solve_tracer and adapt_field == 'tracer':
-            c = self.fwd_solution_tracer
-            c_star = self.adj_solution_tracer
+        if op.adapt_field != 'tracer':
+            raise NotImplementedError
 
-            # Interior gradient term
-            grad_c_star = recover_gradient(c_star, op=op)
+        c = self.fwd_solution_tracer
+        c_star = self.adj_solution_tracer
 
-            # Interior Hessian term
-            u, eta = split(self.fwd_solutions[0])
-            D = self.fields[0].horizontal_diffusivity
-            F = [u[i]*c - D*c.dx(i) for i in dims]
-            kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=mesh, op=op)
-            interior_hessians = [
-                interpolate(steady_metric(F[i], **kwargs)*abs(grad_c_star[i]), P1_ten) for i in dims
-            ]
+        # Interior gradient term
+        grad_c_star = recover_gradient(c_star, op=op)
 
-            # Interior source Hessian term
-            if source:
-                S = self.fields[0].tracer_source_2d
-                interior_hessians.append(interpolate(steady_metric(S, **kwargs)*abs(c_star), P1_ten))
+        # Interior Hessian term
+        u, eta = split(self.fwd_solutions[0])
+        D = self.fields[0].horizontal_diffusivity
+        F = [u[i]*c - D*c.dx(i) for i in dims]
+        kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=mesh, op=op)
+        interior_hessians = [
+            interpolate(steady_metric(F[i], **kwargs)*abs(grad_c_star[i]), P1_ten) for i in dims
+        ]
 
-            # Average interior Hessians
-            interior_hessian = metric_average(*interior_hessians)
+        # Interior source Hessian term
+        if source:
+            S = self.fields[0].tracer_source_2d
+            interior_hessians.append(interpolate(steady_metric(S, **kwargs)*abs(c_star), P1_ten))
 
-            # Boundary Hessian
-            n = FacetNormal(mesh)
-            Fbar = -D*dot(grad(c), n)  # NOTE: Minus zero (imposed boundary value)
-            # TODO: weakly imposed Dirichlet conditions
-            bcs = self.boundary_conditions[0]['tracer']
-            tags = [tag for tag in bcs if 'diff_flux' in bcs[tag]]
-            H = recover_boundary_hessian(Fbar, mesh=mesh, op=op, boundary_tag=tags)
-            boundary_hessian = abs(c_star)*abs(H)
+        # Average interior Hessians
+        interior_hessian = metric_average(*interior_hessians)
 
-            # Get target complexities based on interior and boundary Hessians
-            C = volume_and_surface_contributions(interior_hessian, boundary_hessian, op=op)
+        # Boundary Hessian
+        n = FacetNormal(mesh)
+        Fbar = -D*dot(grad(c), n)  # NOTE: Minus zero (imposed boundary value)
+        # TODO: weakly imposed Dirichlet conditions
+        bcs = self.boundary_conditions[0]['tracer']
+        tags = [tag for tag in bcs if 'diff_flux' in bcs[tag]]
+        H = recover_boundary_hessian(Fbar, mesh=mesh, op=op, boundary_tag=tags)
+        boundary_hessian = abs(c_star)*abs(H)
 
-            # Assemble and combine metrics
-            kwargs = dict(normalise=True, enforce_constraints=True, mesh=mesh, integral=C, op=op)
-            interior_metric = steady_metric(H=interior_hessian, **kwargs)
-            boundary_metric = boundary_steady_metric(boundary_hessian, **kwargs)
-            return metric_intersection(interior_metric, boundary_metric, boundary_tag=tags)
-        else:
-            raise NotImplementedError  # TODO
+        # Get target complexities based on interior and boundary Hessians
+        C = volume_and_surface_contributions(interior_hessian, boundary_hessian, op=op)
 
-    def get_isotropic_dwr_metric(self, adjoint=False):
+        # Assemble and combine metrics
+        kwargs = dict(normalise=True, enforce_constraints=True, mesh=mesh, integral=C, op=op)
+        interior_metric = steady_metric(H=interior_hessian, **kwargs)
+        boundary_metric = boundary_steady_metric(boundary_hessian, **kwargs)
+        return metric_intersection(interior_metric, boundary_metric, boundary_tag=tags)
+
+    def get_adjoint_weighted_gradient_metric(self, source=True):
+        from adapt_utils.adapt.recovery import recover_gradient, recover_boundary_hessian
+
+        op = self.op
+        mesh = self.mesh
+        dim = mesh.topological_dimension()
+        dims = range(dim)
+        P1_ten = self.P1_ten[0]
+        if op.adapt_field != 'tracer':
+            raise NotImplementedError
+
+        c = self.fwd_solution_tracer
+        c_star = self.adj_solution_tracer
+
+        # Interior gradient term
+        grad_c = recover_gradient(c, op=op)
+
+        # Interior Hessian term
+        u, eta = split(self.fwd_solutions[0])
+        D = self.fields[0].horizontal_diffusivity
+        F = [-u[i]*c_star - D*c_star.dx(i) for i in dims]
+        kwargs = dict(normalise=True, noscale=True, enforce_constraints=False, mesh=mesh, op=op)
+        interior_hessians = [
+            interpolate(steady_metric(F[i], **kwargs)*abs(grad_c[i]), P1_ten) for i in dims
+        ]
+
+        # Interior source Hessian term
+        if source:
+            S = self.kernels_tracer[i]
+            interior_hessians.append(interpolate(steady_metric(S, **kwargs)*abs(c), P1_ten))
+
+        # Average interior Hessians
+        interior_hessian = metric_average(*interior_hessians)
+
+        # Boundary Hessian
+        n = FacetNormal(mesh)
+        Fbar = -(D*dot(grad(c_star), n) + c_star*dot(u, n))
+        # TODO: weakly imposed Dirichlet conditions
+        bcs = self.boundary_conditions[0]['tracer']
+        tags = [tag for tag in bcs if 'value' not in bcs[tag]]
+        H = recover_boundary_hessian(Fbar, mesh=mesh, op=op, boundary_tag=tags)
+        boundary_hessian = abs(c)*abs(H)
+
+        # Get target complexities based on interior and boundary Hessians
+        C = volume_and_surface_contributions(interior_hessian, boundary_hessian, op=op)
+
+        # Assemble and combine metrics
+        kwargs = dict(normalise=True, enforce_constraints=True, mesh=mesh, integral=C, op=op)
+        interior_metric = steady_metric(H=interior_hessian, **kwargs)
+        boundary_metric = boundary_steady_metric(boundary_hessian, **kwargs)
+        return metric_intersection(interior_metric, boundary_metric, boundary_tag=tags)
+
+    def get_isotropic_dwr_metric(self, forward=False, adjoint=False):
         """
         Construct an isotropic metric using an approach inspired by [Carpio et al. 2013].
         """
         adapt_field = self.op.adapt_field
         if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
             adapt_field = 'shallow_water'
-        approach = 'dwr_adjoint' if adjoint else 'dwr'
+        if not forward and not adjoint:
+            raise ValueError("Must specify forward or adjoint.")
+        approach = 'dwr_avg' if forward and adjoint else 'dwr_adjoint' if adjoint else 'dwr'
 
         # Compute error indicators
         self.indicate_error(adapt_field, approach=approach)
