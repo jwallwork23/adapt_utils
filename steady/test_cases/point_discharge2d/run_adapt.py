@@ -9,6 +9,7 @@ from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischar
 # --- Parse arguments
 
 parser = argparse.ArgumentParser()
+parser.add_argument('approach', help="Mesh adaptation approach.")
 
 # Solver
 parser.add_argument('-level', help="Number of uniform refinements to apply to the initial mesh.")
@@ -17,13 +18,13 @@ parser.add_argument('-stabilisation', help="Stabilisation method to use.")
 parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 
 # Mesh adaptation
-parser.add_argument('-approach', help="Mesh adaptation approach.")
 parser.add_argument('-target', help="Target complexity.")
 parser.add_argument('-normalisation', help="Metric normalisation strategy.")
 parser.add_argument('-norm_order', help="Metric normalisation order.")
 parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
 parser.add_argument('-min_adapt', help="Minimum number of mesh adaptations.")
 parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
+parser.add_argument('-enrichment_method', help="Choose from {'GE_hp', 'GE_h', 'GE_p', 'PR', 'DQ'}.")
 
 # I/O and debugging
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
@@ -44,12 +45,13 @@ kwargs = {
     'aligned': not bool(args.offset or False),
 
     # Mesh adaptation
-    'approach': args.approach or 'dwr',
+    'approach': args.approach,
     'target': float(args.target or 5.0e+02),
     'norm_order': p,
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
+    'enrichment_method': args.enrichment_method or 'GE_h',
 
     # I/O and debugging
     'plot_pvd': True,
