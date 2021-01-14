@@ -76,7 +76,8 @@ for offset in (0, 1):
         # Read data from file
         fname = os.path.join(di, '{:s}/hdf5/qoi_offset_{:d}.h5'.format(approach, offset))
         if not os.path.exists(fname):
-            raise IOError("File {:s} does not exist.".format(fname))
+            print("File {:s} does not exist.".format(fname))
+            continue
         with h5py.File(fname, 'r') as f:
             dofs, qois = np.array(f['dofs']), np.array(f['qoi'])
             if loglog and approach == 'fixed_mesh':

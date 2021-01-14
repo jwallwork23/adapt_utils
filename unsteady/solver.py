@@ -229,24 +229,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Shallow water space
         self.V = [FunctionSpace(mesh, self.finite_element) for mesh in self.meshes]
-        if op.degree_increase > 0:
-            fe = self.finite_element.reconstruct(degree=op.degree + op.degree_increase)
-            self.V_plus = [FunctionSpace(mesh, fe) for mesh in self.meshes]
 
         # Tracer space(s)
         if op.solve_tracer:
             assert not op.solve_sediment
             self.Q = [FunctionSpace(mesh, self.finite_element_tracer) for mesh in self.meshes]
-            if op.degree_increase_tracer > 0:
-                p = op.degree_tracer + op.degree_increase_tracer
-                fe = self.finite_element_tracer.reconstruct(degree=p)
-                self.Q_plus = [FunctionSpace(mesh, fe) for mesh in self.meshes]
         elif op.solve_sediment:
             self.Q = [FunctionSpace(mesh, self.finite_element_sediment) for mesh in self.meshes]
-            if op.degree_increase_sediment > 0:
-                p = op.degree_sediment + op.degree_increase_sediment
-                fe = self.finite_element_sediment.reconstruct(degree=p)
-                self.Q_plus = [FunctionSpace(mesh, fe) for mesh in self.meshes]
         else:
             self.Q = [None for mesh in self.meshes]
 
@@ -259,15 +248,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
         # Record DOFs
         self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]  # TODO: other function spaces
 
-    def get_function_space(self, field, increase=False):
+    def get_function_space(self, field):
         spaces = {'shallow_water': 'V', 'tracer': 'Q', 'sediment': 'Q', 'bathymetry': 'W'}
         space = spaces[field]
-        if increase:
-            space += '_plus'
         try:
             return self.__getattribute__(space)
         except KeyError:
-            return self.V_plus if increase else self.V
+            return self.V
 
     def create_intermediary_spaces(self):
         super(AdaptiveProblem, self).create_intermediary_spaces()
