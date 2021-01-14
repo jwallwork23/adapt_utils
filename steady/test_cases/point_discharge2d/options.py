@@ -60,7 +60,6 @@ class PointDischarge2dOptions(CoupledOptions):
         self.region_of_interest = [(20.0, 5.0, 0.5)] if aligned else [(20.0, 7.5, 0.5)]
 
         # Goal-oriented error estimation
-        self.degree_increase_tracer = 0
         self.adapt_field = 'tracer'
 
         # Mesh adaptation

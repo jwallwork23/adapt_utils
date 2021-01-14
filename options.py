@@ -29,9 +29,9 @@ class Options(FrozenConfigurable):
         where p is the polynomial order specified by :attr:`degree`.""").tag(config=True)
     degree = NonNegativeInteger(1, help="""
         Polynomial order for hydrodynamics finite element pair :attr:`family'.""").tag(config=True)
-    degree_increase = NonNegativeInteger(0, help="""
+    degree_increase = PositiveInteger(1, help="""
         When defining an enriched hydrodynamics finite element space, how much should the
-        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+        polynomial order of the finite element space by incremented?
         """).tag(config=True)
     periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
 
@@ -457,9 +457,9 @@ class CoupledOptions(Options):
     degree_tracer = NonNegativeInteger(1, help="""
         Polynomial order for tracer finite element pair :attr:`tracer_family'.
         """).tag(config=True)
-    degree_increase_tracer = NonNegativeInteger(0, help="""
+    degree_increase_tracer = PositiveInteger(1, help="""
         When defining an enriched tracer finite element space, how much should the
-        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+        polynomial order of the finite element space by incremented?
         """).tag(config=True)
     stabilisation_tracer = Unicode(None, allow_none=True, help="""
         Stabilisation approach for tracer model, chosen from {'SU', 'SUPG', 'lax_friedrichs'}, if
@@ -485,9 +485,9 @@ class CoupledOptions(Options):
     degree_sediment = NonNegativeInteger(1, help="""
         Polynomial order for sediment finite element pair :attr:`sediment_family'.
         """).tag(config=True)
-    degree_increase_sediment = NonNegativeInteger(0, help="""
+    degree_increase_sediment = PositiveInteger(1, help="""
         When defining an enriched sediment finite element space, how much should the
-        polynomial order of the finite element space by incremented? (NOTE: zero is an option)
+        polynomial order of the finite element space by incremented?
         """).tag(config=True)
     stabilisation_sediment = Unicode(None, allow_none=True, help="""
         Stabilisation approach for sediment model, set to 'lax_friedrichs', if not None.
@@ -803,9 +803,6 @@ class CoupledOptions(Options):
         elif adapt_field == 'sediment':
             assert self.degree_increase_sediment != 0
             self.degree_sediment += self.degree_increase_sediment
-        elif adapt_field == 'bathymetry':
-            assert self.degree_increase_bathymetry != 0
-            self.degree_bathymetry += self.degree_increase_bathymetry
         else:
             assert self.degree_increase != 0
             self.degree += self.degree_increase

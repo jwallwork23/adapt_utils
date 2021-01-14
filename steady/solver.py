@@ -389,14 +389,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             ep.solve_adjoint()
             enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
 
-            # Setup forward error estimator
-            ets = ep.get_timestepper(0, adapt_field, adjoint=False)
-            ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
-
             # Approximate adjoint error in enriched space
             adj_error = interpolate(adj_solution, enriched_space[0])
             adj_error *= -1
             adj_error += enriched_adj_solution
+
+            # Setup forward error estimator
+            ets = ep.get_timestepper(0, adapt_field, adjoint=False)
+            ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
 
             # Compute dual weighted residual
             dwr_cell = ets.error_estimator.element_residual()
@@ -405,8 +405,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.indicator['cell'] += dwr_cell
             self.indicator['flux'] += dwr_flux
             if both:
-                indicator = interpolate(abs(cell + flux), self.P0[0])
-                self.indicator['dwr'] = interpolate(indicator_enriched, self.P1[0])
+                indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
+                self.indicator['dwr'] = interpolate(indicator, self.P1[0])
 
         if adjoint:
 
@@ -419,14 +419,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             ep.solve_forward()
             enriched_fwd_solution = ep.get_solutions(adapt_field, adjoint=False)[0]
 
-            # Setup adjoint error estimator
-            ets = ep.get_timestepper(0, adapt_field, adjoint=True)
-            ets.setup_error_estimator(adj_proj, adj_proj, fwd_error, bcs)
-
             # Approximate forward error in enriched space
             fwd_error = interpolate(fwd_solution, enriched_space[0])
             fwd_error *= -1
             fwd_error += enriched_fwd_solution
+
+            # Setup adjoint error estimator
+            ets = ep.get_timestepper(0, adapt_field, adjoint=True)
+            ets.setup_error_estimator(adj_proj, adj_proj, fwd_error, bcs)
 
             # Compute dual weighted residual
             dwr_cell = ets.error_estimator.element_residual()
@@ -435,8 +435,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.indicator['cell'] += dwr_cell
             self.indicator['flux'] += dwr_flux
             if both:
-                indicator_enriched = interpolate(abs(cell + flux), self.P0[0])
-                self.indicator['dwr_adjoint'] = interpolate(indicator_enriched, self.P1[0])
+                indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
+                self.indicator['dwr_adjoint'] = interpolate(indicator, self.P1[0])
 
         if both:
             self.indicator['cell'] *= 0.5
@@ -731,7 +731,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         K_opt.interpolate(min_value(max_value(scaling*K/K_opt, self.op.h_min**2), self.op.h_max**2))
 
         # Recover Hessian and compute eigendecomposition
-        H = self.get_hessian_metric(adapt_field, adjoint=adjoint, elementwise=True)
+        H = self.get_hessian_metric(adapt_field, adjoint=adjoint, elementwise=False)
+        H = project(H, self.P0_ten[0])
+        # H = self.get_hessian_metric(adapt_field, adjoint=adjoint, elementwise=True)
         evectors = Function(self.P0_ten[0], name="Elementwise Hessian eigenvectors")
         evalues = Function(self.P0_vec[0], name="Elementwise Hessian eigenvalues")
         kernel = eigen_kernel(get_reordered_eigendecomposition, dim)
