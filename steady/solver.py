@@ -218,9 +218,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         elif self.op.enrichment_method == 'GE_p':
             return self.dwr_indicator_GE_p(adapt_field, forward=forward, adjoint=adjoint)
         elif self.op.enrichment_method == 'PR':
-            raise NotImplementedError  # TODO: Use recover_zz
+            return self.dwr_indicator_PR(adapt_field, forward=forward, adjoint=adjoint)
         elif self.op.enrichment_method == 'DQ':
-            raise NotImplementedError  # TODO
+            return self.dwr_indicator_DQ(adapt_field, forward=forward, adjoint=adjoint)
         else:
             raise ValueError("Enrichment mode {:s} not recognised.".format(self.op.enrichment_method))
 
@@ -580,6 +580,77 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         self.indicator[label] = Function(self.P1[0], name=label)
         self.indicator[label].project(indicator)
         self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
+        return self.indicator[label]
+
+    def dwr_indicator_PR(self, adapt_field, forward=False, adjoint=False):
+        """
+        Indicate DWR errors using an enriched space obtained by patch recovery.
+        """
+        raise NotImplementedError  # TODO
+
+    def dwr_indicator_DQ(self, adapt_field, forward=False, adjoint=False):
+        """
+        Indicate DWR errors using difference quotients.
+        """
+        from adapt_utils.mesh import anisotropic_cell_size
+
+        op = self.op
+        both = forward and adjoint
+        if not (forward and not adjoint) or adapt_field != 'tracer' or op.tracer_family != 'cg':
+            raise NotImplementedError  # TODO
+        bcs = self.boundary_conditions[0][adapt_field]
+        p0test = TestFunction(self.P0[0])
+        p0trial = TrialFunction(self.P0[0])
+        c = self.get_solutions(adapt_field, adjoint=False)[0]
+        c_star = self.get_solutions(adapt_field, adjoint=True)[0]
+        u, eta = self.fwd_solution.split()
+        D = self.fields[0].horizontal_diffusivity*Identity(2)
+        S = self.fields[0].tracer_source_2d
+        n = FacetNormal(self.mesh)
+
+        # Cell residual
+        Psi = S - dot(u, grad(c)) + div(dot(D, grad(c)))
+        self.indicator['cell'] = assemble(p0test*inner(Psi, Psi)*dx)
+
+        # Fluxes
+        psi = dot(dot(D, grad(c)), n)
+        mass_term = p0test*p0trial*dx
+        psi_sq = p0test*inner(psi, psi)
+        flux_terms = (psi_sq('+') + psi_sq('-'))*dS
+        for seg in bcs:
+            if 'diff_flux' in bcs[seg]:
+                g_N = bcs[seg]['diff_flux']
+                flux_terms += -p0test*inner(psi - g_N, psi - g_N)*ds(seg)
+        self.indicator['flux'] = Function(self.P0[0])
+        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
+        solve(mass_term == flux_terms, self.indicator['flux'], solver_parameters=params)
+
+        # Sum cell and flux contributions
+        h = anisotropic_cell_size(self.mesh) if op.anisotropic_stabilisation else CellSize(self.mesh)
+        indicator = Function(self.P0[0])
+        indicator.interpolate(sqrt(self.indicator['cell']) + sqrt(self.indicator['flux']/h))
+
+        # Account for stabilisation
+        if op.stabilisation == 'su':
+            raise NotImplementedError
+        elif op.stabilisation == 'supg':
+            tau = self.tracer_options[0].supg_stabilisation
+            c_star.interpolate(c_star + tau*dot(u, grad(c_star)))
+
+        # Multiply by gradient of adjoint solution
+        indicator *= sqrt(interpolate(dot(grad(c_star), grad(c_star)), self.P0[0]))
+
+        # Global error estimate
+        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
+        if label not in self.estimators:
+            self.estimators[label] = []
+        self.estimators[label].append(indicator.vector().gather().sum())
+
+        # Interpolate into P1 space
+        self.indicator[label] = Function(self.P1[0], name=label)
+        self.indicator[label].interpolate(abs(indicator))
+        # self.indicator[label].project(indicator)
+        # self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
         return self.indicator[label]
 
     def get_hessian_metric(self, adapt_field, adjoint=False, elementwise=False):
