@@ -32,7 +32,7 @@ analytical_qoi = 0.06956861886754047 if offset else 0.1633864523747167
 
 levels = 6
 methods = ('GE_hp', 'GE_h', 'GE_p', 'DQ')
-out = {method: {'effectivity': [], 'time': [], 'num_cells': []} for method in methods}
+out = {method: {'effectivity': [], 'time': [], 'num_cells': [], 'dofs': []} for method in methods}
 di = create_directory('outputs/dwr/enrichment')
 fname = os.path.join(di, '{:s}.p'.format('offset' if offset else 'aligned'))
 for method in methods:
@@ -48,6 +48,7 @@ for method in methods:
 
         tp = AdaptiveSteadyProblem(op, print_progress=False)
         out[method]['num_cells'].append(tp.mesh.num_cells())
+        out[method]['dofs'].append(tp.mesh.num_vertices())
         tp.solve_forward()
         tp.solve_adjoint()
 

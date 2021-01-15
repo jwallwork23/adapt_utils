@@ -102,7 +102,7 @@ for alignment in ('aligned', 'offset'):
     axes.grid(True, which='minor', axis='y')
 
     # Save to file
-    filename = 'qoi_enrichment_{:s}'.format(ext)
+    filename = 'qoi_enrichment_{:s}_{:s}'.format(approach, ext)
     if anisotropic_stabilisation:
         filename += '_anisotropic'
     filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
