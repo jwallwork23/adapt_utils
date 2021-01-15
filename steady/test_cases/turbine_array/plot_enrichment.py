@@ -11,8 +11,8 @@ di = os.path.dirname(__file__)
 input_dir = os.path.join(di, 'outputs/dwr/enrichment')
 plot_dir = os.path.join(di, 'plots')
 
-for alignment in ('aligned', 'offset'):
-    for nonlinear_method in ('prolong', 'solve'):
+for nonlinear_method in ('prolong', 'solve'):
+    for alignment in ('aligned', 'offset'):
         fname = os.path.join(input_dir, '{:s}_{:s}.p'.format(alignment, nonlinear_method))
         out = pickle.load(open(fname, 'rb'))
 
@@ -22,9 +22,9 @@ for alignment in ('aligned', 'offset'):
 
         fig, axes = plt.subplots(figsize=(6, 5))
         for method in out.keys():
-            time = out[method]['time'][1:]
-            axes.loglog(out[method]['num_cells'][1:], time, '--x', label=out[method]['label'])
-        axes.set_xlabel("Element count")
+            time = out[method]['time']
+            axes.loglog(out[method]['dofs'], time, '--x', label=out[method]['label'])
+        axes.set_xlabel("Degrees of freedom")
         axes.set_ylabel(r"Computation time [$\mathrm s$]")
         axes.grid(True)
         annotation.slope_marker((5.0e+05, 1), 1, invert=False, ax=axes, size_frac=0.2)
