@@ -183,11 +183,11 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         op = self.op
         approach = approach or op.approach
         if 'dwr_adjoint' in approach:
-            indicator = self.dwr_indicator(adapt_field, adjoint=True)
+            indicator = self.dwr_indicator(adapt_field, forward=False, adjoint=True)
         elif 'dwr_avg' in approach or 'dwr_int' in approach:
             indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=True)
         elif 'dwr' in approach:
-            indicator = self.dwr_indicator(adapt_field, forward=True)
+            indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=False)
         else:
             raise NotImplementedError  # TODO
         self._have_indicated_error = True
@@ -999,7 +999,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         # Compute error indicators
         self.indicate_error(adapt_field, approach=approach)
-        dwr = self.indicator[approach]
+        dwr = self.indicator[self.op.enrichment_method]
 
         # Get current element volume
         K = Function(self.P0[0], name="Element volume")
@@ -1034,7 +1034,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         # Compute error indicators
         self.indicate_error(adapt_field, approach=approach)
-        dwr = self.indicator[approach]
+        dwr = self.indicator[self.op.enrichment_method]
 
         # Get current element volume
         K = Function(self.P0[0], name="Element volume")
