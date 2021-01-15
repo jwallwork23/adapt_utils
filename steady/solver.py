@@ -500,6 +500,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         )
         ep.outer_iteration = self.outer_iteration
         enriched_space = ep.get_function_space(adapt_field)
+        tm = dmhooks.get_transfer_manager(self.get_plex(0))
         bcs = self.boundary_conditions[0][adapt_field]
         self.indicator['cell'] = Function(self.P0[0])
         self.indicator['flux'] = Function(self.P0[0])
@@ -509,7 +510,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         if forward:
 
             # Interpolate forward solution and solve, if requested
-            fwd_proj = interpolate(fwd_solution, enriched_space[0])
+            if adapt_field == 'shallow_water':
+                fwd_proj = Function(enriched_space[0])
+                fwd_proj_u, fwd_proj_eta = fwd_proj.split()
+                u, eta = fwd_solution.split()
+                fwd_proj_u.interpolate(u)
+                fwd_proj_eta.interpolate(eta)
+            else:
+                fwd_proj = interpolate(fwd_solution, enriched_space[0])
             if self.nonlinear:
                 if op.solve_enriched_forward:
                     ep.solve_forward()
@@ -523,7 +531,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
 
             # Approximate adjoint error in enriched space
-            adj_error = interpolate(adj_solution, enriched_space[0])
+            if adapt_field == 'shallow_water':
+                adj_error = Function(enriched_space[0])
+                adj_error_z, adj_error_zeta = adj_error.split()
+                z, zeta = adj_solution.split()
+                adj_error_z.interpolate(z)
+                adj_error_zeta.interpolate(zeta)
+            else:
+                adj_error = interpolate(adj_solution, enriched_space[0])
             adj_error *= -1
             adj_error += enriched_adj_solution
 
@@ -544,7 +559,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         if adjoint:
 
             # Interpolate adjoint solution
-            adj_proj = interpolate(adj_solution, enriched_space[0])
+            if adapt_field == 'shallow_water':
+                adj_proj = Function(enriched_space[0])
+                adj_proj_z, adj_proj_zeta = adj_proj.split()
+                z, zeta = adj_solution.split()
+                adj_proj_z.interpolate(z)
+                adj_proj_zeta.interpolate(zeta)
+            else:
+                adj_proj = interpolate(adj_solution, enriched_space[0])
 
             # Setup adjoint solver for enriched problem
             ep.create_error_estimators_step(0, adjoint=True)
@@ -553,7 +575,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             enriched_fwd_solution = ep.get_solutions(adapt_field, adjoint=False)[0]
 
             # Approximate forward error in enriched space
-            fwd_error = interpolate(fwd_solution, enriched_space[0])
+            if adapt_field == 'shallow_water':
+                fwd_error = Function(enriched_space[0])
+                fwd_error_u, fwd_error_eta = fwd_error.split()
+                u, eta = fwd_solution.split()
+                fwd_error_u.interpolate(u)
+                fwd_error_eta.interpolate(eta)
+            else:
+                fwd_error = interpolate(fwd_solution, enriched_space[0])
             fwd_error *= -1
             fwd_error += enriched_fwd_solution
 
@@ -603,7 +632,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         eop.increase_degree(adapt_field)  # Apply p-refinement
         ep = type(self)(
             eop,
-            meshes=self.mesh,
+            self.mesh,
             nonlinear=self.nonlinear,
             discrete_adjoint=self.discrete_adjoint,
         )
