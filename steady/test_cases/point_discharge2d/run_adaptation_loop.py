@@ -28,6 +28,7 @@ parser.add_argument('-norm_order', help="Metric normalisation order.")
 parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
 parser.add_argument('-min_adapt', help="Minimum number of mesh adaptations.")
 parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
+parser.add_argument('-enrichment_method', help="Choose from {'GE_hp', 'GE_h', 'GE_p', 'PR', 'DQ'}.")
 
 # I/O and debugging
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
@@ -80,6 +81,7 @@ kwargs = {
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
+    'enrichment_method': args.enrichment_method or 'GE_h',
 
     # Convergence analysis
     'target_base': 2,
@@ -97,7 +99,8 @@ op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' el
 op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
 op.print_debug(op)
-di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', op.approach, 'hdf5'))
+di = os.path.dirname(__file__)
+di = create_directory(os.path.join(di, 'outputs', op.approach, op.enrichment_method, 'hdf5'))
 
 
 # --- Solve

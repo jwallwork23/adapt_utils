@@ -1,7 +1,7 @@
 import argparse
 import os
 
-from adapt_utils.io import save_mesh
+from adapt_utils.io import create_directory, File, save_mesh
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 
@@ -27,6 +27,7 @@ parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
 parser.add_argument('-enrichment_method', help="Choose from {'GE_hp', 'GE_h', 'GE_p', 'PR', 'DQ'}.")
 
 # I/O and debugging
+parser.add_argument('-plot_indicator', help="Plot error indicator to file.")
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
@@ -63,9 +64,7 @@ stabilisation = args.stabilisation or 'supg'
 op.stabilisation_tracer = None if stabilisation == 'none' else stabilisation
 op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
 op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
-op.di = os.path.join(op.di, op.stabilisation_tracer or family)
-if op.enrichment_method != 'GE_h':
-    op.di = os.path.join(op.di, op.enrichment_method)
+op.di = create_directory(os.path.join(op.di, op.stabilisation_tracer or family, op.enrichment_method))
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
 op.print_debug(op)
 
@@ -73,6 +72,10 @@ op.print_debug(op)
 
 tp = AdaptiveSteadyProblem(op)
 tp.run()
+
+if bool(args.plot_indicator or False):
+    indicator_file = File(os.path.join(op.di, "indicator.pvd"))
+    indicator_file.write(tp.indicator[op.enrichment_method])
 
 # Export to HDF5
 save_mesh(tp.mesh, "mesh", fpath=op.di)
