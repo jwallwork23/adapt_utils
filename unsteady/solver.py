@@ -183,7 +183,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             u_element = VectorElement("DG", triangle, p)
             eta_element = FiniteElement("DG", triangle, p, variant='equispaced')
         elif family == 'dg-cg':
-            assert p == 1
+            assert p in (1, 2)
             u_element = VectorElement("DG", triangle, p)
             eta_element = FiniteElement("Lagrange", triangle, p+1, variant='equispaced')
         else:
