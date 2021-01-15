@@ -23,25 +23,26 @@ for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots(figsize=(6, 5))
     for method in out.keys():
         time = out[method]['time'][1:]
-        axes.loglog(out[method]['num_cells'][1:], time, '--x', label=out[method]['label'])
-    axes.set_xlabel("Element count")
+        # axes.loglog(out[method]['num_cells'][1:], time, '--x', label=out[method]['label'])
+        axes.loglog(out[method]['dofs'][1:], time, '--x', label=out[method]['label'])
+    axes.set_xlabel("Degrees of freedom")
     axes.set_ylabel(r"Computation time [$\mathrm s$]")
     axes.grid(True)
-    annotation.slope_marker((5.0e+05, 1), 1, invert=False, ax=axes, size_frac=0.2)
-    annotation.slope_marker((2.0e+06, 10000), 1.5, invert=True, ax=axes, size_frac=0.2)
+    annotation.slope_marker((3.0e+05, 1), 1, invert=False, ax=axes, size_frac=0.2)
+    annotation.slope_marker((1.0e+06, 1.0e+04), 1.5, invert=True, ax=axes, size_frac=0.2)
     savefig("enrichment_time_{:s}".format(alignment), plot_dir, extensions=["pdf"])
 
     fig, axes = plt.subplots(figsize=(6, 5))
     for method in out.keys():
-        # I_eff = np.array(out[method]['effectivity'])/np.array(out[method]['num_cells'])
         I_eff = np.array(out[method]['effectivity'][1:])
         # axes.semilogx(out[method]['num_cells'], I_eff, '--x', label=out[method]['label'])
-        axes.loglog(out[method]['num_cells'][1:], I_eff, '--x', label=out[method]['label'])
-    axes.set_xlabel("Element count")
+        # axes.loglog(out[method]['num_cells'][1:], I_eff, '--x', label=out[method]['label'])
+        axes.loglog(out[method]['dofs'][1:], I_eff, '--x', label=out[method]['label'])
+    axes.set_xlabel("Degrees of freedom")
     axes.set_ylabel("Effectivity index")
     axes.grid(True)
-    annotation.slope_marker((5.0e+05, 5), 0.5, invert=False, ax=axes, size_frac=0.2)
-    annotation.slope_marker((5.0e+05, 4.0e+04), 1.5, invert=False, ax=axes, size_frac=0.2)
+    annotation.slope_marker((2.0e+05, 4), 0.5, invert=False, ax=axes, size_frac=0.2)
+    annotation.slope_marker((2.0e+05, 2.0e+04), 1.5, invert=False, ax=axes, size_frac=0.2)
     savefig("enrichment_effectivity_{:s}".format(alignment), plot_dir, extensions=["pdf"])
 
     # Save legend to file

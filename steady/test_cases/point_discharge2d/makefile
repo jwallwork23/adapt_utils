@@ -4,9 +4,25 @@ dir:
 	@echo "Making directories..."
 	@mkdir -p outputs/fixed_mesh/hdf5
 	@mkdir -p outputs/dwr/hdf5
+	@mkdir -p outputs/dwr_adjoint/hdf5
+	@mkdir -p outputs/dwr_avg/hdf5
+	@mkdir -p outputs/dwr_int/hdf5
+	@mkdir -p outputs/isotropic_dwr/hdf5
+	@mkdir -p outputs/isotropic_dwr_adjoint/hdf5
+	@mkdir -p outputs/isotropic_dwr_avg/hdf5
+	@mkdir -p outputs/isotropic_dwr_int/hdf5
 	@mkdir -p outputs/anisotropic_dwr/hdf5
+	@mkdir -p outputs/anisotropic_dwr_adjoint/hdf5
+	@mkdir -p outputs/anisotropic_dwr_avg/hdf5
+	@mkdir -p outputs/anisotropic_dwr_int/hdf5
 	@mkdir -p outputs/weighted_hessian/hdf5
+	@mkdir -p outputs/weighted_hessian_adjoint/hdf5
+	@mkdir -p outputs/weighted_hessian_avg/hdf5
+	@mkdir -p outputs/weighted_hessian_int/hdf5
 	@mkdir -p outputs/weighted_gradient/hdf5
+	@mkdir -p outputs/weighted_gradient_adjoint/hdf5
+	@mkdir -p outputs/weighted_gradient_avg/hdf5
+	@mkdir -p outputs/weighted_gradient_int/hdf5
 	@mkdir -p data
 	@mkdir -p plots
 
@@ -51,7 +67,7 @@ uniform:
 
 table:
 	@echo "Writing to LaTeX formatted table..."
-	@python3 write_table.py
+	@python3 write_table.py cg -stabilisation supg -anisotropic_stabilisation 1
 
 enrichment:
 	@echo "Running vertexwise isotropic DWR adaptation convergence test for enrichment..."
