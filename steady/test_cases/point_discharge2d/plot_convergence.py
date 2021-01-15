@@ -26,7 +26,7 @@ assert mode in (
     'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient', 'isotropic'
 )
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
-alpha = float(args.convergence_rate or 10)
+alpha = float(args.convergence_rate or 2)
 enrichment_method = args.enrichment_method or 'GE_h'
 
 # Get filenames
@@ -97,7 +97,6 @@ for alignment in ('aligned', 'offset'):
             dofs = np.array(outfile['dofs'])
             qoi = np.array(outfile['qoi'])
             if approach == 'fixed_mesh':
-                # qoi_exact = np.array(outfile['qoi_exact'][-1])
                 qoi_exact = np.array(outfile['qoi'][-1])
         absolute_error = np.abs(qoi - qoi_exact)
         relative_error = absolute_error/np.abs(qoi_exact)
@@ -122,7 +121,7 @@ for alignment in ('aligned', 'offset'):
         filename += '_anisotropic'
     filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
     filename += '_{:.0f}'.format(alpha)
-    savefig('_'.join([filename, alignment]), plot_dir, extensions=['pdf'])
+    savefig('_'.join([filename, alignment, enrichment_method]), plot_dir, extensions=['pdf'])
 
     # Save legend to file
     if alignment == 'aligned':
@@ -134,4 +133,4 @@ for alignment in ('aligned', 'offset'):
         fig2.canvas.draw()
         axes2.set_axis_off()
         bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
-        fig2.savefig(os.path.join(plot_dir, 'legend_{:s}.pdf'.format(mode)), dpi='figure', bbox_inches=bbox)
+        savefig('legend_{:s}'.format(mode), plot_dir, bbox_inches=bbox, extensions=['pdf'])

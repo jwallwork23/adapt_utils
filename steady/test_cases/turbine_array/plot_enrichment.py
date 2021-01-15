@@ -27,8 +27,8 @@ for nonlinear_method in ('prolong', 'solve'):
         axes.set_xlabel("Degrees of freedom")
         axes.set_ylabel(r"Computation time [$\mathrm s$]")
         axes.grid(True)
-        annotation.slope_marker((5.0e+05, 1), 1, invert=False, ax=axes, size_frac=0.2)
-        annotation.slope_marker((2.0e+06, 10000), 1.5, invert=True, ax=axes, size_frac=0.2)
+        if nonlinear_method == 'prolong':
+            annotation.slope_marker((1.0e+05, 20), 1, invert=False, ax=axes, size_frac=0.2)
         savefig("enrichment_time_{:s}_{:s}".format(alignment, nonlinear_method), plot_dir, extensions=["pdf"])
 
         # Save legend to file
