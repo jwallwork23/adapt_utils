@@ -9,25 +9,16 @@ from adapt_utils.plotting import *
 
 # Parse arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('mode', help="""
-    Choose from {'forward', 'adjoint', 'avg', 'int', 'dwr', 'anisotropic_dwr, 'weighed_hessian',
-    'weighted_gradient', 'isotropic'}.
-    """)
+parser.add_argument('approach', help="Mesh adaptation approach.")
 parser.add_argument('-family', help="Finite element family.")
 parser.add_argument('-stabilisation', help="Stabilisation method to use.")
 parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-norm_order', help="Metric normalisation order.")
 parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
-parser.add_argument('-enrichment_method', help="Choose from {'GE_hp', 'GE_h', 'GE_p', 'PR', 'DQ'}.")
 args = parser.parse_args()
-mode = args.mode
-assert mode in (
-    'forward', 'adjoint', 'avg', 'int', 'dwr',
-    'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient', 'isotropic'
-)
+approach = args.approach
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 10)
-enrichment_method = args.enrichment_method or 'GE_h'
 
 # Get filenames
 family = args.family or 'cg'
@@ -42,67 +33,61 @@ else:
         ext += '_su'
     if args.stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
-fixed_di = os.path.join(os.path.dirname(__file__), 'outputs', 'fixed_mesh', 'hdf5')
-di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', enrichment_method, 'hdf5')
+di = os.path.join(os.path.dirname(__file__), 'outputs', approach, '{:s}', 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
-label_ext = ''
-if mode == 'adjoint':
-    label_ext = '_adjoint'
-elif mode == 'avg':
-    label_ext = '_int'
-elif mode == 'int':
-    label_ext = '_int'
-approaches = {
+methods = {
     'fixed_mesh': {'label': 'Uniform', 'marker': '*'},
-    'dwr' + label_ext: {'label': 'Isotropic DWR', 'marker': '^'},
-    'anisotropic_dwr' + label_ext: {'label': 'Anisotropic DWR', 'marker': 'h'},
-    'weighted_hessian' + label_ext: {'label': 'Weighted Hessian', 'marker': 's'},
-    'weighted_gradient' + label_ext: {'label': 'Weighted Gradient', 'marker': 'x'},
+    'GE_hp': {'label': r'GE$_{hp}$', 'marker': '^'},
+    'GE_h': {'label': r'GE$_h$', 'marker': 'h'},
+    'GE_p': {'label': r'GE$_p$', 'marker': 's'},
+    'DQ': {'label': 'DQ', 'marker': 'x'},
 }
-if mode in ('dwr', 'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient'):
-    approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
-    approaches[mode] = {'label': 'Forward', 'marker': '^'}
-    approaches[mode + '_adjoint'] = {'label': 'Adjoint', 'marker': 'h'}
-    approaches[mode + '_avg'] = {'label': 'Averaged', 'marker': 's'}
-    approaches[mode + '_int'] = {'label': 'Intersected', 'marker': 'x'}
-elif mode == 'isotropic':
-    approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
-    approaches['dwr'] = {'label': 'Vertex-based', 'marker': '^'}
-    approaches['isotropic_dwr'] = {'label': 'Element-based', 'marker': 'h'}
 for alignment in ('aligned', 'offset'):
+
+    # TODO: Neaten
+    filename = 'qoi_{:s}'.format(ext)
+    if anisotropic_stabilisation:
+        filename += '_anisotropic'
+    filename = '{:s}_{:s}.h5'.format(filename, alignment)
+
+    with h5py.File(os.path.join('outputs', 'fixed_mesh', 'hdf5', filename), 'r') as outfile:
+        dofs = np.array(outfile['dofs'])
+        qoi = np.array(outfile['qoi'])
+        qoi_exact = np.array(outfile['qoi'][-1])
+    absolute_error = np.abs(qoi - qoi_exact)
+    relative_error = absolute_error/np.abs(qoi_exact)
+
     fig, axes = plt.subplots()
+    label = methods['fixed_mesh']['label']
+    marker = methods['fixed_mesh']['marker']
+    axes.semilogx(dofs, relative_error, '--', label=label, marker=marker)
+
+    # TODO: Neaten
+    filename = 'qoi_{:s}'.format(ext)
+    if anisotropic_stabilisation:
+        filename += '_anisotropic'
+    if 'isotropic_dwr' in approach:
+        filename += '_{:.0f}'.format(alpha)
+    else:
+        filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
+    filename = '{:s}_{:s}.h5'.format(filename, alignment)
 
     # Plot convergence curves
-    for approach in approaches:
-        filename = 'qoi_{:s}'.format(ext)
-        if anisotropic_stabilisation:
-            filename += '_anisotropic'
-        if approach == 'fixed_mesh':
-            fpath = fixed_di
-        else:
-            fpath = di.format(approach)
-            if 'isotropic_dwr' in approach:
-                filename += '_{:.0f}'.format(alpha)
-            else:
-                filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
-        fname = os.path.join(fpath, '{:s}_{:s}.h5'.format(filename, alignment))
+    for method in methods:
+        fname = os.path.join(di.format(method), filename)
         if not os.path.isfile(fname):
             print(fname)
             msg = "Cannot find convergence data for {:}-norm {:s} adaptation in the {:s} setup."
             print(msg.format(p, approach, alignment))
             continue
         with h5py.File(fname, 'r') as outfile:
-            elements = np.array(outfile['elements'])
             dofs = np.array(outfile['dofs'])
             qoi = np.array(outfile['qoi'])
-            if approach == 'fixed_mesh':
-                # qoi_exact = np.array(outfile['qoi_exact'][-1])
-                qoi_exact = np.array(outfile['qoi'][-1])
         absolute_error = np.abs(qoi - qoi_exact)
         relative_error = absolute_error/np.abs(qoi_exact)
-        label = approaches[approach]['label']
-        marker = approaches[approach]['marker']
+        label = methods[method]['label']
+        marker = methods[method]['marker']
         axes.semilogx(dofs, relative_error, '--', label=label, marker=marker)
     axes.set_xlabel("Degrees of Freedom")
     axes.set_ylabel("Relative error")
@@ -117,12 +102,12 @@ for alignment in ('aligned', 'offset'):
     axes.grid(True, which='minor', axis='y')
 
     # Save to file
-    filename = 'qoi_{:s}_{:s}'.format(mode, ext)
+    filename = 'qoi_enrichment_{:s}'.format(ext)
     if anisotropic_stabilisation:
         filename += '_anisotropic'
     filename += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
     filename += '_{:.0f}'.format(alpha)
-    savefig('_'.join([filename, alignment]), plot_dir, extensions=['pdf'])
+    savefig('_'.join([filename, alignment]), plot_dir, extensions=["pdf"])
 
     # Save legend to file
     if alignment == 'aligned':
@@ -134,4 +119,4 @@ for alignment in ('aligned', 'offset'):
         fig2.canvas.draw()
         axes2.set_axis_off()
         bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
-        fig2.savefig(os.path.join(plot_dir, 'legend_{:s}.pdf'.format(mode)), dpi='figure', bbox_inches=bbox)
+        fig2.savefig(os.path.join(plot_dir, 'legend_enrichment.pdf'), dpi='figure', bbox_inches=bbox)
