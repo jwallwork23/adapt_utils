@@ -53,6 +53,25 @@ table:
 	@echo "Writing to LaTeX formatted table..."
 	@python3 write_table.py
 
+enrichment:
+	@echo "Running vertexwise isotropic DWR adaptation convergence test for enrichment..."
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr -enrichment_method GE_hp
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr -enrichment_method GE_hp -offset 1
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr -enrichment_method GE_h
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr -enrichment_method GE_h -offset 1
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr -enrichment_method GE_p
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr -enrichment_method GE_p -offset 1
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr -enrichment_method DQ
+	@python3 run_adaptation_loop.py -family cg -stabilisation supg -anisotropic_stabilisation 1 \
+		-norm_order 1 -approach dwr -enrichment_method DQ -offset 1
+
 # --- Adaptation runs based on 1st order forward result
 
 adaptive_forward: dwr isotropic_dwr anisotropic_dwr weighted_hessian weighted_gradient

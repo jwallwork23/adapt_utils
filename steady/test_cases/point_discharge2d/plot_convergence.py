@@ -18,6 +18,7 @@ parser.add_argument('-stabilisation', help="Stabilisation method to use.")
 parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-norm_order', help="Metric normalisation order.")
 parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic DWR.")
+parser.add_argument('-enrichment_method', help="Choose from {'GE_hp', 'GE_h', 'GE_p', 'PR', 'DQ'}.")
 args = parser.parse_args()
 mode = args.mode
 assert mode in (
@@ -26,6 +27,7 @@ assert mode in (
 )
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 10)
+enrichment_method = args.enrichment_method or 'GE_h'
 
 # Get filenames
 family = args.family or 'cg'
@@ -40,7 +42,8 @@ else:
         ext += '_su'
     if args.stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
-di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', 'hdf5')
+# di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', 'hdf5')
+di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', enrichment_method, 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
 label_ext = ''

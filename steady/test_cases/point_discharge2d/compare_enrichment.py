@@ -1,5 +1,3 @@
-from firedrake import norm, errornorm
-
 import argparse
 import os
 import pickle
@@ -38,6 +36,7 @@ out = {method: {'effectivity': [], 'time': [], 'num_cells': []} for method in me
 di = create_directory('outputs/dwr/enrichment')
 fname = os.path.join(di, '{:s}.p'.format('offset' if offset else 'aligned'))
 for method in methods:
+    print(method)
     for level in range(levels):
         op = PointDischarge2dOptions(level=level, **kwargs)
         op.tracer_family = 'cg'
