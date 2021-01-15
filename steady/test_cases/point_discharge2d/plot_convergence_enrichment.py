@@ -18,7 +18,7 @@ parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic 
 args = parser.parse_args()
 approach = args.approach
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
-alpha = float(args.convergence_rate or 10)
+alpha = float(args.convergence_rate or 2)
 
 # Get filenames
 family = args.family or 'cg'
