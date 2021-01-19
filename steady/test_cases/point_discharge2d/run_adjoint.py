@@ -1,7 +1,7 @@
 from thetis import *
 from firedrake_adjoint import *
 from firedrake.adjoint.blocks import GenericSolveBlock, ProjectBlock
-import pyadjoint
+# import pyadjoint
 
 import argparse
 import os
@@ -48,10 +48,11 @@ op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 
 # --- Solve forward
 
-tp = AdaptiveSteadyProblem(op)
+tp = AdaptiveSteadyProblem(op, print_progress=False)
 tp.solve_forward()
 J = tp.quantity_of_interest()
-pyadjoint.solve_adjoint(J)
+# pyadjoint.solve_adjoint(J)
+compute_gradient(J, Control(tp.fields[0].horizontal_diffusivity))
 stop_annotating()
 
 
@@ -63,6 +64,7 @@ solve_blocks = [block for block in solve_blocks if not isinstance(block, Project
 adj = solve_blocks[-1].adj_sol
 adj *= -1  # FIXME: Why do we need this?
 export_field(adj, "Adjoint tracer", "discrete_adjoint", fpath=op.di, plexname=None, op=op)
+solutions = [adj]
 
 
 # --- Solve continuous adjoint
@@ -71,3 +73,9 @@ tp.solve_adjoint()
 adj = tp.adj_solution_tracer
 op.plot_pvd = False
 export_field(adj, "Adjoint tracer", "continuous_adjoint", fpath=op.di, plexname=None, op=op)
+solutions.append(adj)
+
+
+# --- Compute L2 error against discrete adjoint
+
+print_output("L2 'error': {:.4f}%".format(100*errornorm(*solutions)/norm(solutions[0])))
