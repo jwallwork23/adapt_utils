@@ -474,6 +474,8 @@ class CoupledOptions(Options):
         """).tag(config=True)
     norm_smoother = FiredrakeScalarExpression(Constant(0.0)).tag(config=True)  # TODO: help
     tracer_advective_velocity_factor = FiredrakeScalarExpression(Constant(1.0)).tag(config=True)  # TODO: help
+    diffusivity_space_family = Unicode("CG").tag(config=True)  # TODO: help
+    diffusivity_space_degree = NonNegativeInteger(1).tag(config=True)  # TODO: help
 
     # Sediment model
     solve_sediment = Bool(False, help="Toggle solving the sediment model.").tag(config=True)
@@ -655,11 +657,13 @@ class CoupledOptions(Options):
 
     def set_viscosity(self, fs):
         """Should be implemented in derived class."""
-        return None if np.isclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
+        # return None if np.isclose(self.base_viscosity, 0.0) else Constant(self.base_viscosity)
+        return None if np.isclose(self.base_viscosity, 0.0) else Function(fs).assign(self.base_viscosity)
 
     def set_diffusivity(self, fs):
         """Should be implemented in derived class."""
-        return None if np.isclose(self.base_diffusivity, 0.0) else Constant(self.base_diffusivity)
+        # return None if np.isclose(self.base_diffusivity, 0.0) else Constant(self.base_diffusivity)
+        return None if np.isclose(self.base_diffusivity, 0.0) else Function(fs).assign(self.base_diffusivity)
 
     def set_inflow(self, fs):
         """Should be implemented in derived class."""

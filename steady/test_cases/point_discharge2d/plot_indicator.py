@@ -1,7 +1,6 @@
 from firedrake import tricontourf, interpolate, max_value
 
 import argparse
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 
