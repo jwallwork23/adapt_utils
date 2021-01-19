@@ -97,7 +97,8 @@ for alignment in ('aligned', 'offset'):
             dofs = np.array(outfile['dofs'])
             qoi = np.array(outfile['qoi'])
             if approach == 'fixed_mesh':
-                qoi_exact = np.array(outfile['qoi'][-1])
+                qoi_exact = np.array(outfile['qoi'][-1])  # Discretisation error
+                # qoi_exact = np.array(outfile['qoi_exact'][-1])  # Total error
         absolute_error = np.abs(qoi - qoi_exact)
         relative_error = absolute_error/np.abs(qoi_exact)
         label = approaches[approach]['label']

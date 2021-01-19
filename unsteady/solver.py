@@ -245,6 +245,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         else:
             self.W = [None for mesh in self.meshes]
 
+        # Diffusivity space
+        self.diffusivity_space = [FunctionSpace(mesh, op.diffusivity_space_family, op.diffusivity_space_degree) for mesh in self.meshes]
+
         # Record DOFs
         self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]  # TODO: other function spaces
 
@@ -352,7 +355,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         self.fields[i].update({
             'horizontal_viscosity': self.op.set_viscosity(self.P1[i]),
-            'horizontal_diffusivity': self.op.set_diffusivity(self.P1[i]),
+            'horizontal_diffusivity': self.op.set_diffusivity(self.diffusivity_space[i]),
             'coriolis_frequency': self.op.set_coriolis(self.P1[i]),
             'nikuradse_bed_roughness': self.op.ksp,
             'quadratic_drag_coefficient': self.op.set_quadratic_drag_coefficient(self.P1[i]),

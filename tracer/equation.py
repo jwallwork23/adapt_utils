@@ -39,12 +39,12 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
             uv = fields_old.get('uv_2d')
             if uv is None:
                 return -f
-            f += self.test*dot(uv, grad(solution))*dx
+            f += self.test*dot(uv, grad(solution))*self.dx
 
             # Apply SU / SUPG stabilisation
             if self.stabilisation in ('su', 'supg'):
                 tau = self.su_stabilisation if self.stabilisation == 'su' else self.supg_stabilisation
-                f += tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*dx
+                f += tau*dot(uv, grad(self.test))*dot(uv, grad(solution))*self.dx
 
         return -f
 
@@ -91,7 +91,7 @@ class HorizontalDiffusionTerm(thetis_tracer.HorizontalDiffusionTerm):
             uv = fields_old.get('uv_2d')
             if self.stabilisation == 'supg' and uv is not None:
                 tau = self.supg_stabilisation
-                f += -tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*dx
+                f += -tau*dot(uv, grad(self.test))*div(dot(diff_tensor, grad(solution)))*self.dx
 
         return -f
 
@@ -113,7 +113,7 @@ class SourceTerm(thetis_tracer.SourceTerm):
         uv = fields_old.get('uv_2d')
         if not self.horizontal_dg and self.stabilisation == 'supg' and uv is not None:
             tau = self.supg_stabilisation
-            f += -tau*dot(uv, grad(self.test))*source*dx
+            f += -tau*dot(uv, grad(self.test))*source*self.dx
 
         return -f
 
@@ -143,12 +143,12 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
             uv = fields_old.get('uv_2d')
             if uv is None:
                 return -f
-            f += self.test*div(uv*solution)*dx
+            f += self.test*div(uv*solution)*self.dx
 
             # Apply SU / SUPG stabilisation
             if self.stabilisation == 'supg' and uv is not None:
                 tau = self.supg_stabilisation
-                f += tau*dot(uv, grad(self.test))*div(uv*solution)*dx
+                f += tau*dot(uv, grad(self.test))*div(uv*solution)*self.dx
 
         return -f
 
@@ -180,7 +180,7 @@ class ConservativeSourceTerm(thetis_cons_tracer.ConservativeSourceTerm):
         uv = fields_old.get('uv_2d')
         if self.stabilisation == 'supg' and uv is not None:
             tau = self.supg_stabilisation
-            f += -tau*dot(uv, grad(self.test))*source*dx
+            f += -tau*dot(uv, grad(self.test))*source*self.dx
 
         return -f
 
@@ -231,7 +231,7 @@ class TracerEquation2D(Equation):
             assert velocity is not None
             assert hasattr(self, 'supg_stabilisation')
             test = test + self.supg_stabilisation*dot(velocity, grad(test))
-        return inner(solution, test)*dx
+        return inner(solution, test)*self.dx
 
     def add_terms(self, function_space, depth, stabilisation, sipg_parameter):
         args = (function_space, depth)

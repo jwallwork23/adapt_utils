@@ -1,7 +1,6 @@
 from thetis import *
 from firedrake_adjoint import *
 from firedrake.adjoint.blocks import GenericSolveBlock, ProjectBlock
-# import pyadjoint
 
 import argparse
 import os
@@ -19,6 +18,7 @@ parser.add_argument('-family', help="Finite element family")
 parser.add_argument('-stabilisation', help="Stabilisation method to use")
 parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
+parser.add_argument('-taylor_test', help="Run a Taylor test.")
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 
@@ -49,10 +49,17 @@ op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 # --- Solve forward
 
 tp = AdaptiveSteadyProblem(op, print_progress=False)
+n = FacetNormal(tp.mesh)
 tp.solve_forward()
 J = tp.quantity_of_interest()
-# pyadjoint.solve_adjoint(J)
-compute_gradient(J, Control(tp.fields[0].horizontal_diffusivity))
+
+D = tp.fields[0].horizontal_diffusivity
+m = Control(D)
+h = D.copy(deepcopy=True)
+h.assign(0.001)
+dJdm = compute_gradient(J, m)  # in R space
+# print("Discrete adjoint gradient = {:.4e}".format(dJdm.dat.data[0]))
+print(dJdm.dat.data[0])
 stop_annotating()
 
 
@@ -61,13 +68,66 @@ stop_annotating()
 tape = get_working_tape()
 solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
 solve_blocks = [block for block in solve_blocks if not isinstance(block, ProjectBlock)]
-adj = solve_blocks[-1].adj_sol
+adj = solve_blocks[-1].adj_sol.copy(deepcopy=True)
 adj *= -1  # FIXME: Why do we need this?
 export_field(adj, "Adjoint tracer", "discrete_adjoint", fpath=op.di, plexname=None, op=op)
 solutions = [adj]
 
 
+def reduced_functional(m):
+    """
+    Evaluate the reduced functional for diffusivity `m`.
+    """
+    op.base_diffusivity = m.dat.data[0]
+    tp.__init__(op, print_progress=False)
+    tp.fwd_solution_tracer.assign(0.0)
+    tp.solve_forward()
+    return tp.quantity_of_interest()
+
+
+def gradient_discrete():
+    """
+    Evaluate the gradient of the reduced functional using the discrete adjoint solution.
+    """
+    return assemble(-h*inner(grad(adj), grad(tp.fwd_solution_tracer))*dx)
+
+
+# Taylor test discrete adjoint
+if bool(args.taylor_test or False):
+    Jhat = reduced_functional
+    dJdm = gradient_discrete()
+    # dJdm = dJdm.dat.data[0]*h.dat.data[0]
+    print("Discrete adjoint gradient = {:.4e}".format(dJdm))
+    # Jhat = ReducedFunctional(J, m)
+    # dJdm = None
+    minconv = taylor_test(Jhat, D, h, dJdm=dJdm)
+    assert minconv >= 1.95
+
+
 # --- Solve continuous adjoint
+
+
+def gradient_continuous(m):
+    """
+    Evaluate the gradient of the reduced functional for diffusivity `m` using the continuous
+    adjoint method.
+    """
+    op.base_diffusivity = m.dat.data[0]
+    tp.__init__(op, print_progress=False)
+    tp.solve_forward()
+    tp.solve_adjoint()
+    c = tp.fwd_solution_tracer
+    c_star = tp.adj_solution_tracer
+    return assemble(-h*inner(grad(c_star), grad(c))*dx)
+
+
+# Taylor test continuous adjoint
+if bool(args.taylor_test or False):
+    Jhat = reduced_functional
+    dJdm = gradient_continuous(D)
+    print("Continuous adjoint gradient = {:.4e}".format(dJdm))
+    minconv = taylor_test(Jhat, D, h, dJdm=dJdm)
+    assert minconv >= 1.95
 
 tp.solve_adjoint()
 adj = tp.adj_solution_tracer

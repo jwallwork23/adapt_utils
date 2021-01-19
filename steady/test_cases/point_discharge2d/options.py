@@ -52,6 +52,8 @@ class PointDischarge2dOptions(CoupledOptions):
         # Hydrodynamics
         self.base_velocity = [1.0, 0.0]
         self.base_diffusivity = 0.1
+        self.diffusivity_space_family = "R"
+        self.diffusivity_space_degree = 0
         self.characteristic_speed = Constant(1.0)
         self.characteristic_diffusion = Constant(0.1)
 
@@ -141,7 +143,7 @@ class PointDischarge2dOptions(CoupledOptions):
         b = self.ball(mesh, source=False)
         area = assemble(b*dx)
         area_analytical = pi*self.region_of_interest[0][2]**2
-        rescaling = 1.0 if np.isclose(area, 0.0) else area_analytical/area
+        rescaling = Constant(1.0 if np.isclose(area, 0.0) else area_analytical/area)
         return rescaling*b
 
     def analytical_solution(self, fs):
