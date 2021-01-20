@@ -58,8 +58,7 @@ m = Control(D)
 h = D.copy(deepcopy=True)
 h.assign(0.1)
 dJdm = compute_gradient(J, m)  # in R space
-# print("Discrete adjoint gradient = {:.4e}".format(dJdm.dat.data[0]))
-print(dJdm.dat.data[0])
+print("Discrete adjoint gradient = {:.4e}".format(dJdm.dat.data[0]))
 stop_annotating()
 
 
@@ -80,7 +79,6 @@ def reduced_functional(m):
     """
     op.base_diffusivity = m.dat.data[0]
     tp.__init__(op, print_progress=False)
-    tp.fwd_solution_tracer.assign(0.0)
     tp.solve_forward()
     return tp.quantity_of_interest()
 

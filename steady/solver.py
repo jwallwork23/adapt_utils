@@ -75,7 +75,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def _solve_discrete_adjoint(self, **kwargs):
         F = self.timestepper.F
         sol = self.get_solutions(self.equation_set, adjoint=False)[0]
-        adj_sol = self.get_solutions(self.equation_set, adjoint=True)[0]
         fs = self.function_space
 
         # Take the adjoint
@@ -86,13 +85,21 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # Account for strong boundary conditions
         bcs = self.boundary_conditions[0][self.equation_set]
         adj_bcs = []
-        if self.equation_set == 'tracer' and self.op.tracer_family == 'cg':  # TODO: Other equations
-            for segment in bcs:
-                if 'diff_flux' not in bcs:
-                    adj_bcs.append(DirichletBC(fs, 0, segment))
+        if self.equation_set == 'shallow_water':
+            if self.op.family == 'cg':
+                raise NotImplementedError  # TODO
+        elif self.equation_set == 'tracer':
+            if self.op.tracer_family == 'cg':
+                for segment in bcs:
+                    if 'diff_flux' not in bcs:
+                        adj_bcs.append(DirichletBC(fs, 0, segment))
+        else:
+            raise NotImplementedError
 
         # Solve using adjoint solver parameters
-        params = self.op.adjoint_solver_parameters[self.equation_set]
+        adj_sol = self.get_solutions(self.equation_set, adjoint=True)[0]
+        params = self.op.adjoint_solver_parameters[self.equation_set].copy()
+        params['snes_type'] = 'ksponly'
         solve(dFdu_form == dJdu, adj_sol, bcs=adj_bcs, solver_parameters=params)
 
     def quantity_of_interest(self):
