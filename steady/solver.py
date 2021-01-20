@@ -39,17 +39,17 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
     @property
     def function_space(self):
-        return self.V[0] if self.op.solve_swe else self.Q[0]
+        return self.Q[0] if self.op.solve_tracer else self.V[0]
 
     @property
     def timestepper(self):
         steppers = self.timesteppers[0]
-        return steppers.shallow_water if self.op.solve_swe else steppers.tracer
+        return steppers.tracer if self.op.solve_tracer else steppers.shallow_water
 
     @property
     def kernel(self):
         op = self.op
-        return op.set_qoi_kernel(self, 0) if op.solve_swe else op.set_qoi_kernel_tracer(self, 0)
+        return op.set_qoi_kernel_tracer(self, 0) if op.solve_tracer else op.set_qoi_kernel(self, 0)
 
     @property
     def indicator(self):
@@ -69,19 +69,20 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         super(AdaptiveSteadyProblem, self).solve_adjoint(**kwargs)
 
     def _solve_discrete_adjoint(self, **kwargs):
-        fs = self.function_space
         F = self.timestepper.F
+        sol = self.fwd_solution_tracer if self.op.solve_tracer else self.fwd_solution
+        fs = sol.function_space()
 
         # Linearise the form, if requested
         if not self.nonlinear:
-            tmp_u = Function(fs)
-            F = action(lhs(F), tmp_u) - rhs(F)
-            F = replace(F, {tmp_u: self.fwd_solution})
+            tmp = Function(fs)
+            F = action(lhs(F), tmp) - rhs(F)
+            F = replace(F, {tmp_u: sol})
 
         # Take the adjoint
         dFdu = derivative(F, self.fwd_solution, TrialFunction(fs))
         dFdu_form = adjoint(dFdu)
-        dJdu = derivative(self.quantity_of_interest_form(), self.fwd_solution, TestFunction(fs))
+        dJdu = derivative(self.quantity_of_interest_form(), sol, TestFunction(fs))
         bcs = None  # TODO: Hook up as in setup_solver_adjoint in the unsteady solver
         params = self.op.adjoint_solver_parameters[self.equation_set]
         solve(dFdu_form == dJdu, self.adj_solution, bcs=bcs, solver_parameters=params)
@@ -105,8 +106,13 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         UFL form describing the quantity of interest (QoI).
         """
         deg = self.op.qoi_quadrature_degree
-        op.print_debug("DIAGNOSTICS: Generating QoI form using quadrature degree {:d}".format(deg))
-        return inner(self.fwd_solution, self.kernel)*dx(degree=deg)
+        self.op.print_debug("DIAGNOSTICS: Generating QoI form using quadrature degree {:d}".format(deg))
+        if self.op.solve_tracer:
+            return inner(self.fwd_solution_tracer, self.kernel)*dx(degree=deg)
+        elif self.op.solve_swe:
+            return inner(self.fwd_solution, self.kernel)*dx(degree=deg)
+        else:
+            raise NotImplementedError  # TODO
 
     def get_scaled_residual(self, adjoint=False, **kwargs):
         r"""

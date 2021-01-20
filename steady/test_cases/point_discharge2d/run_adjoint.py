@@ -56,7 +56,7 @@ J = tp.quantity_of_interest()
 D = tp.fields[0].horizontal_diffusivity
 m = Control(D)
 h = D.copy(deepcopy=True)
-h.assign(0.001)
+h.assign(0.1)
 dJdm = compute_gradient(J, m)  # in R space
 # print("Discrete adjoint gradient = {:.4e}".format(dJdm.dat.data[0]))
 print(dJdm.dat.data[0])
@@ -101,7 +101,7 @@ if bool(args.taylor_test or False):
     # Jhat = ReducedFunctional(J, m)
     # dJdm = None
     minconv = taylor_test(Jhat, D, h, dJdm=dJdm)
-    assert minconv >= 1.95
+    assert minconv >= 1.94
 
 
 # --- Solve continuous adjoint
@@ -127,7 +127,7 @@ if bool(args.taylor_test or False):
     dJdm = gradient_continuous(D)
     print("Continuous adjoint gradient = {:.4e}".format(dJdm))
     minconv = taylor_test(Jhat, D, h, dJdm=dJdm)
-    assert minconv >= 1.95
+    assert minconv >= 1.94
 
 tp.solve_adjoint()
 adj = tp.adj_solution_tracer
