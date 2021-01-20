@@ -204,6 +204,7 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
         :kwarg remove_turbines: toggle whether turbines are present in the flow or not.
         :kwarg callback_dir: directory to save power output data to.
         """
+        kwargs.setdefault('turbine_density', None)
         self.discrete_turbines = kwargs.pop('discrete_turbines', False)
         self.thrust_correction = kwargs.pop('thrust_correction', True)
         self.smooth_indicators = kwargs.pop('smooth_indicators', True)
@@ -212,11 +213,11 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
         self.callback_dir = kwargs.pop('callback_dir', op.di)
         super(AdaptiveSteadyTurbineProblem, self).__init__(op, **kwargs)
 
-    def setup_all(self):
+    def setup_all(self, **kwargs):
         super(AdaptiveSteadyTurbineProblem, self).setup_all()
-        self.create_tidal_farms()
+        self.create_tidal_farms(**kwargs)
 
-    def create_tidal_farms(self):
+    def create_tidal_farms(self, turbine_density=None, **kwargs):
         """
         Create tidal farm objects *on each mesh*.
 
@@ -239,12 +240,15 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
             shape = op.bump if self.smooth_indicators else op.box
         D = op.turbine_diameter
         A_T = pi*(0.5*D)**2
-        if self.discrete_turbines:  # TODO: Use length and width
-            self.turbine_density = Constant(1.0/D**2, domain=self.mesh)
+        if turbine_density is not None:
+            self.turbine_density = turbine_density
         else:
-            area = assemble(shape(self.mesh)*dx)
-            # self.turbine_density = shape(self.mesh, scale=num_turbines/area)
-            self.turbine_density = interpolate(shape(self.mesh, scale=num_turbines/area), self.P1[0])
+            if self.discrete_turbines:  # TODO: Use length and width
+                self.turbine_density = Constant(1.0/D**2, domain=self.mesh)
+            else:
+                area = assemble(shape(self.mesh)*dx)
+                # self.turbine_density = shape(self.mesh, scale=num_turbines/area)
+                self.turbine_density = interpolate(shape(self.mesh, scale=num_turbines/area), self.P1[0])
 
         self.farm_options.turbine_density = self.turbine_density
         self.farm_options.turbine_options.diameter = D

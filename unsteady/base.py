@@ -74,7 +74,7 @@ class AdaptiveProblemBase(object):
         self.meshes = [None for i in range(self.num_meshes)]
         self.set_meshes(meshes)
         if not self.manual:
-            self.setup_all()
+            self.setup_all(**kwargs)
         implemented_steppers = {
             'CrankNicolson': CrankNicolson,
             'SteadyState': SteadyState,
@@ -164,7 +164,7 @@ class AdaptiveProblemBase(object):
             #     coords = mesh.coordinates
             #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
 
-    def setup_all(self):
+    def setup_all(self, **kwargs):
         """
         Setup everything which isn't explicitly associated with either the forward or adjoint
         problem.

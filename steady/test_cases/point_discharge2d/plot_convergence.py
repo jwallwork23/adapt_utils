@@ -60,6 +60,7 @@ approaches = {
     'fixed_mesh': {'label': 'Uniform', 'marker': '*'},
     'dwr' + label_ext: {'label': 'Isotropic DWR', 'marker': '^'},
     'anisotropic_dwr' + label_ext: {'label': 'Anisotropic DWR', 'marker': 'h'},
+    # 'isotropic_dwr' + label_ext: {'label': 'Isotropic DWR', 'marker': 'h'},
     'weighted_hessian' + label_ext: {'label': 'Weighted Hessian', 'marker': 's'},
     'weighted_gradient' + label_ext: {'label': 'Weighted Gradient', 'marker': 'x'},
 }
@@ -145,4 +146,4 @@ for alignment in ('aligned', 'offset'):
         fig2.canvas.draw()
         axes2.set_axis_off()
         bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
-        savefig('legend_{:s}'.format(mode), plot_dir, bbox_inches=bbox, extensions=['pdf'])
+        savefig('legend_{:s}'.format(mode), plot_dir, bbox_inches=bbox, extensions=['pdf'], tight=False)
