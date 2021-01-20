@@ -85,17 +85,24 @@ def reduced_functional(m):
     return tp.quantity_of_interest()
 
 
-def gradient_discrete():
+def gradient_discrete(m):
     """
     Evaluate the gradient of the reduced functional using the discrete adjoint solution.
     """
-    return assemble(-h*inner(grad(adj), grad(tp.fwd_solution_tracer))*dx)
+    c_star = adj
+    # op.base_diffusivity = m.dat.data[0]
+    # tp.__init__(op, print_progress=False)
+    # tp.solve_forward()
+    # tp._solve_discrete_adjoint()
+    c = tp.fwd_solution_tracer
+    # c_star = tp.adj_solution_tracer
+    return assemble(-h*inner(grad(c_star), grad(c))*dx)
 
 
 # Taylor test discrete adjoint
 if bool(args.taylor_test or False):
     Jhat = reduced_functional
-    dJdm = gradient_discrete()
+    dJdm = gradient_discrete(m)
     # dJdm = dJdm.dat.data[0]*h.dat.data[0]
     print("Discrete adjoint gradient = {:.4e}".format(dJdm))
     # Jhat = ReducedFunctional(J, m)

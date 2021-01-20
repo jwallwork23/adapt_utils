@@ -39,17 +39,21 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
     @property
     def function_space(self):
-        return self.Q[0] if self.op.solve_tracer else self.V[0]
+        return self.get_function_space(self.equation_set)[0]
 
     @property
     def timestepper(self):
-        steppers = self.timesteppers[0]
-        return steppers.tracer if self.op.solve_tracer else steppers.shallow_water
+        return self.timesteppers[0][self.equation_set]
 
     @property
     def kernel(self):
         op = self.op
-        return op.set_qoi_kernel_tracer(self, 0) if op.solve_tracer else op.set_qoi_kernel(self, 0)
+        if self.op.solve_tracer:
+            return op.set_qoi_kernel_tracer(self, 0)
+        elif self.op.solve_swe:
+            return op.set_qoi_kernel(self, 0)
+        else:
+            raise NotImplementedError
 
     @property
     def indicator(self):
@@ -70,22 +74,26 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
     def _solve_discrete_adjoint(self, **kwargs):
         F = self.timestepper.F
-        sol = self.fwd_solution_tracer if self.op.solve_tracer else self.fwd_solution
-        fs = sol.function_space()
-
-        # Linearise the form, if requested
-        if not self.nonlinear:
-            tmp = Function(fs)
-            F = action(lhs(F), tmp) - rhs(F)
-            F = replace(F, {tmp_u: sol})
+        sol = self.get_solutions(self.equation_set, adjoint=False)[0]
+        adj_sol = self.get_solutions(self.equation_set, adjoint=True)[0]
+        fs = self.function_space
 
         # Take the adjoint
-        dFdu = derivative(F, self.fwd_solution, TrialFunction(fs))
+        dFdu = derivative(F, sol, TrialFunction(fs))
         dFdu_form = adjoint(dFdu)
         dJdu = derivative(self.quantity_of_interest_form(), sol, TestFunction(fs))
-        bcs = None  # TODO: Hook up as in setup_solver_adjoint in the unsteady solver
+
+        # Account for strong boundary conditions
+        bcs = self.boundary_conditions[0][self.equation_set]
+        adj_bcs = []
+        if self.equation_set == 'tracer' and self.op.tracer_family == 'cg':  # TODO: Other equations
+            for segment in bcs:
+                if 'diff_flux' not in bcs:
+                    adj_bcs.append(DirichletBC(fs, 0, segment))
+
+        # Solve using adjoint solver parameters
         params = self.op.adjoint_solver_parameters[self.equation_set]
-        solve(dFdu_form == dJdu, self.adj_solution, bcs=bcs, solver_parameters=params)
+        solve(dFdu_form == dJdu, adj_sol, bcs=adj_bcs, solver_parameters=params)
 
     def quantity_of_interest(self):
         """
