@@ -50,6 +50,13 @@ class AdaptiveDiscreteAdjointSteadyProblem(AdaptiveSteadyProblem):
             adapt_field = 'shallow_water'
         self.log_entities(adapt_field=adapt_field)
 
+    def get_metric(self, *args, **kwargs):
+        """
+        Do not annotate the metric computation process.
+        """
+        with stop_annotating():
+            return super(AdaptiveDiscreteAdjointSteadyProblem, self).get_metric(*args, **kwargs)
+
     def get_solve_blocks(self):
         """
         Extract all tape blocks which are subclasses of :class:`GenericSolveBlock`, but not
