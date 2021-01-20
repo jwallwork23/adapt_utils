@@ -33,14 +33,15 @@ enrichment_method = args.enrichment_method or 'GE_h'
 family = args.family or 'cg'
 assert family in ('cg', 'dg')
 ext = family
-anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
+stabilisation = args.stabilisation or 'supg'
+anisotropic_stabilisation = False if args.anisotropic_stabilisation == "0" else True
 if ext == 'dg':
-    if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
+    if stabilisation in ('lf', 'LF', 'lax_friedrichs'):
         ext += '_lf'
 else:
-    if args.stabilisation in ('su', 'SU'):
+    if stabilisation in ('su', 'SU'):
         ext += '_su'
-    if args.stabilisation in ('supg', 'SUPG'):
+    if stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
 fixed_di = os.path.join(os.path.dirname(__file__), 'outputs', 'fixed_mesh', 'hdf5')
 di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', enrichment_method, 'hdf5')

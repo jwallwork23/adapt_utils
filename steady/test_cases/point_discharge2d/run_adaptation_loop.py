@@ -6,7 +6,6 @@ import os
 import sys
 
 from adapt_utils.io import create_directory, print_output
-from adapt_utils.steady.solver import AdaptiveSteadyProblem
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 
 
@@ -19,6 +18,7 @@ parser.add_argument('-level', help="Number of uniform refinements to apply to th
 parser.add_argument('-family', help="Finite element family.")
 parser.add_argument('-stabilisation', help="Stabilisation method to use.")
 parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
+parser.add_argument('-discrete_adjoint', help="Use discrete adjoint method.")
 
 # Mesh adaptation
 parser.add_argument('-approach', help="Mesh adaptation approach.")
@@ -35,7 +35,16 @@ parser.add_argument('-offset', help="Toggle between aligned or offset region of 
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
-alpha = float(args.convergence_rate or 10)
+alpha = float(args.convergence_rate or 2)
+
+discrete_adjoint = bool(args.discrete_adjoint or False)
+# discrete_adjoint = False if args.discrete_adjoint == "0" else True
+if discrete_adjoint:
+    from adapt_utils.steady.solver_adjoint import AdaptiveDiscreteAdjointSteadyProblem
+    problem = AdaptiveDiscreteAdjointSteadyProblem
+else:
+    from adapt_utils.steady.solver import AdaptiveSteadyProblem
+    problem = AdaptiveSteadyProblem
 
 
 # --- Set parameters
@@ -45,17 +54,18 @@ assert family in ('cg', 'dg')
 target = float(args.target or 5.0e+02)
 level = int(args.level or 0)
 offset = bool(args.offset or False)
-anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
+stabilisation = args.stabilisation or 'supg'
+anisotropic_stabilisation = False if args.anisotropic_stabilisation == "0" else True
 
 # Get filenames
 ext = family
 if ext == 'dg':
-    if args.stabilisation in ('lf', 'LF', 'lax_friedrichs'):
+    if stabilisation in ('lf', 'LF', 'lax_friedrichs'):
         ext += '_lf'
 else:
-    if args.stabilisation in ('su', 'SU'):
+    if stabilisation in ('su', 'SU'):
         ext += '_su'
-    if args.stabilisation in ('supg', 'SUPG'):
+    if stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
     if anisotropic_stabilisation:
         ext += '_anisotropic'
@@ -81,7 +91,7 @@ kwargs = {
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
-    'enrichment_method': args.enrichment_method or 'GE_h',
+    'enrichment_method': args.enrichment_method or 'DQ' if discrete_adjoint else 'GE_h',
 
     # Convergence analysis
     'target_base': 2,
@@ -93,9 +103,8 @@ kwargs = {
 }
 op = PointDischarge2dOptions(**kwargs)
 op.tracer_family = family
-stabilisation = args.stabilisation or 'supg'
 op.stabilisation_tracer = None if stabilisation == 'none' else stabilisation
-op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == '0' else True
+op.anisotropic_stabilisation = anisotropic_stabilisation
 op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 op.normalisation = args.normalisation or 'complexity'  # FIXME: error
 op.print_debug(op)
@@ -112,7 +121,7 @@ estimators = []
 for n in range(op.outer_iterations):
     op.target = target*op.target_base**n
     op.default_mesh = RectangleMesh(100*2**level, 20*2**level, 50, 10)
-    tp = AdaptiveSteadyProblem(op)
+    tp = problem(op)
     tp.run()
     elements.append(tp.num_cells[-1][0])
     print("Element count: ", elements)

@@ -1110,8 +1110,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         Log metric complexity.
         """
-        self.print("\nRiemannian metric\n=================")
-        self.print("  complexity {:13.4e}".format(metric_complexity(self.metrics[0])))
+        if self.print_progress:
+            self.print("\nRiemannian metric\n=================")
+            self.print("  complexity {:13.4e}".format(metric_complexity(self.metrics[0])))
 
     def run_dwr(self, **kwargs):
         """
