@@ -83,6 +83,7 @@ class PointDischarge2dOptions(CoupledOptions):
         #     'ksp_type': 'gmres',
         #     'pc_type': 'sor',
         # }
+        self.adjoint_solver_parameters['tracer'] = self.solver_parameters['tracer']
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)
