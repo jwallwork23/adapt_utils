@@ -237,18 +237,14 @@ class AdaptiveSteadyTurbineProblem(AdaptiveSteadyProblem):  # TODO: Use mixed in
         c_T = op.get_thrust_coefficient(correction=self.thrust_correction)
         if not self.discrete_turbines:
             shape = op.bump if self.smooth_indicators else op.box
-        if hasattr(op, 'turbine_diameter'):
-            D = op.turbine_diameter
-            A_T = D**2
-        else:
-            D = max(op.turbine_length, op.turbine_width)
-            A_T = op.turbine_length, op.turbine_width
-            print_output("#### TODO: Account for non-square turbines")  # TODO
+        D = op.turbine_diameter
+        A_T = pi*(0.5*D)**2
         if self.discrete_turbines:  # TODO: Use length and width
             self.turbine_density = Constant(1.0/D**2, domain=self.mesh)
         else:
             area = assemble(shape(self.mesh)*dx)
-            self.turbine_density = shape(self.mesh, scale=num_turbines/area)
+            # self.turbine_density = shape(self.mesh, scale=num_turbines/area)
+            self.turbine_density = interpolate(shape(self.mesh, scale=num_turbines/area), self.P1[0])
 
         self.farm_options.turbine_density = self.turbine_density
         self.farm_options.turbine_options.diameter = D
