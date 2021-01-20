@@ -4,7 +4,6 @@ import pickle
 from time import perf_counter
 
 from adapt_utils.io import create_directory
-from adapt_utils.steady.solver import AdaptiveSteadyProblem
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 
 
@@ -13,6 +12,7 @@ from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischar
 parser = argparse.ArgumentParser()
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
 parser.add_argument('-debug', help="Toggle debugging mode.")
+parser.add_argument('-discrete_adjoint', help="Use discrete adjoint method.")
 args = parser.parse_args()
 
 
@@ -26,6 +26,15 @@ kwargs = {
     'debug': bool(args.debug or 0),
 }
 analytical_qoi = 0.06956861886754047 if offset else 0.1633864523747167
+
+discrete_adjoint = bool(args.discrete_adjoint or False)
+# discrete_adjoint = False if args.discrete_adjoint == "0" else True
+if discrete_adjoint:
+    from adapt_utils.steady.solver_adjoint import AdaptiveDiscreteAdjointSteadyProblem
+    problem = AdaptiveDiscreteAdjointSteadyProblem
+else:
+    from adapt_utils.steady.solver import AdaptiveSteadyProblem
+    problem = AdaptiveSteadyProblem
 
 
 # --- Loop over enrichment methods
@@ -46,7 +55,7 @@ for method in methods:
         op.normalisation = 'complexity'
         op.enrichment_method = method
 
-        tp = AdaptiveSteadyProblem(op, print_progress=False)
+        tp = problem(op, print_progress=False)
         out[method]['num_cells'].append(tp.mesh.num_cells())
         out[method]['dofs'].append(tp.mesh.num_vertices())
         tp.solve_forward()
