@@ -20,7 +20,7 @@ class AdaptiveDiscreteAdjointSteadyProblem(AdaptiveSteadyProblem):
         self.tape = get_working_tape()
         super(AdaptiveDiscreteAdjointSteadyProblem, self).__init__(*args, **kwargs)
 
-        # Default control
+    def set_controls(self):
         if self.equation_set == 'shallow_water':
             self.control_field = self.fields[0].horizontal_viscosity
         elif self.equation_set == 'tracer':
@@ -34,21 +34,13 @@ class AdaptiveDiscreteAdjointSteadyProblem(AdaptiveSteadyProblem):
     def clear_tape(self):
         self.tape.clear_tape()
 
-    def adapt_meshes(self, **kwargs):
+    def setup_all(self, **kwargs):
         """
-        Fully reset the problem - including the tape - when the mesh is adapted.
+        Clear the tape and reset controls.
         """
-        self.print("\nStarting mesh adaptation for iteration {:d}...".format(self.outer_iteration+1))
-        self.meshes[0] = adapt(self.meshes[0], self.metrics[0])
-        self.set_meshes(self.meshes)
         self.clear_tape()
-        self.__init__(self.op, meshes=self.meshes, nonlinear=self.nonlinear)
-
-        # Logging
-        adapt_field = self.op.adapt_field
-        if self.op.adapt_field not in ('tracer', 'sediment', 'bathymetry'):
-            adapt_field = 'shallow_water'
-        self.log_entities(adapt_field=adapt_field)
+        super(AdaptiveDiscreteAdjointSteadyProblem, self).setup_all(**kwargs)
+        self.set_controls()
 
     def get_metric(self, *args, **kwargs):
         """

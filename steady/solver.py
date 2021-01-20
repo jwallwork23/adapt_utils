@@ -21,13 +21,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     relates to time-independent problems and so this does not make sense.
     """
     def __init__(self, op, discrete_adjoint=False, **kwargs):
-        super(AdaptiveSteadyProblem, self).__init__(op, **kwargs)
-        self.discrete_adjoint = discrete_adjoint
-        if self.num_meshes > 1:
-            raise ValueError("`AdaptiveSteadyProblem` only supports single meshes.")
-        ts = op.timestepper
-        if ts != "SteadyState":
-            raise ValueError("Timestepper {:s} not allowed for steady-state problems.".format(ts))
         if op.solve_tracer:
             self.equation_set = 'tracer'
             self.nonlinear = False
@@ -36,6 +29,13 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.nonlinear = True
         else:
             raise ValueError("Steady-state solver only supports one of hydrodynamics and tracers.")
+        super(AdaptiveSteadyProblem, self).__init__(op, **kwargs)
+        self.discrete_adjoint = discrete_adjoint
+        if self.num_meshes > 1:
+            raise ValueError("`AdaptiveSteadyProblem` only supports single meshes.")
+        ts = op.timestepper
+        if ts != "SteadyState":
+            raise ValueError("Timestepper {:s} not allowed for steady-state problems.".format(ts))
 
     @property
     def function_space(self):
