@@ -2,7 +2,6 @@ import argparse
 import os
 
 from adapt_utils.io import create_directory, File, save_mesh
-from adapt_utils.steady.solver import AdaptiveSteadyProblem
 from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischarge2dOptions
 
 
@@ -10,6 +9,7 @@ from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischar
 
 parser = argparse.ArgumentParser()
 parser.add_argument('approach', help="Mesh adaptation approach.")
+parser.add_argument('-discrete_adjoint', help="Use discrete adjoint method.")
 
 # Solver
 parser.add_argument('-level', help="Number of uniform refinements to apply to the initial mesh.")
@@ -34,6 +34,13 @@ args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 2)
 
+discrete_adjoint = bool(args.discrete_adjoint or False)
+if discrete_adjoint:
+    from adapt_utils.steady.solver_adjoint import AdaptiveDiscreteAdjointSteadyProblem
+    problem = AdaptiveDiscreteAdjointSteadyProblem
+else:
+    from adapt_utils.steady.solver import AdaptiveSteadyProblem
+    problem = AdaptiveSteadyProblem
 
 # --- Set parameters
 
@@ -52,7 +59,7 @@ kwargs = {
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
-    'enrichment_method': args.enrichment_method or 'GE_h',
+    'enrichment_method': args.enrichment_method or 'DQ' if discrete_adjoint else 'GE_h',
 
     # I/O and debugging
     'plot_pvd': True,
@@ -70,7 +77,7 @@ op.print_debug(op)
 
 # --- Solve
 
-tp = AdaptiveSteadyProblem(op)
+tp = problem(op)
 tp.run()
 
 if bool(args.plot_indicator or False):
