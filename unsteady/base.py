@@ -67,8 +67,10 @@ class AdaptiveProblemBase(object):
         physical_constants['g_grav'].assign(op.g)
 
         # Setup problem
-        self.num_cells = [[], ]
-        self.num_vertices = [[], ]
+        if not hasattr(self, 'num_cells'):
+            self.num_cells = [[], ]
+        if not hasattr(self, 'num_vertices'):
+            self.num_vertices = [[], ]
         self.meshes = [None for i in range(self.num_meshes)]
         self.set_meshes(meshes)
         if not self.manual:
@@ -94,10 +96,13 @@ class AdaptiveProblemBase(object):
         # Storage for diagnostics over mesh adaptation loop
         self.indicators = [{} for i in range(self.num_meshes)]
         self._have_indicated_error = False
-        self.estimators = {}
+        if not hasattr(self, 'estimators'):
+            self.estimators = {}
         self.metrics = [None for P1_ten in self.P1_ten]
-        self.qois = []
-        self.st_complexities = [np.nan]
+        if not hasattr(self, 'qois'):
+            self.qois = []
+        if not hasattr(self, 'st_complexities'):
+            self.st_complexities = [np.nan]
         self.outer_iteration = 0
 
         # Various empty lists and dicts
