@@ -24,8 +24,9 @@ kwargs = {
     'tracer_family': args.family or 'dg',
     'stabilisation_tracer': args.stabilisation or 'lax_friedrichs',
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
-    'use_limiter_for_tracers': bool(args.limiters or True),
-    'use_tracer_conservative_form': bool(args.conservative or False),
+    # 'use_limiter_for_tracers': bool(args.limiters or False),
+    'use_limiter_for_tracers': False if args.limiters == "0" else True,
+    'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
     'debug': bool(args.debug or False),
 }
 if os.getenv('REGRESSION_TEST') is not None:

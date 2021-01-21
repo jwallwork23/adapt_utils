@@ -1,6 +1,7 @@
 from thetis import *
 
 import argparse
+import numpy as np
 
 from adapt_utils.adapt.r import MeshMover
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -27,8 +28,9 @@ kwargs = {
     'tracer_family': args.family or 'dg',
     'stabilisation_tracer': args.stabilisation or 'lax_friedrichs',
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
-    'use_limiter_for_tracers': bool(args.limiters or True),
-    'use_tracer_conservative_form': bool(args.conservative or False),
+    'use_limiter_for_tracers': False if args.limiters == "0" else True,
+    # 'use_limiter_for_tracers': bool(args.limiters or False),
+    'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
 
     # Mesh movement
     'nonlinear_method': 'relaxation',
@@ -71,6 +73,7 @@ tp.__init__(op, meshes=[Mesh(mesh_mover.x), ])
 #  * This motivates applying monitor based methods throughout the simulation
 
 tp.set_initial_condition()
+init_vol = assemble(Constant(1.0)*dx(domain=tp.mesh))
 init_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
 init_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
@@ -79,9 +82,17 @@ tp.solve_forward()
 # TODO: Plot inverted elements
 
 # Compare initial and final tracer concentrations
+final_vol = assemble(Constant(1.0)*dx(domain=tp.mesh))
 final_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
 final_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
 abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')
+print_output("Volume error:       {:.2f}%".format(100*abs(init_vol-final_vol)/init_vol))
 print_output("Conservation error: {:.2f}%".format(100*abs(init_l1_norm-final_l1_norm)/init_l1_norm))
 print_output("Relative L2 error:  {:.2f}%".format(100*abs_l2_error/init_l2_norm))
+init_sol = init_sol.dat.data
+final_sol = final_sol.dat.data
+assert np.isclose(init_sol.min(), final_sol.min())
+assert np.isclose(init_sol.max(), final_sol.max())
+assert np.isclose(np.mean(init_sol), np.mean(final_sol))
+assert np.allclose(diff, 0.0)
