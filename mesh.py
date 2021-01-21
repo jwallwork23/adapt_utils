@@ -1,7 +1,8 @@
 from thetis import *
 
-import matplotlib.pyplot as plt
 import numpy as np
+
+from adapt_utils.plotting import *
 
 
 __all__ = ["MeshStats", "isotropic_cell_size", "anisotropic_cell_size", "make_consistent",
@@ -200,40 +201,43 @@ def get_patch(vertex, mesh=None, plex=None, coordinates=None, midfacets=False, e
     return patch
 
 
-# FIXME: Why do rotations of the same element not have the same quality?
-def quality(mesh):
+def quality(mesh, initial_signs=None):
     r"""
     Compute the scaled Jacobian for each mesh element:
-..  math::
+
+  ..math::
         Q(K) = \frac{\det(J_K)}{\|\mathbf e_1\|\,\|\mathbf e2\|},
 
-    where element :math:`K` is defined by edges :math:`\mathbf e_1` and :math:`\mathbf e_2`.
+    where element :math:`K` is defined by it edges of maximum length,
+    :math:`\mathbf e_1` and :math:`\mathbf e_2`.
 
-    NOTE that :math:`J_K = [\mathbf e_1, \mathbf e_2]`.
+    If :math:`Q(K)<0` then we have an inverted element.
+
+    :arg mesh: mesh to evaluate quality of.
+    :kwarg initial_signs: (optional) signs of Jacobian determinant.
     """
     assert mesh.topological_dimension() == 2
     P0 = FunctionSpace(mesh, "DG", 0)
     P0_ten = TensorFunctionSpace(mesh, "DG", 0)
     J = interpolate(Jacobian(mesh), P0_ten)
     detJ = JacobianDeterminant(mesh)
-    jacobian_sign = interpolate(sign(detJ), P0)
-    # unswapped = as_matrix([[J[0, 0], J[0, 1]], [J[1, 0], J[1, 1]]])
-    # swapped = as_matrix([[J[1, 0], J[1, 1]], [J[0, 0], J[0, 1]]])
-    # sgn = Function(P0)
-    # sgn.dat.data[:] = jacobian_sign.dat.data
-    # J.interpolate(conditional(ge(jacobian_sign, 0), unswapped, swapped))
-    # J.interpolate(conditional(ge(sgn, 0), unswapped, swapped))
-    # detJ = det(J)
+    jacobian_sign = initial_signs or interpolate(sign(detJ), P0)
     edge1 = as_vector([J[0, 0], J[1, 0]])
     edge2 = as_vector([J[0, 1], J[1, 1]])
+    edge3 = edge1 - edge2
     norm1 = sqrt(dot(edge1, edge1))
     norm2 = sqrt(dot(edge2, edge2))
-    scaled_jacobian = interpolate(detJ/(norm1*norm2*jacobian_sign), P0)
+    norm3 = sqrt(dot(edge3, edge3))
+    prod1 = max_value(norm1*norm2, norm1*norm3)
+    prod2 = max_value(norm2*norm3, norm2*norm1)
+    prod3 = max_value(norm3*norm1, norm3*norm2)
+    maxproduct = max_value(max_value(prod1, prod2), prod3)
+    scaled_jacobian = interpolate(detJ/(maxproduct*jacobian_sign), P0)
     return scaled_jacobian
 
 
 # FIXME: Inverted elements do not show! Tried making transparent but it didn't do anything.
-def plot_quality(mesh, fig=None, axes=None, extensions=['png']):
+def plot_quality(mesh, fig=None, axes=None, show_mesh=True, **kwargs):
     """
     Plot scaled Jacobian using a discretised scale:
       * green   : high quality elements (over 75%);
@@ -241,16 +245,31 @@ def plot_quality(mesh, fig=None, axes=None, extensions=['png']):
       * blue    : low quality elements (0 - 50%);
       * magenta : inverted elements (quality < 0).
     """
-    q = quality(mesh)
+    from matplotlib.colors import ListedColormap
+    import matplotlib.pyplot as plt
 
-    cmap = plt.get_cmap('viridis', 30)
-    newcolours = cmap(np.linspace(0, 1, 30))
-    newcolours[:10] = np.array([1, 0, 1, 1])    # Magenta
-    newcolours[10:20] = np.array([0, 1, 1, 1])  # Cyan
-    newcolours[20:25] = np.array([1, 1, 0, 1])  # Yellow
-    newcolours[25:] = np.array([0, 1, 0, 1])    # Green
+    # Compute mesh quality
+    q = quality(mesh, **kwargs)
 
+    # Create a modified colourscale
+    cmap = plt.get_cmap('viridis', 201)
+    newcolours = cmap(np.linspace(0, 1, 201))
+    newcolours[:100, :] = np.array([1, 0, 1, 1])    # Magenta
+    newcolours[100:150, :] = np.array([0, 1, 1, 1])  # Cyan
+    newcolours[150:175, :] = np.array([1, 1, 0, 1])  # Yellow
+    newcolours[175:, :] = np.array([0, 1, 0, 1])    # Green
+    cmap = newcmp = ListedColormap(newcolours)
+    eps = 1.0e-06
+    levels = np.linspace(-1-eps, 1+eps, 201)
+
+    # Plot quality
     if fig is None or axes is None:
         fig, axes = plt.subplots()
-    triplot(mesh, axes=axes)
-    fig.colorbar(tricontourf(q, axes=axes, cmap=cmap), ax=axes)
+    tc = tricontourf(q, axes=axes, cmap=cmap, levels=levels)
+    cbar = fig.colorbar(tc, ax=axes)
+    cbar.set_ticks([-1, 0, 0.5, 0.75, 1])
+    cbar.set_ticklabels([r"-100\%", r"0\%", r"50\%", r"75\%", r"100\%"])
+    if show_mesh:
+        triplot(mesh, axes=axes, boundary_kw={'color': 'k'})
+    axes.axis(False)
+    return fig, axes

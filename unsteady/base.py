@@ -7,6 +7,7 @@ import os
 
 from ..adapt.metric import *
 from ..io import save_mesh, load_mesh
+from ..mesh import quality
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
@@ -598,8 +599,8 @@ class AdaptiveProblemBase(object):
 
     def move_mesh(self, i):
         # TODO: documentation
-        if self.op.approach in ('lagrangian', 'ale'):  # TODO: Make more robust (apply BCs etc.)
-            self.move_mesh_ale(i)
+        if self.op.approach in ('lagrangian', 'ale', 'hybrid'):
+            self.move_mesh_ale(i)  # TODO: Make more robust (apply BCs etc.)
         elif self.mesh_movers[i] is not None:
             self.move_mesh_monge_ampere(i)
 
@@ -612,13 +613,14 @@ class AdaptiveProblemBase(object):
 
         # Crank-Nicolson  # TODO: Assemble once
         if hasattr(self.op, 'get_velocity'):
+            theta = 0.5
             coord_space = coords.function_space()
             coords_old = Function(coord_space).assign(coords)
             test = TestFunction(coord_space)
 
             F = inner(test, coords)*dx - inner(test, coords_old)*dx
-            F -= 0.5*dt*inner(test, self.op.get_velocity(coords_old, t))*dx
-            F -= 0.5*dt*inner(test, self.op.get_velocity(coords, t))*dx
+            F -= (1 - theta)*dt*inner(test, self.op.get_velocity(coords_old, t))*dx
+            F -= theta*dt*inner(test, self.op.get_velocity(coords, t))*dx
 
             params = {
                 'mat_type': 'aij',
@@ -637,12 +639,13 @@ class AdaptiveProblemBase(object):
             coords.interpolate(coords + dt*self.mesh_velocities[i])
 
         # Check for inverted elements
-        orig_signs = self.jacobian_signs[i]
-        r = interpolate(JacobianDeterminant(mesh)/orig_signs, self.P0[i]).vector().gather()
-        num_inverted = len(r[r < 0])
+        Q = quality(mesh, initial_signs=self.jacobian_signs[i])
+        num_inverted = len(Q[Q < 0])
         if num_inverted > 0:
             import warnings
             warnings.warn("Mesh has {:d} inverted element(s)!".format(num_inverted))
+            if self.op.approach == 'hybrid':
+                raise NotImplementedError  # TODO: adapt
 
     def move_mesh_monge_ampere(self, i):  # TODO: Annotation
         """
