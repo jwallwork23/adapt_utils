@@ -6,7 +6,7 @@ from adapt_utils.plotting import *
 
 
 __all__ = ["MeshStats", "isotropic_cell_size", "anisotropic_cell_size", "make_consistent",
-           "get_patch"]
+           "get_patch", "quality", "plot_quality", "aspect_ratio", "plot_aspect_ratio"]
 
 
 class MeshStats(object):
@@ -203,7 +203,7 @@ def get_patch(vertex, mesh=None, plex=None, coordinates=None, midfacets=False, e
 
 def quality(mesh, initial_signs=None):
     r"""
-    Compute the scaled Jacobian for each mesh element:
+    Compute the scaled Jacobian for each element of a triangular mesh:
 
   ..math::
         Q(K) = \frac{\det(J_K)}{\|\mathbf e_1\|\,\|\mathbf e2\|},
@@ -217,6 +217,7 @@ def quality(mesh, initial_signs=None):
     :kwarg initial_signs: (optional) signs of Jacobian determinant.
     """
     assert mesh.topological_dimension() == 2
+    assert mesh.coordinates.ufl_element().cell() == triangle
     P0 = FunctionSpace(mesh, "DG", 0)
     P0_ten = TensorFunctionSpace(mesh, "DG", 0)
     J = interpolate(Jacobian(mesh), P0_ten)
@@ -231,9 +232,25 @@ def quality(mesh, initial_signs=None):
     prod1 = max_value(norm1*norm2, norm1*norm3)
     prod2 = max_value(norm2*norm3, norm2*norm1)
     prod3 = max_value(norm3*norm1, norm3*norm2)
-    maxproduct = max_value(max_value(prod1, prod2), prod3)
-    scaled_jacobian = interpolate(detJ/(maxproduct*jacobian_sign), P0)
-    return scaled_jacobian
+    return interpolate(detJ/(max_value(max_value(prod1, prod2), prod3)*jacobian_sign), P0)
+
+
+def aspect_ratio(mesh):
+    """
+    Compute the aspect ratio of each element of a triangular mesh.
+    """
+    assert mesh.topological_dimension() == 2
+    assert mesh.coordinates.ufl_element().cell() == triangle
+    P0 = FunctionSpace(mesh, "DG", 0)
+    P0_ten = TensorFunctionSpace(mesh, "DG", 0)
+    J = interpolate(Jacobian(mesh), P0_ten)
+    edge1 = as_vector([J[0, 0], J[1, 0]])
+    edge2 = as_vector([J[0, 1], J[1, 1]])
+    edge3 = edge1 - edge2
+    a = sqrt(dot(edge1, edge1))
+    b = sqrt(dot(edge2, edge2))
+    c = sqrt(dot(edge3, edge3))
+    return interpolate(a*b*c/((a+b-c)*(b+c-a)*(c+a-b)), P0)
 
 
 # FIXME: Inverted elements do not show! Tried making transparent but it didn't do anything.
@@ -270,6 +287,23 @@ def plot_quality(mesh, fig=None, axes=None, show_mesh=True, **kwargs):
     cbar.set_ticks([-1, 0, 0.5, 0.75, 1])
     cbar.set_ticklabels([r"-100\%", r"0\%", r"50\%", r"75\%", r"100\%"])
     if show_mesh:
-        triplot(mesh, axes=axes, boundary_kw={'color': 'k'})
+        triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
+    axes.axis(False)
+    return fig, axes
+
+
+def plot_aspect_ratio(mesh, fig=None, axes=None, show_mesh=True):
+    """
+    Plot aspect ratio of a triangular mesh.
+    """
+    import matplotlib.pyplot as plt
+
+    ar = aspect_ratio(mesh)
+    if fig is None or axes is None:
+        fig, axes = plt.subplots()
+    tc = tricontourf(ar, axes=axes, cmap='coolwarm', levels=10)
+    cbar = fig.colorbar(tc, ax=axes)
+    if show_mesh:
+        triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
     axes.axis(False)
     return fig, axes
