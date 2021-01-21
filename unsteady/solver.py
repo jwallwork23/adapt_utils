@@ -90,7 +90,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'sipg_parameter': None,
             'use_tracer_conservative_form': op.use_tracer_conservative_form,
         }
-        if op.use_tracer_conservative_form and op.approach == 'lagrangian':
+        if op.use_tracer_conservative_form and op.approach in ('lagrangian', 'hybrid'):
             raise NotImplementedError  # TODO
         self.tracer_limiters = [None for i in range(op.num_meshes)]
         for i, to in enumerate(self.tracer_options):
@@ -143,20 +143,33 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def adj_solution_tracer(self):
         return self.adj_solutions_tracer[0]
 
-    def create_outfiles(self):
+    def create_outfiles(self, restarted=False):
         if not self.op.plot_pvd:
             return
         if self.op.solve_swe:
-            super(AdaptiveProblem, self).create_outfiles()
+            super(AdaptiveProblem, self).create_outfiles(restarted=restarted)
         if self.op.solve_tracer:
-            self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
-            self.adjoint_tracer_file = File(os.path.join(self.di, 'adjoint_tracer.pvd'))
+            if restarted:
+                self.tracer_file._topology = None
+                self.adjoint_tracer_file._topology = None
+            else:
+                self.tracer_file = File(os.path.join(self.di, 'tracer.pvd'))
+                self.adjoint_tracer_file = File(os.path.join(self.di, 'adjoint_tracer.pvd'))
         if self.op.solve_sediment:
-            self.sediment_file = File(os.path.join(self.di, 'sediment.pvd'))
+            if restarted:
+                self.sediment_file._topology = None
+            else:
+                self.sediment_file = File(os.path.join(self.di, 'sediment.pvd'))
         if self.op.recover_vorticity:
-            self.vorticity_file = File(os.path.join(self.di, 'vorticity.pvd'))
+            if restarted:
+                self.vorticity_file._topology = None
+            else:
+                self.vorticity_file = File(os.path.join(self.di, 'vorticity.pvd'))
         if self.op.plot_bathymetry or self.op.solve_exner:
-            self.exner_file = File(os.path.join(self.di, 'modified_bathymetry.pvd'))
+            if restarted:
+                self.exner_file._topology = None
+            else:
+                self.exner_file = File(os.path.join(self.di, 'modified_bathymetry.pvd'))
 
     def set_finite_elements(self):
         """
@@ -259,9 +272,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
         except KeyError:
             return self.V
 
-    def create_intermediary_spaces(self):
+    def create_intermediary_spaces(self, have_intermediaries=False):
         super(AdaptiveProblem, self).create_intermediary_spaces()
-        if self.op.approach != 'monge_ampere':
+        if have_intermediaries or self.op.approach not in ('monge_ampere', 'hybrid'):
             return
         mesh_copies = self.intermediary_meshes
         if self.op.solve_tracer:
@@ -706,6 +719,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
                       self.intermediary_depo_term[i].dat.data,
                       "depo_term")
 
+    def project_from_intermediary_mesh(self, i):
+        super(AdaptiveProblem, self).project_from_intermediary_mesh(i)
+        if self.op.solve_tracer:
+            self.fwd_solutions_tracer[i].project(self.intermediary_solutions_tracer[i])
+        if self.op.solve_sediment:
+            self.fwd_solutions_sediment[i].project(self.intermediary_solutions_sediment[i])
+        if self.op.solve_exner:
+            self.fwd_solutions_bathymetry[i].project(self.intermediary_solutions_bathymetry[i])
+        if hasattr(self.op, 'sediment_model'):
+            raise NotImplementedError
+
     # TODO: Use par_loop
     def copy_data_from_intermediary_mesh(self, i):
         super(AdaptiveProblem, self).copy_data_from_intermediary_mesh(i)
@@ -1041,7 +1065,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'momentum_source': None,
             'volume_source': None,
         })
-        if self.op.approach == 'lagrangian':
+        if self.op.approach in ('lagrangian', 'hybrid'):
             raise NotImplementedError  # TODO
         if self.stabilisation == 'lax_friedrichs':
             fields['lax_friedrichs_velocity_scaling_factor'] = self.shallow_water_options[i].lax_friedrichs_velocity_scaling_factor
@@ -1067,7 +1091,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         })
         if self.mesh_velocities[i] is not None:
             fields['mesh_velocity'] = self.mesh_velocities[i]
-        if self.op.approach == 'lagrangian':
+        if self.op.approach in ('lagrangian', 'hybrid'):
             self.mesh_velocities[i] = u
             fields['uv_{:d}d'.format(self.dim)] = Constant(as_vector(np.zeros(self.dim)))
         if self.stabilisation_tracer == 'lax_friedrichs':
@@ -1090,7 +1114,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         })
         if self.mesh_velocities[i] is not None:
             fields['mesh_velocity'] = self.mesh_velocities[i]
-        if self.op.approach == 'lagrangian':
+        if self.op.approach in ('lagrangian', 'hybrid'):
             self.mesh_velocities[i] = u
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
         if self.stabilisation_sediment == 'lax_friedrichs':
@@ -1111,7 +1135,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         })
         if self.mesh_velocities[i] is not None:
             fields['mesh_velocity'] = self.mesh_velocities[i]
-        if self.op.approach == 'lagrangian':
+        if self.op.approach in ('lagrangian', 'hybrid'):
             self.mesh_velocities[i] = u
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
         return fields
@@ -1342,7 +1366,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug("SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i, adjoint=False)
 
-    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False):
+    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False, restarted=False):
         """
         Solve forward PDE on mesh `i`.
 
@@ -1358,11 +1382,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.iteration = 0
         start_time = i*op.dt*self.dt_per_mesh
         end_time = (i+1)*op.dt*self.dt_per_mesh
-        try:
-            assert np.allclose(self.simulation_time, start_time)
-        except AssertionError:
-            msg = "Mismatching start time: {:.2f} vs {:.2f}"
-            raise ValueError(msg.format(self.simulation_time, start_time))
+        if not restarted:
+            try:
+                assert np.allclose(self.simulation_time, start_time)
+            except AssertionError:
+                msg = "Mismatching start time: {:.2f} vs {:.2f}"
+                raise ValueError(msg.format(self.simulation_time, start_time))
 
         # Exports and callbacks
         self.print(80*'=')
@@ -1422,7 +1447,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Mesh movement
             if self.iteration % op.dt_per_mesh_movement == 0:
-                self.move_mesh(i)
+                inverted = self.move_mesh(i)
+                if inverted:
+                    self.add_callbacks(i)  # TODO: Only normed ones will work
+                    self.setup_solver_forward_step(i)
+                    self.solve_forward_step(i, update_forcings=update_forcings, export_func=export_func, plot_pvd=plot_pvd, export_initial=True, restarted=True)
 
             # TODO: Update mesh velocity
 
@@ -1655,7 +1684,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op = self.op
         kwargs.setdefault('normalise', True)
         kwargs['op'] = op
-        sol = self.get_solutions(self.op.adapt_field, adjoint=adjoint)[i]
+        sol = self.get_solutions(op.adapt_field, adjoint=adjoint)[i]
         if op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
 
             # Account for SUPG stabilisation in weighted Hessian metric
@@ -1673,6 +1702,31 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 recover_hessian_metric(sol, adapt_field='velocity_y', fields=fields, **kwargs),
                 recover_hessian_metric(sol, adapt_field='elevation', fields=fields, **kwargs),
             ]
+
+    def get_static_hessian_metric(self, adapt_field, i=0, adjoint=False, elementwise=False):
+        """
+        Compute an appropriate Hessian for the problem at hand. This is inherently
+        problem-dependent, since the choice of field for adaptation is not universal.
+        """
+        hessian_kwargs = dict(normalise=False, enforce_constraints=False, op=self.op)
+        if elementwise:
+            sol = self.get_solutions(adapt_field, adjoint=adjoint)[i]
+            hessian_kwargs['V'] = self.P0_ten[i]
+            gradient_kwargs = dict(mesh=self.mesh, op=self.op)
+            if adapt_field == 'shallow_water':
+                u, eta = sol.split()
+                fields = [u[0], u[1], eta]
+                gradients = [recover_gradient(f, **gradient_kwargs) for f in fields]
+                hessians = [steady_metric(H=grad(g), **hessian_kwargs) for g in gradients]
+                return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
+            else:
+                return steady_metric(H=grad(recover_gradient(sol, op=self.op)), **hessian_kwargs)
+        else:
+            hessians = self.recover_hessian_metrics(0, adjoint=adjoint, **hessian_kwargs)
+            if self.op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
+                return hessians[0]
+            else:
+                return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
 
     def get_recovery(self, i, **kwargs):
         """

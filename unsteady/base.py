@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 from thetis import *
+from thetis.callback import CallbackManager
 
 import numpy as np
 import os
@@ -75,6 +76,7 @@ class AdaptiveProblemBase(object):
         if not hasattr(self, 'max_ar'):
             self.max_ar = [[], ]
         self.meshes = [None for i in range(self.num_meshes)]
+        self.have_intermediaries = False
         self.set_meshes(meshes)
         if not self.manual:
             self.setup_all(**kwargs)
@@ -169,7 +171,7 @@ class AdaptiveProblemBase(object):
             #     coords = mesh.coordinates
             #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
 
-    def setup_all(self, **kwargs):
+    def setup_all(self, restarted=False, **kwargs):
         """
         Setup everything which isn't explicitly associated with either the forward or adjoint
         problem.
@@ -180,9 +182,9 @@ class AdaptiveProblemBase(object):
         self.set_fields(init=True)
         self.set_stabilisation()
         self.set_boundary_conditions()
-        self.create_outfiles()
-        self.create_intermediary_spaces()
-        self.callbacks = [None for i in range(self.num_meshes)]
+        self.create_outfiles(restarted=restarted)
+        self.create_intermediary_spaces(self.have_intermediaries)
+        self.callbacks = [CallbackManager() for i in range(self.num_meshes)]
         self.equations = [AttrDict() for i in range(self.num_meshes)]
         self.error_estimators = [AttrDict() for i in range(self.num_meshes)]
         self.timesteppers = [AttrDict() for i in range(self.num_meshes)]
@@ -199,19 +201,20 @@ class AdaptiveProblemBase(object):
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")
 
-    def create_intermediary_spaces(self):
+    def create_intermediary_spaces(self, have_intermediaries=False):
         """
         Create a copy of each mesh and define function spaces and solution fields upon it.
 
         This functionality is used for mesh movement driven by solving Monge-Ampere type equations.
         """
-        if self.op.approach != 'monge_ampere':
+        if self.have_intermediaries or self.op.approach not in ('monge_ampere', 'hybrid'):
             return
         self.op.print_debug("SETUP: Creating intermediary spaces...")
         mesh_copies = [Mesh(mesh.coordinates.copy(deepcopy=True)) for mesh in self.meshes]
         spaces = [FunctionSpace(mesh, self.finite_element) for mesh in mesh_copies]
         self.intermediary_meshes = mesh_copies
         self.intermediary_solutions = [Function(space) for space in spaces]
+        self.have_intermediaries = True
 
     def create_function_spaces(self):
         """
@@ -292,12 +295,16 @@ class AdaptiveProblemBase(object):
             self.op.set_boundary_conditions(self, i) for i in range(self.num_meshes)
         ]
 
-    def create_outfiles(self):
+    def create_outfiles(self, restarted=False):
         if not self.op.plot_pvd:
             return
         self.op.print_debug("SETUP: Creating output files...")
-        self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
-        self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
+        if restarted:
+            self.solution_file._topology = None
+            self.adjoint_solution_file._topology = None
+        else:
+            self.solution_file = File(os.path.join(self.di, 'solution.pvd'))
+            self.adjoint_solution_file = File(os.path.join(self.di, 'adjoint_solution.pvd'))
 
     def set_initial_condition(self):
         self.op.set_initial_condition(self)
@@ -360,7 +367,7 @@ class AdaptiveProblemBase(object):
         """Free the memory associated with adjoint timesteppers defined on mesh i."""
         raise NotImplementedError("To be implemented in derived class")
 
-    def add_callbacks(self, i):
+    def add_callbacks(self, i, **kwargs):
         """To be implemented in derived class"""
         pass
 
@@ -423,6 +430,16 @@ class AdaptiveProblemBase(object):
         """
         for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
             f_int.project(f)
+
+    def project_from_intermediary_mesh(self, i):
+        """
+        Project solution fields from mesh i into corresponding function spaces defined on
+        intermediary mesh i.
+
+        This function is designed for use under Monge-Ampere type mesh movement methods.
+        """
+        for f, f_int in zip(self.fwd_solutions[i].split(), self.intermediary_solutions[i].split()):
+            f.project(f_int)
 
     def copy_data_from_intermediary_mesh(self, i):
         """
@@ -604,27 +621,28 @@ class AdaptiveProblemBase(object):
     def move_mesh(self, i):
         # TODO: documentation
         if self.op.approach in ('lagrangian', 'ale', 'hybrid'):
-            self.move_mesh_ale(i)  # TODO: Make more robust (apply BCs etc.)
+            return self.move_mesh_ale(i)  # TODO: Make more robust (apply BCs etc.)
         elif self.mesh_movers[i] is not None:
-            self.move_mesh_monge_ampere(i)
+            return self.move_mesh_monge_ampere(i)
 
     def move_mesh_ale(self, i):
         # TODO: documentation
+        op = self.op
         mesh = self.meshes[i]
         t = self.simulation_time
-        dt = self.op.dt
+        dt = op.dt
         coords = mesh.coordinates
 
         # Crank-Nicolson  # TODO: Assemble once
-        if hasattr(self.op, 'get_velocity'):
+        if hasattr(op, 'get_velocity'):
             theta = 0.5
             coord_space = coords.function_space()
             coords_old = Function(coord_space).assign(coords)
             test = TestFunction(coord_space)
 
             F = inner(test, coords)*dx - inner(test, coords_old)*dx
-            F -= (1 - theta)*dt*inner(test, self.op.get_velocity(coords_old, t))*dx
-            F -= theta*dt*inner(test, self.op.get_velocity(coords, t))*dx
+            F -= (1 - theta)*dt*inner(test, op.get_velocity(coords_old, t))*dx
+            F -= theta*dt*inner(test, op.get_velocity(coords, t))*dx
 
             params = {
                 'mat_type': 'aij',
@@ -643,13 +661,26 @@ class AdaptiveProblemBase(object):
             coords.interpolate(coords + dt*self.mesh_velocities[i])
 
         # Check for inverted elements
-        Q = quality(mesh, initial_signs=self.jacobian_signs[i])
+        Q = quality(mesh, initial_signs=self.jacobian_signs[i]).dat.data
+        restarted = False
+        if op.approach == 'hybrid' and Q.min() < op.scaled_jacobian_tol:
+            restarted = True
+            adapt_field = op.adapt_field
+            if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
+                adapt_field = 'shallow_water'
+            self.project_to_intermediary_mesh(i)
+            M = self.get_static_hessian_metric(adapt_field, i=i)
+            space_normalise(M, op=op)
+            enforce_element_constraints(M, op=op)
+            self.meshes[i] = adapt(self.meshes[i], M)
+            self.set_meshes(self.meshes)  # TODO: Case of more than one mesh
+            self.setup_all(restarted=True)
+            self.project_from_intermediary_mesh(i)  # TODO: project fields, too
         num_inverted = len(Q[Q < 0])
         if num_inverted > 0:
             import warnings
             warnings.warn("Mesh has {:d} inverted element(s)!".format(num_inverted))
-            if self.op.approach == 'hybrid':
-                raise NotImplementedError  # TODO: adapt
+        return restarted
 
     def move_mesh_monge_ampere(self, i):  # TODO: Annotation
         """
@@ -694,6 +725,7 @@ class AdaptiveProblemBase(object):
         # Re-interpolate fields
         self.op.print_debug("MESH MOVEMENT: Re-interpolating fields...")
         self.set_fields()
+        return False
 
     # --- Error estimation
 

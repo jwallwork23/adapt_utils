@@ -14,6 +14,7 @@ class BubbleOptions(CoupledOptions):
         super(BubbleOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
+        self.adapt_field = 'tracer'
         self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
         if self.tracer_family == 'cg':
             self.stabilisation_tracer = 'supg'
