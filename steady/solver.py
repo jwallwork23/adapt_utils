@@ -1166,3 +1166,16 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
     def run_no_dwr(self, **kwargs):
         self.run_dwr(**kwargs)
+
+    def _check_element_convergence(self):
+        converged = super(AdaptiveSteadyProblem, self)._check_element_convergence()
+        if converged:
+            if self.equation_set == 'shallow_water':
+                self.solution_file.__init__(self.solution_file.filename)
+                self.solution_file.write(*self.fwd_solution.split())
+            elif self.equation_set == 'tracer':
+                self.tracer_file.__init__(self.tracer_file.filename)
+                self.tracer_file.write(self.fwd_solution_tracer)
+            else:
+                raise NotImplementedError
+        return converged

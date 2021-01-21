@@ -13,24 +13,27 @@ from adapt_utils.steady.test_cases.point_discharge2d.options import PointDischar
 # Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('approach', help="Mesh adaptation approach")
-parser.add_argument('family', help="Finite element family")
+parser.add_argument('-family', help="Finite element family")
 parser.add_argument('-stabilisation', help="Stabilisation method to use")
 parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
+parser.add_argument('-enrichment_method', help="Choose from {'GE_hp', 'GE_h', 'GE_p', 'PR', 'DQ'}.")
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
 
 # Set parameters
-assert args.family in ('cg', 'dg')
+family = args.family or 'cg'
+assert family in ('cg', 'dg')
 kwargs = {
     'approach': args.approach,
+    'enrichment_method': args.enrichment_method or 'DQ',
     'plot_pvd': False,
     'debug': bool(args.debug or False),
 }
 op = PointDischarge2dOptions(**kwargs)
-op.tracer_family = args.family
-op.stabilisation_tracer = args.stabilisation
-op.anisotropic_stabilisation = bool(args.anisotropic_stabilisation or False)
-op.di = os.path.join(op.di, args.stabilisation or args.family)
+op.tracer_family = family
+op.stabilisation_tracer = args.stabilisation or 'supg'
+op.anisotropic_stabilisation = False if args.anisotropic_stabilisation == "0" else True
+op.di = os.path.join(op.di, op.stabilisation_tracer or family, op.enrichment_method)
 
 # Load from HDF5
 op.plot_pvd = False
