@@ -13,7 +13,7 @@ class MeshStats(object):
     """
     A class for holding various statistics related to a given mesh.
     """
-    def __init__(self, op, mesh=None):
+    def __init__(self, op, mesh=None, initial_signs=None):
         """
         :arg op: :class:`Options` parameter object.
         :kwarg mesh: if a mesh is not provided, the :attr:`default_mesh` associated with :attr:`op`
@@ -23,12 +23,12 @@ class MeshStats(object):
 
         self._op = op
         self._mesh = mesh or op.default_mesh
-        self._P0 = FunctionSpace(mesh, "DG", 0)
-        self.boundary_markers = mesh.exterior_facets.unique_markers
+        self._P0 = FunctionSpace(self._mesh, "DG", 0)
+        self.boundary_markers = self._mesh.exterior_facets.unique_markers
         self.dim = self._mesh.topological_dimension()
-        self.num_cells = mesh.num_cells()
-        self.num_edges = mesh.num_edges()
-        self.num_vertices = mesh.num_vertices()
+        self.num_cells = self._mesh.num_cells()
+        self.num_edges = self._mesh.num_edges()
+        self.num_vertices = self._mesh.num_vertices()
 
         # Compute statistics
         self.get_element_sizes()
@@ -39,24 +39,30 @@ class MeshStats(object):
             self.angles_min = get_minimum_angles_2d(self._mesh)
             self.angle_min = self.angles_min.vector().gather().min()
             self.get_element_volumes()
+            self.aspect_ratio = aspect_ratio(self._mesh)
+            self.scaled_jacobian = quality(self._mesh, initial_signs=initial_signs)
         elif self.dim != 3:
             raise ValueError("Mesh of dimension {:d} not supported.".format(self.dim))
         op.print_debug(self.summary)
 
     @property
     def summary(self):
-        msg = "\n" + 35*"*" + "\n" + 10*" " + "MESH STATISTICS\n" + 35*"*" + "\n"
-        msg += "MESH: num cells       = {:11d}\n".format(self.num_cells)
-        msg += "MESH: num edges       = {:11d}\n".format(self.num_edges)
-        msg += "MESH: num vertices    = {:11d}\n".format(self.num_vertices)
-        msg += "MESH: min(dx)         = {:11.4e}\n".format(self.dx_min)
-        msg += "MESH: max(dx)         = {:11.4e}\n".format(self.dx_max)
+        msg = "\n" + 40*"*" + "\n" + 10*" " + "MESH STATISTICS\n" + 40*"*" + "\n"
+        msg += "MESH: num cells           = {:11d}\n".format(self.num_cells)
+        msg += "MESH: num edges           = {:11d}\n".format(self.num_edges)
+        msg += "MESH: num vertices        = {:11d}\n".format(self.num_vertices)
+        msg += "MESH: min(dx)             = {:11.4e}\n".format(self.dx_min)
+        msg += "MESH: max(dx)             = {:11.4e}\n".format(self.dx_max)
         if self.dim == 2:
-            msg += "MESH: min(angles)     = {:11.4e}\n".format(self.angle_min)
-            msg += "MESH: min(vol)        = {:11.4e}\n".format(self.volume_min)
-            msg += "MESH: max(vol)        = {:11.4e}\n".format(self.volume_max)
-            msg += "MESH: boundary length = {:11.4e}\n".format(self.boundary_length)
-        msg += 35*"*" + "\n"
+            msg += "MESH: min(angles)         = {:11.4e}\n".format(self.angle_min)
+            msg += "MESH: min(vol)            = {:11.4e}\n".format(self.volume_min)
+            msg += "MESH: max(vol)            = {:11.4e}\n".format(self.volume_max)
+            msg += "MESH: boundary length     = {:11.4e}\n".format(self.boundary_length)
+            msg += "MESH: min aspect ratio    = {:11.4e}\n".format(self.aspect_ratio.dat.data.min())
+            msg += "MESH: max aspect ratio    = {:11.4e}\n".format(self.aspect_ratio.dat.data.max())
+            msg += "MESH: min scaled Jacobian = {:11.4e}\n".format(self.scaled_jacobian.dat.data.min())
+            msg += "MESH: max scaled Jacobian = {:11.4e}\n".format(self.scaled_jacobian.dat.data.max())
+        msg += 40*"*" + "\n"
         return msg
 
     def get_element_sizes(self, anisotropic=False):
