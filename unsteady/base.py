@@ -7,7 +7,7 @@ import os
 
 from ..adapt.metric import *
 from ..io import save_mesh, load_mesh
-from ..mesh import quality
+from ..mesh import quality, aspect_ratio
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
@@ -72,6 +72,8 @@ class AdaptiveProblemBase(object):
             self.num_cells = [[], ]
         if not hasattr(self, 'num_vertices'):
             self.num_vertices = [[], ]
+        if not hasattr(self, 'max_ar'):
+            self.max_ar = [[], ]
         self.meshes = [None for i in range(self.num_meshes)]
         self.set_meshes(meshes)
         if not self.manual:
@@ -145,6 +147,7 @@ class AdaptiveProblemBase(object):
         if self.num_cells != [[], ]:
             self.num_cells.append([])
             self.num_vertices.append([])
+            self.max_ar.append([])
 
         msg = "SETUP: Mesh {:d} has {:d} elements and {:d} vertices"
         self.dim = self.meshes[0].topological_dimension()
@@ -159,6 +162,7 @@ class AdaptiveProblemBase(object):
             self.op.print_debug(msg.format(i, num_cells, num_vertices))
             self.num_cells[-1].append(num_cells)
             self.num_vertices[-1].append(num_vertices)
+            self.max_ar[-1].append(aspect_ratio(mesh).vector().gather().max())
 
             # # Create mesh velocity Functions
             # if op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO
@@ -780,8 +784,14 @@ class AdaptiveProblemBase(object):
         base_space = self.get_function_space(adapt_field or self.op.adapt_field)
         self.dofs.append([np.sum(fs.dof_count) for fs in base_space])
         self.print("\nResulting meshes\n================")
-        for i, (nv, nc) in enumerate(zip(self.num_vertices[-1], self.num_cells[-1])):
-            self.print("  mesh {:2d}: vertices {:7d} elements {:7d}".format(i, nv, nc))
+        msg = "  mesh {:2d}: vertices {:7d} elements {:7d}   max. aspect ratio {:.1f}"
+        if self.num_meshes == 1:
+            msg = msg[13:]
+        for i, (nv, nc, ar) in enumerate(zip(self.num_vertices[-1], self.num_cells[-1], self.max_ar[-1])):
+            if self.num_meshes == 1:
+                self.print(msg.format(nv, nc, ar))
+            else:
+                self.print(msg.format(i, nv, nc, ar))
         self.print("\n")
 
     def combine_over_windows(self, adapt_fields):
