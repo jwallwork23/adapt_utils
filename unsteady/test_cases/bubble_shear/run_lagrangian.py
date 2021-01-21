@@ -71,15 +71,17 @@ tp.__init__(op, meshes=[Mesh(mesh_mover.x), ])
 #  * This motivates applying monitor based methods throughout the simulation
 
 tp.set_initial_condition()
-init_norm = norm(tp.fwd_solutions_tracer[0])
+init_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
+init_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
 tp.solve_forward()
 
 # TODO: Plot inverted elements
 
 # Compare initial and final tracer concentrations
-final_norm = norm(tp.fwd_solutions_tracer[0])
+final_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
+final_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
-print_output("Initial norm:   {:.4e}".format(init_norm))
-print_output("Final norm:     {:.4e}".format(final_norm))
-print_output("Relative error: {:.2f}%".format(100*abs(1.0-errornorm(init_sol, final_sol)/init_norm)))
+abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')
+print_output("Conservation error: {:.2f}%".format(100*abs(init_l1_norm-final_l1_norm)/init_l1_norm))
+print_output("Relative L2 error:  {:.2f}%".format(100*abs_l2_error/init_l2_norm))
