@@ -1048,15 +1048,14 @@ class AdaptiveProblem(AdaptiveProblemBase):
         return fields
 
     def _get_fields_for_tracer_timestepper(self, i):
-        if self.op.solve_swe:
-            if self.op.timestepper == 'SteadyState':
+        if self.op.timestepper == 'SteadyState':
+            if self.op.solve_swe:
                 u, eta = split(self.fwd_solutions[i])  # FIXME: Not fully annotated
             else:
-                u, eta = self.fwd_solutions[i].split()  # FIXME: Not fully annotated
+                u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
+                eta = Constant(0.0)
         else:
-            # u = Constant(as_vector(self.op.base_velocity))  # FIXME: Pyadjoint doesn't like this
-            u = interpolate(as_vector(self.op.base_velocity), self.P1_vec[i])
-            eta = Constant(0.0)
+            u, eta = self.fwd_solutions[i].split()  # FIXME: Not fully annotated
         fields = AttrDict({
             'elev_{:d}d'.format(self.dim): eta,
             'uv_{:d}d'.format(self.dim): u,
