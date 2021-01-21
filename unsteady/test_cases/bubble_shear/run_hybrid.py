@@ -4,6 +4,7 @@ import argparse
 import numpy as np
 
 from adapt_utils.adapt.r import MeshMover
+# from adapt_utils.adapt.metric import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 
@@ -17,7 +18,7 @@ parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-debug", help="Toggle debugging mode.")
-args = parser.parse_args()
+args, unknown = parser.parse_known_args()
 
 
 # --- Set parameters
@@ -35,13 +36,17 @@ kwargs = {
     # Mesh movement
     'nonlinear_method': 'relaxation',
     'r_adapt_rtol': 5.0e-2,
+    'scaled_jacobian_tol': 0.01,
+    'target': 4000,
+    'normalisation': 'complexity',
+    'norm_order': None,
 
     # Misc
     'debug': bool(args.debug or False),
 }
 if os.getenv('REGRESSION_TEST') is not None:
     kwargs['end_time'] = 1.5
-op = BubbleOptions(approach='lagrangian', n=int(args.n or 1))
+op = BubbleOptions(approach='hybrid', n=int(args.n or 1))
 op.update(kwargs)
 
 
@@ -61,9 +66,16 @@ def monitor(mesh):
     return conditional(le(abs((x-x0)**2 + (y-y0)**2 - r**2), eps), alpha, 1.0)
 
 
+# Get a suitable initial mesh
 mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
 mesh_mover.adapt()
-tp.__init__(op, meshes=[Mesh(mesh_mover.x), ])
+tp.__init__(op, meshes=[Mesh(mesh_mover.x)])
+# for i in range(4):
+#     tp.set_initial_condition()
+#     M = tp.get_static_hessian_metric('tracer')
+#     space_normalise(M, op=op)
+#     enforce_element_constraints(M, op=op)
+#     tp.__init__(op, meshes=[adapt(tp.meshes[0], M)])
 
 
 # --- Solve the tracer transport problem

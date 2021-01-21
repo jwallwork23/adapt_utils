@@ -17,7 +17,7 @@ from adapt_utils.options import Options
 __all__ = ["metric_complexity", "cell_size_metric", "volume_and_surface_contributions",
            "steady_metric", "isotropic_metric", "space_normalise", "space_time_normalise",
            "boundary_steady_metric", "combine_metrics", "metric_intersection", "metric_average",
-           "HessianMetricRecoverer"]
+           "HessianMetricRecoverer", "enforce_element_constraints"]
 
 
 def metric_complexity(M, boundary=False):
@@ -268,7 +268,6 @@ def space_normalise(M, f=None, integral=None, boundary=False, **kwargs):
     assert integral > 1.0e-08
     determinant = 1 if p is None else pow(det(M), -1/(2*p + d))
     M.interpolate(integral*determinant*M)
-    return
 
 
 def enforce_element_constraints(M, op=Options(), boundary_tag=None):

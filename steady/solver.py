@@ -806,31 +806,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
         return self.indicator[label]
 
-    def get_hessian_metric(self, adapt_field, adjoint=False, elementwise=False):
-        """
-        Compute an appropriate Hessian for the problem at hand. This is inherently
-        problem-dependent, since the choice of field for adaptation is not universal.
-        """
-        hessian_kwargs = dict(normalise=False, enforce_constraints=False, op=self.op)
-        if elementwise:
-            sol = self.get_solutions(adapt_field, adjoint=adjoint)[0]
-            hessian_kwargs['V'] = self.P0_ten[0]
-            gradient_kwargs = dict(mesh=self.mesh, op=self.op)
-            if adapt_field == 'shallow_water':
-                u, eta = sol.split()
-                fields = [u[0], u[1], eta]
-                gradients = [recover_gradient(f, **gradient_kwargs) for f in fields]
-                hessians = [steady_metric(H=grad(g), **hessian_kwargs) for g in gradients]
-                return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
-            else:
-                return steady_metric(H=grad(recover_gradient(sol, op=self.op)), **hessian_kwargs)
-        else:
-            hessians = self.recover_hessian_metrics(0, adjoint=adjoint, **hessian_kwargs)
-            if self.op.adapt_field in ('tracer', 'sediment', 'bathymetry'):
-                return hessians[0]
-            else:
-                return combine_metrics(*hessians, average='avg' in self.op.adapt_field)
-
     def get_metric(self, adapt_field, approach=None):
         """
         Compute metric associated with adaptation approach of choice.
@@ -1074,9 +1049,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         K_opt.interpolate(min_value(max_value(scaling*K/K_opt, self.op.h_min**2), self.op.h_max**2))
 
         # Recover Hessian and compute eigendecomposition
-        H = self.get_hessian_metric(adapt_field, adjoint=adjoint, elementwise=False)
+        H = self.get_static_hessian_metric(adapt_field, adjoint=adjoint, elementwise=False)
         H = project(H, self.P0_ten[0])
-        # H = self.get_hessian_metric(adapt_field, adjoint=adjoint, elementwise=True)
+        # H = self.get_static_hessian_metric(adapt_field, adjoint=adjoint, elementwise=True)
         evectors = Function(self.P0_ten[0], name="Elementwise Hessian eigenvectors")
         evalues = Function(self.P0_vec[0], name="Elementwise Hessian eigenvalues")
         kernel = eigen_kernel(get_reordered_eigendecomposition, dim)
