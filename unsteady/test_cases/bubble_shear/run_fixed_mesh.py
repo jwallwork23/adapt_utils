@@ -21,19 +21,11 @@ args = parser.parse_args()
 # --- Set parameters
 
 kwargs = {
-
-    # Spatial discretisation
     'tracer_family': args.family or 'dg',
     'stabilisation_tracer': args.stabilisation or 'lax_friedrichs',
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or True),
     'use_tracer_conservative_form': bool(args.conservative or False),
-
-    # Mesh movement
-    'nonlinear_method': 'relaxation',
-    'r_adapt_rtol': 5.0e-2,
-
-    # Misc
     'debug': bool(args.debug or False),
 }
 if os.getenv('REGRESSION_TEST') is not None:
@@ -46,13 +38,15 @@ op.update(kwargs)
 
 tp = AdaptiveProblem(op)
 tp.set_initial_condition()
-init_norm = norm(tp.fwd_solutions_tracer[0])
+init_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
+init_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
 tp.solve_forward()
 
 # Compare initial and final tracer concentrations
-final_norm = norm(tp.fwd_solutions_tracer[0])
+final_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
+final_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
-print_output("Initial norm:   {:.4e}".format(init_norm))
-print_output("Final norm:     {:.4e}".format(final_norm))
-print_output("Relative error: {:.2f}%".format(100*abs(1.0-errornorm(init_sol, final_sol)/init_norm)))
+abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')
+print_output("Conservation error: {:.2f}%".format(100*abs(init_l1_norm-final_l1_norm)/init_l1_norm))
+print_output("Relative L2 error:  {:.2f}%".format(100*abs_l2_error/init_l2_norm))

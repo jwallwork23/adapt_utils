@@ -54,6 +54,7 @@ class BubbleOptions(CoupledOptions):
         ])
 
     def update_velocity(self, prob, i, t):
+        # u = prob.timesteppers[0].tracer.fields['uv_2d']
         u, eta = prob.fwd_solutions[i].split()
         u.interpolate(self.get_velocity(prob.meshes[i].coordinates, t))
 
