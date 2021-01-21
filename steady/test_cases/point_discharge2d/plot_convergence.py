@@ -122,6 +122,7 @@ for alignment in ('aligned', 'offset'):
         axes.set_yticklabels([r"{{{:d}}}\%".format(int(yt*100)) for yt in yticks])
         axes.set_ylim([-0.01, 0.31])
         xlim = axes.get_xlim()
+        axes.set_xticks([1.0e+03, 1.0e+04, 1.0e+05, 1.0e+06])
         axes.hlines(y=0.01, xmin=xlim[0], xmax=xlim[1], color='k', linestyle='-', label=r'1.0\% error')
         axes.set_xlim(xlim)
     axes.grid(True)
