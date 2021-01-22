@@ -281,7 +281,7 @@ def plot_quality(mesh, fig=None, axes=None, show_mesh=True, **kwargs):
     newcolours[100:150, :] = np.array([0, 1, 1, 1])  # Cyan
     newcolours[150:175, :] = np.array([1, 1, 0, 1])  # Yellow
     newcolours[175:, :] = np.array([0, 1, 0, 1])     # Green
-    cmap = newcmp = ListedColormap(newcolours)
+    cmap = ListedColormap(newcolours)
     eps = 1.0e-06
     levels = np.linspace(-1-eps, 1+eps, 201)
 
@@ -308,7 +308,7 @@ def plot_aspect_ratio(mesh, fig=None, axes=None, show_mesh=True, levels=10):
     if fig is None or axes is None:
         fig, axes = plt.subplots()
     tc = tricontourf(ar, axes=axes, cmap='coolwarm', levels=levels)
-    cbar = fig.colorbar(tc, ax=axes)
+    fig.colorbar(tc, ax=axes)
     if show_mesh:
         triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
     axes.axis(False)

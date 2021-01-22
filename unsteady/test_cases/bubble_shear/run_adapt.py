@@ -1,5 +1,3 @@
-from thetis import *
-
 import argparse
 
 from adapt_utils.unsteady.solver import AdaptiveProblem

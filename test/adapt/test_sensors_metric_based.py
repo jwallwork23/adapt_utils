@@ -99,7 +99,6 @@ def test_sensors(sensor, recovery, normalisation, norm_order, plot_mesh=False, *
         savefig(fname + '_quality', os.path.join(fpath, 'outputs', op.approach), extensions=['png'])
         plt.close()
 
-
         fig, axes = plt.subplots(figsize=(6, 5))
         fig, axes = plot_aspect_ratio(mesh, fig=fig, axes=axes, levels=np.linspace(1, 2, 6))
         savefig(fname + '_aspect_ratio', os.path.join(fpath, 'outputs', op.approach), extensions=['png'])

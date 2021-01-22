@@ -2,7 +2,6 @@ from pyadjoint.verification import convergence_rates
 
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.ticker import ScalarFormatter
 from mpltools import annotation
 import numpy as np
 
