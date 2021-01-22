@@ -37,6 +37,7 @@ kwargs = {
     # Mesh adaptation
     'num_meshes': int(args.num_meshes or 200),
     'max_adapt': 8,
+    'hessian_time_combination': 'intersect',
     'target': float(args.target or 4000),
     'norm_order': 1,
     'normalisation': 'complexity',
