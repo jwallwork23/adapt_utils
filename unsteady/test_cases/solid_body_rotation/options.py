@@ -1,5 +1,4 @@
 from thetis import *
-from thetis.configuration import *
 
 import math
 import os
@@ -31,6 +30,7 @@ class LeVequeOptions(CoupledOptions):
     def __init__(self, shape=0, geometry='circle', level=0, background_concentration=0.0, **kwargs):
         self.solve_swe = False
         self.solve_tracer = True
+        self.adapt_field = 'tracer'
         self.shape = shape
 
         # Temporal discretisation

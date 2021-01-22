@@ -614,18 +614,16 @@ class CoupledOptions(Options):
             raise NotImplementedError("Model does not support Exner without sediment.")
 
         # Metadata
-        self.solve_flags = (
-            self.solve_swe,
-            self.solve_tracer,
-            self.solve_sediment,
-            self.solve_exner,
-        )
         self.solve_fields = (
             "shallow_water",
             "tracer",
             "sediment",
             "bathymetry",
         )
+
+    @property
+    def solve_flags(self):
+        return (self.solve_swe, self.solve_tracer, self.solve_sediment, self.solve_exner)
 
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()

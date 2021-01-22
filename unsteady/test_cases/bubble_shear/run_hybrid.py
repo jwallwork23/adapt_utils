@@ -37,15 +37,14 @@ kwargs = {
     'nonlinear_method': 'relaxation',
     'r_adapt_rtol': 5.0e-2,
     'scaled_jacobian_tol': 0.01,
-    'target': 4000,
+    'target': 2000,
     'normalisation': 'complexity',
-    'norm_order': None,
+    'norm_order': 1,
+    'max_adapt': 4,  # TODO
 
     # Misc
     'debug': bool(args.debug or False),
 }
-if os.getenv('REGRESSION_TEST') is not None:
-    kwargs['end_time'] = 1.5
 op = BubbleOptions(approach='hybrid', n=int(args.n or 1))
 op.update(kwargs)
 
