@@ -8,11 +8,13 @@ sensor functions defined in [Olivier 2011].
 from firedrake import *
 
 import matplotlib.pyplot as plt
+import numpy as np
 import os
 import pytest
 from wurlitzer import pipes
 
 from adapt_utils import *
+from adapt_utils.mesh import plot_quality, plot_aspect_ratio
 from adapt_utils.test.adapt.sensors import *
 
 
@@ -85,10 +87,22 @@ def test_sensors(sensor, recovery, normalisation, norm_order, plot_mesh=False, *
     if plot_mesh:
         print("Number of elements = {:d}".format(mesh.num_cells()))
         print("Number of vertices = {:d}".format(mesh.num_vertices()))
+
         fig, axes = plt.subplots(figsize=(5, 5))
         triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
         axes.axis(False)
         savefig(fname, os.path.join(fpath, 'outputs', op.approach), extensions=['png'])
+        plt.close()
+
+        fig, axes = plt.subplots(figsize=(6, 5))
+        fig, axes = plot_quality(mesh, fig=fig, axes=axes)
+        savefig(fname + '_quality', os.path.join(fpath, 'outputs', op.approach), extensions=['png'])
+        plt.close()
+
+
+        fig, axes = plt.subplots(figsize=(6, 5))
+        fig, axes = plot_aspect_ratio(mesh, fig=fig, axes=axes, levels=np.linspace(1, 2, 6))
+        savefig(fname + '_aspect_ratio', os.path.join(fpath, 'outputs', op.approach), extensions=['png'])
         plt.close()
         return
 
