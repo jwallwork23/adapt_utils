@@ -1,9 +1,6 @@
 from thetis import *
 from firedrake_adjoint import *
 from firedrake.adjoint.blocks import GenericSolveBlock, ProjectBlock
-import pyadjoint
-
-import os
 
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
 
@@ -71,7 +68,7 @@ class AdaptiveDiscreteAdjointSteadyProblem(AdaptiveSteadyProblem):
         control.
         """
         J = self.quantity_of_interest()
-        dJdm = compute_gradient(J, self.control)
+        compute_gradient(J, self.control)
         adj_sol = self.get_solutions(self.equation_set, adjoint=True)[0]
         adj_sol.assign(-self.solve_blocks[-1].adj_sol)  # TODO: Why minus sign?
         return J

@@ -355,7 +355,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         tm.inject(cell, self.indicator['cell'])
         tm.inject(flux, self.indicator['flux'])
         self.indicator['GE_hp'] = Function(self.P0[0])
-        self.indicator['GE_hp'].interpolate(abs(self.indicator['cell'] + self.indicator['flux'])) 
+        self.indicator['GE_hp'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
 
         # Indicate error on enriched space
         indicator_enriched = Function(ep.P0[0])
@@ -481,7 +481,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         tm.inject(cell, self.indicator['cell'])
         tm.inject(flux, self.indicator['flux'])
         self.indicator['GE_h'] = Function(self.P0[0])
-        self.indicator['GE_h'].interpolate(abs(self.indicator['cell'] + self.indicator['flux'])) 
+        self.indicator['GE_h'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
 
         # Indicate error on enriched space
         indicator_enriched = Function(ep.P0[0])
@@ -521,7 +521,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         )
         ep.outer_iteration = self.outer_iteration
         enriched_space = ep.get_function_space(adapt_field)
-        tm = dmhooks.get_transfer_manager(self.get_plex(0))
         bcs = self.boundary_conditions[0][adapt_field]
         self.indicator['cell'] = Function(self.P0[0])
         self.indicator['flux'] = Function(self.P0[0])

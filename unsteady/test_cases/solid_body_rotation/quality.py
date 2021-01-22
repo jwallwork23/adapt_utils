@@ -1,5 +1,4 @@
 from firedrake import *
-import matplotlib.pyplot as plt
 from adapt_utils.mesh import plot_quality
 from adapt_utils.plotting import *
 

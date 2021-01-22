@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 from mpltools import annotation
-import numpy as np
 import os
 import pickle
 
