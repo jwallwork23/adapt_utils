@@ -937,7 +937,7 @@ class AdaptiveProblemBase(object):
                         elif op.hessian_time_combination == 'integrate':
                             H_window[f] += wq*H
                         else:
-                            H_window[f] = H if first_ts else metric_intersection(H, H_window[f])
+                            H_window[f] = H if H_window[f] == 0 else metric_intersection(H, H_window[f])
 
                 def export_func_wrapper():
                     """
@@ -957,7 +957,8 @@ class AdaptiveProblemBase(object):
                     'export_func': export_func_wrapper,
                     'update_forcings': update_forcings_wrapper,
                     'plot_pvd': op.plot_pvd,
-                    'export_initial': False,
+                    # 'export_initial': False,
+                    'export_initial': True,
                 }
                 self.solve_forward_step(i, **solve_kwargs)
 
