@@ -1,5 +1,4 @@
 from thetis import *
-from thetis.configuration import *
 
 from adapt_utils.options import CoupledOptions
 
@@ -9,7 +8,13 @@ __all__ = ["BubbleOptions"]
 
 # TODO: 3d version
 class BubbleOptions(CoupledOptions):
-    # TODO: doc
+    r"""
+    Parameters for a 2D version of the pure advection test case in [Barral et al. 2016].
+
+    An initial circular bubble is advected in a non-uniform velocity field. The velocity
+    field reverses halfway through the time period, meaning that the final solution should
+    match the initial condition.
+    """
     def __init__(self, n=1, **kwargs):
         super(BubbleOptions, self).__init__(**kwargs)
         self.solve_swe = False
@@ -31,10 +36,8 @@ class BubbleOptions(CoupledOptions):
         # Time integration
         self.period = 6.0
         self.dt = 0.015
-        # self.end_time = self.period/4
         self.end_time = self.period/2
-        # self.dt_per_export = 10
-        self.dt_per_export = 1
+        self.dt_per_export = 1  # Required for Lagrangian mesh movement
 
     def set_boundary_conditions(self, prob, i):
         boundary_conditions = {
@@ -55,7 +58,6 @@ class BubbleOptions(CoupledOptions):
         ])
 
     def update_velocity(self, prob, i, t):
-        # u = prob.timesteppers[0].tracer.fields['uv_2d']
         u, eta = prob.fwd_solutions[i].split()
         u.interpolate(self.get_velocity(prob.meshes[i].coordinates, t))
 

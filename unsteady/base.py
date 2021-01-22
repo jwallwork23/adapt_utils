@@ -668,6 +668,7 @@ class AdaptiveProblemBase(object):
             adapt_field = op.adapt_field
             if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
                 adapt_field = 'shallow_water'
+            # for i in range(op.max_adapt):  # FIXME
             self.project_to_intermediary_mesh(i)
             M = self.get_static_hessian_metric(adapt_field, i=i)
             space_normalise(M, op=op)
@@ -989,7 +990,10 @@ class AdaptiveProblemBase(object):
 
     def _check_qoi_convergence(self):
         n = self.outer_iteration
-        qoi = self.quantity_of_interest()
+        try:
+            qoi = self.quantity_of_interest()
+        except NotImplementedError:
+            return False
         self.print("\nQuantity of interest\n====================")
         self.print("  iteration {:d}: {:.4e}\n".format(n+1, qoi))
         self.qois.append(qoi)

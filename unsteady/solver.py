@@ -635,7 +635,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.project(f, i, j)
 
     def project_to_intermediary_mesh(self, i):
-        super(AdaptiveProblem, self).project_to_intermediary_mesh(i)
+        if self.op.solve_swe:
+            super(AdaptiveProblem, self).project_to_intermediary_mesh(i)
         if self.op.solve_tracer:
             self.intermediary_solutions_tracer[i].project(self.fwd_solutions_tracer[i])
         if self.op.solve_sediment:
@@ -720,7 +721,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                       "depo_term")
 
     def project_from_intermediary_mesh(self, i):
-        super(AdaptiveProblem, self).project_from_intermediary_mesh(i)
+        if self.op.solve_swe:
+            super(AdaptiveProblem, self).project_from_intermediary_mesh(i)
         if self.op.solve_tracer:
             self.fwd_solutions_tracer[i].project(self.intermediary_solutions_tracer[i])
         if self.op.solve_sediment:
