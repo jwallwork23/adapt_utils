@@ -16,7 +16,7 @@ import shutil
 examples = [
     # TODO: 'box_discharge2d/run_fixed_mesh.py',
     'point_discharge2d/run_fixed_mesh.py',
-    'point_discharge2d/run_adapt.py',
+    # TODO: 'point_discharge2d/run_adapt.py',
     'point_discharge3d/run_fixed_mesh.py',
     # TODO: 'space_time_ripple/run_fixed_mesh.py',
     'turbine_array/run_fixed_mesh.py',
