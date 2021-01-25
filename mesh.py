@@ -6,7 +6,7 @@ from adapt_utils.plotting import *
 
 
 __all__ = ["MeshStats", "isotropic_cell_size", "anisotropic_cell_size", "make_consistent",
-           "get_patch", "quality", "plot_quality", "aspect_ratio", "plot_aspect_ratio"]
+           "get_patch", "quality", "aspect_ratio", "plot_mesh", "plot_quality", "plot_aspect_ratio"]
 
 
 class MeshStats(object):
@@ -286,6 +286,19 @@ def aspect_ratio(mesh):
     return interpolate(a*b*c/((a+b-c)*(b+c-a)*(c+a-b)), P0)
 
 
+def plot_mesh(mesh, fig=None, axes=None):
+    """
+    Plot aspect ratio of a triangular mesh.
+    """
+    import matplotlib.pyplot as plt
+
+    if fig is None or axes is None:
+        fig, axes = plt.subplots()
+    triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
+    axes.axis(False)
+    return fig, axes
+
+
 # FIXME: Inverted elements do not show! Tried making transparent but it didn't do anything.
 def plot_quality(mesh, fig=None, axes=None, show_mesh=True, **kwargs):
     """
@@ -340,3 +353,26 @@ def plot_aspect_ratio(mesh, fig=None, axes=None, show_mesh=True, levels=10):
         triplot(mesh, axes=axes, interior_kw={'linewidth': 0.1}, boundary_kw={'color': 'k'})
     axes.axis(False)
     return fig, axes
+
+
+if __name__ == "__main__":
+    import matplotlib.pyplot as plt
+    from plotting import *
+
+    # Take a uniform mesh
+    mesh = UnitSquareMesh(3, 3)
+    jacobian_sign = interpolate(sign(JacobianDeterminant(mesh)), FunctionSpace(mesh, "DG", 0))
+
+    # Deform it
+    mesh.coordinates.dat.data[6] += 0.2
+    fig, axes = plt.subplots(figsize=(5, 5))
+    fig, axes = plot_mesh(mesh, fig=fig, axes=axes)
+    savefig("inverted", "plots", extensions=["png"])
+    plt.close()
+
+    # Remesh from the vertices
+    mesh = remesh(mesh, remove=False)
+    fig, axes = plt.subplots(figsize=(5, 5))
+    fig, axes = plot_mesh(mesh, fig=fig, axes=axes)
+    savefig("remeshed", "plots", extensions=["png"])
+    plt.close()
