@@ -207,6 +207,33 @@ def get_patch(vertex, mesh=None, plex=None, coordinates=None, midfacets=False, e
     return patch
 
 
+def remesh(mesh, fname='mymesh', fpath='.', remove=True):
+    """
+    Remesh a tangled mesh using triangle.
+    """
+    import meshio
+    import triangle
+
+    plex = mesh._topology_dm
+    if mesh.topological_dimension() != 2:
+        raise NotImplementedError
+    vertices = mesh.coordinates.dat.data
+    cells = [('triangle', triangle.triangulate({'vertices': vertices})['triangles'])]
+    points = np.array([[*point, 0.0] for point in vertices])
+    cell_tag = lambda i: plex.getLabelValue("celltype", i)
+    # bnd_tag = lambda i: plex.getLabelValue("boundary_faces", i)   # TODO
+    cell_data = {
+        "gmsh:physical": [np.array([cell_tag(i) for i in range(*plex.getHeightStratum(0))])],
+    }
+    newmesh = meshio.Mesh(points, cells, cell_data=cell_data)
+    filename = os.path.join(fpath, fname + '.msh')
+    meshio.gmsh.write(filename, newmesh, fmt_version="2.2", binary=False)
+    outmesh = Mesh(filename)
+    if remove:
+        os.remove(filename)
+    return outmesh
+
+
 def quality(mesh, initial_signs=None):
     r"""
     Compute the scaled Jacobian for each element of a triangular mesh:
