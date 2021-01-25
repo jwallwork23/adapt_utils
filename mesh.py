@@ -220,12 +220,9 @@ def remesh(mesh, fname='mymesh', fpath='.', remove=True):
     vertices = mesh.coordinates.dat.data
     cells = [('triangle', triangle.triangulate({'vertices': vertices})['triangles'])]
     points = np.array([[*point, 0.0] for point in vertices])
-    cell_tag = lambda i: plex.getLabelValue("celltype", i)
-    # bnd_tag = lambda i: plex.getLabelValue("boundary_faces", i)   # TODO
-    cell_data = {
-        "gmsh:physical": [np.array([cell_tag(i) for i in range(*plex.getHeightStratum(0))])],
-    }
-    newmesh = meshio.Mesh(points, cells, cell_data=cell_data)
+    # TODO: Preserve boundary tags
+    # TODO: Preserve cell tags
+    newmesh = meshio.Mesh(points, cells)
     filename = os.path.join(fpath, fname + '.msh')
     meshio.gmsh.write(filename, newmesh, fmt_version="2.2", binary=False)
     outmesh = Mesh(filename)
@@ -371,7 +368,7 @@ if __name__ == "__main__":
     plt.close()
 
     # Remesh from the vertices
-    mesh = remesh(mesh, remove=False)
+    mesh = remesh(mesh, remove=True)
     fig, axes = plt.subplots(figsize=(5, 5))
     fig, axes = plot_mesh(mesh, fig=fig, axes=axes)
     savefig("remeshed", "plots", extensions=["png"])
