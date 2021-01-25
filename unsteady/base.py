@@ -7,8 +7,8 @@ import numpy as np
 import os
 
 from ..adapt.metric import *
-from ..io import save_mesh, load_mesh
-from ..mesh import quality, aspect_ratio
+from ..io import load_mesh, save_mesh
+from ..mesh import aspect_ratio, quality, remesh
 from .ts import *  # NOTE: Overrides some of the Thetis time integrators
 
 
@@ -668,12 +668,15 @@ class AdaptiveProblemBase(object):
             adapt_field = op.adapt_field
             if adapt_field not in ('tracer', 'sediment', 'bathymetry'):
                 adapt_field = 'shallow_water'
-            # for i in range(op.max_adapt):  # FIXME
             self.project_to_intermediary_mesh(i)
             M = self.get_static_hessian_metric(adapt_field, i=i)
             space_normalise(M, op=op)
             enforce_element_constraints(M, op=op)
-            self.meshes[i] = adapt(self.meshes[i], M)
+            if op.hybrid_mode == 'h':
+                self.meshes[i] = adapt(self.meshes[i], M)
+                # self.meshes[i] = adapt(remesh(self.meshes[i]), M)  # TODO: Preserve tags
+            else:
+                self.meshes[i] = remesh(self.meshes[i])
             self.set_meshes(self.meshes)  # TODO: Case of more than one mesh
             self.setup_all(restarted=True)
             self.project_from_intermediary_mesh(i)  # TODO: project fields, too

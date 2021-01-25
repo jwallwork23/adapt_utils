@@ -135,7 +135,12 @@ class Options(FrozenConfigurable):
     nonlinear_method = Enum(['quasi_newton', 'relaxation'], default_value='quasi_newton', help="""
         Method for solving nonlinear system under Monge-Ampere mesh movement.
         """).tag(config=True)
-    scaled_jacobian_tol = NonNegativeFloat(0.0).tag(config=True)  # TODO: help
+    scaled_jacobian_tol = NonNegativeFloat(0.0, help="""
+        Tolerance to be met before invoking secondary adaptation mode.
+        """).tag(config=True)
+    hybrid_mode = Enum(['h', 'm'], default_value='m', help="""
+        Adaptation mode used for detangling.
+        """).tag(coonfig=True)
 
     # Recovery
     gradient_recovery = Enum(['L2', 'ZZ'], default_value='L2', help="""
