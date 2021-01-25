@@ -33,7 +33,7 @@ def recovery(request):
 
 
 # @pytest.fixture(params=['complexity', 'error'])
-@pytest.fixture(params=['complexity', 'error'])
+@pytest.fixture(params=['complexity'])
 def normalisation(request):
     return request.param
 
