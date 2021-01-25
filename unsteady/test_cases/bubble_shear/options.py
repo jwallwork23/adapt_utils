@@ -42,10 +42,11 @@ class BubbleOptions(CoupledOptions):
     def set_boundary_conditions(self, prob, i):
         boundary_conditions = {
             'tracer': {
-                1: {'value': Constant(0.0)},
-                2: {'value': Constant(0.0)},
-                3: {'value': Constant(0.0)},
-                4: {'value': Constant(0.0)},
+                'on_boundary': {'value': Constant(0.0)}
+                # 1: {'value': Constant(0.0)},
+                # 2: {'value': Constant(0.0)},
+                # 3: {'value': Constant(0.0)},
+                # 4: {'value': Constant(0.0)},
             },
         }
         return boundary_conditions

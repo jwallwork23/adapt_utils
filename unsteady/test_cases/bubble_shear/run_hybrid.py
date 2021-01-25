@@ -17,6 +17,7 @@ parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
+parser.add_argument("-mode", help="Choose from 'h' and 'm'")
 parser.add_argument("-debug", help="Toggle debugging mode.")
 args, unknown = parser.parse_known_args()
 
@@ -41,6 +42,7 @@ kwargs = {
     'normalisation': 'complexity',
     'norm_order': 1,
     'max_adapt': 4,  # TODO
+    'hybrid_mode': args.mode or 'm',
 
     # Misc
     'debug': bool(args.debug or False),

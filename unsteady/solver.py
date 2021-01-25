@@ -1042,8 +1042,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     # --- Timestepping
 
-    def create_forward_timesteppers_step(self, i):
-        if i == 0:
+    def create_forward_timesteppers_step(self, i, restarted=False):
+        if i == 0 and not restarted:
             self.simulation_time = 0.0
         if self.op.solve_swe:
             self.create_forward_shallow_water_timestepper_step(i, self.integrator)
@@ -1325,7 +1325,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.vorticity = [None for mesh in self.meshes]
             self.callbacks[i].add(VorticityNormCallback(self, i, **kwargs), mode)
 
-    def setup_solver_forward_step(self, i):
+    def setup_solver_forward_step(self, i, restarted=False):
         """
         Setup forward solver on mesh `i`.
         """
@@ -1333,7 +1333,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug("SETUP: Creating forward equations on mesh {:d}...".format(i))
         self.create_forward_equations_step(i)
         op.print_debug("SETUP: Creating forward timesteppers on mesh {:d}...".format(i))
-        self.create_forward_timesteppers_step(i)
+        self.create_forward_timesteppers_step(i, restarted=restarted)
         bcs = self.boundary_conditions[i]
         if op.solve_swe:
             ts = self.timesteppers[i]['shallow_water']
@@ -1381,7 +1381,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Initialise counters
         t_epsilon = 1.0e-05
-        self.iteration = 0
+        if not restarted:
+            self.iteration = 0
         start_time = i*op.dt*self.dt_per_mesh
         end_time = (i+1)*op.dt*self.dt_per_mesh
         if not restarted:
@@ -1451,8 +1452,10 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if self.iteration % op.dt_per_mesh_movement == 0:
                 inverted = self.move_mesh(i)
                 if inverted:
+                    self.simulation_time += op.dt
+                    self.iteration += 1
                     self.add_callbacks(i)  # TODO: Only normed ones will work
-                    self.setup_solver_forward_step(i)
+                    self.setup_solver_forward_step(i, restarted=True)
                     self.solve_forward_step(i, update_forcings=update_forcings, export_func=export_func, plot_pvd=plot_pvd, export_initial=True, restarted=True)
 
             # TODO: Update mesh velocity
