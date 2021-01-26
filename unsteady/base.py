@@ -635,26 +635,26 @@ class AdaptiveProblemBase(object):
 
         # Crank-Nicolson  # TODO: Assemble once
         if hasattr(op, 'get_velocity'):
-            theta = 0.5
+            theta = Constant(0.5)
             coord_space = coords.function_space()
             coords_old = Function(coord_space).assign(coords)
+            trial = TrialFunction(coord_space)
             test = TestFunction(coord_space)
 
-            F = inner(test, coords)*dx - inner(test, coords_old)*dx
-            F -= (1 - theta)*dt*inner(test, op.get_velocity(coords_old, t))*dx
-            F -= theta*dt*inner(test, op.get_velocity(coords, t))*dx
+            a = inner(test, trial)*dx
+            a -= theta*dt*inner(test, op.get_velocity(trial, t))*dx
+            L = inner(test, coords_old)*dx
+            L += (1 - theta)*dt*inner(test, op.get_velocity(coords_old, t))*dx  # TODO: Old t?
 
             params = {
                 'mat_type': 'aij',
-                'snes_type': 'ksponly',  # TODO: Reformulate as a linear system so not needed
-                'snes_rtol': 1.0e-03,
                 # 'ksp_type': 'gmres',
                 'ksp_type': 'preonly',
                 # 'pc_type': 'sor',
                 'pc_type': 'lu',
                 'pc_type_factor_mat_solver_type': 'mumps',
             }
-            solve(F == 0, coords, solver_parameters=params)
+            solve(a == L, coords, solver_parameters=params)
 
         # Forward Euler
         else:
@@ -885,7 +885,8 @@ class AdaptiveProblemBase(object):
 
         # Loop until we hit the maximum number of iterations, max_adapt
         assert op.min_adapt < op.max_adapt
-        hessian_kwargs = dict(normalise=False, enforce_constraints=False)
+        # hessian_kwargs = dict(normalise=False, enforce_constraints=False)
+        hessian_kwargs = dict(normalise=True, enforce_constraints=False, noscale=True)
         for n in range(op.max_adapt):
             self.outer_iteration = n
             fwd_solutions = self.get_solutions(op.adapt_field, adjoint=False)
@@ -961,6 +962,7 @@ class AdaptiveProblemBase(object):
                     'update_forcings': update_forcings_wrapper,
                     'plot_pvd': op.plot_pvd,
                     'export_initial': False,
+                    'final_update': False,
                 }
                 self.solve_forward_step(i, **solve_kwargs)
 
