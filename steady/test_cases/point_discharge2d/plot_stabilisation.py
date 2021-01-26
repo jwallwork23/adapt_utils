@@ -55,7 +55,7 @@ if args.family == 'cg':
     axes.set_xlim([0, 50])
     axes.set_ylim([0, 10])
     fname = 'anisotropic_cell_size' if op.anisotropic_stabilisation else 'isotropic_cell_size'
-    savefig(fname, op.di, extensions=["png"])
+    savefig(fname, op.di, extensions=["jpg"])
 
     # Calculate stabilisation parameter
     uv = Constant(as_vector(op.base_velocity))
@@ -77,7 +77,7 @@ if args.family == 'cg':
     axes.set_xlim([0, 50])
     axes.set_ylim([0, 10])
     fname = 'anisotropic_stabilisation' if op.anisotropic_stabilisation else 'isotropic_stabilisation'
-    savefig(fname, op.di, extensions=["png"])
+    savefig(fname, op.di, extensions=["jpg"])
 else:
 
     # Calculate SIPG parameter
@@ -101,4 +101,4 @@ else:
     axes.set_xlim([0, 50])
     axes.set_ylim([0, 10])
     fname = 'anisotropic_sipg' if op.anisotropic_stabilisation else 'isotropic_sipg'
-    savefig(fname, op.di, extensions=["png"])
+    savefig(fname, op.di, extensions=["jpg"])

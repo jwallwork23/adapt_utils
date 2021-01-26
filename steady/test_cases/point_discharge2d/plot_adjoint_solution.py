@@ -57,7 +57,7 @@ for approach in ('continuous', 'discrete'):
     axes.set_xticks(np.linspace(0, 50, 6))
     axes.xaxis.tick_top()
     axes.set_yticks(np.linspace(0, 10, 3))
-    savefig(fname, op.di, extensions=["png"])
+    savefig(fname, op.di, extensions=["jpg"])
 
 # Compute L2 error
 print_output("L2 'error': {:.4f}%".format(100*errornorm(*solutions)/norm(solutions[1])))
@@ -82,4 +82,4 @@ cbar.set_ticklabels([r"$10^{{{:d}}}$".format(int(i)) for i in powers])
 axes.set_xticks(np.linspace(0, 50, 6))
 axes.xaxis.tick_top()
 axes.set_yticks(np.linspace(0, 10, 3))
-savefig("difference", op.di, extensions=["png"])
+savefig("difference", op.di, extensions=["jpg"])
