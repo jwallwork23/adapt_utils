@@ -24,7 +24,6 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         super(IdealisedDesalinationOutfallOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
-        self.solve_flags = (False, True, False, False)
         self.adapt_field = 'tracer'
 
         # Domain

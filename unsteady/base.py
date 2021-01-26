@@ -164,7 +164,10 @@ class AdaptiveProblemBase(object):
             self.op.print_debug(msg.format(i, num_cells, num_vertices))
             self.num_cells[-1].append(num_cells)
             self.num_vertices[-1].append(num_vertices)
-            self.max_ar[-1].append(aspect_ratio(mesh).vector().gather().max())
+            if self.dim == 2:
+                self.max_ar[-1].append(aspect_ratio(mesh).vector().gather().max())
+            else:
+                self.max_ar[-1].append(np.nan)
 
             # # Create mesh velocity Functions
             # if op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO

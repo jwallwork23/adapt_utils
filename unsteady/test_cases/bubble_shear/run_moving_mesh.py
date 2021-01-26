@@ -12,10 +12,14 @@ from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", help="Resolution of initial mesh.")
+parser.add_argument("-dt", help="Timestep.")
+parser.add_argument("-end_time", help="Simulation end time.")
+
 parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
+
 parser.add_argument("-dt_per_mesh_movement", help="Mesh movement frequency")
 parser.add_argument("-alpha", help="Prominence of refined region.")
 parser.add_argument("-debug", help="Toggle debugging mode.")
@@ -40,6 +44,10 @@ kwargs = {
 }
 op = BubbleOptions(approach='monge_ampere', n=int(args.n or 1))
 op.update(kwargs)
+if args.dt is not None:
+    op.dt = float(args.dt)
+if args.end_time is not None:
+    op.end_time = float(args.end_time)
 alpha = 5.0
 eps = 1.0e-03  # Parameter controlling width of refined region
 
@@ -114,7 +122,8 @@ def advected_monitor(monitor):  # FIXME
             'pc_type_factor_mat_solver_type': 'mumps',
         }
         solve(a == L, monitor_new, solver_parameters=params)
-        return 0.5*(monitor_new + monitor_old)
+        # return 0.5*(monitor_new + monitor_old)
+        return monitor_new
     return wrapper
 
 
