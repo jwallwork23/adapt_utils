@@ -1368,7 +1368,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug("SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i, adjoint=False)
 
-    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False, restarted=False):
+    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False, restarted=False, final_update=True):
         """
         Solve forward PDE on mesh `i`.
 
@@ -1526,7 +1526,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     b = self.fwd_solutions_bathymetry[i] if op.solve_exner else self.bathymetry[i]
                     proj_bath.project(b)
                     self.exner_file.write(proj_bath)
-        if update_forcings is not None:
+        if final_update and update_forcings is not None:
             update_forcings(self.simulation_time + op.dt)
         self.print(80*'=')
 

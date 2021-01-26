@@ -36,6 +36,7 @@ kwargs = {
     'r_adapt_rtol': 5.0e-02,
     'dt_per_mesh_movement': int(args.dt_per_mesh_movement or 1),
     'debug': bool(args.debug or False),
+    'debug_mode': 'full',
 }
 op = BubbleOptions(approach='monge_ampere', n=int(args.n or 1))
 op.update(kwargs)
@@ -47,14 +48,15 @@ eps = 1.0e-03  # Parameter controlling width of refined region
 
 tp = AdaptiveProblem(op)
 
-
-def monitor(mesh):
-    x, y = SpatialCoordinate(mesh)
-    x0, y0, r = op.source_loc[0]
-    return conditional(le(abs((x-x0)**2 + (y-y0)**2 - r**2), eps), alpha, 1.0)
+ring = lambda x, y: conditional(le(abs((x-x0)**2 + (y-y0)**2 - r**2), eps), alpha, 1.0)
+x0, y0, r = op.source_loc[0]
 
 
-mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
+def ring_monitor(mesh):
+    return ring(*SpatialCoordinate(mesh))
+
+
+mesh_mover = MeshMover(tp.meshes[0], ring_monitor, method='monge_ampere', op=op)
 mesh_mover.adapt()
 tp.__init__(op, meshes=[Mesh(mesh_mover.x)])
 
@@ -64,19 +66,57 @@ tp.__init__(op, meshes=[Mesh(mesh_mover.x)])
 op.r_adapt_rtol = 1.0e-03
 alpha = Constant(float(args.alpha or 10.0))
 tp.set_initial_condition()
+tp.simulation_time = 0.0
+dt = Constant(op.dt)
+theta = Constant(1.0)  # Implicit Euler
+dx = dx(degree=3)
 
 
-def monitor(mesh):
+def static_gradient_monitor(mesh):
+    """
+    Simple monitor function based on the gradient.
+    """
     P1 = FunctionSpace(mesh, "CG", 1)
     sol = project(tp.fwd_solutions_tracer[0], P1)
     g = recover_gradient(sol, op=op)
     gnorm = sqrt(dot(g, g))
     g_max = interpolate(gnorm, P1).vector().gather().max()
     return 1.0 + alpha*gnorm/g_max
-    # frobenius = sqrt(H[0, 0]**2 + H[0, 1]**2 + H[1, 0]**2 + H[1, 1]**2)
-    # frobenius_max = interpolate(frobenius, P1).vector().gather().max()
-    # return 1.0 + alpha*frobenius/frobenius_max
 
 
-tp.set_monitor_functions(monitor)
+def static_hessian_monitor(mesh):
+    P1 = FunctionSpace(mesh, "CG", 1)
+    sol = project(tp.fwd_solutions_tracer[0], P1)
+    H = recover_hessian(sol, op=op)
+    frobenius = sqrt(H[0, 0]**2 + H[0, 1]**2 + H[1, 0]**2 + H[1, 1]**2)
+    frobenius_max = interpolate(frobenius, P1).vector().gather().max()
+    return 1.0 + alpha*frobenius/frobenius_max
+
+
+def advected_monitor(monitor):  # FIXME
+    def wrapper(mesh):
+        t = tp.simulation_time
+        coords = mesh.coordinates
+        P1 = FunctionSpace(mesh, "CG", 1)
+        monitor_old = static_gradient_monitor(mesh)
+        u = op.get_velocity(coords, t)
+        u_new = op.get_velocity(coords, t+op.dt)
+
+        trial, test = TrialFunction(P1), TestFunction(P1)
+        a = trial*test*dx - theta*dt*dot(u_new, grad(trial))*test*dx
+        L = monitor_old*test*dx + (1-theta)*dt*dot(u, grad(monitor_old))*test*dx
+
+        monitor_new = Function(P1)
+        params = {
+            'mat_type': 'aij',
+            'ksp_type': 'preonly',
+            'pc_type': 'lu',
+            'pc_type_factor_mat_solver_type': 'mumps',
+        }
+        solve(a == L, monitor_new, solver_parameters=params)
+        return 0.5*(monitor_new + monitor_old)
+    return wrapper
+
+
+tp.set_monitor_functions(advected_monitor(static_hessian_monitor))
 tp.solve_forward()
