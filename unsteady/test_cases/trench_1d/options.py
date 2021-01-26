@@ -49,7 +49,7 @@ class TrenchSedimentOptions(CoupledOptions):
 
         # Initialisation
         self.uv_init, self.elev_init = initialise_hydrodynamics(
-            input_dir, outputdir=output_dir, op=self
+            input_dir, outputdir=output_dir, op=self,
         )
         self.set_up_morph_model(input_dir, self.default_mesh)
         self.morphological_acceleration_factor = Constant(100)

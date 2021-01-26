@@ -44,7 +44,7 @@ def method(request):
 def test_sensors(sensor, monitor_type, method, plot_mesh=False):
     alpha = Constant(5.0)
     hessian_kwargs = dict(enforce_constraints=False, normalise=True, noscale=True)
-    if monitor_type == 'gradient' and sensor == interweaved:
+    if monitor_type == 'gradient' and sensor in (multiscale, interweaved):
         pytest.xfail("This test requires too much memory / needs tweaking")  # FIXME
     if monitor_type == 'frobenius' and sensor in (multiscale, interweaved):
         pytest.xfail("This test requires too much memory / needs tweaking")  # FIXME

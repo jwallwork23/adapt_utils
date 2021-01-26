@@ -214,14 +214,12 @@ def remesh(mesh, fname='mymesh', fpath='.', remove=True):
     import meshio
     import triangle
 
-    plex = mesh._topology_dm
     if mesh.topological_dimension() != 2:
         raise NotImplementedError
     vertices = mesh.coordinates.dat.data
     cells = [('triangle', triangle.triangulate({'vertices': vertices})['triangles'])]
     points = np.array([[*point, 0.0] for point in vertices])
-    # TODO: Preserve boundary tags
-    # TODO: Preserve cell tags
+    # TODO: Preserve boundary and cell tags (see ACSE-7, lecture 5)
     newmesh = meshio.Mesh(points, cells)
     filename = os.path.join(fpath, fname + '.msh')
     meshio.gmsh.write(filename, newmesh, fmt_version="2.2", binary=False)
