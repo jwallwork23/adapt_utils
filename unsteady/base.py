@@ -674,9 +674,7 @@ class AdaptiveProblemBase(object):
             enforce_element_constraints(M, op=op)
             if op.hybrid_mode == 'h':
                 self.meshes[i] = adapt(self.meshes[i], M)
-                # self.meshes[i] = adapt(remesh(self.meshes[i]), M)  # TODO: Preserve tags
-            else:
-                self.meshes[i] = remesh(self.meshes[i])
+            self.meshes[i] = remesh(self.meshes[i])  # TODO: Account for tags
             self.set_meshes(self.meshes)  # TODO: Case of more than one mesh
             self.setup_all(restarted=True)
             self.project_from_intermediary_mesh(i)  # TODO: project fields, too
@@ -948,8 +946,10 @@ class AdaptiveProblemBase(object):
 
                     NOTE: We only care about the final export in each mesh iteration.
                     """
+                    t = self.simulation_time
                     export_func()
-                    if np.isclose(self.simulation_time, (i+1)*op.dt*dt_per_mesh):
+                    if np.isclose(t, (i+1)*op.dt*dt_per_mesh):
+                        update_forcings_wrapper(t)
                         for j, H in enumerate(H_window):
                             if op.hessian_time_combination == 'intersect':
                                 H_window[j] *= op.dt*dt_per_mesh
@@ -960,8 +960,7 @@ class AdaptiveProblemBase(object):
                     'export_func': export_func_wrapper,
                     'update_forcings': update_forcings_wrapper,
                     'plot_pvd': op.plot_pvd,
-                    # 'export_initial': False,
-                    'export_initial': True,
+                    'export_initial': False,
                 }
                 self.solve_forward_step(i, **solve_kwargs)
 
