@@ -49,6 +49,7 @@ kwargs = {
 }
 op = BubbleOptions(approach='hybrid', n=int(args.n or 1))
 op.update(kwargs)
+op.end_time += op.dt
 
 
 # --- Initialise the mesh
@@ -99,13 +100,10 @@ final_vol = assemble(Constant(1.0)*dx(domain=tp.mesh))
 final_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
 final_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
-abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')
 print_output("Volume error:       {:.2f}%".format(100*abs(init_vol-final_vol)/init_vol))
 print_output("Conservation error: {:.2f}%".format(100*abs(init_l1_norm-final_l1_norm)/init_l1_norm))
-print_output("Relative L2 error:  {:.2f}%".format(100*abs_l2_error/init_l2_norm))
 init_sol = init_sol.dat.data
 final_sol = final_sol.dat.data
 assert np.isclose(init_sol.min(), final_sol.min())
 assert np.isclose(init_sol.max(), final_sol.max())
 assert np.isclose(np.mean(init_sol), np.mean(final_sol))
-assert np.allclose(diff, 0.0)

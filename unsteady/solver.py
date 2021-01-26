@@ -1451,14 +1451,13 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Mesh movement
             if self.iteration % op.dt_per_mesh_movement == 0:
                 inverted = self.move_mesh(i)
-                if inverted:
+                if inverted and op.approach in ('lagrangian', 'hybrid'):
                     self.simulation_time += op.dt
                     self.iteration += 1
                     self.add_callbacks(i)  # TODO: Only normed ones will work
                     self.setup_solver_forward_step(i, restarted=True)
                     self.solve_forward_step(i, update_forcings=update_forcings, export_func=export_func, plot_pvd=plot_pvd, export_initial=True, restarted=True)
-
-            # TODO: Update mesh velocity
+                    return
 
             # Solve PDE(s)
             if op.solve_swe:
