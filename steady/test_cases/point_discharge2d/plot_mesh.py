@@ -46,4 +46,4 @@ triplot(mesh, axes=axes, interior_kw={"linewidth": 0.1}, boundary_kw={"color": "
 axes.axis(False)
 axes.set_xlim([0, 50])
 axes.set_ylim([0, 10])
-savefig("mesh", op.di, extensions=["png"])
+savefig("mesh", op.di, extensions=["jpg"])
