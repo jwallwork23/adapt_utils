@@ -14,6 +14,7 @@ import pandas as pd
 import time
 
 from adapt_utils.adapt import recovery
+from adapt_utils.norms import local_frobenius_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.trench_1d.options import TrenchSedimentOptions
 
@@ -67,11 +68,26 @@ swp = AdaptiveProblem(op)
 
 
 def frobenius_monitor(mesh):
+    """
+    Frobenius norm taken component-wise.
+    """
     P1 = FunctionSpace(mesh, "CG", 1)
     b = project(swp.fwd_solutions_bathymetry[0], P1)
     H = recovery.recover_hessian(b, op=op)
     frob = sqrt(H[0, 0]**2 + H[0, 1]**2 + H[1, 0]**2 + H[1, 1]**2)
     return 1 + alpha_const*frob/interpolate(frob, P1).vector().gather().max()
+
+
+def frobenius_monitor(mesh):  # NOQA: Version above not smooth enough
+    """
+    Frobenius norm taken element-wise.
+    """
+    P1 = FunctionSpace(mesh, "CG", 1)
+    b = swp.fwd_solutions_bathymetry[0]
+    P0 = FunctionSpace(b.function_space().mesh(), "DG", 0)
+    H = recovery.recover_hessian(b, op=op)
+    frob = interpolate(local_frobenius_norm(H), P0)
+    return 1 + alpha_const*project(frob, P1)/frob.vector().gather().max()
 
 
 # --- Simulation and analysis
