@@ -66,7 +66,7 @@ for level in range(4):
     l2_error.append(100*abs_l2_error/init_l2_norm)
 
 # Save to HDF5
-with h5py.File(os.path.join(op.di, 'uniform.h5'), 'w') as outfile:
+with h5py.File(os.path.join(op.di, 'convergence.h5'), 'w') as outfile:
     outfile.create_dataset('elements', data=num_cells)
     outfile.create_dataset('dofs', data=dofs)
     outfile.create_dataset('time', data=times)
