@@ -49,7 +49,7 @@ kwargs = {
 }
 op = BubbleOptions(approach='hybrid', n=int(args.n or 1))
 op.update(kwargs)
-op.end_time += op.dt
+op.end_time += op.dt  # FIXME
 
 
 # --- Initialise the mesh

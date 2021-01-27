@@ -36,6 +36,7 @@ kwargs = {
     'debug': bool(args.debug or False),
 }
 if os.getenv('REGRESSION_TEST') is not None:
+    kwargs['dt'] = 0.015
     kwargs['end_time'] = 1.5
 op = BubbleOptions(approach='fixed_mesh', n=int(args.n or 1))
 op.update(kwargs)
