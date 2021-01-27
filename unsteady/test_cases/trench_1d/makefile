@@ -142,10 +142,12 @@ res:
 
 plot:
 	mkdir -p plots
+	python3 plot_rtol.py -res 0.0625
 	python3 plot_rtol.py -res 0.125
 	python3 plot_rtol.py -res 0.25
 	python3 plot_rtol.py -res 0.5
 	python3 plot_rtol.py -res 1.0
+	python3 plot_freq.py -res 0.0625
 	python3 plot_freq.py -res 0.125
 	python3 plot_freq.py -res 0.25
 	python3 plot_freq.py -res 0.5

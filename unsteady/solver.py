@@ -1437,7 +1437,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # Mesh movement
             if self.iteration % op.dt_per_mesh_movement == 0:
                 inverted = self.move_mesh(i)
-                print("#### DEBUG: t = {:.4f}, i = {:d}".format(self.simulation_time, self.iteration))
                 if inverted and op.approach in ('lagrangian', 'hybrid'):
                     self.simulation_time += op.dt
                     self.iteration += 1
