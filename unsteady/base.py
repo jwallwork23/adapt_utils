@@ -663,9 +663,9 @@ class AdaptiveProblemBase(object):
 
         # NOTE: We allow for the velocity to be a nonlinear function of the trial
         F = inner(test, trial)*dx
-        F += -theta*dt*inner(test, op.get_velocity(trial, t))*dx
+        F += -theta*dt*inner(test, op.get_velocity(trial, t + op.dt))*dx
         F += -inner(test, coords_old)*dx
-        F += -(1 - theta)*dt*inner(test, op.get_velocity(coords_old, t))*dx  # TODO: Old t?
+        F += -(1 - theta)*dt*inner(test, op.get_velocity(coords_old, t))*dx
 
         params = {
             'snes_type': 'newtonls',
