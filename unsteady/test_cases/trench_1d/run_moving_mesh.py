@@ -31,7 +31,8 @@ parser.add_argument("-rtol", help="Relative tolerance for relaxation method (def
 parser.add_argument("-dt_per_mesh_movement", help="Number of timesteps per mesh movement.")
 args = parser.parse_args()
 
-alpha = Constant(float(args.alpha or 2.0))
+alpha = float(args.alpha or 2.0)
+alpha_const = Constant(alpha)
 res = float(args.res or 0.5)
 rtol = float(args.rtol or 1.0e-04)
 freq = int(args.dt_per_mesh_movement or 40)
@@ -65,12 +66,12 @@ assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 
 
-def frobenius_monitor(mesh, alpha=alpha):
+def frobenius_monitor(mesh):
     P1 = FunctionSpace(mesh, "CG", 1)
     b = project(swp.fwd_solutions_bathymetry[0], P1)
     H = recovery.recover_hessian(b, op=op)
     frob = sqrt(H[0, 0]**2 + H[0, 1]**2 + H[1, 0]**2 + H[1, 1]**2)
-    return 1 + alpha*frob/interpolate(frob, P1).vector().gather().max()
+    return 1 + alpha_const*frob/interpolate(frob, P1).vector().gather().max()
 
 
 # --- Simulation and analysis
