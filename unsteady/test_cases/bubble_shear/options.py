@@ -35,7 +35,7 @@ class BubbleOptions(CoupledOptions):
 
         # Time integration
         self.period = 6.0
-        self.dt = 0.0025
+        self.dt = 0.005*0.5**n
         self.end_time = self.period/2
         self.dt_per_export = 1  # Required for Lagrangian mesh movement
 

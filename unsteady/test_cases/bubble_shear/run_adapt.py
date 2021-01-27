@@ -31,12 +31,11 @@ args = parser.parse_args()
 kwargs = {
 
     # Solver
-    'tracer_family': args.family or 'dg',
-    'stabilisation_tracer': args.stabilisation or 'lax_friedrichs',
-    'anisotropic_stabilisation': bool(args.anisotropic_stabilisation or False),
+    'tracer_family': args.family or 'cg',
+    'stabilisation_tracer': args.stabilisation or 'supg',
+    'anisotropic_stabilisation': False if args.anisotropic_stabilisation == "0" else True,
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
-    # 'use_limiter_for_tracers': bool(args.limiters or False),
-    'use_limiter_for_tracers': False if args.limiters == "0" else True,
+    'use_limiter_for_tracers': bool(args.limiters or False),
     'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
 
     # Mesh adaptation
