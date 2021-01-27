@@ -14,7 +14,6 @@ import pandas as pd
 import time
 
 from adapt_utils.adapt import recovery
-from adapt_utils.norms import local_frobenius_norm
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.trench_1d.options import TrenchSedimentOptions
 
@@ -32,7 +31,7 @@ parser.add_argument("-rtol", help="Relative tolerance for relaxation method (def
 parser.add_argument("-dt_per_mesh_movement", help="Number of timesteps per mesh movement.")
 args = parser.parse_args()
 
-alpha = float(args.alpha or 2.0)
+alpha = Constant(float(args.alpha or 2.0))
 res = float(args.res or 0.5)
 rtol = float(args.rtol or 1.0e-04)
 freq = int(args.dt_per_mesh_movement or 40)
@@ -66,27 +65,18 @@ assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
 
 
-def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
-    """
-    Monitor function focused around the steep_gradient (budd acta numerica)
-
-    NOTE: Defined on the *computational* mesh.
-    """
+def frobenius_monitor(mesh, alpha=alpha):
     P1 = FunctionSpace(mesh, "CG", 1)
-    b = swp.fwd_solutions_bathymetry[0]
-    bath_hess = recovery.recover_hessian(b, op=op)
-    frob_bath_hess = Function(b.function_space()).project(local_frobenius_norm(bath_hess))
-    # TODO: Use component-wise Frobenius norm, not element-wise
-    frob_bath_norm = Function(b.function_space()).project(frob_bath_hess/max(frob_bath_hess.dat.data[:]))
-    norm_two_proj = project(frob_bath_norm, P1)
-    mon_init = project(Constant(1.0) + alpha * norm_two_proj, P1)
-    return mon_init
+    b = project(swp.fwd_solutions_bathymetry[0], P1)
+    H = recovery.recover_hessian(b, op=op)
+    frob = sqrt(H[0, 0]**2 + H[0, 1]**2 + H[1, 0]**2 + H[1, 1]**2)
+    return 1 + alpha*frob/interpolate(frob, P1).vector().gather().max()
 
 
 # --- Simulation and analysis
 
 # Solve forward problem
-swp.set_monitor_functions(gradient_interface_monitor)
+swp.set_monitor_functions(frobenius_monitor)
 t1 = time.time()
 swp.solve_forward()
 t2 = time.time()
