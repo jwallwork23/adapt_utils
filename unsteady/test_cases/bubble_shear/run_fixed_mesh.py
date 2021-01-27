@@ -10,10 +10,15 @@ from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-n", help="Resolution of initial mesh.")
+parser.add_argument("-dt", help="Timestep.")
+parser.add_argument("-end_time", help="Simulation end time.")
+
+parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
-parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
+parser.add_argument("-anisotropic_stabilisation", help="Use anisotropic stabilisation.")
+
 parser.add_argument("-debug", help="Toggle debugging mode.")
 args = parser.parse_args()
 
@@ -23,6 +28,7 @@ args = parser.parse_args()
 kwargs = {
     'tracer_family': args.family or 'dg',
     'stabilisation_tracer': args.stabilisation or 'lax_friedrichs',
+    'anisotropic_stabilisation': bool(args.anisotropic_stabilisation or False),
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     # 'use_limiter_for_tracers': bool(args.limiters or False),
     'use_limiter_for_tracers': False if args.limiters == "0" else True,
@@ -33,6 +39,10 @@ if os.getenv('REGRESSION_TEST') is not None:
     kwargs['end_time'] = 1.5
 op = BubbleOptions(approach='fixed_mesh', n=int(args.n or 1))
 op.update(kwargs)
+if args.dt is not None:
+    op.dt = float(args.dt)
+if args.end_time is not None:
+    op.end_time = float(args.end_time)
 
 
 # --- Solve the tracer transport problem

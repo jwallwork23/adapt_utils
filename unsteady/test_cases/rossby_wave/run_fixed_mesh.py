@@ -91,9 +91,9 @@ if monitor is not None:
     op.__init__(mesh=mesh, **kwargs)
     swp.__init__(op, meshes=[mesh, ])
 
-# Apply constant mesh velocity  # FIXME
+# Apply constant mesh velocity
 if ale:
-    swp.mesh_velocities[0] = Constant(as_vector([-op.lx/op.end_time, 0.0]))
+    raise NotImplementedError  # FIXME
 
 
 # --- Solve forward problem and print diagnostics

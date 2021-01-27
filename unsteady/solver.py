@@ -55,7 +55,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             # 'check_volume_conservation_2d': True,  # TODO
             'norm_smoother': op.norm_smoother,
             'sipg_parameter': None,
-            'mesh_velocity': None,
         }
         for i, swo in enumerate(self.shallow_water_options):
             swo.update(static_options)
@@ -821,8 +820,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
     def create_forward_shallow_water_equations_step(self, i):
         from ..swe.equation import ShallowWaterEquations
 
-        if self.mesh_velocities[i] is not None:
-            self.shallow_water_options[i]['mesh_velocity'] = self.mesh_velocities[i]
         self.equations[i].shallow_water = ShallowWaterEquations(
             self.V[i],
             self.depth[i],
@@ -1089,12 +1086,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'source': self.fields[i].tracer_source_2d,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
             'lax_friedrichs_tracer_scaling_factor': self.tracer_options[i].lax_friedrichs_tracer_scaling_factor,
-            'mesh_velocity': None,
         })
-        if self.mesh_velocities[i] is not None:
-            fields['mesh_velocity'] = self.mesh_velocities[i]
         if self.op.approach in ('lagrangian', 'hybrid'):
-            self.mesh_velocities[i] = u
             fields['uv_{:d}d'.format(self.dim)] = Constant(as_vector(np.zeros(self.dim)))
         if self.stabilisation_tracer == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.tracer_options[i].lax_friedrichs_tracer_scaling_factor
@@ -1112,12 +1105,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'depth_integrated_sink': self.fields[i].sediment_depth_integ_sink,
             'tracer_advective_velocity_factor': self.fields[i].tracer_advective_velocity_factor,
             'lax_friedrichs_tracer_scaling_factor': self.sediment_options[i].lax_friedrichs_tracer_scaling_factor,
-            'mesh_velocity': None,
         })
-        if self.mesh_velocities[i] is not None:
-            fields['mesh_velocity'] = self.mesh_velocities[i]
         if self.op.approach in ('lagrangian', 'hybrid'):
-            self.mesh_velocities[i] = u
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
         if self.stabilisation_sediment == 'lax_friedrichs':
             fields['lax_friedrichs_tracer_scaling_factor'] = self.sediment_options[i].lax_friedrichs_tracer_scaling_factor
@@ -1135,10 +1124,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'morfac': self.op.morphological_acceleration_factor,
             'porosity': self.op.porosity,
         })
-        if self.mesh_velocities[i] is not None:
-            fields['mesh_velocity'] = self.mesh_velocities[i]
         if self.op.approach in ('lagrangian', 'hybrid'):
-            self.mesh_velocities[i] = u
             fields['uv_2d'] = Constant(as_vector([0.0, 0.0]))
         return fields
 

@@ -123,7 +123,7 @@ class AdaptiveProblemBase(object):
         if self.print_progress:
             print_output(msg)
 
-    def set_meshes(self, meshes):
+    def set_meshes(self, meshes, index=None):
         """
         Build a mesh associated with each mesh.
 
@@ -137,6 +137,8 @@ class AdaptiveProblemBase(object):
         if meshes is None:
             op.print_debug("SETUP: Setting default meshes...")
             self.meshes = [op.default_mesh for i in range(self.num_meshes)]
+        elif index is not None:
+            self.meshes[index] = meshes
         elif isinstance(meshes, str):
             self.load_meshes(fname=meshes)  # TODO: allow fpath
         elif not isinstance(meshes, list):
@@ -145,11 +147,18 @@ class AdaptiveProblemBase(object):
             op.print_debug("SETUP: Setting user-provided meshes...")
             assert len(meshes) == self.num_meshes
             self.meshes = meshes
-        self.mesh_velocities = [None for i in range(self.num_meshes)]
         if self.num_cells != [[], ]:
             self.num_cells.append([])
             self.num_vertices.append([])
             self.max_ar.append([])
+
+        if index is not None:
+            mesh = self.meshes[index]
+            self.dim = mesh.topological_dimension()
+            mesh.boundary_len = integrate_boundary(mesh)
+            num_cells, num_vertices = mesh.num_cells(), mesh.num_vertices()
+            self.op.print_debug(msg.format(i, num_cells, num_vertices))
+            return
 
         msg = "SETUP: Mesh {:d} has {:d} elements and {:d} vertices"
         self.dim = self.meshes[0].topological_dimension()
@@ -168,11 +177,6 @@ class AdaptiveProblemBase(object):
                 self.max_ar[-1].append(aspect_ratio(mesh).vector().gather().max())
             else:
                 self.max_ar[-1].append(np.nan)
-
-            # # Create mesh velocity Functions
-            # if op.approach in ('lagrangian', 'ale', 'monge_ampere'):  # TODO
-            #     coords = mesh.coordinates
-            #     self.mesh_velocities[i] = Function(coords.function_space(), name="Mesh velocity")
 
     def setup_all(self, restarted=False, **kwargs):
         """
@@ -514,7 +518,9 @@ class AdaptiveProblemBase(object):
             self.solve_forward(**kwargs)
 
     def solve_forward(self, reverse=False, **kwargs):
-        """Solve forward problem on the full sequence of meshes."""
+        """
+        Solve forward problem on the full sequence of meshes.
+        """
         R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
         for i in R:
             self.transfer_forward_solution(i)
@@ -524,7 +530,9 @@ class AdaptiveProblemBase(object):
                 self.free_solver_forward_step(i)
 
     def solve_adjoint(self, reverse=True, **kwargs):
-        """Solve adjoint problem on the full sequence of meshes."""
+        """
+        Solve adjoint problem on the full sequence of meshes.
+        """
         R = range(self.num_meshes-1, -1, -1) if reverse else range(self.num_meshes)
         for i in R:
             self.transfer_adjoint_solution(i)
@@ -534,7 +542,9 @@ class AdaptiveProblemBase(object):
                 self.free_solver_adjoint_step(i)
 
     def quantity_of_interest(self):
-        """Functional of interest which takes the PDE solution as input."""
+        """
+        Functional of interest which takes the PDE solution as input.
+        """
         raise NotImplementedError("Should be implemented in derived class.")
 
     def save_to_checkpoint(self, f, mode='memory', i=None, **kwargs):
@@ -622,46 +632,51 @@ class AdaptiveProblemBase(object):
             self.mesh_movers[i] = MeshMover(*args, **kwargs)
 
     def move_mesh(self, i):
-        # TODO: documentation
-        if self.op.approach in ('lagrangian', 'ale', 'hybrid'):
-            return self.move_mesh_ale(i)  # TODO: Make more robust (apply BCs etc.)
+        """
+        Move the mesh using an r-adaptive or hybrid method of choice.
+        """
+        if self.op.approach in ('lagrangian', 'hybrid'):
+            return self.move_lagrangian_mesh(i)  # TODO: Make more robust (apply BCs etc.)
+        elif self.op.approach == 'ale':
+            raise NotImplementedError  # TODO
         elif self.mesh_movers[i] is not None:
             return self.move_mesh_monge_ampere(i)
 
-    def move_mesh_ale(self, i):
-        # TODO: documentation
+    def move_lagrangian_mesh(self, i):
+        """
+        Move mesh i in a Lagrangian sense, using a prescribed mesh velocity.
+        """
         op = self.op
         mesh = self.meshes[i]
         t = self.simulation_time
         dt = op.dt
         coords = mesh.coordinates
 
-        # Crank-Nicolson  # TODO: Assemble once
-        if hasattr(op, 'get_velocity'):
-            theta = Constant(0.5)
-            coord_space = coords.function_space()
-            coords_old = Function(coord_space).assign(coords)
-            trial = TrialFunction(coord_space)
-            test = TestFunction(coord_space)
+        assert hasattr(op, 'get_velocity')
+        assert op.timestepper == 'CrankNicolson'
+        theta = Constant(op.implicitness_theta)  # Crank-Nicolson implicitness
+        dx = thetis.dx(degree=3)
+        coord_space = coords.function_space()
+        coords_old = Function(coord_space).assign(coords)
+        test = TestFunction(coord_space)
+        trial = coords
 
-            a = inner(test, trial)*dx
-            a -= theta*dt*inner(test, op.get_velocity(trial, t))*dx
-            L = inner(test, coords_old)*dx
-            L += (1 - theta)*dt*inner(test, op.get_velocity(coords_old, t))*dx  # TODO: Old t?
+        # NOTE: We allow for the velocity to be a nonlinear function of the trial
+        F = inner(test, trial)*dx
+        F += -theta*dt*inner(test, op.get_velocity(trial, t))*dx
+        F += -inner(test, coords_old)*dx
+        F += -(1 - theta)*dt*inner(test, op.get_velocity(coords_old, t))*dx  # TODO: Old t?
 
-            params = {
-                'mat_type': 'aij',
-                # 'ksp_type': 'gmres',
-                'ksp_type': 'preonly',
-                # 'pc_type': 'sor',
-                'pc_type': 'lu',
-                'pc_type_factor_mat_solver_type': 'mumps',
-            }
-            solve(a == L, coords, solver_parameters=params)
-
-        # Forward Euler
-        else:
-            coords.interpolate(coords + dt*self.mesh_velocities[i])
+        params = {
+            'snes_type': 'newtonls',
+            'mat_type': 'aij',
+            # 'ksp_type': 'gmres',
+            'ksp_type': 'preonly',
+            # 'pc_type': 'sor',
+            'pc_type': 'lu',
+            'pc_type_factor_mat_solver_type': 'mumps',
+        }
+        solve(F == 0, coords, solver_parameters=params)  # TODO: Assemble once
 
         # Check for inverted elements
         Q = quality(mesh, initial_signs=self.jacobian_signs[i]).dat.data
@@ -678,7 +693,7 @@ class AdaptiveProblemBase(object):
             if op.hybrid_mode == 'h':
                 self.meshes[i] = adapt(self.meshes[i], M)
             self.meshes[i] = remesh(self.meshes[i])  # TODO: Account for tags
-            self.set_meshes(self.meshes)  # TODO: Case of more than one mesh
+            self.set_meshes(self.meshes)
             self.setup_all(restarted=True)
             self.project_from_intermediary_mesh(i)  # TODO: project fields, too
         num_inverted = len(Q[Q < 0])

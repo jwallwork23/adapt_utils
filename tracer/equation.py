@@ -1,8 +1,7 @@
 """
 2D non-conservative and conservative tracer equations as in Thetis, with a few minor modifications:
     1. Allow for CG discretisations and either SU or SUPG stabilisation.
-    2. Account for mesh movement under a prescribed mesh velocity.
-    3. Enable choice of anisotropic cell size measure.
+    2. Enable choice of anisotropic cell size measure.
 
 **********************************************************************************************
 *  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
@@ -25,13 +24,6 @@ class HorizontalAdvectionTerm(thetis_tracer.HorizontalAdvectionTerm):
     """
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
-
-        # Account for mesh movement
-        mesh_velocity = fields_old.get('mesh_velocity')  # TODO: Make more robust
-        if mesh_velocity is not None:
-            f += (Dx(mesh_velocity[0]*self.test, 0)*solution
-                  + Dx(mesh_velocity[1]*self.test, 1)*solution)*self.dx
-
         if self.horizontal_dg:
             args = (solution, solution_old, fields, fields_old, )
             f += -super(HorizontalAdvectionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
@@ -128,16 +120,9 @@ class ConservativeHorizontalAdvectionTerm(thetis_cons_tracer.ConservativeHorizon
     def residual(self, solution, solution_old, fields, fields_old, bnd_conditions=None):
         f = 0
 
-        # Account for mesh movement
-        mesh_velocity = fields_old.get('mesh_velocity')  # TODO: Make more robust
-        if mesh_velocity is not None:
-            f += (Dx(mesh_velocity[0]*self.test, 0)*solution
-                  + Dx(mesh_velocity[1]*self.test, 1)*solution)*self.dx
-
         if self.horizontal_dg:
             args = (solution, solution_old, fields, fields_old, )
             f += -super(ConservativeHorizontalAdvectionTerm, self).residual(*args, bnd_conditions=bnd_conditions)
-
         else:
             # NOTE: This is a different formulation as for DG!
             uv = fields_old.get('uv_2d')

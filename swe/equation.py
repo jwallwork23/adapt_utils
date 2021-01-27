@@ -3,10 +3,9 @@ Depth averaged shallow water equations as in Thetis, with a few minor modificati
 
     1. Allow the use of a P2-P1 Taylor-Hood discretisation. Note that Dirichlet boundary conditions
        on the elevation are enforced strongly.
-    2. Allow for mesh movement under some prescribed mesh velocity using the option `mesh_velocity`.
-    3. Do not include friction terms if the `use_nonlinear_equations` option is set to false.
-    4. Do not include 3D bottom drag or atmospheric pressure terms.
-    5. Enable choice of anisotropic cell size measure.
+    2. Do not include friction terms if the `use_nonlinear_equations` option is set to false.
+    3. Do not include 3D bottom drag or atmospheric pressure terms.
+    4. Enable choice of anisotropic cell size measure.
 
 **********************************************************************************************
 *  NOTE: This file is based on the Thetis project (https://thetisproject.org) and contains   *
@@ -39,25 +38,6 @@ class ExternalPressureGradientTerm(thetis_sw.ExternalPressureGradientTerm):
             return super(ExternalPressureGradientTerm, self).residual(*args, **kwargs)
 
 
-class HUDivTerm(thetis_sw.HUDivTerm):
-    """
-    Continuity term from Thetis, modified to account for mesh movement under a prescribed mesh
-    velocity.
-    """
-    def residual(self, *args, **kwargs):
-        f = -super(HUDivTerm, self).residual(*args, **kwargs)
-
-        # Account for mesh movement
-        mesh_velocity = self.options.get('mesh_velocity')  # TODO
-        if mesh_velocity is not None:
-            eta = args[1]
-            # f += -self.eta_test*inner(mesh_velocity, grad(eta))*dx
-            f += inner(grad(self.eta_test), eta*mesh_velocity)*dx
-            # f += inner(grad(self.eta_test), total_h*mesh_velocity)*dx
-
-        return -f
-
-
 class HorizontalAdvectionTerm(thetis_sw.HorizontalAdvectionTerm):
     """
     Nonlinear advection term from Thetis, modified to account for mesh movement under a prescribed
@@ -68,15 +48,7 @@ class HorizontalAdvectionTerm(thetis_sw.HorizontalAdvectionTerm):
         uv = args[0]
         uv_old = args[2]
 
-        # Account for mesh movement
         f = 0
-        mesh_velocity = self.options.get('mesh_velocity')  # TODO
-        if mesh_velocity is not None:
-            # f += -inner(self.u_test, dot(mesh_velocity, nabla_grad(uv)))*dx
-            f += (Dx(mesh_velocity[0]*self.u_test[0], 0)*uv[0]
-                  + Dx(mesh_velocity[0]*self.u_test[1], 0)*uv[1]
-                  + Dx(mesh_velocity[1]*self.u_test[0], 1)*uv[0]
-                  + Dx(mesh_velocity[1]*self.u_test[1], 1)*uv[1])*self.dx
         if not self.options.use_nonlinear_equations:
             return -f
 
@@ -133,7 +105,7 @@ class BaseShallowWaterEquation(Equation):
         self.add_term(thetis_sw.MomentumSourceTerm(*args), 'source')
 
     def add_continuity_terms(self, *args):
-        self.add_term(HUDivTerm(*args), 'implicit')
+        self.add_term(thetis_sw.HUDivTerm(*args), 'implicit')
         self.add_term(thetis_sw.ContinuitySourceTerm(*args), 'source')
 
     def residual_uv_eta(self, label, uv, eta, uv_old, eta_old, fields, fields_old, bnd_conditions):

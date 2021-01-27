@@ -64,7 +64,6 @@ op = TrenchSedimentOptions(**kwargs)
 op.dt_per_mesh_movement = freq
 assert op.num_meshes == 1
 swp = AdaptiveProblem(op)
-swp.shallow_water_options[0]['mesh_velocity'] = None
 
 
 def gradient_interface_monitor(mesh, alpha=alpha, gamma=0.0):
