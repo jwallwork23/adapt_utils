@@ -50,7 +50,6 @@ kwargs = {
 }
 op = BubbleOptions(approach='hybrid', n=int(args.n or 1))
 op.update(kwargs)
-op.end_time += op.dt  # FIXME
 
 
 # --- Initialise the mesh
@@ -73,7 +72,7 @@ def monitor(mesh):
 mesh_mover = MeshMover(tp.meshes[0], monitor, method='monge_ampere', op=op)
 mesh_mover.adapt()
 tp.__init__(op, meshes=[Mesh(mesh_mover.x)])
-# for i in range(4):
+# for i in range(op.max_adapt):
 #     tp.set_initial_condition()
 #     M = tp.get_static_hessian_metric('tracer')
 #     space_normalise(M, op=op)
@@ -93,8 +92,6 @@ init_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
 init_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
 tp.solve_forward()
-
-# TODO: Plot inverted elements
 
 # Compare initial and final tracer concentrations
 final_vol = assemble(Constant(1.0)*dx(domain=tp.mesh))
