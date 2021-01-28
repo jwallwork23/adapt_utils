@@ -9,12 +9,15 @@ __all__ = ["TurbineOptions", "SteadyTurbineOptions"]
 
 
 # Default solve parameters for steady state case:
-#   Newton with line search; solve linear system exactly with LU factorisation
+#   - Newton with line search; solve linear system exactly with LU factorisation
+#   - For details on MUMPS parameters, see
+#         mcs.anl.gov/petsc/petsc-current/docs/manualpages/Mat/MATSOLVERMUMPS.html
 lu_params = {
     'mat_type': 'aij',
     'snes_type': 'newtonls',
-    'snes_rtol': 1e-8,
-    'snes_max_it': 100,
+    # 'snes_rtol': 1.0e-08,
+    'snes_rtol': 1.0e-04,
+    'snes_max_it': 20,
     'snes_linesearch_type': 'bt',
     'snes_monitor': None,
     'snes_converged_reason': None,
@@ -22,6 +25,8 @@ lu_params = {
     'ksp_converged_reason': None,
     'pc_type': 'lu',
     'pc_factor_mat_solver_type': 'mumps',
+    # 'mat_mumps_icntl_14': 200,  # Percentage increase in the estimated working space
+    'mat_mumps_icntl_24': 1,    # Detection of null pivot rows (0 or 1)
 }
 default_params = lu_params
 
