@@ -35,7 +35,7 @@ args = parser.parse_args()
 alpha = float(args.alpha or 2.0)
 alpha_const = Constant(alpha)
 res = float(args.res or 0.5)
-rtol = float(args.rtol or 1.0e-04)
+rtol = float(args.rtol or 1.0e-03)
 freq = int(args.dt_per_mesh_movement or 40)
 
 # --- Set parameters

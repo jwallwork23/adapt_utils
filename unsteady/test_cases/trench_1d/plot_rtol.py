@@ -61,6 +61,8 @@ if np.isclose(res, 0.0625):
     yticks = [43, 44, 45, 46, 47, 48]
     host.set_yticks(yticks)
     host.set_yticklabels([r"{{{:.0f}}}\%".format(yt) for yt in yticks])
+elif np.isclose(res, 0.125):
+    host.set_yticklabels([r"{{{:.1f}}}\%".format(yt) for yt in host.get_yticks()])
 elif np.isclose(res, 0.25):
     yticks = host.get_yticks()
     host.set_yticks(yticks)
