@@ -58,7 +58,7 @@ axes.set_xlabel(r"Element count in $x$-direction")
 axes.set_ylabel(r"Relative $\ell_2$ error")
 yticks = [0.01, 0.1, 1, 10, 100]
 axes.set_yticks(yticks)
-axes.set_yticklabels([r"0.01\%", r"0.1\%", r"1\%", r"10\%", r"100\%",])
+axes.set_yticklabels([r"0.01\%", r"0.1\%", r"1\%", r"10\%", r"100\%"])
 
 # Add slope markers
 annotation.slope_marker((20, 1.0e-03), -2, invert=True, ax=axes, size_frac=0.2)

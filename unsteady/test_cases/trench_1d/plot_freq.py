@@ -28,7 +28,7 @@ for freq in freqs:
         time.append(float(f.readline().split(':')[-1][:-2]))
 assert np.allclose(res*np.ones(N), resolutions)
 assert np.allclose(alpha*np.ones(N), alphas)
-assert np.allclose(1.0e-04*np.ones(N), tol)
+assert np.allclose(1.0e-03*np.ones(N), tol)
 
 # Get high resolution data
 df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
@@ -68,23 +68,16 @@ host.set_xticklabels([r"$\frac1{{{:d}}}$".format(int(f)) for f in 1.0/freqs])
 if np.isclose(res, 0.0625):
     host.set_yticks([80, 85, 90, 95, 100, 105])
     host.set_ylim([80, 105])
-    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
-    par1.set_ylim([100, 1000])
+    par1.set_yticks([100, 200, 300, 400, 500, 600])
+    par1.set_ylim([100, 650])
 elif np.isclose(res, 0.125):
     host.set_yticks([30, 35, 40, 45, 50])
-    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
-    par1.set_ylim([100, 1000])
+    par1.set_yticks([100, 200, 300, 400, 500, 600])
+    par1.set_ylim([100, 600])
 elif np.isclose(res, 0.25):
     host.set_yticks([60, 65, 70, 75, 80, 85])
-    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
-elif np.isclose(res, 0.5):
-    host.set_yticks([60, 70, 80, 90])
-    host.set_ylim([60, 90])
-    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900])
-    par1.set_ylim([100, 900])
-elif np.isclose(res, 1.0):
-    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800])
-    par1.set_ylim([200, 800])
+    par1.set_yticks([100, 200, 300, 400, 500, 600])
+    par1.set_ylim([100, 600])
 for yaxis in (host, par1):
     yticks = yaxis.get_yticks()
     yaxis.set_yticklabels([r"{{{:.0f}}}\%".format(yt) for yt in yticks])
