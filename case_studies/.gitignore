@@ -1,5 +1,6 @@
 tohoku/outputs/
 tohoku/hazard/outputs/
+tohoku/hazard/plots/
 tohoku/inversion/1d/outputs/
 tohoku/inversion/box/outputs/
 tohoku/inversion/radial/outputs/
