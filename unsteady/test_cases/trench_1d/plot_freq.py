@@ -36,12 +36,14 @@ df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
 # Get discretisation errors
 disc_err = []
 for freq in freqs:
-    df = pd.read_csv('adapt_output/bed_trench_output_uni_s_{:.4f}_2.0_1.0e-04_{:d}.csv'.format(res, freq))
-    disc_err.append(np.sqrt(sum([(df['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))])))
+    fname = 'adapt_output/bed_trench_output_uni_s_{:.4f}_2.0_1.0e-04_{:d}.csv'.format(res, freq)
+    disc_err.append(np.sqrt(np.sum((pd.read_csv(fname)['bath'] - df_real['bath'])**2)))
 
 # Get fixed mesh data
-df_fixed = pd.read_csv('fixed_output/bed_trench_output_uni_c_{:.4f}.csv'.format(res))
-fixed_err = np.sqrt(sum([(df_fixed['bath'][i] - df_real['bath'][i])**2 for i in range(len(df_real))]))
+fname = 'fixed_output/bed_trench_output_uni_c_{:.4f}.csv'.format(res)
+fixed_err = np.sqrt(np.sum((pd.read_csv(fname)['bath'] - df_real['bath'])**2))
+
+# Get fixed mesh time
 fname = os.path.join(os.path.dirname(__file__), 'outputs', 'res', '{:.4f}'.format(res))
 with open(fname, 'r') as f:
     assert np.isclose(res, float(f.readline().split('=')[-1]))
@@ -64,11 +66,17 @@ plt.xscale('log')
 host.set_xticks(list(freqs))
 host.set_xticklabels([r"$\frac1{{{:d}}}$".format(int(f)) for f in 1.0/freqs])
 if np.isclose(res, 0.0625):
-    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100])
-    par1.set_ylim([100, 1100])
-elif np.isclose(res, 0.125) or np.isclose(res, 0.25):
+    host.set_yticks([80, 85, 90, 95, 100, 105])
+    host.set_ylim([80, 105])
     par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
     par1.set_ylim([100, 1000])
+elif np.isclose(res, 0.125):
+    host.set_yticks([30, 35, 40, 45, 50])
+    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
+    par1.set_ylim([100, 1000])
+elif np.isclose(res, 0.25):
+    host.set_yticks([60, 65, 70, 75, 80, 85])
+    par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800, 900, 1000])
 elif np.isclose(res, 0.5):
     host.set_yticks([60, 70, 80, 90])
     host.set_ylim([60, 90])
@@ -77,9 +85,12 @@ elif np.isclose(res, 0.5):
 elif np.isclose(res, 1.0):
     par1.set_yticks([100, 200, 300, 400, 500, 600, 700, 800])
     par1.set_ylim([200, 800])
+for yaxis in (host, par1):
+    yticks = yaxis.get_yticks()
+    yaxis.set_yticklabels([r"{{{:.0f}}}\%".format(yt) for yt in yticks])
 host.set_xlabel("Mesh movement frequency")
-host.set_ylabel(r"$\ell_2$ error change ($\%$)")
-par1.set_ylabel(r"Time change ($\%$)")
+host.set_ylabel(r"$\ell_2$ error / uniform mesh")
+par1.set_ylabel("CPU time / uniform mesh")
 host.axis["left"].label.set_color(p1.get_color())
 par1.axis["right"].label.set_color(p2.get_color())
 plt.draw()
