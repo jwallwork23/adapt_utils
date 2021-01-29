@@ -163,7 +163,7 @@ if op.approach not in ('dwr', 'isotropic_dwr', 'anisotropic_dwr'):
     sys.exit(0)
 
 # Plot dwr cell residual
-residual = interpolate(abs(tp.indicator['dwr_cell']), tp.indicator['dwr_cell'].function_space())
+residual = interpolate(abs(tp.indicator['cell']), tp.indicator['cell'].function_space())
 fig, axes = plt.subplots(figsize=(12, 5))
 fig.colorbar(tricontourf(residual, axes=axes, **tricontourf_kwargs), ax=axes, **colourbar_kwargs)
 axes.set_yticks([0, 100, 200, 300, 400, 500])
@@ -173,7 +173,7 @@ fname = 'cell_residual__offset{:d}__elem{:d}'
 savefig(fname.format(op.offset, tp.num_cells[-1][0]), plot_dir, extensions=extensions)
 
 # Plot dwr flux
-flux = interpolate(abs(tp.indicator['dwr_flux']), tp.indicator['dwr_flux'].function_space())
+flux = interpolate(abs(tp.indicator['flux']), tp.indicator['flux'].function_space())
 fig, axes = plt.subplots(figsize=(12, 5))
 fig.colorbar(tricontourf(flux, axes=axes, **tricontourf_kwargs), ax=axes, **colourbar_kwargs)
 axes.set_yticks([0, 100, 200, 300, 400, 500])
