@@ -29,7 +29,7 @@ examples = [
     'unsteady/test_cases/rossby_wave/run_fixed_mesh.py',            # Has been cut short
     'unsteady/test_cases/solid_body_rotation/run_fixed_mesh.py',
     # 'unsteady/test_cases/spaceship/run_fixed_mesh.py',            # Takes too long to run
-    'unsteady/test_cases/trench_1d/trench_hydro',
+    'unsteady/test_cases/trench_1d/trench_hydro.py',
     'unsteady/test_cases/trench_1d/run_fixed_mesh.py',              # Has been cut (very) short
     'unsteady/test_cases/trench_slant/run_fixed_mesh.py',           # Has been cut (very) short
     # 'unsteady/test_cases/turbine_array/run_fixed_mesh.py',        # Takes too long to run

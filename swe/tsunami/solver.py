@@ -28,10 +28,9 @@ class AdaptiveTsunamiProblem(AdaptiveProblem):
 
     def get_qoi_timeseries(self):
         self._qoi_timeseries = []
-        for c in self.callbacks:
-            for i in range(self.num_meshes):
-                tag = 'qoi_{:5s}'.format(index_string(i))
-                self._qoi_timeseries.extend(c['timestep'][tag].timeseries)
+        for i in range(self.num_meshes):
+            tag = 'qoi_{:5s}'.format(index_string(i))
+            self._qoi_timeseries.extend(self.callbacks[i]['timestep'][tag].timeseries)
 
     @property
     def qoi_timeseries(self):
