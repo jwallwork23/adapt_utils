@@ -164,6 +164,7 @@ op.J = 0
 
 kernel = Function(swp.fwd_solution)
 
+
 def update_forcings(t):
     # dt = op.dt
     # t = t - dt
@@ -180,6 +181,7 @@ def update_forcings(t):
     # op.J = op.J + assemble(swp.fwd_solution[1]*dx)  # DOESN'T WORK
     # op.J = op.J + assemble(split(swp.fwd_solution)[1]*dx)  # DOESN'T WORK
 
+
 # Solve the forward problem
 print_output("Run forward to get initial timeseries...")
 u, eta = swp.fwd_solution.split()
@@ -191,6 +193,7 @@ J = swp.quantity_of_interest()  # FIXME
 # J = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
 
 # Define reduced functionals
+
 
 def derivative_cb_post(j, dj, c):
     # djdm = vecnorm(dj, order=np.Inf)

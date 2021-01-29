@@ -7,7 +7,7 @@ import os
 
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 from adapt_utils.case_studies.tohoku.options.radial_options import TohokuRadialBasisOptions
-from adapt_utils.norms import vecnorm
+# from adapt_utils.norms import vecnorm
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
 
@@ -183,6 +183,7 @@ solve(a == L, kernel)  # DOESN'T WORK
 # k_u, k_eta = kernel.split()
 # k_eta.assign(1.0)
 
+
 def update_forcings(t):
     q = solver_obj.fields.solution_2d
     # options.qoi = options.qoi + assemble(solver_obj.fields.elev_2d*dx)  # DOESN'T WORK
@@ -192,6 +193,7 @@ def update_forcings(t):
     options.qoi = options.qoi + assemble(elev*dx)
     # kernel.assign(q)
     # options.qoi = options.qoi + assemble(inner(kernel, kernel)*dx)
+
 
 solver_obj.iterate(update_forcings=update_forcings)
 # q = solver_obj.fields.solution_2d
@@ -212,10 +214,10 @@ for control in m:
 
 eta0 = source(m)
 # if test_consistency:
-# 
+#
 #     # Unroll tape
 #     J = reduced_functional(m)
-# 
+#
 #     # By hand
 #     u, eta = swp.fwd_solution.split()
 #     u.assign(0.0)
@@ -223,7 +225,7 @@ eta0 = source(m)
 #     swp.setup_solver_forward_step(0)
 #     swp.solve_forward_step(0)
 #     JJ = assemble(inner(swp.fwd_solution, swp.fwd_solution)*dx)
-# 
+#
 #     # Check consistency
 #     msg = "Pyadjoint disagrees with solve_forward: {:.8e} vs {:.8e}"
 #     assert np.isclose(J, JJ), msg.format(J, JJ)

@@ -13,8 +13,6 @@ import datetime
 import os
 import sys
 import time
-import numpy as np
-import pandas as pd
 
 from adapt_utils.io import initialise_bathymetry, export_bathymetry
 from adapt_utils.unsteady.solver import AdaptiveProblem

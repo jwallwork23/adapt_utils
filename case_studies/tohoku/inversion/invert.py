@@ -330,7 +330,7 @@ if taylor:
         else:
             msg = "Taylor test '{:s}' failed! Convergence ratio {:.2f} < 2."
             raise ConvergenceError(msg.format(mode, minconv))
-        import adapt_utils.optimisation as opt
+        # import adapt_utils.optimisation as opt
         # opt.taylor_test(reduced_functional, gradient, c, verbose=True)
         # print_output("Taylor test '{:s}' passed!".format(mode))
     sys.exit(0)
@@ -368,7 +368,7 @@ if optimise:
             np.save(fname.format('grad'), np.array(gradient_values_opt))
 
         # Run BFGS optimisation
-        reduced_functional = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)
+        reduced_functional = ReducedFunctional(J, controls, derivative_cb_post=derivative_cb_post)  # noqa
         optimised_value = minimize(reduced_functional, method='BFGS', options=opt_kwargs)
         optimised_value = [m.dat.data[0] for m in optimised_value]
     else:
