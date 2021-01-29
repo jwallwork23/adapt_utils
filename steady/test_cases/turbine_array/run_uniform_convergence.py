@@ -70,7 +70,8 @@ for i in range(levels):
 # --- Save to file
 
 # Store QoI and element and DOF counts to HDF5
-with h5py.File('data/qoi_offset_{:d}.h5'.format(op.offset), 'w') as outfile:
+di = create_directory('outputs/fixed_mesh/hdf5')
+with h5py.File(os.path.join(di, 'qoi_offset_{:d}.h5'.format(op.offset)), 'w') as outfile:
     outfile.create_dataset('elements', data=num_cells)
     outfile.create_dataset('dofs', data=dofs)
     outfile.create_dataset('qoi', data=qois)
