@@ -10,11 +10,14 @@ from adapt_utils.plotting import *
 
 
 parser = argparse.ArgumentParser()
+parser.add_argument("-alpha", help="Monitor function parameter")
 parser.add_argument("-res", help="Resolution in x-direction")
+parser.add_argument("-rtol", help="Relative tolerance for Monge-Ampere solver")
 args = parser.parse_args()
 
+alpha = float(args.alpha or 2.0)
 res = float(args.res or 0.5)
-alpha = 2.0
+rtol = float(args.rtol or 1.0e-03)
 
 di = os.path.join(os.path.dirname(__file__), 'outputs', 'freq', '{:.4f}'.format(res))
 freqs = [5, 10, 20, 40, 120, 360, 1080, 2160]
@@ -28,7 +31,7 @@ for freq in freqs:
         time.append(float(f.readline().split(':')[-1][:-2]))
 assert np.allclose(res*np.ones(N), resolutions)
 assert np.allclose(alpha*np.ones(N), alphas)
-assert np.allclose(1.0e-03*np.ones(N), tol)
+assert np.allclose(rtol*np.ones(N), tol)
 
 # Get high resolution data
 df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
@@ -36,7 +39,7 @@ df_real = pd.read_csv('fixed_output/bed_trench_output_uni_c_4.0000.csv')
 # Get discretisation errors
 disc_err = []
 for freq in freqs:
-    fname = 'adapt_output/bed_trench_output_uni_s_{:.4f}_2.0_1.0e-04_{:d}.csv'.format(res, freq)
+    fname = 'adapt_output/bed_trench_output_uni_s_{:.4f}_{:.1f}_{:.1e}_{:d}.csv'.format(res, alpha, rtol, freq)
     disc_err.append(np.sqrt(np.sum((pd.read_csv(fname)['bath'] - df_real['bath'])**2)))
 
 # Get fixed mesh data

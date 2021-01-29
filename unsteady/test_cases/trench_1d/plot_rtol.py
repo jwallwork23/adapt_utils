@@ -10,11 +10,14 @@ from adapt_utils.plotting import *
 
 
 parser = argparse.ArgumentParser()
+parser.add_argument("-alpha", help="Monitor function parameter")
+parser.add_argument("-freq", help="Mesh movement frequency")
 parser.add_argument("-res", help="Resolution in x-direction")
 args = parser.parse_args()
 
+alpha = float(args.alpha or 2.0)
+freq = int(args.freq or 40)
 res = float(args.res or 0.5)
-alpha = 2.0  # TODO
 
 di = os.path.join(os.path.dirname(__file__), 'outputs', 'rtol', '{:.4f}'.format(res))
 fnames = ["{:.0e}".format(10**(-i)) for i in range(1, 9)]
@@ -38,9 +41,10 @@ nrm = np.sqrt(np.sum(df_real['bath']**2))
 
 # Get discretisation errors
 disc_err = []
+fname = fname = 'adapt_output/bed_trench_output_uni_s_{:.4f}_{:.1f}_1.0e-0{:1d}_{:d}.csv'
 for rtol in range(1, 9):
-    fname = 'adapt_output/bed_trench_output_uni_s_{:.4f}_2.0_1.0e-0{:1d}_40.csv'.format(res, rtol)
-    disc_err.append(100*np.sqrt(np.sum((pd.read_csv(fname)['bath'] - df_real['bath'])**2))/nrm)
+    df = pd.read_csv(fname.format(res, alpha, rtol, freq))
+    disc_err.append(100*np.sqrt(np.sum((df['bath'] - df_real['bath'])**2))/nrm)
 
 # Plot both error and time against rtol
 fig, axes = plt.subplots(figsize=(8, 5))

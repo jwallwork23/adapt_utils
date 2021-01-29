@@ -272,13 +272,17 @@ class Options(FrozenConfigurable):
             self.di = os.path.join(self.di, fpath)
         self.di = create_directory(self.di)
         if self.debug:
+            from firedrake.petsc import PETSc
+            PETSc.Sys.popErrorHandler()
             if self.debug_mode == 'basic':
                 set_log_level(INFO)
             else:
                 set_log_level(DEBUG)
 
     def set_all_rtols(self, tol):
-        """Set all relative tolerances to a single value, `tol`."""
+        """
+        Set all relative tolerances to a single value, `tol`.
+        """
         self.element_rtol = tol
         self.qoi_rtol = tol
         self.estimator_rtol = tol
@@ -336,13 +340,17 @@ class Options(FrozenConfigurable):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def get_update_forcings(self, prob, i, **kwargs):
-        """Should be implemented in derived class."""
+        """
+        Should be implemented in derived class.
+        """
         def update_forcings(t):
             return
         return update_forcings
 
     def get_export_func(self, prob, i, **kwargs):
-        """Should be implemented in derived class."""
+        """
+        Should be implemented in derived class.
+        """
         def export_func():
             return
         return export_func
