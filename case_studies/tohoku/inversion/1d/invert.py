@@ -67,7 +67,7 @@ if bool(args.continuous_timeseries or False):
 dirname = os.path.dirname(__file__)
 di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
 if args.extension is not None:
-    di = '_'.join([di, args.extension])
+    di = create_directory('_'.join([di, args.extension]))
 
 # Collect initialisation parameters
 nonlinear = bool(args.nonlinear or False)
@@ -216,7 +216,7 @@ else:
         """
         J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
         swp.solve_adjoint(checkpointing_mode=chk)
-        g = assemble(inner(op.basis_function, swp.adj_solution)*dx)  # TODO: No minus sign?
+        g = assemble(inner(op.basis_function, swp.adj_solution)*dx)
         if use_regularisation:
             g += op.regularisation_term_gradients[0]
         msg = "control = {:15.8e}  functional = {:15.8e}  gradient = {:15.8e}"

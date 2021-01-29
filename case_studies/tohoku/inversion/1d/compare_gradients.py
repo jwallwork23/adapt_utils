@@ -91,7 +91,22 @@ except AssertionError:
         np.save(fname, op.gauges[gauge]['data'])
 
 
+# --- Adjoint-free
+
+print_output("*** ADJOINT-FREE ***...")
+
+# Solve the forward problem with 'suboptimal' control parameter m = 7.5, no checkpointing
+op.di = create_directory(os.path.join(di, 'adjoint_free'))
+swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
+op.assign_control_parameters(kwargs['control_parameters'])
+print_output("Solve forward...")
+swp.solve_forward()
+g_adjoint_free = op.adjoint_free_gradient/kwargs['control_parameters'][0]
+print_output("Gradient computed without adjoint: {:.4e}".format(g_adjoint_free))
+
 # --- Discrete adjoint
+
+print_output("*** DISCRETE ADJOINT ***...")
 
 # Solve the forward problem with 'suboptimal' control parameter m = 7.5
 op.di = create_directory(os.path.join(di, 'discrete'))
@@ -110,7 +125,8 @@ for gauge, fname in zip(gauges, fnames):
     np.save(fname, op.gauges[gauge][timeseries])
 
 # Compute gradient
-g_discrete = swp.compute_gradient(control).dat.data[0]
+# g_discrete = swp.compute_gradient(control).dat.data[0]
+g_discrete = compute_gradient(swp.quantity_of_interest(), control).dat.data[0]
 print_output("Gradient computed by dolfin-adjoint (discrete): {:.4e}".format(g_discrete))
 
 # Check consistency of by-hand gradient formula
@@ -124,6 +140,8 @@ stop_annotating()
 
 
 # --- Continuous adjoint
+
+print_output("*** CONTINUOUS ADJOINT ***...")
 
 # Solve the forward problem with 'suboptimal' control parameter m = 7.5, checkpointing state
 op.di = create_directory(os.path.join(di, 'continuous'))
@@ -140,6 +158,8 @@ elements = swp.meshes[0].num_cells()
 
 
 # --- Finite differences
+
+print_output("*** FINITE DIFFERENCES ***...")
 
 # Establish gradient using finite differences
 if fd:
@@ -167,10 +187,11 @@ if fd:
 # --- Logging
 
 logstr = "elements: {:d}\n".format(elements)
+logstr += "adjoint-free gradient: {:.8e}\n".format(g_adjoint_free)
 if fd:
-    logstr += "finite difference gradient (rtol={:.1e}): {:.4e}\n".format(rtol, g_fd)
-logstr += "discrete gradient: {:.4e}\n".format(g_discrete)
-logstr += "continuous gradient: {:.4e}\n".format(g_continuous)
+    logstr += "finite difference gradient (rtol={:.1e}): {:.8e}\n".format(rtol, g_fd)
+logstr += "discrete gradient: {:.8e}\n".format(g_discrete)
+logstr += "continuous gradient: {:.8e}\n".format(g_continuous)
 print_output(logstr)
 fname = os.path.join(di, "gradient_at_{:.1f}_level{:d}.log")
 with open(fname.format(int(kwargs['control_parameters'][0]), level), 'w') as logfile:

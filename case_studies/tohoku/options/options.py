@@ -626,6 +626,9 @@ class TohokuInversionOptions(TohokuOptions):
                 gauge_dat["diff_smooth"] = []
                 if not self.synthetic or "data" not in self.gauges[gauge]:
                     gauge_dat["data"] = []
+                if hasattr(self, 'nx') and hasattr(self, 'ny'):
+                    if self.nx == self.ny == 1:
+                        self.adjoint_free_gradient = 0.0
 
         def update_forcings(t):
             """
@@ -674,10 +677,14 @@ class TohokuInversionOptions(TohokuOptions):
                 #     * The initial free surface *field* is subtracted in some cases.
                 #     * Factor of half is included in `scaling`
                 #     * Quadrature weights and timestep included in `weight`
-                diff = I*(eta - self.eta_init - gauge_dat["obs"])**2
-                self.J += assemble(scaling*quadrature_weight*gauge_dat["weight"]*diff*dx)
+                diff = eta - self.eta_init - gauge_dat["obs"]
+                wq = scaling*quadrature_weight*gauge_dat["weight"]
+                self.J += assemble(wq*I*diff*diff*dx)
                 if self.save_timeseries:
-                    gauge_dat["diff_smooth"].append(assemble(diff*dx, annotate=False))
+                    gauge_dat["diff_smooth"].append(assemble(I*diff*diff*dx, annotate=False))
+                    if hasattr(self, "adjoint_free_gradient"):
+                        # NOTE: Factor of 2 counteracts the half in scaling
+                        self.adjoint_free_gradient += assemble(2*wq*I*diff*eta*dx, annotate=False)
 
         return update_forcings
 
