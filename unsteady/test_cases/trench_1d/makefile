@@ -99,79 +99,8 @@ freq_20:
 	python3 run_moving_mesh.py -res 0.25 -alpha 2 -dt_per_mesh_movement 2160 > outputs/freq/0.2500/2160
 	python3 run_fixed_mesh.py -res 0.25 > outputs/res/0.2500
 
-alpha: alpha_5 alpha_10 alpha_20
-
-alpha_5:
-	python3 run_moving_mesh.py -res 0.0625 -alpha 0 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 1 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 2 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 3 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 4 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 5 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 6 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 7 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 8 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 9 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 10 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 11 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 12 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 13 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 14 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.0625 -alpha 15 -dt_per_mesh_movement 40
-
-alpha_10:
-	python3 run_moving_mesh.py -res 0.125 -alpha 0 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 1 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 2 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 3 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 4 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 5 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 6 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 7 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 8 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 9 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 10 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 11 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 12 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 13 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 14 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.125 -alpha 15 -dt_per_mesh_movement 40
-
-alpha_20:
-	python3 run_moving_mesh.py -res 0.25 -alpha 0 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 1 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 2 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 3 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 4 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 5 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 6 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 7 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 8 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 9 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 10 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 11 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 12 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 13 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 14 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.25 -alpha 15 -dt_per_mesh_movement 40
-
-alpha_40:
-	python3 run_moving_mesh.py -res 0.5 -alpha 0 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 1 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 2 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 3 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 4 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 5 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 6 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 7 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 8 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 9 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 10 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 11 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 12 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 13 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 14 -dt_per_mesh_movement 40
-	python3 run_moving_mesh.py -res 0.5 -alpha 15 -dt_per_mesh_movement 40
+alpha:
+	./run_alpha.sh
 
 plot: plot_rtol plot_freq plot_res
 
@@ -184,6 +113,9 @@ plot_freq:
 	python3 plot_freq.py -res 0.0625
 	python3 plot_freq.py -res 0.125
 	python3 plot_freq.py -res 0.25
+
+plot_alpha:
+	python3 plot_alpha.py
 
 plot_res:
 	python3 plot_res.py
