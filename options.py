@@ -81,13 +81,19 @@ class Options(FrozenConfigurable):
         Account for mesh anisotropy by using an alternative cell size measure to `CellSize`.
         """).tag(config=True)
     use_automatic_sipg_parameter = Bool(True, help="""
-        Toggle automatic generation of symmetric interior penalty method.""").tag(config=True)
+        Toggle automatic generation of symmetric interior penalty method.
+        """).tag(config=True)
+    use_maximal_sipg = Bool(False, help="""
+        Use the maximum of the automatically generated SIPG field over the whole domain.
+        """).tag(config=True)
 
     # Solver parameters
     solver_parameters = PETScSolverParameters({}, help="""
-        Solver parameters for the forward model, separated by equation set.""").tag(config=True)
+        Solver parameters for the forward model, separated by equation set.
+        """).tag(config=True)
     adjoint_solver_parameters = PETScSolverParameters({}, help="""
-        Solver parameters for the adjoint models, separated by equation set.""").tag(config=True)
+        Solver parameters for the adjoint models, separated by equation set.
+        """).tag(config=True)
 
     # Outputs
     debug = Bool(False, help="Toggle debugging for more verbose screen output.").tag(config=True)
@@ -101,7 +107,7 @@ class Options(FrozenConfigurable):
 
     # --- Adaptation
 
-    approach = Unicode('fixed_mesh', help="Mesh adaptive approach.").tag(config=True)
+    approach = Unicode('fixed_mesh', help="Mesh adaptation approach.").tag(config=True)
 
     # Metric based
     rescaling = PositiveFloat(0.85, help="""

@@ -3,7 +3,6 @@ from thetis import *
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
-import os
 
 from adapt_utils.case_studies.tohoku.hazard.options import TohokuHazardOptions
 from adapt_utils.plotting import *
