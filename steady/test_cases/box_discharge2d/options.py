@@ -32,6 +32,8 @@ class PowerOptions(TracerOptions):
         self.region_of_interest = [(3., 2., 0.1)] if centred else [(3., 2.5, 0.1)]
         self.base_diffusivity = 1.0
         self.base_velocity = [15.0, 0.0]
+        self.characteristic_speed = Constant(15.0)
+        self.characteristic_diffusion = Constant(1.0)
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)
@@ -44,6 +46,9 @@ class PowerOptions(TracerOptions):
         }
         return boundary_conditions
 
+    def get_velocity(self, t):
+        return as_vector(self.base_velocity)
+
     def set_initial_condition(self, prob):
         u, eta = prob.fwd_solutions[0].split()
         u.interpolate(as_vector(self.base_velocity))
@@ -51,11 +56,11 @@ class PowerOptions(TracerOptions):
     def set_source(self, fs):  # TODO
         source = self.bump(fs.mesh(), source=True)
         area = assemble(source*dx)
-        rescaling = 1.0 if np.allclose(area, 0.0) else 0.04/area
+        rescaling = 1.0 if np.isclose(area, 0.0) else 0.04/area
         return interpolate(rescaling*source)
 
     def set_qoi_kernel(self, fs):  # FIXME: update
         kernel = self.bump(fs.mesh())
         area = assemble(kernel*dx)
-        rescaling = 1.0 if np.allclose(area, 0.0) else 0.04/area
+        rescaling = 1.0 if np.isclose(area, 0.0) else 0.04/area
         return interpolate(rescaling*kernel, fs)

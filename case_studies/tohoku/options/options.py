@@ -3,9 +3,8 @@ from thetis import *
 import netCDF4
 import os
 
-from adapt_utils.io import load_mesh
-from adapt_utils.unsteady.swe.tsunami.options import TsunamiOptions
-from adapt_utils.unsteady.swe.tsunami.conversion import from_latlon
+from adapt_utils.swe.tsunami.options import TsunamiOptions
+from adapt_utils.swe.tsunami.conversion import from_latlon
 
 
 __all__ = ["TohokuOptions", "TohokuInversionOptions"]
@@ -39,38 +38,33 @@ class TohokuOptions(TsunamiOptions):
         :kwarg force_zone_number: allow to use a specific UTM zone even if some mesh coordinates lie
             outside of it.
         :kwarg base_viscosity: :type:`float` value to be assigned to constant viscosity field.
-        :kwarg postproc: :type:`bool` value toggling whether to use an initial mesh which has been
-            postprocessed using Pragmatic (see `resources/meshes/postproc.py`.)
         """
         super(TohokuOptions, self).__init__(force_zone_number=force_zone_number, **kwargs)
 
         # Process keyword arguments
         self.level = kwargs.get('level', 0)
-        postproc = kwargs.get('postproc', False)
+        self.save_timeseries = kwargs.get('save_timeseries', False)
+        self.synthetic = kwargs.get('synthetic', False)
+        if not self.synthetic:
+            self.noisy_data = kwargs.get('noisy_data', False)
+        self.qoi_scaling = kwargs.get('qoi_scaling', 1.0)
 
         # Mesh
         self.print_debug("INIT: Loading mesh...")
         self.resource_dir = os.path.join(os.path.dirname(__file__), '..', 'resources')
         self.mesh_dir = os.path.join(self.resource_dir, 'meshes')
         self.mesh_file = 'Tohoku{:d}'.format(self.level)
-        if mesh is None:
-            if postproc:
-                self.default_mesh = load_mesh(self.mesh_file, self.mesh_dir)
-            else:
-                self.default_mesh = Mesh(os.path.join(self.mesh_dir, self.mesh_file) + '.msh')
-        else:
-            self.default_mesh = mesh
-        self.num_cells = [15849, 62626, 247970, 988882]
+        self.default_mesh = mesh or Mesh(os.path.join(self.mesh_dir, self.mesh_file) + '.msh')
 
         # Physics
         self.friction = None
         # self.friction = 'manning'  # FIXME
-        self.friction_coeff = 0.025
+        self.friction_coeff = 0.0025
         self.base_viscosity = kwargs.get('base_viscosity', 0.0)
 
         # Stabilisation
         self.use_automatic_sipg_parameter = not np.isclose(self.base_viscosity, 0.0)
-        self.sipg_parameter = kwargs.get('sipg_paramter', None)
+        self.sipg_parameter = kwargs.get('sipg_parameter', None)
 
         # Timestepping
         # ============

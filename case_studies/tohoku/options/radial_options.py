@@ -85,7 +85,8 @@ class TohokuRadialBasisOptions(TohokuInversionOptions):
         """
         Assemble an array of radial basis functions, rotated by specified angle.
         """
-        from adapt_utils.misc import gaussian, rotation_matrix
+        from adapt_utils.misc import gaussian
+        from adapt_utils.linalg import rotation_matrix
 
         # Gather parameters
         x0, y0 = self.centre_x, self.centre_y  # Centre of basis region

@@ -6,7 +6,7 @@ import weakref
 import numpy as np
 import matplotlib.pyplot as plt
 
-from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.options import CoupledOptions
 
 
 __all__ = ["BoydOptions"]

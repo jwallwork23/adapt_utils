@@ -4,8 +4,8 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as ptch
 import os
 
+from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
 from adapt_utils.unsteady.test_cases.spaceship.options import SpaceshipOptions
-from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
 
 
 # --- Set parameters

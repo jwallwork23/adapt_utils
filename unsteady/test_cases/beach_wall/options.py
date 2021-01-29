@@ -3,8 +3,8 @@ from thetis.configuration import *
 from thetis.options import ModelOptions2d
 
 from adapt_utils.io import initialise_hydrodynamics
-from adapt_utils.unsteady.options import CoupledOptions
-from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
+from adapt_utils.options import CoupledOptions
+from adapt_utils.sediment.sediments_model import SedimentModel
 
 import numpy as np
 
@@ -46,7 +46,7 @@ class BeachOptions(CoupledOptions):
         self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
 
         self.plot_pvd = True
-        self.hessian_recovery = 'dL2'
+        self.hessian_recovery = 'L2'
 
         self.grad_depth_viscosity = True
 
@@ -54,6 +54,7 @@ class BeachOptions(CoupledOptions):
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         self.morphological_acceleration_factor = Constant(1000)
 

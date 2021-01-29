@@ -3,8 +3,8 @@ from thetis.configuration import *
 from thetis.options import ModelOptions2d
 
 from adapt_utils.io import initialise_hydrodynamics
-from adapt_utils.unsteady.options import CoupledOptions
-from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
+from adapt_utils.options import CoupledOptions
+from adapt_utils.sediment.sediments_model import SedimentModel
 
 import numpy as np
 
@@ -41,6 +41,7 @@ class TrenchSlantOptions(CoupledOptions):
 
         # Stabilisation
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         # Initial
         self.uv_init, self.elev_init = initialise_hydrodynamics(input_dir, outputdir=output_dir, op=self)
@@ -67,7 +68,7 @@ class TrenchSlantOptions(CoupledOptions):
     def set_up_morph_model(self, input_dir, mesh=None):
 
         # Physical
-        self.base_diffusivity = 0.18161630470135287
+        self.base_diffusivity = 0.18011042551606954
 
         self.porosity = Constant(0.4)
         self.ks = Constant(0.025)

@@ -1,11 +1,9 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Mon May 25 14:59:04 2020
+Beach Profile Test case
+=======================
 
-@author: mc4117
+Solves the initial hydrodynamics simulation of a beach profile
 
-Spin up hydrodynamics for simulation
 """
 
 import thetis as th
@@ -14,8 +12,6 @@ import hydro_fns as hydro
 import numpy as np
 
 from adapt_utils.io import export_hydrodynamics
-
-plot = False
 
 
 def boundary_conditions_fn_balzano(bathymetry_2d, flag=None, morfac=1, t_new=0, state='initial'):
@@ -61,11 +57,14 @@ def boundary_conditions_fn_balzano(bathymetry_2d, flag=None, morfac=1, t_new=0, 
         return inflow_constant, outflow_constant
 
 
+fac_x = 0.5
+fac_y = 1
+
 # define mesh
 lx = 220
 ly = 10
-nx = np.int(lx*0.5)
-ny = 10
+nx = np.int(lx*fac_x)
+ny = np.int(10*fac_y)
 mesh2d = th.RectangleMesh(nx, ny, lx, ly)
 
 # define function spaces
@@ -98,30 +97,5 @@ solver_obj.iterate(update_forcings=update_forcings_hydrodynamics)
 
 uv, elev = solver_obj.fields.solution_2d.split()
 
-if plot is False:
-    fpath = "hydrodynamics_beach_l_sep_nx_{:d}_{:d}".format(nx, ny)
-    export_hydrodynamics(uv, elev, fpath)
-else:
-    import pylab as plt
-
-    x = np.linspace(0, 220, 221)
-
-    bath = [-(4.5 - i/40) for i in x]
-
-    # change t_end = 30
-    wd_bath_displacement = solver_obj.depth.wd_bathymetry_displacement
-    eta = solver_obj.fields.elev_2d
-    eta_tilde = th.Function(P1_2d).project(eta+wd_bath_displacement(eta))
-
-    xaxisthetis1 = []
-    elevthetis1 = []
-
-    for i in np.linspace(0, 219, 220):
-        xaxisthetis1.append(i)
-        elevthetis1.append(eta_tilde.at([i, 5]))
-
-    plt.plot(xaxisthetis1, elevthetis1, label='water surface')
-    plt.plot(x, bath, label='bed height')
-    plt.xlabel(r'$x$ (m)')
-    plt.ylabel(r'height (m)')
-    plt.legend(loc=3)
+fpath = "hydrodynamics_beach_l_sep_nx_{:d}_{:d}".format(nx, ny)
+export_hydrodynamics(uv, elev, fpath)

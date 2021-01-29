@@ -5,7 +5,7 @@ from math import e
 import numpy as np
 import os
 
-from adapt_utils.unsteady.swe.turbine.options import TurbineOptions
+from adapt_utils.swe.turbine.options import TurbineOptions
 
 
 __all__ = ["SpaceshipOptions"]
@@ -55,7 +55,8 @@ class SpaceshipOptions(TurbineOptions):
         self.spun = spun
 
         # Timestepping
-        self.timestepper = 'PressureProjectionPicard'
+        self.timestepper = 'CrankNicolson'
+        # self.timestepper = 'PressureProjectionPicard'
         self.implicitness_theta = 1.0
         self.use_semi_implicit_linearisation = True
         self.dt = 10.0

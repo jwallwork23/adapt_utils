@@ -1,12 +1,20 @@
 # Directories
 __pycache__/
+swe/tsunami/tsunami1d/
+steady/spacetime/
 
 # Specific files
+TODO
 FIXME
 .DS_Store
 condition.py
+steady/swe/solver.py
+
+# File endings
+*_old.py
 
 # File types
+*.csv
 *.swp
 *.msh
 *.pvd

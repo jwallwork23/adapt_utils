@@ -13,12 +13,6 @@ mesh:
 	@mkdir -p resources/meshes
 	@python meshgen.py
 
-mesh_postproc:
-	@echo "Post-processing meshes..."
-	@python3 resources/meshes/postproc.py \
-		-dm_plex_prescribed_boundary_labels 100,200,300 \
-		-dm_plex_prescribed_boundary_sizes 100e3,10e3,5e3 -dm_plex_remesh_bd
-
 
 # --- Gauges
 

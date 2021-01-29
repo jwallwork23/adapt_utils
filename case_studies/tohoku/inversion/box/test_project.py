@@ -10,8 +10,8 @@ from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
 from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOptions
 from adapt_utils.plotting import *
 from adapt_utils.norms import timeseries_error
+from adapt_utils.swe.tsunami.conversion import lonlat_to_utm
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 
 # --- Parse arguments

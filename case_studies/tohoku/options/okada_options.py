@@ -144,7 +144,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         If control parameters were not provided then data are downloaded according to the
         `download_okada_parameters` method.
         """
-        from adapt_utils.unsteady.swe.tsunami.dtopotools import Fault, SubFault
+        from adapt_utils.swe.tsunami.dtopotools import Fault, SubFault
 
         # Reset subfaults if requested
         if reset:

@@ -3,8 +3,8 @@ from thetis import *
 import argparse
 import os
 
-from adapt_utils.case_studies.tohoku.options.hazard_options import TohokuHazardOptions
-from adapt_utils.unsteady.swe.tsunami.solver import AdaptiveTsunamiProblem
+from adapt_utils.case_studies.tohoku.hazard.options import TohokuHazardOptions
+from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 
 # --- Parse arguments
@@ -45,7 +45,7 @@ if args.locations is None:  # TODO: Parse as list
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)
-plot_pvd = bool(args.plot_pvd or False)
+plot_pvd = False if args.plot_pvd == '0' else True
 kwargs = {
     'approach': 'fixed_mesh',
 
@@ -59,8 +59,8 @@ kwargs = {
     # 'bathymetry_cap': None,
 
     # Solver
-    'family': args.family or 'dg-cg',
-    'stabilsation': args.stabilisation,
+    'family': args.family or 'cg-cg',
+    'stabilisation': args.stabilisation,
     # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
     'wetting_and_drying_alpha': Constant(10.0),

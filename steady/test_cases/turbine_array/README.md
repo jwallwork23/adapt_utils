@@ -1,7 +1,7 @@
 ## Two turbines in a channel
 
-Test case as described in [Wallwork et al.], modelling two turbines positioned in a channel. Two
-different configurations are considered: one in which the turbines are aligned and another where
+Test case as described in [Wallwork et al. 2020b], modelling two turbines positioned in a channel.
+Two different configurations are considered: one in which the turbines are aligned and another where
 they are offset.
 
 Many thanks to [Stephan Kramer][1] for coding the original fixed mesh version of this test case in
@@ -30,12 +30,9 @@ drag coefficient and divided by water depth).
 
 ### References
 
-[Wallwork et al.] J.G. Wallwork, N. Barral, S.C. Kramer, D.A. Ham, M.D. Piggott,
-                  "Goal-oriented error estimation and mesh adaptation for shallow water
-                  modelling" (2020), Springer Nature Applied Sciences, volume 2, pp.1053--1063,
-                  DOI: 10.1007/s42452-020-2745-9, URL: https://rdcu.be/b35wZ.
-
-[Kramer and Piggott] S.C. Kramer, M.D. Piggott, "A correction to the enhanced bottom drag
-                     parameterisation of tidal turbines." Renewable Energy 92 (2016): 385-396.
+[Wallwork et al. 2020b] J. G. Wallwork, N. Barral, S. C. Kramer, D. A. Ham, M. D. Piggott,
+    "Goal-oriented error estimation and mesh adaptation for shallow water modelling" (2020),
+    Springer Nature Applied Sciences, volume 2, pp.1053--1063, DOI: 10.1007/s42452-020-2745-9,
+    URL: https://rdcu.be/b35wZ.
 
 [1]: https://www.imperial.ac.uk/people/s.kramer "Stephan Kramer"

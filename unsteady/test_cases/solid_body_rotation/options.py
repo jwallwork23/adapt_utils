@@ -1,10 +1,9 @@
 from thetis import *
-from thetis.configuration import *
 
 import math
 import os
 
-from adapt_utils.unsteady.options import CoupledOptions
+from adapt_utils.options import CoupledOptions
 
 
 __all__ = ["LeVequeOptions"]
@@ -28,9 +27,10 @@ class LeVequeOptions(CoupledOptions):
     The QoI considered in this test case may be viewed as an extension of the QoI considered in the
     [Power et al. 2006] and TELEMAC-2D test cases to time-dependent problems.
     """
-    def __init__(self, shape=0, geometry='circle', n=0, background_concentration=0.0, **kwargs):
+    def __init__(self, shape=0, geometry='circle', level=0, background_concentration=0.0, **kwargs):
         self.solve_swe = False
         self.solve_tracer = True
+        self.adapt_field = 'tracer'
         self.shape = shape
 
         # Temporal discretisation
@@ -49,10 +49,10 @@ class LeVequeOptions(CoupledOptions):
                 self.default_mesh = Mesh(mesh_file)
             else:
                 raise IOError("Mesh file {:s} does not exist.".format(mesh_file))
-            if n > 0:
-                self.default_mesh = MeshHierarchy(self.default_mesh, n)[-1]
+            if level > 0:
+                self.default_mesh = MeshHierarchy(self.default_mesh, level)[-1]
         elif geometry == 'square':
-            self.default_mesh = UnitSquareMesh(40*2**n, 40*2**n)
+            self.default_mesh = UnitSquareMesh(40*2**level, 40*2**level)
         else:
             raise ValueError("Geometry {:s} not recognised.".format(geometry))
         self.default_mesh.coordinates.dat.data[:] -= 0.5
@@ -66,12 +66,13 @@ class LeVequeOptions(CoupledOptions):
 
         # Physics
         self.base_diffusivity = 0.0
+        self.characteristic_speed = Constant(1.0)  # TODO: check
 
         # Spatial discretisation
         if self.tracer_family == 'cg':
-            self.stabilisation = 'SUPG'
+            self.stabilisation_tracer = 'supg'
         elif self.tracer_family == 'dg':
-            self.stabilisation = 'lax_friedrichs'
+            self.stabilisation_tracer = 'lax_friedrichs'
             self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
 
         # Solver

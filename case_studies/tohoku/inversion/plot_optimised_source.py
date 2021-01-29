@@ -7,8 +7,8 @@ import sys
 
 from adapt_utils.argparse import ArgumentParser
 from adapt_utils.plotting import *
+from adapt_utils.swe.tsunami.conversion import lonlat_to_utm
 from adapt_utils.unsteady.solver import AdaptiveProblem
-from adapt_utils.unsteady.swe.tsunami.conversion import lonlat_to_utm
 
 
 # --- Parse arguments

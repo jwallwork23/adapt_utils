@@ -4,8 +4,8 @@ from thetis.options import ModelOptions2d
 
 import numpy as np
 
-from adapt_utils.unsteady.options import CoupledOptions
-from adapt_utils.unsteady.sediment.sediments_model import SedimentModel
+from adapt_utils.options import CoupledOptions
+from adapt_utils.sediment.sediments_model import SedimentModel
 
 
 __all__ = ["BeachOptions"]
@@ -47,9 +47,10 @@ class BeachOptions(CoupledOptions):
 
         # Models
         self.set_up_morph_model(self.default_mesh)
-        self.hessian_recovery = 'dL2'
+        self.hessian_recovery = 'L2'
         self.grad_depth_viscosity = True
         self.stabilisation = 'lax_friedrichs'
+        self.stabilisation_sediment = 'lax_friedrichs'
 
         # Boundary conditions
         h_amp = 0.25  # Ocean boundary forcing amplitude

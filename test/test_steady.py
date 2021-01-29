@@ -14,14 +14,13 @@ import shutil
 
 # Collate a list of all examples to be tested
 examples = [
-    # TODO: 'box_discharge2d/run.py',
-    # TODO: 'point_discharge2d/run.py',
-    # TODO: 'point_discharge2d/run_uniform_convergence.py',
-    # TODO: 'point_discharge3d/run.py',
+    # TODO: 'box_discharge2d/run_fixed_mesh.py',
+    'point_discharge2d/run_fixed_mesh.py',
+    # TODO: 'point_discharge2d/run_adapt.py',
+    'point_discharge3d/run_fixed_mesh.py',
     # TODO: 'space_time_ripple/run_fixed_mesh.py',
-    'turbine_array/run.py',
-    # TODO: 'turbine_array/run_uniform_convergence.py',
-    # TODO: 'turbine_array/run_adaptive_convergence.py',
+    'turbine_array/run_fixed_mesh.py',
+    # TODO: 'turbine_array/run_adapt.py',
 ]
 cwd = os.path.abspath(os.path.dirname(__file__))
 unsteady_dir = os.path.abspath(os.path.join(cwd, '..', 'steady', 'test_cases'))

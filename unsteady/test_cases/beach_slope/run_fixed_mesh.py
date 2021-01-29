@@ -1,3 +1,11 @@
+"""
+Beach Profile Test case
+=======================
+
+Solves the hydro-morphodynamic simulation of a beach profile on a fixed uniform mesh
+
+"""
+
 from thetis import *
 import firedrake as fire
 
@@ -14,8 +22,8 @@ from adapt_utils.unsteady.test_cases.beach_slope.options import BeachOptions
 
 t1 = time.time()
 
-nx = 1
-ny = 1
+fac_x = 0.5
+fac_y = 1
 
 ts = time.time()
 st = datetime.datetime.fromtimestamp(ts).strftime('%Y-%m-%d %H:%M:%S')
@@ -23,22 +31,23 @@ di = os.path.dirname(__file__)
 outputdir = os.path.join(di, 'outputs' + st)
 
 # to create the input hydrodynamics directiory please run beach_tidal_hydro.py
-# setting nx and ny to be the same values as above
+# setting fac_x and fac_y to be the same values as above
 
-# we have included the hydrodynamics input dir for nx = 1 and ny = 1 as an example
+# we have included the hydrodynamics input dir for fac_x = 0.5 and fac_y = 1 as an example
 
-inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(nx*220)))
+inputdir = os.path.join(di, 'hydrodynamics_beach_l_sep_nx_' + str(int(fac_x*220)) + '_' + str(int(fac_y*10)))
 print(inputdir)
 kwargs = {
     'approach': 'fixed_mesh',
-    'nx': nx,
-    'ny': ny,
+    'nx': fac_x,
+    'ny': fac_y,
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
+    'stabilisation_sediment': None,
     'use_automatic_sipg_parameter': True,
     'friction': 'manning'
 }
@@ -61,19 +70,21 @@ new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
 
-fpath = "hydrodynamics_beach_bath_fixed_{:d}_{:d}".format(int(nx*220), ny)
+fpath = "hydrodynamics_beach_bath_fixed_{:d}_{:d}".format(int(fac_x*220), int(fac_y*10))
 export_bathymetry(bath, os.path.join("fixed_output", fpath), op=op)
 
-xaxisthetis1 = []
-baththetis1 = []
+bath_real = initialise_bathymetry(new_mesh, os.path.join(di, 'fixed_output/hydrodynamics_beach_bath_fixed_440_10'))
 
-for i in np.linspace(0, 219, 220):
-    xaxisthetis1.append(i)
-    baththetis1.append(-bath.at([i, 5]))
-df = pd.concat([pd.DataFrame(xaxisthetis1, columns=['x']), pd.DataFrame(baththetis1, columns=['bath'])], axis=1)
-df.to_csv("final_result_check_nx" + str(nx) + "_ny" + str(ny) + ".csv", index=False)
-
-bath_real = initialise_bathymetry(new_mesh, os.path.join(di, 'fixed_output/hydrodynamics_beach_bath_fixed_440_1'))
-
-print('L2')
+print('whole domain error')
 print(fire.errornorm(bath, bath_real))
+
+V = FunctionSpace(new_mesh, 'CG', 1)
+
+x, y = SpatialCoordinate(new_mesh)
+
+bath_mod = Function(V).interpolate(conditional(x > 70, bath, Constant(0.0)))
+bath_real_mod = Function(V).interpolate(conditional(x > 70, bath_real, Constant(0.0)))
+
+print('subdomain error')
+
+print(fire.errornorm(bath_mod, bath_real_mod))

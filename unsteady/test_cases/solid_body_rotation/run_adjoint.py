@@ -38,9 +38,9 @@ kwargs = {
     'geometry': geometry,
 
     # Spatial discretisation
-    'refinement_level': i,
+    'level': i,
     'tracer_family': args.family or 'dg',
-    'stabilisation': args.stabilisation,
+    'stabilisation_tracer': args.stabilisation,
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or True),
     'use_tracer_conservative_form': bool(args.conservative or False),

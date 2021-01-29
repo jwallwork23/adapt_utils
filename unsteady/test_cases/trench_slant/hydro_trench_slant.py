@@ -1,21 +1,19 @@
-#!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 """
-Created on Fri Apr  5 15:13:47 2019
+Migrating Trench 2D Test case
+=======================
 
-@author: mc4117
+Solves initial hydrodynamics simulation of a 2D migrating trench
+
 """
-
 import thetis as th
 import hydro_fns as hydro
 import numpy as np
-import pylab as plt
 
 from adapt_utils.io import export_hydrodynamics
 
-timestep = 0.1
-fac = 3
-fac2 = 3
+timestep = 0.25
+fac_x = 0.5
+fac_y = 0.5
 
 
 def boundary_conditions_fn_trench(bathymetry_2d, flag, morfac=1, t_new=0, state='initial'):
@@ -47,9 +45,9 @@ def boundary_conditions_fn_trench(bathymetry_2d, flag, morfac=1, t_new=0, state=
 # define mesh
 lx = 16
 ly = 1.1
-nx = np.int(lx*5*fac)
-ny = np.int(np.ceil(5*fac2))
-print(ny)
+nx = np.int(lx*5*fac_x)
+ny = np.int(np.ceil(5*fac_y))
+
 mesh2d = th.RectangleMesh(nx, ny, lx, ly)
 
 x, y = th.SpatialCoordinate(mesh2d)
@@ -70,27 +68,16 @@ trench = th.conditional(th.le(x, 5), (0.1*(y-0.55)) + depth_riv, th.conditional(
                         th.conditional(th.le(x, 9.5), (0.1*(y-0.55)) + depth_trench, th.conditional(th.le(x, 11), (0.1*(y-0.55)) - (1/1.5)*depth_diff*(x-11) + depth_riv, (0.1*(y-0.55)) + depth_riv))))
 bathymetry_2d.interpolate(-trench)
 
-
-fig, ax = plt.subplots(figsize=(10, 3))
-test = th.Function(V).interpolate(trench)
-th.plot(test, axes=ax)
-ax.set_xlabel(r'$x(m)$', axes=ax)
-ax.set_ylabel(r'$y(m)$')
-ax.set_xlim([0, 16])
-ax.set_ylim([0, 1.1])
-plt.text(19, 0.5, r'$z_{b}$ (m)', fontsize=12, rotation=270)
-plt.show()
-
 # define initial elevation
 elev_init = th.Function(P1_2d).interpolate(th.Constant(0.4))
 uv_init = th.as_vector((0.51, 0.0))
 
-solver_obj, update_forcings_hydrodynamics = hydro.hydrodynamics_only(boundary_conditions_fn_trench, mesh2d, bathymetry_2d, uv_init, elev_init, ks=0.025, average_size=160 * (10**(-6)), dt=timestep, t_end=500)
+solver_obj, update_forcings_hydrodynamics = hydro.hydrodynamics_only(boundary_conditions_fn_trench, mesh2d, bathymetry_2d, uv_init, elev_init, average_size=160 * (10**(-6)), dt=timestep, t_end=500)
 
 # run model
 solver_obj.iterate(update_forcings=update_forcings_hydrodynamics)
 
 
 uv, elev = solver_obj.fields.solution_2d.split()
-fpath = "hydrodynamics_trench_slant_{:d}".format(fac)
+fpath = "hydrodynamics_trench_slant_" + str(fac_x)
 export_hydrodynamics(uv, elev, fpath)

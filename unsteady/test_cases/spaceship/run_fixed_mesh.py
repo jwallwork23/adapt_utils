@@ -1,5 +1,3 @@
-from thetis import create_directory, print_output, File, COMM_WORLD
-
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
@@ -7,9 +5,10 @@ import os
 import sys
 from time import perf_counter
 
-from adapt_utils.unsteady.swe.turbine.solver import AdaptiveTurbineProblem
-from adapt_utils.unsteady.test_cases.spaceship.options import SpaceshipOptions
+from adapt_utils.io import create_directory, print_output, File, COMM_WORLD
 from adapt_utils.plotting import *  # NOQA
+from adapt_utils.swe.turbine.solver import AdaptiveTurbineProblem
+from adapt_utils.unsteady.test_cases.spaceship.options import SpaceshipOptions
 
 
 # --- Parse arguments
@@ -92,7 +91,7 @@ else:
 # --- Run model
 
 # Create solver object
-swp = AdaptiveTurbineProblem(op, callback_dir=data_dir, ramp_dir=ramp_dir, load_mesh=load_mesh, discrete_turbines=True)
+swp = AdaptiveTurbineProblem(op, callback_dir=data_dir, ramp_dir=ramp_dir, load_mesh=load_mesh)
 
 # Plot bathymetry and viscosity
 swp.bathymetry_file.write(swp.bathymetry[0])
@@ -105,8 +104,7 @@ if not plot_only:
     cpu_time = perf_counter() - cpu_timestamp
     msg = "Total CPU time: {:.1f} seconds / {:.1f} minutes / {:.3f} hours"
     print_output(msg.format(cpu_time, cpu_time/60, cpu_time/3600))
-    average_power = swp.quantity_of_interest()/op.end_time
-    print_output("Average power output of array: {:.1f}W".format(average_power))
+    print_output("Average power output of array: {:.1f}W".format(swp.average_power_output()))
 if not op.spun:
     op.end_time -= op.T_ramp
 

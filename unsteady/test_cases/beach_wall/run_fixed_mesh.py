@@ -35,6 +35,7 @@ kwargs = {
     # Spatial discretisation
     'family': 'dg-dg',
     'stabilisation': None,
+    'stabilisation_sediment': None,
     'use_automatic_sipg_parameter': True,
     'friction': 'manning',
 
@@ -43,9 +44,6 @@ kwargs = {
     'plot_pvd': True,
     'input_dir': inputdir,
     'output_dir': outputdir,
-
-    # Debugging
-    'debug': True,
 }
 
 op = BeachOptions(**kwargs)
