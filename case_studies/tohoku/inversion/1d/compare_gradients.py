@@ -113,7 +113,7 @@ op.di = create_directory(os.path.join(di, 'discrete'))
 swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
 swp.clear_tape()
 print_output("Setting initial guess...")
-op.assign_control_parameters(kwargs['control_parameters'])
+op.assign_control_parameters(kwargs['control_parameters'], mesh=swp.meshes[0])
 control = Control(op.control_parameter)
 
 # Solve the forward problem

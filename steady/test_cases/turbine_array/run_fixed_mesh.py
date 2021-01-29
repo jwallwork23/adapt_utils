@@ -70,7 +70,7 @@ triplot_kwargs = {
         "linewidth": 0.1,
     },
     "boundary_kw": {
-        "linewidth": 3.0,
+        "linewidth": 5.0,
         "colors": ["C0", "C2", "C1"],
     },
 }
@@ -91,7 +91,7 @@ plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 # --- Plot initial mesh
 
 if plot_any:
-    fig, axes = plt.subplots(figsize=(12, 5))
+    fig, axes = plt.subplots(figsize=(12, 5.5))
     triplot(op.default_mesh, axes=axes, **triplot_kwargs)
     eps = 1
     axes.set_xlim([-eps, op.domain_length + eps])
@@ -110,12 +110,18 @@ if plot_any:
     handles, labels = axes.get_legend_handles_labels()
     handles.append(turbine1)
     labels = ['Inflow', 'Outflow', 'Walls', 'Turbines']
-    axes.legend(handles, labels, loc='upper right', fontsize=fontsizes['legend'])
 
     # Save to file
-    fname = 'inital_mesh__offset{:d}__elem{:d}'
+    fname = 'initial_mesh__offset{:d}__elem{:d}'
     savefig(fname.format(op.offset, num_cells), plot_dir, extensions=extensions)
 
+    # Save legend to file
+    fig2, axes2 = plt.subplots()
+    legend = axes2.legend(handles, labels, fontsize=fontsizes['legend'], frameon=False, ncol=4)
+    fig2.canvas.draw()
+    axes2.set_axis_off()
+    bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
+    savefig('legend_mesh', plot_dir, bbox_inches=bbox, extensions=extensions, tight=False)
 
 # --- Solve forward problem
 

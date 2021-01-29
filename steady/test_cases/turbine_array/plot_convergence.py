@@ -25,8 +25,6 @@ loglog = bool(args.loglog)
 xlabel = "Degrees of freedom"
 ylabel = r"Power output $(\mathrm{MW})$"
 ylabel2 = r"Relative error (\%)"
-if loglog:
-    ylabel = ylabel2
 errorline = float(args.errorline or 0.0)
 
 # Curve plotting kwargs
@@ -72,7 +70,6 @@ for offset in (0, 1):
         # Plot convergence curves
         if loglog:
             axes.loglog(dofs, power2error(qois), **characteristics[approach])
-            print(approach, offset, power2error(qois))
         else:
             axes.semilogx(dofs, qois, **characteristics[approach])
 
@@ -97,7 +94,8 @@ for offset in (0, 1):
 
     # Save to file
     axes.set_xlabel(xlabel, fontsize=fontsize)
-    axes.set_ylabel(ylabel, fontsize=fontsize)
+    if not loglog:
+        axes.set_ylabel(ylabel, fontsize=fontsize)
     fname = 'convergence_{:d}'.format(offset)
     if loglog:
         fname = '_'.join([fname, 'loglog'])

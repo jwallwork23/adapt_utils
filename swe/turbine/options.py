@@ -15,8 +15,8 @@ __all__ = ["TurbineOptions", "SteadyTurbineOptions"]
 lu_params = {
     'mat_type': 'aij',
     'snes_type': 'newtonls',
-    # 'snes_rtol': 1.0e-08,
-    'snes_rtol': 1.0e-04,
+    'snes_rtol': 1.0e-08,
+    # 'snes_rtol': 1.0e-04,
     'snes_max_it': 20,
     'snes_linesearch_type': 'bt',
     'snes_monitor': None,
@@ -67,6 +67,8 @@ class TurbineOptions(CoupledOptions):
 
     def __init__(self, **kwargs):
         super(TurbineOptions, self).__init__(**kwargs)
+        self.solve_swe = True
+        self.solve_tracer = False
         self.farm_ids = ["everywhere"]
         if self.turbine_width is None:
             self.turbine_width = self.turbine_diameter
