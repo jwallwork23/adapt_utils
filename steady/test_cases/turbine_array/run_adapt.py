@@ -32,6 +32,7 @@ parser.add_argument('-adapt_field', help="Field(s) for adaptation (default all_i
 # I/O and debugging
 parser.add_argument('-plot_pdf', help="Save plots to .pdf (default False).")
 parser.add_argument('-plot_png', help="Save plots to .png (default False).")
+parser.add_argument('-plot_jpg', help="Save plots to .jpg (default False).")
 parser.add_argument('-plot_pvd', help="Save plots to .pvd (default False).")
 parser.add_argument('-plot_all', help="Plot to .pdf, .png and .pvd (default False).")
 parser.add_argument('-save_plex', help="Save DMPlex to HDF5 (default False)")
@@ -46,13 +47,16 @@ args = parser.parse_args()
 
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
+plot_jpg = bool(args.plot_jpg or False)
 if bool(args.plot_all or False):
-    plot_pdf = plot_png = True
+    plot_pdf = plot_png = plot_jpg = True
 extensions = []
 if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
+if plot_jpg:
+    extensions.append('jpg')
 plot_any = len(extensions) > 0
 save_plex = bool(args.save_plex or False)
 kwargs = {
@@ -79,6 +83,8 @@ kwargs = {
     'debug': bool(args.debug or 0),
     'debug_mode': args.debug_mode or 'basic',
 }
+discrete_turbines = True
+# discrete_turbines = False
 op = TurbineArrayOptions(**kwargs)
 op.set_all_rtols(op.element_rtol)
 if op.approach == 'fixed_mesh':
@@ -117,7 +123,7 @@ plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 
 # --- Solve forward problem within a mesh adaptation loop
 
-tp = AdaptiveSteadyTurbineProblem(op, discrete_adjoint=True)
+tp = AdaptiveSteadyTurbineProblem(op, discrete_adjoint=True, discrete_turbines=discrete_turbines)
 tp.run()
 if save_plex:
     tp.store_plexes('{:s}_{:d}.h5'.format(op.approach, op.offset))
