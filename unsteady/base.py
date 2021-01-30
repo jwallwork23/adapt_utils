@@ -1116,6 +1116,7 @@ class AdaptiveProblemBase(object):
         if converged:
             n = self.outer_iteration
             self.print("Converged number of mesh elements after {:d} iterations!".format(n+1))
+            self.solve_forward()  # Ensure that final outputs are from converged mesh
         return converged
 
     @property
