@@ -4,7 +4,7 @@ base: dir clean base_geo base_mesh
 
 box: box_geo box_mesh
 
-adapt: isotropic anisotropic weighted_hessian
+adapt: isotropic_dwr anisotropic_dwr weighted_hessian
 
 screenshot: screenshot_uniform screenshot_adapt
 
@@ -96,13 +96,17 @@ uniform:
 	@python3 run_uniform_convergence.py -offset 0
 	@python3 run_uniform_convergence.py -offset 1
 
-isotropic:
+isotropic_dwr:
 	@echo "Running isotropic adaptive convergence test..."
-	@python3 run_adaptation_loop.py -approach isotropic_dwr
+	@python3 run_adaptation_loop.py -approach isotropic_dwr -enrichment_method GE_h
+	@python3 run_adaptation_loop.py -approach isotropic_dwr -enrichment_method GE_h \
+		-solve_enriched_forward 1
 
-anisotropic:
+anisotropic_dwr:
 	@echo "Running anisotropic adaptive convergence test..."
-	@python3 run_adaptation_loop.py -approach anisotropic_dwr
+	@python3 run_adaptation_loop.py -approach anisotropic_dwr -enrichment_method GE_h
+	@python3 run_adaptation_loop.py -approach anisotropic_dwr -enrichment_method GE_h \
+		-solve_enriched_forward 1
 
 weighted_hessian:
 	@echo "Running WH adaptive convergence test..."

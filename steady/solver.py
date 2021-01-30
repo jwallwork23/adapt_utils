@@ -652,9 +652,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         eop.increase_degree(adapt_field)  # Apply p-refinement
         ep = type(self)(
             eop,
-            self.mesh,
+            meshes=self.mesh,
             nonlinear=self.nonlinear,
             discrete_adjoint=self.discrete_adjoint,
+            print_progress=self.print_progress,
         )
         ep.outer_iteration = self.outer_iteration
         enriched_space = ep.get_function_space(adapt_field)
