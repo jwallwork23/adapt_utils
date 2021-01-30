@@ -76,7 +76,7 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-levels = int(args.levels or 4)
+levels = int(args.levels or 5)
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh'))
 
 
