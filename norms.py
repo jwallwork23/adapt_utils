@@ -3,7 +3,7 @@ from firedrake import *
 import numpy as np
 
 
-__all__ = ["lp_norm", "total_variation", "vecnorm", "timeseries_error",
+__all__ = ["errornorm", "norm", "lp_norm", "total_variation", "vecnorm", "timeseries_error",
            "local_norm", "frobenius_norm", "local_frobenius_norm",
            "local_edge_integral", "local_interior_edge_integral", "local_boundary_integral"]
 

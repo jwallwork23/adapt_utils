@@ -1,4 +1,5 @@
 import argparse
+from time import perf_counter
 
 from adapt_utils.norms import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -19,7 +20,6 @@ parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabi
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 
 parser.add_argument("-approach", help="Mesh adaptation approach")
-parser.add_argument("-target", help="Target complexity")
 parser.add_argument("-num_meshes", help="Number of meshes in the sequence")
 parser.add_argument("-max_adapt", help="Maximum number of adaptation steps")
 parser.add_argument("-hessian_time_combination")
@@ -45,7 +45,6 @@ kwargs = {
     'num_meshes': int(args.num_meshes or 50),
     'max_adapt': int(args.max_adapt or 3),
     'hessian_time_combination': args.hessian_time_combination or 'integrate',
-    'target': float(args.target or 4000),
     'norm_order': 1,
     'normalisation': 'complexity',
 
@@ -61,16 +60,37 @@ if args.end_time is not None:
 
 # --- Solve the tracer transport problem
 
-tp = AdaptiveProblem(op)
-tp.run()
+assert op.approach != 'fixed_mesh'
+l2_error = []
+cons_error = []
+times = []
+num_cells = []
+dofs = []
+for i in range(5):
+    op.target = 4000*2**i
 
-final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
-final_l1_norm = norm(final_sol, norm_type='L1')
-final_l2_norm = norm(final_sol, norm_type='L2')
-tp.set_initial_condition()
-init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
-init_l1_norm = norm(init_sol, norm_type='L1')
-init_l2_norm = norm(init_sol, norm_type='L2')
-abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')
-print("Conservation error: {:.2f}%".format(100*abs(init_l1_norm-final_l1_norm)/init_l1_norm))
-print("Relative L2 error:  {:.2f}%".format(100*abs_l2_error/init_l2_norm))
+    tp = AdaptiveProblem(op)
+    cpu_timestamp = perf_counter()
+    tp.run()
+    times.append(perf_counter() - cpu_timestamp)
+    dofs.append(tp.Q[0].dof_count)
+    num_cells.append(tp.mesh.num_cells())
+
+    final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
+    final_l1_norm = norm(final_sol, norm_type='L1')
+    final_l2_norm = norm(final_sol, norm_type='L2')
+    tp.set_initial_condition()
+    init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
+    init_l1_norm = norm(init_sol, norm_type='L1')
+    init_l2_norm = norm(init_sol, norm_type='L2')
+    abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')
+    cons_error.append(100*abs(init_l1_norm-final_l1_norm)/init_l1_norm)
+    l2_error.append(100*abs_l2_error/init_l2_norm)
+
+# Save to HDF5
+with h5py.File(os.path.join(op.di, 'convergence.h5'), 'w') as outfile:
+    outfile.create_dataset('elements', data=num_cells)
+    outfile.create_dataset('dofs', data=dofs)
+    outfile.create_dataset('time', data=times)
+    outfile.create_dataset('l2_error', data=l2_error)
+    outfile.create_dataset('cons_error', data=cons_error)
