@@ -204,14 +204,21 @@ class AdaptiveProblemBase(object):
         self._plexes = []
         for mesh in self.meshes:
             try:
-                self._plexes.append(mesh._topology_dm)
+                self._plexes.append(mesh.topology_dm)
             except AttributeError:
-                self._plexes.append(mesh._plex_)  # Backwards compatability
+                try:
+                    self._plexes.append(mesh._topology_dm)
+                except AttributeError:
+                    self._plexes.append(mesh._plex_)  # Backwards compatability
 
     @property
     def plexes(self):
         self.get_plexes()
         return self._plexes
+
+    @property
+    def plex(self):
+        return self.plexes[0]
 
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")
@@ -525,7 +532,7 @@ class AdaptiveProblemBase(object):
         else:
             self.solve_forward(**kwargs)
 
-    def solve_forward(self, reverse=False, **kwargs):
+    def solve_forward(self, reverse=False, keep=False, **kwargs):
         """
         Solve forward problem on the full sequence of meshes.
         """
@@ -534,9 +541,10 @@ class AdaptiveProblemBase(object):
             self.transfer_forward_solution(i)
             self.setup_solver_forward_step(i)
             self.solve_forward_step(i, **kwargs)
-            self.free_solver_forward_step(i)
+            if not keep:
+                self.free_solver_forward_step(i)
 
-    def solve_adjoint(self, reverse=True, **kwargs):
+    def solve_adjoint(self, reverse=True, keep=False, **kwargs):
         """
         Solve adjoint problem on the full sequence of meshes.
         """
@@ -545,7 +553,8 @@ class AdaptiveProblemBase(object):
             self.transfer_adjoint_solution(i)
             self.setup_solver_adjoint_step(i)
             self.solve_adjoint_step(i, **kwargs)
-            self.free_solver_adjoint_step(i)
+            if not keep:
+                self.free_solver_adjoint_step(i)
 
     def quantity_of_interest(self):
         """

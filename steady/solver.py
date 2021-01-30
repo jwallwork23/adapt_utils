@@ -267,7 +267,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         )
         ep.outer_iteration = self.outer_iteration
         enriched_space = ep.get_function_space(adapt_field)
-        tm = dmhooks.get_transfer_manager(self.get_plex(0))
+        tm = dmhooks.get_transfer_manager(self.plex)
         bcs = self.boundary_conditions[0][adapt_field]
         cell = Function(ep.P0[0])
         flux = Function(ep.P0[0])
@@ -393,7 +393,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         )
         ep.outer_iteration = self.outer_iteration
         enriched_space = ep.get_function_space(adapt_field)
-        tm = dmhooks.get_transfer_manager(self.get_plex(0))
+        tm = dmhooks.get_transfer_manager(self.plex)
         bcs = self.boundary_conditions[0][adapt_field]
         cell = Function(ep.P0[0])
         flux = Function(ep.P0[0])
@@ -1112,7 +1112,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.create_error_estimators_step(0, adjoint='adjoint' in op.approach)
 
             # Solve forward in base space
-            self.solve_forward()
+            self.solve_forward(keep=True)
 
             # Check convergence
             if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
