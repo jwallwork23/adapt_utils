@@ -1974,13 +1974,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 # --- Setup forward solver for enriched problem
 
-                # TODO: Need to transfer fwd sol in nonlinear case
                 ep.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
                 ep.setup_solver_forward_step(i)
+                if self.nonlinear:
+                    ep.solve_forward_step(i)
+                    # TODO: Option to prolong forward solution
                 ets = ep.get_timestepper(i, op.adapt_field)
 
                 # --- Solve forward on current window
 
+                self.simulation_time = i*op.dt*self.dt_per_mesh
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward_step(i)
                 ts = self.get_timestepper(i, op.adapt_field)
 
                 def export_func():
@@ -1988,9 +1993,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     fwd_solutions_step_old.append(ts.solution_old.copy(deepcopy=True))
                     # TODO: Also need store fields at each export (in general case)
 
-                self.simulation_time = i*op.dt*self.dt_per_mesh
-                self.transfer_forward_solution(i)
-                self.setup_solver_forward_step(i)
                 self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=False)
 
                 # --- Solve adjoint on current window
@@ -1998,6 +2000,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 def export_func():
                     adj = self.get_solutions(op.adapt_field, adjoint=True)[i].copy(deepcopy=True)
                     adj_solutions_step.append(adj)
+
+                if self.nonlinear:
+                    raise NotImplementedError  # TODO: update_forcings fwd sol in base adjoint solve
 
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint_step(i)
@@ -2008,6 +2013,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 def export_func():
                     adj = ep.get_solutions(op.adapt_field, adjoint=True)[i].copy(deepcopy=True)
                     enriched_adj_solutions_step.append(adj)
+
+                if self.nonlinear:
+                    raise NotImplementedError  # TODO: update_forcings fwd sol in enriched adjoint solve
 
                 ep.simulation_time = (i+1)*op.dt*self.dt_per_mesh  # TODO: Shouldn't be needed
                 ep.transfer_adjoint_solution(i)
@@ -2244,6 +2252,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     'plot_pvd': op.plot_pvd,
                     'export_initial': True,
                 }
+                if self.nonlinear:
+                    raise NotImplementedError  # TODO: update_forcings fwd sol adjoint solve
                 self.solve_adjoint_step(i, **solve_kwargs)
 
                 # Reverse order of Hessians and take pairwise averages

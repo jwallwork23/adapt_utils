@@ -43,7 +43,6 @@ parser.add_argument("-radius", help="Radius of interest (default 100km)")
 parser.add_argument("-max_adapt", help="Maximum number of adaptation loop iterations (default 35)")
 parser.add_argument("-element_rtol", help="Relative tolerance for element count (default 0.005)")
 parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
-parser.add_argument("-target")
 parser.add_argument("-target_base")
 parser.add_argument("-iterations")
 
