@@ -79,6 +79,8 @@ else:
     ext += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
 fname = 'qoi_{:s}'.format(ext)
 
+both = 'int' in approach or 'avg' in approach
+adjoint = 'adjoint' in approach or both
 kwargs = {
     'level': level,
 
@@ -91,7 +93,7 @@ kwargs = {
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
-    'enrichment_method': args.enrichment_method or 'DQ',
+    'enrichment_method': args.enrichment_method or 'GE_p' if adjoint else 'DQ',
 
     # Convergence analysis
     'target_base': 2,
