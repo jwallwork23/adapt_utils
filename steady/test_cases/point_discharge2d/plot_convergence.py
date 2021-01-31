@@ -11,7 +11,7 @@ from adapt_utils.plotting import *
 parser = argparse.ArgumentParser()
 parser.add_argument('mode', help="""
     Choose from {'forward', 'adjoint', 'avg', 'int', 'dwr', 'anisotropic_dwr, 'weighed_hessian',
-    'weighted_gradient', 'isotropic'}.
+    'weighted_gradient', 'isotropic', 'enrichment'}.
     """)
 parser.add_argument('-family', help="Finite element family.")
 parser.add_argument('-stabilisation', help="Stabilisation method to use.")
@@ -23,8 +23,8 @@ parser.add_argument('-loglog', help="Use a log-log scale")
 args = parser.parse_args()
 mode = args.mode
 assert mode in (
-    'forward', 'adjoint', 'avg', 'int', 'dwr',
-    'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient', 'isotropic'
+    'forward', 'adjoint', 'avg', 'int', 'dwr', 'anisotropic_dwr', 'weighted_hessian',
+    'weighted_gradient', 'isotropic', 'enrichment'
 )
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 2)
@@ -45,8 +45,8 @@ else:
         ext += '_su'
     if stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
-fixed_di = os.path.join(os.path.dirname(__file__), 'outputs', 'fixed_mesh', 'hdf5')
-di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', enrichment_method, 'hdf5')
+output_di = os.path.join(os.path.dirname(__file__), 'outputs')
+fixed_di = os.path.join(output_di, 'fixed_mesh', 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
 label_ext = ''
@@ -74,18 +74,28 @@ elif mode == 'isotropic':
     approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
     approaches['dwr'] = {'label': 'Vertex-based', 'marker': '^'}
     approaches['isotropic_dwr'] = {'label': 'Element-based', 'marker': 'h'}
+elif mode == 'enrichment':
+    approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
+    approaches['GE_hp'] = {'label': r'GE$_{hp}$', 'marker': '^'}
+    approaches['GE_h'] = {'label': r'GE$_h$', 'marker': 'h'}
+    approaches['GE_p'] = {'label': r'GE$_p$', 'marker': 's'}
+    approaches['DQ'] = {'label': 'DQ', 'marker': 'x'}
+
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
 
     # Plot convergence curves
     for approach in approaches:
+        if mode == 'enrichment':
+            enrichment_method = approach
+        di = os.path.join(output_di, '{:s}', enrichment_method, 'hdf5')
         filename = 'qoi_{:s}'.format(ext)
         if anisotropic_stabilisation:
             filename += '_anisotropic'
         if approach == 'fixed_mesh':
             fpath = fixed_di
         else:
-            fpath = di.format(approach)
+            fpath = di.format('dwr' if mode == 'enrichment' else approach)
             if 'isotropic_dwr' in approach:
                 filename += '_{:.0f}'.format(alpha)
             else:
