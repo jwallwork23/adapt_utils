@@ -43,6 +43,9 @@ parser.add_argument("-radius", help="Radius of interest (default 100km)")
 parser.add_argument("-max_adapt", help="Maximum number of adaptation loop iterations (default 35)")
 parser.add_argument("-element_rtol", help="Relative tolerance for element count (default 0.005)")
 parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
+parser.add_argument("-target")
+parser.add_argument("-target_base")
+parser.add_argument("-iterations")
 
 # I/O and debugging
 parser.add_argument("-save_meshes", help="Save final set of mesh DMPlexes to disk")
@@ -106,6 +109,9 @@ kwargs = {
     'element_rtol': float(args.element_rtol or 0.005),
     'qoi_rtol': float(args.qoi_rtol or 0.005),
     'max_adapt': int(args.max_adapt or 5),  # As recommended in [Belme et al. 2012]
+    'target': float(args.target or 24*4000),
+    'target_base': float(args.target_base or 2.0),
+    'outer_iterations': int(args.iterations or 5),
 
     # Misc
     'plot_pvd': plot_pvd,
@@ -119,8 +125,8 @@ op = TohokuHazardOptions(**kwargs)
 
 # --- Solve
 
-for i in range(5):
-    kwargs['target'] = 5000*2**i
+for i in range(op.outer_iterations):
+    kwargs['target'] = op.target*op.target_base**i
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
     logger = TimeDependentAdaptationLogger(swp, nonlinear=nonlinear, **kwargs)
     swp.run()

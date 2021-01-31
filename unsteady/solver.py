@@ -265,9 +265,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
     def get_function_space(self, field):
         spaces = {'shallow_water': 'V', 'tracer': 'Q', 'sediment': 'Q', 'bathymetry': 'W'}
-        space = spaces[field]
         try:
-            return self.__getattribute__(space)
+            return self.__getattribute__(spaces[field])
         except KeyError:
             return self.V
 
