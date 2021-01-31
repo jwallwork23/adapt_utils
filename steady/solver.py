@@ -5,6 +5,7 @@ import os
 from adapt_utils.adapt.kernels import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.recovery import *
+from adapt_utils.params import flux_params
 from adapt_utils.norms import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
@@ -672,7 +673,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # Setup forward solver for enriched problem
             ep.create_error_estimators_step(0, adjoint=False)
             ep.setup_solver_forward_step(0)  # Needed to create timestepper
-            # ep.solve_adjoint()
             enriched_adj_solution = recover_zz(adj_solution, to_recover='field')
 
             # Approximate adjoint error in enriched space
@@ -699,7 +699,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # Setup adjoint solver for enriched problem
             ep.create_error_estimators_step(0, adjoint=True)
             ep.setup_solver_adjoint_step(0)  # Needed to create timestepper
-            # ep.solve_forward()
             enriched_fwd_solution = recover_zz(fwd_solution, to_recover='field')
 
             # Approximate forward error in enriched space
@@ -749,51 +748,91 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         op = self.op
         both = forward and adjoint
-        if not (forward and not adjoint) or adapt_field != 'tracer' or op.tracer_family != 'cg':
+        if adapt_field != 'tracer' or op.tracer_family != 'cg':
             raise NotImplementedError  # TODO
+
         bcs = self.boundary_conditions[0][adapt_field]
         p0test = TestFunction(self.P0[0])
         p0trial = TrialFunction(self.P0[0])
-        c = self.get_solutions(adapt_field, adjoint=False)[0]
-        c_star = self.get_solutions(adapt_field, adjoint=True)[0]
+        c = self.get_solutions(adapt_field, adjoint=False)[0].copy(deepcopy=True)
+        c_star = self.get_solutions(adapt_field, adjoint=True)[0].copy(deepcopy=True)
         u, eta = self.fwd_solution.split()
-        D = self.fields[0].horizontal_diffusivity*Identity(2)
-        S = self.fields[0].tracer_source_2d
         n = FacetNormal(self.mesh)
-
-        # Cell residual
-        Psi = S - dot(u, grad(c)) + div(dot(D, grad(c)))
-        self.indicator['cell'] = assemble(p0test*inner(Psi, Psi)*dx)
-
-        # Fluxes
-        psi = dot(dot(D, grad(c)), n)
-        mass_term = p0test*p0trial*dx
-        psi_sq = p0test*inner(psi, psi)
-        flux_terms = (psi_sq('+') + psi_sq('-'))*dS
-        for seg in bcs:
-            if 'diff_flux' in bcs[seg]:
-                g_N = bcs[seg]['diff_flux']
-                flux_terms += -p0test*inner(psi - g_N, psi - g_N)*ds(seg)
-        self.indicator['flux'] = Function(self.P0[0])
-        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-        solve(mass_term == flux_terms, self.indicator['flux'], solver_parameters=params)
-
-        # Sum cell and flux contributions
+        D = self.fields[0].horizontal_diffusivity*Identity(2)
         h = anisotropic_cell_size(self.mesh) if op.anisotropic_stabilisation else CellSize(self.mesh)
+
         self.indicator['DQ'] = Function(self.P0[0])
-        self.indicator['DQ'].interpolate(sqrt(abs(self.indicator['cell'])) + sqrt(abs(self.indicator['flux']/h)))
+        self.indicator['cell'] = Function(self.P0[0])
+        self.indicator['flux'] = Function(self.P0[0])
+        mass_term = p0test*p0trial*dx
+        if forward:
 
-        # Account for stabilisation
-        if op.stabilisation == 'su':
-            raise NotImplementedError
-        elif op.stabilisation == 'supg':
-            tau = self.tracer_options[0].supg_stabilisation
-            c_star.interpolate(c_star + tau*dot(u, grad(c_star)))
+            # Cell residual
+            Psi = self.fields[0].tracer_source_2d - dot(u, grad(c)) + div(dot(D, grad(c)))
+            cell = assemble(p0test*inner(Psi, Psi)*dx)
+            self.indicator['cell'] += cell
 
-        # Multiply by Laplacian of adjoint solution
-        g = recover_gradient(c_star, op=self.op)
-        self.indicator['DQ'] *= sqrt(interpolate(abs(inner(div(g), div(g))), self.P0[0]))
-        # TODO: Flux version
+            # Fluxes
+            psi = dot(dot(D, grad(c)), n)
+            psi_sq = p0test*inner(psi, psi)
+            flux_terms = (psi_sq('+') + psi_sq('-'))*dS
+            for seg in bcs:
+                if 'diff_flux' in bcs[seg]:
+                    g_N = bcs[seg]['diff_flux']
+                    flux_terms += p0test*inner(psi - g_N, psi - g_N)*ds(seg)
+            flux = Function(self.P0[0])
+            solve(mass_term == flux_terms, flux, solver_parameters=flux_params)
+            self.indicator['flux'] += flux
+
+            # Recover Laplacian of adjoint solution  # TODO: Flux version
+            if op.stabilisation == 'su':
+                raise NotImplementedError
+            elif op.stabilisation == 'supg':
+                tau = self.tracer_options[0].supg_stabilisation
+                g = recover_gradient(c_star + tau*dot(u, grad(c_star)), op=self.op)
+            else:
+                g = recover_gradient(c_star, op=self.op)
+            laplacian = assemble(p0test*inner(div(g), div(g))*dx)
+
+            # Sum cell and flux contributions
+            self.indicator['DQ'] += interpolate(
+                (sqrt(abs(cell)) + sqrt(abs(flux/h)))*sqrt(abs(laplacian)), self.P0[0])
+
+        if adjoint:
+
+            # Cell residual
+            Psi = self.kernels_tracer[0] + div(u*c_star) + div(dot(D, grad(c_star)))
+            cell = assemble(p0test*inner(Psi, Psi)*dx)
+            self.indicator['cell'] += cell
+
+            # Fluxes
+            psi = dot(dot(D, grad(c_star)), n) + c_star*dot(u, n)
+            psi_sq = p0test*inner(psi, psi)
+            flux_terms = (psi_sq('+') + psi_sq('-'))*dS
+            for seg in bcs:
+                if 'value' not in bcs[seg]:
+                    flux_terms += p0test*inner(psi, psi)*ds(seg)
+            flux = Function(self.P0[0])
+            solve(mass_term == flux_terms, flux, solver_parameters=flux_params)
+            self.indicator['flux'] += flux
+
+            # Recover Laplacian of forward solution  # TODO: Flux version
+            if op.stabilisation == 'su':
+                raise NotImplementedError
+            elif op.stabilisation == 'supg':
+                tau = self.tracer_options[0].supg_stabilisation
+                g = recover_gradient(c + tau*dot(u, grad(c)), op=self.op)
+            else:
+                g = recover_gradient(c, op=self.op)
+            laplacian = assemble(p0test*inner(div(g), div(g))*dx)
+
+            # Sum cell and flux contributions
+            self.indicator['DQ'] += interpolate(
+                (sqrt(abs(cell)) + sqrt(abs(flux/h)))*sqrt(abs(laplacian)), self.P0[0])
+
+        if both:
+            self.indicator['cell'] *= 0.5
+            self.indicator['flux'] *= 0.5
 
         # Global error estimate
         label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
@@ -1109,20 +1148,24 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             adapt_field = 'shallow_water'
         if 'dwr' in op.approach:
             self.estimators['dwr'] = []
+        adjoint = 'adjoint' in op.approach
+        both = 'avg' in op.approach or 'int' in op.approach
         for n in range(op.max_adapt):
             self._have_indicated_error = False
             self.outer_iteration = n
-            self.create_error_estimators_step(0, adjoint='adjoint' in op.approach)
+            self.create_error_estimators_step(0, adjoint=adjoint)
+            if both:
+                self.create_error_estimators_step(0, adjoint=not adjoint)
 
             # Solve forward in base space
-            self.solve_forward(keep=True)
+            self.solve_forward(keep=not adjoint or both)
 
             # Check convergence
             if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
                 break
 
             # Solve adjoint equation in base space
-            self.solve_adjoint()
+            self.solve_adjoint(keep=adjoint or both)
 
             # Construct metric
             self.metrics[0] = self.get_metric(adapt_field)

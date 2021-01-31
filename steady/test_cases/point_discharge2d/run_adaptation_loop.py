@@ -91,7 +91,7 @@ kwargs = {
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
-    'enrichment_method': args.enrichment_method or 'DQ' if discrete_adjoint else 'GE_h',
+    'enrichment_method': args.enrichment_method or 'DQ',
 
     # Convergence analysis
     'target_base': 2,

@@ -19,7 +19,7 @@ where:
 """
 
 __all__ = ["lu_params", "fieldsplit_params", "iterative_tracer_params", "direct_tracer_params",
-           "l2_projection_params", "ibp_params"]
+           "l2_projection_params", "ibp_params", "flux_params"]
 
 
 # Default for time-dependent shallow water
@@ -105,23 +105,23 @@ l2_projection_params = {
     'mat_type': 'aij',
 
     # Use stationary preconditioners in the Schur complement, to get away with applying
-    # GMRES to the whole mixed system
+    # GMRES to the whole mixed system.
     'ksp_type': 'gmres',
     'pc_type': 'fieldsplit',
     'pc_fieldsplit_type': 'schur',
 
-    # We want to eliminate H (field 1) to get an equation for g (field 0)
+    # We want to eliminate H (field 1) to get an equation for g (field 0).
     'pc_fieldsplit_0_fields': '1',
     'pc_fieldsplit_1_fields': '0',
 
     # Use a diagonal approximation of the A00 block.
     'pc_fieldsplit_schur_precondition': 'selfp',
 
-    # Use ILU to approximate the inverse of A00, without a KSP solver
+    # Use ILU to approximate the inverse of A00, without a KSP solver.
     'fieldsplit_0_pc_type': 'ilu',
     'fieldsplit_0_ksp_type': 'preonly',
 
-    # Use GAMG to approximate the inverse of the Schur complement matrix
+    # Use GAMG to approximate the inverse of the Schur complement matrix.
     'fieldsplit_1_ksp_type': 'preonly',
     'fieldsplit_1_pc_type': 'gamg',
     'ksp_max_it': 20,
@@ -130,11 +130,21 @@ l2_projection_params = {
 # Integration by parts
 # ====================
 #
-# GMRES with restarts and SOR as a preconditioner
+# GMRES with restarts and SOR as a preconditioner.
 
 ibp_params = {
     'ksp_type': 'gmres',
     'ksp_gmres_restart': 20,
     'ksp_rtol': 1.0e-05,
     'pc_type': 'sor',
+}
+
+# Fluxes
+# ======
+#
+# Simply divide by the diagonal of the mass matrix.
+
+flux_params = {
+    'ksp_type': 'preonly',
+    'pc_type': 'jacobi',
 }

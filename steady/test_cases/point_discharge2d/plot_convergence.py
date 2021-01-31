@@ -28,7 +28,7 @@ assert mode in (
 )
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 2)
-enrichment_method = args.enrichment_method or 'GE_h'
+enrichment_method = args.enrichment_method or 'DQ'
 loglog = bool(args.loglog or False)
 
 # Get filenames

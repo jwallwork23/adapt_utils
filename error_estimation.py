@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 from thetis.utility import *
 from .equation import Equation
+from .params import flux_params
 
 
 class GOErrorEstimatorTerm(object):
@@ -120,8 +121,7 @@ class GOErrorEstimator(Equation):
             self.flux.assign(0.0)
         else:
             mass_term = self.p0test*self.p0trial*dx
-            params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-            solve(mass_term == self.inter_element_flux_terms, self.flux, solver_parameters=params)
+            solve(mass_term == self.inter_element_flux_terms, self.flux, solver_parameters=flux_params)
         return self.flux
 
     def boundary_flux(self):
@@ -135,8 +135,7 @@ class GOErrorEstimator(Equation):
             self.bnd.assign(0.0)
         else:
             mass_term = self.p0test*self.p0trial*dx
-            params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-            solve(mass_term == self.bnd_flux_terms, self.bnd, solver_parameters=params)
+            solve(mass_term == self.bnd_flux_terms, self.bnd, solver_parameters=flux_params)
         return self.bnd
 
     def weighted_residual(self):
