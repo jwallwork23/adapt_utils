@@ -82,7 +82,7 @@ enrichment:
 
 # --- Adaptation runs based on 1st order forward result
 
-adaptive_forward: dwr isotropic_dwr anisotropic_dwr weighted_hessian weighted_gradient
+forward: dwr isotropic_dwr anisotropic_dwr weighted_hessian weighted_gradient
 
 dwr:
 	@echo "Running vertexwise isotropic DWR adaptation convergence test..."
@@ -111,7 +111,7 @@ weighted_gradient:
 
 # --- Adaptation runs based on 1st order adjoint result
 
-adaptive_adjoint: dwr_adjoint isotropic_dwr_adjoint anisotropic_dwr_adjoint weighted_hessian_adjoint
+adjoint: dwr_adjoint isotropic_dwr_adjoint anisotropic_dwr_adjoint weighted_hessian_adjoint
 
 dwr_adjoint:
 	@echo "Running vertexwise isotropic adjoint DWR adaptation convergence test..."
@@ -140,11 +140,9 @@ weighted_gradient_adjoint:
 
 # --- Adaptation runs based on 2nd order result / combinations of first order results
 
-adaptive_avg: dwr_avg isotropic_dwr_avg \
-	anisotropic_dwr_avg weighted_hessian_avg weighted_gradient_avg
+avg: dwr_avg isotropic_dwr_avg anisotropic_dwr_avg weighted_hessian_avg weighted_gradient_avg
 
-adaptive_int: dwr_int isotropic_dwr_int \
-	anisotropic_dwr_int weighted_hessian_int weighted_gradient_int
+int: dwr_int isotropic_dwr_int anisotropic_dwr_int weighted_hessian_int weighted_gradient_int
 
 dwr_avg:
 	@echo "Running vertexwise second order isotropic DWR adaptation convergence test..."
@@ -240,4 +238,4 @@ plot_isotropic:
 	@echo "Plotting isotropic convergence curves..."
 	@python3 plot_convergence.py isotropic
 
-convergence: uniform table adaptive_forward plot_forward
+convergence: uniform table forward plot_forward

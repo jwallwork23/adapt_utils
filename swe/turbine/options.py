@@ -2,33 +2,11 @@ from thetis import *
 from thetis.configuration import *
 
 from adapt_utils.options import CoupledOptions
+from adapt_utils.params import lu_params
 from adapt_utils.swe.utils import speed
 
 
 __all__ = ["TurbineOptions", "SteadyTurbineOptions"]
-
-
-# Default solve parameters for steady state case:
-#   - Newton with line search; solve linear system exactly with LU factorisation
-#   - For details on MUMPS parameters, see
-#         mcs.anl.gov/petsc/petsc-current/docs/manualpages/Mat/MATSOLVERMUMPS.html
-lu_params = {
-    'mat_type': 'aij',
-    'snes_type': 'newtonls',
-    'snes_rtol': 1.0e-08,
-    # 'snes_rtol': 1.0e-04,
-    'snes_max_it': 20,
-    'snes_linesearch_type': 'bt',
-    'snes_monitor': None,
-    'snes_converged_reason': None,
-    'ksp_type': 'preonly',
-    'ksp_converged_reason': None,
-    'pc_type': 'lu',
-    'pc_factor_mat_solver_type': 'mumps',
-    # 'mat_mumps_icntl_14': 200,  # Percentage increase in the estimated working space
-    'mat_mumps_icntl_24': 1,    # Detection of null pivot rows (0 or 1)
-}
-default_params = lu_params
 
 
 class TurbineOptions(CoupledOptions):
@@ -74,9 +52,6 @@ class TurbineOptions(CoupledOptions):
             self.turbine_width = self.turbine_diameter
         else:
             assert self.turbine_width <= self.turbine_diameter
-
-        # Timestepping
-        self.timestepper = 'CrankNicolson'
 
         # Boundary forcing
         self.T_tide = self.M2_tide_period
@@ -227,17 +202,17 @@ class SteadyTurbineOptions(TurbineOptions):
     # --- Setup
 
     def __init__(self, num_iterations=1, **kwargs):
+        self.timestepper = 'SteadyState'
         super(SteadyTurbineOptions, self).__init__(**kwargs)
 
         # Timestepping
-        self.timestepper = 'SteadyState'
         self.dt = 20.0
         self.dt_per_export = 1
         self.end_time = num_iterations*self.dt - 0.2
 
         # Solver parameters
-        self.solver_parameters = {'shallow_water': default_params}
-        self.adjoint_solver_parameters = {'shallow_water': default_params}
+        self.solver_parameters = {'shallow_water': lu_params}
+        self.adjoint_solver_parameters = {'shallow_water': lu_params}
 
     def set_qoi_kernel(self, prob, i):
         prob.kernels[i] = Function(prob.V[i])

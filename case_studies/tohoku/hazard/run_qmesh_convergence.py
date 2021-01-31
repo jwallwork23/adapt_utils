@@ -90,6 +90,7 @@ for level in range(levels):
     # Set parameters
     kwargs['level'] = level
     op = TohokuHazardOptions(**kwargs)
+    kwargs.pop('level')
 
     # Solve
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)

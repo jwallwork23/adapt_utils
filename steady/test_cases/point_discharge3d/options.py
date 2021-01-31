@@ -26,6 +26,7 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
     :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
     def __init__(self, level=0, aligned=True, **kwargs):
+        kwargs.setdefault('direct', False)
         super(PointDischarge3dOptions, self).__init__(aligned=aligned, **kwargs)
         # self.qoi_quadrature_degree = 12
         self.qoi_quadrature_degree = 3
@@ -41,18 +42,6 @@ class PointDischarge3dOptions(PointDischarge2dOptions):
         self.h_max = 1.0e+06
         # self.hessian_recovery = 'parts'
         self.hessian_recovery = 'L2'
-
-        # Solver parameters
-        self.solver_parameters['tracer'] = {
-            'ksp_type': 'gmres',
-            'pc_type': 'sor',
-        }
-        # self.solver_parameters['tracer'] = {
-        #     'mat_type': 'aij',
-        #     'ksp_type': 'preonly',
-        #     'pc_type': 'lu',
-        #     'pc_factor_mat_solver_type': 'mumps',
-        # }
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)

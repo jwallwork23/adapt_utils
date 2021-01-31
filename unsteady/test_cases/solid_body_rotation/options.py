@@ -75,22 +75,6 @@ class LeVequeOptions(CoupledOptions):
             self.stabilisation_tracer = 'lax_friedrichs'
             self.lax_friedrichs_tracer_scaling_factor = Constant(1.0)
 
-        # Solver
-        self.solver_parameters = {
-            'tracer': {
-                'ksp_type': 'gmres',
-                'pc_type': 'sor',
-                # 'ksp_converged_reason': None,
-            }
-        }
-        self.adjoint_solver_parameters = {
-            'tracer': {
-                'ksp_type': 'gmres',
-                'pc_type': 'sor',
-                # 'ksp_converged_reason': None,
-            }
-        }
-
     def set_region_of_interest(self, shape=0):
         assert shape in (0, 1, 2)
         self.shape = shape

@@ -37,8 +37,8 @@ args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 2)
 
-# discrete_adjoint = bool(args.discrete_adjoint or False)
-discrete_adjoint = False if args.discrete_adjoint == "0" else True
+discrete_adjoint = bool(args.discrete_adjoint or False)
+# discrete_adjoint = False if args.discrete_adjoint == "0" else True
 if discrete_adjoint:
     from adapt_utils.steady.solver_adjoint import AdaptiveDiscreteAdjointSteadyProblem
     problem = AdaptiveDiscreteAdjointSteadyProblem
@@ -121,7 +121,7 @@ estimators = []
 for n in range(op.outer_iterations):
     op.target = target*op.target_base**n
     op.default_mesh = RectangleMesh(100*2**level, 20*2**level, 50, 10)
-    tp = problem(op)
+    tp = problem(op, nonlinear=False)
     tp.run()
     elements.append(tp.num_cells[-1][0])
     print("Element count: ", elements)

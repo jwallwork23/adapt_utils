@@ -7,6 +7,7 @@ import sys
 
 from . import misc
 from .mesh import MeshStats
+from .params import *
 
 
 __all__ = ["Options", "CoupledOptions", "ReynoldsNumberArray"]
@@ -167,14 +168,9 @@ class Options(FrozenConfigurable):
           'L2':    global L2 projection;
           'ZZ':    recovery a la [Zienkiewicz and Zhu 1987].
         """).tag(config=True)
-    gradient_solver_parameters = PETScSolverParameters(
-        {
-            'snes_rtol': 1e8,
-            'ksp_rtol': 1e-5,
-            'ksp_gmres_restart': 20,
-            'pc_type': 'sor',
-        },
-        help="Solver parameters for gradient recovery.").tag(config=True)
+    gradient_solver_parameters = PETScSolverParameters(ibp_params, help="""
+        Solver parameters for gradient recovery.
+        """).tag(config=True)
     hessian_recovery = Enum(['parts', 'L2', 'ZZ'], default_value='L2', help="""
         Hessian recovery technique, from:
           'L2':    global double L2 projection;
@@ -184,43 +180,10 @@ class Options(FrozenConfigurable):
     hessian_solver_parameters = PETScSolverParameters(
         {
             # Integration by parts
-            'parts': {
-
-                # GMRES with restarts
-                'ksp_type': 'gmres',
-                'ksp_gmres_restart': 20,
-                'ksp_rtol': 1.0e-05,
-
-                # SOR preconditioning
-                'pc_type': 'sor',
-            },
+            'parts': ibp_params,
 
             # Double L2 projection
-            'L2': {
-                'mat_type': 'aij',
-
-                # Use stationary preconditioners in the Schur complement, to get away with applying
-                # GMRES to the whole mixed system
-                'ksp_type': 'gmres',
-                'pc_type': 'fieldsplit',
-                'pc_fieldsplit_type': 'schur',
-
-                # We want to eliminate H (field 1) to get an equation for g (field 0)
-                'pc_fieldsplit_0_fields': '1',
-                'pc_fieldsplit_1_fields': '0',
-
-                # Use a diagonal approximation of the A00 block.
-                'pc_fieldsplit_schur_precondition': 'selfp',
-
-                # Use ILU to approximate the inverse of A00, without a KSP solver
-                'fieldsplit_0_pc_type': 'ilu',
-                'fieldsplit_0_ksp_type': 'preonly',
-
-                # Use GAMG to approximate the inverse of the Schur complement matrix
-                'fieldsplit_1_ksp_type': 'preonly',
-                'fieldsplit_1_pc_type': 'gamg',
-                'ksp_max_it': 20,
-            }
+            'L2': l2_projection_params,
         },
         help="Solver parameters for Hessian recovery.").tag(config=True)
     hessian_time_combination = Enum(
@@ -588,70 +551,16 @@ class CoupledOptions(Options):
        """).tag(config=True)
 
     def __init__(self, **kwargs):
-        """
-        Solver
-        =====
-        The time-dependent shallow water system looks like
-
-                                    ------------------------- -----   -----
-              ------------- -----   |                 |     | |   |   |   |
-              | A00 | A01 | | U |   |  T + C + V + D  |  G  | | U |   | 0 |
-        A x = ------------- ----- = |                 |     | |   | = |   |  = b,
-              | A10 | A11 | | H |   ------------------------- -----   -----
-              ------------- -----   |        B        |  T  | | H |   | 0 |
-                                    ------------------------- -----   -----
-
-        where:
-         * T - time derivative;
-         * C - Coriolis;
-         * V - viscosity;
-         * D - quadratic drag;
-         * G - gravity;
-         * B - bathymetry.
-
-        We apply a multiplicative fieldsplit preconditioner, i.e. block Gauss-Seidel:
-
-            ---------------- ------------ ----------------
-            | I |     0    | |   I  | 0 | | A00^{-1} | 0 |
-        P = ---------------- ------------ ----------------.
-            | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
-            ---------------- ------------ ----------------
-        """
+        super(CoupledOptions, self).__init__(**kwargs)
+        steady = self.timestepper == 'SteadyState'
         self.default_solver_parameters = {
-            "shallow_water": {
-                "ksp_type": "gmres",
-                "pc_type": "fieldsplit",
-                "pc_fieldsplit_type": "multiplicative",
-                "fieldsplit_U_2d": {
-                    "ksp_type": "preonly",
-                    "ksp_max_it": 10000,
-                    "ksp_rtol": 1.0e-05,
-                    "pc_type": "sor",
-                },
-                "fieldsplit_H_2d": {
-                    "ksp_type": "preonly",
-                    "ksp_max_it": 10000,
-                    "ksp_rtol": 1.0e-05,
-                    # "pc_type": "sor",
-                    "pc_type": "jacobi",
-                },
-            },
-            "tracer": {
-                "ksp_type": "gmres",
-                "pc_type": "sor",
-            },
-            "sediment": {
-                "ksp_type": "gmres",
-                "pc_type": "sor",
-            },
-            "exner": {
-                "ksp_type": "gmres",
-                "pc_type": "sor",
-            }
+            'shallow_water': lu_params if steady else fieldsplit_params,
+            'tracer': direct_tracer_params if steady else iterative_tracer_params,
+            'sediment': direct_tracer_params if steady else iterative_tracer_params,
+            'exner': direct_tracer_params if steady else iterative_tracer_params,
         }
         self.solver_parameters = self.default_solver_parameters
         self.adjoint_solver_parameters.update(self.solver_parameters)
-        super(CoupledOptions, self).__init__(**kwargs)
 
         # Check setup
         if not np.any([self.solve_swe, self.solve_tracer, self.solve_sediment, self.solve_exner]):

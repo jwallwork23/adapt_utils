@@ -19,6 +19,7 @@ class BalzanoOptions(CoupledOptions):
         shallow water flow models." Coastal Engineering 34.1-2 (1998): 83-107.
     """
     def __init__(self, n=1, bathymetry_type=1, plot_timeseries=False, **kwargs):
+        self.timestepper = 'CrankNicolson'
         super(BalzanoOptions, self).__init__(**kwargs)
         self.plot_timeseries = plot_timeseries
         self.basin_x = 13800.0  # Length of wet region
@@ -62,7 +63,6 @@ class BalzanoOptions(CoupledOptions):
         self.end_time = self.num_hours*3600.0
         # self.dt_per_export = 6
         self.dt_per_export = 1
-        self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 0.5
 
         # Timeseries

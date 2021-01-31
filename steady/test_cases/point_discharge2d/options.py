@@ -5,6 +5,7 @@ import os
 
 from adapt_utils.maths import bessk0
 from adapt_utils.options import CoupledOptions
+from adapt_utils.params import *
 
 
 __all__ = ["PointDischarge2dOptions"]
@@ -25,13 +26,13 @@ class PointDischarge2dOptions(CoupledOptions):
     :kwarg shift: Shift in x-direction for source location.
     :kwarg aligned: Toggle whether receiver is positioned in the centre of the flow or not.
     """
-    def __init__(self, level=0, shift=1.0, aligned=True, **kwargs):
+    def __init__(self, level=0, shift=1.0, aligned=True, direct=True, **kwargs):
+        self.timestepper = 'SteadyState'
         super(PointDischarge2dOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
 
         # Steady state
-        self.timestepper = 'SteadyState'
         self.start_time = 0.0
         self.end_time = 20.0
         self.dt = 20.0
@@ -73,16 +74,7 @@ class PointDischarge2dOptions(CoupledOptions):
         self.h_max = 1.0e+02
 
         # Solver parameters
-        self.solver_parameters['tracer'] = {
-            'mat_type': 'aij',
-            'ksp_type': 'preonly',
-            'pc_type': 'lu',
-            'pc_factor_mat_solver_type': 'mumps',
-        }
-        # self.solver_parameters['tracer'] = {
-        #     'ksp_type': 'gmres',
-        #     'pc_type': 'sor',
-        # }
+        self.solver_parameters['tracer'] = direct_tracer_params if direct else iterative_tracer_params
         self.adjoint_solver_parameters['tracer'] = self.solver_parameters['tracer']
 
     def set_boundary_conditions(self, prob, i):

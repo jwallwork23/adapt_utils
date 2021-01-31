@@ -3,13 +3,14 @@ from thetis.configuration import *
 
 import numpy as np
 
-from adapt_utils.steady.tracer.options import TracerOptions
+from adapt_utils.params import *
+from adapt_utils.options import CoupledOptions
 
 
-__all__ = ["PowerOptions"]
+__all__ = ["BoxDischarge2dOptions"]
 
 
-class PowerOptions(TracerOptions):
+class BoxDischarge2dOptions(CoupledOptions):
     r"""
     Parameters for test case in [Power et al. 2006].
 
@@ -21,8 +22,9 @@ class PowerOptions(TracerOptions):
 
     :kwarg centred: Toggle whether receiver is positioned in the centre of the flow or not.
     """
-    def __init__(self, centred=True, **kwargs):
-        super(PowerOptions, self).__init__(**kwargs)
+    def __init__(self, centred=True, direct=True, **kwargs):
+        self.timestepper = 'SteadyState'
+        super(BoxDischarge2dOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
         self.default_mesh = SquareMesh(40, 40, 4, 4)
@@ -34,6 +36,10 @@ class PowerOptions(TracerOptions):
         self.base_velocity = [15.0, 0.0]
         self.characteristic_speed = Constant(15.0)
         self.characteristic_diffusion = Constant(1.0)
+
+        # Solver parameters
+        self.solver_parameters['tracer'] = direct_tracer_params if direct else iterative_tracer_params
+        self.adjoint_solver_parameters['tracer'] = self.solver_parameters['tracer']
 
     def set_boundary_conditions(self, prob, i):
         zero = Constant(0.0)

@@ -21,6 +21,7 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
     domain_width = PositiveFloat(1000.0).tag(config=False)
 
     def __init__(self, level=0, aligned=False, **kwargs):
+        self.timestepper = 'CrankNicolson'
         super(IdealisedDesalinationOutfallOptions, self).__init__(**kwargs)
         self.solve_swe = False
         self.solve_tracer = True
@@ -38,7 +39,6 @@ class IdealisedDesalinationOutfallOptions(DesalinationOutfallOptions):
         self.characteristic_diffusion = Constant(self.base_diffusivity)
 
         # Time integration
-        self.timestepper = 'CrankNicolson'
         self.start_time = 0.0
         # self.T_tide = 0.1*self.M2_tide_period
         self.T_tide = 0.05*self.M2_tide_period
