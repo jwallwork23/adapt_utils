@@ -256,6 +256,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # Generate enriched space
         eop = op.copy()
         eop.increase_degree(adapt_field)  # Apply p-refinement
+        eop.stabilisation = None  # Stabilisation methods considered don't extend
         hierarchy = MeshHierarchy(self.mesh, 1)
         refined_mesh = hierarchy[1]
         ep = type(self)(
@@ -512,6 +513,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # Generate enriched space
         eop = op.copy()
         eop.increase_degree(adapt_field)  # Apply p-refinement
+        eop.stabilisation = None  # Stabilisation methods considered don't extend
         ep = type(self)(
             eop,
             meshes=self.mesh,
