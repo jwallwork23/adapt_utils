@@ -1117,9 +1117,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         kernel = eigen_kernel(set_eigendecomposition, dim)
         op2.par_loop(kernel, self.P0_ten[0].node_set, M.dat(op2.RW), evectors.dat(op2.READ), evalues.dat(op2.READ))
 
-        # Project metric
+        # Project metric and ensure SPD
         M_p1 = Function(self.P1_ten[0], name="Anisotropic DWR metric")
         M_p1.project(M)
+        M_p1.interpolate(steady_metric(H=M_p1, normalise=False, enforce_constraints=False, op=self.op))
         return M_p1
 
     def log_complexities(self):
