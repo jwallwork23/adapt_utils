@@ -29,6 +29,7 @@ parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic 
 parser.add_argument('-min_adapt', help="Minimum number of mesh adaptations.")
 parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
 parser.add_argument('-enrichment_method', help="Choose from {'GE_hp', 'GE_h', 'GE_p', 'PR', 'DQ'}.")
+parser.add_argument('-outer_iterations', help="Number of targets to consider.")
 
 # I/O and debugging
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
@@ -97,7 +98,7 @@ kwargs = {
 
     # Convergence analysis
     'target_base': 2,
-    'outer_iterations': 8,
+    'outer_iterations': int(args.outer_iterations or 8),
 
     # I/O and debugging
     'plot_pvd': True,

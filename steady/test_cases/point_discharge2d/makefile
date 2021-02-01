@@ -198,12 +198,12 @@ weighted_hessian_int:
 
 weighted_gradient_int:
 	@echo "Running intersected 'weighted gradient' adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach weighted_gradient_int
-	@python3 run_adaptation_loop.py -approach weighted_gradient_int -offset 1
+	@python3 run_adaptation_loop.py -approach weighted_gradient_int -target 250
+	@python3 run_adaptation_loop.py -approach weighted_gradient_int -target 250 -offset 1
 
 # --- Convergence plots
 
-plot: plot_by_estimator plot_by_approach
+plot: plot_by_estimator plot_by_approach plot_enrichment
 
 plot_by_estimator: plot_forward plot_adjoint plot_avg plot_int
 
@@ -244,5 +244,9 @@ plot_weighted_gradient:
 plot_isotropic:
 	@echo "Plotting isotropic convergence curves..."
 	@python3 plot_convergence.py isotropic
+
+plot_enrichment:
+	@echo "Plotting enrichment method convergence curves..."
+	@python3 plot_convergence.py enrichment
 
 convergence: uniform table forward plot_forward

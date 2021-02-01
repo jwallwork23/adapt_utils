@@ -1,5 +1,6 @@
 import argparse
 import h5py
+import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -128,20 +129,25 @@ for alignment in ('aligned', 'offset'):
         if loglog:
             axes.loglog(dofs, relative_error, '--', label=label, marker=marker, color=colour)
         else:
-            axes.semilogx(dofs, relative_error, '--', label=label, marker=marker, color=colour)
+            axes.plot(dofs, relative_error, '--', label=label, marker=marker, color=colour)
+            axes.set_xscale('log')
+            x_minor = ticker.LogLocator(base=10.0, subs=np.arange(1.0, 10.0)*0.1, numticks=10)
+            axes.xaxis.set_minor_locator(x_minor)
+            axes.xaxis.set_minor_formatter(ticker.NullFormatter())
+            y_minor = ticker.LinearLocator(numticks=23)
+            axes.yaxis.set_minor_locator(y_minor)
     axes.set_xlabel("Degrees of Freedom")
     axes.set_ylabel("Relative error")
     if not loglog:
         yticks = np.linspace(0, 0.5, 6)
         axes.set_yticks(yticks)
         axes.set_yticklabels([r"{{{:d}}}\%".format(int(yt*100)) for yt in yticks])
-        axes.set_ylim([-0.01, 0.31])
+        axes.set_ylim([-0.01, 0.21])
         xlim = axes.get_xlim()
         axes.set_xticks([1.0e+03, 1.0e+04, 1.0e+05, 1.0e+06])
         axes.hlines(y=0.01, xmin=xlim[0], xmax=xlim[1], color='k', linestyle='-', label=r'1.0\% error')
         axes.set_xlim(xlim)
     axes.grid(True)
-    axes.grid(True, which='minor', axis='y')
 
     # Save to file
     filename = 'qoi_{:s}_{:s}'.format(mode, ext)
