@@ -1367,7 +1367,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug("SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i, adjoint=False)
 
-    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False, restarted=False, final_update=True):
+    def solve_forward_step(self, i, update_forcings=None, export_func=None, restarted=False, **kwargs):
         """
         Solve forward PDE on mesh `i`.
 
@@ -1377,7 +1377,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         :kwarg checkpointing_mode: choose between 'memory' and 'disk'.
         """
         op = self.op
-        plot_pvd &= op.plot_pvd
+        plot_pvd = op.plot_pvd and kwargs.get('plot_pvd', True)
 
         # Initialise counters
         t_epsilon = 1.0e-05
@@ -1396,6 +1396,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.print(80*'=')
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
         export_func = export_func or self.op.get_export_func(self, i)
+        export_initial = kwargs.get('export_initial', False)
         if export_initial:
             update_forcings(self.simulation_time)  # TODO: CHECK
             if export_func is not None:
@@ -1527,7 +1528,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     b = self.fwd_solutions_bathymetry[i] if op.solve_exner else self.bathymetry[i]
                     proj_bath.project(b)
                     self.exner_file.write(proj_bath)
-        if final_update and update_forcings is not None:
+        if kwargs.get('final_update', True) and update_forcings is not None:
             update_forcings(self.simulation_time + op.dt)
         self.print(80*'=')
 
@@ -1567,7 +1568,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         self.add_callbacks(i, adjoint=True)
 
-    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False, **kwargs):
+    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, **kwargs):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.
 
@@ -1577,7 +1578,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         :kwarg checkpointing_mode: choose between 'memory' and 'disk'.
         """
         op = self.op
-        plot_pvd &= op.plot_pvd
+        plot_pvd = op.plot_pvd and kwargs.get('plot_pvd', True)
 
         # Initialise counters
         t_epsilon = 1.0e-05
@@ -1594,6 +1595,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.print(80*'=')
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
         export_func = export_func or self.op.get_export_func(self, i)
+        export_initial = kwargs.get('export_initial', False)
         if export_initial:
             update_forcings(self.simulation_time)
             export_func()

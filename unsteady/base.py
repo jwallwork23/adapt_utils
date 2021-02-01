@@ -500,10 +500,10 @@ class AdaptiveProblemBase(object):
             self.op.print_debug(self.op.indent + "I/O: Loading plex from {:s}...".format(fname))
             self.meshes[i] = load_mesh('{:s}_{:d}'.format(fname, i), fpath)
 
-    def setup_solver_forward_step(self, i):
+    def setup_solver_forward_step(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
 
-    def setup_solver_adjoint_step(self, i):
+    def setup_solver_adjoint_step(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
 
     def free_solver_forward_step(self, i):
