@@ -179,7 +179,7 @@ else:
         """
         J = Jhat(m) if len(swp.checkpoint) == 0 else swp.quantity_of_interest()
         swp.solve_adjoint(checkpointing_mode=chk)
-        g = assemble(inner(op.basis_function, swp.adj_solution)*dx)
+        g = assemble(inner(op.basis_function, swp.adj_solution.split()[1])*dx)
         if use_regularisation:
             g += op.regularisation_term_gradients[0]
         msg = "control = {:15.8e}  functional = {:15.8e}  gradient = {:15.8e}"

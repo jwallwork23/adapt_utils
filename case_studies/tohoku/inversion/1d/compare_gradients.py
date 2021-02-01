@@ -100,7 +100,7 @@ except AssertionError:
 # --- Adjoint-free
 
 if af:
-    print_output("*** ADJOINT-FREE ***...")
+    print_output("*** ADJOINT-FREE ***")
 
     # Solve the forward problem with 'suboptimal' control parameter m = 7.5, no checkpointing
     op.di = create_directory(os.path.join(di, 'adjoint_free'))
@@ -114,7 +114,7 @@ if af:
 # --- Discrete adjoint
 
 if da:
-    print_output("*** DISCRETE ADJOINT ***...")
+    print_output("*** DISCRETE ADJOINT ***")
 
     # Solve the forward problem with 'suboptimal' control parameter m = 7.5
     op.di = create_directory(os.path.join(di, 'discrete'))
@@ -139,7 +139,7 @@ if da:
 
     # Check consistency of by-hand gradient formula
     swp.save_adjoint_trajectory()
-    g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solution)*dx)
+    g_by_hand_discrete = assemble(inner(op.basis_function, swp.adj_solution.split()[1])*dx)
     print_output("Gradient computed by hand (discrete): {:.4e}".format(g_by_hand_discrete))
     relative_error = abs((g_discrete - g_by_hand_discrete)/g_discrete)
     assert np.isclose(relative_error, 0.0)
@@ -150,7 +150,7 @@ if da:
 # --- Continuous adjoint
 
 if ca:
-    print_output("*** CONTINUOUS ADJOINT ***...")
+    print_output("*** CONTINUOUS ADJOINT ***")
 
     # Solve the forward problem with 'suboptimal' control parameter m = 7.5, checkpointing state
     op.di = create_directory(os.path.join(di, 'continuous'))
@@ -159,7 +159,7 @@ if ca:
 
     # Solve adjoint equation in continuous form
     swp.solve_adjoint()
-    g_continuous = assemble(inner(op.basis_function, swp.adj_solution)*dx)
+    g_continuous = assemble(inner(op.basis_function, swp.adj_solution.split()[1])*dx)
     print_output("Gradient computed by hand (continuous): {:.4e}".format(g_continuous))
 
 
@@ -167,7 +167,7 @@ if ca:
 
 # Establish gradient using finite differences
 if fd:
-    print_output("*** FINITE DIFFERENCES ***...")
+    print_output("*** FINITE DIFFERENCES ***")
 
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
     op.assign_control_parameters(kwargs['control_parameters'])
