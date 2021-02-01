@@ -206,7 +206,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         approach = approach or op.approach
         if 'dwr_adjoint' in approach:
             indicator = self.dwr_indicator(adapt_field, forward=False, adjoint=True)
-        elif 'dwr_avg' in approach or 'dwr_int' in approach:
+        elif approach == 'dwr_both' or 'dwr_avg' in approach or 'dwr_int' in approach:
             indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=True)
         elif 'dwr' in approach:
             indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=False)
@@ -364,7 +364,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         indicator_enriched.interpolate(abs(cell + flux))
 
         # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
+        label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
         self.estimators[label].append(self.indicator['GE_hp'].vector().gather().sum())
@@ -490,7 +490,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         indicator_enriched.interpolate(abs(cell + flux))
 
         # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
+        label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
         self.estimators[label].append(self.indicator['GE_h'].vector().gather().sum())
@@ -632,7 +632,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         self.indicator['GE_p'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
 
         # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
+        label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
         self.estimators[label].append(self.indicator['GE_p'].vector().gather().sum())
@@ -729,7 +729,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         self.indicator['PR'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
 
         # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
+        label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
         self.estimators[label].append(self.indicator['PR'].vector().gather().sum())
@@ -835,7 +835,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.indicator['flux'] *= 0.5
 
         # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
+        label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
         self.estimators[label].append(self.indicator['DQ'].vector().gather().sum())
@@ -856,7 +856,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         forward = 'adjoint' not in approach
         if 'dwr' in approach:
             self.indicate_error(adapt_field)
-        if approach in ('dwr', 'dwr_adjoint', 'dwr_avg'):
+        if approach in ('dwr', 'dwr_adjoint', 'dwr_both'):
             metric = self.get_isotropic_metric(self.op.adapt_field, approach=approach)
         elif approach in ('isotropic_dwr', 'isotropic_dwr_adjoint', 'isotropic_dwr_avg'):
             metric = self.get_isotropic_dwr_metric(forward=forward, adjoint=adjoint)
@@ -1032,7 +1032,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             adapt_field = 'shallow_water'
         if not forward and not adjoint:
             raise ValueError("Must specify forward or adjoint.")
-        approach = 'dwr_avg' if forward and adjoint else 'dwr_adjoint' if adjoint else 'dwr'
+        approach = 'dwr_both' if forward and adjoint else 'dwr_adjoint' if adjoint else 'dwr'
 
         # Compute error indicators
         self.indicate_error(adapt_field, approach=approach)

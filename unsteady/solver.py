@@ -1781,6 +1781,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'dwr_adjoint': self.run_dwr,
             'dwr_avg': self.run_dwr,
             'dwr_int': self.run_dwr,
+            'dwr_both': self.run_dwr,
             'isotropic_dwr': self.run_dwr,                 # TODO: Unsteady case
             'isotropic_dwr_adjoint': self.run_dwr,         # TODO: Unsteady case
             'isotropic_dwr_avg': self.run_dwr,             # TODO: Unsteady case

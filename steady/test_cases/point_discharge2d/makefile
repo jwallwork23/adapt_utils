@@ -144,6 +144,13 @@ avg: dwr_avg isotropic_dwr_avg anisotropic_dwr_avg weighted_hessian_avg weighted
 
 int: dwr_int isotropic_dwr_int anisotropic_dwr_int weighted_hessian_int weighted_gradient_int
 
+second_order: dwr_both avg int
+
+dwr_both:
+	@echo "Running vertexwise second order isotropic DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -approach dwr_both
+	@python3 run_adaptation_loop.py -approach dwr_both -offset 1
+
 dwr_avg:
 	@echo "Running vertexwise second order isotropic DWR adaptation convergence test..."
 	@python3 run_adaptation_loop.py -approach dwr_avg

@@ -1069,12 +1069,10 @@ class AdaptiveProblemBase(object):
     def _check_estimator_convergence(self):
         n = self.outer_iteration
         approach = self.op.approach
-        if 'dwr_int' in approach:
-            approach = 'dwr_avg'
         if 'dwr_adjoint' in approach:
             estimators = self.estimators['dwr_adjoint']
-        elif 'dwr_avg' in approach:
-            estimators = self.estimators['dwr_avg']
+        elif approach == 'dwr_both' or 'dwr_avg' in approach or 'dwr_int' in approach:
+            estimators = self.estimators['dwr_both']
         elif 'dwr' in approach:
             estimators = self.estimators['dwr']
         else:

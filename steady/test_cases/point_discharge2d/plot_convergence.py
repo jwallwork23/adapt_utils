@@ -55,7 +55,7 @@ label_ext = ''
 if mode == 'adjoint':
     label_ext = '_adjoint'
 elif mode == 'avg':
-    label_ext = '_int'
+    label_ext = '_avg'
 elif mode == 'int':
     label_ext = '_int'
 approaches = {
@@ -66,6 +66,8 @@ approaches = {
     'weighted_hessian' + label_ext: {'label': 'Weighted Hessian', 'marker': 's'},
     'weighted_gradient' + label_ext: {'label': 'Weighted Gradient', 'marker': 'x'},
 }
+if mode == 'avg':
+    approaches['dwr_both'] = {'label': '$2^{nd}$ order isotropic DWR', 'marker': 'v'}
 if mode in ('dwr', 'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient'):
     approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
     approaches[mode] = {'label': 'Forward', 'marker': '^'}
@@ -82,12 +84,13 @@ elif mode == 'enrichment':
     approaches['GE_h'] = {'label': r'GE$_h$', 'marker': 'h'}
     approaches['GE_p'] = {'label': r'GE$_p$', 'marker': 's'}
     approaches['DQ'] = {'label': 'DQ', 'marker': 'x'}
+colours = ['C{:d}'.format(i) for i in range(6)]
 
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
 
     # Plot convergence curves
-    for approach in approaches:
+    for approach, colour in zip(approaches, colours):
         if mode == 'enrichment':
             enrichment_method = approach
         di = os.path.join(output_di, '{:s}', enrichment_method, 'hdf5')
@@ -123,9 +126,9 @@ for alignment in ('aligned', 'offset'):
             dofs = dofs[:-1]
             relative_error = relative_error[:-1]
         if loglog:
-            axes.loglog(dofs, relative_error, '--', label=label, marker=marker)
+            axes.loglog(dofs, relative_error, '--', label=label, marker=marker, color=colour)
         else:
-            axes.semilogx(dofs, relative_error, '--', label=label, marker=marker)
+            axes.semilogx(dofs, relative_error, '--', label=label, marker=marker, color=colour)
     axes.set_xlabel("Degrees of Freedom")
     axes.set_ylabel("Relative error")
     if not loglog:
@@ -155,7 +158,7 @@ for alignment in ('aligned', 'offset'):
         if not loglog:
             lines = [lines[-1]] + lines[:-1]
             labels = [labels[-1]] + labels[:-1]
-        legend = axes2.legend(lines, labels, fontsize=18, frameon=False, ncol=3)
+        legend = axes2.legend(lines, labels, fontsize=18, frameon=False, ncol=4 if mode == 'avg' else 3)
         fig2.canvas.draw()
         axes2.set_axis_off()
         bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
