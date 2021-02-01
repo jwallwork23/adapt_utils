@@ -30,7 +30,6 @@ parser = ArgumentParser(
     optimisation=True,
     shallow_water=True,
 )
-parser.add_argument("-recompute_parameter_space", help="Recompute parameter space")
 parser.add_argument("-initial_guess", help="Initial guess for control parameter")
 parser.add_argument("-optimal_control", help="Artificially choose an optimum to invert for")
 parser.add_argument("-regularisation", help="Parameter for Tikhonov regularisation term")
@@ -55,7 +54,6 @@ else:
 
 # Parsed arguments
 level = int(args.level or 0)
-recompute = bool(args.recompute_parameter_space or False)
 optimise = bool(args.rerun_optimisation or False)
 gtol = float(args.gtol or 1.0e-04)
 plot_pvd = bool(args.plot_pvd or False)
@@ -127,41 +125,6 @@ except AssertionError:
     for gauge, fname in zip(gauges, fnames):
         op.gauges[gauge]['data'] = op.gauges[gauge][timeseries]
         np.save(fname, op.gauges[gauge]['data'])
-
-
-# --- Explore parameter spaces
-
-n = 8
-op.save_timeseries = False
-control_values = [[m] for m in np.linspace(0.5, 7.5, n)]
-
-# Unregularised parameter space
-fname = os.path.join(di, 'parameter_space_{:d}.npy'.format(level))
-if recompute or not os.path.isfile(fname):
-    msg = "{:2d}: control value {:.8e}  functional value {:.8e}"
-    func_values = np.zeros(n)
-    with stop_annotating():
-        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
-        for i, m in enumerate(control_values):
-            op.assign_control_parameters(m, mesh=swp.meshes[0])
-            swp.solve_forward()
-            func_values[i] = swp.quantity_of_interest()
-            print_output(msg.format(i, m[0], func_values[i]))
-    np.save(fname, func_values)
-
-# Regularised parameter space
-fname = os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level))
-if use_regularisation and (recompute or os.path.isfile(fname)):
-    msg = "{:2d}: control value {:.8e}  regularised functional value {:.8e}"
-    func_values_reg = np.zeros(n)
-    with stop_annotating():
-        swp = problem_constructor(op, nonlinear=nonlinear, print_progress=False)
-        for i, m in enumerate(control_values):
-            op.assign_control_parameters(m, mesh=swp.meshes[0])
-            swp.solve_forward()
-            func_values_reg[i] = swp.quantity_of_interest()
-            print_output(msg.format(i, m[0], func_values_reg[i]))
-    np.save(fname, func_values_reg)
 
 
 # --- Tracing

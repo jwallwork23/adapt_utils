@@ -49,8 +49,6 @@ dirname = os.path.dirname(__file__)
 if args.adjoint is None or args.adjoint not in ('discrete', 'continuous'):
     raise ValueError
 di = create_directory(os.path.join(dirname, 'outputs', 'synthetic'))
-if args.extension is not None:
-    di = '_'.join([di, args.extension])
 plot_dir = create_directory(os.path.join(di, 'plots'))
 
 # Collect initialisation parameters
@@ -83,57 +81,12 @@ kwargs = {'markevery': 5}
 
 # --- Plot optimisation progress
 
-# Load parameter spaces
-n = 8
-control_values = np.linspace(0.5, 7.5, n)
-func_values = np.load(os.path.join(di, 'parameter_space_{:d}.npy'.format(level)))
-if use_regularisation:
-    func_values_reg = np.load(os.path.join(di, 'parameter_space_reg_{:d}.npy'.format(level)))
-
-# Fit a quadratic to the first three points and find its root
-q = scipy.interpolate.lagrange(control_values[:3], func_values[:3])
-# q = scipy.interpolate.lagrange(control_values[::3], func_values[::3])
-dq = q.deriv()
-print_output("Exact gradient at 5.0:  {:.4f}".format(dq(5.0)))
-print_output("Exact gradient at 7.5:  {:.4f}".format(dq(7.5)))
-q_min = -dq.coefficients[1]/dq.coefficients[0]
-assert len(q.coefficients) == 3
-assert dq.deriv().coefficients[0] > 0, "Minimum does not exist!"
-print_output("Minimiser of quadratic: {:.4f}".format(q_min))
-assert np.isclose(dq(q_min), 0.0), "Gradient at minimum = {:.1f}"
-if not plot.any:
-    print_output("Nothing to plot.")
-    sys.exit(0)
-
-# Fit quadratic to regularised functional values
-if use_regularisation:
-    q_reg = scipy.interpolate.lagrange(control_values[::3], func_values_reg[::3])
-    dq_reg = q_reg.deriv()
-    q_reg_min = -dq_reg.coefficients[1]/dq_reg.coefficients[0]
-    assert dq_reg.deriv().coefficients[0] > 0
-    print_output("Minimiser of quadratic (regularised): {:.4f}".format(q_reg_min))
-    assert np.isclose(dq_reg(q_reg_min), 0.0)
-
-# Plot parameter space
-fig, axes = plt.subplots(figsize=(8, 8))
-params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'markevery': 10}
-params['label'] = r'$\alpha=0.00$' if use_regularisation else r'Parameter space'
-x = np.linspace(control_values[0], control_values[-1], 10*len(control_values))
-axes.plot(x, q(x), '--x', **params)
-axes.set_xlabel(r"Basis function coefficient, $m$", fontsize=fontsize)
-axes.set_ylabel(r"Quantity of interest", fontsize=fontsize)
-plt.xticks(fontsize=fontsize_tick)
-plt.yticks(fontsize=fontsize_tick)
-plt.xlim([0, 8])
-axes.grid()
-fname = 'parameter_space'
-if use_regularisation:
-    fname += '_reg'
-savefig('{:s}_{:d}'.format(fname, level), plot_dir, extensions=plot.extensions)
-
 # Load trajectory
 msg = "Cannot plot optimisation progress on mesh {:d} because {:s} data don't exist."
-fname = os.path.join(di, args.adjoint, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+fname = os.path.join(di, args.adjoint)
+if args.extension is not None:
+    fname = '_'.join([fname, args.extension])
+fname = os.path.join(fname, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 if not os.path.isfile(fname.format('ctrl')):
     print_output(msg.format(level, 'control'))
 elif not os.path.isfile(fname.format('func')):
@@ -145,6 +98,47 @@ else:
     func_values_opt = np.load(fname.format('func', level))
     gradient_values_opt = np.load(fname.format('grad', level))
     optimised_value = control_values_opt[-1]
+
+    # Fit a quadratic to the first three points and find its root
+    q = scipy.interpolate.lagrange(control_values_opt[:3], func_values_opt[:3])
+    dq = q.deriv()
+    print_output("Exact gradient at 5.0:  {:.4f}".format(dq(5.0)))
+    print_output("Exact gradient at 7.5:  {:.4f}".format(dq(7.5)))
+    q_min = -dq.coefficients[1]/dq.coefficients[0]
+    assert len(q.coefficients) == 3
+    assert dq.deriv().coefficients[0] > 0, "Minimum does not exist!"
+    print_output("Minimiser of quadratic: {:.4f}".format(q_min))
+    assert np.isclose(dq(q_min), 0.0), "Gradient at minimum = {:.1f}"
+    if not plot.any:
+        print_output("Nothing to plot.")
+        sys.exit(0)
+
+    # # Fit quadratic to regularised functional values  # TODO
+    # if use_regularisation:
+    #     q_reg = scipy.interpolate.lagrange(control_values_opy[::3], func_values_reg_opt[::3])
+    #     dq_reg = q_reg.deriv()
+    #     q_reg_min = -dq_reg.coefficients[1]/dq_reg.coefficients[0]
+    #     assert dq_reg.deriv().coefficients[0] > 0
+    #     print_output("Minimiser of quadratic (regularised): {:.4f}".format(q_reg_min))
+    #     assert np.isclose(dq_reg(q_reg_min), 0.0)
+
+    # Plot parameter space
+    fig, axes = plt.subplots(figsize=(8, 8))
+    params = {'linewidth': 1, 'markersize': 8, 'color': 'C0', 'markevery': 10}
+    params['label'] = r'$\alpha=0.00$' if use_regularisation else r'Parameter space'
+    x = np.linspace(0.5, 7.5, 60)
+    axes.plot(x, q(x), '--x', **params)
+    axes.set_xlabel(r"Basis function coefficient, $m$", fontsize=fontsize)
+    axes.set_ylabel(r"Quantity of interest", fontsize=fontsize)
+    plt.xticks(fontsize=fontsize_tick)
+    plt.yticks(fontsize=fontsize_tick)
+    axes.set_xlim([0, 8])
+    # axes.set_ylim([0, 8000])
+    axes.grid(True)
+    fname = 'parameter_space'
+    if use_regularisation:
+        fname += '_reg'
+    savefig('{:s}_{:d}'.format(fname, level), plot_dir, extensions=plot.extensions)
 
     # Plot progress of optimisation routine
     params = {'markersize': 14, 'color': 'C0', 'label': r'$m^\star = {:.4f}$'.format(q_min)}
@@ -180,7 +174,7 @@ else:
     fname = 'optimisation_progress'
     if use_regularisation:
         fname += '_reg'
-    savefig(fname + '_{:d}'.format(level), plot_dir, args.adjoint, extensions=plot.extensions)
+    savefig(fname + '_{:d}'.format(level), plot_dir, extensions=plot.extensions)
 
 
 # --- Plot timeseries
@@ -265,4 +259,4 @@ if plotted:
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
     fname = 'timeseries_optimised_{:d}'.format(level)
-    savefig(fname, plot_dir, args.adjoint, extensions=plot.extensions)
+    savefig(fname, plot_dir, extensions=plot.extensions)
