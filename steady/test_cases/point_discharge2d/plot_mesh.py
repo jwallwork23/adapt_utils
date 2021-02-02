@@ -28,7 +28,7 @@ both = approach == 'dwr_both' or 'int' in approach or 'avg' in approach
 adjoint = 'adjoint' in approach or both
 kwargs = {
     'approach': approach,
-    'enrichment_method': args.enrichment_method or 'GE_p' if adjoint else 'DQ',
+    'enrichment_method': args.enrichment_method or ('GE_p' if adjoint else 'DQ'),
     'plot_pvd': False,
     'debug': bool(args.debug or False),
 }

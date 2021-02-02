@@ -34,8 +34,8 @@ args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 2)
 
-discrete_adjoint = bool(args.discrete_adjoint or False)
-# discrete_adjoint = False if args.discrete_adjoint == "0" else True
+# discrete_adjoint = bool(args.discrete_adjoint or False)
+discrete_adjoint = False if args.discrete_adjoint == "0" else True
 if discrete_adjoint:
     from adapt_utils.steady.solver_adjoint import AdaptiveDiscreteAdjointSteadyProblem
     problem = AdaptiveDiscreteAdjointSteadyProblem
@@ -58,12 +58,12 @@ kwargs = {
 
     # Mesh adaptation
     'approach': approach,
-    'target': float(args.target or 5.0e+02),
+    'target': float(args.target or 4000.0),
     'norm_order': p,
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
-    'enrichment_method': args.enrichment_method or 'GE_p' if adjoint else 'DQ',
+    'enrichment_method': args.enrichment_method or ('GE_p' if adjoint else 'DQ'),
 
     # I/O and debugging
     'plot_pvd': True,

@@ -617,18 +617,6 @@ class AdaptiveProblemBase(object):
         """
         self.op.set_qoi_kernel(self, i)
 
-    def clear_tape(self):
-        """
-        Should be implemented in derived class.
-        """
-        pass
-
-    def save_adjoint_trajectory(self):
-        """
-        Should be implemented in derived class.
-        """
-        pass
-
     # --- Mesh movement
 
     def set_monitor_functions(self, monitors, bc=None, bbc=None):

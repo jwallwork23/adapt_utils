@@ -130,88 +130,17 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         else:
             raise NotImplementedError  # TODO
 
-    def get_scaled_residual(self, adjoint=False, **kwargs):
-        r"""
-        Evaluate the scaled form of the residual, as used in [Becker & Rannacher, 2001].
-        i.e. the $\rho_K$ term.
-        """
-        raise NotImplementedError  # TODO
-
-    def get_scaled_weights(self, adjoint=False, **kwargs):
-        r"""
-        Evaluate the scaled form of the residual weights, as used in [Becker & Rannacher, 2001].
-        i.e. the $\omega_K$ term.
-        """
-        raise NotImplementedError  # TODO
-
-    def get_dwr_upper_bound(self, adjoint=False, **kwargs):
-        r"""
-        Evaluate an upper bound for the DWR given by the product of residual and weights,
-        as used in [Becker & Rannacher, 2001].
-        i.e. $\rho_K \omega_K$.
-        """
-        raise NotImplementedError  # TODO
-
-    def get_difference_quotient(self, adjoint=False, **kwargs):
-        """
-        Evaluate difference quotient approximation to the DWR given by the product of residual and
-        flux term evaluated at the adjoint solution, as used in [Becker & Rannacher, 2001].
-        """
-        raise NotImplementedError  # TODO
-
-    def get_flux(self, adjoint=False, **kwargs):
-        """
-        Evaluate flux terms for forward or adjoint PDE, as specified by the `adjoint` boolean kwarg.
-        """
-        if adjoint:
-            return self.get_flux_adjoint(**kwargs)
-        else:
-            return self.get_flux_forward(**kwargs)
-
-    def get_flux_forward(self):
-        raise NotImplementedError  # TODO
-
-    def get_flux_adjoint(self):
-        raise NotImplementedError  # TODO
-
-    def get_dwr_residual(self, adjoint=False):
-        """
-        Evaluate the cellwise component of the forward or adjoint 'Dual Weighted Residual' (DWR)
-        error estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg
-        `adjoint`.
-        """
-        return self.get_dwr_residual_adjoint() if adjoint else self.get_dwr_residual_forward()
-
-    def get_dwr_residual_forward(self):
-        raise NotImplementedError  # TODO
-
-    def get_dwr_residual_adjoint(self):
-        raise NotImplementedError  # TODO
-
-    def get_dwr_flux(self, adjoint=False):
-        """
-        Evaluate the edgewise component of the forward or adjoint Dual Weighted Residual (DWR) error
-        estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg `adjoint`.
-        """
-        return self.get_dwr_flux_adjoint() if adjoint else self.get_dwr_flux_forward()
-
-    def get_dwr_flux_forward(self):
-        raise NotImplementedError  # TODO
-
-    def get_dwr_flux_adjoint(self):
-        raise NotImplementedError  # TODO
-
     def indicate_error(self, adapt_field, approach=None):
         op = self.op
         approach = approach or op.approach
-        if 'dwr_adjoint' in approach:
+        if 'dwr' not in approach:
+            return
+        elif approach[-7:] == 'adjoint':
             indicator = self.dwr_indicator(adapt_field, forward=False, adjoint=True)
-        elif approach == 'dwr_both' or 'dwr_avg' in approach or 'dwr_int' in approach:
+        elif approach == 'dwr_both' or approach[-3:] in ('avg', 'int'):
             indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=True)
-        elif 'dwr' in approach:
-            indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=False)
         else:
-            raise NotImplementedError  # TODO
+            indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=False)
         self._have_indicated_error = True
         return indicator
 
@@ -247,27 +176,44 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         else:
             raise ValueError("Enrichment mode {:s} not recognised.".format(self.op.enrichment_method))
 
-    def dwr_indicator_GE_hp(self, adapt_field, forward=False, adjoint=False):
+    def get_enriched_problem(self, field, mode):
         """
-        Indicate DWR errors using an enriched space obtained by iso-P2 refinement and p-refinement.
+        Generate a globally enriched version of this problem class.
+
+        :arg field: solution field to be refined.
         """
         op = self.op
-        both = forward and adjoint
-
-        # Generate enriched space
+        assert field in op.solve_fields
+        assert mode in ('hp', 'h', 'p')
         eop = op.copy()
-        eop.increase_degree(adapt_field)  # Apply p-refinement
-        eop.stabilisation = None  # Stabilisation methods considered don't extend
-        hierarchy = MeshHierarchy(self.mesh, 1)
-        refined_mesh = hierarchy[1]
+        if 'p' in mode:
+            eop.increase_degree(field)              # Apply p-refinement
+            if op.stabilisation in ('su', 'supg'):  # These don't extend under p-refinement
+                eop.stabilisation = None
+        mesh = self.mesh
+        if 'h' in mode:
+            mesh = MeshHierarchy(mesh, 1)[1]        # Apply h-refinement
         ep = type(self)(
             eop,
-            meshes=refined_mesh,
+            meshes=mesh,
             nonlinear=self.nonlinear,
             discrete_adjoint=self.discrete_adjoint,
             print_progress=self.print_progress,
         )
         ep.outer_iteration = self.outer_iteration
+        return ep
+
+    def dwr_indicator_GE_hp(self, adapt_field, forward=False, adjoint=False):
+        """
+        Indicate DWR errors using an enriched space obtained by iso-P2 refinement and p-refinement.
+
+        The number of p-refinements is determined by :attr:`degree_increase`.
+        """
+        op = self.op
+        both = forward and adjoint
+
+        # Generate enriched space
+        ep = self.get_enriched_problem(adapt_field, 'hp')
         enriched_space = ep.get_function_space(adapt_field)
         tm = dmhooks.get_transfer_manager(self.plex)
         bcs = self.boundary_conditions[0][adapt_field]
@@ -286,6 +232,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                     ep.solve_forward()
                 else:
                     ep.fwd_solution.assign(fwd_proj)
+            elif hasattr(ep, 'tape'):
+                ep.solve_forward()
 
             # Setup forward solver for enriched problem
             ep.create_error_estimators_step(0, adjoint=False)
@@ -384,16 +332,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         both = forward and adjoint
 
         # Generate enriched space
-        hierarchy = MeshHierarchy(self.mesh, 1)
-        refined_mesh = hierarchy[1]
-        ep = type(self)(
-            op,
-            meshes=refined_mesh,
-            nonlinear=self.nonlinear,
-            discrete_adjoint=self.discrete_adjoint,
-            print_progress=self.print_progress,
-        )
-        ep.outer_iteration = self.outer_iteration
+        ep = self.get_enriched_problem(adapt_field, 'h')
         enriched_space = ep.get_function_space(adapt_field)
         tm = dmhooks.get_transfer_manager(self.plex)
         bcs = self.boundary_conditions[0][adapt_field]
@@ -413,6 +352,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                     ep.solve_forward()
                 else:
                     ep.fwd_solution.assign(fwd_proj)
+            elif hasattr(ep, 'tape'):
+                ep.solve_forward()
 
             # Setup forward solver for enriched problem
             ep.create_error_estimators_step(0, adjoint=False)
@@ -512,17 +453,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         both = forward and adjoint
 
         # Generate enriched space
-        eop = op.copy()
-        eop.increase_degree(adapt_field)  # Apply p-refinement
-        eop.stabilisation = None  # Stabilisation methods considered don't extend
-        ep = type(self)(
-            eop,
-            meshes=self.mesh,
-            nonlinear=self.nonlinear,
-            discrete_adjoint=self.discrete_adjoint,
-            print_progress=self.print_progress,
-        )
-        ep.outer_iteration = self.outer_iteration
+        ep = self.get_enriched_problem(adapt_field, 'p')
         enriched_space = ep.get_function_space(adapt_field)
         bcs = self.boundary_conditions[0][adapt_field]
         self.indicator['cell'] = Function(self.P0[0])
@@ -546,6 +477,8 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
                     ep.solve_forward()
                 else:
                     ep.fwd_solution.assign(fwd_proj)
+            elif hasattr(ep, 'tape'):
+                ep.solve_forward()
 
             # Setup forward solver for enriched problem
             ep.create_error_estimators_step(0, adjoint=False)
@@ -645,22 +578,12 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
     def dwr_indicator_PR(self, adapt_field, forward=False, adjoint=False):
         """
-        Indicate DWR errors using an enriched space obtained by patch recovery.
+        Indicate DWR errors using an enriched space obtained by superconvergent patch recovery.
         """
-        op = self.op
         both = forward and adjoint
 
         # Generate enriched space
-        eop = op.copy()
-        eop.increase_degree(adapt_field)  # Apply p-refinement
-        ep = type(self)(
-            eop,
-            meshes=self.mesh,
-            nonlinear=self.nonlinear,
-            discrete_adjoint=self.discrete_adjoint,
-            print_progress=self.print_progress,
-        )
-        ep.outer_iteration = self.outer_iteration
+        ep = self.get_enriched_problem(adapt_field, 'p')
         enriched_space = ep.get_function_space(adapt_field)
         bcs = self.boundary_conditions[0][adapt_field]
         self.indicator['cell'] = Function(self.P0[0])
@@ -854,8 +777,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         approach = approach or self.op.approach
         adjoint = 'adjoint' in approach
         forward = 'adjoint' not in approach
-        if 'dwr' in approach:
-            self.indicate_error(adapt_field)
         if approach in ('dwr', 'dwr_adjoint', 'dwr_both'):
             metric = self.get_isotropic_metric(self.op.adapt_field, approach=approach)
         elif approach in ('isotropic_dwr', 'isotropic_dwr_adjoint', 'isotropic_dwr_avg'):
@@ -1167,6 +1088,9 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
             # Solve adjoint equation in base space
             self.solve_adjoint(keep=adjoint or both)
+
+            # Indicate error
+            self.indicate_error(adapt_field)
 
             # Construct metric
             self.metrics[0] = self.get_metric(adapt_field)
