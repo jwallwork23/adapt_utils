@@ -4,6 +4,7 @@ box_discharge2d/__pycache__/
 point_discharge2d/outputs/
 point_discharge2d/screenshots/
 point_discharge2d/data/
+point_discharge2d/plots/
 point_discharge2d/__pycache__/
 point_discharge2d/uniform_convergence_log
 point_discharge3d/outputs/
