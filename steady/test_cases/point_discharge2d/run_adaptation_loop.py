@@ -80,7 +80,7 @@ else:
     ext += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
 fname = 'qoi_{:s}'.format(ext)
 
-both = 'int' in approach or 'avg' in approach
+both = approach == 'dwr_both' or 'int' in approach or 'avg' in approach
 adjoint = 'adjoint' in approach or both
 kwargs = {
     'level': level,
