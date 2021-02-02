@@ -35,6 +35,10 @@ class Options(FrozenConfigurable):
         When defining an enriched hydrodynamics finite element space, how much should the
         polynomial order of the finite element space by incremented?
         """).tag(config=True)
+    num_refinements = PositiveInteger(1, help="""
+        When defining enriched finite element spaces, how many times should iso-P2
+        refinement be applied?
+        """).tag(config=True)
     periodic = Bool(False, help="Is the domain periodic?").tag(config=True)
     quadrature_degree = NonNegativeInteger(None, allow_none=True, help="""
         Quadrature degree used in all forms. If set to `None` then the Firedrake / Thetis

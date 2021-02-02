@@ -38,8 +38,8 @@ args = parser.parse_args()
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 2)
 
-discrete_adjoint = bool(args.discrete_adjoint or False)
-# discrete_adjoint = False if args.discrete_adjoint == "0" else True
+# discrete_adjoint = bool(args.discrete_adjoint or False)
+discrete_adjoint = False if args.discrete_adjoint == "0" else True
 if discrete_adjoint:
     from adapt_utils.steady.solver_adjoint import AdaptiveDiscreteAdjointSteadyProblem
     problem = AdaptiveDiscreteAdjointSteadyProblem

@@ -71,33 +71,13 @@ class AdaptiveDiscreteAdjointSteadyProblem(AdaptiveSteadyProblem):
         adj_sol.assign(-self.solve_blocks[-1].adj_sol)  # TODO: Why minus sign?
         return J
 
-    def get_enriched_problem(self, field, mode):
+    def get_enriched_problem(self, field):
         """
         Generate a globally enriched version of this problem class with its own tape.
 
         :arg field: solution field to be refined.
         """
-        op = self.op
-        assert field in op.solve_fields
-        assert mode in ('hp', 'h', 'p')
-        eop = op.copy()
-        if 'p' in mode:
-            eop.increase_degree(field)              # Apply p-refinement
-            if op.stabilisation in ('su', 'supg'):  # These don't extend under p-refinement
-                eop.stabilisation = None
-        mesh = self.mesh
-        if 'h' in mode:
-            mesh = MeshHierarchy(mesh, 1)[1]        # Apply h-refinement
-        ep = type(self)(
-            eop,
-            meshes=mesh,
-            nonlinear=self.nonlinear,
-            discrete_adjoint=self.discrete_adjoint,
-            print_progress=self.print_progress,
-            tape=Tape(),
-        )
-        ep.outer_iteration = self.outer_iteration
-        return ep
+        return super(AdaptiveDiscreteAdjointSteadyProblem, self).get_enriched_problem(field, tape=Tape())
 
     def indicate_error(self, *args, **kwargs):
         """
