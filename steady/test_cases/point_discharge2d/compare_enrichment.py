@@ -27,8 +27,8 @@ kwargs = {
 }
 analytical_qoi = 0.06956861886754047 if offset else 0.1633864523747167
 
-discrete_adjoint = bool(args.discrete_adjoint or False)
-# discrete_adjoint = False if args.discrete_adjoint == "0" else True
+# discrete_adjoint = bool(args.discrete_adjoint or False)
+discrete_adjoint = False if args.discrete_adjoint == "0" else True
 if discrete_adjoint:
     from adapt_utils.steady.solver_adjoint import AdaptiveDiscreteAdjointSteadyProblem
     problem = AdaptiveDiscreteAdjointSteadyProblem

@@ -24,10 +24,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def __init__(self, op, discrete_adjoint=False, **kwargs):
         if op.solve_tracer:
             self.equation_set = 'tracer'
-            self.nonlinear = False
+            kwargs.setdefault('nonlinear', False)
         elif op.solve_swe:
             self.equation_set = 'shallow_water'
-            self.nonlinear = True
+            kwargs.setdefault('nonlinear', True)
         else:
             raise ValueError("Steady-state solver only supports one of hydrodynamics and tracers.")
         super(AdaptiveSteadyProblem, self).__init__(op, **kwargs)

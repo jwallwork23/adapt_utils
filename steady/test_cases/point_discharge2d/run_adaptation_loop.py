@@ -124,7 +124,7 @@ estimators = []
 for n in range(op.outer_iterations):
     op.target = target*op.target_base**n
     op.default_mesh = RectangleMesh(100*2**level, 20*2**level, 50, 10)
-    tp = problem(op, nonlinear=False)
+    tp = problem(op)
     tp.run()
     elements.append(tp.num_cells[-1][0])
     print("Element count: ", elements)

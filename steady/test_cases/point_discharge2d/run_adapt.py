@@ -81,7 +81,7 @@ op.print_debug(op)
 
 # --- Solve
 
-tp = problem(op, nonlinear=False)
+tp = problem(op)
 tp.run()
 
 if bool(args.plot_indicator or False):
