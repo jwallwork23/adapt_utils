@@ -52,21 +52,22 @@ for method in methods:
         op.stabilisation_tracer = 'supg'
         op.anisotropic_stabilisation = True
         op.use_automatic_sipg_parameter = False
-        op.normalisation = 'complexity'
         op.enrichment_method = method
 
+        # Setup problem and solve problems in base space
         tp = problem(op, print_progress=False)
         out[method]['num_cells'].append(tp.mesh.num_cells())
         out[method]['dofs'].append(tp.mesh.num_vertices())
         tp.solve_forward()
         tp.solve_adjoint()
 
+        # Indicate error
         timestamp = perf_counter()
         tp.indicate_error('tracer')
         out[method]['time'].append(perf_counter() - timestamp)
 
         # Calculate effectivity
-        estimator = tp.indicator[op.enrichment_method].vector().gather().sum()
+        estimator = tp.estimators['dwr'][-1]
         out[method]['effectivity'].append(estimator/analytical_qoi)
 pickle.dump(out, open(fname, 'wb'))
 for method in out.keys():

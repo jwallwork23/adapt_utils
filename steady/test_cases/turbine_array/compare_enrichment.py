@@ -43,19 +43,19 @@ for method in methods:
     print(method)
     for level in range(levels):
         op = TurbineArrayOptions(level=level, **kwargs)
-        op.normalisation = 'complexity'
         op.enrichment_method = method
 
+        # Solve problems in base space
         tp = AdaptiveSteadyTurbineProblem(op, print_progress=False, discrete_adjoint=True)
         out[method]['num_cells'].append(tp.mesh.num_cells())
         out[method]['dofs'].append(sum(tp.V[0].dof_count))
         tp.solve_forward()
         tp.solve_adjoint()
 
+        # Indicate error
         timestamp = perf_counter()
         tp.indicate_error('shallow_water')
         out[method]['time'].append(perf_counter() - timestamp)
-
 pickle.dump(out, open(fname, 'wb'))
 for method in out.keys():
     print(out, out[method])
