@@ -268,16 +268,14 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             # Setup forward solver for enriched problem
             ep.create_error_estimators_step(0, adjoint=False)
             ep.setup_solver_forward_step(0)  # Needed to create timestepper
-            if method == 'PR':
-                enriched_adj_solution = recover_zz(adj_solution, to_recover='field')
-            else:
-                ep.solve_adjoint()
-                enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
 
             # Approximate adjoint error in enriched space
-            adj_error = ep.prolong(adj_solution)
-            adj_error *= -1
-            adj_error += enriched_adj_solution
+            if method == 'PR':
+                adj_error = recover_zz(adj_solution, to_recover='field')
+            else:
+                ep.solve_adjoint()
+                adj_error = ep.get_solutions(adapt_field, adjoint=True)[0]
+            adj_error -= ep.prolong(adj_solution)
 
             # Setup forward error estimator
             ets = ep.get_timestepper(0, adapt_field, adjoint=False)
@@ -343,7 +341,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # Error indicator components
         label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         self.indicator['cell'] = self.inject(cell, self.P0[0])
-        self.indicator['flux'] = self.inject(cell, self.P0[0])
+        self.indicator['flux'] = self.inject(flux, self.P0[0])
         self.indicator[method] = interpolate(abs(self.indicator['cell'] + self.indicator['flux']), self.P0[0])
         if 'h' in method:
             indicator_enriched = interpolate(abs(cell + flux), ep.P0[0])

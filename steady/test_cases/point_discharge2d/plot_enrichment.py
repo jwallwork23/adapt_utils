@@ -13,6 +13,7 @@ input_dir = os.path.join(di, 'outputs/dwr/enrichment')
 plot_dir = os.path.join(di, 'plots')
 
 markers = ('^', 's', 'o', 'x')
+minor = ticker.LogLocator(base=10.0, subs=np.arange(1.0, 10.0)*0.1, numticks=10)
 for alignment in ('aligned', 'offset'):
     fname = os.path.join(input_dir, '{:s}.p'.format(alignment))
     out = pickle.load(open(fname, 'rb'))
@@ -28,11 +29,9 @@ for alignment in ('aligned', 'offset'):
         axes.plot(out[method]['dofs'][1:], time, '--', label=out[method]['label'], marker=marker)
     axes.set_xscale('log')
     axes.set_yscale('log')
-    minor = ticker.LogLocator(base=10.0, subs=np.arange(1.0, 10.0)*0.1, numticks=10)
-    axes.xaxis.set_minor_locator(minor)
-    axes.xaxis.set_minor_formatter(ticker.NullFormatter())
-    axes.yaxis.set_minor_locator(minor)
-    axes.yaxis.set_minor_formatter(ticker.NullFormatter())
+    for ax in (axes.xaxis, axes.yaxis):
+        ax.set_minor_locator(minor)
+        ax.set_minor_formatter(ticker.NullFormatter())
     axes.set_xlabel("Degrees of freedom")
     axes.set_ylabel(r"CPU time [$\mathrm s$]")
     axes.grid(True, which='both')
@@ -43,10 +42,17 @@ for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots(figsize=(6, 5))
     for method, marker in zip(out.keys(), markers):
         I_eff = np.array(out[method]['effectivity'][1:])
-        axes.loglog(out[method]['dofs'][1:], I_eff, '--', label=out[method]['label'], marker=marker)
+        axes.plot(out[method]['dofs'][1:], I_eff, '--', label=out[method]['label'], marker=marker)
+    axes.set_xscale('log')
+    axes.set_yscale('log')
+    for ax in (axes.xaxis, axes.yaxis):
+        ax.set_minor_locator(minor)
+        ax.set_minor_formatter(ticker.NullFormatter())
+    axes.set_xticks([10**i for i in range(4, 7)])
+    axes.set_yticks([10**i for i in range(-1, 7)])
     axes.set_xlabel("Degrees of freedom")
     axes.set_ylabel("Effectivity index")
-    axes.grid(True)
+    axes.grid(True, which='both')
     savefig("enrichment_effectivity_{:s}".format(alignment), plot_dir, extensions=["pdf"])
 
     # Save legend to file
