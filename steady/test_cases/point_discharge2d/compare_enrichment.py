@@ -25,7 +25,7 @@ kwargs = {
     'plot_pvd': False,
     'debug': bool(args.debug or 0),
 }
-analytical_qoi = 0.06956861886754047 if offset else 0.1633864523747167
+J = 0.06956861886754047 if offset else 0.1633864523747167
 
 # discrete_adjoint = bool(args.discrete_adjoint or False)
 discrete_adjoint = False if args.discrete_adjoint == "0" else True
@@ -59,6 +59,7 @@ for method in methods:
         out[method]['num_cells'].append(tp.mesh.num_cells())
         out[method]['dofs'].append(tp.mesh.num_vertices())
         tp.solve_forward()
+        Je = abs(J - tp.quantity_of_interest())
         tp.solve_adjoint()
 
         # Indicate error
@@ -68,7 +69,7 @@ for method in methods:
 
         # Calculate effectivity
         estimator = tp.estimators['dwr'][-1]
-        out[method]['effectivity'].append(estimator/analytical_qoi)
+        out[method]['effectivity'].append(estimator/Je)
 pickle.dump(out, open(fname, 'wb'))
 for method in out.keys():
     print(out, out[method])
