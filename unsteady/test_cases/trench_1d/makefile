@@ -102,7 +102,7 @@ freq_20:
 alpha:
 	./run_alpha.sh
 
-plot: plot_rtol plot_freq plot_res
+plot: plot_rtol plot_freq plot_alpha plot_res
 
 plot_rtol:
 	python3 plot_rtol.py -res 0.0625
@@ -115,7 +115,9 @@ plot_freq:
 	python3 plot_freq.py -res 0.25
 
 plot_alpha:
-	python3 plot_alpha.py
+	python3 plot_alpha.py -freq 40
+	python3 plot_alpha.py -freq 120
+	python3 plot_alpha.py -freq 360
 
 plot_res:
 	python3 plot_res.py

@@ -95,21 +95,23 @@ turbine2 = ptch.Rectangle((loc[1][0]-D/2, loc[1][1]-D/2), D, D, **patch_kwargs)
 
 # Plot mesh and annotate with turbine footprint
 fig, axes = plt.subplots(figsize=(12, 5))
-interior_kw = {"linewidth": 0.1}
+interior_kw = {"linewidth": 0.3}
 boundary_kw = {"linewidth": 3.0, "colors": ["k", "k", "k"]}
 triplot(tp.mesh, axes=axes, interior_kw=interior_kw, boundary_kw=boundary_kw)
 axes.set_xlim([-1, op.domain_length+1])
 axes.set_ylim([-1, op.domain_width+1])
 axes.add_patch(turbine1)
 axes.add_patch(turbine2)
+axes.set_xticks([])
+axes.set_yticks([])
 fname = '{:s}__offset{:d}__target{:d}__elem{:d}'
-savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1][0]), plot_dir, extensions=["pdf"])
+savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1][0]), plot_dir, extensions=["jpg"])
 
 # Magnify turbine region
 axes.set_xlim(loc[0][0] - 2*D, loc[1][0] + 2*D)
 axes.set_ylim(op.domain_width/2 - 3.5*D, op.domain_width/2 + 3.5*D)
 fname = '{:s}__offset{:d}__target{:d}__elem{:d}__zoom'
-savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1][0]), plot_dir, extensions=["pdf"])
+savefig(fname.format(op.approach, op.offset, int(op.target), tp.num_cells[-1][0]), plot_dir, extensions=["jpg"])
 
 
 # --- Plot goal-oriented error indicators
