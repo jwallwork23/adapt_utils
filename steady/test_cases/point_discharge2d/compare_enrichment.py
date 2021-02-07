@@ -39,7 +39,7 @@ else:
 
 # --- Loop over enrichment methods
 
-levels = 5
+levels = 6
 methods = ('GE_hp', 'GE_h', 'GE_p', 'DQ')
 out = {method: {'effectivity': [], 'time': [], 'num_cells': [], 'dofs': []} for method in methods}
 di = create_directory('outputs/dwr/enrichment')

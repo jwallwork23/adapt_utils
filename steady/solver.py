@@ -342,7 +342,16 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         self.indicator['cell'] = self.inject(cell, self.P0[0])
         self.indicator['flux'] = self.inject(flux, self.P0[0])
-        self.indicator[method] = interpolate(abs(self.indicator['cell'] + self.indicator['flux']), self.P0[0])
+        self.indicator[method] = self.indicator['cell'].copy(deepcopy=True)
+        self.indicator[method] += self.indicator['flux']
+
+        # Global error estimate
+        if label not in self.estimators:
+            self.estimators[label] = []
+        self.estimators[label].append(abs(self.indicator[method].vector().gather().sum()))
+        self.indicator[method].interpolate(abs(self.indicator[method]))
+
+        # P1 error indicator
         if 'h' in method:
             indicator_enriched = interpolate(abs(cell + flux), ep.P0[0])
             indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
@@ -352,11 +361,6 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             self.indicator[label] = project(self.indicator[method], self.P1[0])
             self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
         self.indicator[label].rename(label)
-
-        # Global error estimate
-        if label not in self.estimators:
-            self.estimators[label] = []
-        self.estimators[label].append(self.indicator[method].vector().gather().sum())
 
         return self.indicator[label]
 
