@@ -289,7 +289,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             flux += dwr_flux
             if both:
                 if 'h' in method:
-                    indicator_enriched = interpolate(abs(dwr_cell + dwr_flux), ep.P0[0])
+                    indicator_enriched = interpolate(abs(dwr_cell + dwr_flux), ep.P0[0])  # TODO: Necessary?
                     indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
                     self.indicator['dwr'] = self.inject(indicator_enriched_cts, self.P1[0])
                 else:
@@ -327,7 +327,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             flux += dwr_flux
             if both:
                 if 'h' in method:
-                    indicator_enriched = interpolate(abs(dwr_cell + dwr_flux), ep.P0[0])
+                    indicator_enriched = interpolate(abs(dwr_cell + dwr_flux), ep.P0[0])  # TODO: Necessary?
                     indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
                     self.indicator['dwr_adjoint'] = self.inject(indicator_enriched_cts, self.P1[0])
                 else:
@@ -338,17 +338,19 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             cell *= 0.5
             flux *= 0.5
 
+        # Global error estimate
+        indicator_enriched = cell.copy(deepcopy=True)
+        indicator_enriched += flux
+        if label not in self.estimators:
+            self.estimators[label] = []
+        self.estimators[label].append(abs(indicator_enriched.vector().gather().sum()))
+
         # Error indicator components
         label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         self.indicator['cell'] = self.inject(cell, self.P0[0])
         self.indicator['flux'] = self.inject(flux, self.P0[0])
         self.indicator[method] = self.indicator['cell'].copy(deepcopy=True)
         self.indicator[method] += self.indicator['flux']
-
-        # Global error estimate
-        if label not in self.estimators:
-            self.estimators[label] = []
-        self.estimators[label].append(abs(self.indicator[method].vector().gather().sum()))
         self.indicator[method].interpolate(abs(self.indicator[method]))
 
         # P1 error indicator
