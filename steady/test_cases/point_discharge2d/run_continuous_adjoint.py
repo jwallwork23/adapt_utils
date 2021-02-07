@@ -1,10 +1,7 @@
 from thetis import *
-from firedrake_adjoint import *
-from firedrake.adjoint.blocks import GenericSolveBlock, ProjectBlock
 
 import argparse
 import os
-import sys
 from time import perf_counter
 
 from adapt_utils.io import export_field
@@ -69,24 +66,7 @@ tp.solve_forward()
 myprint("{:.4f}".format(perf_counter() - timestamp), time)
 
 
-# --- Solve discrete adjoint
-
-timestamp = perf_counter()
 J = tp.quantity_of_interest()
-m = Control(D)
-dJdm = compute_gradient(J, m)  # in R space
-myprint("Discrete adjoint gradient = {:.4e}".format(dJdm.dat.data[0]), not time)
-stop_annotating()
-tape = get_working_tape()
-solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
-solve_blocks = [block for block in solve_blocks if not isinstance(block, ProjectBlock)]
-adj = solve_blocks[-1].adj_sol.copy(deepcopy=True)
-adj *= -1  # FIXME: Why do we need this?
-myprint("{:.4f}".format(perf_counter() - timestamp), time)
-if time:
-    sys.exit(0)
-export_field(adj, "Adjoint tracer", "discrete_adjoint", fpath=op.di, plexname=None, op=op)
-solutions = [adj]
 
 
 def reduced_functional(m):
@@ -99,34 +79,7 @@ def reduced_functional(m):
     return tp.quantity_of_interest()
 
 
-def gradient_discrete(m):
-    """
-    Evaluate the gradient of the reduced functional using the discrete adjoint solution.
-    """
-    c_star = adj
-    # op.base_diffusivity = m.dat.data[0]
-    # tp.__init__(op, print_progress=False)
-    # tp.solve_forward()
-    # tp._solve_discrete_adjoint()
-    c = tp.fwd_solution_tracer
-    # c_star = tp.adj_solution_tracer
-    return assemble(-h*inner(grad(c_star), grad(c))*dx)
-
-
-# Taylor test discrete adjoint
-if taylor:
-    Jhat = reduced_functional
-    dJdm = gradient_discrete(m)
-    # dJdm = dJdm.dat.data[0]*h.dat.data[0]
-    print("Discrete adjoint gradient = {:.4e}".format(dJdm))
-    # Jhat = ReducedFunctional(J, m)
-    # dJdm = None
-    minconv = taylor_test(Jhat, D, h, dJdm=dJdm)
-    assert minconv >= 1.94
-
-
 # --- Solve continuous adjoint
-
 
 def gradient_continuous(m):
     """
@@ -152,13 +105,7 @@ if taylor:
 
 timestamp = perf_counter()
 tp.solve_adjoint()
-myprint("Time for continuous solve: {:.4f}s".format(perf_counter() - timestamp), time)
+myprint("{:.4f}".format(perf_counter() - timestamp), time)
 adj = tp.adj_solution_tracer
 op.plot_pvd = False
 export_field(adj, "Adjoint tracer", "continuous_adjoint", fpath=op.di, plexname=None, op=op)
-solutions.append(adj)
-
-
-# --- Compute L2 error against discrete adjoint
-
-myprint("L2 'error': {:.4f}%".format(100*errornorm(*solutions)/norm(solutions[0])), not time)
