@@ -40,7 +40,7 @@ else:
 # --- Loop over enrichment methods
 
 levels = 6
-methods = ('GE_hp', 'GE_h', 'GE_p', 'DQ')
+methods = ('DQ', 'GE_p', 'GE_h', 'GE_hp')
 keys = ('effectivity', 'time', 'num_cells', 'dofs', 'time_fwd', 'time_adj')
 out = {method: {key: [] for key in keys} for method in methods}
 di = create_directory('outputs/dwr/enrichment')
@@ -75,6 +75,5 @@ for method in methods:
         # Calculate effectivity
         estimator = tp.estimators['dwr'][-1]
         out[method]['effectivity'].append(estimator/Je)
-pickle.dump(out, open(fname, 'wb'))
-for method in out.keys():
-    print(out, out[method])
+    pickle.dump(out, open(fname, 'wb'))
+    print(out[method])
