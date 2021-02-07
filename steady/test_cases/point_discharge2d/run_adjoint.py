@@ -4,6 +4,7 @@ from firedrake.adjoint.blocks import GenericSolveBlock, ProjectBlock
 
 import argparse
 import os
+from time import perf_counter
 
 from adapt_utils.io import export_field
 from adapt_utils.steady.solver import AdaptiveSteadyProblem
@@ -19,8 +20,14 @@ parser.add_argument('-stabilisation', help="Stabilisation method to use")
 parser.add_argument('-anisotropic_stabilisation', help="Use anisotropic cell size measure?")
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
 parser.add_argument('-taylor_test', help="Run a Taylor test.")
+parser.add_argument('-time', help="Toggle timing mode.")
 parser.add_argument('-debug', help="Toggle debugging mode.")
 args = parser.parse_args()
+
+
+def myprint(msg, flag):
+    if flag:
+        print(msg)
 
 
 # --- Set parameters
@@ -28,6 +35,8 @@ args = parser.parse_args()
 family = args.family or 'cg'
 assert family in ('cg', 'dg')
 offset = bool(args.offset or False)
+time = bool(args.time or False)
+taylor = bool(args.taylor_test or False) and not time
 kwargs = {
     'level': int(args.level or 0),
     'aligned': not offset,
@@ -50,25 +59,29 @@ op.use_automatic_sipg_parameter = op.tracer_family == 'dg'
 
 tp = AdaptiveSteadyProblem(op, print_progress=False)
 n = FacetNormal(tp.mesh)
-tp.solve_forward()
-J = tp.quantity_of_interest()
-
 D = tp.fields[0].horizontal_diffusivity
-m = Control(D)
 h = D.copy(deepcopy=True)
 h.assign(0.1)
-dJdm = compute_gradient(J, m)  # in R space
-print("Discrete adjoint gradient = {:.4e}".format(dJdm.dat.data[0]))
-stop_annotating()
+
+timestamp = perf_counter()
+tp.solve_forward()
+myprint("Time for forward solve: {:.4f}s".format(perf_counter() - timestamp), time)
 
 
 # --- Solve discrete adjoint
 
+timestamp = perf_counter()
+J = tp.quantity_of_interest()
+m = Control(D)
+dJdm = compute_gradient(J, m)  # in R space
+myprint("Discrete adjoint gradient = {:.4e}".format(dJdm.dat.data[0]), not time)
+stop_annotating()
 tape = get_working_tape()
 solve_blocks = [block for block in tape.get_blocks() if isinstance(block, GenericSolveBlock)]
 solve_blocks = [block for block in solve_blocks if not isinstance(block, ProjectBlock)]
 adj = solve_blocks[-1].adj_sol.copy(deepcopy=True)
 adj *= -1  # FIXME: Why do we need this?
+myprint("Time for discrete solve: {:.4f}s".format(perf_counter() - timestamp), time)
 export_field(adj, "Adjoint tracer", "discrete_adjoint", fpath=op.di, plexname=None, op=op)
 solutions = [adj]
 
@@ -98,7 +111,7 @@ def gradient_discrete(m):
 
 
 # Taylor test discrete adjoint
-if bool(args.taylor_test or False):
+if taylor:
     Jhat = reduced_functional
     dJdm = gradient_discrete(m)
     # dJdm = dJdm.dat.data[0]*h.dat.data[0]
@@ -127,14 +140,16 @@ def gradient_continuous(m):
 
 
 # Taylor test continuous adjoint
-if bool(args.taylor_test or False):
+if taylor:
     Jhat = reduced_functional
     dJdm = gradient_continuous(D)
     print("Continuous adjoint gradient = {:.4e}".format(dJdm))
     minconv = taylor_test(Jhat, D, h, dJdm=dJdm)
     assert minconv >= 1.94
 
+timestamp = perf_counter()
 tp.solve_adjoint()
+myprint("Time for continuous solve: {:.4f}s".format(perf_counter() - timestamp), time)
 adj = tp.adj_solution_tracer
 op.plot_pvd = False
 export_field(adj, "Adjoint tracer", "continuous_adjoint", fpath=op.di, plexname=None, op=op)
@@ -143,4 +158,4 @@ solutions.append(adj)
 
 # --- Compute L2 error against discrete adjoint
 
-print_output("L2 'error': {:.4f}%".format(100*errornorm(*solutions)/norm(solutions[0])))
+myprint("L2 'error': {:.4f}%".format(100*errornorm(*solutions)/norm(solutions[0])), not time)

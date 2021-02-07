@@ -122,6 +122,10 @@ class AdaptiveProblemBase(object):
         if self.print_progress:
             print_output(msg)
 
+    def warning(self, msg):
+        if os.environ.get('WARNINGS', '0') != '0':
+            print_output(msg)
+
     def set_meshes(self, meshes, index=None):
         """
         Build a mesh associated with each mesh.

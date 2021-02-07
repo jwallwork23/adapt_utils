@@ -403,7 +403,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if dim == 2:
                 self.minimum_angles[i] = get_minimum_angles_2d(self.meshes[i])
             else:
-                print_output("WARNING: Cannot compute minimum angle in {:d}D.".format(dim))
+                self.warning("WARNING: Cannot compute minimum angle in {:d}D.".format(dim))
         if self.op.solve_swe:
             self._set_shallow_water_stabilisation_step(i)
         if self.op.solve_tracer:
@@ -675,7 +675,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if not self.op.debug:
                 return
             if np.allclose(a, b):
-                print_output("WARNING: Is the intermediary {:s} solution just copied?".format(name))
+                self.warning("WARNING: Is the intermediary {:s} solution just copied?".format(name))
 
         debug(self.fwd_solutions[i].dat.data[0],
               self.intermediary_solutions[i].dat.data[0],
