@@ -22,7 +22,12 @@ for alignment in ('aligned', 'offset'):
     out['GE_h']['label'] = 'GE$_h$'
     out['GE_p']['label'] = 'GE$_p$'
     out['DQ']['label'] = 'DQ'
+    methods = list(out.keys())
 
+    # Get average time for an adjoint solve
+    time_adj = sum(np.array(out[method]['time_adj']) for method in out.keys())/len(methods)
+
+    # Plot CPU time
     fig, axes = plt.subplots(figsize=(6, 5))
     for method, marker in zip(out.keys(), markers):
         time = out[method]['time'][1:]
@@ -34,11 +39,30 @@ for alignment in ('aligned', 'offset'):
         ax.set_minor_formatter(ticker.NullFormatter())
     axes.set_xlabel("Degrees of freedom")
     axes.set_ylabel(r"CPU time [$\mathrm s$]")
+    axes.set_xticks([10**i for i in range(4, 7)])
+    axes.set_yticks([10**i for i in range(5)])
     axes.grid(True, which='both')
     annotation.slope_marker((1.5e+05, 1.5), 1, invert=False, ax=axes, size_frac=0.2)
     annotation.slope_marker((2.0e+05, 1.0e+03), 1.5, invert=True, ax=axes, size_frac=0.2)
     savefig("enrichment_time_{:s}".format(alignment), plot_dir, extensions=["pdf"])
 
+    # Plot relative CPU time
+    fig, axes = plt.subplots(figsize=(6, 5))
+    for method, marker in zip(out.keys(), markers):
+        time = np.array(out[method]['time'][1:])/time_adj[1:]
+        axes.plot(out[method]['dofs'][1:], time, '--', label=out[method]['label'], marker=marker)
+    axes.set_xscale('log')
+    axes.set_yscale('log')
+    for ax in (axes.xaxis, ):
+        ax.set_minor_locator(minor)
+        ax.set_minor_formatter(ticker.NullFormatter())
+    axes.set_xlabel("Degrees of freedom")
+    axes.set_ylabel(r"CPU time / adjoint solve")
+    axes.set_xticks([10**i for i in range(4, 7)])
+    axes.grid(True, which='both')
+    savefig("relative_enrichment_time_{:s}".format(alignment), plot_dir, extensions=["pdf"])
+
+    # Plot effectivity
     fig, axes = plt.subplots(figsize=(6, 5))
     for method, marker in zip(out.keys(), markers):
         I_eff = np.array(out[method]['effectivity'][1:])
