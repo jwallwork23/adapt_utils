@@ -41,7 +41,8 @@ else:
 
 levels = 6
 methods = ('GE_hp', 'GE_h', 'GE_p', 'DQ')
-out = {method: {'effectivity': [], 'time': [], 'num_cells': [], 'dofs': []} for method in methods}
+keys = ('effectivity', 'time', 'num_cells', 'dofs', 'time_fwd', 'time_adj')
+out = {method: {key: [] for key in keys} for method in methods}
 di = create_directory('outputs/dwr/enrichment')
 fname = os.path.join(di, '{:s}.p'.format('offset' if offset else 'aligned'))
 for method in methods:
@@ -58,9 +59,13 @@ for method in methods:
         tp = problem(op, print_progress=False)
         out[method]['num_cells'].append(tp.mesh.num_cells())
         out[method]['dofs'].append(tp.mesh.num_vertices())
+        timestamp = perf_counter()
         tp.solve_forward()
+        out[method]['time_fwd'].append(perf_counter() - timestamp)
         Je = abs(J - tp.quantity_of_interest())
+        timestamp = perf_counter()
         tp.solve_adjoint()
+        out[method]['time_adj'].append(perf_counter() - timestamp)
 
         # Indicate error
         timestamp = perf_counter()
