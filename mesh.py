@@ -13,7 +13,7 @@ class MeshStats(object):
     """
     A class for holding various statistics related to a given mesh.
     """
-    def __init__(self, op, mesh=None, initial_signs=None):
+    def __init__(self, op=None, mesh=None, initial_signs=None):
         """
         :arg op: :class:`Options` parameter object.
         :kwarg mesh: if a mesh is not provided, the :attr:`default_mesh` associated with :attr:`op`
@@ -43,7 +43,8 @@ class MeshStats(object):
             self.scaled_jacobian = quality(self._mesh, initial_signs=initial_signs)
         elif self.dim != 3:
             raise ValueError("Mesh of dimension {:d} not supported.".format(self.dim))
-        op.print_debug(self.summary)
+        if op is not None:
+            op.print_debug(self.summary)
 
     @property
     def summary(self):

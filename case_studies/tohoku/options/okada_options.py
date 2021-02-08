@@ -1,12 +1,14 @@
+from thetis import *
+
 import numpy as np
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 
 
 __all__ = ["TohokuOkadaBasisOptions"]
 
 
-class TohokuOkadaBasisOptions(TohokuOptions):
+class TohokuOkadaBasisOptions(TohokuInversionOptions):
     """
     Initialise the free surface with an initial condition generated using Okada functions.
 
@@ -52,13 +54,15 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         :kwarg okada_grid_lat_min: minimum latitude in the Okada grid.
         """
         super(TohokuOkadaBasisOptions, self).__init__(**kwargs)
-        self.control_parameters = kwargs.get('control_parameters')
+        self.assign_control_parameters(kwargs.get('control_parameters'))
         self.coordinate_specification = kwargs.get('coordinate_specification', 'centroid')
-        self.N = kwargs.get('okada_grid_resolution', 101)
+        self.N = kwargs.get('okada_grid_resolution', None)
         self.lx = kwargs.get('okada_grid_length_lon', 10)
         self.ly = kwargs.get('okada_grid_length_lat', 10)
         self.xmin = kwargs.get('okada_grid_lon_min', 138)
         self.ymin = kwargs.get('okada_grid_lat_min', 32)
+        self.xmax = kwargs.get('okada_grid_lon_max', self.xmin + self.lx)
+        self.ymax = kwargs.get('okada_grid_lat_max', self.ymin + self.ly)
         self.subfaults = []
         self.get_subfaults()
         self.all_controls = (
@@ -71,6 +75,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         self.nx = kwargs.get('nx', 19)
         self.ny = kwargs.get('ny', 10)
         assert self.nx*self.ny == len(self.subfaults)
+        self.num_subfaults = len(self.subfaults)
 
         # Active controls for automatic differentation
         self.active_controls = ('slip', 'rake', 'strike', 'dip')
@@ -125,6 +130,12 @@ class TohokuOkadaBasisOptions(TohokuOptions):
                 self.control_parameters['width'].append(20.0e+03)
         self.all_controls += ('length', 'width', )
 
+    def assign_control_parameters(self, control_values):
+        """
+        For consistency with :class:`TohokuBoxBasisOptions` and :class:`TohokuRadialBasisOptions`.
+        """
+        self.control_parameters = control_values
+
     def get_subfaults(self, check_validity=False, reset=False):
         """
         Create GeoCLAW :class:`SubFault` objects from provided subfault parameters, as well as a
@@ -167,13 +178,43 @@ class TohokuOkadaBasisOptions(TohokuOptions):
             self.subfaults.append(subfault)
 
         # Create a lon-lat grid upon which to represent the source
-        x = np.linspace(self.xmin, self.xmin + self.lx, self.N)
-        y = np.linspace(self.ymin, self.ymin + self.ly, self.N)
+        if self.N is not None:
+            x = np.linspace(self.xmin, self.xmax, self.N)
+            y = np.linspace(self.ymin, self.ymax, self.N)
+            self.coords = (x, y)
+        else:
+            self.indices = []
+            self.coords = []
+            for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
+                if (self.xmin < xy[0] < self.xmax) and (self.ymin < xy[1] < self.ymax):
+                    self.indices.append(i)
+                    self.coords.append(xy)
+            if len(self.coords) == 0:
+                raise ValueError("Source region does not lie in domain.")
+            self.coords = (np.array(self.coords), )
 
         # Create fault
-        self.fault = Fault(x, y, subfaults=self.subfaults)
+        self.fault = Fault(*self.coords, subfaults=self.subfaults)
 
-    def set_initial_condition(self, prob, annotate_source=False, **kwargs):
+    def interpolate_dislocation_field(self, prob, data=None):
+        from scipy.interpolate import griddata
+
+        surf = Function(prob.P1[0])
+        if data is not None:
+            surf.dat.data[self.indices] = data
+        elif self.N is not None:  # Interpolate it using SciPy
+            surf.dat.data[:] = griddata(
+                (self.fault.dtopo.X, self.fault.dtopo.Y),
+                self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape),
+                self.coords,
+                method='linear',
+                fill_value=0.0,
+            )
+        else:  # Just insert the data at the appropriate nodes, assuming zero elsewhere
+            surf.dat.data[self.indices] = self.fault.dtopo.dZ.reshape(self.fault.dtopo.X.shape)
+        return surf
+
+    def set_initial_condition(self, prob, annotate_source=False, unroll_tape=False, **kwargs):
         """
         Set initial condition using the Okada parametrisation [Okada 85].
 
@@ -187,21 +228,23 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         :kwarg annotate_source: toggle annotation of the rupture process using pyadolc.
         :kwarg tag: non-negative integer label for tape.
         """
-        from scipy.interpolate import interp2d
-        import firedrake
+        # separate_faults = kwargs.get('separate_faults', True)
+        separate_faults = kwargs.get('separate_faults', False)
+        subtract_from_bathymetry = kwargs.pop('subtract_from_bathymetry', True)
+        tag = kwargs.get('tag', 0)
 
-        # Create fault topography
-        self.create_topography(annotate=annotate_source, **kwargs)
-
-        # Interpolate it using SciPy
-        surf_interp = interp2d(self.fault.dtopo.x, self.fault.dtopo.y, self.fault.dtopo.dZ)
-
-        # Evaluate the interpolant at the mesh vertices
-        surf = firedrake.Function(prob.P1[0])
-        if not hasattr(self, 'lonlat_mesh'):
-            self.get_lonlat_mesh()
-        for i, xy in enumerate(self.lonlat_mesh.coordinates.dat.data):
-            surf.dat.data[i] = surf_interp(*xy)
+        # Create fault topography...
+        if unroll_tape:
+            # ... by unrolling ADOL-C's tape
+            import adolc
+            F = adolc.zos_forward(tag, self.input_vector, keep=1)
+            if separate_faults:
+                F = np.sum(F.reshape(self.num_subfaults, len(self.indices)), axis=0)
+            surf = self.interpolate_dislocation_field(prob, data=F)
+        else:
+            # ... by running the Okada model
+            self.create_topography(annotate=annotate_source, **kwargs)
+            surf = self.interpolate_dislocation_field(prob)
 
         # Assume zero initial velocity and interpolate into the elevation space
         u, eta = prob.fwd_solutions[0].split()
@@ -209,8 +252,58 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         eta.interpolate(surf)
 
         # Subtract initial surface from the bathymetry field
-        self.subtract_surface_from_bathymetry(prob, surf=surf)
+        if subtract_from_bathymetry:
+            self.subtract_surface_from_bathymetry(prob, surf=surf)
         return surf
+
+    def get_basis_functions(self, prob=None):
+        """
+        Assemble a dictionary containing lists of Okada basis functions on each subfault.
+
+        Each basis function associated with a subfault has active controls set to zero on all other
+        subfaults and only one non-zero active control on the subfault itself, set to one. All passive
+        controls retain the value that they hold before assembly.
+        """
+        from adapt_utils.unsteady.solver import AdaptiveProblem
+
+        prob = prob or AdaptiveProblem(self)
+        self._basis_functions = {}
+
+        # Stash the control parameters and zero out all active ones
+        tmp = self.control_parameters.copy()
+        for control in self.active_controls:
+            self.control_parameters[control] = np.zeros(self.num_subfaults)
+
+        # Loop over active controls on each subfault and compute the associated basis functions
+        msg = "INIT: Assembling Okada basis function array with active controls {:}..."
+        print_output(msg.format(self.active_controls))
+        msg = "INIT: Assembling '{:s}' basis function on subfault {:d}/{:d}..."
+        for control in self.active_controls:
+            self._basis_functions[control] = []
+            for i, subfault in enumerate(self.subfaults):
+                self.print_debug(msg.format(control, i, self.num_subfaults), mode='full')
+                self.control_parameters[control][i] = 1
+                self.set_initial_condition(prob, annotate_source=False, subtract_from_bathymetry=False)
+                self._basis_functions[control].append(prob.fwd_solutions[0].copy(deepcopy=True))
+                self.control_parameters[control][i] = 0
+        self.control_parameters = tmp
+
+    @property
+    def basis_functions(self):
+        recompute = False
+        if not hasattr(self, '_basis_functions'):
+            recompute = True
+        else:
+            # Check the active controls haven't changed
+            for control in self.active_controls:
+                if control not in self._basis_functions:
+                    recompute = True
+            for control in self._basis_functions:
+                if control not in self.active_controls:
+                    recompute = True
+        if recompute:
+            self.get_basis_functions()
+        return self._basis_functions
 
     def create_topography(self, annotate=False, interpolate=False, **kwargs):
         """
@@ -223,25 +316,26 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         :kwarg annotate: toggle annotation using pyadolc.
         :kwarg interpolate: see the :attr:`interpolate` method.
         :kwarg tag: label for tape.
+        :kwarg separate_faults: set to `True` if we want forward mode derivatives.
         """
-        msg = "Fault corresponds to an earthquake with moment magnitude {:4.1e}"
+        msg = "INIT: Fault corresponds to an earthquake with moment magnitude {:4.1e}"
         if annotate:
             if interpolate:
                 self._create_topography_active_interpolate(**kwargs)
             else:
                 self._create_topography_active(**kwargs)
-            self.print_debug(msg.format(self.fault.Mw().val))
+            self.print_debug(msg.format(self.fault.Mw().val), mode='full')
         else:
             self._create_topography_passive()
-            self.print_debug(msg.format(self.fault.Mw()))
+            self.print_debug(msg.format(self.fault.Mw()), mode='full')
 
     def _create_topography_passive(self):
-        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        msg = "INIT: Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
         for i, subfault in enumerate(self.subfaults):
             for control in self.all_controls:
                 subfault.__setattr__(control, self.control_parameters[control][i])
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo()))
-        self.fault.create_dtopography(verbose=self.debug, active=False)
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo()), mode='full')
+        self.fault.create_dtopography(verbose=self.debug and self.debug_mode == 'full', active=False)
 
     # --- Automatic differentiation
 
@@ -258,7 +352,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         adolc.trace_on(tag)
 
         # Read parameters and mark active variables as independent
-        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        msg = "INIT: Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
         for i, subfault in enumerate(self.subfaults):
             for control in self.all_controls:
                 if control in self.active_controls:
@@ -266,11 +360,11 @@ class TohokuOkadaBasisOptions(TohokuOptions):
                     adolc.independent(subfault.__getattribute__(control))
                 else:
                     subfault.__setattr__(control, self.control_parameters[control][i])
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val))
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val), mode='full')
 
         # Create the topography, thereby calling Okada
         self.print_debug("SETUP: Creating topography using Okada model...")
-        self.fault.create_dtopography(verbose=self.debug, active=True)
+        self.fault.create_dtopography(verbose=self.debug and self.debug_mode == 'full', active=True)
 
         # Mark output as dependent
         if separate_faults:
@@ -293,7 +387,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         adolc.trace_on(tag)
 
         # Read parameters and mark active variables as independent
-        msg = "Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
+        msg = "INIT: Subfault {:d}: shear modulus {:4.1e} Pa, seismic moment is {:4.1e}"
         for i, subfault in enumerate(self.subfaults):
             for control in self.all_controls:
                 if control in self.active_controls:
@@ -301,11 +395,11 @@ class TohokuOkadaBasisOptions(TohokuOptions):
                     adolc.independent(subfault.__getattribute__(control))
                 else:
                     subfault.__setattr__(control, self.control_parameters[control][i])
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val))
+            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val), mode='full')
 
         # Create the topography, thereby calling Okada
         self.print_debug("SETUP: Creating topography using Okada model...")
-        self.fault.create_dtopography(verbose=self.debug, active=True)
+        self.fault.create_dtopography(verbose=self.debug and self.debug_mode == 'full', active=True)
 
         # Compute quantity of interest
         self.J_subfaults = [0.0 for j in range(self.N)]
@@ -324,17 +418,18 @@ class TohokuOkadaBasisOptions(TohokuOptions):
             adolc.dependent(self.J)
         adolc.trace_off()
 
-    def get_input_vector(self):
+    @property
+    def input_vector(self):
         """
         Get a vector of the same length as the total number of controls and populate it with passive
         versions of each parameter. This provides a point at which we can compute derivative
         matrices.
         """
-        controls = self.control_parameters
-        num_subfaults = len(self.subfaults)
-        X = [controls[control][i] for i in range(num_subfaults) for control in self.active_controls]
-        self.input_vector = np.array(X)
-        return self.input_vector
+        return np.array([
+            self.control_parameters[control][i]
+            for i in range(self.num_subfaults)
+            for control in self.active_controls
+        ])
 
     def get_seed_matrices(self):
         """
@@ -346,31 +441,36 @@ class TohokuOkadaBasisOptions(TohokuOptions):
 
         In the default case we have four active controls and hence there are four seed matrices.
         """
-        if not hasattr(self, 'input_vector'):
-            self.get_input_vector()
         n = len(self.active_controls)
-        S = [[1 if i % n == j else 0 for j in range(n)] for i in range(len(self.input_vector))]
-        self.seed_matrices = np.array(S)
-        return self.seed_matrices
+        self._seed_matrices = np.array([
+            [1 if i % n == j else 0 for j in range(n)]
+            for i in range(len(self.input_vector))
+        ])
+
+    @property
+    def seed_matrices(self):
+        if not hasattr(self, '_seed_matrices'):
+            self.get_seed_matrices()
+        return self._seed_matrices
 
     # --- Interpolation between Okada grid and computational mesh
 
+    # TODO: No longer needed
     def get_interpolation_operators(self):
         """
         Establish the mapping between Okada grid
         """
-        import firedrake
         from firedrake.projection import SupermeshProjector
 
+        assert self.N is not None
+
         # Create a Firedrake mesh associated with the (uniform) Okada grid.
-        self.okada_mesh = firedrake.SquareMesh(self.N-1, self.N-1, self.lx, self.ly)
+        self.okada_mesh = SquareMesh(self.N-1, self.N-1, self.lx, self.ly)
         self.okada_mesh.coordinates.dat.data[:] += [self.xmin, self.ymin]
 
         # Create function spaces associated with both the Okada and longitude-latitude meshes
-        self.P1_okada = firedrake.FunctionSpace(self.okada_mesh, "CG", 1)
-        if not hasattr(self, 'lonlat_mesh'):
-            self.get_lonlat_mesh()
-        self.P1_lonlat = firedrake.FunctionSpace(self.lonlat_mesh, "CG", 1)
+        self.P1_okada = FunctionSpace(self.okada_mesh, "CG", 1)
+        self.P1_lonlat = FunctionSpace(self.lonlat_mesh, "CG", 1)
 
         # Establish an index mapping between the logical x- and y- directions and the vertex
         # ordering used by Firedrake's utility mesh, :class:`SquareMesh`.
@@ -382,14 +482,15 @@ class TohokuOkadaBasisOptions(TohokuOptions):
 
         # Create source and target images and a libsupermesh projector between them
         self.print_debug("SETUP: Establishing supermesh projector between Okada and lonlat meshes...")
-        self.source_okada = firedrake.Function(self.P1_okada, name="Interp. source on Okada mesh")
-        self.target_lonlat = firedrake.Function(self.P1_lonlat, name="Interp. target on lonlat mesh")
+        self.source_okada = Function(self.P1_okada, name="Interp. source on Okada mesh")
+        self.target_lonlat = Function(self.P1_lonlat, name="Interp. target on lonlat mesh")
         self._okada2lonlat = SupermeshProjector(self.source_okada, self.target_lonlat)
 
         # Target image on UTM mesh
-        P1 = firedrake.FunctionSpace(self.default_mesh, "CG", 1)
-        self.target_utm = firedrake.Function(P1, name="Interpolation target on UTM mesh")
+        P1 = FunctionSpace(self.default_mesh, "CG", 1)
+        self.target_utm = Function(P1, name="Interpolation target on UTM mesh")
 
+    # TODO: No longer needed
     def _field_from_array(self, arr):
         """
         Insert an array `arr` from the Okada model into the source field defined on the Firedrake
@@ -397,10 +498,12 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         """
         if not hasattr(self, 'source_okada'):
             self.get_interpolation_operators()
+        assert self.N is not None
         assert arr.shape == (self.N, self.N)
         for k in range(self.N*self.N):
             self.source_okada.dat.data[k] = arr[self._y_locations[k], self._x_locations[k]]
 
+    # TODO: No longer needed
     def interpolate_okada_array(self, arr):
         """
         Given an array `arr` obtained from the Okada model, interpolate it onto the Firedrake mesh
@@ -430,10 +533,123 @@ class TohokuOkadaBasisOptions(TohokuOptions):
 
     # --- Projection and interpolation into Okada basis
 
-    def project(self, prob, source):
-        raise NotImplementedError("""
-            Projection not implemented in Okada bases (and it probably isn't what you want anyway).
-            Use interpolate instead.""")
+    def project(self, prob, source, maxiter=2, rtol=1.0e-02):
+        """
+        Project a source field into the Okada basis.
+
+        Whilst the Okada model (evaluated on each subfault) is nonlinear, the dislocation field across
+        the whole fault is computed by simply summing all contributions.
+
+        We restrict attention to the case where slip and rake are the only active control parameters.
+        On any given fault, if the slip is zero then so is the rake. This means that we cannot assemble
+        a monolithic system using basis functions from both slip and rake parameter spaces, as half of
+        its rows would be zero.
+
+        Instead, we take an iterative approach:
+
+          1. set all active control parameters to zero;
+          2. while not converged:
+              (a) solve for slip, holding rake parameters fixed;
+              (b) solve for rake, holding slip parameters fixed;
+              (c) compute dislocation field for current control parameters;
+              (d) check for convergence.
+
+        Convergence is determined either by subsequent dislocation field approximations meeting a
+        relative l2 error tolerance, or when the maximum number of iterations is met.
+        """
+        active_controls = self.active_controls
+        try:
+            assert 'slip' in active_controls
+            assert 'rake' in active_controls
+            for control in self.all_controls:
+                if control in active_controls:
+                    assert control in ('slip', 'rake')
+        except AssertionError:
+            raise NotImplementedError
+
+        # Cacheing
+        cache_dir = create_directory(os.path.join(os.path.dirname(__file__), '.cache'))
+        fname = os.path.join(cache_dir, 'mass_matrix_okada_{:d}_{:d}x{:d}_slip.npy')
+
+        # Set rake to zero initially
+        N = len(self.subfaults)
+        self.control_parameters['rake'] = np.zeros(N)
+
+        # Solve for slip and then rake
+        dirty_cache = self.dirty_cache
+        errors = []
+        for n in range(maxiter):
+            for control in ('slip', 'rake'):
+
+                # Get basis functions with slip solution above
+                self.active_controls = (control, )
+                self.get_basis_functions(prob)
+                phi = [bf.split()[1] for bf in self.basis_functions[control]]
+                assert np.array([np.linalg.norm(phi_i.dat.data) for phi_i in phi]).min() > 0
+
+                # Assemble mass matrix
+                if os.path.isfile(fname) and not dirty_cache:
+                    self.print_debug("PROJECTION: Loading slip mass matrix from cache...")
+                    A = np.load(fname)
+                    dirty_cache = True  # We only actually cache the first slip mass matrix
+                else:
+                    self.print_debug("PROJECTION: Assembling {:s} mass matrix...".format(control))
+                    A = np.zeros((N, N))
+                    for i in range(N):
+                        for j in range(i+1):
+                            A[i, j] = assemble(phi[i]*phi[j]*dx)
+                    for i in range(N):
+                        for j in range(i+1, N):
+                            A[i, j] = A[j, i]
+                    if control == 'slip' and n == 0:
+                        self.print_debug("PROJECTION: Cacheing slip mass matrix...")
+                        np.save(fname, A)
+
+                # Assemble RHS
+                self.print_debug("PROJECTION: Assembling RHS for {:s} solve...".format(control))
+                b = np.array([assemble(phi[i]*source*dx) for i in range(N)])
+
+                # Solve
+                self.print_debug("PROJECTION: Solving linear system for {:s}...".format(control))
+                self.control_parameters[control] = np.linalg.solve(A, b)
+
+                # Ensure that we always end with a slip solve
+                if control == 'rake':
+                    continue
+
+                # Generate surface
+                surf = self.set_initial_condition(prob, subtract_from_bathymetry=False)
+                if self.debug:
+                    import matplotlib.pyplot as plt
+                    fig, axes = plt.subplots(figsize=(8, 8))
+                    fig.colorbar(tricontourf(surf, cmap='coolwarm', levels=50, axes=axes), ax=axes)
+                    axes.set_title("Iteration {:d}".format(n))
+                    axes.axis(False)
+                    plt.show()
+
+                # Check for convergence
+                err = errornorm(surf, source)/norm(source)
+                errors.append(err)
+                msg = "PROJECTION: Relative l2 error at iteration {:d} = {:.2f}%"
+                self.print_debug(msg.format(n, 100*err))
+                if err < rtol:
+                    msg = "PROJECTION: Converged due to meeting relative tol after {:d} iterations!"
+                    self.print_debug(msg.format(n+1))
+                    self.print_debug("PROJECTION: relative errors: {:}".format(errors))
+                    break
+                if n == maxiter-1:
+                    msg = "PROJECTION: Terminated after maximum iteration count, {:d}!"
+                    self.print_debug(msg.format(maxiter))
+                    self.print_debug("PROJECTION: relative errors: {:}".format(errors))
+                    break
+
+        # Subtract initial surface from bathymetry
+        self.subtract_surface_from_bathymetry(prob, surf=surf)
+
+        # Reset active control tuple
+        self.active_controls = active_controls
+
+        return surf
 
     def interpolate(self, prob, source, tag=0):
         r"""
@@ -460,7 +676,7 @@ class TohokuOkadaBasisOptions(TohokuOptions):
         """
         # from adapt_utils.norms import vecnorm
 
-        self._data_to_interpolate = source  # TODO: Probably needs discretising on Okada grid
+        # self._data_to_interpolate = source  # TODO: Probably needs discretising on Okada grid
         self.create_topography(annotate=True, interpolate=True, tag=tag)
-        self.get_seed_matrices()
+        # self.get_seed_matrices()
         raise NotImplementedError  # TODO: Copy over from notebook

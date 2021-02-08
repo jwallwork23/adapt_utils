@@ -5,6 +5,7 @@ import os
 from adapt_utils.adapt.kernels import *
 from adapt_utils.adapt.metric import *
 from adapt_utils.adapt.recovery import *
+from adapt_utils.params import flux_params
 from adapt_utils.norms import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 
@@ -23,10 +24,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
     def __init__(self, op, discrete_adjoint=False, **kwargs):
         if op.solve_tracer:
             self.equation_set = 'tracer'
-            self.nonlinear = False
+            kwargs.setdefault('nonlinear', False)
         elif op.solve_swe:
             self.equation_set = 'shallow_water'
-            self.nonlinear = True
+            kwargs.setdefault('nonlinear', True)
         else:
             raise ValueError("Steady-state solver only supports one of hydrodynamics and tracers.")
         super(AdaptiveSteadyProblem, self).__init__(op, **kwargs)
@@ -129,88 +130,21 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         else:
             raise NotImplementedError  # TODO
 
-    def get_scaled_residual(self, adjoint=False, **kwargs):
-        r"""
-        Evaluate the scaled form of the residual, as used in [Becker & Rannacher, 2001].
-        i.e. the $\rho_K$ term.
+    def indicate_error(self, field, approach=None):
         """
-        raise NotImplementedError  # TODO
-
-    def get_scaled_weights(self, adjoint=False, **kwargs):
-        r"""
-        Evaluate the scaled form of the residual weights, as used in [Becker & Rannacher, 2001].
-        i.e. the $\omega_K$ term.
+        Evaluate error indicator for some solution field.
         """
-        raise NotImplementedError  # TODO
-
-    def get_dwr_upper_bound(self, adjoint=False, **kwargs):
-        r"""
-        Evaluate an upper bound for the DWR given by the product of residual and weights,
-        as used in [Becker & Rannacher, 2001].
-        i.e. $\rho_K \omega_K$.
-        """
-        raise NotImplementedError  # TODO
-
-    def get_difference_quotient(self, adjoint=False, **kwargs):
-        """
-        Evaluate difference quotient approximation to the DWR given by the product of residual and
-        flux term evaluated at the adjoint solution, as used in [Becker & Rannacher, 2001].
-        """
-        raise NotImplementedError  # TODO
-
-    def get_flux(self, adjoint=False, **kwargs):
-        """
-        Evaluate flux terms for forward or adjoint PDE, as specified by the `adjoint` boolean kwarg.
-        """
-        if adjoint:
-            return self.get_flux_adjoint(**kwargs)
-        else:
-            return self.get_flux_forward(**kwargs)
-
-    def get_flux_forward(self):
-        raise NotImplementedError  # TODO
-
-    def get_flux_adjoint(self):
-        raise NotImplementedError  # TODO
-
-    def get_dwr_residual(self, adjoint=False):
-        """
-        Evaluate the cellwise component of the forward or adjoint 'Dual Weighted Residual' (DWR)
-        error estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg
-        `adjoint`.
-        """
-        return self.get_dwr_residual_adjoint() if adjoint else self.get_dwr_residual_forward()
-
-    def get_dwr_residual_forward(self):
-        raise NotImplementedError  # TODO
-
-    def get_dwr_residual_adjoint(self):
-        raise NotImplementedError  # TODO
-
-    def get_dwr_flux(self, adjoint=False):
-        """
-        Evaluate the edgewise component of the forward or adjoint Dual Weighted Residual (DWR) error
-        estimator (see [Becker and Rannacher, 2001]), as specified by the boolean kwarg `adjoint`.
-        """
-        return self.get_dwr_flux_adjoint() if adjoint else self.get_dwr_flux_forward()
-
-    def get_dwr_flux_forward(self):
-        raise NotImplementedError  # TODO
-
-    def get_dwr_flux_adjoint(self):
-        raise NotImplementedError  # TODO
-
-    def indicate_error(self, adapt_field, approach=None):
         op = self.op
+        assert field in op.solve_fields
         approach = approach or op.approach
-        if 'dwr_adjoint' in approach:
-            indicator = self.dwr_indicator(adapt_field, forward=False, adjoint=True)
-        elif 'dwr_avg' in approach or 'dwr_int' in approach:
-            indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=True)
-        elif 'dwr' in approach:
-            indicator = self.dwr_indicator(adapt_field, forward=True, adjoint=False)
+        if 'dwr' not in approach:
+            return
+        elif approach[-7:] == 'adjoint':
+            indicator = self.dwr_indicator(field, forward=False, adjoint=True)
+        elif approach == 'dwr_both' or approach[-3:] in ('avg', 'int'):
+            indicator = self.dwr_indicator(field, forward=True, adjoint=True)
         else:
-            raise NotImplementedError  # TODO
+            indicator = self.dwr_indicator(field, forward=True, adjoint=False)
         self._have_indicated_error = True
         return indicator
 
@@ -223,344 +157,125 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         """
         if self._have_indicated_error:
             return
-
-        self.indicator['cell'] = Function(self.P0[0], name="DWR cell indicator")
-        self.indicator['flux'] = Function(self.P0[0], name="DWR flux indicator")
         if not forward and not adjoint:
             raise ValueError("Specify either forward or adjoint model.")
-
         if adjoint and self.discrete_adjoint:
             raise NotImplementedError
-
-        # Setup problem on enriched space
-        if self.op.enrichment_method == 'GE_hp':
-            return self.dwr_indicator_GE_hp(adapt_field, forward=forward, adjoint=adjoint)
-        elif self.op.enrichment_method == 'GE_h':
-            return self.dwr_indicator_GE_h(adapt_field, forward=forward, adjoint=adjoint)
-        elif self.op.enrichment_method == 'GE_p':
-            return self.dwr_indicator_GE_p(adapt_field, forward=forward, adjoint=adjoint)
-        elif self.op.enrichment_method == 'PR':
-            return self.dwr_indicator_PR(adapt_field, forward=forward, adjoint=adjoint)
+        if self.op.enrichment_method in ('GE_hp', 'GE_h', 'GE_p', 'PR'):
+            return self.dwr_indicator_GE(adapt_field, forward=forward, adjoint=adjoint)
         elif self.op.enrichment_method == 'DQ':
             return self.dwr_indicator_DQ(adapt_field, forward=forward, adjoint=adjoint)
         else:
             raise ValueError("Enrichment mode {:s} not recognised.".format(self.op.enrichment_method))
 
-    def dwr_indicator_GE_hp(self, adapt_field, forward=False, adjoint=False):
+    def get_enriched_problem(self, field, **kwargs):
         """
-        Indicate DWR errors using an enriched space obtained by iso-P2 refinement and p-refinement.
-        """
-        op = self.op
-        both = forward and adjoint
+        Generate a globally enriched version of this problem class.
 
-        # Generate enriched space
+        :arg field: solution field to be refined.
+        """
+        kwargs.setdefault('nonlinear', self.nonlinear)
+        kwargs.setdefault('discrete_adjoint', self.discrete_adjoint)
+        kwargs.setdefault('print_progress', self.print_progress)
+        op = self.op
+        mode = 'p' if op.enrichment_method == 'PR' else op.enrichment_method[3:]
+        assert field in op.solve_fields
+        assert mode in ('hp', 'h', 'p')
         eop = op.copy()
-        eop.increase_degree(adapt_field)  # Apply p-refinement
-        hierarchy = MeshHierarchy(self.mesh, 1)
-        refined_mesh = hierarchy[1]
-        ep = type(self)(
-            eop,
-            meshes=refined_mesh,
-            nonlinear=self.nonlinear,
-            discrete_adjoint=self.discrete_adjoint,
-            print_progress=self.print_progress,
-        )
+        if 'p' in mode:
+            eop.increase_degree(field)              # Apply p-refinement
+            if op.stabilisation in ('su', 'supg'):  # These don't extend well under p-refinement
+                eop.stabilisation = None
+        mesh = self.mesh
+        if 'h' in mode:
+            mesh = MeshHierarchy(mesh, op.num_refinements)[1]  # Apply h-refinement
+        ep = type(self)(eop, meshes=mesh, **kwargs)
         ep.outer_iteration = self.outer_iteration
-        enriched_space = ep.get_function_space(adapt_field)
-        tm = dmhooks.get_transfer_manager(self.get_plex(0))
-        bcs = self.boundary_conditions[0][adapt_field]
-        cell = Function(ep.P0[0])
-        flux = Function(ep.P0[0])
-        fwd_solution = self.get_solutions(adapt_field, adjoint=False)[0]
-        adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
+        if 'h' in mode:
+            self.transfer_manager = dmhooks.get_transfer_manager(self.plex)
+            ep.transfer_manager = self.transfer_manager
+        return ep
 
-        if forward:
-
-            # Prolong forward solution and solve, if requested
-            fwd_proj = Function(enriched_space[0])
-            tm.prolong(fwd_solution, fwd_proj)
-            if self.nonlinear:
-                if op.solve_enriched_forward:
-                    ep.solve_forward()
-                else:
-                    ep.fwd_solution.assign(fwd_proj)
-
-            # Setup forward solver for enriched problem
-            ep.create_error_estimators_step(0, adjoint=False)
-            ep.setup_solver_forward_step(0)  # Needed to create timestepper
-            ep.solve_adjoint()
-            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
-
-            # Approximate adjoint error in enriched space
-            adj_error = Function(enriched_space[0])
-            tm.prolong(adj_solution, adj_error)
-            adj_error *= -1
-            adj_error += enriched_adj_solution
-
-            # Setup forward error estimator
-            ets = ep.get_timestepper(0, adapt_field, adjoint=False)
-            ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
-
-            # Compute dual weighted residual
-            dwr_cell = ets.error_estimator.element_residual()
-            dwr_flux = ets.error_estimator.inter_element_flux()
-            dwr_flux += ets.error_estimator.boundary_flux()
-            cell += dwr_cell
-            flux += dwr_flux
-            if both:
-                indicator_enriched = interpolate(abs(cell + flux), ep.P0[0])
-                indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
-                self.indicator['dwr'] = Function(self.P1[0])
-                tm.inject(indicator_enriched_cts, self.indicator['dwr'])
-
-        if adjoint:
-
-            # Prolong adjoint solution
-            adj_proj = Function(enriched_space[0])
-            tm.prolong(adj_solution, adj_proj)
-
-            # Setup adjoint solver for enriched problem
-            ep.create_error_estimators_step(0, adjoint=True)
-            ep.setup_solver_adjoint_step(0)  # Needed to create timestepper
-            ep.solve_forward()
-            enriched_fwd_solution = ep.get_solutions(adapt_field, adjoint=False)[0]
-
-            # Approximate forward error in enriched space
-            fwd_error = Function(enriched_space[0])
-            tm.prolong(fwd_solution, fwd_error)
-            fwd_error *= -1
-            fwd_error += enriched_fwd_solution
-
-            # Setup adjoint error estimator
-            ets = ep.get_timestepper(0, adapt_field, adjoint=True)
-            ets.setup_error_estimator(adj_proj, adj_proj, fwd_error, bcs)
-
-            # Compute dual weighted residual
-            dwr_cell = ets.error_estimator.element_residual()
-            dwr_flux = ets.error_estimator.inter_element_flux()
-            dwr_flux += ets.error_estimator.boundary_flux()
-            cell += dwr_cell
-            flux += dwr_flux
-            if both:
-                indicator_enriched = interpolate(abs(cell + flux), ep.P0[0])
-                indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
-                self.indicator['dwr_adjoint'] = Function(self.P1[0])
-                tm.inject(indicator_enriched_cts, self.indicator['dwr_adjoint'])
-
-        if both:
-            cell *= 0.5
-            flux *= 0.5
-
-        # Error indicator components on base space
-        tm.inject(cell, self.indicator['cell'])
-        tm.inject(flux, self.indicator['flux'])
-        self.indicator['GE_hp'] = Function(self.P0[0])
-        self.indicator['GE_hp'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
-
-        # Indicate error on enriched space
-        indicator_enriched = Function(ep.P0[0])
-        indicator_enriched.interpolate(abs(cell + flux))
-
-        # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
-        if label not in self.estimators:
-            self.estimators[label] = []
-        self.estimators[label].append(self.indicator['GE_hp'].vector().gather().sum())
-
-        # Project into P1 space and inject into base mesh
-        indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
-        indicator_enriched_cts.interpolate(abs(indicator_enriched_cts))  # Ensure positive
-        self.indicator[label] = Function(self.P1[0], name=label)
-        tm.inject(indicator_enriched_cts, self.indicator[label])
-        return self.indicator[label]
-
-    def dwr_indicator_GE_h(self, adapt_field, forward=False, adjoint=False):
+    def prolong(self, f, fs=None):
         """
-        Indicate DWR errors using an enriched space obtained by iso-P2 refinement.
+        Prolong field `f` into the prognostic space.
         """
-        op = self.op
-        both = forward and adjoint
+        g = Function(fs or self.function_space)
+        if hasattr(self, 'transfer_manager'):
+            self.transfer_manager.prolong(f, g)
+        elif self.equation_set == 'shallow_water':
+            fu, feta = f.split()
+            gu, geta = g.split()
+            gu.interpolate(fu)
+            geta.interpolate(feta)
+        else:
+            g.interpolate(f)
+        return g
 
-        # Generate enriched space
-        hierarchy = MeshHierarchy(self.mesh, 1)
-        refined_mesh = hierarchy[1]
-        ep = type(self)(
-            op,
-            meshes=refined_mesh,
-            nonlinear=self.nonlinear,
-            discrete_adjoint=self.discrete_adjoint,
-            print_progress=self.print_progress,
-        )
-        ep.outer_iteration = self.outer_iteration
-        enriched_space = ep.get_function_space(adapt_field)
-        tm = dmhooks.get_transfer_manager(self.get_plex(0))
-        bcs = self.boundary_conditions[0][adapt_field]
-        cell = Function(ep.P0[0])
-        flux = Function(ep.P0[0])
-        fwd_solution = self.get_solutions(adapt_field, adjoint=False)[0]
-        adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
-
-        if forward:
-
-            # Prolong forward solution and solve, if requested
-            fwd_proj = Function(enriched_space[0])
-            adj_error = Function(enriched_space[0])
-            tm.prolong(fwd_solution, fwd_proj)
-            if self.nonlinear:
-                if op.solve_enriched_forward:
-                    ep.solve_forward()
-                else:
-                    ep.fwd_solution.assign(fwd_proj)
-
-            # Setup forward solver for enriched problem
-            ep.create_error_estimators_step(0, adjoint=False)
-            ep.setup_solver_forward_step(0)  # Needed to create timestepper
-            ep.solve_adjoint()
-            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
-
-            # Approximate adjoint error in enriched space
-            tm.prolong(adj_solution, adj_error)
-            adj_error *= -1
-            adj_error += enriched_adj_solution
-
-            # Setup forward error estimator
-            ets = ep.get_timestepper(0, adapt_field, adjoint=False)
-            ets.setup_error_estimator(fwd_proj, fwd_proj, adj_error, bcs)
-
-            # Compute dual weighted residual
-            dwr_cell = ets.error_estimator.element_residual()
-            dwr_flux = ets.error_estimator.inter_element_flux()
-            dwr_flux += ets.error_estimator.boundary_flux()
-            cell += dwr_cell
-            flux += dwr_flux
-            if both:
-                indicator_enriched = interpolate(abs(cell + flux), ep.P0[0])
-                indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
-                self.indicator['dwr'] = Function(self.P1[0])
-                tm.inject(indicator_enriched_cts, self.indicator['dwr'])
-
-        if adjoint:
-
-            # Prolong adjoint solution
-            adj_proj = Function(enriched_space[0])
-            fwd_error = Function(enriched_space[0])
-            tm.prolong(adj_solution, adj_proj)
-
-            # Setup adjoint solver for enriched problem
-            ep.create_error_estimators_step(0, adjoint=True)
-            ep.setup_solver_adjoint_step(0)  # Needed to create timestepper
-            ep.solve_forward()
-            enriched_fwd_solution = ep.get_solutions(adapt_field, adjoint=False)[0]
-
-            # Approximate forward error in enriched space
-            tm.prolong(fwd_solution, fwd_error)
-            fwd_error *= -1
-            fwd_error += enriched_fwd_solution
-
-            # Setup adjoint error estimator
-            ets = ep.get_timestepper(0, adapt_field, adjoint=True)
-            ets.setup_error_estimator(adj_proj, adj_proj, fwd_error, bcs)
-
-            # Compute dual weighted residual
-            dwr_cell = ets.error_estimator.element_residual()
-            dwr_flux = ets.error_estimator.inter_element_flux()
-            dwr_flux += ets.error_estimator.boundary_flux()
-            cell += dwr_cell
-            flux += dwr_flux
-            if both:
-                indicator_enriched = interpolate(abs(cell + flux), ep.P0[0])
-                indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
-                self.indicator['dwr_adjoint'] = Function(self.P1[0])
-                tm.inject(indicator_enriched_cts, self.indicator['dwr_adjoint'])
-
-        if both:
-            cell *= 0.5
-            flux *= 0.5
-
-        # Error indicator components on base space
-        tm.inject(cell, self.indicator['cell'])
-        tm.inject(flux, self.indicator['flux'])
-        self.indicator['GE_h'] = Function(self.P0[0])
-        self.indicator['GE_h'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
-
-        # Indicate error on enriched space
-        indicator_enriched = Function(ep.P0[0])
-        indicator_enriched.interpolate(abs(cell + flux))
-
-        # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
-        if label not in self.estimators:
-            self.estimators[label] = []
-        self.estimators[label].append(self.indicator['GE_h'].vector().gather().sum())
-
-        # Project into P1 space and inject into base mesh
-        indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
-        indicator_enriched_cts.interpolate(abs(indicator_enriched_cts))  # Ensure positive
-        self.indicator[label] = Function(self.P1[0], name=label)
-        tm.inject(indicator_enriched_cts, self.indicator[label])
-        return self.indicator[label]
-
-    def dwr_indicator_GE_p(self, adapt_field, forward=False, adjoint=False):
+    def inject(self, f, fs=None):
         """
-        Indicate DWR errors using an enriched space obtained by p-refinement.
+        Inject field `f` into the prognostic space.
+        """
+        g = Function(fs or self.function_space)
+        if hasattr(self, 'transfer_manager'):
+            self.transfer_manager.inject(f, g)
+        else:
+            g.assign(f)
+        return g
+
+    def dwr_indicator_GE(self, adapt_field, forward=False, adjoint=False):
+        """
+        Indicate DWR errors using an enriched space. The type of enriched space is determined by
+        :attr:`enrichment_method` of the :class:`Options` parameter object:
+
+          * 'GE_h': iso-P2 (h-)refinement;
+          * 'GE_p': increment of the polynomial order (p-refinement);
+          * 'GE_hp': both of the above.
 
         The number of p-refinements is determined by :attr:`degree_increase`.
+
+        :arg adapt_field: solution field to be refined.
+        :kwarg forward: use forward error estimator?
+        :kwarg adjoint: use adjoint error estimator?
         """
         op = self.op
+        assert adapt_field in op.solve_fields
+        method = op.enrichment_method
         both = forward and adjoint
 
         # Generate enriched space
-        eop = op.copy()
-        eop.increase_degree(adapt_field)  # Apply p-refinement
-        ep = type(self)(
-            eop,
-            meshes=self.mesh,
-            nonlinear=self.nonlinear,
-            discrete_adjoint=self.discrete_adjoint,
-            print_progress=self.print_progress,
-        )
-        ep.outer_iteration = self.outer_iteration
-        enriched_space = ep.get_function_space(adapt_field)
+        ep = self.get_enriched_problem(adapt_field)
         bcs = self.boundary_conditions[0][adapt_field]
-        self.indicator['cell'] = Function(self.P0[0])
-        self.indicator['flux'] = Function(self.P0[0])
+        cell = Function(ep.P0[0])
+        flux = Function(ep.P0[0])
         fwd_solution = self.get_solutions(adapt_field, adjoint=False)[0]
         adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
 
         if forward:
 
-            # Interpolate forward solution and solve, if requested
-            if adapt_field == 'shallow_water':
-                fwd_proj = Function(enriched_space[0])
-                fwd_proj_u, fwd_proj_eta = fwd_proj.split()
-                u, eta = fwd_solution.split()
-                fwd_proj_u.interpolate(u)
-                fwd_proj_eta.interpolate(eta)
-            else:
-                fwd_proj = interpolate(fwd_solution, enriched_space[0])
-            if self.nonlinear:
+            # Prolong forward solution and solve, if requested
+            fwd_proj = ep.prolong(fwd_solution)
+            if method == 'PR':
+                pass
+            elif self.nonlinear:
                 if op.solve_enriched_forward:
                     ep.solve_forward()
                 else:
                     ep.fwd_solution.assign(fwd_proj)
+            elif hasattr(ep, 'tape'):
+                ep.solve_forward()
 
             # Setup forward solver for enriched problem
             ep.create_error_estimators_step(0, adjoint=False)
             ep.setup_solver_forward_step(0)  # Needed to create timestepper
-            ep.solve_adjoint()
-            enriched_adj_solution = ep.get_solutions(adapt_field, adjoint=True)[0]
 
             # Approximate adjoint error in enriched space
-            if adapt_field == 'shallow_water':
-                adj_error = Function(enriched_space[0])
-                adj_error_z, adj_error_zeta = adj_error.split()
-                z, zeta = adj_solution.split()
-                adj_error_z.interpolate(z)
-                adj_error_zeta.interpolate(zeta)
+            if method == 'PR':
+                adj_error = recover_zz(adj_solution, to_recover='field')
             else:
-                adj_error = interpolate(adj_solution, enriched_space[0])
-            adj_error *= -1
-            adj_error += enriched_adj_solution
+                ep.solve_adjoint()
+                adj_error = ep.get_solutions(adapt_field, adjoint=True)[0]
+            adj_error -= ep.prolong(adj_solution)
 
             # Setup forward error estimator
             ets = ep.get_timestepper(0, adapt_field, adjoint=False)
@@ -570,39 +285,33 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             dwr_cell = ets.error_estimator.element_residual()
             dwr_flux = ets.error_estimator.inter_element_flux()
             dwr_flux += ets.error_estimator.boundary_flux()
-            self.indicator['cell'] += dwr_cell
-            self.indicator['flux'] += dwr_flux
+            cell += dwr_cell
+            flux += dwr_flux
             if both:
-                indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
-                self.indicator['dwr'] = interpolate(indicator, self.P1[0])
+                if 'h' in method:
+                    indicator_enriched = interpolate(abs(dwr_cell + dwr_flux), ep.P0[0])  # TODO: Necessary?
+                    indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
+                    self.indicator['dwr'] = self.inject(indicator_enriched_cts, self.P1[0])
+                else:
+                    indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
+                    self.indicator['dwr'] = interpolate(indicator, self.P1[0])
 
         if adjoint:
 
-            # Interpolate adjoint solution
-            if adapt_field == 'shallow_water':
-                adj_proj = Function(enriched_space[0])
-                adj_proj_z, adj_proj_zeta = adj_proj.split()
-                z, zeta = adj_solution.split()
-                adj_proj_z.interpolate(z)
-                adj_proj_zeta.interpolate(zeta)
-            else:
-                adj_proj = interpolate(adj_solution, enriched_space[0])
+            # Prolong adjoint solution
+            adj_proj = ep.prolong(adj_solution)
 
             # Setup adjoint solver for enriched problem
             ep.create_error_estimators_step(0, adjoint=True)
             ep.setup_solver_adjoint_step(0)  # Needed to create timestepper
-            ep.solve_forward()
-            enriched_fwd_solution = ep.get_solutions(adapt_field, adjoint=False)[0]
+            if method == 'PR':
+                enriched_fwd_solution = recover_zz(fwd_solution, to_recover='field')
+            else:
+                ep.solve_forward()
+                enriched_fwd_solution = ep.get_solutions(adapt_field, adjoint=False)[0]
 
             # Approximate forward error in enriched space
-            if adapt_field == 'shallow_water':
-                fwd_error = Function(enriched_space[0])
-                fwd_error_u, fwd_error_eta = fwd_error.split()
-                u, eta = fwd_solution.split()
-                fwd_error_u.interpolate(u)
-                fwd_error_eta.interpolate(eta)
-            else:
-                fwd_error = interpolate(fwd_solution, enriched_space[0])
+            fwd_error = ep.prolong(fwd_solution)
             fwd_error *= -1
             fwd_error += enriched_fwd_solution
 
@@ -614,128 +323,47 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             dwr_cell = ets.error_estimator.element_residual()
             dwr_flux = ets.error_estimator.inter_element_flux()
             dwr_flux += ets.error_estimator.boundary_flux()
-            self.indicator['cell'] += dwr_cell
-            self.indicator['flux'] += dwr_flux
+            cell += dwr_cell
+            flux += dwr_flux
             if both:
-                indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
-                self.indicator['dwr_adjoint'] = interpolate(indicator, self.P1[0])
+                if 'h' in method:
+                    indicator_enriched = interpolate(abs(dwr_cell + dwr_flux), ep.P0[0])  # TODO: Necessary?
+                    indicator_enriched_cts = interpolate(indicator_enriched, ep.P1[0])
+                    self.indicator['dwr_adjoint'] = self.inject(indicator_enriched_cts, self.P1[0])
+                else:
+                    indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
+                    self.indicator['dwr_adjoint'] = interpolate(indicator, self.P1[0])
 
         if both:
-            self.indicator['cell'] *= 0.5
-            self.indicator['flux'] *= 0.5
-
-        # Indicate error
-        self.indicator['GE_p'] = Function(self.P0[0])
-        self.indicator['GE_p'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
+            cell *= 0.5
+            flux *= 0.5
 
         # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
+        indicator_enriched = cell.copy(deepcopy=True)
+        indicator_enriched += flux
+        label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
-        self.estimators[label].append(self.indicator['GE_p'].vector().gather().sum())
+        self.estimators[label].append(abs(indicator_enriched.vector().gather().sum()))
 
-        # Project into P1 space
-        self.indicator[label] = Function(self.P1[0], name=label)
-        self.indicator[label].project(self.indicator['GE_p'])
-        self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
-        return self.indicator[label]
+        # Error indicator components
+        self.indicator['cell'] = self.inject(cell, self.P0[0])
+        self.indicator['flux'] = self.inject(flux, self.P0[0])
+        self.indicator[method] = self.indicator['cell'].copy(deepcopy=True)
+        self.indicator[method] += self.indicator['flux']
+        self.indicator[method].interpolate(abs(self.indicator[method]))
 
-    def dwr_indicator_PR(self, adapt_field, forward=False, adjoint=False):
-        """
-        Indicate DWR errors using an enriched space obtained by patch recovery.
-        """
-        op = self.op
-        both = forward and adjoint
+        # P1 error indicator
+        if 'h' in method:
+            indicator_enriched = interpolate(abs(cell + flux), ep.P0[0])
+            indicator_enriched_cts = project(indicator_enriched, ep.P1[0])
+            indicator_enriched_cts.interpolate(abs(indicator_enriched_cts))  # Ensure positive
+            self.indicator[label] = self.inject(indicator_enriched_cts, self.P1[0])
+        else:
+            self.indicator[label] = project(self.indicator[method], self.P1[0])
+            self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
+        self.indicator[label].rename(label)
 
-        # Generate enriched space
-        eop = op.copy()
-        eop.increase_degree(adapt_field)  # Apply p-refinement
-        ep = type(self)(
-            eop,
-            self.mesh,
-            nonlinear=self.nonlinear,
-            discrete_adjoint=self.discrete_adjoint,
-        )
-        ep.outer_iteration = self.outer_iteration
-        enriched_space = ep.get_function_space(adapt_field)
-        bcs = self.boundary_conditions[0][adapt_field]
-        self.indicator['cell'] = Function(self.P0[0])
-        self.indicator['flux'] = Function(self.P0[0])
-        fwd_solution = self.get_solutions(adapt_field, adjoint=False)[0]
-        adj_solution = self.get_solutions(adapt_field, adjoint=True)[0]
-
-        if forward:
-
-            # Setup forward solver for enriched problem
-            ep.create_error_estimators_step(0, adjoint=False)
-            ep.setup_solver_forward_step(0)  # Needed to create timestepper
-            # ep.solve_adjoint()
-            enriched_adj_solution = recover_zz(adj_solution, to_recover='field')
-
-            # Approximate adjoint error in enriched space
-            adj_error = interpolate(adj_solution, enriched_space[0])
-            adj_error *= -1
-            adj_error += enriched_adj_solution
-
-            # Setup forward error estimator
-            ets = ep.get_timestepper(0, adapt_field, adjoint=False)
-            ets.setup_error_estimator(fwd_solution, fwd_solution, adj_error, bcs)
-
-            # Compute dual weighted residual
-            dwr_cell = ets.error_estimator.element_residual()
-            dwr_flux = ets.error_estimator.inter_element_flux()
-            dwr_flux += ets.error_estimator.boundary_flux()
-            self.indicator['cell'] += dwr_cell
-            self.indicator['flux'] += dwr_flux
-            if both:
-                indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
-                self.indicator['dwr'] = interpolate(indicator, self.P1[0])
-
-        if adjoint:
-
-            # Setup adjoint solver for enriched problem
-            ep.create_error_estimators_step(0, adjoint=True)
-            ep.setup_solver_adjoint_step(0)  # Needed to create timestepper
-            # ep.solve_forward()
-            enriched_fwd_solution = recover_zz(fwd_solution, to_recover='field')
-
-            # Approximate forward error in enriched space
-            fwd_error = interpolate(fwd_solution, enriched_space[0])
-            fwd_error *= -1
-            fwd_error += enriched_fwd_solution
-
-            # Setup adjoint error estimator
-            ets = ep.get_timestepper(0, adapt_field, adjoint=True)
-            ets.setup_error_estimator(adj_solution, adj_solution, fwd_error, bcs)
-
-            # Compute dual weighted residual
-            dwr_cell = ets.error_estimator.element_residual()
-            dwr_flux = ets.error_estimator.inter_element_flux()
-            dwr_flux += ets.error_estimator.boundary_flux()
-            self.indicator['cell'] += dwr_cell
-            self.indicator['flux'] += dwr_flux
-            if both:
-                indicator = interpolate(abs(dwr_cell + dwr_flux), self.P0[0])
-                self.indicator['dwr_adjoint'] = interpolate(indicator, self.P1[0])
-
-        if both:
-            self.indicator['cell'] *= 0.5
-            self.indicator['flux'] *= 0.5
-
-        # Indicate error
-        self.indicator['PR'] = Function(self.P0[0])
-        self.indicator['PR'].interpolate(abs(self.indicator['cell'] + self.indicator['flux']))
-
-        # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
-        if label not in self.estimators:
-            self.estimators[label] = []
-        self.estimators[label].append(self.indicator['PR'].vector().gather().sum())
-
-        # Project into P1 space
-        self.indicator[label] = Function(self.P1[0], name=label)
-        self.indicator[label].project(self.indicator['PR'])
-        self.indicator[label].interpolate(abs(self.indicator[label]))  # Ensure positive
         return self.indicator[label]
 
     def dwr_indicator_DQ(self, adapt_field, forward=False, adjoint=False):
@@ -746,54 +374,94 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
 
         op = self.op
         both = forward and adjoint
-        if not (forward and not adjoint) or adapt_field != 'tracer' or op.tracer_family != 'cg':
+        if adapt_field != 'tracer' or op.tracer_family != 'cg':
             raise NotImplementedError  # TODO
+
         bcs = self.boundary_conditions[0][adapt_field]
         p0test = TestFunction(self.P0[0])
         p0trial = TrialFunction(self.P0[0])
-        c = self.get_solutions(adapt_field, adjoint=False)[0]
-        c_star = self.get_solutions(adapt_field, adjoint=True)[0]
+        c = self.get_solutions(adapt_field, adjoint=False)[0].copy(deepcopy=True)
+        c_star = self.get_solutions(adapt_field, adjoint=True)[0].copy(deepcopy=True)
         u, eta = self.fwd_solution.split()
-        D = self.fields[0].horizontal_diffusivity*Identity(2)
-        S = self.fields[0].tracer_source_2d
         n = FacetNormal(self.mesh)
-
-        # Cell residual
-        Psi = S - dot(u, grad(c)) + div(dot(D, grad(c)))
-        self.indicator['cell'] = assemble(p0test*inner(Psi, Psi)*dx)
-
-        # Fluxes
-        psi = dot(dot(D, grad(c)), n)
-        mass_term = p0test*p0trial*dx
-        psi_sq = p0test*inner(psi, psi)
-        flux_terms = (psi_sq('+') + psi_sq('-'))*dS
-        for seg in bcs:
-            if 'diff_flux' in bcs[seg]:
-                g_N = bcs[seg]['diff_flux']
-                flux_terms += -p0test*inner(psi - g_N, psi - g_N)*ds(seg)
-        self.indicator['flux'] = Function(self.P0[0])
-        params = {"ksp_type": "preonly", "pc_type": "jacobi"}
-        solve(mass_term == flux_terms, self.indicator['flux'], solver_parameters=params)
-
-        # Sum cell and flux contributions
+        D = self.fields[0].horizontal_diffusivity*Identity(2)
         h = anisotropic_cell_size(self.mesh) if op.anisotropic_stabilisation else CellSize(self.mesh)
+
         self.indicator['DQ'] = Function(self.P0[0])
-        self.indicator['DQ'].interpolate(sqrt(abs(self.indicator['cell'])) + sqrt(abs(self.indicator['flux']/h)))
+        self.indicator['cell'] = Function(self.P0[0])
+        self.indicator['flux'] = Function(self.P0[0])
+        mass_term = p0test*p0trial*dx
+        if forward:
 
-        # Account for stabilisation
-        if op.stabilisation == 'su':
-            raise NotImplementedError
-        elif op.stabilisation == 'supg':
-            tau = self.tracer_options[0].supg_stabilisation
-            c_star.interpolate(c_star + tau*dot(u, grad(c_star)))
+            # Cell residual
+            Psi = self.fields[0].tracer_source_2d - dot(u, grad(c)) + div(dot(D, grad(c)))
+            cell = assemble(p0test*inner(Psi, Psi)*dx)
+            self.indicator['cell'] += cell
 
-        # Multiply by Laplacian of adjoint solution
-        g = recover_gradient(c_star, op=self.op)
-        self.indicator['DQ'] *= sqrt(interpolate(abs(inner(div(g), div(g))), self.P0[0]))
-        # TODO: Flux version
+            # Fluxes
+            psi = dot(dot(D, grad(c)), n)
+            psi_sq = p0test*inner(psi, psi)
+            flux_terms = (psi_sq('+') + psi_sq('-'))*dS
+            for seg in bcs:
+                if 'diff_flux' in bcs[seg]:
+                    g_N = bcs[seg]['diff_flux']
+                    flux_terms += p0test*inner(psi - g_N, psi - g_N)*ds(seg)
+            flux = Function(self.P0[0])
+            solve(mass_term == flux_terms, flux, solver_parameters=flux_params)
+            self.indicator['flux'] += flux
+
+            # Recover Laplacian of adjoint solution  # TODO: Flux version
+            if op.stabilisation == 'su':
+                raise NotImplementedError
+            elif op.stabilisation == 'supg':
+                tau = self.tracer_options[0].supg_stabilisation
+                g = recover_gradient(c_star + tau*dot(u, grad(c_star)), op=self.op)
+            else:
+                g = recover_gradient(c_star, op=self.op)
+            laplacian = assemble(p0test*inner(div(g), div(g))*dx)
+
+            # Sum cell and flux contributions
+            self.indicator['DQ'] += interpolate(
+                (sqrt(abs(cell)) + sqrt(abs(flux/h)))*sqrt(abs(laplacian)), self.P0[0])
+
+        if adjoint:
+
+            # Cell residual
+            Psi = self.kernels_tracer[0] + div(u*c_star) + div(dot(D, grad(c_star)))
+            cell = assemble(p0test*inner(Psi, Psi)*dx)
+            self.indicator['cell'] += cell
+
+            # Fluxes
+            psi = dot(dot(D, grad(c_star)), n) + c_star*dot(u, n)
+            psi_sq = p0test*inner(psi, psi)
+            flux_terms = (psi_sq('+') + psi_sq('-'))*dS
+            for seg in bcs:
+                if 'value' not in bcs[seg]:
+                    flux_terms += p0test*inner(psi, psi)*ds(seg)
+            flux = Function(self.P0[0])
+            solve(mass_term == flux_terms, flux, solver_parameters=flux_params)
+            self.indicator['flux'] += flux
+
+            # Recover Laplacian of forward solution  # TODO: Flux version
+            if op.stabilisation == 'su':
+                raise NotImplementedError
+            elif op.stabilisation == 'supg':
+                tau = self.tracer_options[0].supg_stabilisation
+                g = recover_gradient(c + tau*dot(u, grad(c)), op=self.op)
+            else:
+                g = recover_gradient(c, op=self.op)
+            laplacian = assemble(p0test*inner(div(g), div(g))*dx)
+
+            # Sum cell and flux contributions
+            self.indicator['DQ'] += interpolate(
+                (sqrt(abs(cell)) + sqrt(abs(flux/h)))*sqrt(abs(laplacian)), self.P0[0])
+
+        if both:
+            self.indicator['cell'] *= 0.5
+            self.indicator['flux'] *= 0.5
 
         # Global error estimate
-        label = 'dwr_avg' if both else 'dwr_adjoint' if adjoint else 'dwr'
+        label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
         self.estimators[label].append(self.indicator['DQ'].vector().gather().sum())
@@ -812,9 +480,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         approach = approach or self.op.approach
         adjoint = 'adjoint' in approach
         forward = 'adjoint' not in approach
-        if 'dwr' in approach:
-            self.indicate_error(adapt_field)
-        if approach in ('dwr', 'dwr_adjoint', 'dwr_avg'):
+        if approach in ('dwr', 'dwr_adjoint', 'dwr_both'):
             metric = self.get_isotropic_metric(self.op.adapt_field, approach=approach)
         elif approach in ('isotropic_dwr', 'isotropic_dwr_adjoint', 'isotropic_dwr_avg'):
             metric = self.get_isotropic_dwr_metric(forward=forward, adjoint=adjoint)
@@ -990,7 +656,7 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             adapt_field = 'shallow_water'
         if not forward and not adjoint:
             raise ValueError("Must specify forward or adjoint.")
-        approach = 'dwr_avg' if forward and adjoint else 'dwr_adjoint' if adjoint else 'dwr'
+        approach = 'dwr_both' if forward and adjoint else 'dwr_adjoint' if adjoint else 'dwr'
 
         # Compute error indicators
         self.indicate_error(adapt_field, approach=approach)
@@ -1075,9 +741,10 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         kernel = eigen_kernel(set_eigendecomposition, dim)
         op2.par_loop(kernel, self.P0_ten[0].node_set, M.dat(op2.RW), evectors.dat(op2.READ), evalues.dat(op2.READ))
 
-        # Project metric
+        # Project metric and ensure SPD
         M_p1 = Function(self.P1_ten[0], name="Anisotropic DWR metric")
         M_p1.project(M)
+        M_p1.interpolate(steady_metric(H=M_p1, normalise=False, enforce_constraints=False, op=self.op))
         return M_p1
 
     def log_complexities(self):
@@ -1106,20 +773,27 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
             adapt_field = 'shallow_water'
         if 'dwr' in op.approach:
             self.estimators['dwr'] = []
+        adjoint = 'adjoint' in op.approach
+        both = 'avg' in op.approach or 'int' in op.approach
         for n in range(op.max_adapt):
             self._have_indicated_error = False
             self.outer_iteration = n
-            self.create_error_estimators_step(0, adjoint='adjoint' in op.approach)
+            self.create_error_estimators_step(0, adjoint=adjoint)
+            if both:
+                self.create_error_estimators_step(0, adjoint=not adjoint)
 
             # Solve forward in base space
-            self.solve_forward()
+            self.solve_forward(keep=not adjoint or both)
 
             # Check convergence
             if (self.qoi_converged or self.maximum_adaptations_met) and self.minimum_adaptations_met:
                 break
 
             # Solve adjoint equation in base space
-            self.solve_adjoint()
+            self.solve_adjoint(keep=adjoint or both)
+
+            # Indicate error
+            self.indicate_error(adapt_field)
 
             # Construct metric
             self.metrics[0] = self.get_metric(adapt_field)

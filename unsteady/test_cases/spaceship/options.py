@@ -30,6 +30,8 @@ class SpaceshipOptions(TurbineOptions):
     resource_dir = os.path.join(os.path.dirname(__file__), 'resources')
 
     def __init__(self, spun=False, **kwargs):
+        self.timestepper = 'CrankNicolson'
+        # self.timestepper = 'PressureProjectionPicard'
         super(SpaceshipOptions, self).__init__(**kwargs)
         self.array_ids = np.array([3, 2])
         self.farm_ids = tuple(self.array_ids)
@@ -55,8 +57,6 @@ class SpaceshipOptions(TurbineOptions):
         self.spun = spun
 
         # Timestepping
-        self.timestepper = 'CrankNicolson'
-        # self.timestepper = 'PressureProjectionPicard'
         self.implicitness_theta = 1.0
         self.use_semi_implicit_linearisation = True
         self.dt = 10.0
@@ -70,7 +70,7 @@ class SpaceshipOptions(TurbineOptions):
         D = self.turbine_diameter
         self.region_of_interest = [(6050, 0, D, D), (6450, 0, D, D)]
 
-        # Solver parameters and discretisation
+        # Discretisation
         self.stabilisation = None
         # self.stabilisation = 'lax_friedrichs'
         self.use_automatic_sipg_parameter = True

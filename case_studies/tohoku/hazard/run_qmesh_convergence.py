@@ -43,7 +43,7 @@ args = parser.parse_args()
 # --- Set parameters
 
 if args.locations is None:  # TODO: Parse as list
-    locations = ['Fukushima Daiichi', ]
+    locations = ['Fukushima Daiichi']
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)
@@ -76,7 +76,7 @@ kwargs = {
     'debug': bool(args.debug or False),
     'debug_mode': args.debug_mode or 'basic',
 }
-levels = int(args.levels or 4)
+levels = int(args.levels or 5)
 di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'qmesh'))
 
 
@@ -90,6 +90,7 @@ for level in range(levels):
     # Set parameters
     kwargs['level'] = level
     op = TohokuHazardOptions(**kwargs)
+    kwargs.pop('level')
 
     # Solve
     swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear, print_progress=False)

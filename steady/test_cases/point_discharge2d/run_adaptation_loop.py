@@ -29,6 +29,7 @@ parser.add_argument('-convergence_rate', help="Convergence rate for anisotropic 
 parser.add_argument('-min_adapt', help="Minimum number of mesh adaptations.")
 parser.add_argument('-max_adapt', help="Maximum number of mesh adaptations.")
 parser.add_argument('-enrichment_method', help="Choose from {'GE_hp', 'GE_h', 'GE_p', 'PR', 'DQ'}.")
+parser.add_argument('-outer_iterations', help="Number of targets to consider.")
 
 # I/O and debugging
 parser.add_argument('-offset', help="Toggle between aligned or offset region of interest.")
@@ -79,6 +80,8 @@ else:
     ext += '_inf' if p == 'inf' else '_{:.0f}'.format(p)
 fname = 'qoi_{:s}'.format(ext)
 
+both = approach == 'dwr_both' or 'int' in approach or 'avg' in approach
+adjoint = 'adjoint' in approach or both
 kwargs = {
     'level': level,
 
@@ -91,11 +94,11 @@ kwargs = {
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
-    'enrichment_method': args.enrichment_method or 'DQ' if discrete_adjoint else 'GE_h',
+    'enrichment_method': args.enrichment_method or ('GE_p' if adjoint else 'DQ'),
 
     # Convergence analysis
     'target_base': 2,
-    'outer_iterations': 8,
+    'outer_iterations': int(args.outer_iterations or 8),
 
     # I/O and debugging
     'plot_pvd': True,
@@ -129,11 +132,8 @@ for n in range(op.outer_iterations):
     print("DoF count: ", dofs)
     qois.append(tp.qois[-1])
     print("QoIs:          ", qois)
-    if op.approach in ('dwr_adjoint', 'dwr_avg'):
+    if op.approach in ('dwr', 'dwr_adjoint', 'dwr_both'):
         estimators.append(tp.estimators[op.approach][-1])
-        print("Estimators:    ", estimators)
-    elif op.approach == 'dwr':
-        estimators.append(tp.estimators['dwr'][-1])
         print("Estimators:    ", estimators)
 
 # Store element count and QoI to HDF5
@@ -142,5 +142,5 @@ with h5py.File(os.path.join(di, '{:s}_{:s}.h5'.format(fname, alignment)), 'w') a
     outfile.create_dataset('elements', data=elements)
     outfile.create_dataset('dofs', data=dofs)
     outfile.create_dataset('qoi', data=qois)
-    if op.approach in ('dwr', 'dwr_adjoint', 'dwr_avg'):
+    if op.approach in ('dwr', 'dwr_adjoint', 'dwr_both'):
         outfile.create_dataset('estimators', data=estimators)

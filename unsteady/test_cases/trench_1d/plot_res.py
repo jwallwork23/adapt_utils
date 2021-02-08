@@ -30,8 +30,7 @@ axes.set_ylabel(r"Relative $\ell_2$ error")
 yticks = [0, 10, 20, 30, 40]
 axes.set_yticks(yticks)
 axes.set_yticklabels([r"{{{:.0f}}}\%".format(yt) for yt in yticks])
-axes.grid(True)
-axes.grid(b=True, which='minor')
+axes.grid(True, which='both')
 savefig("total_error", "plots", extensions=['pdf'])
 
 
@@ -53,16 +52,15 @@ for res in resolutions:
 
 # Plot discretisation error against element count
 fig, axes = plt.subplots(figsize=(6, 5))
-axes.loglog(nx, disc_err, '-o')
+axes.plot(nx, disc_err, '-o')
+axes.set_xscale('log')
+axes.set_yscale('log')
 axes.set_xlabel(r"Element count in $x$-direction")
 axes.set_ylabel(r"Relative $\ell_2$ error")
+axes.set_xticks([10, 100])
 yticks = [0.01, 0.1, 1, 10, 100]
 axes.set_yticks(yticks)
 axes.set_yticklabels([r"0.01\%", r"0.1\%", r"1\%", r"10\%", r"100\%"])
-
-# Add slope markers
-annotation.slope_marker((20, 1.0e-03), -2, invert=True, ax=axes, size_frac=0.2)
-
-axes.grid(True)
-axes.grid(b=True, which='minor')
+annotation.slope_marker((20, 0.3), -2, invert=True, ax=axes, size_frac=0.2)
+axes.grid(True, which='minor')
 savefig("discretisation_error", "plots", extensions=['pdf'])

@@ -19,7 +19,7 @@ class TsunamiOptions(CoupledOptions):
     Omega = PositiveFloat(7.291e-5, help="Planetary rotation rate").tag(config=True)
     bathymetry_cap = NonNegativeFloat(30.0, allow_none=True, help="Minimum depth").tag(config=True)
 
-    def __init__(self, regularisation=0.0, **kwargs):
+    def __init__(self, regularisation=0.0, coordinate_system='utm', **kwargs):
         """
         kwarg regularisation: non-negative constant parameter used for Tikhonov regularisation
             methods for the quantity of interest.
@@ -28,6 +28,10 @@ class TsunamiOptions(CoupledOptions):
         self.solve_swe = True
         self.solve_tracer = False
         self.force_zone_number = kwargs.get('force_zone_number', False)
+        if coordinate_system not in ('utm', 'lonlat'):
+            msg = "Coordinate system '{:s}' not recognised.".format(coordinate_system)
+            raise NotImplementedError(msg)
+        self.coordinate_system = coordinate_system
         self.gauges = {}
         self.locations_of_interest = {}
 
@@ -52,12 +56,19 @@ class TsunamiOptions(CoupledOptions):
         Given a mesh in longitude-latitude coordinates, establish a corresponding mesh in UTM
         coordinates using the conversion code in `adapt_utils.swe.tsunami.conversion`.
         """
-        assert hasattr(self, 'lonlat_mesh')
         zone = self.force_zone_number
-        self.default_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
-        lon, lat = SpatialCoordinate(self.default_mesh)
+        self._utm_mesh = Mesh(Function(self.lonlat_mesh.coordinates))
+        lon, lat = SpatialCoordinate(self._utm_mesh)
         x, y = lonlat_to_utm(lon, lat, zone)
-        self.default_mesh.coordinates.interpolate(as_vector([x, y]))
+        self._utm_mesh.coordinates.interpolate(as_vector([x, y]))
+
+    @property
+    def utm_mesh(self):
+        if self.coordinate_system == 'utm':
+            return self.default_mesh
+        elif not hasattr(self, '_utm_mesh'):
+            self.get_utm_mesh()
+        return self._utm_mesh
 
     def get_lonlat_mesh(self, northern=True):
         """
@@ -66,12 +77,20 @@ class TsunamiOptions(CoupledOptions):
 
         :kwarg northern: tell the UTM coordinate transformation which hemisphere we are in.
         """
-        assert hasattr(self, 'default_mesh')
         zone = self.force_zone_number
-        self.lonlat_mesh = Mesh(Function(self.default_mesh.coordinates))
-        x, y = SpatialCoordinate(self.lonlat_mesh)
+        self._lonlat_mesh = Mesh(Function(self.utm_mesh.coordinates))
+        x, y = SpatialCoordinate(self._lonlat_mesh)
         lon, lat = utm_to_lonlat(x, y, zone, northern=northern, force_longitude=True)
-        self.lonlat_mesh.coordinates.interpolate(as_vector([lon, lat]))
+        self._lonlat_mesh.coordinates.interpolate(as_vector([lon, lat]))
+
+    @property
+    def lonlat_mesh(self):
+        if self.coordinate_system == 'lonlat':
+            return self.default_mesh
+        # elif not hasattr(self, '_lonlat_mesh'):
+        #     self.get_lonlat_mesh()
+        self.get_lonlat_mesh()
+        return self._lonlat_mesh
 
     def set_bathymetry(self, fs=None, northern=True, force_longitude=True, **kwargs):
         """
@@ -109,7 +128,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating bathymetry...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):  # TODO: Use lonlat_mesh?
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             bathymetry.dat.data[i] -= self.bathymetry_interpolator(lat, lon)
 
@@ -151,7 +170,7 @@ class TsunamiOptions(CoupledOptions):
         # Insert interpolated data onto nodes of *problem domain space*
         self.print_debug("INIT: Interpolating initial surface...")
         conversion_kwargs = {'northern': northern, 'force_longitude': force_longitude}
-        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):
+        for i, xy in enumerate(fs.mesh().coordinates.dat.data_ro):  # TODO: use lonlat_mesh?
             lon, lat = utm_to_lonlat(xy[0], xy[1], self.force_zone_number, **conversion_kwargs)
             initial_surface.dat.data[i] = self.surface_interpolator(lat, lon)
 
@@ -188,25 +207,29 @@ class TsunamiOptions(CoupledOptions):
 
         Note that we reset the bathymetry first, in case this method has already been called.
         """
-        self.print_debug("INIT: Subtracting initial surface from bathymetry field...")
 
         # Reset bathymetry
+        self.print_debug("INIT: Resetting bathymetry...")
         fs = prob.bathymetry[0].function_space()
         prob.bathymetry[0] = self.set_bathymetry(fs)
 
         # Project bathymetry into P1 space
         P1 = prob.P1[0]
+        self.print_debug("INIT: Projecting bathymetry into P1 space...")
         b = project(prob.bathymetry[0], P1)
 
         # Interpolate free surface into P1 space
         if surf is None:
-            surf = interpolate(prob.fwd_solutions[0].split()[1], P1)
+            self.print_debug("INIT: Projecting free surface into P1 space...")
+            surf = project(prob.fwd_solutions[0].split()[1], P1)
 
         # Subtract surface from bathymetry
+        self.print_debug("INIT: Subtracting initial surface from bathymetry field...")
         b -= surf
 
         # Project updated bathymetry onto each mesh
         for i in range(self.num_meshes):
+            self.print_debug("INIT: Projecting updated bathymetry onto mesh {:d}...".format(i))
             prob.bathymetry[i].project(b)
 
     def set_coriolis(self, fs):
@@ -249,8 +272,6 @@ class TsunamiOptions(CoupledOptions):
         try:
             self.default_mesh.coordinates.at(point)
         except PointNotInDomainError:
-            if not hasattr(self, 'lonlat_mesh'):
-                self.get_lonlat_mesh()
             self.lonlat_mesh.coordinates.at(point)
 
     def extract_data(self, gauge):
@@ -306,7 +327,7 @@ class TsunamiOptions(CoupledOptions):
                     sampled_times.append(0.5*(time + time_prev))
                     sampled_data.append(np.mean(running))
                     time_prev = time
-                    running = []
+                    running = [dat]
 
         # Construct interpolant
         kwargs.setdefault('bounds_error', False)
@@ -322,6 +343,17 @@ class TsunamiOptions(CoupledOptions):
         raise NotImplementedError
 
     def check_cfl_criterion(self, prob, i, error_factor=None):
+        r"""
+        Check whether the CFL criterion is met under the current discretisation, using the minimum
+        mesh element size and the timestep. Fluid speed is taken to be the celerity,
+        :math:`\sqrt{gb_{\max}}`, where :math:`b_{\max}` is the maximum water depth.
+
+        :arg prob: the :class:`AdaptiveTsunamiProblem` object.
+        :arg i: mesh number from sequence.
+        :kwarg error_factor: optionally raise an error if the CFL criterion is not met.
+        """
+        if error_factor is None and not self.debug:
+            return
         self.print_debug("INIT: Computing CFL number on mesh {:d}...".format(i))
         b = prob.bathymetry[i].vector().gather().max()
         g = self.g.values()[0]

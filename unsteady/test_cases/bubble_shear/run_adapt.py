@@ -1,5 +1,6 @@
 import argparse
 
+from adapt_utils.norms import *
 from adapt_utils.unsteady.solver import AdaptiveProblem
 from adapt_utils.unsteady.test_cases.bubble_shear.options import BubbleOptions
 
@@ -17,6 +18,7 @@ parser.add_argument("-stabilisation", help="Stabilisation method")
 parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabilisation")
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 
+parser.add_argument("-approach", help="Mesh adaptation approach")
 parser.add_argument("-target", help="Target complexity")
 parser.add_argument("-num_meshes", help="Number of meshes in the sequence")
 parser.add_argument("-max_adapt", help="Maximum number of adaptation steps")
@@ -39,6 +41,7 @@ kwargs = {
     'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
 
     # Mesh adaptation
+    'approach': args.approach or 'hessian',
     'num_meshes': int(args.num_meshes or 50),
     'max_adapt': int(args.max_adapt or 3),
     'hessian_time_combination': args.hessian_time_combination or 'integrate',
@@ -60,4 +63,14 @@ if args.end_time is not None:
 
 tp = AdaptiveProblem(op)
 tp.run()
-tp.solve_forward()
+
+final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
+final_l1_norm = norm(final_sol, norm_type='L1')
+final_l2_norm = norm(final_sol, norm_type='L2')
+tp.set_initial_condition()
+init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
+init_l1_norm = norm(init_sol, norm_type='L1')
+init_l2_norm = norm(init_sol, norm_type='L2')
+abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')
+print("Conservation error: {:.2f}%".format(100*abs(init_l1_norm-final_l1_norm)/init_l1_norm))
+print("Relative L2 error:  {:.2f}%".format(100*abs_l2_error/init_l2_norm))

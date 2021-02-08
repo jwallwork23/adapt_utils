@@ -1,11 +1,11 @@
 from thetis import COMM_WORLD, create_directory, print_output, tricontourf
 
-import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 
+from adapt_utils.argparse import ArgumentParser
 from adapt_utils.plotting import *
 from adapt_utils.swe.tsunami.conversion import lonlat_to_utm
 from adapt_utils.unsteady.solver import AdaptiveProblem
@@ -13,21 +13,13 @@ from adapt_utils.unsteady.solver import AdaptiveProblem
 
 # --- Parse arguments
 
-parser = argparse.ArgumentParser()
-
-# Inversion
-parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
+parser = ArgumentParser(
+    prog="plot_optimised_source",
+    basis=True,
+    plotting=True,
+)
 parser.add_argument("-level", help="Mesh resolution level (default 0)")
-parser.add_argument("-real_data", help="Toggle whether to use real data (default False)")
 parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data (default False)")
-parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
-
-# I/O
-parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
-parser.add_argument("-plot_png", help="Toggle plotting to .png")
-parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
-parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
-parser.add_argument("-plot_only", help="Just plot using saved data")
 
 
 # --- Set parameters
@@ -36,21 +28,7 @@ parser.add_argument("-plot_only", help="Just plot using saved data")
 args = parser.parse_args()
 basis = args.basis
 level = int(args.level or 0)
-plot_pdf = bool(args.plot_pdf or False)
-plot_png = bool(args.plot_png or False)
-plot_all = bool(args.plot_all or False)
-if plot_all:
-    plot_pvd = plot_pdf = plot_png = True
-extensions = []
-if plot_pdf:
-    extensions.append('pdf')
-if plot_png:
-    extensions.append('png')
-plot_any = len(extensions) > 0
-real_data = bool(args.real_data or False)
-timeseries_type = "timeseries"
-if bool(args.continuous_timeseries or False):
-    timeseries_type = "_".join([timeseries_type, "smooth"])
+plot = parser.plotting_args()
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1:
@@ -58,14 +36,15 @@ if COMM_WORLD.size > 1:
     sys.exit(0)
 
 # Setup output directories
-dirname = os.path.join(os.path.dirname(__file__), basis)
-di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
-plot_dir = create_directory(os.path.join(di, 'plots', 'discrete'))
+dirname = os.path.join(os.path.dirname(__file__))
+extension = lambda fpath: fpath if args.extension is None else '_'.join([fpath, args.extension])
+data_dir = create_directory(os.path.join(dirname, basis, 'outputs', extension('realistic')))
+plot_dir = create_directory(os.path.join(dirname, 'plots', extension('realistic'), basis))
 
 # Collect initialisation parameters
 kwargs = {
     'level': level,
-    'synthetic': not real_data,
+    'synthetic': False,
     'noisy_data': bool(args.noisy_data or False),
 }
 if basis == 'box':
@@ -83,7 +62,7 @@ fontsize = 22
 fontsize_tick = 20
 
 # Load control parameters
-fname = os.path.join(di, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+fname = os.path.join(data_dir, 'discrete', 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
 kwargs['control_parameters'] = np.load(fname.format('ctrl', level))[-1]
 op = constructor(**kwargs)
 
@@ -98,7 +77,7 @@ cbar.set_label(r'Elevation [$\mathrm m$]', size=fontsize)
 axes.axis(False)
 cbar.ax.tick_params(labelsize=fontsize_tick)
 plt.tight_layout()
-savefig('optimised_source_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+savefig('optimised_source_{:d}'.format(level), fpath=plot_dir, extensions=plot.extensions)
 
 # Zoom
 lonlat_corners = [(138, 32), (148, 42), (138, 42)]
@@ -119,4 +98,4 @@ axes.set_ylim(ylim)
 axes.set_xlabel("Degrees longitude", fontsize=fontsize)
 axes.set_ylabel("Degrees latitude", fontsize=fontsize)
 axes.axis(True)
-savefig('optimised_source_{:d}_zoom'.format(level), fpath=plot_dir, extensions=extensions)
+savefig('optimised_source_{:d}_zoom'.format(level), fpath=plot_dir, extensions=plot.extensions)

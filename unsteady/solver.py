@@ -261,13 +261,12 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.diffusivity_space = [FunctionSpace(mesh, op.diffusivity_space_family, op.diffusivity_space_degree) for mesh in self.meshes]
 
         # Record DOFs
-        self.dofs = [[np.array(V.dof_count).sum() for V in self.V], ]  # TODO: other function spaces
+        self.dofs = [[np.array(V.dof_count).sum() for V in self.V]]  # TODO: other function spaces
 
     def get_function_space(self, field):
         spaces = {'shallow_water': 'V', 'tracer': 'Q', 'sediment': 'Q', 'bathymetry': 'W'}
-        space = spaces[field]
         try:
-            return self.__getattribute__(space)
+            return self.__getattribute__(spaces[field])
         except KeyError:
             return self.V
 
@@ -404,7 +403,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if dim == 2:
                 self.minimum_angles[i] = get_minimum_angles_2d(self.meshes[i])
             else:
-                print_output("WARNING: Cannot compute minimum angle in {:d}D.".format(dim))
+                self.warning("WARNING: Cannot compute minimum angle in {:d}D.".format(dim))
         if self.op.solve_swe:
             self._set_shallow_water_stabilisation_step(i)
         if self.op.solve_tracer:
@@ -544,11 +543,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """
         self.op.set_initial_condition(self, **kwargs)
         if self.op.solve_tracer:
-            self.op.set_initial_condition_tracer(self)
+            self.op.set_initial_condition_tracer(self, **kwargs)
         if self.op.solve_sediment:
-            self.op.set_initial_condition_sediment(self)
+            self.op.set_initial_condition_sediment(self, **kwargs)
         if self.op.solve_exner:
-            self.op.set_initial_condition_bathymetry(self)
+            self.op.set_initial_condition_bathymetry(self, **kwargs)
 
     def compute_mesh_reynolds_number(self, i):
         # u, eta = self.fwd_solutions[i].split()
@@ -676,7 +675,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             if not self.op.debug:
                 return
             if np.allclose(a, b):
-                print_output("WARNING: Is the intermediary {:s} solution just copied?".format(name))
+                self.warning("WARNING: Is the intermediary {:s} solution just copied?".format(name))
 
         debug(self.fwd_solutions[i].dat.data[0],
               self.intermediary_solutions[i].dat.data[0],
@@ -796,6 +795,21 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op = self.op
         kwargs['outputdir'] = self.di
         kwargs['op'] = op
+        if op.solve_exner:
+            name = 'bathymetry'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.W[i], name, name, fpath)
+            self.fwd_solutions_bathymetry[i].project(initialise_field(*args, **kwargs))
+        if op.solve_sediment:
+            name = 'sediment'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.Q[i], name, name, fpath)
+            self.fwd_solutions_sediment[i].project(initialise_field(*args, **kwargs))
+        if op.solve_tracer:
+            name = 'tracer'
+            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
+            args = (self.Q[i], name, name, fpath)
+            self.fwd_solutions_tracer[i].project(initialise_field(*args, **kwargs))
         if op.solve_swe:
             kwargs['plexname'] = plexname
             op.print_debug("I/O: Loading hydrodynamics from {:s}...".format(fpath))
@@ -803,21 +817,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
             u, eta = self.fwd_solutions[i].split()
             u.project(u_init)
             eta.project(eta_init)
-        if op.solve_tracer:
-            name = 'tracer'
-            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
-            args = (self.Q[i], name, name, fpath)
-            self.fwd_solutions_tracer[i].project(initialise_field(*args, **kwargs))
-        if op.solve_sediment:
-            name = 'sediment'
-            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
-            args = (self.Q[i], name, name, fpath)
-            self.fwd_solutions_sediment[i].project(initialise_field(*args, **kwargs))
-        if op.solve_exner:
-            name = 'bathymetry'
-            op.print_debug("I/O: Loading {:s} from {:s}...".format(name, fpath))
-            args = (self.W[i], name, name, fpath)
-            self.fwd_solutions_bathymetry[i].project(initialise_field(*args, **kwargs))
 
     # --- Equations
 
@@ -1368,16 +1367,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
         op.print_debug("SETUP: Adding callbacks on mesh {:d}...".format(i))
         self.add_callbacks(i, adjoint=False)
 
-    def solve_forward_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False, restarted=False, final_update=True):
+    def solve_forward_step(self, i, update_forcings=None, export_func=None, restarted=False, **kwargs):
         """
         Solve forward PDE on mesh `i`.
 
         :kwarg update_forcings: a function which takes simulation time as an argument and is
             evaluated at the start of every timestep.
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
+        :kwarg checkpointing_mode: choose between 'memory' and 'disk'.
         """
         op = self.op
-        plot_pvd &= op.plot_pvd
+        plot_pvd = op.plot_pvd and kwargs.get('plot_pvd', True)
 
         # Initialise counters
         t_epsilon = 1.0e-05
@@ -1396,6 +1396,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.print(80*'=')
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=False)
         export_func = export_func or self.op.get_export_func(self, i)
+        export_initial = kwargs.get('export_initial', False)
         if export_initial:
             update_forcings(self.simulation_time)  # TODO: CHECK
             if export_func is not None:
@@ -1481,14 +1482,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Save to checkpoint
             if self.checkpointing:
+                mode = kwargs.get('checkpointing_mode', 'memory')
                 if op.solve_swe:
-                    self.save_to_checkpoint(self.fwd_solutions[i])
+                    self.save_to_checkpoint(i, self.fwd_solutions[i], mode=mode)
                 if op.solve_tracer:
-                    self.save_to_checkpoint(self.fwd_solutions_tracer[i])
+                    self.save_to_checkpoint(i, self.fwd_solutions_tracer[i], mode=mode)
                 if op.solve_sediment:
-                    self.save_to_checkpoint(self.fwd_solutions_sediment[i])
+                    self.save_to_checkpoint(i, self.fwd_solutions_sediment[i], mode=mode)
                 if op.solve_exner:
-                    self.save_to_checkpoint(self.fwd_solutions_bathymetry[i])
+                    self.save_to_checkpoint(i, self.fwd_solutions_bathymetry[i], mode=mode)
                 # TODO: Checkpoint mesh if moving
 
             self.iteration += 1
@@ -1526,7 +1528,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     b = self.fwd_solutions_bathymetry[i] if op.solve_exner else self.bathymetry[i]
                     proj_bath.project(b)
                     self.exner_file.write(proj_bath)
-        if final_update and update_forcings is not None:
+        if kwargs.get('final_update', True) and update_forcings is not None:
             update_forcings(self.simulation_time + op.dt)
         self.print(80*'=')
 
@@ -1566,16 +1568,17 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise NotImplementedError
         self.add_callbacks(i, adjoint=True)
 
-    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, plot_pvd=True, export_initial=False, **kwargs):
+    def solve_adjoint_step(self, i, update_forcings=None, export_func=None, **kwargs):
         """
         Solve adjoint PDE on mesh `i` *backwards in time*.
 
         :kwarg update_forcings: a function which takes simulation time as an argument and is
             evaluated at the start of every timestep.
         :kwarg export_func: a function with no arguments which is evaluated at every export step.
+        :kwarg checkpointing_mode: choose between 'memory' and 'disk'.
         """
         op = self.op
-        plot_pvd &= op.plot_pvd
+        plot_pvd = op.plot_pvd and kwargs.get('plot_pvd', True)
 
         # Initialise counters
         t_epsilon = 1.0e-05
@@ -1592,6 +1595,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         self.print(80*'=')
         update_forcings = update_forcings or self.op.get_update_forcings(self, i, adjoint=True)
         export_func = export_func or self.op.get_export_func(self, i)
+        export_initial = kwargs.get('export_initial', False)
         if export_initial:
             update_forcings(self.simulation_time)
             export_func()
@@ -1631,16 +1635,19 @@ class AdaptiveProblem(AdaptiveProblemBase):
             self.time_kernel.assign(1.0 if self.simulation_time >= self.op.start_time else 0.0)
 
             # Collect forward solution from checkpoint and free associated memory
-            #   NOTE: We need collect the checkpoints from the stack in reverse order
             if self.checkpointing:
-                if op.solve_exner:
-                    self.fwd_solutions_bathymetry[i].assign(self.collect_from_checkpoint())
-                if op.solve_sediment:
-                    self.fwd_solutions_sediment[i].assign(self.collect_from_checkpoint())
-                if op.solve_tracer:
-                    self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint())
-                if op.solve_swe:
-                    self.fwd_solutions[i].assign(self.collect_from_checkpoint())
+                mode = kwargs.get('checkpointing_mode', 'memory')
+                if mode == 'disk':
+                    self.collect_from_checkpoint(i, mode=mode)
+                else:
+                    if op.solve_exner:
+                        self.fwd_solutions_bathymetry[i].assign(self.collect_from_checkpoint(i, mode=mode))
+                    if op.solve_sediment:
+                        self.fwd_solutions_sediment[i].assign(self.collect_from_checkpoint(i, mode=mode))
+                    if op.solve_tracer:
+                        self.fwd_solutions_tracer[i].assign(self.collect_from_checkpoint(i, mode=mode))
+                    if op.solve_swe:
+                        self.fwd_solutions[i].assign(self.collect_from_checkpoint(i, mode=mode))
 
             # Solve adjoint PDE(s)
             if op.solve_swe:
@@ -1774,6 +1781,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             'dwr_adjoint': self.run_dwr,
             'dwr_avg': self.run_dwr,
             'dwr_int': self.run_dwr,
+            'dwr_both': self.run_dwr,
             'isotropic_dwr': self.run_dwr,                 # TODO: Unsteady case
             'isotropic_dwr_adjoint': self.run_dwr,         # TODO: Unsteady case
             'isotropic_dwr_avg': self.run_dwr,             # TODO: Unsteady case
@@ -1965,17 +1973,22 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 fwd_solutions_step_old = []
                 adj_solutions_step = []
                 enriched_adj_solutions_step = []
-                tm = dmhooks.get_transfer_manager(self.get_plex(i))
+                tm = dmhooks.get_transfer_manager(self.plexes[i])
 
                 # --- Setup forward solver for enriched problem
 
-                # TODO: Need to transfer fwd sol in nonlinear case
                 ep.create_error_estimators_step(i)  # Passed to the timesteppers under the hood
                 ep.setup_solver_forward_step(i)
+                if self.nonlinear:
+                    ep.solve_forward_step(i)
+                    # TODO: Option to prolong forward solution
                 ets = ep.get_timestepper(i, op.adapt_field)
 
                 # --- Solve forward on current window
 
+                self.simulation_time = i*op.dt*self.dt_per_mesh
+                self.transfer_forward_solution(i)
+                self.setup_solver_forward_step(i)
                 ts = self.get_timestepper(i, op.adapt_field)
 
                 def export_func():
@@ -1983,9 +1996,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     fwd_solutions_step_old.append(ts.solution_old.copy(deepcopy=True))
                     # TODO: Also need store fields at each export (in general case)
 
-                self.simulation_time = i*op.dt*self.dt_per_mesh
-                self.transfer_forward_solution(i)
-                self.setup_solver_forward_step(i)
                 self.solve_forward_step(i, export_func=export_func, plot_pvd=False, export_initial=False)
 
                 # --- Solve adjoint on current window
@@ -1993,6 +2003,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 def export_func():
                     adj = self.get_solutions(op.adapt_field, adjoint=True)[i].copy(deepcopy=True)
                     adj_solutions_step.append(adj)
+
+                if self.nonlinear:
+                    raise NotImplementedError  # TODO: update_forcings fwd sol in base adjoint solve
 
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint_step(i)
@@ -2003,6 +2016,9 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 def export_func():
                     adj = ep.get_solutions(op.adapt_field, adjoint=True)[i].copy(deepcopy=True)
                     enriched_adj_solutions_step.append(adj)
+
+                if self.nonlinear:
+                    raise NotImplementedError  # TODO: update_forcings fwd sol in enriched adjoint solve
 
                 ep.simulation_time = (i+1)*op.dt*self.dt_per_mesh  # TODO: Shouldn't be needed
                 ep.transfer_adjoint_solution(i)
@@ -2239,6 +2255,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     'plot_pvd': op.plot_pvd,
                     'export_initial': True,
                 }
+                if self.nonlinear:
+                    raise NotImplementedError  # TODO: update_forcings fwd sol adjoint solve
                 self.solve_adjoint_step(i, **solve_kwargs)
 
                 # Reverse order of Hessians and take pairwise averages

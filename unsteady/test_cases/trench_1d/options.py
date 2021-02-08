@@ -21,6 +21,7 @@ class TrenchSedimentOptions(CoupledOptions):
         Netherlands, 1980.
     """
     def __init__(self, friction='nik_solver', nx=1, ny=1, input_dir=None, output_dir=None, **kwargs):
+        self.timestepper = 'CrankNicolson'
         super(TrenchSedimentOptions, self).__init__(**kwargs)
         self.default_mesh = RectangleMesh(np.int(16*5*nx), 5*ny, 16, 1.1)
         self.plot_pvd = True
@@ -59,7 +60,6 @@ class TrenchSedimentOptions(CoupledOptions):
         self.end_time = self.num_hours*3600.0/float(self.morphological_acceleration_factor)
         self.dt_per_mesh_movement = 40
         self.dt_per_export = 40
-        self.timestepper = 'CrankNicolson'
         self.implicitness_theta = 1.0
         self.family = 'dg-dg'
 

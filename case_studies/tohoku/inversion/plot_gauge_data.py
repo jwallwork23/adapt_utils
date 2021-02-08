@@ -1,26 +1,26 @@
+from thetis import create_directory
+
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.plotting import *  # NOQA
 
 
 # Plotting parameters
-fontsize = 20
-fontsize_tick = 18
+fontsize = 22
+fontsize_tick = 20
 plotting_kwargs = {
     'markevery': 5,
 }
 
 # Create output directories
 dirname = os.path.dirname(__file__)
-di = os.path.join(dirname, 'outputs')
-if not os.path.exists(di):
-    os.makedirs(di)
+di = create_directory(os.path.join(dirname, 'plots'))
 
 # Instantiate TohokuOptions object and setup interpolator
-op = TohokuOptions()
+op = TohokuInversionOptions()
 gauges = list(op.gauges)
 num_gauges = len(gauges)
 for smoothed in (True, False):
@@ -45,24 +45,30 @@ for smoothed in (True, False):
 
     # Plot timeseries data
     N = int(np.ceil(np.sqrt(num_gauges)))
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(16, 12))
+    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
     for i, gauge in enumerate(gauges):
         ax = axes[i//N, i % N]
-        ax.plot(time_minutes, op.gauges[gauge]['data'], '--x', label=gauge, **plotting_kwargs)
-        ax.legend(loc='best', fontsize=fontsize_tick)
-        ax.set_xlabel(r'Time [$\mathrm{min}$]', fontsize=fontsize)
-        ax.set_ylabel(r'Elevation [$\mathrm m$]', fontsize=fontsize)
+        plotting_kwargs['color'] = op.gauges[gauge]['colour']
+        ax.plot(time_minutes, op.gauges[gauge]['data'], '-', label=gauge, **plotting_kwargs)
+        leg = ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_tick)
+        for item in leg.legendHandles:
+            item.set_visible(False)
+        if i//N == 3:
+            ax.set_xlabel(r'Time [$\mathrm{min}$]', fontsize=fontsize)
+        if i % N == 0:
+            ax.set_ylabel(r'Elevation [$\mathrm m$]', fontsize=fontsize)
+        ax.xaxis.set_tick_params(labelsize=fontsize_tick)
+        ax.yaxis.set_tick_params(labelsize=fontsize_tick)
+        ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
+        ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
         t0 = op.gauges[gauge]["arrival_time"]/60
         tf = op.gauges[gauge]["departure_time"]/60
         ax.set_xlim([t0, tf])
-        ax.tick_params(axis='x', labelsize=fontsize_tick)
-        ax.tick_params(axis='y', labelsize=fontsize_tick)
         ax.grid()
     for i in range(num_gauges, N*N):
         axes[i//N, i % N].axis(False)
     plt.tight_layout()
-    fname = os.path.join(di, 'gauge_data')
+    fname = 'gauge_data'
     if smoothed:
         fname = fname + '_smoothed'
-    plt.savefig(fname + '.pdf')
-    plt.savefig(fname + '.png')
+    savefig(fname, di, extensions=['png', 'pdf'])

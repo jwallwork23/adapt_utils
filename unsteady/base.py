@@ -49,7 +49,6 @@ class AdaptiveProblemBase(object):
         self.checkpointing = kwargs.pop('checkpointing', False)
         self.print_progress = kwargs.pop('print_progress', True)
         self.manual = kwargs.pop('manual', False)
-        self.on_the_fly = kwargs.pop('on_the_fly', False)  # TODO
 
         # Timestepping export details
         self.num_timesteps = int(np.round(op.end_time/op.dt, 0))
@@ -121,6 +120,10 @@ class AdaptiveProblemBase(object):
 
     def print(self, msg):  # TODO: Write to log file
         if self.print_progress:
+            print_output(msg)
+
+    def warning(self, msg):
+        if os.environ.get('WARNINGS', '0') != '0':
             print_output(msg)
 
     def set_meshes(self, meshes, index=None):
@@ -196,14 +199,30 @@ class AdaptiveProblemBase(object):
         self.error_estimators = [AttrDict() for i in range(self.num_meshes)]
         self.timesteppers = [AttrDict() for i in range(self.num_meshes)]
 
-    def get_plex(self, i):
+    def get_plexes(self):
         """
         :return: DMPlex associated with the ith mesh.
         """
-        try:
-            return self.meshes[i]._topology_dm
-        except AttributeError:
-            return self.meshes[i]._plex  # Backwards compatability
+        if hasattr(self, '_plexes') and self._plexes != []:
+            return
+        self._plexes = []
+        for mesh in self.meshes:
+            try:
+                self._plexes.append(mesh.topology_dm)
+            except AttributeError:
+                try:
+                    self._plexes.append(mesh._topology_dm)
+                except AttributeError:
+                    self._plexes.append(mesh._plex_)  # Backwards compatability
+
+    @property
+    def plexes(self):
+        self.get_plexes()
+        return self._plexes
+
+    @property
+    def plex(self):
+        return self.plexes[0]
 
     def set_finite_elements(self):
         raise NotImplementedError("To be implemented in derived class")
@@ -485,10 +504,10 @@ class AdaptiveProblemBase(object):
             self.op.print_debug(self.op.indent + "I/O: Loading plex from {:s}...".format(fname))
             self.meshes[i] = load_mesh('{:s}_{:d}'.format(fname, i), fpath)
 
-    def setup_solver_forward_step(self, i):
+    def setup_solver_forward_step(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
 
-    def setup_solver_adjoint_step(self, i):
+    def setup_solver_adjoint_step(self, i, **kwargs):
         raise NotImplementedError("To be implemented in derived class")
 
     def free_solver_forward_step(self, i):
@@ -517,7 +536,7 @@ class AdaptiveProblemBase(object):
         else:
             self.solve_forward(**kwargs)
 
-    def solve_forward(self, reverse=False, **kwargs):
+    def solve_forward(self, reverse=False, keep=False, **kwargs):
         """
         Solve forward problem on the full sequence of meshes.
         """
@@ -526,10 +545,10 @@ class AdaptiveProblemBase(object):
             self.transfer_forward_solution(i)
             self.setup_solver_forward_step(i)
             self.solve_forward_step(i, **kwargs)
-            if self.on_the_fly:
+            if not keep:
                 self.free_solver_forward_step(i)
 
-    def solve_adjoint(self, reverse=True, **kwargs):
+    def solve_adjoint(self, reverse=True, keep=False, **kwargs):
         """
         Solve adjoint problem on the full sequence of meshes.
         """
@@ -538,22 +557,28 @@ class AdaptiveProblemBase(object):
             self.transfer_adjoint_solution(i)
             self.setup_solver_adjoint_step(i)
             self.solve_adjoint_step(i, **kwargs)
-            if self.on_the_fly:
+            if not keep:
                 self.free_solver_adjoint_step(i)
 
     def quantity_of_interest(self):
         """
         Functional of interest which takes the PDE solution as input.
         """
-        raise NotImplementedError("Should be implemented in derived class.")
+        if hasattr(self.op, 'J'):
+            return self.op.J
+        else:
+            raise NotImplementedError("Should be implemented in derived class.")
 
-    def save_to_checkpoint(self, f, mode='memory', i=None, **kwargs):
+    def save_to_checkpoint(self, i, f, mode='memory', **kwargs):
         """
         Extremely simple checkpointing scheme with a simple stack.
 
         In the case of memory checkpointing, the field to be stored is deep copied and put on top of
         the stack. For disk checkpointing, it is saved to a HDF5 file using a file extension which
         is put on top of the stack, for identification purposes.
+
+        :kwarg mode: toggle whether to save checkpoints in memory or on disk.
+        :kwarg fpath: filepath to checkpoint stored on disk.
         """
         assert mode in ('memory', 'disk')
         if mode == 'memory':
@@ -567,7 +592,7 @@ class AdaptiveProblemBase(object):
             self.checkpoint.append(chk)
         self.op.print_debug("CHECKPOINT SAVE: {:3d} currently stored".format(len(self.checkpoint)))
 
-    def collect_from_checkpoint(self, mode='memory', i=None, delete=True):
+    def collect_from_checkpoint(self, i, mode='memory', delete=True, **kwargs):
         """
         Extremely simple checkpointing scheme which pops off the top of a stack.
 
@@ -575,7 +600,9 @@ class AdaptiveProblemBase(object):
         disk checkpointing, it is loaded from a HDF5 file using the file extension which is popped
         off the top of the stack.
 
+        :kwarg mode: toggle whether to save checkpoints in memory or on disk.
         :kwarg delete: toggle deletion of the checkpoint file.
+        :kwarg fpath: filepath to checkpoint stored on disk.
         """
         assert mode in ('memory', 'disk')
         assert len(self.checkpoint) > 0
@@ -583,8 +610,6 @@ class AdaptiveProblemBase(object):
             return self.checkpoint.pop(-1)
         else:
             fpath = kwargs.get('fpath', self.op.di)
-            if i is None:
-                raise ValueError("Please provide mesh number")
             chk = self.checkpoint.pop(-1)
             self.load_state(i, fpath, index_str=chk, delete=delete)
         self.op.print_debug("CHECKPOINT LOAD: {:3d} currently stored".format(len(self.checkpoint)))
@@ -1036,12 +1061,10 @@ class AdaptiveProblemBase(object):
     def _check_estimator_convergence(self):
         n = self.outer_iteration
         approach = self.op.approach
-        if 'dwr_int' in approach:
-            approach = 'dwr_avg'
         if 'dwr_adjoint' in approach:
             estimators = self.estimators['dwr_adjoint']
-        elif 'dwr_avg' in approach:
-            estimators = self.estimators['dwr_avg']
+        elif approach == 'dwr_both' or 'dwr_avg' in approach or 'dwr_int' in approach:
+            estimators = self.estimators['dwr_both']
         elif 'dwr' in approach:
             estimators = self.estimators['dwr']
         else:
@@ -1092,6 +1115,7 @@ class AdaptiveProblemBase(object):
         if converged:
             n = self.outer_iteration
             self.print("Converged number of mesh elements after {:d} iterations!".format(n+1))
+            self.solve_forward()  # Ensure that final outputs are from converged mesh
         return converged
 
     @property

@@ -30,6 +30,7 @@ class BoydOptions(CoupledOptions):
         :kwarg periodic: toggle periodic boundary in x-direction
         :kwarg n: mesh resolution
         """
+        self.timestepper = 'CrankNicolson'
         super(BoydOptions, self).__init__(mesh=mesh, **kwargs)
         self.solve_swe = True
         self.solve_tracer = False
@@ -70,7 +71,6 @@ class BoydOptions(CoupledOptions):
         self.end_time = 120.0
         # self.end_time = 30.0
         self.dt_per_export = 50
-        self.timestepper = 'CrankNicolson'
         self.family = 'dg-dg'
         # self.family = 'dg-cg'
 

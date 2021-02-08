@@ -1,5 +1,6 @@
 import argparse
 import h5py
+import matplotlib.ticker as ticker
 import matplotlib.pyplot as plt
 import numpy as np
 import os
@@ -11,7 +12,7 @@ from adapt_utils.plotting import *
 parser = argparse.ArgumentParser()
 parser.add_argument('mode', help="""
     Choose from {'forward', 'adjoint', 'avg', 'int', 'dwr', 'anisotropic_dwr, 'weighed_hessian',
-    'weighted_gradient', 'isotropic'}.
+    'weighted_gradient', 'isotropic', 'enrichment'}.
     """)
 parser.add_argument('-family', help="Finite element family.")
 parser.add_argument('-stabilisation', help="Stabilisation method to use.")
@@ -23,13 +24,15 @@ parser.add_argument('-loglog', help="Use a log-log scale")
 args = parser.parse_args()
 mode = args.mode
 assert mode in (
-    'forward', 'adjoint', 'avg', 'int', 'dwr',
-    'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient', 'isotropic'
+    'forward', 'adjoint', 'avg', 'int', 'dwr', 'anisotropic_dwr', 'weighted_hessian',
+    'weighted_gradient', 'isotropic', 'enrichment'
 )
 p = 'inf' if args.norm_order == 'inf' else float(args.norm_order or 1)
 alpha = float(args.convergence_rate or 2)
-enrichment_method = args.enrichment_method or 'GE_h'
 loglog = bool(args.loglog or False)
+
+adjoint = mode not in ('forward', 'isotropic', 'enrichment')
+enrichment_method = args.enrichment_method or 'GE_p' if adjoint else 'DQ'
 
 # Get filenames
 family = args.family or 'cg'
@@ -45,15 +48,15 @@ else:
         ext += '_su'
     if stabilisation in ('supg', 'SUPG'):
         ext += '_supg'
-fixed_di = os.path.join(os.path.dirname(__file__), 'outputs', 'fixed_mesh', 'hdf5')
-di = os.path.join(os.path.dirname(__file__), 'outputs', '{:s}', enrichment_method, 'hdf5')
+output_di = os.path.join(os.path.dirname(__file__), 'outputs')
+fixed_di = os.path.join(output_di, 'fixed_mesh', 'hdf5')
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
 
 label_ext = ''
 if mode == 'adjoint':
     label_ext = '_adjoint'
 elif mode == 'avg':
-    label_ext = '_int'
+    label_ext = '_avg'
 elif mode == 'int':
     label_ext = '_int'
 approaches = {
@@ -64,6 +67,8 @@ approaches = {
     'weighted_hessian' + label_ext: {'label': 'Weighted Hessian', 'marker': 's'},
     'weighted_gradient' + label_ext: {'label': 'Weighted Gradient', 'marker': 'x'},
 }
+if mode == 'avg':
+    approaches['dwr_both'] = {'label': '$2^{nd}$ order isotropic DWR', 'marker': 'v'}
 if mode in ('dwr', 'anisotropic_dwr', 'weighted_hessian', 'weighted_gradient'):
     approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
     approaches[mode] = {'label': 'Forward', 'marker': '^'}
@@ -74,18 +79,29 @@ elif mode == 'isotropic':
     approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
     approaches['dwr'] = {'label': 'Vertex-based', 'marker': '^'}
     approaches['isotropic_dwr'] = {'label': 'Element-based', 'marker': 'h'}
+elif mode == 'enrichment':
+    approaches = {'fixed_mesh': {'label': 'Uniform', 'marker': '*'}}
+    approaches['GE_hp'] = {'label': r'GE$_{hp}$', 'marker': '^'}
+    approaches['GE_h'] = {'label': r'GE$_h$', 'marker': 'h'}
+    approaches['GE_p'] = {'label': r'GE$_p$', 'marker': 's'}
+    approaches['DQ'] = {'label': 'DQ', 'marker': 'x'}
+colours = ['C{:d}'.format(i) for i in range(6)]
+
 for alignment in ('aligned', 'offset'):
     fig, axes = plt.subplots()
 
     # Plot convergence curves
-    for approach in approaches:
+    for approach, colour in zip(approaches, colours):
+        if mode == 'enrichment':
+            enrichment_method = approach
+        di = os.path.join(output_di, '{:s}', enrichment_method, 'hdf5')
         filename = 'qoi_{:s}'.format(ext)
         if anisotropic_stabilisation:
             filename += '_anisotropic'
         if approach == 'fixed_mesh':
             fpath = fixed_di
         else:
-            fpath = di.format(approach)
+            fpath = di.format('dwr' if mode == 'enrichment' else approach)
             if 'isotropic_dwr' in approach:
                 filename += '_{:.0f}'.format(alpha)
             else:
@@ -111,22 +127,27 @@ for alignment in ('aligned', 'offset'):
             dofs = dofs[:-1]
             relative_error = relative_error[:-1]
         if loglog:
-            axes.loglog(dofs, relative_error, '--', label=label, marker=marker)
+            axes.loglog(dofs, relative_error, '--', label=label, marker=marker, color=colour)
         else:
-            axes.semilogx(dofs, relative_error, '--', label=label, marker=marker)
+            axes.plot(dofs, relative_error, '--', label=label, marker=marker, color=colour)
+            axes.set_xscale('log')
+            x_minor = ticker.LogLocator(base=10.0, subs=np.arange(1.0, 10.0)*0.1, numticks=10)
+            axes.xaxis.set_minor_locator(x_minor)
+            axes.xaxis.set_minor_formatter(ticker.NullFormatter())
+            y_minor = ticker.LinearLocator(numticks=23)
+            axes.yaxis.set_minor_locator(y_minor)
     axes.set_xlabel("Degrees of Freedom")
     axes.set_ylabel("Relative error")
     if not loglog:
         yticks = np.linspace(0, 0.5, 6)
         axes.set_yticks(yticks)
         axes.set_yticklabels([r"{{{:d}}}\%".format(int(yt*100)) for yt in yticks])
-        axes.set_ylim([-0.01, 0.31])
+        axes.set_ylim([-0.01, 0.21])
         xlim = axes.get_xlim()
         axes.set_xticks([1.0e+03, 1.0e+04, 1.0e+05, 1.0e+06])
         axes.hlines(y=0.01, xmin=xlim[0], xmax=xlim[1], color='k', linestyle='-', label=r'1.0\% error')
         axes.set_xlim(xlim)
     axes.grid(True)
-    axes.grid(True, which='minor', axis='y')
 
     # Save to file
     filename = 'qoi_{:s}_{:s}'.format(mode, ext)
@@ -143,7 +164,7 @@ for alignment in ('aligned', 'offset'):
         if not loglog:
             lines = [lines[-1]] + lines[:-1]
             labels = [labels[-1]] + labels[:-1]
-        legend = axes2.legend(lines, labels, fontsize=18, frameon=False, ncol=3)
+        legend = axes2.legend(lines, labels, fontsize=18, frameon=False, ncol=4 if mode == 'avg' else 3)
         fig2.canvas.draw()
         axes2.set_axis_off()
         bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())

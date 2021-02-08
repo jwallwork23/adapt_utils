@@ -12,6 +12,7 @@ from __future__ import absolute_import
 from thetis.utility import *
 import thetis.tracer_eq_2d as thetis_tracer
 import thetis.conservative_tracer_eq_2d as thetis_cons_tracer
+import os
 from ..equation import Equation
 
 
@@ -231,7 +232,8 @@ class TracerEquation2D(Equation):
             args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
             self.add_term(thetis_tracer.SinkTerm(*args), 'source')
         except Exception:
-            print_output("WARNING: Cannot import SinkTerm.")
+            if os.environ.get('WARNINGS', '0') != '0':
+                print_output("WARNING: Cannot import SinkTerm.")
 
 
 class ConservativeTracerEquation2D(TracerEquation2D):
@@ -251,4 +253,5 @@ class ConservativeTracerEquation2D(TracerEquation2D):
             args = (function_space, depth, use_lax_friedrichs, sipg_parameter)
             self.add_term(thetis_cons_tracer.ConservativeSinkTerm(*args), 'source')
         except Exception:
-            print_output("WARNING: Cannot import ConservativeSinkTerm.")
+            if os.environ.get('WARNINGS', '0') != '0':
+                print_output("WARNING: Cannot import ConservativeSinkTerm.")

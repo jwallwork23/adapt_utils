@@ -13,8 +13,9 @@ class AdaptiveDiscreteAdjointSteadyProblem(AdaptiveSteadyProblem):
     Subclass for :class:`AdaptiveSteadyProblem` which uses the discrete adjoint functionality
     built into Firedrake to solve adjoint problems.
     """
-    def __init__(self, *args, **kwargs):
-        self.tape = get_working_tape()
+    def __init__(self, *args, tape=get_working_tape(), **kwargs):
+        set_working_tape(tape)
+        self.tape = tape
         super(AdaptiveDiscreteAdjointSteadyProblem, self).__init__(*args, **kwargs)
 
     def set_controls(self):
@@ -46,7 +47,8 @@ class AdaptiveDiscreteAdjointSteadyProblem(AdaptiveSteadyProblem):
         with stop_annotating():
             return super(AdaptiveDiscreteAdjointSteadyProblem, self).get_metric(*args, **kwargs)
 
-    def get_solve_blocks(self):
+    @property
+    def solve_blocks(self):
         """
         Extract all tape blocks which are subclasses of :class:`GenericSolveBlock`, but not
         :class:`ProjectBlock`.
@@ -58,10 +60,6 @@ class AdaptiveDiscreteAdjointSteadyProblem(AdaptiveSteadyProblem):
         solve_blocks = [block for block in solve_blocks if not isinstance(block, ProjectBlock)]
         return [block for block in solve_blocks if block.adj_sol is not None]
 
-    @property
-    def solve_blocks(self):
-        return self.get_solve_blocks()
-
     def solve_adjoint(self, **kwargs):
         """
         Solve discrete adjoint as a by-product when computing the gradient w.r.t. the default
@@ -72,3 +70,19 @@ class AdaptiveDiscreteAdjointSteadyProblem(AdaptiveSteadyProblem):
         adj_sol = self.get_solutions(self.equation_set, adjoint=True)[0]
         adj_sol.assign(-self.solve_blocks[-1].adj_sol)  # TODO: Why minus sign?
         return J
+
+    def get_enriched_problem(self, field):
+        """
+        Generate a globally enriched version of this problem class with its own tape.
+
+        :arg field: solution field to be refined.
+        """
+        return super(AdaptiveDiscreteAdjointSteadyProblem, self).get_enriched_problem(field, tape=Tape())
+
+    def indicate_error(self, *args, **kwargs):
+        """
+        Make sure to reset tape after dealing with enriched problems.
+        """
+        indicator = super(AdaptiveDiscreteAdjointSteadyProblem, self).indicate_error(*args, **kwargs)
+        set_working_tape(self.tape)
+        return indicator

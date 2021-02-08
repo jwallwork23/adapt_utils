@@ -13,6 +13,7 @@ from adapt_utils.plotting import *
 parser = argparse.ArgumentParser()
 parser.add_argument("-loglog")
 parser.add_argument("-errorline")
+parser.add_argument("-enrichment_method")
 args = parser.parse_args()
 
 
@@ -25,8 +26,6 @@ loglog = bool(args.loglog)
 xlabel = "Degrees of freedom"
 ylabel = r"Power output $(\mathrm{MW})$"
 ylabel2 = r"Relative error (\%)"
-if loglog:
-    ylabel = ylabel2
 errorline = float(args.errorline or 0.0)
 
 # Curve plotting kwargs
@@ -38,8 +37,9 @@ characteristics = {
 }
 for approach in list(characteristics.keys()):
     characteristics[approach]['linestyle'] = '-'
+approaches = ['isotropic_dwr', 'anisotropic_dwr', 'weighted_hessian']
 plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
-
+method = args.enrichment_method or 'GE_h'
 
 # --- Plot convergence curves
 
@@ -49,41 +49,61 @@ for offset in (0, 1):
     axes.grid(True)
 
     # Read converged QoI value from file
-    with h5py.File(os.path.join(di, 'fixed_mesh/hdf5/qoi_offset_{:d}.h5'.format(offset)), 'r') as f:
+    fname = os.path.join(di, 'fixed_mesh', 'hdf5', 'qoi_offset_{:d}.h5'.format(offset))
+    with h5py.File(fname, 'r') as f:
         exact = np.array(f['qoi'])[-1]
 
     # Conversion functions
     power2error = lambda x: 100*abs(x - exact)/exact
     error2power = lambda x: x*exact/100 + exact
 
+    # Plot fixed mesh
+    approach = 'fixed_mesh'
+    fname = os.path.join(di, approach, 'hdf5', 'qoi_offset_{:d}.h5'.format(offset))
+    with h5py.File(fname, 'r') as f:
+        dofs, qois = np.array(f['dofs']), np.array(f['qoi'])
+    if loglog:
+        axes.loglog(np.array(dofs[:-1]), power2error(np.array(qois[:-1])), **characteristics[approach])
+    else:
+        axes.semilogx(dofs, qois, **characteristics[approach])
+
     # Plot convergence curves
-    for approach in characteristics:
+    for approach in approaches:
+        for forward in ('prolong', 'solve'):
 
-        # Read data from file
-        fname = os.path.join(di, '{:s}/hdf5/qoi_offset_{:d}.h5'.format(approach, offset))
-        if not os.path.exists(fname):
-            print("File {:s} does not exist.".format(fname))
-            continue
-        with h5py.File(fname, 'r') as f:
-            dofs, qois = np.array(f['dofs']), np.array(f['qoi'])
-            if loglog and approach == 'fixed_mesh':
-                dofs, qois = np.array(dofs[:-1]), np.array(qois[:-1])
+            # Read data from file
+            fname = os.path.join(di, approach, 'hdf5', 'qoi_offset_{:d}_{:s}'.format(offset, method))
+            if method not in ('PR', 'DQ'):
+                fname += '_{:s}'.format(forward)
+            fname += '.h5'
+            if not os.path.exists(fname):
+                print("File {:s} does not exist.".format(fname))
+                continue
+            with h5py.File(fname, 'r') as f:
+                dofs, qois = np.array(f['dofs']), np.array(f['qoi'])
 
-        # Plot convergence curves
-        if loglog:
-            axes.loglog(dofs, power2error(qois), **characteristics[approach])
-            print(approach, offset, power2error(qois))
-        else:
-            axes.semilogx(dofs, qois, **characteristics[approach])
+            # Plot convergence curves
+            chars = characteristics[approach].copy()
+            if method not in ('PR', 'DQ'):
+                chars['label'] += " ({:s})".format(forward)
+                if forward == 'solve':
+                    chars['linestyle'] = '--'
+            if loglog:
+                axes.loglog(dofs, power2error(qois), **chars)
+            else:
+                axes.semilogx(dofs, qois, **chars)
 
     if loglog:
         yticks = [0.001, 0.01, 0.1, 1]
         axes.set_yticks(yticks)
         axes.set_yticklabels(["0.001", "0.01", "0.1", "1"])
     else:
-        # Add a secondary axis and annotate with an error line
+        if offset == 0:
+            axes.set_ylim([21.80, 22.03])
+
+        # Annotate with an error line
         xticks = [1.0e+04, 1.0e+05, 1.0e+06, 1.0e+07]
-        hlines = [exact, ]
+        hlines = [exact]
         if errorline > 1e-3:
             hlines.append((1.0 + errorline/100)*exact)
         label = r'{:.1f}\% relative error'.format(errorline)
@@ -91,26 +111,28 @@ for offset in (0, 1):
         axes.set_xticks(xticks)
         axes.set_xlim([xticks[0], xticks[-1]])
         axes.yaxis.set_minor_locator(AutoMinorLocator())
+
+        # Add a secondary axis
         secax = axes.secondary_yaxis('right', functions=(power2error, error2power))
         secax.set_ylabel(ylabel2, fontsize=fontsize)
         secax.yaxis.set_minor_locator(AutoMinorLocator())
 
     # Save to file
     axes.set_xlabel(xlabel, fontsize=fontsize)
-    axes.set_ylabel(ylabel, fontsize=fontsize)
-    fname = 'convergence_{:d}'.format(offset)
+    if not loglog:
+        axes.set_ylabel(ylabel, fontsize=fontsize)
+    fname = 'convergence_{:d}_{:s}'.format(offset, method)
     if loglog:
         fname = '_'.join([fname, 'loglog'])
     savefig(fname, plot_dir, extensions=["pdf"])
 
     # Save legend to file
-    if offset == 0:
+    if offset == 0 and not loglog:
         fig2, axes2 = plt.subplots()
         lines, labels = axes.get_legend_handles_labels()
-        if not loglog:
-            lines = [lines[-1]] + lines[:-1]
-            labels = [labels[-1]] + labels[:-1]
-        legend = axes2.legend(lines, labels, fontsize=fontsize_legend, frameon=False, ncol=2)
+        lines = [lines[-1]] + lines[:-1]
+        labels = [labels[-1]] + labels[:-1]
+        legend = axes2.legend(lines, labels, fontsize=fontsize_legend, frameon=False, ncol=3)
         fig2.canvas.draw()
         axes2.set_axis_off()
         bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())

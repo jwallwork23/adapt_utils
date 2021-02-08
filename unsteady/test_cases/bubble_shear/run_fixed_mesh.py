@@ -49,15 +49,15 @@ if args.end_time is not None:
 
 tp = AdaptiveProblem(op)
 tp.set_initial_condition()
-init_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
-init_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
+init_l1_norm = norm(init_sol, norm_type='L1')
+init_l2_norm = norm(init_sol, norm_type='L2')
 tp.solve_forward()
 
 # Compare initial and final tracer concentrations
-final_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
-final_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
+final_l1_norm = norm(final_sol, norm_type='L1')
+final_l2_norm = norm(final_sol, norm_type='L2')
 abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')
 print_output("Conservation error: {:.2f}%".format(100*abs(init_l1_norm-final_l1_norm)/init_l1_norm))
 print_output("Relative L2 error:  {:.2f}%".format(100*abs_l2_error/init_l2_norm))

@@ -11,10 +11,11 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-freq", help="Mesh movement frequency")
 parser.add_argument("-rtol", help="Relative tolerance for Monge-Ampere solver")
 args = parser.parse_args()
+plot_dir = "plots"
 
 freq = int(args.freq or 40)
 rtol = float(args.rtol or 1.0e-03)
-resolutions = [0.0625, 0.125, 0.25]
+resolutions = [0.0625, 0.125, 0.25, 0.5]
 data = {res: {'disc_err': [], 'total_err': []} for res in resolutions}
 alphas = np.linspace(0, 15, 16)
 colours = ["C{:d}".format(i) for i in range(len(resolutions))]
@@ -58,8 +59,8 @@ axes.set_ylim([10, 100])
 axes.xaxis.set_minor_locator(AutoMinorLocator())
 axes.grid(True)
 axes.grid(True, which='minor')
-axes.legend(bbox_to_anchor=(0.0, 0.9, 1.0, 0.2), fontsize=18, ncol=2)
-savefig("total_error_alpha", "plots", extensions=['pdf'])
+axes.legend(bbox_to_anchor=(0.0, 0.95, 1.0, 0.2), fontsize=18, ncol=2)
+savefig("total_error_alpha", plot_dir, extensions=['pdf'])
 
 # Plot discretisation error against element count
 fig, axes = plt.subplots(figsize=(6, 5))
@@ -70,11 +71,18 @@ for res, colour in zip(data, colours):
 axes.set_xlabel(r"Monitor function parameter, $\alpha$")
 axes.set_ylabel(r"Relative $\ell_2$ error")
 axes.set_xlim([alphas[0], alphas[-1]])
-yticks = [1, 10, 100]
+yticks = [0.1, 1, 10, 100]
 axes.set_yticks(yticks)
-axes.set_yticklabels([r"1\%", r"10\%", r"100\%"])
+axes.set_yticklabels([r"0.1\%", r"1\%", r"10\%", r"100\%"])
 axes.xaxis.set_minor_locator(AutoMinorLocator())
 axes.grid(True)
 axes.grid(True, which='minor')
-axes.legend(bbox_to_anchor=(0.0, 0.9, 1.0, 0.2), fontsize=18, ncol=2)
-savefig("discretisation_error_alpha", "plots", extensions=['pdf'])
+savefig("discretisation_error_alpha_{:d}".format(freq), plot_dir, extensions=['pdf'])
+
+fig2, axes2 = plt.subplots()
+lines, labels = axes.get_legend_handles_labels()
+legend = axes2.legend(lines, labels, fontsize=18, frameon=False, ncol=2)
+fig2.canvas.draw()
+axes2.set_axis_off()
+bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
+savefig('legend_alpha', plot_dir, bbox_inches=bbox, extensions=['pdf'], tight=False)

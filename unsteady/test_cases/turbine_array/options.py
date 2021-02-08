@@ -83,7 +83,7 @@ class TurbineArrayOptions(TurbineOptions):
         self.elev_out = [None for i in range(self.num_meshes)]
         self.spun = spun
 
-        # Solver parameters and discretisation
+        # Discretisation
         self.stabilisation = 'lax_friedrichs'
         self.use_automatic_sipg_parameter = True
         self.grad_div_viscosity = False

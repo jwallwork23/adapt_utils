@@ -72,7 +72,7 @@ class TurbineArrayOptions(SteadyTurbineOptions):
         if os.path.isfile(self.mesh_file):
             self.default_mesh = Mesh(self.mesh_file)
 
-        # Solver parameters and discretisation
+        # Discretisation
         self.family = 'dg-cg'
         self.sipg_parameter = None
         self.use_automatic_sipg_parameter = True

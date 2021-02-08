@@ -47,6 +47,9 @@ else:
 
 family = args.family or 'cg'
 assert family in ('cg', 'dg')
+approach = args.approach
+both = approach == 'dwr_both' or 'int' in approach or 'avg' in approach
+adjoint = 'adjoint' in approach or both
 kwargs = {
     'level': int(args.level or 0),
 
@@ -54,13 +57,13 @@ kwargs = {
     'aligned': not bool(args.offset or False),
 
     # Mesh adaptation
-    'approach': args.approach,
-    'target': float(args.target or 5.0e+02),
+    'approach': approach,
+    'target': float(args.target or 4000.0),
     'norm_order': p,
     'convergence_rate': alpha,
     'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 35),
-    'enrichment_method': args.enrichment_method or 'DQ' if discrete_adjoint else 'GE_h',
+    'enrichment_method': args.enrichment_method or ('GE_p' if adjoint else 'DQ'),
 
     # I/O and debugging
     'plot_pvd': True,

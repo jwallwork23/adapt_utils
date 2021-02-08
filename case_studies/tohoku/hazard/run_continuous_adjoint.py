@@ -41,7 +41,7 @@ args = parser.parse_args()
 # --- Set parameters
 
 if args.locations is None:  # TODO: Parse as list
-    locations = ['Fukushima Daiichi', ]
+    locations = ['Fukushima Daiichi']
 else:
     locations = args.locations.split(',')
 radius = float(args.radius or 100.0e+03)

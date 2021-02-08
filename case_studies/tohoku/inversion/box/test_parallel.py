@@ -9,12 +9,6 @@ from adapt_utils.case_studies.tohoku.options.box_options import TohokuBoxBasisOp
 from adapt_utils.unsteady.solver_adjoint import AdaptiveDiscreteAdjointProblem
 
 
-class DiscreteAdjointTsunamiProblem(AdaptiveDiscreteAdjointProblem):
-    """The subclass exists to pass the QoI as required."""
-    def quantity_of_interest(self):
-        return self.op.J
-
-
 nproc = COMM_WORLD.size
 
 
@@ -85,7 +79,7 @@ op.di = create_directory(os.path.join(dirname, 'outputs', 'test_parallel', str(n
 # Solve the forward problem with initial guess
 op.save_timeseries = True
 print_output("Run forward...")
-swp = DiscreteAdjointTsunamiProblem(op, nonlinear=nonlinear, print_progress=op.debug)
+swp = AdaptiveDiscreteAdjointProblem(op, nonlinear=nonlinear, print_progress=op.debug)
 swp.solve_forward()
 J = swp.quantity_of_interest()
 print_output("Quantity of interest = {:.8e}".format(J))

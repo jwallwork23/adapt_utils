@@ -82,7 +82,7 @@ enrichment:
 
 # --- Adaptation runs based on 1st order forward result
 
-adaptive_forward: dwr isotropic_dwr anisotropic_dwr weighted_hessian weighted_gradient
+forward: dwr isotropic_dwr anisotropic_dwr weighted_hessian weighted_gradient
 
 dwr:
 	@echo "Running vertexwise isotropic DWR adaptation convergence test..."
@@ -111,7 +111,7 @@ weighted_gradient:
 
 # --- Adaptation runs based on 1st order adjoint result
 
-adaptive_adjoint: dwr_adjoint isotropic_dwr_adjoint anisotropic_dwr_adjoint weighted_hessian_adjoint
+adjoint: dwr_adjoint isotropic_dwr_adjoint anisotropic_dwr_adjoint weighted_hessian_adjoint
 
 dwr_adjoint:
 	@echo "Running vertexwise isotropic adjoint DWR adaptation convergence test..."
@@ -140,11 +140,16 @@ weighted_gradient_adjoint:
 
 # --- Adaptation runs based on 2nd order result / combinations of first order results
 
-adaptive_avg: dwr_avg isotropic_dwr_avg \
-	anisotropic_dwr_avg weighted_hessian_avg weighted_gradient_avg
+avg: dwr_avg isotropic_dwr_avg anisotropic_dwr_avg weighted_hessian_avg weighted_gradient_avg
 
-adaptive_int: dwr_int isotropic_dwr_int \
-	anisotropic_dwr_int weighted_hessian_int weighted_gradient_int
+int: dwr_int isotropic_dwr_int anisotropic_dwr_int weighted_hessian_int weighted_gradient_int
+
+second_order: dwr_both avg int
+
+dwr_both:
+	@echo "Running vertexwise second order isotropic DWR adaptation convergence test..."
+	@python3 run_adaptation_loop.py -approach dwr_both
+	@python3 run_adaptation_loop.py -approach dwr_both -offset 1
 
 dwr_avg:
 	@echo "Running vertexwise second order isotropic DWR adaptation convergence test..."
@@ -193,12 +198,12 @@ weighted_hessian_int:
 
 weighted_gradient_int:
 	@echo "Running intersected 'weighted gradient' adaptation convergence test..."
-	@python3 run_adaptation_loop.py -approach weighted_gradient_int
-	@python3 run_adaptation_loop.py -approach weighted_gradient_int -offset 1
+	@python3 run_adaptation_loop.py -approach weighted_gradient_int -target 250
+	@python3 run_adaptation_loop.py -approach weighted_gradient_int -target 250 -offset 1
 
 # --- Convergence plots
 
-plot: plot_by_estimator plot_by_approach
+plot: plot_by_estimator plot_by_approach plot_enrichment
 
 plot_by_estimator: plot_forward plot_adjoint plot_avg plot_int
 
@@ -240,4 +245,8 @@ plot_isotropic:
 	@echo "Plotting isotropic convergence curves..."
 	@python3 plot_convergence.py isotropic
 
-convergence: uniform table adaptive_forward plot_forward
+plot_enrichment:
+	@echo "Plotting enrichment method convergence curves..."
+	@python3 plot_convergence.py enrichment
+
+convergence: uniform table forward plot_forward

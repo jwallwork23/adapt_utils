@@ -12,6 +12,7 @@ import ufl
 
 from math import pi, sqrt
 import numpy as np
+import os
 from utm.conversion import latitude_to_zone_letter, latlon_to_zone_number, zone_number_to_central_longitude
 from utm.error import OutOfRangeError
 
@@ -87,7 +88,8 @@ def to_latlon(easting, northing, zone_number, zone_letter=None, northern=None, f
     if isinstance(northing, ufl.indexed.Indexed):
         from firedrake import sin, cos, sqrt
         if coords is None:
-            print_output("WARNING: Cannot check validity of coordinates.")
+            if os.environ.get('WARNINGS', '0') != '0':
+                print_output("WARNING: Cannot check validity of coordinates.")
         else:
             minval, maxval = coords.dat.data[:, 1].min(), coords.dat.data[:, 1].max()
             if not (0 <= minval and maxval <= 10000000):
@@ -171,7 +173,8 @@ def from_latlon(latitude, longitude, force_zone_number=None, zone_info=False, co
     if isinstance(latitude, ufl.indexed.Indexed):
         from firedrake import sin, cos, sqrt
         if coords is None:
-            print_output("WARNING: Cannot check validity of coordinates.")
+            if os.environ.get('WARNINGS', '0') != '0':
+                print_output("WARNING: Cannot check validity of coordinates.")
         else:
             minval, maxval = coords.dat.data[:, 0].min(), coords.dat.data[:, 0].max()
             if not (-80.0 <= minval and maxval <= 84.0):

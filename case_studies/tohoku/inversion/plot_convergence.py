@@ -1,32 +1,37 @@
 from thetis import COMM_WORLD, create_directory, print_output
 
-import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import os
 import sys
 
+from adapt_utils.argparse import ArgumentParser
 from adapt_utils.plotting import *
-from adapt_utils.norms import vecnorm
+from adapt_utils.norms import lp_norm, vecnorm
 
 
 # --- Parse arguments
 
-parser = argparse.ArgumentParser()
-
-# Inversion
-parser.add_argument("basis", help="Basis type for inversion, from {'box', 'radial', 'okada'}.")
+parser = ArgumentParser(
+    prog="run_convergence",
+    description="""
+        Given tsunami source inversion run output, generate a variety of plots:
+          (a) timeseries due to initial guess vs. gauge data;
+          (b) progress of the QoI during the optimisation, as a function of iteration count;
+          (c) convergence curve of final 'optimised' QoI values, as a function of mesh element count;
+          (d) progress of the QoI gradient during the optimisation, as a function of iteration count;
+          (e) timeseries due to converged control parameters vs. gauge data.
+        In addition, the script computes mean square errors from the stored timeseries data.
+        """,
+    basis=True,
+    plotting=True,
+)
 parser.add_argument("-levels", help="Number of mesh resolution levels considered (default 3)")
-parser.add_argument("-real_data", help="Toggle whether to use real data (default False)")
-parser.add_argument("-noisy_data", help="Toggle whether to sample noisy data (default False)")
+parser.add_argument("-noisy_data", help="""
+    Toggle whether to consider timeseries data which has *not* been sampled (default False).
+    """)
 parser.add_argument("-continuous_timeseries", help="Toggle discrete or continuous timeseries")
-
-# I/O
-parser.add_argument("-plot_pdf", help="Toggle plotting to .pdf")
-parser.add_argument("-plot_png", help="Toggle plotting to .png")
-parser.add_argument("-plot_pvd", help="Toggle plotting to .pvd")
-parser.add_argument("-plot_all", help="Toggle plotting to .pdf, .png and .pvd")
-parser.add_argument("-plot_only", help="Just plot using saved data")
+parser.add_argument("-plot_initial_guess", help="Plot initial guess timeseries")
 
 
 # --- Set parameters
@@ -34,26 +39,19 @@ parser.add_argument("-plot_only", help="Just plot using saved data")
 # Parsed arguments
 args = parser.parse_args()
 basis = args.basis
-levels = range(int(args.levels or 3))
-plot_pdf = bool(args.plot_pdf or False)
-plot_png = bool(args.plot_png or False)
-plot_all = bool(args.plot_all or False)
-if plot_all:
-    plot_pvd = plot_pdf = plot_png = True
-extensions = []
-if plot_pdf:
-    extensions.append('pdf')
-if plot_png:
-    extensions.append('png')
-plot_any = len(extensions) > 0
-real_data = bool(args.real_data or False)
-timeseries_type = "timeseries"
+levels = int(args.levels or 3)
+plot = parser.plotting_args()
+if len(plot.extensions) == 0:
+    print_output("Nothing to plot.")
+    sys.exit(0)
+plot_init = bool(args.plot_initial_guess or False)
+timeseries_type = 'timeseries'
 if bool(args.continuous_timeseries or False):
-    timeseries_type = "_".join([timeseries_type, "smooth"])
+    timeseries_type = '_'.join([timeseries_type, 'smooth'])
 
 # Do not attempt to plot in parallel
 if COMM_WORLD.size > 1:
-    print_output('Will not attempt to plot in parallel.')
+    print_output("Will not attempt to plot in parallel.")
     sys.exit(0)
 
 # Collect initialisation parameters
@@ -68,7 +66,7 @@ elif basis == 'okada':
     constructor = TohokuOkadaBasisOptions
 else:
     raise ValueError("Basis type '{:s}' not recognised.".format(basis))
-op = constructor(level=0, synthetic=not real_data, noisy_data=bool(args.noisy_data or False))
+op = constructor(level=0, synthetic=False, noisy_data=bool(args.noisy_data or False))
 gauges = list(op.gauges.keys())
 
 # Plotting parameters
@@ -79,95 +77,200 @@ kwargs = {'markevery': 5}
 
 # Setup output directories
 dirname = os.path.join(os.path.dirname(__file__), basis)
-di = create_directory(os.path.join(dirname, 'outputs', 'realistic' if real_data else 'synthetic'))
-op.di = create_directory(os.path.join(di, 'discrete'))
-plot_dir = create_directory(os.path.join(di, 'plots'))
-create_directory(os.path.join(plot_dir, 'discrete'))
+di = 'realistic'
+if args.extension is not None:
+    di = '_'.join([di, args.extension])
+plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots', di, basis))
+di = os.path.join(dirname, 'outputs', di)
+op.di = os.path.join(di, 'discrete')
+for fpath in (di, op.di):
+    if not os.path.exists(fpath):
+        raise IOError("Filepath {:s} does not exist.".format(fpath))
 
+# Plot timeseries under initial guess
+if plot_init:
+    print_output("Plotting initial timeseries against gauge data...")
+    N = int(np.ceil(np.sqrt(len(gauges))))
+    for level in range(levels):
+        fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
+        for i, gauge in enumerate(gauges):
 
-# --- Plot timeseries under initial guess
+            # Load data
+            fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
+            op.gauges[gauge]['data'] = np.load(fname)
+            fname = os.path.join(di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
+            op.gauges[gauge]['init'] = np.load(fname)
+            data = np.array(op.gauges[gauge]['data'])
+            init = np.array(op.gauges[gauge]['init'])
+            n = len(data)
 
-N = int(np.ceil(np.sqrt(len(gauges))))
-for level in levels:
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
-    for i, gauge in enumerate(gauges):
-        fname = os.path.join(di, '_'.join([gauge, 'data', str(level) + '.npy']))
-        op.gauges[gauge]['data'] = np.load(fname)
-        fname = os.path.join(di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
-        op.gauges[gauge]['init'] = np.load(fname)
-
-        T = np.array(op.gauges[gauge]['times'])/60
-        T = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
-        ax = axes[i//N, i % N]
-        ax.plot(T, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
-        ax.plot(T, op.gauges[gauge]['init'], '--x', label=gauge + ' initial guess', **kwargs)
-        ax.legend(loc='best')
-        ax.set_xlabel('Time (min)', fontsize=fontsize)
-        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-        plt.xticks(fontsize=fontsize_tick)
-        plt.yticks(fontsize=fontsize_tick)
-        ax.grid()
-    for i in range(len(gauges), N*N):
-        axes[i//N, i % N].axis(False)
-    plt.tight_layout()
-    savefig('timeseries_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
-
-
-# --- Optimisation progress
+            # Plot timeseries
+            T = np.array(op.gauges[gauge]['times'])/60
+            T = np.linspace(T[0], T[-1], n)
+            ax = axes[i//N, i % N]
+            ax.plot(T, data, '-', **kwargs)
+            ax.plot(T, init, '-', label=gauge, **kwargs)
+            ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
+            if i//N == 3:
+                ax.set_xlabel('Time (min)', fontsize=fontsize)
+            if i % N == 0:
+                ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+            ax.xaxis.set_tick_params(labelsize=fontsize_tick)
+            ax.yaxis.set_tick_params(labelsize=fontsize_tick)
+            ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
+            ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
+            ax.grid()
+        for i in range(len(gauges), N*N):
+            axes[i//N, i % N].axis(False)
+        savefig('timeseries_{:d}'.format(level), plot_dir, extensions=plot.extensions)
 
 # Plot progress of QoI
-fig, axes = plt.subplots(figsize=(6, 4))
-for level in levels:
+print_output("Plotting progress of QoI...")
+fig, axes = plt.subplots(figsize=(8, 6))
+qois = []
+for level in range(levels):
     fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
     func_values_opt = np.load(fname.format('func', level))
-    iterations = range(1, len(func_values_opt)+1)
+    qois.append(func_values_opt[-1])
+    its = range(1, len(func_values_opt)+1)
     label = '{:d} elements'.format(op.num_cells[level])
-    axes.semilogx(iterations, func_values_opt, label=label)
+    axes.loglog(its, func_values_opt, label=label)
+axes.set_xticks([1, 10, 100])
+axes.set_yticks([1e4, 2e4, 1e5])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Iteration")
-axes.set_ylabel("Square error")
-plot_dir = os.path.join(plot_dir, 'discrete')
+axes.set_ylabel("Square timeseries error QoI")
 axes.legend(loc='best', fontsize=fontsize_legend)
-savefig('optimisation_progress_J', fpath=plot_dir, extensions=extensions)
+savefig('optimisation_progress_J', plot_dir, extensions=plot.extensions)
+
+# Plot final QoI values
+print_output("Plotting final QoI values...")
+fig, axes = plt.subplots(figsize=(8, 6))
+axes.semilogx(op.num_cells[:len(qois)], qois, '-x')
+axes.set_xticks([1e4, 1e5])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
+axes.set_xlabel("Mesh element count")
+axes.set_ylabel("Square timeseries error QoI")
+savefig('converged_J', plot_dir, extensions=plot.extensions)
 
 # Plot progress of gradient
-fig, axes = plt.subplots(figsize=(6, 4))
-for level in levels:
+print_output("Plotting progress of gradient norm...")
+fig, axes = plt.subplots(figsize=(8, 6))
+for level in range(levels):
     fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
     gradient_values_opt = np.load(fname.format('grad', level))
     label = '{:d} elements'.format(op.num_cells[level])
-    axes.semilogy([vecnorm(djdm, order=np.Inf) for djdm in gradient_values_opt], label=label)
+    its = range(1, len(gradient_values_opt)+1)
+    axes.loglog(its, [vecnorm(djdm, order=np.Inf) for djdm in gradient_values_opt], label=label)
+axes.set_xticks([1, 10, 100])
+# axes.set_yticks([2e3, 7e3])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Iteration")
 axes.set_ylabel(r"$\ell_\infty$-norm of gradient")
 axes.legend(loc='best', fontsize=fontsize_legend)
-savefig('optimisation_progress_dJdm', fpath=plot_dir, extensions=extensions)
+savefig('optimisation_progress_dJdm_linf', plot_dir, extensions=plot.extensions)
+fig, axes = plt.subplots(figsize=(8, 6))
+for level in range(levels):
+    fname = os.path.join(op.di, 'optimisation_progress_{:s}' + '_{:d}.npy'.format(level))
+    gradient_values_opt = np.load(fname.format('grad', level))
+    label = '{:d} elements'.format(op.num_cells[level])
+    its = range(1, len(gradient_values_opt)+1)
+    axes.loglog(its, [lp_norm(djdm, p='l2') for djdm in gradient_values_opt], label=label)
+axes.set_xticks([1, 10, 100])
+# axes.set_yticks([2e3, 7e3])
+for axis in (axes.xaxis, axes.yaxis):
+    axis.grid(True, which='minor', color='lightgrey')
+    axis.grid(True, which='major', color='lightgrey')
+axes.set_xlabel("Iteration")
+axes.set_ylabel(r"$\ell_2$-norm of gradient")
+axes.legend(loc='best', fontsize=fontsize_legend)
+savefig('optimisation_progress_dJdm_l2', plot_dir, extensions=plot.extensions)
 
-
-# --- Timeseries for optimised run
-
+# Plot timeseries for optimised run
+print_output("Plotting timeseries for optimised run...")
 msg = "Cannot plot timeseries for optimised controls on mesh {:d} because the data don't exist."
-for level in levels:
-    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
+mean_square_errors = np.zeros(levels)
+discrete_qois = np.zeros(levels)
+for level in range(levels):
+    N = int(np.ceil(np.sqrt(len(gauges))))
+    fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(17, 13))
+    plotted = False
     for i, gauge in enumerate(gauges):
-        fname = os.path.join(op.di, '_'.join([gauge, timeseries_type, str(level) + '.npy']))
+
+        # Load data
+        fname = os.path.join(di, '{:s}_data_{:d}.npy'.format(gauge, level))
+        op.gauges[gauge]['data'] = np.load(fname)
+        fname = os.path.join(op.di, '{:s}_{:s}_{:d}.npy'.format(gauge, timeseries_type, level))
         if not os.path.isfile(fname):
             print_output(msg.format(level))
-            sys.exit(0)
+            break
         op.gauges[gauge]['opt'] = np.load(fname)
+        data = np.array(op.gauges[gauge]['data'])
+        opt = np.array(op.gauges[gauge]['opt'])
+        n = len(opt)
+        T = op.gauges[gauge]['times']
+        T = np.linspace(T[0], T[-1], n)
 
-        T = np.array(op.gauges[gauge]['times'])/60
-        TT = np.linspace(T[0], T[-1], len(op.gauges[gauge]['data']))
+        if len(data) == n:
+            print_output("Computing timeseries errors...")
+
+            # Compute mean square errors
+            square_error = (opt - data)**2
+            mse = square_error.sum()/n
+            msg = "{:5s} level {:d} optimised mean square error: {:.4e}"
+            print_output(msg.format(gauge, level, mse))
+            mean_square_errors[level] += mse
+
+            # Compute discrete QoI
+            square_error *= 0.5
+            dt = T[1] - T[0]
+            for q, sq_err in enumerate(square_error):
+                wq = 0.5 if q in (0, n-1) else 1.0  # TODO: Other integrators than trapezium
+                discrete_qois[level] += wq*dt*sq_err
+
+            # Compute total variation
+            # TODO
+
+        else:
+            print_output("Cannot compute timeseries errors because data have inconsistent lengths.")
+
+        # Plot timeseries
         ax = axes[i//N, i % N]
-        ax.plot(TT, op.gauges[gauge]['data'], '--x', label=gauge + ' data', **kwargs)
-        ax.plot(TT, op.gauges[gauge]['init'], '--x', label=gauge + ' initial guess', **kwargs)
-        TT = np.linspace(T[0], T[-1], len(op.gauges[gauge]['opt']))
-        ax.plot(TT, op.gauges[gauge]['opt'], '--x', label=gauge + ' optimised', **kwargs)
-        ax.legend(loc='best')
-        ax.set_xlabel('Time (min)', fontsize=fontsize)
-        ax.set_ylabel('Elevation (m)', fontsize=fontsize)
-        plt.xticks(fontsize=fontsize_tick)
-        plt.yticks(fontsize=fontsize_tick)
+        T /= 60
+        ax.plot(np.linspace(T[0], T[-1], len(data)), data, '-', **kwargs)
+        ax.plot(T, opt, '-', label=gauge, **kwargs)
+        ax.legend(handlelength=0, handletextpad=0, fontsize=fontsize_legend)
+        if i//N == 3:
+            ax.set_xlabel('Time (min)', fontsize=fontsize)
+        if i % N == 0:
+            ax.set_ylabel('Elevation (m)', fontsize=fontsize)
+        ax.xaxis.set_tick_params(labelsize=fontsize_tick)
+        ax.yaxis.set_tick_params(labelsize=fontsize_tick)
+        ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
+        ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
+        t0 = op.gauges[gauge]["arrival_time"]/60
+        tf = op.gauges[gauge]["departure_time"]/60
+        ax.set_xlim([t0, tf])
         ax.grid()
+        plotted = True
+    if not plotted:
+        continue
+    msg = "Level {:d} overall optimised mean square error: {:.4e}"
+    print_output(msg.format(level, mean_square_errors[level]))
+    msg = "Level {:d} discrete QoI: {:.4e}"
+    print_output(msg.format(level, discrete_qois[level]))
     for i in range(len(gauges), N*N):
         axes[i//N, i % N].axis(False)
-    plt.tight_layout()
-    savefig('timeseries_optimised_{:d}'.format(level), fpath=plot_dir, extensions=extensions)
+    savefig('timeseries_optimised_{:d}'.format(level), plot_dir, extensions=plot.extensions)
+
+# Store errors
+fname = os.path.join(di, 'mean_square_errors_{:s}_{:s}.npy')
+np.save(fname.format(basis, ''.join([str(level) for level in range(levels)])), mean_square_errors)
+fname = os.path.join(di, 'discrete_qois_{:s}_{:s}.npy')
+np.save(fname.format(basis, ''.join([str(level) for level in range(levels)])), discrete_qois)

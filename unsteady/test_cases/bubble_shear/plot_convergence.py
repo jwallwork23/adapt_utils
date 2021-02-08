@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.plotting import *  # noqa
+from adapt_utils.io import create_directory
+from adapt_utils.plotting import *
 
 
 characteristics = {
@@ -16,6 +17,7 @@ dofs = {}
 l2_error = {}
 cons_error = {}
 time = {}
+plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 for approach in characteristics:
     di = os.path.join(os.path.dirname(__file__), 'outputs')
     if approach in ('integrate', 'intersect'):
@@ -36,19 +38,19 @@ fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(dofs[approach], l2_error[approach], **characteristics[approach])
 axes.set_xlabel("Degrees of freedom")
-axes.set_ylabel(r"Relative $\mathcal L_2$ error")
+axes.set_ylabel(r"Relative $\mathcal L_2$ error (\%)")
 axes.grid(True)
 axes.legend()
-plt.tight_layout()
+savefig("l2_error", plot_dir, extensions=["pdf"])
 
 fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(dofs[approach], cons_error[approach], **characteristics[approach])
 axes.set_xlabel("Degrees of freedom")
-axes.set_ylabel(r"$\mathcal L_1$ conservation error")
+axes.set_ylabel(r"$\mathcal L_1$ conservation error (\%)")
 axes.grid(True)
 axes.legend()
-plt.tight_layout()
+savefig("cons_error", plot_dir, extensions=["pdf"])
 
 fig, axes = plt.subplots()
 for approach in approaches:
@@ -58,4 +60,4 @@ axes.set_ylabel(r"CPU time [$\mathrm s$]")
 axes.grid(True)
 axes.legend()
 plt.tight_layout()
-plt.show()
+savefig("time", plot_dir, extensions=["pdf"])

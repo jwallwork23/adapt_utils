@@ -7,6 +7,7 @@ import sys
 
 from . import misc
 from .mesh import MeshStats
+from .params import *
 
 
 __all__ = ["Options", "CoupledOptions", "ReynoldsNumberArray"]
@@ -26,14 +27,23 @@ class Options(FrozenConfigurable):
           'cg-cg': Taylor-Hood                    (P2-P1);
           'dg-dg': Equal order DG                 (PpDG-PpDG);
           'dg-cg': Mixed continuous-discontinuous (P1DG-P2),
-        where p is the polynomial order specified by :attr:`degree`.""").tag(config=True)
+        where p is the polynomial order specified by :attr:`degree`.
+        """).tag(config=True)
     degree = NonNegativeInteger(1, help="""
         Polynomial order for hydrodynamics finite element pair :attr:`family'.""").tag(config=True)
     degree_increase = PositiveInteger(1, help="""
         When defining an enriched hydrodynamics finite element space, how much should the
         polynomial order of the finite element space by incremented?
         """).tag(config=True)
-    periodic = Bool(False, help="Is mesh periodic?").tag(config=True)
+    num_refinements = PositiveInteger(1, help="""
+        When defining enriched finite element spaces, how many times should iso-P2
+        refinement be applied?
+        """).tag(config=True)
+    periodic = Bool(False, help="Is the domain periodic?").tag(config=True)
+    quadrature_degree = NonNegativeInteger(None, allow_none=True, help="""
+        Quadrature degree used in all forms. If set to `None` then the Firedrake / Thetis
+        default is used.
+        """).tag(config=True)  # TODO: USEME
 
     # Time discretisation
     timestepper = Enum(
@@ -44,12 +54,14 @@ class Options(FrozenConfigurable):
     start_time = NonNegativeFloat(0.0, help="Start of time window of interest.").tag(config=True)
     end_time = PositiveFloat(60.0, help="End of time window of interest.").tag(config=True)
     num_meshes = PositiveInteger(1, help="""
-        Number of meshes in :class:`AdaptiveProblem` solver""").tag(config=True)
+        Number of meshes in :class:`AdaptiveProblem` solver
+        """).tag(config=True)
     dt_per_export = PositiveFloat(10, help="Number of timesteps per export.").tag(config=True)
     dt_per_mesh_movement = PositiveFloat(1, help="Number of timesteps per mesh movement.").tag(config=True)
     use_semi_implicit_linearisation = Bool(False, help="""
         Toggle whether or not to linearise implicit terms. This is generally recommended if Manning
-        friction is to be included.""").tag(config=True)
+        friction is to be included.
+        """).tag(config=True)
     implicitness_theta = NonNegativeFloat(0.5, help=r"""
         Consider an ODE
 
@@ -97,10 +109,16 @@ class Options(FrozenConfigurable):
 
     # Outputs
     debug = Bool(False, help="Toggle debugging for more verbose screen output.").tag(config=True)
-    debug_mode = Enum(
-        ['basic', 'full'],
-        default_value='basic',
-        help="""Choose debugging mode from {'basic', 'full'}.""").tag(config=True)
+    debug_mode = Enum(['basic', 'full', 'light'], default_value='basic', help="""
+        Choose debugging mode from {'basic', 'full', 'light'}.
+
+        'basic' mode prints all adapt_utils debugging statements with the 'basic' tag, as well
+            as 'INFO' level PyOP2 output.
+        'full' mode prints all adapt_utils debugging statements with the 'full' tag, as well
+            as 'DEBUG' level PyOP2 output.
+        'light' mode prints all adapt_utils debugging statements with the 'basic' tag and no PyOP2
+            output.
+        """).tag(config=True)
     plot_pvd = Bool(True, help="Toggle saving fields to .pvd and .vtu.").tag(config=True)
     plot_bathymetry = Bool(False, help="Toggle plotting bathymetry to .pvd and .vtu.").tag(config=True)
     save_hdf5 = Bool(False, help="Toggle saving fields to HDF5.").tag(config=True)
@@ -154,14 +172,9 @@ class Options(FrozenConfigurable):
           'L2':    global L2 projection;
           'ZZ':    recovery a la [Zienkiewicz and Zhu 1987].
         """).tag(config=True)
-    gradient_solver_parameters = PETScSolverParameters(
-        {
-            'snes_rtol': 1e8,
-            'ksp_rtol': 1e-5,
-            'ksp_gmres_restart': 20,
-            'pc_type': 'sor',
-        },
-        help="Solver parameters for gradient recovery.").tag(config=True)
+    gradient_solver_parameters = PETScSolverParameters(ibp_params, help="""
+        Solver parameters for gradient recovery.
+        """).tag(config=True)
     hessian_recovery = Enum(['parts', 'L2', 'ZZ'], default_value='L2', help="""
         Hessian recovery technique, from:
           'L2':    global double L2 projection;
@@ -171,43 +184,10 @@ class Options(FrozenConfigurable):
     hessian_solver_parameters = PETScSolverParameters(
         {
             # Integration by parts
-            'parts': {
-
-                # GMRES with restarts
-                'ksp_type': 'gmres',
-                'ksp_gmres_restart': 20,
-                'ksp_rtol': 1.0e-05,
-
-                # SOR preconditioning
-                'pc_type': 'sor',
-            },
+            'parts': ibp_params,
 
             # Double L2 projection
-            'L2': {
-                'mat_type': 'aij',
-
-                # Use stationary preconditioners in the Schur complement, to get away with applying
-                # GMRES to the whole mixed system
-                'ksp_type': 'gmres',
-                'pc_type': 'fieldsplit',
-                'pc_fieldsplit_type': 'schur',
-
-                # We want to eliminate H (field 1) to get an equation for g (field 0)
-                'pc_fieldsplit_0_fields': '1',
-                'pc_fieldsplit_1_fields': '0',
-
-                # Use a diagonal approximation of the A00 block.
-                'pc_fieldsplit_schur_precondition': 'selfp',
-
-                # Use ILU to approximate the inverse of A00, without a KSP solver
-                'fieldsplit_0_pc_type': 'ilu',
-                'fieldsplit_0_ksp_type': 'preonly',
-
-                # Use GAMG to approximate the inverse of the Schur complement matrix
-                'fieldsplit_1_ksp_type': 'preonly',
-                'fieldsplit_1_pc_type': 'gamg',
-                'ksp_max_it': 20,
-            }
+            'L2': l2_projection_params,
         },
         help="Solver parameters for Hessian recovery.").tag(config=True)
     hessian_time_combination = Enum(
@@ -259,10 +239,11 @@ class Options(FrozenConfigurable):
         loop.
         """).tag(config=True)
     outer_iterations = PositiveInteger(1, help="""
-        Number of iterations in outer adaptation loop.""").tag(config=True)
+        Number of iterations in outer adaptation loop.
+        """).tag(config=True)
     indent = Unicode('', help="Indent used in nested print statements.").tag(config=True)
 
-    def __init__(self, mesh=None, fpath=None, **kwargs):
+    def __init__(self, mesh=None, fpath=None, di=None, **kwargs):
         """
         Upon initialising the class, any kwargs will be added and a output directory path will be
         created as determined by :attr:`approach` as `outputs/<approach>/`.
@@ -271,10 +252,11 @@ class Options(FrozenConfigurable):
             the subclass.
         :fpath: optional extension to the usual `outputs/<approach>/` output directory path.
         """
+        self.dirty_cache = False
         self.default_mesh = mesh
         self.update(kwargs)
-        self.di = os.path.join('outputs', self.approach)
-        if fpath is not None:
+        self.di = di or os.path.join('outputs', self.approach)
+        if fpath is not None:  # TODO: Needed?
             self.di = os.path.join(self.di, fpath)
         self.di = create_directory(self.di)
         if self.debug:
@@ -282,7 +264,7 @@ class Options(FrozenConfigurable):
             PETSc.Sys.popErrorHandler()
             if self.debug_mode == 'basic':
                 set_log_level(INFO)
-            else:
+            elif self.debug_mode == 'full':
                 set_log_level(DEBUG)
 
     def set_all_rtols(self, tol):
@@ -292,6 +274,21 @@ class Options(FrozenConfigurable):
         self.element_rtol = tol
         self.qoi_rtol = tol
         self.estimator_rtol = tol
+
+    def extract(self, parameters, key, default):
+        """
+        Extract value `key` from a dictionary `parameters` with default value `default`. If the
+        value is not set to the default then the cache is marked as dirty.
+        """
+        value = parameters.get(key)
+        if value is None:
+            return default
+        elif np.isclose(value, default):
+            return default
+        else:
+            self.print_debug("CACHEING: Modified {:s} parameter dirtied cache".format(key))
+            self.dirty_cache = True
+            return value
 
     # TODO: Collapse indicators to one function and include type in RoI and source specifications
 
@@ -318,13 +315,13 @@ class Options(FrozenConfigurable):
     def set_start_condition(self, fs, adjoint=False):
         return self.set_terminal_condition(fs) if adjoint else self.set_initial_condition(fs)
 
-    def set_initial_condition(self, fs):
+    def set_initial_condition(self, prob, i):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def set_terminal_condition(self, fs):
+    def set_terminal_condition(self, prob, i):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def set_boundary_conditions(self, fs):
+    def set_boundary_conditions(self, prob, i):
         raise NotImplementedError("Should be implemented in derived class.")
 
     def set_boundary_surface(self):  # TODO: surely it needs an arg
@@ -370,7 +367,7 @@ class Options(FrozenConfigurable):
         """
         if not self.debug:
             return
-        if mode == 'full' and self.debug_mode == 'basic':
+        if mode == 'full' and self.debug_mode in ('basic', 'light'):
             return
         try:
             print_output(self.indent + msg)
@@ -558,70 +555,16 @@ class CoupledOptions(Options):
        """).tag(config=True)
 
     def __init__(self, **kwargs):
-        """
-        Solver
-        =====
-        The time-dependent shallow water system looks like
-
-                                    ------------------------- -----   -----
-              ------------- -----   |                 |     | |   |   |   |
-              | A00 | A01 | | U |   |  T + C + V + D  |  G  | | U |   | 0 |
-        A x = ------------- ----- = |                 |     | |   | = |   |  = b,
-              | A10 | A11 | | H |   ------------------------- -----   -----
-              ------------- -----   |        B        |  T  | | H |   | 0 |
-                                    ------------------------- -----   -----
-
-        where:
-         * T - time derivative;
-         * C - Coriolis;
-         * V - viscosity;
-         * D - quadratic drag;
-         * G - gravity;
-         * B - bathymetry.
-
-        We apply a multiplicative fieldsplit preconditioner, i.e. block Gauss-Seidel:
-
-            ---------------- ------------ ----------------
-            | I |     0    | |   I  | 0 | | A00^{-1} | 0 |
-        P = ---------------- ------------ ----------------.
-            | 0 | A11^{-1} | | -A10 | 0 | |    0     | I |
-            ---------------- ------------ ----------------
-        """
+        super(CoupledOptions, self).__init__(**kwargs)
+        steady = self.timestepper == 'SteadyState'
         self.default_solver_parameters = {
-            "shallow_water": {
-                "ksp_type": "gmres",
-                "pc_type": "fieldsplit",
-                "pc_fieldsplit_type": "multiplicative",
-                "fieldsplit_U_2d": {
-                    "ksp_type": "preonly",
-                    "ksp_max_it": 10000,
-                    "ksp_rtol": 1.0e-05,
-                    "pc_type": "sor",
-                },
-                "fieldsplit_H_2d": {
-                    "ksp_type": "preonly",
-                    "ksp_max_it": 10000,
-                    "ksp_rtol": 1.0e-05,
-                    # "pc_type": "sor",
-                    "pc_type": "jacobi",
-                },
-            },
-            "tracer": {
-                "ksp_type": "gmres",
-                "pc_type": "sor",
-            },
-            "sediment": {
-                "ksp_type": "gmres",
-                "pc_type": "sor",
-            },
-            "exner": {
-                "ksp_type": "gmres",
-                "pc_type": "sor",
-            }
+            'shallow_water': lu_params if steady else fieldsplit_params,
+            'tracer': direct_tracer_params if steady else iterative_tracer_params,
+            'sediment': direct_tracer_params if steady else iterative_tracer_params,
+            'exner': direct_tracer_params if steady else iterative_tracer_params,
         }
         self.solver_parameters = self.default_solver_parameters
         self.adjoint_solver_parameters.update(self.solver_parameters)
-        super(CoupledOptions, self).__init__(**kwargs)
 
         # Check setup
         if not np.any([self.solve_swe, self.solve_tracer, self.solve_sediment, self.solve_exner]):

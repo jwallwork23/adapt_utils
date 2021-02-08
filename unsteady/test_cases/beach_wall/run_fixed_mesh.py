@@ -59,9 +59,6 @@ if os.getenv('REGRESSION_TEST') is not None:
 
 print(t2-t1)
 
-# fpath = "hydrodynamics_beach_bath_new_{:d}".format(int(nx*220))
-# export_bathymetry(bath, fpath, op=op)
-
 new_mesh = RectangleMesh(880, 20, 220, 10)
 
 bath = Function(FunctionSpace(new_mesh, "CG", 1)).project(swp.fwd_solutions_bathymetry[0])
