@@ -9,6 +9,7 @@
 """
 from thetis import *
 from adapt_utils.options import Options
+from adapt_utils.params import serial_quasi_newton, parallel_quasi_newton  # noqa
 
 
 __all__ = ["MeshMover"]
@@ -207,32 +208,9 @@ class MeshMover(object):
 
             prob = NonlinearVariationalProblem(F, self.φσ, Jp=Jp)
             nullspace = MixedVectorSpaceBasis(self.W, [self.V_nullspace, self.W.sub(1)])
-
-            params = {"ksp_type": "gmres",
-                      "pc_type": "fieldsplit",
-                      "pc_fieldsplit_type": "multiplicative",
-                      "pc_fieldsplit_off_diag_use_amat": True,
-                      "fieldsplit_0_pc_type": "gamg",
-                      "fieldsplit_0_ksp_type": "preonly",
-                      "fieldsplit_0_mg_levels_ksp_max_it": 5,
-                      # "fieldsplit_0_mg_levels_pc_type": "bjacobi",  # parallel
-                      # "fieldsplit_0_mg_levels_sub_ksp_type": "preonly",  # parallel
-                      # "fieldsplit_0_mg_levels_sub_pc_type": "ilu",  # parallel
-                      "fieldsplit_0_mg_levels_pc_type": "ilu",  # serial
-                      # "fieldsplit_1_pc_type": "bjacobi",  # parallel
-                      # "fieldsplit_1_sub_ksp_type": "preonly",  # parallel
-                      # "fieldsplit_1_sub_pc_type": "ilu",  # parallel
-                      "fieldsplit_1_pc_type": "ilu",  # serial
-                      "fieldsplit_1_ksp_type": "preonly",
-                      "ksp_max_it": 200,
-                      "snes_max_it": 125,
-                      "ksp_gmres_restart": 200,
-                      "snes_rtol": self.op.r_adapt_rtol,
-                      "snes_linesearch_type": "l2",
-                      "snes_linesearch_max_it": 5,
-                      "snes_linesearch_maxstep": 1.05,
-                      "snes_linesearch_damping": 0.8,
-                      "snes_lag_preconditioner": -1}
+            params = serial_quasi_newton
+            # params = parallel_quasi_newton
+            params["snes_rtol"] = self.op.r_adapt_rtol
             if self.op.debug:
                 # params["ksp_monitor"] = None
                 # params["ksp_monitor_singular_value"] = None
