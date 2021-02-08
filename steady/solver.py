@@ -341,12 +341,12 @@ class AdaptiveSteadyProblem(AdaptiveProblem):
         # Global error estimate
         indicator_enriched = cell.copy(deepcopy=True)
         indicator_enriched += flux
+        label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         if label not in self.estimators:
             self.estimators[label] = []
         self.estimators[label].append(abs(indicator_enriched.vector().gather().sum()))
 
         # Error indicator components
-        label = 'dwr_both' if both else 'dwr_adjoint' if adjoint else 'dwr'
         self.indicator['cell'] = self.inject(cell, self.P0[0])
         self.indicator['flux'] = self.inject(flux, self.P0[0])
         self.indicator[method] = self.indicator['cell'].copy(deepcopy=True)
