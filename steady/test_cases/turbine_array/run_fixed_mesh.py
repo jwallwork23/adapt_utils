@@ -22,6 +22,7 @@ parser.add_argument('-offset', help="""
     (Default 0)""")
 parser.add_argument('-plot_pdf', help="Save plots to .pdf (default False).")
 parser.add_argument('-plot_png', help="Save plots to .png (default False).")
+parser.add_argument('-plot_jpg', help="Save plots to .jpg (default False).")
 parser.add_argument('-plot_pvd', help="Save plots to .pvd (default False).")
 parser.add_argument('-plot_all', help="Plot to .pdf, .png and .pvd (default False).")
 parser.add_argument('-debug', help="Toggle debugging mode (default False).")
@@ -34,13 +35,16 @@ args = parser.parse_args()
 
 plot_pdf = bool(args.plot_pdf or False)
 plot_png = bool(args.plot_png or False)
+plot_jpg = bool(args.plot_jpg or False)
 if bool(args.plot_all or False):
-    plot_pdf = plot_png = True
+    plot_pdf = plot_png = plot_jpg = True
 extensions = []
 if plot_pdf:
     extensions.append('pdf')
 if plot_png:
     extensions.append('png')
+if plot_jpg:
+    extensions.append('jpg')
 plot_any = len(extensions) > 0
 kwargs = {
     'approach': 'fixed_mesh',
@@ -83,7 +87,7 @@ tricontourf_kwargs = {
 fontsizes = {
     'legend': 20,
     'tick': 24,
-    'cbar': 20,
+    'cbar': 26,
 }
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 
@@ -138,14 +142,18 @@ if plot_any:
     spd = interpolate(speed(tp.fwd_solution), tp.P1[0])
 
     # Plot
-    fig, axes = plt.subplots(figsize=(12, 5))
-    cbar = fig.colorbar(tricontourf(spd, axes=axes, **tricontourf_kwargs), ax=axes)
+    fig, axes = plt.subplots(figsize=(12, 6.5))
+    tc = tricontourf(spd, axes=axes, **tricontourf_kwargs)
+    cbar = fig.colorbar(tc, ax=axes, orientation="horizontal", pad=0.1)
     cbar.ax.set_yticklabels(cbar.ax.get_yticklabels(), fontsize=fontsizes['cbar'])
     cbar.set_label(r'Fluid speed [$m\,s^{-1}$]', fontsize=fontsizes['cbar'])
     axes.set_xlim([0, op.domain_length])
     axes.set_ylim([0, op.domain_width])
-    for axis in (axes.xaxis, axes.yaxis):
-        for tick in axis.get_major_ticks():
-            tick.label.set_fontsize(fontsizes['tick'])
+    # axes.xaxis.tick_top()
+    # for axis in (axes.xaxis, axes.yaxis):
+    #     for tick in axis.get_major_ticks():
+    #         tick.label.set_fontsize(fontsizes['tick'])
+    axes.set_xticks([])
+    axes.set_yticks([])
     fname = 'fluid_speed__offset{:d}__elem{:d}'
     savefig(fname.format(op.offset, num_cells), plot_dir, extensions=extensions)
