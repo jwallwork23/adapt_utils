@@ -165,6 +165,8 @@ if ca:
 
 # --- Finite differences
 
+print_output("*** FINITE DIFFERENCES ***...")
+
 # Establish gradient using finite differences
 if fd:
     print_output("*** FINITE DIFFERENCES ***")
