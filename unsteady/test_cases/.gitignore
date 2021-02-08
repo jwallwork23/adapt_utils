@@ -40,6 +40,7 @@ solid_body_rotation/outputs/
 solid_body_rotation/screenshots/
 solid_body_rotation/videos/
 solid_body_rotation/__pycache__/
+trench_1d/adapt_output/
 trench_1d/outputs/
 trench_1d/plots/
 trench_1d/results/
