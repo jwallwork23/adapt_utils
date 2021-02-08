@@ -14,6 +14,7 @@ characteristics = {
 }
 approaches = []
 dofs = {}
+average_dofs = {}
 l2_error = {}
 cons_error = {}
 time = {}
@@ -30,34 +31,53 @@ for approach in characteristics:
     approaches.append(approach)
     with h5py.File(fname, 'r') as outfile:
         dofs[approach] = np.array(outfile['dofs'])
+        if approach != 'fixed_mesh':
+            average_dofs[approach] = np.average(dofs[approach], axis=1)
         time[approach] = np.array(outfile['time'])
         l2_error[approach] = np.array(outfile['l2_error'])
         cons_error[approach] = np.array(outfile['cons_error'])
 
+# Plot L2 error
 fig, axes = plt.subplots()
 for approach in approaches:
-    axes.semilogx(dofs[approach], l2_error[approach], **characteristics[approach])
-axes.set_xlabel("Degrees of freedom")
+    if approach == 'fixed_mesh':
+        axes.semilogx(dofs[approach], l2_error[approach], **characteristics[approach])
+    else:
+        axes.semilogx(average_dofs[approach], l2_error[approach], **characteristics[approach])
+axes.set_xlabel("Mean spatial DoFs")
 axes.set_ylabel(r"Relative $\mathcal L_2$ error (\%)")
 axes.grid(True)
-axes.legend()
 savefig("l2_error", plot_dir, extensions=["pdf"])
 
+# Plot conservation error
 fig, axes = plt.subplots()
 for approach in approaches:
-    axes.semilogx(dofs[approach], cons_error[approach], **characteristics[approach])
-axes.set_xlabel("Degrees of freedom")
+    if approach == 'fixed_mesh':
+        axes.semilogx(dofs[approach], cons_error[approach], **characteristics[approach])
+    else:
+        axes.semilogx(average_dofs[approach], cons_error[approach], **characteristics[approach])
+axes.set_xlabel("Mean spatial DoFs")
 axes.set_ylabel(r"$\mathcal L_1$ conservation error (\%)")
 axes.grid(True)
-axes.legend()
 savefig("cons_error", plot_dir, extensions=["pdf"])
 
+# Plot CPU time
 fig, axes = plt.subplots()
 for approach in approaches:
-    axes.semilogx(dofs[approach], time[approach], **characteristics[approach])
-axes.set_xlabel("Degrees of freedom")
+    if approach == 'fixed_mesh':
+        axes.loglog(dofs[approach], time[approach], **characteristics[approach])
+    else:
+        axes.loglog(average_dofs[approach], time[approach], **characteristics[approach])
+axes.set_xlabel("Mean spatial DoFs")
 axes.set_ylabel(r"CPU time [$\mathrm s$]")
-axes.grid(True)
-axes.legend()
-plt.tight_layout()
+axes.grid(True, which='both')
 savefig("time", plot_dir, extensions=["pdf"])
+
+# Plot legend
+fig2, axes2 = plt.subplots()
+lines, labels = axes.get_legend_handles_labels()
+legend = axes2.legend(lines, labels, fontsize=18, frameon=False, ncol=3)
+fig2.canvas.draw()
+axes2.set_axis_off()
+bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
+savefig('legend', plot_dir, bbox_inches=bbox, extensions=['pdf'], tight=False)
