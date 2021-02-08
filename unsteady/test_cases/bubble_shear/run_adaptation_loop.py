@@ -52,7 +52,8 @@ kwargs = {
     'norm_order': 1,
     'normalisation': 'complexity',
 
-    # Debugging
+    # I/O and debugging
+    'plot_pvd': False,
     'debug': bool(args.debug or False),
 }
 op = BubbleOptions(approach='hessian', n=int(args.n or 1))
@@ -71,23 +72,25 @@ cons_error = []
 times = []
 num_cells = []
 dofs = []
-for i in range(int(args.levels or 5)):
-    op.target = 4000*2**i
+for n in range(int(args.levels or 5)):
+    op.target = 4000*2**n
+    op.dt *= 0.5
+    op.dt_per_export *= 2
 
     # Run simulation
     tp = AdaptiveProblem(op)
     cpu_timestamp = perf_counter()
     tp.run()
     times.append(perf_counter() - cpu_timestamp)
-    dofs.append(tp.Q[0].dof_count)
-    num_cells.append(tp.mesh.num_cells())
+    dofs.append([Q.dof_count for Q in tp.Q])
+    num_cells.append([mesh.num_cells() for mesh in tp.meshes])
 
     # Assess error
-    final_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
+    final_sol = tp.fwd_solutions_tracer[-1].copy(deepcopy=True)
     final_l1_norm = norm(final_sol, norm_type='L1')
     final_l2_norm = norm(final_sol, norm_type='L2')
-    tp.set_initial_condition()
-    init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
+    tp.set_initial_condition(i=-1)
+    init_sol = tp.fwd_solutions_tracer[-1].copy(deepcopy=True)
     init_l1_norm = norm(init_sol, norm_type='L1')
     init_l2_norm = norm(init_sol, norm_type='L2')
     abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')

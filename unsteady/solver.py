@@ -543,11 +543,11 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """
         self.op.set_initial_condition(self, **kwargs)
         if self.op.solve_tracer:
-            self.op.set_initial_condition_tracer(self)
+            self.op.set_initial_condition_tracer(self, **kwargs)
         if self.op.solve_sediment:
-            self.op.set_initial_condition_sediment(self)
+            self.op.set_initial_condition_sediment(self, **kwargs)
         if self.op.solve_exner:
-            self.op.set_initial_condition_bathymetry(self)
+            self.op.set_initial_condition_bathymetry(self, **kwargs)
 
     def compute_mesh_reynolds_number(self, i):
         # u, eta = self.fwd_solutions[i].split()

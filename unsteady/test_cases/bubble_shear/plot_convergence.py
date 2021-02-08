@@ -3,7 +3,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import os
 
-from adapt_utils.plotting import *  # noqa
+from adapt_utils.io import create_directory
+from adapt_utils.plotting import *
 
 
 characteristics = {
@@ -16,7 +17,7 @@ dofs = {}
 l2_error = {}
 cons_error = {}
 time = {}
-plot_dir = os.path.join(os.path.dirname(__file__), 'plots')
+plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 for approach in characteristics:
     di = os.path.join(os.path.dirname(__file__), 'outputs')
     if approach in ('integrate', 'intersect'):
