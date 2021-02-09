@@ -23,7 +23,8 @@ parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabi
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 
 parser.add_argument("-approach", help="Mesh adaptation approach")
-parser.add_argument("-levels", help="Number of adaptive runs")
+parser.add_argument("-min_level", help="Lowest target level considered")
+parser.add_argument("-max_level", help="Largest target level considered")
 parser.add_argument("-num_meshes", help="Number of meshes in the sequence")
 parser.add_argument("-max_adapt", help="Maximum number of adaptation steps")
 parser.add_argument("-hessian_time_combination")
@@ -67,12 +68,7 @@ op.di = create_directory(os.path.join(op.di, op.hessian_time_combination))
 # --- Solve the tracer transport problem
 
 assert op.approach != 'fixed_mesh'
-l2_error = []
-cons_error = []
-times = []
-num_cells = []
-dofs = []
-for n in range(int(args.levels or 5)):
+for n in range(int(args.min_level or 0), int(args.max_level or 5)):
     op.target = 4000*2**n
     op.dt *= 0.5
     op.dt_per_export *= 2
@@ -81,9 +77,9 @@ for n in range(int(args.levels or 5)):
     tp = AdaptiveProblem(op)
     cpu_timestamp = perf_counter()
     tp.run()
-    times.append(perf_counter() - cpu_timestamp)
-    dofs.append([Q.dof_count for Q in tp.Q])
-    num_cells.append([mesh.num_cells() for mesh in tp.meshes])
+    times = [perf_counter() - cpu_timestamp]
+    dofs = [Q.dof_count for Q in tp.Q]
+    num_cells = [mesh.num_cells() for mesh in tp.meshes]
 
     # Assess error
     final_sol = tp.fwd_solutions_tracer[-1].copy(deepcopy=True)
@@ -94,11 +90,11 @@ for n in range(int(args.levels or 5)):
     init_l1_norm = norm(init_sol, norm_type='L1')
     init_l2_norm = norm(init_sol, norm_type='L2')
     abs_l2_error = errornorm(init_sol, final_sol, norm_type='L2')
-    cons_error.append(100*abs(init_l1_norm-final_l1_norm)/init_l1_norm)
-    l2_error.append(100*abs_l2_error/init_l2_norm)
+    cons_error = [100*abs(init_l1_norm-final_l1_norm)/init_l1_norm]
+    l2_error = [100*abs_l2_error/init_l2_norm]
 
     # Save to HDF5
-    with h5py.File(os.path.join(op.di, 'convergence.h5'), 'w') as outfile:
+    with h5py.File(os.path.join(op.di, 'convergence_{:d}.h5'.format(n)), 'w') as outfile:
         outfile.create_dataset('elements', data=num_cells)
         outfile.create_dataset('dofs', data=dofs)
         outfile.create_dataset('time', data=times)
