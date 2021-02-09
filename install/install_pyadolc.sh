@@ -30,11 +30,20 @@ if [ ! -e "$VIRTUAL_ENV" ]; then
     exit 1
 fi
 
+# KNOWN INSTALL BUG:
+#   If you are using Python3.6 then you may need to remove the NULL return statement in
+version=$(python3 -c "print(int('$(python3 --version)'[9]) <= 6)")
+if [ $version == $(echo "True") ]; then
+	echo "Remove the NULL satement in $VIRTUAL_ENV/lib/python3.6/site-packages/numpy/core/include/numpy/__multiarray_api.h."
+	exit
+fi
+
 # Install dependencies
 sudo apt-get update -y
 sudo apt-get install -y libtool libboost-all-dev wget
 
 # Clone repo from GitHub
+cp pyadolc_python3.patch $SOFTWARE/
 cd $SOFTWARE
 mkdir PyADOL-C
 cd PyADOL-C
@@ -51,10 +60,6 @@ git apply $SOFTWARE/pyadolc_python3.patch
 # Build, install
 CC=gcc CXX=g++ python3 setup.py build
 python3 setup.py install
-
-# KNOWN INSTALL BUG:
-#   If you are using Python3.6 then you may need to remove the NULL return statement in
-#   `$VIRTUAL_ENV/lib/python3.6/site-packages/numpy/core/include/numpy/__multiarray_api.h`.
 
 # Test (outside of install directory)
 cd $SOTWARE
