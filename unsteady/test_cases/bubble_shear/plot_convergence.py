@@ -12,7 +12,7 @@ characteristics = {
     "integrate": {"label": "Integration", "marker": "v"},
     "intersect": {"label": "Intersection", "marker": "^"},
 }
-levels = 2
+levels = 4
 approaches = ['fixed_mesh']
 dofs = {'integrate': None, 'intersect': None}
 l2_error = {'integrate': None, 'intersect': None}
@@ -55,8 +55,12 @@ fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(dofs[approach], l2_error[approach], **characteristics[approach])
 axes.set_xlabel("Mean spatial DoFs")
-axes.set_ylabel(r"Relative $\mathcal L_2$ error (\%)")
-axes.grid(True)
+axes.set_ylabel(r"Relative $\mathcal L_2$ error")
+yticks = [20, 40, 60, 80]
+axes.set_yticks(yticks)
+axes.set_yticklabels([r"{{{:.0f}}}\%".format(yt) for yt in yticks])
+axes.set_ylim([10, 80])
+axes.grid(True, which='both')
 savefig("l2_error", plot_dir, extensions=["pdf"])
 
 # Plot conservation error

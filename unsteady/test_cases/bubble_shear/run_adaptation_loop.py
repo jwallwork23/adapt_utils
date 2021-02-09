@@ -71,7 +71,7 @@ assert op.approach != 'fixed_mesh'
 for n in range(int(args.min_level or 0), int(args.max_level or 5)):
     op.target = 1000*2**n
     op.dt = 0.01*0.5**n
-    op.dt_per_export *= 2**n
+    op.dt_per_export = 2**n
 
     # Run simulation
     tp = AdaptiveProblem(op)
@@ -95,6 +95,7 @@ for n in range(int(args.min_level or 0), int(args.max_level or 5)):
 
     # Save to HDF5
     with h5py.File(os.path.join(op.di, 'convergence_{:d}.h5'.format(n)), 'w') as outfile:
+        outfile.create_dataset('iterations', data=[len(tp.outer_iteration)])
         outfile.create_dataset('elements', data=num_cells)
         outfile.create_dataset('dofs', data=dofs)
         outfile.create_dataset('time', data=times)
