@@ -165,11 +165,9 @@ if ca:
 
 # --- Finite differences
 
-print_output("*** FINITE DIFFERENCES ***...")
-
 # Establish gradient using finite differences
 if fd:
-    print_output("*** FINITE DIFFERENCES ***")
+    print_output("*** FINITE DIFFERENCES ***...")
 
     swp = AdaptiveProblem(op, nonlinear=nonlinear, checkpointing=False, print_progress=False)
     op.assign_control_parameters(kwargs['control_parameters'])

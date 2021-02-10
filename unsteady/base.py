@@ -1121,3 +1121,6 @@ class AdaptiveProblemBase(object):
     @property
     def elements_converged(self):
         return self._check_element_convergence()
+
+    def clear_tape(self):
+        pass

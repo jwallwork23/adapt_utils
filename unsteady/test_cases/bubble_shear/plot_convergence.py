@@ -72,7 +72,7 @@ axes2.set_axis_off()
 bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
 savefig('legend_dofs', plot_dir, bbox_inches=bbox, extensions=['pdf'], tight=False)
 
-# Plot L2 error
+# Plot L2 error vs. mean DoFs
 fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(dofs[approach], l2_error[approach], **characteristics[approach])
@@ -85,7 +85,7 @@ axes.set_ylim([10, 80])
 axes.grid(True, which='both')
 savefig("l2_error", plot_dir, extensions=["pdf"])
 
-# Plot conservation error
+# Plot conservation error vs. mean DoFs
 fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(dofs[approach], cons_error[approach], **characteristics[approach])
@@ -94,7 +94,23 @@ axes.set_ylabel(r"$\mathcal L_1$ conservation error (\%)")
 axes.grid(True)
 savefig("cons_error", plot_dir, extensions=["pdf"])
 
-# Plot CPU time
+# Plot L2 error vs. time
+fig, axes = plt.subplots()
+for approach in approaches:
+    axes.semilogx(time[approach], l2_error[approach], **characteristics[approach])
+axes.set_xlabel(r"CPU time [$\mathrm s$]")
+axes.set_ylabel(r"Relative $\mathcal L_2$ error")
+xticks = [100, 1000, 10000]
+axes.set_xticks(xticks)
+axes.set_xlim([60, 10000])
+yticks = [20, 40, 60, 80]
+axes.set_yticks(yticks)
+axes.set_yticklabels([r"{{{:.0f}}}\%".format(yt) for yt in yticks])
+axes.set_ylim([10, 80])
+axes.grid(True, which='both')
+savefig("l2_error_time", plot_dir, extensions=["pdf"])
+
+# Plot CPU time vs. DoFs
 fig, axes = plt.subplots()
 for approach in approaches:
     axes.loglog(dofs[approach], time[approach], **characteristics[approach])
