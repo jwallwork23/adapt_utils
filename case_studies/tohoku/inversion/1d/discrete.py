@@ -3,6 +3,7 @@ from firedrake_adjoint import *
 
 import argparse
 import scipy.interpolate as si
+from time import perf_counter
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.misc import gaussian, ellipse
@@ -215,34 +216,18 @@ def cb(mm):
 
 
 Jhat = ReducedFunctional(J, c, derivative_cb_post=cb_post)
-
-
 c.assign(10.0)
+tic = perf_counter()
 m_opt = minimize(Jhat, method='BFGS', callback=cb, options={'gtol': 1.0e-08})
-
-
-# --- Only store data from successful line searches
-
-i = 0
-indices = [0]
-for j, ctrl in enumerate(op.control_trajectory):
-    if i == len(op.line_search_trajectory):
-        break
-    if np.isclose(ctrl, op.line_search_trajectory[i]):
-        indices.append(j)
-        i += 1
-op.control_trajectory = [op.control_trajectory[i] for i in indices]
-op.functional_trajectory = [op.functional_trajectory[i] for i in indices]
-op.gradient_trajectory = [op.gradient_trajectory[i] for i in indices]
+cpu_time = perf_counter() - tic
 np.save('data/opt_progress_discrete_{:d}_ctrl'.format(level), op.control_trajectory)
 np.save('data/opt_progress_discrete_{:d}_func'.format(level), op.functional_trajectory)
 np.save('data/opt_progress_discrete_{:d}_grad'.format(level), op.gradient_trajectory)
-
-
-# --- Taylor test at 'optimum'
-
-print("Taylor test at 'optimum'...")
-m.assign(m_opt)
-dm0.assign(0.1)
-minconv = taylor_test(Jhat, m, dm0)
-assert minconv > 1.90, minconv
+np.save('data/opt_progress_discrete_{:d}_ls'.format(level), op.line_search_trajectory)
+with open('data/discrete_{:d}.log'.format(level), 'w+') as log:
+    log.write("minimiser:            {:.8e}\n".format(op.control_trajectory[-1]))
+    log.write("minimum:              {:.8e}\n".format(op.functional_trajectory[-1]))
+    log.write("gradient at min:      {:.8e}\n".format(op.gradient_trajectory[-1]))
+    # TODO: function evaluations
+    log.write("gradient evaluations: {:d}\n".format(len(op.gradient_trajectory)))
+    log.write("CPU time:             {:.2f}\n".format(cpu_time))
