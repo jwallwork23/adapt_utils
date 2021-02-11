@@ -1,5 +1,6 @@
 from thetis import *
 
+import argparse
 import scipy.interpolate as si
 import scipy.optimize as so
 
@@ -7,14 +8,17 @@ from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptio
 from adapt_utils.misc import gaussian, ellipse
 
 
-level = 0
+parser = argparse.ArgumentParser()
+parser.add_argument("level")
+args = parser.parse_args()
+
+level = int(args.level)
 op = TohokuInversionOptions(level=level)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
     if gauge[:2] not in ('P0','80'):
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
-print(gauges)
 op.end_time = 60*30
 
 mesh = op.default_mesh
@@ -99,8 +103,6 @@ def solve_forward(control, store=False, keep=False):
     for gauge in gauges:
         op.gauges[gauge]['timeseries'] = []
         op.gauges[gauge]['diff'] = []
-        op.gauges[gauge]['timeseries_smooth'] = []
-        op.gauges[gauge]['diff_smooth'] = []
         op.gauges[gauge]['init'] = None
         if store:
             op.gauges[gauge]['data'] = []
@@ -144,8 +146,6 @@ def solve_forward(control, store=False, keep=False):
                 diff = eta - eta_obs
                 J += assemble(0.5*I*weight*dtc*diff*diff*dx)
                 op.gauges[gauge]['adjoint_free'] += assemble(I*weight*dtc*diff*eta*dx, annotate=False)
-                op.gauges[gauge]['diff_smooth'].append(assemble(diff*dx, annotate=False))
-                op.gauges[gauge]['timeseries_smooth'].append(assemble(I*eta_obs*dx, annotate=False))
 
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))
@@ -172,6 +172,7 @@ for gauge in gauges:
 
 # --- Solve forward to get 'data'
 
+print("Solve forward to get 'data'...")
 times = np.linspace(0, op.end_time, int(op.end_time/op.dt))
 solve_forward(m, store=True)
 for gauge in gauges:
@@ -224,8 +225,6 @@ def compute_gradient_continuous(control):
     """
     Compute gradient by solving continuous adjoint problem.
     """
-    if fwd:
-        solve_forward(control, keep=True)
     iteration = int(op.end_time/op.dt)
     t = op.end_time
     while t > 0.0:
@@ -251,6 +250,7 @@ def compute_gradient_continuous(control):
 
 # --- Optimisation
 
+print("Run optimisation...")
 m.assign(10.0)
 op.control_trajectory = []
 op.functional_trajectory = []
@@ -273,6 +273,11 @@ def continuous_gradient(control):
     op.functional_trajectory.append(op._J)
     op.gradient_trajectory.append(g)
     return g
+
+
+def cb(mm):
+    op.line_search_trajectory.append(mm[0])
+    print("Line search complete")
 
 
 so.fmin_bfgs(continuous_rf, m.dat.data[0], fprime=continuous_gradient, callback=cb, gtol=1.0e-08)
