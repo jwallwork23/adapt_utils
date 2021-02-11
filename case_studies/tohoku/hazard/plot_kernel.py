@@ -55,7 +55,7 @@ print_output("elem {:d} vert {:d} vol {:.4f} km^3".format(num_cells, num_vertice
 
 
 # --- Plot
-fig, axes = plt.subplots(figsize=(5.5, 5))
+fig, axes = plt.subplots(figsize=(5, 5))
 cax = fig.add_axes([0.05, 0.5, 0.1, 0.4])
 cax.axis(False)
 tc = tricontourf(k_eta, axes=axes, levels=np.linspace(0, 1.05, 50), cmap='coolwarm')
