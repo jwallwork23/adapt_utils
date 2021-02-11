@@ -3,6 +3,7 @@ from thetis import *
 import argparse
 import scipy.interpolate as si
 import scipy.optimize as so
+from time import perf_counter
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.misc import gaussian, ellipse
@@ -16,7 +17,7 @@ level = int(args.level)
 op = TohokuInversionOptions(level=level)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
-    if gauge[:2] not in ('P0','80'):
+    if gauge[:2] not in ('P0', '80'):
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
 op.end_time = 60*30
@@ -48,6 +49,7 @@ u_, eta_ = q_.split()
 a = inner(z, u)*dx + inner(zeta, eta)*dx
 L = inner(z, u_)*dx + inner(zeta, eta_)*dx
 
+
 def G(uv, elev):
     F = g*inner(z, grad(elev))*dx
     F += f*inner(z, as_vector((-uv[1], uv[0])))*dx
@@ -56,6 +58,7 @@ def G(uv, elev):
         if "freeslip" not in boundary_conditions[tag]:
             F += inner(zeta*n, b*uv)*ds(tag)
     return F
+
 
 a += 0.5*dtc*G(u, eta)
 L += -0.5*dtc*G(u_, eta_)
@@ -98,7 +101,7 @@ def solve_forward(control, store=False, keep=False):
     """
     Solve forward problem.
     """
-    q_.project(control*basis_function);
+    q_.project(control*basis_function)
 
     for gauge in gauges:
         op.gauges[gauge]['timeseries'] = []
@@ -190,6 +193,7 @@ L_star = inner(z, u_star_)*dx
 a_star += inner(zeta, eta_star)*dx
 L_star += inner(zeta, eta_star_)*dx
 
+
 def G_star(uv_star, elev_star):
     F = -b*inner(z, grad(elev_star))*dx
     F += -f*inner(z, as_vector((-uv_star[1], uv_star[0])))*dx
@@ -198,6 +202,7 @@ def G_star(uv_star, elev_star):
         if "dirichlet" in boundary_conditions[tag]:
             F += -inner(zeta*n, uv_star)*ds(tag)
     return F
+
 
 a_star += 0.5*dtc*G_star(u_star, eta_star)
 L_star += -0.5*dtc*G_star(u_star_, eta_star_)
@@ -234,7 +239,7 @@ def compute_gradient_continuous(control):
         for gauge in gauges:
             op.gauges[gauge]['obs'].assign(op.gauges[gauge]['data'][iteration-1])
         rhs.interpolate(sum(op.gauges[g]['indicator']*(eta_saved - op.gauges[g]['obs']) for g in gauges))
-        
+
         # Solve adjoint equation at current timestep
         adj_solver.solve()
 
@@ -244,7 +249,6 @@ def compute_gradient_continuous(control):
         iteration -= 1
 
     assert np.allclose(t, 0.0)
-    
     return assemble(phi*eta_star*dx)
 
 
@@ -259,6 +263,9 @@ op.line_search_trajectory = []
 
 
 def continuous_rf(control):
+    """
+    Reduced functional.
+    """
     tmp = Function(R).assign(control[0])
     op._J = solve_forward(tmp, keep=True)
     print("control {:12.8f} functional {:15.8e}".format(control[0], op._J))
@@ -280,21 +287,26 @@ def cb(mm):
     print("Line search complete")
 
 
-so.fmin_bfgs(continuous_rf, m.dat.data[0], fprime=continuous_gradient, callback=cb, gtol=1.0e-08)
+kwargs = dict(fprime=continuous_gradient, callback=cb, gtol=1.0e-08, full_output=True)
+tic = perf_counter()
+out = list(so.fmin_bfgs(continuous_rf, m.dat.data[0], **kwargs))
+cpu_time = perf_counter() - tic
+op.control_trajectory.append(out[0][0])
+op.functional_trajectory.append(out[1])
+op.gradient_trajectory.append(out[2][0])
 
 
 # --- Only save data from successful line searches
 
-i = 0
-indices = [0]
-for j, ctrl in enumerate(op.control_trajectory):
-    if i == len(op.line_search_trajectory):
-        break
-    if np.isclose(ctrl, op.line_search_trajectory[i]):
-        indices.append(j)
-op.control_trajectory = [op.control_trajectory[i] for i in indices]
-op.functional_trajectory = [op.functional_trajectory[i] for i in indices]
-op.gradient_trajectory = [op.gradient_trajectory[i] for i in indices]
 np.save('data/opt_progress_continuous_{:d}_ctrl'.format(level), op.control_trajectory)
 np.save('data/opt_progress_continuous_{:d}_func'.format(level), op.functional_trajectory)
 np.save('data/opt_progress_continuous_{:d}_grad'.format(level), op.gradient_trajectory)
+np.save('data/opt_progress_continuous_{:d}_ls'.format(level), op.line_search_trajectory)
+
+with open('data/continuous_{:d}.log'.format(level), 'w+') as log:
+    log.write("minimiser:            {:.8e}\n".format(out[0][0]))
+    log.write("minimum:              {:.8e}\n".format(out[1]))
+    log.write("gradient at min:      {:.8e}\n".format(out[2][0]))
+    log.write("function evaluations: {:d}\n".format(out[4]))
+    log.write("gradient evaluations: {:d}\n".format(out[5]))
+    log.write("CPU time:             {:.2f}\n".format(cpu_time))
