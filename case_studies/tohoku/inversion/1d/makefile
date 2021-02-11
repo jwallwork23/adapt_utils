@@ -11,9 +11,11 @@ plot_discrete:
 	@python3 plot_progress.py 2 discrete
 
 continuous:
-	@echo "Running continuous adjoint inversion on mesh 1/3..."
-	@python3 continuous.py -level 0 -rerun_optimisation 1
-	@echo "Running continuous adjoint inversion on mesh 2/3..."
-	@python3 continuous.py -level 1 -rerun_optimisation 1
-	@echo "Running continuous adjoint inversion on mesh 3/3..."
-	@python3 continuous.py -level 2 -rerun_optimisation 1
+	@python3 continuous.py 0
+	@python3 continuous.py 1
+	@python3 continuous.py 2
+
+plot_continuous:
+	@python3 plot_progress.py 0 continuous
+	@python3 plot_progress.py 1 continuous
+	@python3 plot_progress.py 2 continuous
