@@ -1,3 +1,4 @@
+import argparse
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy.interpolate as si
@@ -5,14 +6,18 @@ import scipy.interpolate as si
 from adapt_utils.plotting import *
 
 
-level = 1
-mode = 'discrete'
-# mode = 'continuous'
+parser = argparse.ArgumentParser()
+parser.add_argument("level")
+parser.add_argument("mode")
+args = parser.parse_args()
+
+level = int(args.level)
+mode = args.mode
+assert mode in ('discrete', 'continuous')
 
 control_trajectory = np.load('data/opt_progress_{:s}_{:d}_ctrl.npy'.format(mode, level))
 functional_trajectory = np.load('data/opt_progress_{:s}_{:d}_func.npy'.format(mode, level))
 gradient_trajectory = np.load('data/opt_progress_{:s}_{:d}_grad.npy'.format(mode, level))
-
 
 fig, axes = plt.subplots(figsize=(8, 8))
 l = si.lagrange(control_trajectory[:3], functional_trajectory[:3])
@@ -28,9 +33,10 @@ for m, f, g in zip(control_trajectory, functional_trajectory, gradient_trajector
     x = np.array([m - delta_m, m + delta_m])
     axes.plot(x, g*(x-m) + f, '-', color='C2', linewidth=3)
 axes.plot(control_trajectory, functional_trajectory, 'o', color='C1', markersize=8)
+axes.plot(l_min, l(l_min), '*', markersize=14, color='C0', label=r"$m^\star={:.4f}$".format(l_min))
 axes.set_xlabel(r"Control parameter, $m$")
 axes.set_ylabel("QoI")
 axes.grid(True)
+axes.legend()
 plt.tight_layout()
-plt.show()
-# plt.savefig("plots/opt_progress_discrete_{:d}.pdf".format(level))
+plt.savefig("plots/opt_progress_discrete_{:d}.pdf".format(level))

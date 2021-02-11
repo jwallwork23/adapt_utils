@@ -1,21 +1,24 @@
 from thetis import *
 from firedrake_adjoint import *
 
+import argparse
 import scipy.interpolate as si
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.misc import gaussian, ellipse
 
 
-# level = 0
-level = 1
+parser = argparse.ArgumentParser()
+parser.add_argument("level")
+args = parser.parse_args()
+
+level = int(args.level)
 op = TohokuInversionOptions(level=level)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
     if gauge[:2] not in ('P0', '80'):
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
-print(gauges)
 op.end_time = 60*30
 
 mesh = op.default_mesh
@@ -95,8 +98,6 @@ def solve_forward(control, store=False, keep=False):
     for gauge in gauges:
         op.gauges[gauge]['timeseries'] = []
         op.gauges[gauge]['diff'] = []
-        op.gauges[gauge]['timeseries_smooth'] = []
-        op.gauges[gauge]['diff_smooth'] = []
         op.gauges[gauge]['init'] = None
         if store:
             op.gauges[gauge]['data'] = []
@@ -140,8 +141,6 @@ def solve_forward(control, store=False, keep=False):
                 diff = eta - eta_obs
                 J += assemble(0.5*I*weight*dtc*diff*diff*dx)
                 op.gauges[gauge]['adjoint_free'] += assemble(I*weight*dtc*diff*eta*dx, annotate=False)
-                op.gauges[gauge]['diff_smooth'].append(assemble(diff*dx, annotate=False))
-                op.gauges[gauge]['timeseries_smooth'].append(assemble(I*eta_obs*dx, annotate=False))
 
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))
@@ -181,7 +180,6 @@ with stop_annotating():
 print("Solve forward to annotate tape...")
 m.assign(10.0)
 J = solve_forward(m)
-print("Quantity of interest = {:.4e}".format(J))
 c = Control(m)
 stop_annotating()
 Jhat = ReducedFunctional(J, c)
@@ -211,12 +209,12 @@ def cb_post(j, dj, mm):
     print("control {:12.8f} functional {:15.8e} gradient {:15.8e}".format(mm.dat.data[0], j, dj.dat.data[0]))
 
 
-Jhat = ReducedFunctional(J, c, derivative_cb_post=cb_post)
-
-
 def cb(mm):
     op.line_search_trajectory.append(mm[0])
     print("Line search complete")
+
+
+Jhat = ReducedFunctional(J, c, derivative_cb_post=cb_post)
 
 
 c.assign(10.0)
@@ -244,7 +242,7 @@ np.save('data/opt_progress_discrete_{:d}_grad'.format(level), op.gradient_trajec
 # --- Taylor test at 'optimum'
 
 print("Taylor test at 'optimum'...")
-m0.assign(m_opt)
+m.assign(m_opt)
 dm0.assign(0.1)
-minconv = taylor_test(Jhat, m0, dm0)
+minconv = taylor_test(Jhat, m, dm0)
 assert minconv > 1.90, minconv
