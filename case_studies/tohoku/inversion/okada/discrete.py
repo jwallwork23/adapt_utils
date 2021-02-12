@@ -236,7 +236,7 @@ def gradient(m):
     """
     Apply the chain rule to both tapes
     """
-    # op._J = rf_pyadjoint(rf_pyadolc(m))
+    # op._J = rf_pyadjoint(rf_pyadolc(m))  # TODO: Check not necessary
     dJdq0 = rf_pyadjoint.derivative()
     dJdu0, dJdeta0 = dJdq0.split()
     dJdeta0 = dJdeta0.dat.data[op.indices]
