@@ -20,7 +20,6 @@ try:
     control_trajectory = np.load('data/opt_progress_{:s}_{:d}_ctrl.npy'.format(mode, level))
     functional_trajectory = np.load('data/opt_progress_{:s}_{:d}_func.npy'.format(mode, level))
     gradient_trajectory = np.load('data/opt_progress_{:s}_{:d}_grad.npy'.format(mode, level))
-    print(len(gradient_trajectory))
     line_search_trajectory = np.load('data/opt_progress_{:s}_{:d}_ls.npy'.format(mode, level))
 except Exception:
     print("Cannot load {:s} data for level {:d}.".format(mode, level))
@@ -44,16 +43,19 @@ print("Exact gradient at 10.0: {:.4f}".format(dl(10.0)))
 print("Exact gradient at  5.0: {:.4f}".format(dl(5.0)))
 l_min = -dl.coefficients[1]/dl.coefficients[0]
 print("Minimiser of quadratic: {:.4f}".format(l_min))
-xx = np.linspace(0, 10, 100)
-axes.plot(xx, l(xx), '--x', color='C0', markevery=10)
+xx = np.linspace(2, 10, 100)
+axes.plot(xx, l(xx), ':', color='C0')
 delta_m = 0.25
 for m, f, g in zip(control_trajectory, functional_trajectory, gradient_trajectory):
     x = np.array([m - delta_m, m + delta_m])
-    axes.plot(x, g*(x-m) + f, '-', color='C2', linewidth=3)
+    axes.plot(x, g*(x-m) + f, '-', color='C2', linewidth=5)
 axes.plot(control_trajectory, functional_trajectory, 'o', color='C1', markersize=8)
 axes.plot(l_min, l(l_min), '*', markersize=14, color='C0', label=r"$m^\star={:.4f}$".format(l_min))
 axes.set_xlabel(r"Control parameter, $m$")
 axes.set_ylabel("Quantity of Interest")
+if mode == 'continuous':
+    axes.yaxis.set_label_position("right")
+    axes.yaxis.tick_right()
 axes.grid(True)
 axes.legend()
 plt.tight_layout()

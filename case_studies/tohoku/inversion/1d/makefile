@@ -22,6 +22,8 @@ plot_continuous:
 	@python3 plot_progress.py 1 continuous
 	@python3 plot_progress.py 2 continuous
 
+plot: plot_discrete plot_continuous
+
 gradient:
 	@python3 gradient_discrete.py 0
 	@python3 gradient_continuous.py 0
