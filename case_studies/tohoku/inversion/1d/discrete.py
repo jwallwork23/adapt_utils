@@ -7,13 +7,16 @@ from time import perf_counter
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.misc import gaussian, ellipse
+from adapt_utils.optimisation import GradientConverged
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
+parser.add_argument("-gtol")
 args = parser.parse_args()
 
 level = int(args.level)
+gtol = float(args.gtol or 1.0e-08)
 op = TohokuInversionOptions(level=level)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
@@ -208,22 +211,29 @@ def cb_post(j, dj, mm):
     op.functional_trajectory.append(j)
     op.gradient_trajectory.append(dj.dat.data[0])
     print("control {:12.8f} functional {:15.8e} gradient {:15.8e}".format(mm.dat.data[0], j, dj.dat.data[0]))
+    np.save('data/opt_progress_discrete_{:d}_ctrl'.format(level), op.control_trajectory)
+    np.save('data/opt_progress_discrete_{:d}_func'.format(level), op.functional_trajectory)
+    np.save('data/opt_progress_discrete_{:d}_grad'.format(level), op.gradient_trajectory)
+    if abs(dj.dat.data[0]) < gtol:
+        op.line_search_trajectory.append(mm.dat.data[0])
+        np.save('data/opt_progress_discrete_{:d}_ls'.format(level), op.line_search_trajectory)
+        raise GradientConverged
 
 
 def cb(mm):
-    op.line_search_trajectory.append(mm[0])
     print("Line search complete")
+    op.line_search_trajectory.append(mm[0])
+    np.save('data/opt_progress_discrete_{:d}_ls'.format(level), op.line_search_trajectory)
 
 
 Jhat = ReducedFunctional(J, c, derivative_cb_post=cb_post)
 c.assign(10.0)
 tic = perf_counter()
-m_opt = minimize(Jhat, method='BFGS', callback=cb, options={'gtol': 1.0e-08})
+try:
+    m_opt = minimize(Jhat, method='BFGS', callback=cb, options={'gtol': gtol})
+except GradientConverged:
+    m_opt = op.control_trajectory[-1]
 cpu_time = perf_counter() - tic
-np.save('data/opt_progress_discrete_{:d}_ctrl'.format(level), op.control_trajectory)
-np.save('data/opt_progress_discrete_{:d}_func'.format(level), op.functional_trajectory)
-np.save('data/opt_progress_discrete_{:d}_grad'.format(level), op.gradient_trajectory)
-np.save('data/opt_progress_discrete_{:d}_ls'.format(level), op.line_search_trajectory)
 with open('data/discrete_{:d}.log'.format(level), 'w+') as log:
     log.write("minimiser:            {:.8e}\n".format(op.control_trajectory[-1]))
     log.write("minimum:              {:.8e}\n".format(op.functional_trajectory[-1]))

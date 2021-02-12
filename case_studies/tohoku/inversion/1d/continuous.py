@@ -7,13 +7,16 @@ from time import perf_counter
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.misc import gaussian, ellipse
+from adapt_utils.optimisation import GradientConverged
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
+parser.add_argument("-gtol")
 args = parser.parse_args()
 
 level = int(args.level)
+gtol = float(args.gtol or 1.0e-08)
 op = TohokuInversionOptions(level=level)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
@@ -260,6 +263,7 @@ op.control_trajectory = []
 op.functional_trajectory = []
 op.gradient_trajectory = []
 op.line_search_trajectory = []
+op._feval = 0
 
 
 def continuous_rf(control):
@@ -268,6 +272,7 @@ def continuous_rf(control):
     """
     tmp = Function(R).assign(control[0])
     op._J = solve_forward(tmp, keep=True)
+    op._feval += 1
     print("control {:12.8f} functional {:15.8e}".format(control[0], op._J))
     return op._J
 
@@ -279,30 +284,32 @@ def continuous_gradient(control):
     op.control_trajectory.append(control[0])
     op.functional_trajectory.append(op._J)
     op.gradient_trajectory.append(g)
+    np.save('data/opt_progress_continuous_{:d}_ctrl'.format(level), op.control_trajectory)
+    np.save('data/opt_progress_continuous_{:d}_func'.format(level), op.functional_trajectory)
+    np.save('data/opt_progress_continuous_{:d}_grad'.format(level), op.gradient_trajectory)
+    if abs(g) < gtol:
+        op.line_search_trajectory.append(control[0])
+        np.save('data/opt_progress_continuous_{:d}_ls'.format(level), op.line_search_trajectory)
+        raise GradientConverged
     return g
 
 
-def cb(mm):
-    op.line_search_trajectory.append(mm[0])
+def cb(control):
     print("Line search complete")
+    op.line_search_trajectory.append(control[0])
+    np.save('data/opt_progress_continuous_{:d}_ls'.format(level), op.line_search_trajectory)
 
 
-kwargs = dict(fprime=continuous_gradient, callback=cb, gtol=1.0e-08, full_output=True)
+kwargs = dict(fprime=continuous_gradient, callback=cb, gtol=gtol, full_output=True)
 tic = perf_counter()
-out = list(so.fmin_bfgs(continuous_rf, m.dat.data[0], **kwargs))
+try:
+    out = list(so.fmin_bfgs(continuous_rf, m.dat.data[0], **kwargs))
+except GradientConverged:
+    out = ([op.control_trajectory[-1]], op.functional_trajectory[-1], [op.gradient_trajectory[-1]], op._feval, len(op.gradient_trajectory))
 cpu_time = perf_counter() - tic
 op.control_trajectory.append(out[0][0])
 op.functional_trajectory.append(out[1])
 op.gradient_trajectory.append(out[2][0])
-
-
-# --- Only save data from successful line searches
-
-np.save('data/opt_progress_continuous_{:d}_ctrl'.format(level), op.control_trajectory)
-np.save('data/opt_progress_continuous_{:d}_func'.format(level), op.functional_trajectory)
-np.save('data/opt_progress_continuous_{:d}_grad'.format(level), op.gradient_trajectory)
-np.save('data/opt_progress_continuous_{:d}_ls'.format(level), op.line_search_trajectory)
-
 with open('data/continuous_{:d}.log'.format(level), 'w+') as log:
     log.write("minimiser:            {:.8e}\n".format(out[0][0]))
     log.write("minimum:              {:.8e}\n".format(out[1]))
