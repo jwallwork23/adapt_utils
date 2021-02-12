@@ -2,8 +2,6 @@ from thetis import *
 
 import argparse
 import scipy.interpolate as si
-import scipy.optimize as so
-from time import perf_counter
 
 from adapt_utils.case_studies.tohoku.options.options import TohokuInversionOptions
 from adapt_utils.misc import gaussian, ellipse

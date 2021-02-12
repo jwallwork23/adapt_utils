@@ -20,6 +20,7 @@ try:
     control_trajectory = np.load('data/opt_progress_{:s}_{:d}_ctrl.npy'.format(mode, level))
     functional_trajectory = np.load('data/opt_progress_{:s}_{:d}_func.npy'.format(mode, level))
     gradient_trajectory = np.load('data/opt_progress_{:s}_{:d}_grad.npy'.format(mode, level))
+    print(len(gradient_trajectory))
     line_search_trajectory = np.load('data/opt_progress_{:s}_{:d}_ls.npy'.format(mode, level))
 except Exception:
     print("Cannot load {:s} data for level {:d}.".format(mode, level))
@@ -58,4 +59,5 @@ axes.legend()
 plt.tight_layout()
 plt.savefig("plots/opt_progress_{:s}_{:d}.pdf".format(mode, level))
 
+print("Line searches:        {:d}".format(len(line_search_trajectory)))
 print(open("data/{:s}_{:d}.log".format(mode, level), "r").read())

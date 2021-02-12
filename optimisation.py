@@ -11,7 +11,7 @@ import numpy as np
 from adapt_utils.misc import prod
 
 
-__all__ = ["taylor_test", "StagnationError"]
+__all__ = ["taylor_test", "StagnationError", "GradientConverged"]
 
 
 # TODO: Taylor test gradient using Frobenius norm as QoI
@@ -61,3 +61,7 @@ def taylor_test(function, gradient, m, delta_m=None, verbose=False, ratio_tol=3.
 
 class StagnationError(Exception):
     """Error raised when an optimisation routine stagnates."""
+
+
+class GradientConverged(Exception):
+    """Exception raised when gradient due to an optimisation routine converges."""
