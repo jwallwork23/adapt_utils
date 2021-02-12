@@ -288,8 +288,7 @@ def continuous_gradient(control):
     np.save('data/opt_progress_continuous_{:d}_func'.format(level), op.functional_trajectory)
     np.save('data/opt_progress_continuous_{:d}_grad'.format(level), op.gradient_trajectory)
     if abs(g) < gtol:
-        op.line_search_trajectory.append(control[0])
-        np.save('data/opt_progress_continuous_{:d}_ls'.format(level), op.line_search_trajectory)
+        cb(control)
         raise GradientConverged
     return g
 
@@ -307,9 +306,6 @@ try:
 except GradientConverged:
     out = ([op.control_trajectory[-1]], op.functional_trajectory[-1], [op.gradient_trajectory[-1]], op._feval, len(op.gradient_trajectory))
 cpu_time = perf_counter() - tic
-op.control_trajectory.append(out[0][0])
-op.functional_trajectory.append(out[1])
-op.gradient_trajectory.append(out[2][0])
 with open('data/continuous_{:d}.log'.format(level), 'w+') as log:
     log.write("minimiser:            {:.8e}\n".format(out[0][0]))
     log.write("minimum:              {:.8e}\n".format(out[1]))
