@@ -15,10 +15,12 @@ from adapt_utils.misc import ellipse
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
 parser.add_argument("-gtol")
+parser.add_argument("-maxiter")
 args = parser.parse_args()
 
 level = int(args.level)
 gtol = float(args.gtol or 1.0e-08)
+maxiter = int(args.maxiter or 10000)
 op = TohokuOkadaBasisOptions(level=level, synthetic=False)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
@@ -241,7 +243,8 @@ def gradient(m):
     dJdu0, dJdeta0 = dJdq0.split()
     dJdeta0 = dJdeta0.dat.data[op.indices]
     dJdm = adolc.fos_reverse(tape_tag, dJdeta0)
-    print("functional {:15.8e}  gradient {:15.8e}".format(op._J, vecnorm(dJdm, order=np.Inf)))
+    g = vecnorm(dJdm, order=np.Inf)
+    print("functional {:15.8e}  gradient {:15.8e}".format(op._J, g))
     op.control_trajectory.append(m)
     op.functional_trajectory.append(op._J)
     op.gradient_trajectory.append(dJdm)
@@ -261,14 +264,14 @@ def callback(m):
 
 
 c = np.array(op.control_parameters['slip']).flatten()
-kwargs = dict(fprime=gradient, callback=callback, gtol=gtol, full_output=True, maxiter=1000)
+kwargs = dict(fprime=gradient, callback=callback, gtol=gtol, full_output=True, maxiter=maxiter)
 tic = perf_counter()
 try:
-    out = so.fmin_bfgs(reduced_functional, c, **opt_kwargs)
+    out = so.fmin_bfgs(reduced_functional, c, **kwargs)
 except GradientConverged:
     out = (op.control_trajectory[-1], op.functional_trajectory[-1], op.gradient_trajectory[-1], op._feval, len(op.gradient_trajectory))
 cpu_time = perf_counter() - tic
-with open('data/continuous_{:d}.log'.format(level), 'w+') as log:
+with open('data/discrete_{:d}.log'.format(level), 'w+') as log:
     log.write("minimum:              {:.8e}\n".format(out[1]))
     log.write("function evaluations: {:d}\n".format(out[4]))
     log.write("gradient evaluations: {:d}\n".format(out[5]))
