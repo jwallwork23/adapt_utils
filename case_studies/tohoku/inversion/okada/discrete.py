@@ -200,9 +200,12 @@ stop_annotating()
 rf_tsunami = ReducedFunctional(J, c)
 
 
-def okada_source(m):
+def okada_source(m, keep=1):
     """
-    Unroll PyADOL-C's tape and flag for a reverse propagation.
+    Compute the dislocation field due to a (flattened) array of
+    active control parameters by replaying pyadolc's tape.
+
+    :kwarg keep: toggle whether to flag for a reverse propagation.
     """
     m_array = m.reshape((num_active_controls, num_subfaults))
     for i, control in enumerate(op.active_controls):
@@ -213,44 +216,74 @@ def okada_source(m):
 
 def gradient_tsunami(q0):
     """
-    Compute derivative of tsunami propagation by reverse propagation.
+    Compute the gradient of the tsunami propagation model with
+    respect to an initial velocity-elevation tuple by reverse
+    propagation on pyadjoint's tape.
     """
     J = rf_tsunami(q0)  # noqa
     return rf_tsunami.derivative()
 
 
-def gradient_okada(m):
-    dislocation = okada_source(m)  # noqa
-    return adolc.fos_reverse(tape_tag, np.ones(len(op.indices)))
+def gradient_okada(m, m_b=None):
+    """
+    Compute the gradient of the Okada source model with respect
+    to a (flattened) array of active control parameters by
+    reverse propagation on pyadolc's tape.
+    """
+    if m_b is None:
+        dislocation = okada_source(m)  # noqa
+        m_b = np.one(len(op.indices))
+    return adolc.fos_reverse(tape_tag, m_b)
 
 
-def tsunami_ic(src):
+def tsunami_ic(dislocation):
+    """
+    Set the initial velocity-elevation tuple for the tsunami
+    propagation model, given some dislocation field.
+    """
     q0 = Function(TaylorHood)
     u0, eta0 = q0.split()
-    eta0.dat.data[op.indices] = src
+    eta0.dat.data[op.indices] = dislocation
     return q0
 
 
 def reduced_functional(m):
+    """
+    Compose the okada source and tsunami propagation model,
+    interfacing with `tsunami_ic`.
+    """
     q0 = tsunami_ic(okada_source(m))
     return rf_tsunami(q0)
 
 
+def tsunami_ic_inverse(q0):
+    """
+    Extract the dislocation field associated with an initial
+    velocity-elevation tuple for the tsunami propagation model.
+    """
+    u0, eta0 = q0.split()
+    return eta0.dat.data[op.indices]
+
+
 def gradient(m):
-    eta0 = okada_source(m)
-    dJdq0 = gradient_tsunami(tsunami_ic(eta0))
-    dJdu0, dJdeta0 = dJdq0.split()
-    dJdeta0 = dJdeta0.dat.data[op.indices]
-    return adolc.fos_reverse(tape_tag, dJdeta0)
+    """
+    Compose the gradient functions for the Okada source model
+    and the tsunami propagation model, interfacing with the
+    inverse of `tsunami_ic`.
+    """
+    q0 = tsunami_ic(okada_source(m))
+    dJdq0 = gradient_tsunami(q0)
+    dJdeta0 = tsunami_ic_inverse(dJdq0)
+    return gradient_okada(m, m_b=dJdeta0)
 
 
 # --- Taylor tests  # FIXME
 
 # np.random.seed(0)
-# c = np.array(op.control_parameters['slip']).flatten()
-# c += 0.2
-# # opt.taylor_test(okada_source, gradient_okada, c, verbose=True)  # TODO: TESTME
-# opt.taylor_test(reduced_functional, gradient, c, verbose=True)
+m_init = np.array(op.control_parameters['slip']).flatten()
+# m_init += 0.2
+# # opt.taylor_test(okada_source, gradient_okada, m_init, verbose=True)  # TODO: TESTME
+# opt.taylor_test(reduced_functional, gradient, m_init, verbose=True)
 
 # --- Optimisation
 
@@ -300,7 +333,7 @@ def callback(m):
 kwargs = dict(fprime=gradient__save, callback=callback, gtol=gtol, full_output=True, maxiter=maxiter)
 tic = perf_counter()
 try:
-    out = so.fmin_bfgs(reduced_functional__save, c, **kwargs)
+    out = so.fmin_bfgs(reduced_functional__save, m_init, **kwargs)
 except opt.GradientConverged:
     out = (op.control_trajectory[-1], op.functional_trajectory[-1], op.gradient_trajectory[-1], op._feval, len(op.gradient_trajectory))
 cpu_time = perf_counter() - tic
