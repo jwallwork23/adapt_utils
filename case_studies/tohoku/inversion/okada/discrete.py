@@ -7,7 +7,7 @@ import scipy.optimize as so
 from time import perf_counter
 
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
-from adapt_utils.optimisation import GradientConverged
+import adapt_utils.optimisation as opt
 from adapt_utils.norms import vecnorm
 from adapt_utils.misc import ellipse
 
@@ -197,10 +197,10 @@ print("Quantity of interest = {:.4e}".format(J))
 
 c = Control(q_init)
 stop_annotating()
-rf_pyadjoint = ReducedFunctional(J, c)
+rf_tsunami = ReducedFunctional(J, c)
 
 
-def rf_pyadolc(m):
+def okada_source(m):
     """
     Unroll PyADOL-C's tape and flag for a reverse propagation.
     """
@@ -208,14 +208,52 @@ def rf_pyadolc(m):
     for i, control in enumerate(op.active_controls):
         assert len(op.control_parameters[control]) == len(m_array[i])
         op.control_parameters[control][:] = m_array[i]
-    q0_tmp = Function(TaylorHood)
-    q0_tmp.assign(0.0)
-    u0_tmp, eta0_tmp = q0_tmp.split()
-    eta0_tmp.dat.data[op.indices] = adolc.zos_forward(tape_tag, op.input_vector, keep=1)
-    return q0_tmp
+    return adolc.zos_forward(tape_tag, op.input_vector, keep=1)
 
 
-# Run optimisation
+def gradient_tsunami(q0):
+    """
+    Compute derivative of tsunami propagation by reverse propagation.
+    """
+    J = rf_tsunami(q0)  # noqa
+    return rf_tsunami.derivative()
+
+
+def gradient_okada(m):
+    dislocation = okada_source(m)  # noqa
+    return adolc.fos_reverse(tape_tag, np.ones(len(op.indices)))
+
+
+def tsunami_ic(src):
+    q0 = Function(TaylorHood)
+    u0, eta0 = q0.split()
+    eta0.dat.data[op.indices] = src
+    return q0
+
+
+def reduced_functional(m):
+    q0 = tsunami_ic(okada_source(m))
+    return rf_tsunami(q0)
+
+
+def gradient(m):
+    eta0 = okada_source(m)
+    dJdq0 = gradient_tsunami(tsunami_ic(eta0))
+    dJdu0, dJdeta0 = dJdq0.split()
+    dJdeta0 = dJdeta0.dat.data[op.indices]
+    return adolc.fos_reverse(tape_tag, dJdeta0)
+
+
+# --- Taylor tests  # FIXME
+
+# np.random.seed(0)
+# c = np.array(op.control_parameters['slip']).flatten()
+# c += 0.2
+# # opt.taylor_test(okada_source, gradient_okada, c, verbose=True)  # TODO: TESTME
+# opt.taylor_test(reduced_functional, gradient, c, verbose=True)
+
+# --- Optimisation
+
 print_output("Run optimisation...")
 op.control_trajectory = []
 op.functional_trajectory = []
@@ -224,25 +262,21 @@ op.line_search_trajectory = []
 op._feval = 0
 
 
-def reduced_functional(m):
+def reduced_functional__save(m):
     """
     Compose both unrolled tapes
     """
-    op._J = rf_pyadjoint(rf_pyadolc(m))
+    op._J = reduced_functional(m)
     op._feval += 1
     print("functional {:15.8e}".format(op._J))
     return op._J
 
 
-def gradient(m):
+def gradient__save(m):
     """
     Apply the chain rule to both tapes
     """
-    # op._J = rf_pyadjoint(rf_pyadolc(m))  # TODO: Check not necessary
-    dJdq0 = rf_pyadjoint.derivative()
-    dJdu0, dJdeta0 = dJdq0.split()
-    dJdeta0 = dJdeta0.dat.data[op.indices]
-    dJdm = adolc.fos_reverse(tape_tag, dJdeta0)
+    dJdm = gradient(m)
     g = vecnorm(dJdm, order=np.Inf)
     print("functional {:15.8e}  gradient {:15.8e}".format(op._J, g))
     op.control_trajectory.append(m)
@@ -253,7 +287,7 @@ def gradient(m):
     np.save('data/opt_progress_continuous_{:d}_grad'.format(level), op.gradient_trajectory)
     if abs(g) < gtol:
         callback(m)
-        raise GradientConverged
+        raise opt.GradientConverged
     return dJdm
 
 
@@ -263,12 +297,11 @@ def callback(m):
     np.save('data/opt_progress_continuous_{:d}_ls'.format(level), op.line_search_trajectory)
 
 
-c = np.array(op.control_parameters['slip']).flatten()
-kwargs = dict(fprime=gradient, callback=callback, gtol=gtol, full_output=True, maxiter=maxiter)
+kwargs = dict(fprime=gradient__save, callback=callback, gtol=gtol, full_output=True, maxiter=maxiter)
 tic = perf_counter()
 try:
-    out = so.fmin_bfgs(reduced_functional, c, **kwargs)
-except GradientConverged:
+    out = so.fmin_bfgs(reduced_functional__save, c, **kwargs)
+except opt.GradientConverged:
     out = (op.control_trajectory[-1], op.functional_trajectory[-1], op.gradient_trajectory[-1], op._feval, len(op.gradient_trajectory))
 cpu_time = perf_counter() - tic
 with open('data/discrete_{:d}.log'.format(level), 'w+') as log:
