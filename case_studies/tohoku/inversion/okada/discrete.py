@@ -102,7 +102,6 @@ with stop_annotating():
     u0, eta0 = q0.split()
     op.create_topography(annotate=True, tag=tape_tag, separate_faults=False)
     eta0.dat.data[op.indices] = op.fault.dtopo.dZ.reshape(op.fault.dtopo.X.shape)
-eta0.dat.name = "Initial surface"
 
 q_init = Function(TaylorHood)
 q_init.project(q0)
@@ -118,19 +117,13 @@ def tsunami_propagation(init):
     Run tsunami propagation, given an initial velocity-elevation tuple.
     """
     q_.assign(init)
-
     for gauge in gauges:
-        op.gauges[gauge]['timeseries'] = []
-        op.gauges[gauge]['diff'] = []
-        op.gauges[gauge]['timeseries_smooth'] = []
-        op.gauges[gauge]['diff_smooth'] = []
-        op.gauges[gauge]['init'] = None
-        op.gauges[gauge]['data'] = []
+        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
 
     t = 0.0
     iteration = 0
     J = 0
-    weight = Constant(1.0)
+    wq = Constant(1.0)
     eta_obs = Constant(0.0)
     while t < op.end_time:
 
@@ -138,39 +131,31 @@ def tsunami_propagation(init):
         solver.solve()
 
         # Time integrate QoI
-        weight.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)
-        u, eta = q.split()
         for gauge in op.gauges:
-
-            # Point evaluation at gauges
-            eta_discrete = eta.at(op.gauges[gauge]["coords"])
-            if op.gauges[gauge]['init'] is None:
-                op.gauges[gauge]['init'] = eta_discrete
-            eta_discrete -= op.gauges[gauge]['init']
-            op.gauges[gauge]['timeseries'].append(eta_discrete)
+            if t < op.gauges[gauge]['arrival_time']:
+                continue
+            elif np.allclose(t, op.gauges[gauge]['arrival_time']):
+                wq.assign(0.5*0.5*op.dt)
+            elif np.allclose(t, op.gauges[gauge]['departure_time']):
+                wq.assign(0.5*0.5*op.dt)
+            elif t > op.gauges[gauge]['departure_time']:
+                continue
+            else:
+                wq.assign(0.5*1.0*op.dt)
 
             # Interpolate observations
-            obs = float(op.gauges[gauge]['interpolator'](t))
-            eta_obs.assign(obs)
-            op.gauges[gauge]['data'].append(obs)
-
-            # Discrete form of error
-            diff = 0.5*(eta_discrete - eta_obs.dat.data[0])**2
-            op.gauges[gauge]['diff'].append(diff)
+            eta_obs.assign(float(op.gauges[gauge]['interpolator'](t)))
 
             # Continuous form of error
             I = op.gauges[gauge]['indicator']
-            diff = 0.5*I*(eta - eta_obs)**2
-            J += assemble(weight*dtc*diff*dx)
-            op.gauges[gauge]['diff_smooth'].append(assemble(diff*dx, annotate=False))
-            op.gauges[gauge]['timeseries_smooth'].append(assemble(I*eta_obs*dx, annotate=False))
+            J = J + assemble(wq*I*(eta - eta_obs - op.gauges[gauge]['init'])**2*dx)
 
         # Increment
         q_.assign(q)
         t += op.dt
         iteration += 1
 
-    assert np.allclose(t, op.end_time), print("mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time))
+    assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return J
 
 
@@ -181,7 +166,7 @@ radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the in
 P0 = FunctionSpace(mesh, "DG", 0)
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]
-    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,), ], mesh), P0)
+    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
     op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/assemble(op.gauges[gauge]['indicator']*dx))
 
 times = np.linspace(0, op.end_time, int(op.end_time/op.dt))
