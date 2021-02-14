@@ -146,7 +146,7 @@ def solve_forward(control, store=False, keep=False):
                 I = op.gauges[gauge]['indicator']
                 diff = eta - eta_obs
                 J += assemble(0.5*I*weight*dtc*diff*diff*dx)
-                op.gauges[gauge]['adjoint_free'] += assemble(I*weight*dtc*diff*eta*dx, annotate=False)
+                op.gauges[gauge]['adjoint_free'] += assemble(I*weight*dtc*diff*eta*dx)
 
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))

@@ -108,11 +108,9 @@ def solve_forward(control, store=False, keep=False):
 
     for gauge in gauges:
         op.gauges[gauge]['timeseries'] = []
-        op.gauges[gauge]['diff'] = []
         op.gauges[gauge]['init'] = None
         if store:
             op.gauges[gauge]['data'] = []
-        op.gauges[gauge]['adjoint_free'] = 0.0
     if keep:
         u_, eta_ = q_.split()
         op.eta_saved = [eta_.copy(deepcopy=True)]
@@ -133,7 +131,7 @@ def solve_forward(control, store=False, keep=False):
         for gauge in op.gauges:
 
             # Point evaluation at gauges
-            eta_discrete = eta.at(op.gauges[gauge]["coords"])
+            eta_discrete = eta.at(op.gauges[gauge]['coords'])
             if op.gauges[gauge]['init'] is None:
                 op.gauges[gauge]['init'] = eta_discrete
             eta_discrete -= op.gauges[gauge]['init']
@@ -141,17 +139,12 @@ def solve_forward(control, store=False, keep=False):
             if store:
                 op.gauges[gauge]['data'].append(eta_discrete)
             else:
-                eta_obs.assign(op.gauges[gauge]['data'][iteration])
-
-                # Discrete form of error
-                diff = eta_discrete - eta_obs.dat.data[0]
-                op.gauges[gauge]['diff'].append(diff)
+                eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
 
                 # Continuous form of error
                 I = op.gauges[gauge]['indicator']
                 diff = eta - eta_obs
                 J += assemble(0.5*I*weight*dtc*diff*diff*dx)
-                op.gauges[gauge]['adjoint_free'] += assemble(I*weight*dtc*diff*eta*dx, annotate=False)
 
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))
