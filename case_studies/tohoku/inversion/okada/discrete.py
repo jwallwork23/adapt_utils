@@ -315,9 +315,9 @@ def gradient__save(m):
     op.control_trajectory.append(m)
     op.functional_trajectory.append(op._J)
     op.gradient_trajectory.append(dJdm)
-    np.save('data/opt_progress_continuous_{:d}_ctrl'.format(level), op.control_trajectory)
-    np.save('data/opt_progress_continuous_{:d}_func'.format(level), op.functional_trajectory)
-    np.save('data/opt_progress_continuous_{:d}_grad'.format(level), op.gradient_trajectory)
+    np.save('data/opt_progress_discrete_{:d}_ctrl'.format(level), op.control_trajectory)
+    np.save('data/opt_progress_discrete_{:d}_func'.format(level), op.functional_trajectory)
+    np.save('data/opt_progress_discrete_{:d}_grad'.format(level), op.gradient_trajectory)
     if abs(g) < gtol:
         callback(m)
         raise opt.GradientConverged
@@ -327,7 +327,7 @@ def gradient__save(m):
 def callback(m):
     print("Line search complete")
     op.line_search_trajectory.append(m)
-    np.save('data/opt_progress_continuous_{:d}_ls'.format(level), op.line_search_trajectory)
+    np.save('data/opt_progress_discrete_{:d}_ls'.format(level), op.line_search_trajectory)
 
 
 kwargs = dict(fprime=gradient__save, callback=callback, gtol=gtol, full_output=True, maxiter=maxiter)

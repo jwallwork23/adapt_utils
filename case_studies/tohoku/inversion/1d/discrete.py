@@ -101,7 +101,6 @@ def solve_forward(control, store=False, keep=False):
 
     for gauge in gauges:
         op.gauges[gauge]['timeseries'] = []
-        op.gauges[gauge]['diff'] = []
         op.gauges[gauge]['init'] = None
         if store:
             op.gauges[gauge]['data'] = []
@@ -126,7 +125,7 @@ def solve_forward(control, store=False, keep=False):
         for gauge in op.gauges:
 
             # Point evaluation at gauges
-            eta_discrete = eta.at(op.gauges[gauge]["coords"])
+            eta_discrete = eta.at(op.gauges[gauge]['coords'])
             if op.gauges[gauge]['init'] is None:
                 op.gauges[gauge]['init'] = eta_discrete
             eta_discrete -= op.gauges[gauge]['init']
@@ -134,11 +133,7 @@ def solve_forward(control, store=False, keep=False):
             if store:
                 op.gauges[gauge]['data'].append(eta_discrete)
             else:
-                eta_obs.assign(op.gauges[gauge]['data'][iteration])
-
-                # Discrete form of error
-                diff = eta_discrete - eta_obs.dat.data[0]
-                op.gauges[gauge]['diff'].append(diff)
+                eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
 
                 # Continuous form of error
                 I = op.gauges[gauge]['indicator']
