@@ -15,11 +15,11 @@ parser.add_argument("-num_minutes")
 args = parser.parse_args()
 
 level = int(args.level)
+op = TohokuOkadaBasisOptions(level=level, synthetic=False)
+op.end_time = 60*float(args.num_minutes or 30)
 alpha = float(args.alpha or 0.0)/op.nx*op.ny*25.0e+03*20.0e+03
 reg = not np.isclose(alpha, 0.0)
 alpha = Constant(alpha)
-op = TohokuOkadaBasisOptions(level=level, synthetic=False)
-op.end_time = 60*float(args.num_minutes or 30)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
     # if op.gauges[gauge]['arrival_time'] < op.end_time:  # TODO
@@ -170,7 +170,7 @@ def tsunami_propagation(init):
         for gauge in op.gauges:
 
             # Point evaluation at gauges
-            eta_discrete = eta.at(op.gauges[gauge]['coords']) - op.gauges[gauge]['init'].dat.data[0]
+            eta_discrete = eta.at(op.gauges[gauge]['coords']) - op.gauges[gauge]['init']
             op.gauges[gauge]['timeseries'].append(eta_discrete)
 
             # Interpolate observations
