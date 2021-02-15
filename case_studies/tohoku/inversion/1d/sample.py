@@ -115,6 +115,7 @@ def solve_forward(control, store=False, keep=False):
     wq = Constant(0.5)
     eta_obs = Constant(0.0)
     for gauge in gauges:
+        eta_obs.assign(op.gauges[gauge]['init'])
         J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
     while t < op.end_time:
 
@@ -158,7 +159,7 @@ for gauge in gauges:
 # --- Solve forward to get 'data'
 
 print("Solve forward to get 'data'...")
-times = np.linspace(0, op.end_time, int(op.end_time/op.dt))
+times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 solve_forward(m, store=True)
 for gauge in gauges:
     op.gauges[gauge]['interpolator'] = si.interp1d(times, op.gauges[gauge]['data'])
