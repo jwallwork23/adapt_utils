@@ -148,7 +148,7 @@ def solve_forward(control, store=False, keep=False):
         t += op.dt
         iteration += 1
 
-    assert np.allclose(t, op.end_time), print("mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time))
+    assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return None if store else J
 
 

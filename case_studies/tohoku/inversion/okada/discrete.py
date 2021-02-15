@@ -25,8 +25,9 @@ gtol = float(args.gtol or 1.0e-08)
 maxiter = int(args.maxiter or 10000)
 op = TohokuOkadaBasisOptions(level=level, synthetic=False)
 op.end_time = 60*float(args.num_minutes or 30)
-alpha = float(args.alpha or 0.0)/(op.nx*op.ny*25.0e+03*20.0e+03)
+alpha = float(args.alpha or 0.0)
 reg = not np.isclose(alpha, 0.0)
+alpha /= op.nx*op.ny*25.0e+03*20.0e+03
 alpha = Constant(alpha)
 gauges = list(op.gauges.keys())
 for gauge in gauges:

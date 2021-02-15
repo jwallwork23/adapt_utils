@@ -1,7 +1,5 @@
 all: dir discrete continuous plot
 
-.phony = discrete continuous
-
 dir:
 	@mkdir -p data
 	@mkdir -p outputs
@@ -36,3 +34,9 @@ gradient:
 	@python3 gradient_continuous.py 1
 	@python3 gradient_discrete.py 2
 	@python3 gradient_continuous.py 2
+
+sample:
+	@python3 sample.py 0
+	@python3 sample.py 1
+	@python3 sample.py 2
+	@python3 sample.py 3
