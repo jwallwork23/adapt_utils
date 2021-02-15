@@ -1,6 +1,11 @@
-all: discrete continuous
+all: dir discrete continuous plot
 
 .phony = discrete continuous
+
+dir:
+	@mkdir -p data
+	@mkdir -p outputs
+	@mkdir -p plots
 
 discrete:
 	@python3 discrete.py 0
