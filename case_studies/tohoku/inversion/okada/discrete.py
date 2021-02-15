@@ -23,8 +23,9 @@ args = parser.parse_args()
 level = int(args.level)
 gtol = float(args.gtol or 1.0e-08)
 maxiter = int(args.maxiter or 10000)
-alpha = float(args.alpha or 0.0)
+alpha = float(args.alpha or 0.0)/op.nx*op.ny*25.0e+03*20.0e+03
 reg = not np.isclose(alpha, 0.0)
+alpha = Constant(alpha)
 op = TohokuOkadaBasisOptions(level=level, synthetic=False)
 op.end_time = 60*float(args.num_minutes or 30)
 gauges = list(op.gauges.keys())
@@ -34,8 +35,7 @@ for gauge in gauges:
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
 print(gauges)
-op.active_controls = ['slip']
-op.control_parameters['rake'] = np.zeros(*np.shape(op.control_parameters['rake']))
+op.active_controls = ['slip', 'rake']
 num_active_controls = len(op.active_controls)
 
 
@@ -44,6 +44,7 @@ num_active_controls = len(op.active_controls)
 mesh = op.default_mesh
 P2_vec = VectorFunctionSpace(mesh, "CG", 2)
 P1 = FunctionSpace(mesh, "CG", 1)
+P0 = FunctionSpace(mesh, "DG", 0)
 TaylorHood = P2_vec*P1
 b = Function(P1).assign(op.set_bathymetry(P1))
 g = Constant(op.g)
@@ -124,20 +125,25 @@ def tsunami_propagation(init):
     q_.assign(init)
     for gauge in gauges:
         op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
-
     t = 0.0
-    iteration = 0
-    if reg:
-        area = op.nx*op.ny*25.0e+03*20.0e+03
-        J = assemble(Constant(alpha/area)*inner(init, init)*dx)
-    else:
-        J = 0
-    wq = Constant(1.0)
+    wq = Constant(0.5*0.5*op.dt)
     eta_obs = Constant(0.0)
+
+    # Setup QoI
+    J = 0 if not reg else assemble(alpha*inner(init, init)*dx)
+    for gauge in op.gauges:
+        if t < op.gauges[gauge]['arrival_time']:
+            continue
+        eta_obs.assign(op.gauges[gauge]['init'])
+        J = J + assemble(wq*op.gauges[gauge]['indicator']*(eta - eta_obs)**2*dx)
+
+    # Enter timeloop
     while t < op.end_time:
 
         # Solve forward equation at current timestep
         solver.solve()
+        q_.assign(q)
+        t += op.dt
 
         # Time integrate QoI
         for gauge in op.gauges:
@@ -153,16 +159,11 @@ def tsunami_propagation(init):
                 wq.assign(0.5*1.0*op.dt)
 
             # Interpolate observations
-            eta_obs.assign(float(op.gauges[gauge]['interpolator'](t)))
+            eta_obs.assign(float(op.gauges[gauge]['interpolator'](t)) + op.gauges[gauge]['init'])
 
             # Continuous form of error
             I = op.gauges[gauge]['indicator']
-            J = J + assemble(wq*I*(eta - eta_obs - op.gauges[gauge]['init'])**2*dx)
-
-        # Increment
-        q_.assign(q)
-        t += op.dt
-        iteration += 1
+            J = J + assemble(wq*I*(eta - eta_obs)**2*dx)
 
     assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return J
@@ -172,14 +173,11 @@ def tsunami_propagation(init):
 
 gauges = list(op.gauges.keys())
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
-P0 = FunctionSpace(mesh, "DG", 0)
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]
     op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
-    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/assemble(op.gauges[gauge]['indicator']*dx))
-
-times = np.linspace(0, op.end_time, int(op.end_time/op.dt))
-for gauge in gauges:
+    area = assemble(op.gauges[gauge]['indicator']*dx)
+    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
     op.sample_timeseries(gauge, sample=op.gauges[gauge]['sample'], detide=True)
 
 
@@ -201,11 +199,7 @@ def okada_source(m, keep=1):
 
     :kwarg keep: toggle whether to flag for a reverse propagation.
     """
-    m_array = m.reshape((num_active_controls, num_subfaults))
-    for i, control in enumerate(op.active_controls):
-        assert len(op.control_parameters[control]) == len(m_array[i])
-        op.control_parameters[control][:] = m_array[i]
-    return adolc.zos_forward(tape_tag, op.input_vector, keep=1)
+    return adolc.zos_forward(tape_tag, m, keep=1)
 
 
 def gradient_tsunami(q0):
@@ -274,7 +268,7 @@ def gradient(m):
 # --- Taylor tests  # FIXME
 
 # np.random.seed(0)
-m_init = np.array(op.control_parameters['slip']).flatten()
+m_init = np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
 # m_init += 0.2
 # # opt.taylor_test(okada_source, gradient_okada, m_init, verbose=True)  # TODO: TESTME
 # opt.taylor_test(reduced_functional, gradient, m_init, verbose=True)
