@@ -93,26 +93,20 @@ angle = pi/12
 phi.interpolate(gaussian([loc + radii, ], mesh, rotation=angle))
 
 
-def solve_forward(control, store=False, keep=False):
+def solve_forward(control, store=False):
     """
     Solve forward problem.
     """
     q_.project(control*basis_function)
 
-    for gauge in gauges:
-        op.gauges[gauge]['timeseries'] = []
-        op.gauges[gauge]['init'] = None
-        if store:
-            op.gauges[gauge]['data'] = []
-        op.gauges[gauge]['adjoint_free'] = 0.0
-    if keep:
-        u_, eta_ = q_.split()
-        op.eta_saved = [eta_.copy(deepcopy=True)]
+    if store:
+        for gauge in gauges:
+            op.gauges[gauge]['data'] = [eta_.at(op.gauges[gauge]['coords'])]
 
     t = 0.0
     iteration = 0
     J = 0
-    weight = Constant(1.0)
+    wq = Constant(1.0)
     eta_obs = Constant(0.0)
     while t < op.end_time:
 
@@ -120,29 +114,17 @@ def solve_forward(control, store=False, keep=False):
         solver.solve()
 
         # Time integrate QoI
-        weight.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)
-        u, eta = q.split()
+        wq.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)
         for gauge in op.gauges:
 
-            # Point evaluation at gauges
-            eta_discrete = eta.at(op.gauges[gauge]['coords'])
-            if op.gauges[gauge]['init'] is None:
-                op.gauges[gauge]['init'] = eta_discrete
-            eta_discrete -= op.gauges[gauge]['init']
-            op.gauges[gauge]['timeseries'].append(eta_discrete)
             if store:
+                # Point evaluation at gauges
+                eta_discrete = eta.at(op.gauges[gauge]['coords'])
                 op.gauges[gauge]['data'].append(eta_discrete)
             else:
-                eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
-
                 # Continuous form of error
-                I = op.gauges[gauge]['indicator']
-                diff = eta - eta_obs
-                J += assemble(0.5*I*weight*dtc*diff*diff*dx)
-                op.gauges[gauge]['adjoint_free'] += assemble(I*weight*dtc*diff*eta*dx, annotate=False)
-
-        if keep:
-            op.eta_saved.append(eta.copy(deepcopy=True))
+                eta_obs.assign(op.gauges[gauge]['data'][iteration])
+                J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
 
         # Increment
         q_.assign(q)
@@ -160,18 +142,19 @@ radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the in
 P0 = FunctionSpace(mesh, "DG", 0)
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]
-    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,), ], mesh), P0)
-    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/assemble(op.gauges[gauge]['indicator']*dx))
+    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
+    area = assemble(op.gauges[gauge]['indicator']*dx)
+    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
 
 
 # --- Get 'data'
 
 print("Solve forward to get 'data'...")
-times = np.linspace(0, op.end_time, int(op.end_time/op.dt))
+times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 with stop_annotating():
     solve_forward(m, store=True)
     for gauge in gauges:
-        op.gauges[gauge]['interpolator'] = si.interp1d(times, op.gauges[gauge]['timeseries'])
+        op.gauges[gauge]['interpolator'] = si.interp1d(times, op.gauges[gauge]['data'])
 
 
 # --- Annotate tape
