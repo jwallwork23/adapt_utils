@@ -34,6 +34,7 @@ python3 -m pip install matplotlib netCDF4 numpy pandas scipy utide
 # python3 -m pip install qmesh  # FIXME
 
 # Install ClawPack
+#   If you don't have write access to python3.x/site-packages then you will need to specify --prefix
 export CLAW_SRC=$VIRTUAL_ENV/src/clawpack_src
 python3 -m pip install --src=$CLAW_SRC -e git+https://github.com/clawpack/clawpack.git@v5.7.0#egg=clawpack-v5.7.0
 export CLAW=$CLAW_SRC/clawpack-v5-7-0

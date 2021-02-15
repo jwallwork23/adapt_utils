@@ -137,7 +137,6 @@ def solve_forward(control, store=False):
 
 # --- Gauge indicators
 
-gauges = list(op.gauges.keys())
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
 P0 = FunctionSpace(mesh, "DG", 0)
 for gauge in gauges:

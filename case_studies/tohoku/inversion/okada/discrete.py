@@ -25,7 +25,7 @@ gtol = float(args.gtol or 1.0e-08)
 maxiter = int(args.maxiter or 10000)
 op = TohokuOkadaBasisOptions(level=level, synthetic=False)
 op.end_time = 60*float(args.num_minutes or 30)
-alpha = float(args.alpha or 0.0)/op.nx*op.ny*25.0e+03*20.0e+03
+alpha = float(args.alpha or 0.0)/(op.nx*op.ny*25.0e+03*20.0e+03)
 reg = not np.isclose(alpha, 0.0)
 alpha = Constant(alpha)
 gauges = list(op.gauges.keys())
@@ -171,7 +171,6 @@ def tsunami_propagation(init):
 
 # --- Get gauge data
 
-gauges = list(op.gauges.keys())
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]

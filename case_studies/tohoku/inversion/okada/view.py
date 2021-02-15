@@ -17,7 +17,7 @@ args = parser.parse_args()
 level = int(args.level)
 op = TohokuOkadaBasisOptions(level=level, synthetic=False)
 op.end_time = 60*float(args.num_minutes or 30)
-alpha = float(args.alpha or 0.0)/op.nx*op.ny*25.0e+03*20.0e+03
+alpha = float(args.alpha or 0.0)/(op.nx*op.ny*25.0e+03*20.0e+03)
 reg = not np.isclose(alpha, 0.0)
 alpha = Constant(alpha)
 gauges = list(op.gauges.keys())
@@ -192,7 +192,6 @@ def tsunami_propagation(init):
 
 # --- Get gauge data
 
-gauges = list(op.gauges.keys())
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]
@@ -210,7 +209,7 @@ print("Quantity of interest = {:.4e}".format(J))
 
 # --- Plot gauge timeseries
 
-fig, axes = plt.subplots(ncols=4, nrows=2, figsize=(24, 8), dpi=100)
+fig, axes = plt.subplots(ncols=4, nrows=len(gauges)//4, figsize=(24, 8), dpi=100)
 times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 for i, gauge in enumerate(gauges):
     ax = axes[i//4, i % 4]
@@ -228,7 +227,7 @@ if reg:
     fname += '_reg'
 savefig(fname, 'plots', extensions=['pdf'])
 
-fig, axes = plt.subplots(ncols=4, nrows=2, figsize=(24, 8), dpi=100)
+fig, axes = plt.subplots(ncols=4, nrows=len(gauges)//4, figsize=(24, 8), dpi=100)
 for i, gauge in enumerate(gauges):
     ax = axes[i//4, i % 4]
     ax.plot(times/60, op.gauges[gauge]['diff'], label=gauge)
