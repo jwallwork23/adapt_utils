@@ -10,21 +10,29 @@ from adapt_utils.misc import ellipse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
+parser.add_argument("-alpha")
+parser.add_argument("-num_minutes")
 args = parser.parse_args()
 
 level = int(args.level)
+alpha = float(args.alpha or 0.0)
+reg = not np.isclose(alpha, 0.0)
 op = TohokuOkadaBasisOptions(level=level, synthetic=False)
+op.end_time = 60*float(args.num_minutes or 30)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
-    if gauge[:2] not in ('P0', '80'):  # TODO: Consider all gauges and account for arrival/dept times
+    # if op.gauges[gauge]['arrival_time'] < op.end_time:  # TODO
+    if gauge[:2] not in ('P0', '80'):
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
 print(gauges)
 op.active_controls = ['slip']
-op.control_parameters['slip'] = np.load('data/opt_progress_discrete_{:d}_ctrl.npy'.format(level))[-1]
+fname = 'data/opt_progress_discrete_{:d}_{:s}'
+if reg:
+    fname += '_reg'
+op.control_parameters['slip'] = np.load(fname.format(level, 'ctrl') + '.npy')[-1]
 op.control_parameters['rake'] = np.zeros(*np.shape(op.control_parameters['rake']))
 num_active_controls = len(op.active_controls)
-op.end_time = 60*30
 
 
 # --- Setup tsunami propagation problem
@@ -107,13 +115,14 @@ eta_max = 1.01*eta_init.vector().gather().max()
 tc = tricontourf(eta_init, axes=axes, cmap='coolwarm', levels=np.linspace(eta_min, eta_max, 50))
 fig.colorbar(tc, ax=axes)
 xg, yg = op.gauges["P02"]["coords"]
-axes.set_xlim([xg - 0.25e+06, xg + 0.25e+06]);
-axes.set_ylim([yg - 0.4e+06, yg + 0.3e+06]);
+axes.set_xlim([xg - 0.25e+06, xg + 0.25e+06])
+axes.set_ylim([yg - 0.4e+06, yg + 0.3e+06])
 op.annotate_plot(axes)
 axes.axis(False)
-plt.show()
-savefig("dislocation_{:d}".format(level), "plots", extensions=["jpg"])
-exit(0)
+fname = "dislocation_{:d}".format(level)
+if reg:
+    fname += '_reg'
+savefig(fname, "plots", extensions=["jpg"])
 
 
 def tsunami_propagation(init):
@@ -123,13 +132,22 @@ def tsunami_propagation(init):
     q_.assign(init)
 
     for gauge in gauges:
-        op.gauges[gauge]['timeseries'] = []
-        op.gauges[gauge]['init'] = Constant(eta_.at(op.gauges[gauge]['coords']))
         op.gauges[gauge]['data'] = []
+        op.gauges[gauge]['init'] = Constant(eta_.at(op.gauges[gauge]['coords']))
+        op.gauges[gauge]['init_smooth'] = assemble(op.gauges[gauge]['indicator']*eta_*dx)
+        op.gauges[gauge]['timeseries'] = []
+        op.gauges[gauge]['timeseries_smooth'] = []
+        op.gauges[gauge]['diff'] = []
+        op.gauges[gauge]['diff_smooth'] = []
 
     t = 0.0
     iteration = 0
-    J = 0
+    if reg:
+        area = op.nx*op.ny*25.0e+03*20.0e+03
+        J = assemble(Constant(alpha/area)*inner(init, init)*dx)
+        print("Regularisation term = {:.4e}".format(J))
+    else:
+        J = 0
     weight = Constant(1.0)
     eta_obs = Constant(0.0)
     while t < op.end_time:
@@ -150,11 +168,14 @@ def tsunami_propagation(init):
             obs = float(op.gauges[gauge]['interpolator'](t))
             op.gauges[gauge]['data'].append(obs)
             eta_obs.assign(obs + op.gauges[gauge]['init'])
+            op.gauges[gauge]['diff'].append(0.5*(eta_discrete - obs)**2)
 
             # Continuous form of error
             I = op.gauges[gauge]['indicator']
             diff = 0.5*I*(eta - eta_obs)**2
             J = J + assemble(weight*dtc*diff*dx)
+            op.gauges[gauge]['timeseries_smooth'].append(assemble(I*eta*dx) - op.gauges[gauge]['init_smooth'])
+            op.gauges[gauge]['diff_smooth'].append(assemble(diff*dx))
 
         # Increment
         q_.assign(q)
@@ -192,13 +213,34 @@ print("Quantity of interest = {:.4e}".format(J))
 fig, axes = plt.subplots(ncols=4, nrows=2, figsize=(24, 8), dpi=100)
 
 for i, gauge in enumerate(gauges):
-    ax = axes[i//4, i%4]
-    ax.plot(times/60, op.gauges[gauge]['timeseries'], label=gauge)
-    ax.plot(times/60, op.gauges[gauge]['data'], 'x')
+    ax = axes[i//4, i % 4]
+    ax.plot(times/60, op.gauges[gauge]['timeseries'], label=gauge, color='C0')
+    ax.plot(times/60, op.gauges[gauge]['timeseries_smooth'], ':', color='C0')
+    ax.plot(times/60, op.gauges[gauge]['data'], 'x', color='C1')
     ax.legend(handlelength=0, handletextpad=0)
     if i >= 4:
         ax.set_xlabel("Time [minutes]")
-    if i%4 == 0:
-        ax.set_ylabel("Elevation [m]")
+    if i % 4 == 0:
+        ax.set_ylabel(r"Elevation [$\mathrm m$]")
     ax.grid(True)
-savefig("discrete_timeseries_{:d}".format(level), "plots", extensions=["pdf"])
+fname = 'discrete_timeseries_both_{:d}'.format(level)
+if reg:
+    fname += '_reg'
+savefig(fname, 'plots', extensions=['pdf'])
+
+fig, axes = plt.subplots(ncols=4, nrows=2, figsize=(24, 8), dpi=100)
+
+for i, gauge in enumerate(gauges):
+    ax = axes[i//4, i % 4]
+    ax.plot(times/60, op.gauges[gauge]['diff'], label=gauge)
+    ax.plot(times/60, op.gauges[gauge]['diff_smooth'])
+    ax.legend(handlelength=0, handletextpad=0)
+    if i >= 4:
+        ax.set_xlabel("Time [minutes]")
+    if i % 4 == 0:
+        ax.set_ylabel(r"Squared error [$\mathrm m^2$]")
+    ax.grid(True)
+fname = 'discrete_timeseries_error_{:d}'.format(level)
+if reg:
+    fname += '_reg'
+savefig(fname, 'plots', extensions=['pdf'])

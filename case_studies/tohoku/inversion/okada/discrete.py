@@ -16,22 +16,27 @@ parser = argparse.ArgumentParser()
 parser.add_argument("level")
 parser.add_argument("-gtol")
 parser.add_argument("-maxiter")
+parser.add_argument("-alpha")
+parser.add_argument("-num_minutes")
 args = parser.parse_args()
 
 level = int(args.level)
 gtol = float(args.gtol or 1.0e-08)
 maxiter = int(args.maxiter or 10000)
+alpha = float(args.alpha or 0.0)
+reg = not np.isclose(alpha, 0.0)
 op = TohokuOkadaBasisOptions(level=level, synthetic=False)
+op.end_time = 60*float(args.num_minutes or 30)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
-    if gauge[:2] not in ('P0', '80'):  # TODO: Consider all gauges and account for arrival/dept times
+    # if op.gauges[gauge]['arrival_time'] < op.end_time:  # TODO
+    if gauge[:2] not in ('P0', '80'):
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
 print(gauges)
 op.active_controls = ['slip']
 op.control_parameters['rake'] = np.zeros(*np.shape(op.control_parameters['rake']))
 num_active_controls = len(op.active_controls)
-op.end_time = 60*30
 
 
 # --- Setup tsunami propagation problem
@@ -122,7 +127,11 @@ def tsunami_propagation(init):
 
     t = 0.0
     iteration = 0
-    J = 0
+    if reg:
+        area = op.nx*op.ny*25.0e+03*20.0e+03
+        J = assemble(Constant(alpha/area)*inner(init, init)*dx)
+    else:
+        J = 0
     wq = Constant(1.0)
     eta_obs = Constant(0.0)
     while t < op.end_time:
@@ -278,6 +287,9 @@ op.functional_trajectory = []
 op.gradient_trajectory = []
 op.line_search_trajectory = []
 op._feval = 0
+fname = 'data/opt_progress_discrete_{:d}_{:s}'
+if reg:
+    fname += '_reg'
 
 
 def reduced_functional__save(m):
@@ -300,9 +312,9 @@ def gradient__save(m):
     op.control_trajectory.append(m)
     op.functional_trajectory.append(op._J)
     op.gradient_trajectory.append(dJdm)
-    np.save('data/opt_progress_discrete_{:d}_ctrl'.format(level), op.control_trajectory)
-    np.save('data/opt_progress_discrete_{:d}_func'.format(level), op.functional_trajectory)
-    np.save('data/opt_progress_discrete_{:d}_grad'.format(level), op.gradient_trajectory)
+    np.save(fname.format(level, 'ctrl'), op.control_trajectory)
+    np.save(fname.format(level, 'func'), op.functional_trajectory)
+    np.save(fname.format(level, 'grad'), op.gradient_trajectory)
     if abs(g) < gtol:
         callback(m)
         raise opt.GradientConverged
@@ -312,7 +324,7 @@ def gradient__save(m):
 def callback(m):
     print("Line search complete")
     op.line_search_trajectory.append(m)
-    np.save('data/opt_progress_discrete_{:d}_ls'.format(level), op.line_search_trajectory)
+    np.save(fname.format(level, 'ls'), op.line_search_trajectory)
 
 
 kwargs = dict(fprime=gradient__save, callback=callback, gtol=gtol, full_output=True, maxiter=maxiter)
@@ -322,7 +334,10 @@ try:
 except opt.GradientConverged:
     out = (op.control_trajectory[-1], op.functional_trajectory[-1], op.gradient_trajectory[-1], op._feval, len(op.gradient_trajectory))
 cpu_time = perf_counter() - tic
-with open('data/discrete_{:d}.log'.format(level), 'w+') as log:
+fname = 'data/discrete_{:d}'.format(level)
+if reg:
+    fname += '_reg'
+with open(fname + '.log', 'w+') as log:
     log.write("minimum:              {:.8e}\n".format(out[1]))
     log.write("function evaluations: {:d}\n".format(out[4]))
     log.write("gradient evaluations: {:d}\n".format(out[5]))
