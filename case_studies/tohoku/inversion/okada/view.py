@@ -15,8 +15,9 @@ parser.add_argument("-num_minutes")
 args = parser.parse_args()
 
 level = int(args.level)
-alpha = float(args.alpha or 0.0)
+alpha = float(args.alpha or 0.0)/op.nx*op.ny*25.0e+03*20.0e+03
 reg = not np.isclose(alpha, 0.0)
+alpha = Constant(alpha)
 op = TohokuOkadaBasisOptions(level=level, synthetic=False)
 op.end_time = 60*float(args.num_minutes or 30)
 gauges = list(op.gauges.keys())
@@ -30,8 +31,12 @@ op.active_controls = ['slip']
 fname = 'data/opt_progress_discrete_{:d}_{:s}'
 if reg:
     fname += '_reg'
-op.control_parameters['slip'] = np.load(fname.format(level, 'ctrl') + '.npy')[-1]
-op.control_parameters['rake'] = np.zeros(*np.shape(op.control_parameters['rake']))
+try:
+    opt_controls = np.load(fname.format(level, 'ctrl') + '.npy')[-1]
+    op.control_parameters['slip'] = opt_controls[:190]
+    op.control_parameters['rake'] = opt_controls[190:]
+except Exception:
+    print("Could not find optimised controls. Proceeding with initial guess.")
 num_active_controls = len(op.active_controls)
 
 
@@ -40,6 +45,7 @@ num_active_controls = len(op.active_controls)
 mesh = op.default_mesh
 P2_vec = VectorFunctionSpace(mesh, "CG", 2)
 P1 = FunctionSpace(mesh, "CG", 1)
+P0 = FunctionSpace(mesh, "DG", 0)
 TaylorHood = P2_vec*P1
 b = Function(P1).assign(op.set_bathymetry(P1))
 g = Constant(op.g)
@@ -123,6 +129,7 @@ fname = "dislocation_{:d}".format(level)
 if reg:
     fname += '_reg'
 savefig(fname, "plots", extensions=["jpg"])
+# exit(0)
 
 
 def tsunami_propagation(init):
@@ -132,32 +139,34 @@ def tsunami_propagation(init):
     q_.assign(init)
 
     for gauge in gauges:
-        op.gauges[gauge]['data'] = []
-        op.gauges[gauge]['init'] = Constant(eta_.at(op.gauges[gauge]['coords']))
+        op.gauges[gauge]['data'] = [0.0]
+        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
         op.gauges[gauge]['init_smooth'] = assemble(op.gauges[gauge]['indicator']*eta_*dx)
-        op.gauges[gauge]['timeseries'] = []
-        op.gauges[gauge]['timeseries_smooth'] = []
-        op.gauges[gauge]['diff'] = []
-        op.gauges[gauge]['diff_smooth'] = []
+        op.gauges[gauge]['timeseries'] = [op.gauges[gauge]['init']]
+        op.gauges[gauge]['timeseries_smooth'] = [0.0]
+        op.gauges[gauge]['diff'] = [op.gauges[gauge]['init']]
+        op.gauges[gauge]['diff_smooth'] = [0.0]
 
     t = 0.0
-    iteration = 0
     if reg:
-        area = op.nx*op.ny*25.0e+03*20.0e+03
-        J = assemble(Constant(alpha/area)*inner(init, init)*dx)
+        J = assemble(alpha*inner(init, init)*dx)
         print("Regularisation term = {:.4e}".format(J))
     else:
         J = 0
-    weight = Constant(1.0)
+    weight = Constant(0.5)
     eta_obs = Constant(0.0)
+    for gauge in op.gauges:
+        eta_obs.assign(op.gauges[gauge]['init'])
+        J = J + assemble(0.5*weight*dtc*op.gauges[gauge]['indicator']*(eta - eta_obs)**2*dx)
     while t < op.end_time:
 
         # Solve forward equation at current timestep
         solver.solve()
+        q_.assign(q)
+        t += op.dt
 
         # Time integrate QoI
         weight.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)
-        u, eta = q.split()
         for gauge in op.gauges:
 
             # Point evaluation at gauges
@@ -177,11 +186,6 @@ def tsunami_propagation(init):
             op.gauges[gauge]['timeseries_smooth'].append(assemble(I*eta*dx) - op.gauges[gauge]['init_smooth'])
             op.gauges[gauge]['diff_smooth'].append(assemble(diff*dx))
 
-        # Increment
-        q_.assign(q)
-        t += op.dt
-        iteration += 1
-
     assert np.allclose(t, op.end_time), print("mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time))
     return J
 
@@ -190,15 +194,11 @@ def tsunami_propagation(init):
 
 gauges = list(op.gauges.keys())
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
-P0 = FunctionSpace(mesh, "DG", 0)
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]
     op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
     area = assemble(op.gauges[gauge]['indicator']*dx)
     op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
-
-times = np.linspace(0, op.end_time, int(op.end_time/op.dt))
-for gauge in gauges:
     op.sample_timeseries(gauge, sample=op.gauges[gauge]['sample'], detide=True)
 
 
@@ -211,7 +211,7 @@ print("Quantity of interest = {:.4e}".format(J))
 # --- Plot gauge timeseries
 
 fig, axes = plt.subplots(ncols=4, nrows=2, figsize=(24, 8), dpi=100)
-
+times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 for i, gauge in enumerate(gauges):
     ax = axes[i//4, i % 4]
     ax.plot(times/60, op.gauges[gauge]['timeseries'], label=gauge, color='C0')
@@ -229,7 +229,6 @@ if reg:
 savefig(fname, 'plots', extensions=['pdf'])
 
 fig, axes = plt.subplots(ncols=4, nrows=2, figsize=(24, 8), dpi=100)
-
 for i, gauge in enumerate(gauges):
     ax = axes[i//4, i % 4]
     ax.plot(times/60, op.gauges[gauge]['diff'], label=gauge)
