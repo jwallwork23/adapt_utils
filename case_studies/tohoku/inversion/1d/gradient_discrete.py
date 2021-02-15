@@ -95,9 +95,8 @@ def solve_forward(control, store=False):
     Solve forward problem.
     """
     q_.project(control*basis_function)
-
     for gauge in gauges:
-        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]["coords"])
+        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
         if store:
             op.gauges[gauge]['data'] = [op.gauges[gauge]['init']]
 
@@ -108,7 +107,7 @@ def solve_forward(control, store=False):
     eta_obs = Constant(0.0)
     for gauge in gauges:
         eta_obs.assign(op.gauges[gauge]['init'])
-        J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
+        J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta_ - eta_obs)**2*dx)
     while t < op.end_time:
 
         # Solve forward equation at current timestep
@@ -119,8 +118,7 @@ def solve_forward(control, store=False):
 
         # Time integrate QoI
         wq.assign(0.5 if t >= op.end_time - 0.5*op.dt else 1.0)
-        for gauge in op.gauges:
-
+        for gauge in gauges:
             if store:
                 # Point evaluation at gauges
                 op.gauges[gauge]['data'].append(eta.at(op.gauges[gauge]['coords']))
@@ -135,7 +133,6 @@ def solve_forward(control, store=False):
 
 # --- Gauge indicators
 
-gauges = list(op.gauges.keys())
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]

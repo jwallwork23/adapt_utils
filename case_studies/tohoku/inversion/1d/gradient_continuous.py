@@ -93,7 +93,7 @@ psi, phi = basis_function.split()
 loc = (0.7e+06, 4.2e+06)
 radii = (48e+03, 96e+03)
 angle = pi/12
-phi.interpolate(gaussian([loc + radii, ], mesh, rotation=angle))
+phi.interpolate(gaussian([loc + radii], mesh, rotation=angle))
 
 
 def solve_forward(control, store=False, keep=False):
@@ -101,61 +101,48 @@ def solve_forward(control, store=False, keep=False):
     Solve forward problem.
     """
     q_.project(control*basis_function)
-
     for gauge in gauges:
-        op.gauges[gauge]['timeseries'] = []
-        op.gauges[gauge]['diff'] = []
-        op.gauges[gauge]['init'] = None
+        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
         if store:
-            op.gauges[gauge]['data'] = []
+            op.gauges[gauge]['data'] = [op.gauges[gauge]['init']]
         op.gauges[gauge]['adjoint_free'] = 0.0
     if keep:
-        u_, eta_ = q_.split()
         op.eta_saved = [eta_.copy(deepcopy=True)]
 
     t = 0.0
     iteration = 0
     J = 0
-    weight = Constant(1.0)
+    weight = Constant(0.5)
     eta_obs = Constant(0.0)
+    for gauge in gauges:
+        eta_obs.assign(op.gauges[gauge]['init'])
+        I = op.gauges[gauge]['indicator']
+        diff = eta_ - eta_obs
+        J += assemble(0.5*I*weight*dtc*diff*diff*dx)
+        op.gauges[gauge]['adjoint_free'] += assemble(I*weight*dtc*diff*eta_*dx)
     while t < op.end_time:
 
         # Solve forward equation at current timestep
         solver.solve()
+        q_.assign(q)
+        t += op.dt
+        iteration += 1
 
         # Time integrate QoI
-        weight.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)
-        u, eta = q.split()
-        for gauge in op.gauges:
-
-            # Point evaluation at gauges
-            eta_discrete = eta.at(op.gauges[gauge]["coords"])
-            if op.gauges[gauge]['init'] is None:
-                op.gauges[gauge]['init'] = eta_discrete
-            eta_discrete -= op.gauges[gauge]['init']
-            op.gauges[gauge]['timeseries'].append(eta_discrete)
+        weight.assign(0.5 if t >= op.end_time - 0.5*op.dt else 1.0)
+        for gauge in gauges:
             if store:
-                op.gauges[gauge]['data'].append(eta_discrete)
+                # Point evaluation at gauges
+                op.gauges[gauge]['data'].append(eta.at(op.gauges[gauge]['coords']))
             else:
-                eta_obs.assign(op.gauges[gauge]['data'][iteration])
-
-                # Discrete form of error
-                diff = eta_discrete - eta_obs.dat.data[0]
-                op.gauges[gauge]['diff'].append(diff)
-
                 # Continuous form of error
+                eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
                 I = op.gauges[gauge]['indicator']
                 diff = eta - eta_obs
                 J += assemble(0.5*I*weight*dtc*diff*diff*dx)
                 op.gauges[gauge]['adjoint_free'] += assemble(I*weight*dtc*diff*eta*dx)
-
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))
-
-        # Increment
-        q_.assign(q)
-        t += op.dt
-        iteration += 1
 
     assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return None if store else J
@@ -163,21 +150,21 @@ def solve_forward(control, store=False, keep=False):
 
 # --- Gauge indicators
 
-gauges = list(op.gauges.keys())
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]
     op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
-    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/assemble(op.gauges[gauge]['indicator']*dx))
+    area = assemble(op.gauges[gauge]['indicator']*dx)
+    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
 
 
 # --- Solve forward to get 'data'
 
 print("Solve forward to get 'data'...")
-times = np.linspace(0, op.end_time, int(op.end_time/op.dt))
+times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 solve_forward(m, store=True)
 for gauge in gauges:
-    op.gauges[gauge]['interpolator'] = si.interp1d(times, op.gauges[gauge]['timeseries'])
+    op.gauges[gauge]['interpolator'] = si.interp1d(times, op.gauges[gauge]['data'])
 
 
 # --- Setup continuous adjoint
@@ -206,7 +193,6 @@ a_star += 0.5*dtc*G_star(u_star, eta_star)
 L_star += -0.5*dtc*G_star(u_star_, eta_star_)
 
 rhs = Function(P1)
-
 L_star += dtc*zeta*rhs*dx
 
 q_star = Function(TaylorHood)

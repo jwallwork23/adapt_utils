@@ -105,10 +105,10 @@ def solve_forward(control, store=False, keep=False):
     Solve forward problem.
     """
     q_.project(control*basis_function)
-
     for gauge in gauges:
+        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
         if store:
-            op.gauges[gauge]['data'] = [eta.at(op.gauges[gauge]['coords'])]
+            op.gauges[gauge]['data'] = [op.gauges[gauge]['init']]
     if keep:
         op.eta_saved = [eta_.copy(deepcopy=True)]
 
@@ -117,8 +117,8 @@ def solve_forward(control, store=False, keep=False):
     J = 0
     wq = Constant(0.5)
     eta_obs = Constant(0.0)
-    for gauge in op.gauges:
-        J += assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
+    for gauge in gauges:
+        J += assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta_ - eta_obs)**2*dx)
     while t < op.end_time:
 
         # Solve forward equation at current timestep
@@ -129,17 +129,14 @@ def solve_forward(control, store=False, keep=False):
 
         # Time integrate QoI
         wq.assign(0.5 if t >= op.end_time - 0.5*op.dt else 1.0)
-        for gauge in op.gauges:
-
+        for gauge in gauges:
             if store:
                 # Point evaluation at gauges
-                eta_discrete = eta.at(op.gauges[gauge]['coords'])
-                op.gauges[gauge]['data'].append(eta_discrete)
+                op.gauges[gauge]['data'].append(eta.at(op.gauges[gauge]['coords']))
             else:
                 # Continuous form of error
-                eta_obs.assign(op.gauges[gauge]['data'][iteration])
+                eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
                 J += assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
-
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))
 
@@ -214,20 +211,18 @@ def compute_gradient_continuous(control):
     """
     Compute gradient by solving continuous adjoint problem.
     """
-    iteration = int(op.end_time/op.dt)
+    iteration = -1
     t = op.end_time
     while t > 0.0:
 
         # Evaluate function appearing in RHS
         eta_saved = op.eta_saved[iteration]
         for gauge in gauges:
-            op.gauges[gauge]['obs'].assign(op.gauges[gauge]['data'][iteration-1])
+            op.gauges[gauge]['obs'].assign(op.gauges[gauge]['data'][iteration])
         rhs.interpolate(sum(op.gauges[g]['indicator']*(eta_saved - op.gauges[g]['obs']) for g in gauges))
 
         # Solve adjoint equation at current timestep
         adj_solver.solve()
-
-        # Increment
         q_star_.assign(q_star)
         t -= op.dt
         iteration -= 1
