@@ -34,7 +34,7 @@ fi
 #   If you are using Python3.6 then you may need to remove the NULL return statement in
 version=$(python3 -c "print(int('$(python3 --version)'[9]) <= 6)")
 if [ $version == $(echo "True") ]; then
-	echo "Remove the NULL satement in $VIRTUAL_ENV/lib/python3.6/site-packages/numpy/core/include/numpy/__multiarray_api.h."
+	echo "Remove the 'return NULL;' satement in $VIRTUAL_ENV/lib/python3.6/site-packages/numpy/core/include/numpy/__multiarray_api.h."
 	exit
 fi
 
@@ -57,8 +57,11 @@ cd pyadolc
 # Apply compile flags patch for Python3
 git apply $SOFTWARE/pyadolc_python3.patch
 
-# Build, install
+# Build
 CC=gcc CXX=g++ python3 setup.py build
+
+# Install
+#   If you don't have write access to python3.x/site-packages then you will need to specify --prefix
 python3 setup.py install
 
 # Test (outside of install directory)
