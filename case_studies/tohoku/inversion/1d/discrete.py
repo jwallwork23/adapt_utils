@@ -98,18 +98,19 @@ def solve_forward(control, store=False):
     Solve forward problem.
     """
     q_.project(control*basis_function)
-
-    if store:
-        for gauge in gauges:
-            op.gauges[gauge]['data'] = [eta_.at(op.gauges[gauge]['coords'])]
+    for gauge in gauges:
+        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
+        if store:
+            op.gauges[gauge]['data'] = [op.gauges[gauge]['init']]
 
     t = 0.0
     iteration = 0
     J = 0
     wq = Constant(0.5)
     eta_obs = Constant(0.0)
-    for gauge in op.gauges:
-        J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
+    for gauge in gauges:
+        eta_obs.assign(op.gauges[gauge]['init'])
+        J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta_ - eta_obs)**2*dx)
     while t < op.end_time:
 
         # Solve forward equation at current timestep
@@ -120,15 +121,14 @@ def solve_forward(control, store=False):
 
         # Time integrate QoI
         wq.assign(0.5 if t >= op.end_time - 0.5*op.dt else 1.0)
-        for gauge in op.gauges:
+        for gauge in gauges:
 
             if store:
                 # Point evaluation at gauges
-                eta_discrete = eta.at(op.gauges[gauge]['coords'])
-                op.gauges[gauge]['data'].append(eta_discrete)
+                op.gauges[gauge]['data'].append(eta.at(op.gauges[gauge]['coords']))
             else:
                 # Continuous form of error
-                eta_obs.assign(op.gauges[gauge]['data'][iteration])
+                eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
                 J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
 
     assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)

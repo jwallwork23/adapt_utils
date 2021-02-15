@@ -93,21 +93,18 @@ psi, phi = basis_function.split()
 loc = (0.7e+06, 4.2e+06)
 radii = (48e+03, 96e+03)
 angle = pi/12
-phi.interpolate(gaussian([loc + radii, ], mesh, rotation=angle))
+phi.interpolate(gaussian([loc + radii], mesh, rotation=angle))
 
 
-def solve_forward(control, store=False, keep=False):
+def solve_forward(control, store=False):
     """
     Solve forward problem.
     """
     q_.project(control*basis_function)
-
     for gauge in gauges:
-        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]["coords"])
+        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
         if store:
             op.gauges[gauge]['data'] = [op.gauges[gauge]['init']]
-    if keep:
-        op.eta_saved = [eta_.copy(deepcopy=True)]
 
     t = 0.0
     iteration = 0
@@ -116,7 +113,7 @@ def solve_forward(control, store=False, keep=False):
     eta_obs = Constant(0.0)
     for gauge in gauges:
         eta_obs.assign(op.gauges[gauge]['init'])
-        J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
+        J += assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta_ - eta_obs)**2*dx)
     while t < op.end_time:
 
         # Solve forward equation at current timestep
@@ -124,30 +121,23 @@ def solve_forward(control, store=False, keep=False):
         q_.assign(q)
         t += op.dt
         iteration += 1
-        if keep:
-            op.eta_saved.append(eta.copy(deepcopy=True))
 
         # Time integrate QoI
         wq.assign(0.5 if t >= op.end_time - 0.5*op.dt else 1.0)
-        for gauge in op.gauges:
-
+        for gauge in gauges:
             if store:
                 # Point evaluation at gauges
-                op.gauges[gauge]['data'].append(eta.at(op.gauges[gauge]["coords"]))
+                op.gauges[gauge]['data'].append(eta.at(op.gauges[gauge]['coords']))
             else:
                 # Continuous form of error
                 eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
-                I = op.gauges[gauge]['indicator']
-                diff = eta - eta_obs
-                J = J + assemble(0.5*I*wq*dtc*diff*diff*dx)
-
+                J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
     assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return None if store else J
 
 
 # --- Gauge indicators
 
-gauges = list(op.gauges.keys())
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]
