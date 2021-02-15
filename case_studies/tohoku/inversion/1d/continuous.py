@@ -115,15 +115,20 @@ def solve_forward(control, store=False, keep=False):
     t = 0.0
     iteration = 0
     J = 0
-    wq = Constant(1.0)
+    wq = Constant(0.5)
     eta_obs = Constant(0.0)
+    for gauge in op.gauges:
+        J += assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
     while t < op.end_time:
 
         # Solve forward equation at current timestep
         solver.solve()
+        q_.assign(q)
+        t += op.dt
+        iteration += 1
 
         # Time integrate QoI
-        wq.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)
+        wq.assign(0.5 if t >= op.end_time - 0.5*op.dt else 1.0)
         for gauge in op.gauges:
 
             if store:
@@ -137,11 +142,6 @@ def solve_forward(control, store=False, keep=False):
 
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))
-
-        # Increment
-        q_.assign(q)
-        t += op.dt
-        iteration += 1
 
     assert np.allclose(t, op.end_time), print("mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time))
     return None if store else J
