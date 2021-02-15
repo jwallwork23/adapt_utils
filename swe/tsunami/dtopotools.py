@@ -7,6 +7,7 @@ GeoClaw dtopotools Module `$CLAW/geoclaw/src/python/geoclaw/dtopotools.py` for o
 *        copied code.                                                                        *
 **********************************************************************************************
 """
+from __future__ import absolute_import
 try:
     import adolc
     have_adolc = True
@@ -16,13 +17,19 @@ except ImportError:
     have_adolc = False
 
 import numpy as np
-from time import clock
+from time import perf_counter
 
-import clawpack.geoclaw.dtopotools
-from clawpack.geoclaw.dtopotools import *
+try:
+    import clawpack.geoclaw.dtopotools
+    from clawpack.geoclaw.dtopotools import *
+except ImportError:
+    from dtopotools import *
+
+ClawFault = Fault
+ClawSubFault = SubFault
 
 
-class Fault(clawpack.geoclaw.dtopotools.Fault):
+class Fault(ClawFault):
     """
     Subclass of the CLAWPACK `Fault` class allowing automatic differentation using pyadolc.
     """
@@ -61,21 +68,21 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
 
     def _create_dtopography_passive(self, verbose=False):
         num_subfaults = len(self.subfaults)
-        tic = clock()
+        tic = perf_counter()
         msg = "created topography for subfault {:d}/{:d} ({:.1f} seconds)"
         dz = np.zeros(self.dtopo.X.shape)
         for k, subfault in enumerate(self.subfaults):
             subfault.okada()
             dz += subfault.dtopo.dZ[0, :, :].reshape(dz.shape)
             if k % 10 == 0 and verbose:
-                print(msg.format(k+1, num_subfaults, clock() - tic))
-                tic = clock()
+                print(msg.format(k+1, num_subfaults, perf_counter() - tic))
+                tic = perf_counter()
         self.dtopo.dZ = dz
         return self.dtopo
 
     def _create_dtopography_active(self, verbose=False):
         num_subfaults = len(self.subfaults)
-        tic = clock()
+        tic = perf_counter()
         msg = "created topography for subfault {:d}/{:d} ({:.1f} seconds)"
         dz = np.zeros(self.dtopo.X.shape)
         dz = adolc.adouble(dz)
@@ -83,14 +90,14 @@ class Fault(clawpack.geoclaw.dtopotools.Fault):
             subfault.okada()
             dz += subfault.dtopo.dZ[0, :, :].reshape(dz.shape)
             if k % 10 == 0 and verbose:
-                print(msg.format(k+1, num_subfaults, clock() - tic))
-                tic = clock()
+                print(msg.format(k+1, num_subfaults, perf_counter() - tic))
+                tic = perf_counter()
         self.dtopo.dZ_a = dz
         self.dtopo.dZ = np.array([dzi.val for dzi in np.ravel(dz)]).reshape((1, ) + dz.shape)
         return self.dtopo
 
 
-class SubFault(clawpack.geoclaw.dtopotools.SubFault):
+class SubFault(ClawSubFault):
     """
     Subclass of the CLAWPACK `SubFault` class allowing non-rectangular meshes.
     """
