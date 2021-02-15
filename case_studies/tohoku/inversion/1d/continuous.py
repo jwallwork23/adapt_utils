@@ -107,18 +107,15 @@ def solve_forward(control, store=False, keep=False):
     q_.project(control*basis_function)
 
     for gauge in gauges:
-        op.gauges[gauge]['timeseries'] = []
-        op.gauges[gauge]['init'] = None
         if store:
-            op.gauges[gauge]['data'] = []
+            op.gauges[gauge]['data'] = [eta.at(op.gauges[gauge]['coords'])]
     if keep:
-        u_, eta_ = q_.split()
         op.eta_saved = [eta_.copy(deepcopy=True)]
 
     t = 0.0
     iteration = 0
     J = 0
-    weight = Constant(1.0)
+    wq = Constant(1.0)
     eta_obs = Constant(0.0)
     while t < op.end_time:
 
@@ -126,25 +123,17 @@ def solve_forward(control, store=False, keep=False):
         solver.solve()
 
         # Time integrate QoI
-        weight.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)
-        u, eta = q.split()
+        wq.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)
         for gauge in op.gauges:
 
-            # Point evaluation at gauges
-            eta_discrete = eta.at(op.gauges[gauge]['coords'])
-            if op.gauges[gauge]['init'] is None:
-                op.gauges[gauge]['init'] = eta_discrete
-            eta_discrete -= op.gauges[gauge]['init']
-            op.gauges[gauge]['timeseries'].append(eta_discrete)
             if store:
+                # Point evaluation at gauges
+                eta_discrete = eta.at(op.gauges[gauge]['coords'])
                 op.gauges[gauge]['data'].append(eta_discrete)
             else:
-                eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
-
                 # Continuous form of error
-                I = op.gauges[gauge]['indicator']
-                diff = eta - eta_obs
-                J += assemble(0.5*I*weight*dtc*diff*diff*dx)
+                eta_obs.assign(op.gauges[gauge]['data'][iteration])
+                J += assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
 
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))
@@ -172,10 +161,10 @@ for gauge in gauges:
 # --- Solve forward to get 'data'
 
 print("Solve forward to get 'data'...")
-times = np.linspace(0, op.end_time, int(op.end_time/op.dt))
+times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 solve_forward(m, store=True)
 for gauge in gauges:
-    op.gauges[gauge]['interpolator'] = si.interp1d(times, op.gauges[gauge]['timeseries'])
+    op.gauges[gauge]['interpolator'] = si.interp1d(times, op.gauges[gauge]['data'])
 
 
 # --- Setup continuous adjoint
