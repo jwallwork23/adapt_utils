@@ -143,7 +143,7 @@ def solve_forward(control, store=False, keep=False):
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))
 
-    assert np.allclose(t, op.end_time), print("mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time))
+    assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return None if store else J
 
 
@@ -153,7 +153,7 @@ radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the in
 P0 = FunctionSpace(mesh, "DG", 0)
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]
-    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,), ], mesh), P0)
+    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
     op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/assemble(op.gauges[gauge]['indicator']*dx))
 
 

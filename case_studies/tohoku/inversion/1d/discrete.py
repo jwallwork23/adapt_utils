@@ -90,7 +90,7 @@ psi, phi = basis_function.split()
 loc = (0.7e+06, 4.2e+06)
 radii = (48e+03, 96e+03)
 angle = pi/12
-phi.interpolate(gaussian([loc + radii, ], mesh, rotation=angle))
+phi.interpolate(gaussian([loc + radii], mesh, rotation=angle))
 
 
 def solve_forward(control, store=False):
@@ -131,7 +131,7 @@ def solve_forward(control, store=False):
                 eta_obs.assign(op.gauges[gauge]['data'][iteration])
                 J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
 
-    assert np.allclose(t, op.end_time), print("mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time))
+    assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return None if store else J
 
 

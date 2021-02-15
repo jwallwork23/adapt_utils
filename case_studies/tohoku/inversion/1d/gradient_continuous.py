@@ -23,6 +23,7 @@ op.end_time = 60*30
 mesh = op.default_mesh
 P2_vec = VectorFunctionSpace(mesh, "CG", 2)
 P1 = FunctionSpace(mesh, "CG", 1)
+P0 = FunctionSpace(mesh, "DG", 0)
 TaylorHood = P2_vec*P1
 
 
@@ -156,7 +157,7 @@ def solve_forward(control, store=False, keep=False):
         t += op.dt
         iteration += 1
 
-    assert np.allclose(t, op.end_time), print("mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time))
+    assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return None if store else J
 
 
@@ -164,10 +165,9 @@ def solve_forward(control, store=False, keep=False):
 
 gauges = list(op.gauges.keys())
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
-P0 = FunctionSpace(mesh, "DG", 0)
 for gauge in gauges:
     loc = op.gauges[gauge]["coords"]
-    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,), ], mesh), P0)
+    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
     op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/assemble(op.gauges[gauge]['indicator']*dx))
 
 
