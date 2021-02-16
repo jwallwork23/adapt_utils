@@ -18,6 +18,7 @@ parser.add_argument("-gtol")
 parser.add_argument("-maxiter")
 parser.add_argument("-alpha")
 parser.add_argument("-num_minutes")
+parser.add_argument("-resume")
 args = parser.parse_args()
 
 level = int(args.level)
@@ -37,6 +38,28 @@ for gauge in gauges:
 gauges = list(op.gauges.keys())
 print(gauges)
 op.active_controls = ['slip', 'rake']
+fname = 'data/opt_progress_discrete_{:d}_{:s}'
+logname = 'data/discrete_{:d}'.format(level)
+if reg:
+    fname += '_reg'
+    logname += '_reg'
+resume = bool(args.resume or False)
+if resume:
+    op.control_trajectory = list(np.load(fname.format(level, 'ctrl') + '.npy'))
+    op.functional_trajectory = list(np.load(fname.format(level, 'func') + '.npy'))
+    op.gradient_trajectory = list(np.load(fname.format(level, 'grad') + '.npy'))
+    op.line_search_trajectory = list(np.load(fname.format(level, 'ls') + '.npy'))
+    op.control_parameters['slip'] = op.control_trajectory[-1][:190]
+    op.control_parameters['rake'] = op.control_trajectory[-1][190:]
+    with open(logname + '.log', 'r') as log:
+        log.readline()
+        op._feval = int(log.readline().split(':')[1])
+else:
+    op.control_trajectory = []
+    op.functional_trajectory = []
+    op.gradient_trajectory = []
+    op.line_search_trajectory = []
+    op._feval = 0
 num_active_controls = len(op.active_controls)
 
 
@@ -124,8 +147,6 @@ def tsunami_propagation(init):
     Run tsunami propagation, given an initial velocity-elevation tuple.
     """
     q_.assign(init)
-    for gauge in gauges:
-        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
     t = 0.0
     wq = Constant(0.5*0.5*op.dt)
     eta_obs = Constant(0.0)
@@ -133,6 +154,7 @@ def tsunami_propagation(init):
     # Setup QoI
     J = 0 if not reg else assemble(alpha*inner(init, init)*dx)
     for gauge in op.gauges:
+        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])  # TODO: What if arrival time != 0
         if t < op.gauges[gauge]['arrival_time']:
             continue
         eta_obs.assign(op.gauges[gauge]['init'])
@@ -184,7 +206,10 @@ for gauge in gauges:
 # --- Forward solve
 
 J = tsunami_propagation(q_init)
-print("Quantity of interest = {:.4e}".format(J))
+if resume:
+    J_ = op.functional_trajectory[-1]
+    # assert np.isclose(J, J_), "Expected {:.4e}, got {:.4e}.".format(J_, J)
+    print("Expected {:.4e}, got {:.4e}.".format(J_, J))
 
 
 c = Control(q_init)
@@ -242,6 +267,7 @@ def reduced_functional(m):
     """
     q0 = tsunami_ic(okada_source(m))
     return rf_tsunami(q0)
+    # return tsunami_propagation(q0)
 
 
 def tsunami_ic_inverse(q0):
@@ -273,18 +299,8 @@ m_init = np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_contr
 # # opt.taylor_test(okada_source, gradient_okada, m_init, verbose=True)  # TODO: TESTME
 # opt.taylor_test(reduced_functional, gradient, m_init, verbose=True)
 
+
 # --- Optimisation
-
-print_output("Run optimisation...")
-op.control_trajectory = []
-op.functional_trajectory = []
-op.gradient_trajectory = []
-op.line_search_trajectory = []
-op._feval = 0
-fname = 'data/opt_progress_discrete_{:d}_{:s}'
-if reg:
-    fname += '_reg'
-
 
 def reduced_functional__save(m):
     """
@@ -321,6 +337,7 @@ def callback(m):
     np.save(fname.format(level, 'ls'), op.line_search_trajectory)
 
 
+print_output("Run optimisation...")
 kwargs = dict(fprime=gradient__save, callback=callback, gtol=gtol, full_output=True, maxiter=maxiter)
 tic = perf_counter()
 try:
@@ -328,10 +345,7 @@ try:
 except opt.GradientConverged:
     out = (op.control_trajectory[-1], op.functional_trajectory[-1], op.gradient_trajectory[-1], op._feval, len(op.gradient_trajectory))
 cpu_time = perf_counter() - tic
-fname = 'data/discrete_{:d}'.format(level)
-if reg:
-    fname += '_reg'
-with open(fname + '.log', 'w+') as log:
+with open(logname + '.log', 'w+') as log:
     log.write("minimum:              {:.8e}\n".format(out[1]))
     log.write("function evaluations: {:d}\n".format(out[4]))
     log.write("gradient evaluations: {:d}\n".format(out[5]))
