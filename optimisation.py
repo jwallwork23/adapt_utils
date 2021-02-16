@@ -6,7 +6,7 @@ __all__ = ["taylor_test", "ConvergenceError" "StagnationError", "GradientConverg
 
 
 # TODO: Taylor test gradient using Frobenius norm as QoI
-def taylor_test(function, gradient, m, delta_m=None, verbose=False, ratio_tol=1.95):
+def taylor_test(function, gradient, m, delta_m=None, verbose=False, ratio_tol=1.90):
     """
     Apply a 'Taylor test' to verify that the provided `gradient` function is a consistent
     approximation to the provided `function` at point `m`. This is done by choosing a random search
@@ -23,7 +23,8 @@ def taylor_test(function, gradient, m, delta_m=None, verbose=False, ratio_tol=1.
     if verbose:
         print_output(24*"=" + "TAYLOR TEST" + 24*"=")
     m = np.array(m).flatten()
-    delta_m = delta_m or np.random.normal(loc=0.0, scale=1.0, size=m.shape)
+    if delta_m is None:
+        delta_m = np.random.normal(loc=0.0, scale=1.0, size=m.shape)
     assert len(m) == len(delta_m)
 
     # Evaluate the reduced functional and gradient at the specified control value

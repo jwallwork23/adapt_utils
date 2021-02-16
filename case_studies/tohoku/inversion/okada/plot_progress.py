@@ -12,8 +12,7 @@ parser.add_argument("level")
 args = parser.parse_args()
 
 level = int(args.level)
-# mode = 'discrete'
-mode = 'continuous'
+mode = 'discrete'
 try:
     control_trajectory = np.load('data/opt_progress_{:s}_{:d}_ctrl.npy'.format(mode, level))
     functional_trajectory = np.load('data/opt_progress_{:s}_{:d}_func.npy'.format(mode, level))
@@ -35,7 +34,7 @@ gradient_trajectory = [gradient_trajectory[i] for i in indices]
 gradient_norm_trajectory = [vecnorm(g, order=np.Inf) for g in gradient_trajectory]
 
 fig, axes = plt.subplots(figsize=(8, 8))
-axes.semilogx(functional_trajectory)
+axes.loglog(functional_trajectory)
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Quantity of Interest")
 axes.grid(True, which='both')
