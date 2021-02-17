@@ -2,10 +2,12 @@ from thetis import *
 
 import argparse
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1.inset_locator import zoomed_inset_axes, mark_inset
 
 from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
-from adapt_utils.plotting import *
 from adapt_utils.misc import ellipse
+from adapt_utils.plotting import *
+from adapt_utils.swe.tsunami.conversion import lonlat_to_utm
 
 
 parser = argparse.ArgumentParser()
@@ -111,21 +113,42 @@ eta0.dat.name = "Initial surface"
 q_init = Function(TaylorHood)
 q_init.project(q0)
 num_subfaults = len(op.subfaults)
-
 u_init, eta_init = q_init.split()
-fig, axes = plt.subplots(figsize=(7, 6))
-eta_min = 1.01*eta_init.vector().gather().min()
-eta_max = 1.01*eta_init.vector().gather().max()
-tc = tricontourf(eta_init, axes=axes, cmap='coolwarm', levels=np.linspace(eta_min, eta_max, 50))
-fig.colorbar(tc, ax=axes)
+
+
+# --- Plot initial dislocation field
+
+lonlat_corners = [(138, 32), (148, 42), (138, 42)]
+utm_corners = [lonlat_to_utm(*corner, 54) for corner in lonlat_corners]
+xlim = [utm_corners[0][0], utm_corners[1][0]]
+ylim = [utm_corners[0][1], utm_corners[2][1]]
+figure, axes = plt.subplots(ncols=2, figsize=(15, 6))
+axes[0].axis(False);
+axes = axes[1]
+
+# Plot over whole domain
+levels = np.linspace(-6, 10, 51)
+cbar = figure.colorbar(tricontourf(eta_init, levels=levels, axes=axes, cmap='coolwarm'), ax=axes)
+cbar.set_label(r"Dislocation $[\mathrm m]$");
+cbar.set_ticks(np.linspace(-5, 10, 4))
 op.annotate_plot(axes)
-axes.axis(False)
+axes.axis(False);
+
+# Add zoom
+axins = zoomed_inset_axes(axes, 2.5, bbox_to_anchor=[750, 525]) # zoom-factor: 2.5
+tricontourf(eta_init, levels=51, axes=axins, cmap='coolwarm');
+axins.axis(False);
+axins.set_xlim(xlim);
+axins.set_ylim(ylim);
+mark_inset(axes, axins, loc1=1, loc2=1, fc="none", ec="0.5");
+
+# Save
 fname = "dislocation_1d_{:d}".format(level)
 if reg:
     fname += '_reg'
 if not loaded:
     fname += '_ig'
-savefig(fname, "plots", extensions=["jpg"])
+savefig(fname, "plots", extensions=["jpg"], tight=False)
 
 
 def tsunami_propagation(init):
