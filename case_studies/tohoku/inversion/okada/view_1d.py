@@ -235,7 +235,7 @@ for i, gauge in enumerate(gauges):
     ax = axes[i//4, i % 4]
     ax.plot(times/60, op.gauges[gauge]['timeseries'], label=gauge, color='C0')
     ax.plot(times/60, op.gauges[gauge]['timeseries_smooth'], ':', color='C0')
-    ax.plot(times/60, op.gauges[gauge]['data'], 'x', color='C1')
+    ax.plot(times/60, op.gauges[gauge]['data'], 'x', color='C1', markevery=2**level)
     leg = ax.legend(handlelength=0, handletextpad=0, fontsize=20)
     for item in leg.legendHandles:
         item.set_visible(False)
