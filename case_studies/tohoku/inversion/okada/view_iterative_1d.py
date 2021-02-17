@@ -15,11 +15,22 @@ parser.add_argument("-num_minutes")
 args = parser.parse_args()
 
 level = int(args.level)
-op = TohokuOkadaBasisOptions(level=level, synthetic=False)
-op.end_time = 60*float(args.num_minutes or 30)
+control_parameters = {
+    'latitude': [37.52],
+    'longitude': [143.05],
+    'depth': [12581.10],
+    'strike': [198.0],
+    'dip': [10.0],
+    'length': [300.0e+03],
+    'width': [150.0e+03],
+    'slip': [29.5],
+    'rake': [90.0],
+}
+op = TohokuOkadaBasisOptions(level=level, nx=1, ny=1, control_parameters=control_parameters)
+op.end_time = 60*float(args.num_minutes or 20)
 alpha = float(args.alpha or 0.0)
 reg = not np.isclose(alpha, 0.0)
-alpha /= op.nx*op.ny*25.0e+03*20.0e+03
+alpha /= 300.0e+03*150.0e+03
 alpha = Constant(alpha)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
@@ -29,15 +40,17 @@ for gauge in gauges:
 gauges = list(op.gauges.keys())
 print(gauges)
 op.active_controls = ['slip', 'rake']
-fname = 'data/opt_progress_discrete_{:d}_{:s}'
+fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'
 if reg:
     fname += '_reg'
 try:
     opt_controls = np.load(fname.format(level, 'ctrl') + '.npy')[-1]
-    op.control_parameters['slip'] = opt_controls[:190]
-    op.control_parameters['rake'] = opt_controls[190:]
+    op.control_parameters['slip'] = [opt_controls[0]]
+    op.control_parameters['rake'] = [opt_controls[1]]
 except Exception:
     print("Could not find optimised controls. Proceeding with initial guess.")
+for control in control_parameters:
+    print(control, control_parameters[control])
 num_active_controls = len(op.active_controls)
 base_dt = 4
 op.dt = base_dt*0.5**level
@@ -104,7 +117,7 @@ axes.set_xlim([xg - 0.25e+06, xg + 0.25e+06])
 axes.set_ylim([yg - 0.4e+06, yg + 0.3e+06])
 op.annotate_plot(axes)
 axes.axis(False)
-fname = "dislocation_{:d}".format(level)
+fname = "dislocation_1d_{:d}".format(level)
 if reg:
     fname += '_reg'
 savefig(fname, "plots", extensions=["jpg"])
@@ -140,9 +153,9 @@ def tsunami_propagation(init):
         op.gauges[gauge]['data'] = [0.0]
         op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
         op.gauges[gauge]['init_smooth'] = assemble(op.gauges[gauge]['indicator']*eta_*dx)
-        op.gauges[gauge]['timeseries'] = [op.gauges[gauge]['init']]
+        op.gauges[gauge]['timeseries'] = [0.0]
         op.gauges[gauge]['timeseries_smooth'] = [0.0]
-        op.gauges[gauge]['diff'] = [op.gauges[gauge]['init']]
+        op.gauges[gauge]['diff'] = [0.0]
         op.gauges[gauge]['diff_smooth'] = [0.0]
         eta_obs.assign(op.gauges[gauge]['init'])
         J = J + assemble(0.5*wq*dtc*op.gauges[gauge]['indicator']*(eta - eta_obs)**2*dx)
@@ -215,7 +228,7 @@ for i, gauge in enumerate(gauges):
     if i % 4 == 0:
         ax.set_ylabel(r"Elevation [$\mathrm m$]")
     ax.grid(True)
-fname = 'discrete_timeseries_both_{:d}'.format(level)
+fname = 'discrete_timeseries_both_1d_{:d}'.format(level)
 if reg:
     fname += '_reg'
 savefig(fname, 'plots', extensions=['pdf'])
@@ -231,7 +244,7 @@ for i, gauge in enumerate(gauges):
     if i % 4 == 0:
         ax.set_ylabel(r"Squared error [$\mathrm m^2$]")
     ax.grid(True)
-fname = 'discrete_timeseries_error_{:d}'.format(level)
+fname = 'discrete_timeseries_error_1d_{:d}'.format(level)
 if reg:
     fname += '_reg'
 savefig(fname, 'plots', extensions=['pdf'])

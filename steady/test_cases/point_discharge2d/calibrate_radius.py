@@ -188,7 +188,7 @@ if bool(args.recompute_parameter_space or False):
 # Optimisation
 print_output("Running optimisation...")
 callback = lambda _: print_output("LINE SEARCH COMPLETE")
-r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.01, 1), callback=callback)
+r_calibrated = minimize(Jhat, method='L-BFGS-B', bounds=(0.01, np.Inf), callback=callback)
 
 # Logging
 print_output("Logging...")
