@@ -12,6 +12,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("level")
 parser.add_argument("-alpha")
 parser.add_argument("-num_minutes")
+parser.add_argument("-initial_guess")
 args = parser.parse_args()
 
 level = int(args.level)
@@ -19,6 +20,7 @@ alpha = float(args.alpha or 0.0)
 reg = not np.isclose(alpha, 0.0)
 alpha /= 300.0e+03*150.0e+03
 alpha = Constant(alpha)
+ig = bool(args.initial_guess or False)
 control_parameters = {
     'latitude': [37.52],
     'longitude': [143.05],
@@ -38,13 +40,17 @@ op.active_controls = ['slip', 'rake']
 fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'
 if reg:
     fname += '_reg'
+loaded = False
 try:
+    assert not ig
     opt_controls = np.load(fname.format(level, 'ctrl') + '.npy')[-1]
     op.control_parameters['slip'] = [opt_controls[0]]
     op.control_parameters['rake'] = [opt_controls[1]]
     op.control_parameters['dip'] = [opt_controls[2]]
+    loaded = True
 except Exception:
     print("Could not find optimised controls. Proceeding with initial guess.")
+    fname += '_ig'
 num_active_controls = len(op.active_controls)
 
 
@@ -121,6 +127,8 @@ axes.axis(False)
 fname = "dislocation_1d_{:d}".format(level)
 if reg:
     fname += '_reg'
+if not loaded:
+    fname += '_ig'
 savefig(fname, "plots", extensions=["jpg"])
 
 
@@ -224,6 +232,8 @@ for i, gauge in enumerate(gauges):
 fname = 'discrete_timeseries_both_1d_{:d}'.format(level)
 if reg:
     fname += '_reg'
+if not loaded:
+    fname += '_ig'
 savefig(fname, 'plots', extensions=['pdf'])
 
 fig, axes = plt.subplots(ncols=4, nrows=len(gauges)//4, figsize=(17, 13), dpi=100)
@@ -245,4 +255,6 @@ for i, gauge in enumerate(gauges):
 fname = 'discrete_timeseries_error_1d_{:d}'.format(level)
 if reg:
     fname += '_reg'
+if not loaded:
+    fname += '_ig'
 savefig(fname, 'plots', extensions=['pdf'])
