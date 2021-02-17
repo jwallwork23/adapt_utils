@@ -32,7 +32,7 @@ control_parameters = {
     'length': [300.0e+03],
     'width': [150.0e+03],
     'slip': [29.5],
-    'rake': [90.0],
+    'rake': [30.0],
     'dip': [10.0],
 }
 alpha = float(args.alpha or 0.0)

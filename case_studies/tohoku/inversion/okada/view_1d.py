@@ -29,7 +29,7 @@ control_parameters = {
     'length': [300.0e+03],
     'width': [150.0e+03],
     'slip': [29.5],
-    'rake': [90.0],
+    'rake': [30.0],
     'dip': [10.0],
 }
 op = TohokuOkadaBasisOptions(level=level, nx=1, ny=1, control_parameters=control_parameters)
@@ -142,9 +142,9 @@ def tsunami_propagation(init):
         op.gauges[gauge]['data'] = [0.0]
         op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
         op.gauges[gauge]['init_smooth'] = assemble(op.gauges[gauge]['indicator']*eta_*dx)
-        op.gauges[gauge]['timeseries'] = [op.gauges[gauge]['init']]
+        op.gauges[gauge]['timeseries'] = [0.0]
         op.gauges[gauge]['timeseries_smooth'] = [0.0]
-        op.gauges[gauge]['diff'] = [op.gauges[gauge]['init']]
+        op.gauges[gauge]['diff'] = [0.0]
         op.gauges[gauge]['diff_smooth'] = [0.0]
 
     t = 0.0
