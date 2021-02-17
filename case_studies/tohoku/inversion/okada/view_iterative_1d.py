@@ -39,7 +39,7 @@ for gauge in gauges:
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
 print(gauges)
-op.active_controls = ['slip', 'rake']
+op.active_controls = ['slip', 'rake', 'dip']
 fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'
 if reg:
     fname += '_reg'
@@ -47,6 +47,7 @@ try:
     opt_controls = np.load(fname.format(level, 'ctrl') + '.npy')[-1]
     op.control_parameters['slip'] = [opt_controls[0]]
     op.control_parameters['rake'] = [opt_controls[1]]
+    op.control_parameters['dip'] = [opt_controls[2]]
 except Exception:
     print("Could not find optimised controls. Proceeding with initial guess.")
 for control in control_parameters:

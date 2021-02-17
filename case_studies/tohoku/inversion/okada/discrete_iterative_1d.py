@@ -40,25 +40,26 @@ control_parameters = {
     'longitude': [143.05],
     'depth': [12581.10],
     'strike': [198.0],
-    'dip': [10.0],
     'length': [300.0e+03],
     'width': [150.0e+03],
     'slip': [29.5],
     'rake': [90.0],
+    'dip': [10.0],
 }
 op = TohokuOkadaBasisOptions(level=level, nx=1, ny=1, control_parameters=control_parameters)
-op.end_time = 60*float(args.num_minutes or 120)
+op.end_time = 60*float(args.num_minutes or 20)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
     # if gauge[:2] not in ('P0', '80'):
-    # if gauge[:2] != 'P0':
-    if op.gauges[gauge]['operator'] != 'NOAA':  # Dart gauges only
+    if gauge[:2] != 'P0':
         op.gauges.pop(gauge)
+    # if op.gauges[gauge]['operator'] != 'NOAA':
+    #     op.gauges.pop(gauge)
     elif op.gauges[gauge]['arrival_time'] >= op.end_time:
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
 print(gauges)
-op.active_controls = ['slip', 'rake']
+op.active_controls = ['slip', 'rake', 'dip']
 num_active_controls = len(op.active_controls)
 base_dt = 4
 op.dt = base_dt*0.5**level
@@ -251,16 +252,16 @@ if taylor:
 def reduced_functional__save(m):
     op._J = reduced_functional(m)
     op._feval += 1
-    msg = "slip {:11.4e}  rake {:5.2f}  functional {:15.8e}"
-    print(msg.format(m[0], m[1], op._J))
+    msg = "slip {:5.2f}  rake {:5.2f}  dip {:5.2f}  functional {:15.8e}"
+    print(msg.format(m[0], m[1], m[2], op._J))
     return op._J
 
 
 def gradient__save(m):
     dJdm = gradient(m)
     g = vecnorm(dJdm, order=np.Inf)
-    msg = "slip {:11.4e}  rake {:5.2f}  functional {:15.8e}  gradient {:15.8e}"
-    print(msg.format(m[0], m[1], op._J, g))
+    msg = "slip {:5.2f}  rake {:5.2f}  dip {:5.2f}  functional {:15.8e}  gradient {:15.8e}"
+    print(msg.format(m[0], m[1], m[2], op._J, g))
     op.control_trajectory.append(m)
     op.functional_trajectory.append(op._J)
     op.gradient_trajectory.append(dJdm)
@@ -287,27 +288,19 @@ opt_kwargs = {
     'pgtol': gtol,
     'fprime': gradient__save,
     'callback': callback,
-    'bounds': [(0.0, np.Inf), (0.0, 90.0)],
+    'bounds': [(0.0, np.Inf), (0.0, 90.0), (0.0, 90.0)],
 }
 tic = perf_counter()
 try:
-    out = so.fmin_l_bfgs_b(reduced_functional__save, c, **opt_kwargs)
+    so.fmin_l_bfgs_b(reduced_functional__save, c, **opt_kwargs)
 except opt.GradientConverged:
-    out = (
-        op.control_trajectory[-1],
-        op.functional_trajectory[-1],
-        {
-            'warnflag': 2,
-            'grad': op.gradient_trajectory[-1],
-            'funcalls': op._feval,
-            'nit': len(op.line_search_trajectory),
-        }
-    )
+    pass
 cpu_time = perf_counter() - tic
 with open(logname + '.log', 'w+') as log:
-    log.write("slip minimiser:       {:.8e}\n".format(out[0][0]))
-    log.write("rake minimiser:       {:.8e}\n".format(out[0][1]))
-    log.write("minimum:              {:.8e}\n".format(out[1]))
-    log.write("function evaluations: {:d}\n".format(out[3]['funcalls']))
+    log.write("slip minimiser:       {:.8e}\n".format(op.control_trajectory[-1][0]))
+    log.write("rake minimiser:       {:.4f}\n".format(op.control_trajectory[-1][1]))
+    log.write("dip minimiser:        {:.4f}\n".format(op.control_trajectory[-1][2]))
+    log.write("minimum:              {:.8e}\n".format(op.functional_trajectory[-1]))
+    log.write("function evaluations: {:d}\n".format(op._feval))
     log.write("gradient evaluations: {:d}\n".format(len(op.gradient_trajectory)))
     log.write("CPU time:             {:.2f}\n".format(cpu_time))
