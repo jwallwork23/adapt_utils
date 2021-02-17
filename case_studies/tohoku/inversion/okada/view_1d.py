@@ -24,7 +24,7 @@ ig = bool(args.initial_guess or False)
 control_parameters = {
     'latitude': [37.52],
     'longitude': [143.05],
-    'depth': [12581.10],
+    'depth': [20.0e+03],
     'strike': [198.0],
     'length': [300.0e+03],
     'width': [150.0e+03],
@@ -36,7 +36,6 @@ op = TohokuOkadaBasisOptions(level=level, nx=1, ny=1, control_parameters=control
 op.end_time = 60*float(args.num_minutes or 120)
 gauges = list(op.gauges.keys())
 print(gauges)
-op.active_controls = ['slip', 'rake']
 fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'
 if reg:
     fname += '_reg'
@@ -47,11 +46,11 @@ try:
     op.control_parameters['slip'] = [opt_controls[0]]
     op.control_parameters['rake'] = [opt_controls[1]]
     op.control_parameters['dip'] = [opt_controls[2]]
+    op.control_parameters['strike'] = [opt_controls[3]]
     loaded = True
 except Exception:
     print("Could not find optimised controls. Proceeding with initial guess.")
     fname += '_ig'
-num_active_controls = len(op.active_controls)
 
 
 # --- Setup tsunami propagation problem
@@ -114,14 +113,11 @@ q_init.project(q0)
 num_subfaults = len(op.subfaults)
 
 u_init, eta_init = q_init.split()
-fig, axes = plt.subplots(figsize=(6, 6))
+fig, axes = plt.subplots(figsize=(7, 6))
 eta_min = 1.01*eta_init.vector().gather().min()
 eta_max = 1.01*eta_init.vector().gather().max()
 tc = tricontourf(eta_init, axes=axes, cmap='coolwarm', levels=np.linspace(eta_min, eta_max, 50))
 fig.colorbar(tc, ax=axes)
-# xg, yg = op.gauges["P02"]["coords"]
-# axes.set_xlim([xg - 0.25e+06, xg + 0.25e+06])
-# axes.set_ylim([yg - 0.4e+06, yg + 0.3e+06])
 op.annotate_plot(axes)
 axes.axis(False)
 fname = "dislocation_1d_{:d}".format(level)
@@ -164,6 +160,7 @@ def tsunami_propagation(init):
         solver.solve()
         q_.assign(q)
         t += op.dt
+        print("t = {:.0f} mins".format(t/60))
 
         # Time integrate QoI
         weight.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)

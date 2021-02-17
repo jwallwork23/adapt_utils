@@ -18,7 +18,10 @@ parser.add_argument("-gtol")
 parser.add_argument("-maxiter")
 parser.add_argument("-alpha")
 parser.add_argument("-num_minutes")
-parser.add_argument("-resume")
+parser.add_argument("-slip")
+parser.add_argument("-rake")
+parser.add_argument("-dip")
+parser.add_argument("-strike")
 args = parser.parse_args()
 
 level = int(args.level)
@@ -27,13 +30,13 @@ maxiter = int(args.maxiter or 1000)
 control_parameters = {
     'latitude': [37.52],
     'longitude': [143.05],
-    'depth': [12581.10],
-    'strike': [198.0],
+    'depth': [20.0e+03],
     'length': [300.0e+03],
     'width': [150.0e+03],
-    'slip': [29.5],
-    'rake': [30.0],
-    'dip': [10.0],
+    'slip': [float(args.slip or 29.5)],
+    'rake': [float(args.rake or 30.0)],
+    'dip': [float(args.dip or 10.0)],
+    'strike': [float(args.strike or 198.0)],
 }
 alpha = float(args.alpha or 0.0)
 reg = not np.isclose(alpha, 0.0)
@@ -44,26 +47,13 @@ logname = 'data/discrete_1d_{:d}'.format(level)
 if reg:
     fname += '_reg'
     logname += '_reg'
-resume = bool(args.resume or False)
 op = TohokuOkadaBasisOptions(nx=1, ny=1, level=level, control_parameters=control_parameters)
 op.end_time = 60*float(args.num_minutes or 120)
-if resume:
-    op.control_trajectory = list(np.load(fname.format(level, 'ctrl') + '.npy'))
-    op.functional_trajectory = list(np.load(fname.format(level, 'func') + '.npy'))
-    op.gradient_trajectory = list(np.load(fname.format(level, 'grad') + '.npy'))
-    op.line_search_trajectory = list(np.load(fname.format(level, 'ls') + '.npy'))
-    op.control_parameters['slip'] = op.control_trajectory[-1][0]
-    op.control_parameters['rake'] = op.control_trajectory[-1][1]
-    op.control_parameters['dip'] = op.control_trajectory[-1][2]
-    with open(logname + '.log', 'r') as log:
-        log.readline()
-        op._feval = int(log.readline().split(':')[1])
-else:
-    op.control_trajectory = []
-    op.functional_trajectory = []
-    op.gradient_trajectory = []
-    op.line_search_trajectory = []
-    op._feval = 0
+op.control_trajectory = []
+op.functional_trajectory = []
+op.gradient_trajectory = []
+op.line_search_trajectory = []
+op._feval = 0
 gauges = list(op.gauges.keys())
 for gauge in gauges:
     if gauge[:2] in ('P0', '80'):
@@ -72,7 +62,7 @@ for gauge in gauges:
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
 print(gauges)
-op.active_controls = ['slip', 'rake', 'dip']
+op.active_controls = ['slip', 'rake', 'dip', 'strike']
 num_active_controls = len(op.active_controls)
 
 
@@ -86,12 +76,6 @@ TaylorHood = P2_vec*P1
 b = Function(P1).assign(op.set_bathymetry(P1))
 g = Constant(op.g)
 f = Function(P1).assign(op.set_coriolis(P1))
-
-boundary_conditions = {
-    100: ['freeslip', 'dirichlet'],
-    200: ['freeslip'],
-    300: ['freeslip'],
-}
 dtc = Constant(op.dt)
 n = FacetNormal(mesh)
 
@@ -210,10 +194,6 @@ def tsunami_propagation(init):
 # --- Forward solve
 
 J = tsunami_propagation(q_init)
-if resume:
-    J_ = op.functional_trajectory[-1]
-    # assert np.isclose(J, J_), "Expected {:.4e}, got {:.4e}.".format(J_, J)
-    print("Expected {:.4e}, got {:.4e}.".format(J_, J))
 
 
 c = Control(q_init)
@@ -312,8 +292,8 @@ def reduced_functional__save(m):
     """
     op._J = reduced_functional(m)
     op._feval += 1
-    msg = "slip {:5.2f}  rake {:5.2f}  dip {:5.2f}  functional {:15.8e}"
-    print(msg.format(m[0], m[1], m[2], op._J))
+    msg = "slip {:5.2f} rake {:5.2f} dip {:5.2f} strike {:5.2f} functional {:15.8e}"
+    print(msg.format(*m, op._J))
     return op._J
 
 
@@ -323,8 +303,8 @@ def gradient__save(m):
     """
     dJdm = gradient(m)
     g = vecnorm(dJdm, order=np.Inf)
-    msg = "slip {:5.2f}  rake {:5.2f}  dip {:5.2f}  functional {:15.8e}  gradient {:15.8e}"
-    print(msg.format(m[0], m[1], m[2], op._J, g))
+    msg = "slip {:5.2f} rake {:5.2f} dip {:5.2f} strike {:5.2f} functional {:15.8e} gradient {:15.8e}"
+    print(msg.format(*m, op._J, g))
     op.control_trajectory.append(m)
     op.functional_trajectory.append(op._J)
     op.gradient_trajectory.append(dJdm)
@@ -349,7 +329,7 @@ kwargs = dict(
     callback=callback,
     pgtol=gtol,
     maxiter=maxiter,
-    bounds=[(0.0, np.Inf), (0.0, 90.0), (0.0, 90.0)],
+    bounds=[(0.0, np.Inf), (0.0, 90.0), (0.0, 90.0), (-np.Inf, np.Inf)],
 )
 tic = perf_counter()
 try:
@@ -361,6 +341,7 @@ with open(logname + '.log', 'w+') as log:
     log.write("slip minimiser:       {:.8e}\n".format(op.control_trajectory[-1][0]))
     log.write("rake minimiser:       {:.4f}\n".format(op.control_trajectory[-1][1]))
     log.write("dip minimiser:        {:.4f}\n".format(op.control_trajectory[-1][2]))
+    log.write("strike minimiser:     {:.4f}\n".format(op.control_trajectory[-1][3]))
     log.write("minimum:              {:.8e}\n".format(op.functional_trajectory[-1]))
     log.write("function evaluations: {:d}\n".format(op._feval))
     log.write("gradient evaluations: {:d}\n".format(len(op.gradient_trajectory)))
