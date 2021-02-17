@@ -74,8 +74,9 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         # Numbers of sub-faults in each direction
         self.nx = kwargs.get('nx', 19)
         self.ny = kwargs.get('ny', 10)
-        assert self.nx*self.ny == len(self.subfaults)
+        msg = "nx = {:d}, ny = {:d} inconsistent with {:d} subfaults"
         self.num_subfaults = len(self.subfaults)
+        assert self.nx*self.ny == self.num_subfaults, msg.format(self.nx, self.ny, self.num_subfaults)
 
         # Active controls for automatic differentation
         self.active_controls = ('slip', 'rake', 'strike', 'dip')
@@ -89,7 +90,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         width of 20km. Note that the webpage also provides initial times, rise times and end times
         for each subfault, although we do not use these here.
         """
-        # TODO: Use geoclaw's inbuild functionality for reading from UCSB format
+        # TODO: Use geoclaw's inbuilt functionality for reading from UCSB format
         import os
         import urllib.request
 
