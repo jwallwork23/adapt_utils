@@ -46,7 +46,7 @@ if reg:
     logname += '_reg'
 resume = bool(args.resume or False)
 op = TohokuOkadaBasisOptions(nx=1, ny=1, level=level, control_parameters=control_parameters)
-op.end_time = 60*float(args.num_minutes or 60)
+op.end_time = 60*float(args.num_minutes or 120)
 if resume:
     op.control_trajectory = list(np.load(fname.format(level, 'ctrl') + '.npy'))
     op.functional_trajectory = list(np.load(fname.format(level, 'func') + '.npy'))
@@ -66,7 +66,7 @@ else:
     op._feval = 0
 gauges = list(op.gauges.keys())
 for gauge in gauges:
-    if gauge not in ('KPG1', 'KPG2', '21418'):
+    if gauge[:2] in ('P0', '80'):
         op.gauges.pop(gauge)
     elif op.gauges[gauge]['arrival_time'] >= op.end_time:
         op.gauges.pop(gauge)
