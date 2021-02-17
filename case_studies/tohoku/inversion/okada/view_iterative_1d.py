@@ -15,23 +15,36 @@ parser.add_argument("-num_minutes")
 args = parser.parse_args()
 
 level = int(args.level)
+alpha = float(args.alpha or 0.0)
+reg = not np.isclose(alpha, 0.0)
+alpha /= 300.0e+03*150.0e+03
+alpha = Constant(alpha)
 control_parameters = {
     'latitude': [37.52],
     'longitude': [143.05],
     'depth': [12581.10],
     'strike': [198.0],
-    'dip': [10.0],
     'length': [300.0e+03],
     'width': [150.0e+03],
     'slip': [29.5],
     'rake': [90.0],
+    'dip': [10.0],
 }
+fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'
+if reg:
+    fname += '_reg'
+func = np.load(fname.format(level, 'func') + '.npy')
+try:
+    opt_controls = np.load(fname.format(level, 'ctrl') + '.npy')[-1]
+    control_parameters['slip'] = [opt_controls[0]]
+    control_parameters['rake'] = [opt_controls[1]]
+    control_parameters['dip'] = [opt_controls[2]]
+except Exception:
+    print("Could not find optimised controls. Proceeding with initial guess.")
 op = TohokuOkadaBasisOptions(level=level, nx=1, ny=1, control_parameters=control_parameters)
+for control in control_parameters:
+    print(control, op.control_parameters[control])
 op.end_time = 60*float(args.num_minutes or 20)
-alpha = float(args.alpha or 0.0)
-reg = not np.isclose(alpha, 0.0)
-alpha /= 300.0e+03*150.0e+03
-alpha = Constant(alpha)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
     # if op.gauges[gauge]['arrival_time'] < op.end_time:  # TODO
@@ -40,18 +53,6 @@ for gauge in gauges:
 gauges = list(op.gauges.keys())
 print(gauges)
 op.active_controls = ['slip', 'rake', 'dip']
-fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'
-if reg:
-    fname += '_reg'
-try:
-    opt_controls = np.load(fname.format(level, 'ctrl') + '.npy')[-1]
-    op.control_parameters['slip'] = [opt_controls[0]]
-    op.control_parameters['rake'] = [opt_controls[1]]
-    op.control_parameters['dip'] = [opt_controls[2]]
-except Exception:
-    print("Could not find optimised controls. Proceeding with initial guess.")
-for control in control_parameters:
-    print(control, control_parameters[control])
 num_active_controls = len(op.active_controls)
 base_dt = 4
 op.dt = base_dt*0.5**level

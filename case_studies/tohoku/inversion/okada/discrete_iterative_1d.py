@@ -47,14 +47,13 @@ control_parameters = {
     'dip': [10.0],
 }
 op = TohokuOkadaBasisOptions(level=level, nx=1, ny=1, control_parameters=control_parameters)
-op.end_time = 60*float(args.num_minutes or 20)
+op.end_time = 60*float(args.num_minutes or 60)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
     # if gauge[:2] not in ('P0', '80'):
-    if gauge[:2] != 'P0':
+    # if gauge[:2] != 'P0':
+    if gauge not in ('KPG1', 'KPG2', '21418'):
         op.gauges.pop(gauge)
-    # if op.gauges[gauge]['operator'] != 'NOAA':
-    #     op.gauges.pop(gauge)
     elif op.gauges[gauge]['arrival_time'] >= op.end_time:
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
