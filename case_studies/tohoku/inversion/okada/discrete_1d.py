@@ -14,9 +14,9 @@ from adapt_utils.misc import ellipse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
+parser.add_argument("category")
 parser.add_argument("-gtol")
 parser.add_argument("-maxiter")
-parser.add_argument("-alpha")
 parser.add_argument("-num_minutes")
 parser.add_argument("-slip")
 parser.add_argument("-rake")
@@ -25,6 +25,15 @@ parser.add_argument("-strike")
 args = parser.parse_args()
 
 level = int(args.level)
+category = args.category
+assert category in (
+    'all',
+    'near_field_gps',
+    'near_field_pressure',
+    'mid_field_pressure',
+    'far_field_pressure',
+    'southern_pressure',
+)
 gtol = float(args.gtol or 1.0e-08)
 maxiter = int(args.maxiter or 1000)
 control_parameters = {
@@ -38,15 +47,8 @@ control_parameters = {
     'dip': [float(args.dip or 10.0)],
     'strike': [float(args.strike or 198.0)],
 }
-alpha = float(args.alpha or 0.0)
-reg = not np.isclose(alpha, 0.0)
-alpha /= control_parameters['length'][0]*control_parameters['width'][0]
-alpha = Constant(alpha)
-fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'
-logname = 'data/discrete_1d_{:d}'.format(level)
-if reg:
-    fname += '_reg'
-    logname += '_reg'
+fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'.format(level, category) + '_{:s}'
+logname = 'data/discrete_1d_{:d}_{:s}'.format(level, category)
 op = TohokuOkadaBasisOptions(nx=1, ny=1, level=level, control_parameters=control_parameters)
 op.end_time = 60*float(args.num_minutes or 120)
 op.control_trajectory = []
@@ -54,11 +56,12 @@ op.functional_trajectory = []
 op.gradient_trajectory = []
 op.line_search_trajectory = []
 op._feval = 0
+if category != 'all':
+    op.gauge_classifications_to_consider = [category]
+op.get_gauges()
 gauges = list(op.gauges.keys())
 for gauge in gauges:
-    if gauge[:2] in ('P0', '80'):
-        op.gauges.pop(gauge)
-    elif op.gauges[gauge]['arrival_time'] >= op.end_time:
+    if op.gauges[gauge]['arrival_time'] >= op.end_time:
         op.gauges.pop(gauge)
 gauges = list(op.gauges.keys())
 print(gauges)
@@ -149,7 +152,7 @@ def tsunami_propagation(init):
     eta_obs = Constant(0.0)
 
     # Setup QoI
-    J = 0 if not reg else assemble(alpha*inner(init, init)*dx)
+    J = 0
     for gauge in op.gauges:
         op.gauges[gauge]['init'] = None
         if t < op.gauges[gauge]['arrival_time']:
@@ -308,9 +311,9 @@ def gradient__save(m):
     op.control_trajectory.append(m)
     op.functional_trajectory.append(op._J)
     op.gradient_trajectory.append(dJdm)
-    np.save(fname.format(level, 'ctrl'), op.control_trajectory)
-    np.save(fname.format(level, 'func'), op.functional_trajectory)
-    np.save(fname.format(level, 'grad'), op.gradient_trajectory)
+    np.save(fname.format('ctrl'), op.control_trajectory)
+    np.save(fname.format('func'), op.functional_trajectory)
+    np.save(fname.format('grad'), op.gradient_trajectory)
     if abs(g) < gtol:
         callback(m)
         raise opt.GradientConverged
@@ -320,7 +323,7 @@ def gradient__save(m):
 def callback(m):
     print("Line search complete")
     op.line_search_trajectory.append(m)
-    np.save(fname.format(level, 'ls'), op.line_search_trajectory)
+    np.save(fname.format('ls'), op.line_search_trajectory)
 
 
 print_output("Run optimisation...")
