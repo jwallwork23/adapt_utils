@@ -69,7 +69,8 @@ op.end_time = min(op.end_time, latest)
 gauges = list(op.gauges.keys())
 print(gauges)
 print(op.end_time)
-op.active_controls = ['slip', 'rake', 'dip', 'strike']
+# op.active_controls = ['slip', 'rake', 'dip', 'strike']
+op.active_controls = ['slip', 'rake', 'dip']
 num_active_controls = len(op.active_controls)
 
 
@@ -299,7 +300,8 @@ def reduced_functional__save(m):
     """
     op._J = reduced_functional(m)
     op._feval += 1
-    msg = "slip {:5.2f} rake {:5.2f} dip {:5.2f} strike {:5.2f} functional {:15.8e}"
+    # msg = "slip {:5.2f} rake {:5.2f} dip {:5.2f} strike {:5.2f} functional {:15.8e}"
+    msg = "slip {:5.2f} rake {:5.2f} dip {:5.2f} functional {:15.8e}"
     print(msg.format(*m, op._J))
     return op._J
 
@@ -310,7 +312,8 @@ def gradient__save(m):
     """
     dJdm = gradient(m)
     g = vecnorm(dJdm, order=np.Inf)
-    msg = "slip {:5.2f} rake {:5.2f} dip {:5.2f} strike {:5.2f} functional {:15.8e} gradient {:15.8e}"
+    # msg = "slip {:5.2f} rake {:5.2f} dip {:5.2f} strike {:5.2f} functional {:15.8e} gradient {:15.8e}"
+    msg = "slip {:5.2f} rake {:5.2f} dip {:5.2f} functional {:15.8e} gradient {:15.8e}"
     print(msg.format(*m, op._J, g))
     op.control_trajectory.append(m)
     op.functional_trajectory.append(op._J)
@@ -336,7 +339,8 @@ kwargs = dict(
     callback=callback,
     pgtol=gtol,
     maxiter=maxiter,
-    bounds=[(0.0, np.Inf), (0.0, 90.0), (0.0, 90.0), (-np.Inf, np.Inf)],
+    # bounds=[(0.0, np.Inf), (0.0, 90.0), (0.0, 90.0), (-np.Inf, np.Inf)],
+    bounds=[(0.0, np.Inf), (0.0, 90.0), (0.0, 90.0)],
 )
 tic = perf_counter()
 try:
@@ -348,7 +352,7 @@ with open(logname + '.log', 'w+') as log:
     log.write("slip minimiser:       {:.8e}\n".format(op.control_trajectory[-1][0]))
     log.write("rake minimiser:       {:.4f}\n".format(op.control_trajectory[-1][1]))
     log.write("dip minimiser:        {:.4f}\n".format(op.control_trajectory[-1][2]))
-    log.write("strike minimiser:     {:.4f}\n".format(op.control_trajectory[-1][3]))
+    # log.write("strike minimiser:     {:.4f}\n".format(op.control_trajectory[-1][3]))
     log.write("minimum:              {:.8e}\n".format(op.functional_trajectory[-1]))
     log.write("function evaluations: {:d}\n".format(op._feval))
     log.write("gradient evaluations: {:d}\n".format(len(op.gradient_trajectory)))
