@@ -60,11 +60,15 @@ if category != 'all':
     op.gauge_classifications_to_consider = [category]
 op.get_gauges()
 gauges = list(op.gauges.keys())
+latest = 0.0
 for gauge in gauges:
     if op.gauges[gauge]['arrival_time'] >= op.end_time:
         op.gauges.pop(gauge)
+    latest = max(latest, op.gauges[gauge]['departure_time'])
+op.end_time = min(op.end_time, latest)
 gauges = list(op.gauges.keys())
 print(gauges)
+print(op.end_time)
 op.active_controls = ['slip', 'rake', 'dip', 'strike']
 num_active_controls = len(op.active_controls)
 
@@ -314,9 +318,9 @@ def gradient__save(m):
     np.save(fname.format('ctrl'), op.control_trajectory)
     np.save(fname.format('func'), op.functional_trajectory)
     np.save(fname.format('grad'), op.gradient_trajectory)
-    if abs(g) < gtol:
-        callback(m)
-        raise opt.GradientConverged
+    # if abs(g) < gtol:
+    #     callback(m)
+    #     raise opt.GradientConverged
     return dJdm
 
 
@@ -338,7 +342,7 @@ tic = perf_counter()
 try:
     so.fmin_l_bfgs_b(reduced_functional__save, m_init, **kwargs)
 except opt.GradientConverged:
-    pass
+    print("Gradient converged to tolerance {:.1e}: ".format(gtol), op.gradient_trajectory[-1])
 cpu_time = perf_counter() - tic
 with open(logname + '.log', 'w+') as log:
     log.write("slip minimiser:       {:.8e}\n".format(op.control_trajectory[-1][0]))

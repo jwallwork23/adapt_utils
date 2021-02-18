@@ -12,16 +12,21 @@ from adapt_utils.swe.tsunami.conversion import lonlat_to_utm
 
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
-parser.add_argument("-alpha")
+parser.add_argument("category")
 parser.add_argument("-num_minutes")
 parser.add_argument("-initial_guess")
 args = parser.parse_args()
 
 level = int(args.level)
-alpha = float(args.alpha or 0.0)
-reg = not np.isclose(alpha, 0.0)
-alpha /= 300.0e+03*150.0e+03
-alpha = Constant(alpha)
+category = args.category
+assert category in (
+    'all',
+    'near_field_gps',
+    'near_field_pressure',
+    'mid_field_pressure',
+    'far_field_pressure',
+    'southern_pressure',
+)
 ig = bool(args.initial_guess or False)
 control_parameters = {
     'latitude': [37.52],
@@ -38,13 +43,11 @@ op = TohokuOkadaBasisOptions(level=level, nx=1, ny=1, control_parameters=control
 op.end_time = 60*float(args.num_minutes or 120)
 gauges = list(op.gauges.keys())
 print(gauges)
-fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'
-if reg:
-    fname += '_reg'
+fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'.format(level, category) + '_{:s}'
 loaded = False
 try:
     assert not ig
-    opt_controls = np.load(fname.format(level, 'ctrl') + '.npy')[-1]
+    opt_controls = np.load(fname.format('ctrl') + '.npy')[-1]
     op.control_parameters['slip'] = [opt_controls[0]]
     op.control_parameters['rake'] = [opt_controls[1]]
     op.control_parameters['dip'] = [opt_controls[2]]
@@ -143,9 +146,7 @@ axins.set_ylim(ylim);
 mark_inset(axes, axins, loc1=1, loc2=1, fc="none", ec="0.5");
 
 # Save
-fname = "dislocation_1d_{:d}".format(level)
-if reg:
-    fname += '_reg'
+fname = "dislocation_1d_{:d}_{:s}".format(level, category)
 if not loaded:
     fname += '_ig'
 savefig(fname, "plots", extensions=["jpg"], tight=False)
@@ -167,11 +168,7 @@ def tsunami_propagation(init):
         op.gauges[gauge]['diff_smooth'] = [0.0]
 
     t = 0.0
-    if reg:
-        J = assemble(alpha*inner(init, init)*dx)
-        print("Regularisation term = {:.4e}".format(J))
-    else:
-        J = 0
+    J = 0
     weight = Constant(0.5)
     eta_obs = Constant(0.0)
     for gauge in op.gauges:
@@ -249,9 +246,7 @@ for i, gauge in enumerate(gauges):
     ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
     ax.set_xlim([op.gauges[gauge]["arrival_time"]/60, op.gauges[gauge]["departure_time"]/60])
     ax.grid(True)
-fname = 'discrete_timeseries_both_1d_{:d}'.format(level)
-if reg:
-    fname += '_reg'
+fname = 'discrete_timeseries_both_1d_{:d}_{:s}'.format(level, category)
 if not loaded:
     fname += '_ig'
 savefig(fname, 'plots', extensions=['pdf'])
@@ -272,9 +267,7 @@ for i, gauge in enumerate(gauges):
     ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
     ax.set_xlim([op.gauges[gauge]["arrival_time"]/60, op.gauges[gauge]["departure_time"]/60])
     ax.grid(True)
-fname = 'discrete_timeseries_error_1d_{:d}'.format(level)
-if reg:
-    fname += '_reg'
+fname = 'discrete_timeseries_error_1d_{:d}_{:s}'.format(level, category)
 if not loaded:
     fname += '_ig'
 savefig(fname, 'plots', extensions=['pdf'])
