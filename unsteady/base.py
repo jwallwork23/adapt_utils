@@ -995,8 +995,6 @@ class AdaptiveProblemBase(object):
                     if np.isclose(t, (i+1)*op.dt*dt_per_mesh):
                         update_forcings_wrapper(t)
                         for j, H in enumerate(H_window):
-                            if op.hessian_time_combination == 'intersect':
-                                H_window[j] *= op.dt*dt_per_mesh
                             self._H_windows[j][i].interpolate(H_window[j])
 
                 # Solve step for current mesh iteration
