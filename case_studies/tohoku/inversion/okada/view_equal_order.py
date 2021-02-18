@@ -36,22 +36,11 @@ assert category in (
     'southern_pressure',
 )
 ig = bool(args.initial_guess or False)
-control_parameters = {
-    'latitude': [37.52],
-    'longitude': [143.05],
-    'depth': [20.0e+03],
-    'strike': [198.0],
-    'length': [300.0e+03],
-    'width': [150.0e+03],
-    'slip': [29.5],
-    'rake': [30.0],
-    'dip': [10.0],
-}
-op = TohokuOkadaBasisOptions(level=level, nx=1, ny=1, control_parameters=control_parameters)
+op = TohokuOkadaBasisOptions(level=level)
 op.end_time = 60*float(args.num_minutes or 120)
 gauges = list(op.gauges.keys())
 print(gauges)
-fname = 'data/opt_progress_discrete_1d_{:d}_{:s}'.format(level, category) + '_{:s}'
+fname = 'data/opt_progress_discrete_{:d}_{:s}'.format(level, category) + '_{:s}'
 loaded = False
 try:
     assert not ig
@@ -69,10 +58,11 @@ except Exception:
 # --- Setup tsunami propagation problem
 
 mesh = op.default_mesh
-P2_vec = VectorFunctionSpace(mesh, "CG", 2)
+P1DG_vec = VectorFunctionSpace(mesh, "DG", 1)
+P1DG = FunctionSpace(mesh, "DG", 1)
 P1 = FunctionSpace(mesh, "CG", 1)
 P0 = FunctionSpace(mesh, "DG", 0)
-TaylorHood = P2_vec*P1
+EqualOrder = P1DG_vec*P1DG
 b = Function(P1).assign(op.set_bathymetry(P1))
 g = Constant(op.g)
 f = Function(P1).assign(op.set_coriolis(P1))
@@ -80,51 +70,60 @@ f = Function(P1).assign(op.set_coriolis(P1))
 dtc = Constant(op.dt)
 n = FacetNormal(mesh)
 
-u, eta = TrialFunctions(TaylorHood)
-z, zeta = TestFunctions(TaylorHood)
-q_ = Function(TaylorHood)
+u, eta = TrialFunctions(EqualOrder)
+z, zeta = TestFunctions(EqualOrder)
+q_ = Function(EqualOrder)
 u_, eta_ = q_.split()
-
-a = inner(z, u)*dx + inner(zeta, eta)*dx
-L = inner(z, u_)*dx + inner(zeta, eta_)*dx
 
 
 def G(uv, elev):
-    F = g*inner(z, grad(elev))*dx
+    head_star = avg(elev) + sqrt(b/g)*jump(uv, n)
+    hu_star = b*(avg(uv) + sqrt(g/b)*jump(elev, n))
+    c = sqrt(g*b)
+
+    F = -g*elev*nabla_div(z)*dx
+    F += g*head_star*jump(z, n)*dS
+    F += c*dot(uv, n)*dot(z, n)*ds
+    F += 0.5*g*elev*dot(z, n)*ds(100)
+
     F += f*inner(z, as_vector((-uv[1], uv[0])))*dx
+
     F += -inner(grad(zeta), b*uv)*dx
+    F += inner(jump(zeta, n), b*hu_star)*dS
+    F += 0.5*zeta*b*dot(uv, n)*ds
+    F += zeta*c*elev*ds(100)
+
     return F
 
 
-a += 0.5*dtc*G(u, eta)
-L += -0.5*dtc*G(u_, eta_)
+a = inner(z, u)*dx + inner(zeta, eta)*dx + 0.5*dtc*G(u, eta)
+L = inner(z, u_)*dx + inner(zeta, eta_)*dx - 0.5*dtc*G(u_, eta_)
 
-q = Function(TaylorHood)
+q = Function(EqualOrder)
 u, eta = q.split()
+
 params = {
     "snes_type": "ksponly",
     "ksp_type": "gmres",
     "pc_type": "fieldsplit",
     "pc_fieldsplit_type": "multiplicative",
 }
-problem = LinearVariationalProblem(a, L, q, bcs=DirichletBC(TaylorHood.sub(1), 0, 100))
+problem = LinearVariationalProblem(a, L, q)
 solver = LinearVariationalSolver(problem, solver_parameters=params)
 
 
 # --- Setup source model
 
 tape_tag = 0
-q0 = Function(TaylorHood)
-q0.assign(0.0)
-u0, eta0 = q0.split()
+eta0 = Function(P1)
 op.create_topography(annotate=False)
 eta0.dat.data[op.indices] = op.fault.dtopo.dZ.reshape(op.fault.dtopo.X.shape)
 eta0.dat.name = "Initial surface"
-
-q_init = Function(TaylorHood)
-q_init.project(q0)
 num_subfaults = len(op.subfaults)
+
+q_init = Function(EqualOrder)
 u_init, eta_init = q_init.split()
+eta_init.interpolate(eta0)
 
 
 # --- Plot initial dislocation field
@@ -139,7 +138,7 @@ axes = axes[1]
 
 # Plot over whole domain
 levels = np.linspace(-6, 10, 51)
-cbar = figure.colorbar(tricontourf(eta_init, levels=levels, axes=axes, cmap='coolwarm'), ax=axes)
+cbar = figure.colorbar(tricontourf(eta0, levels=levels, axes=axes, cmap='coolwarm'), ax=axes)
 cbar.set_label(r"Dislocation $[\mathrm m]$")
 cbar.set_ticks(np.linspace(-5, 10, 4))
 op.annotate_plot(axes)
@@ -147,17 +146,28 @@ axes.axis(False)
 
 # Add zoom
 axins = zoomed_inset_axes(axes, 2.5, bbox_to_anchor=[750, 525])  # zoom-factor: 2.5
-tricontourf(eta_init, levels=51, axes=axins, cmap='coolwarm')
+tricontourf(eta0, levels=51, axes=axins, cmap='coolwarm')
 axins.axis(False)
 axins.set_xlim(xlim)
 axins.set_ylim(ylim)
 mark_inset(axes, axins, loc1=1, loc2=1, fc="none", ec="0.5")
 
 # Save
-fname = "dislocation_1d_{:d}_{:s}".format(level, category)
+fname = "dislocation_{:d}_{:s}".format(level, category)
 if not loaded:
     fname += '_ig'
 savefig(fname, "plots", extensions=["jpg"], tight=False)
+
+
+# --- Get gauge data
+
+radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
+for gauge in gauges:
+    loc = op.gauges[gauge]["coords"]
+    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
+    area = assemble(op.gauges[gauge]['indicator']*dx)
+    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
+    op.sample_timeseries(gauge, sample=op.gauges[gauge]['sample'], detide=True)
 
 
 def tsunami_propagation(init):
@@ -215,17 +225,6 @@ def tsunami_propagation(init):
     return J
 
 
-# --- Get gauge data
-
-radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
-for gauge in gauges:
-    loc = op.gauges[gauge]["coords"]
-    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
-    area = assemble(op.gauges[gauge]['indicator']*dx)
-    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
-    op.sample_timeseries(gauge, sample=op.gauges[gauge]['sample'], detide=True)
-
-
 # --- Forward solve
 
 J = tsunami_propagation(q_init)
@@ -254,7 +253,7 @@ for i, gauge in enumerate(gauges):
     ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
     ax.set_xlim([op.gauges[gauge]["arrival_time"]/60, op.gauges[gauge]["departure_time"]/60])
     ax.grid(True)
-fname = 'discrete_timeseries_both_1d_{:d}_{:s}'.format(level, category)
+fname = 'discrete_timeseries_both_{:d}_{:s}'.format(level, category)
 if not loaded:
     fname += '_ig'
 savefig(fname, 'plots', extensions=['pdf'])
@@ -275,7 +274,7 @@ for i, gauge in enumerate(gauges):
     ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
     ax.set_xlim([op.gauges[gauge]["arrival_time"]/60, op.gauges[gauge]["departure_time"]/60])
     ax.grid(True)
-fname = 'discrete_timeseries_error_1d_{:d}_{:s}'.format(level, category)
+fname = 'discrete_timeseries_error_{:d}_{:s}'.format(level, category)
 if not loaded:
     fname += '_ig'
 savefig(fname, 'plots', extensions=['pdf'])
