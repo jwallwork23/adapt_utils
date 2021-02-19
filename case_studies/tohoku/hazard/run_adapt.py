@@ -132,6 +132,7 @@ kwargs = {
 assert 0.0 <= kwargs['start_time'] <= kwargs['end_time']
 save_meshes = bool(args.save_meshes or False)
 op = TohokuHazardOptions(**kwargs)
+op.solver_parameters['shallow_water']['ksp_converged_reason'] = None
 
 
 # --- Solve

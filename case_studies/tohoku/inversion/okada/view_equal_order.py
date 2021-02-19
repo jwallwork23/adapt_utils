@@ -46,10 +46,10 @@ try:
     assert not ig
     print(fname.format('ctrl') + '.npy')
     opt_controls = np.load(fname.format('ctrl') + '.npy')[-1]
-    op.control_parameters['slip'] = [opt_controls[0]]
-    op.control_parameters['rake'] = [opt_controls[1]]
-    op.control_parameters['dip'] = [opt_controls[2]]
-    # op.control_parameters['strike'] = [opt_controls[3]]
+    op.control_parameters['slip'] = opt_controls[:190]
+    op.control_parameters['rake'] = opt_controls[190:380]
+    # op.control_parameters['dip'] = opt_controls[380:570]
+    # op.control_parameters['strike'] = opt_controls[570:]
     loaded = True
 except Exception:
     print("Could not find optimised controls. Proceeding with initial guess.")
