@@ -2,7 +2,7 @@ from thetis import ConvergenceError, print_output
 import numpy as np
 
 
-__all__ = ["taylor_test", "ConvergenceError" "StagnationError", "GradientConverged"]
+__all__ = ["taylor_test", "ConvergenceError", "StagnationError", "GradientConverged"]
 
 
 # TODO: Taylor test gradient using Frobenius norm as QoI

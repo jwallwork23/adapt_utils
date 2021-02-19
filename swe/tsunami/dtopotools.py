@@ -20,7 +20,6 @@ import numpy as np
 from time import perf_counter
 
 try:
-    import clawpack.geoclaw.dtopotools
     from clawpack.geoclaw.dtopotools import *
 except ImportError:
     from dtopotools import *

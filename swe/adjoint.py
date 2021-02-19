@@ -64,6 +64,7 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         complement of Γ₁.
         """
         homogeneous = False
+        # homogeneous = True
         funcs = bnd_conditions.get(bnd_id)
         if funcs is not None and 'elev' not in funcs and 'un' not in funcs:
             raise Exception('Unsupported bnd type: {:}'.format(funcs.keys()))
@@ -161,14 +162,14 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
         if u_star_by_parts:
             f = g_grav*inner(grad(self.eta_star_test), u_star)*self.dx
             if self.eta_star_is_dg:
-                u_star_star = avg(u_star) + sqrt(total_h/g_grav)*jump(eta_star, n)
+                h_av = avg(total_h)
+                u_star_star = avg(u_star) + sqrt(h_av/g_grav)*jump(eta_star, n)
                 f += -g_grav*inner(jump(self.eta_star_test, n), u_star_star)*dS
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
                 eta_star_ext, u_star_ext = self.get_bnd_functions(eta_star, u_star, bnd_marker, bnd_conditions)
                 # Compute linear Riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
-                total_h = self.depth.get_total_depth(fields.get('elev_2d'))
                 eta_star_jump = eta_star - eta_star_ext
                 un_star_rie = 0.5*inner(u_star + u_star_ext, n) + sqrt(total_h/g_grav)*eta_star_jump
                 f += -g_grav*self.eta_star_test*un_star_rie*ds_bnd
@@ -209,7 +210,8 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
         n = self.normal
         if eta_star_by_parts:
             f += eta_star*div(total_h*self.u_star_test)*self.dx
-            eta_star_star = avg(eta_star) + sqrt(g_grav/total_h)*jump(u_star, n)
+            h_av = avg(total_h)
+            eta_star_star = avg(eta_star) + sqrt(g_grav/h_av)*jump(u_star, n)
             f += -total_h*eta_star_star*jump(self.u_star_test, n)*dS
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
@@ -219,7 +221,7 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
                     # Compute linear riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
                     un_star_jump = inner(u_star - u_star_ext, n)
                     eta_star_rie = 0.5*(eta_star + eta_star_ext) + sqrt(g_grav/total_h)*un_star_jump
-                    f += -total_h*eta_star_rie*dot(self.u_star_test, self.normal)*ds_bnd
+                    f += -total_h*eta_star_rie*dot(self.u_star_test, n)*ds_bnd
         else:
             f += -total_h*inner(grad(eta_star), self.u_star_test)*self.dx
             # NOTE: Boundary conditions are strongly enforced if eta_star is continuous
