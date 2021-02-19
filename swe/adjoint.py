@@ -153,24 +153,25 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
     Unlike in the discretisation of the forward equations, we do not include fluxes for this term.
     """
     def residual(self, u_star, eta_star, fields, fields_old, bnd_conditions=None):
+        total_h = self.depth.get_total_depth(fields.get('elev_2d'))
 
         u_star_by_parts = self.u_star_continuity in ['dg', 'hdiv']
 
+        n = self.normal
         if u_star_by_parts:
             f = g_grav*inner(grad(self.eta_star_test), u_star)*self.dx
+            if self.eta_star_is_dg:
+                u_star_star = avg(u_star) + sqrt(total_h/g_grav)*jump(eta_star, n)
+                f += -g_grav*inner(jump(self.eta_star_test, n), u_star_star)*dS
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
                 eta_star_ext, u_star_ext = self.get_bnd_functions(eta_star, u_star, bnd_marker, bnd_conditions)
                 # Compute linear Riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
-                n = self.normal
                 total_h = self.depth.get_total_depth(fields.get('elev_2d'))
                 eta_star_jump = eta_star - eta_star_ext
                 un_star_rie = 0.5*inner(u_star + u_star_ext, n) + sqrt(total_h/g_grav)*eta_star_jump
-                # un_star_jump = inner(u_star - u_star_ext, n)
                 f += -g_grav*self.eta_star_test*un_star_rie*ds_bnd
-
-                # f += -g_grav*self.eta_star_test*inner(u_star_ext, self.normal)*ds_bnd
         else:
             f = -g_grav*self.eta_star_test*div(u_star)*self.dx
             for bnd_marker in self.boundary_markers:
@@ -203,20 +204,25 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
         total_h = self.depth.get_total_depth(fields.get('elev_2d'))
 
         eta_star_by_parts = self.eta_star_is_dg
-        assert not eta_star_by_parts
 
         f = 0
-        if not eta_star_by_parts:
+        n = self.normal
+        if eta_star_by_parts:
+            f += eta_star*div(total_h*self.u_star_test)*self.dx
+            eta_star_star = avg(eta_star) + sqrt(g_grav/total_h)*jump(u_star, n)
+            f += -total_h*eta_star_star*jump(self.u_star_test, n)*dS
+            for bnd_marker in self.boundary_markers:
+                funcs = bnd_conditions.get(bnd_marker)
+                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                if funcs is not None:
+                    eta_star_ext, u_star_ext = self.get_bnd_functions(eta_star, u_star, bnd_marker, bnd_conditions)
+                    # Compute linear riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
+                    un_star_jump = inner(u_star - u_star_ext, n)
+                    eta_star_rie = 0.5*(eta_star + eta_star_ext) + sqrt(g_grav/total_h)*un_star_jump
+                    f += -total_h*eta_star_rie*dot(self.u_star_test, self.normal)*ds_bnd
+        else:
             f += -total_h*inner(grad(eta_star), self.u_star_test)*self.dx
-            # for bnd_marker in self.boundary_markers:
-            #     funcs = bnd_conditions.get(bnd_marker)
-            #     ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
-            #     if funcs is not None:
-            #         eta_star_ext, u_star_ext = self.get_bnd_functions(eta_star, u_star, bnd_marker, bnd_conditions)
-            #         # Compute linear riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
-            #         un_star_jump = inner(u_star - u_star_ext, self.normal)
-            #         eta_star_rie = 0.5*(eta_star + eta_star_ext) + sqrt(g_grav/total_h)*un_star_jump
-            #         f += -total_h*(eta_star_rie-eta_star)*dot(self.u_star_test, self.normal)*ds_bnd
+            # NOTE: Boundary conditions are strongly enforced if eta_star is continuous
         return -f
 
 
