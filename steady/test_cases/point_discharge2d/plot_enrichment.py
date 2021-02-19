@@ -1,6 +1,5 @@
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
-from mpltools import annotation
 import numpy as np
 import os
 import pickle

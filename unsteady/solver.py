@@ -1805,7 +1805,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
         run_scripts[self.approach](**kwargs)
 
-    def run_dwp(self, **kwargs):  # TODO: Modify indicator for time interval
+    def run_dwp(self, **kwargs):
         r"""
         The "dual weighted primal" approach, first used (not under this name) in [1]. For shallow
         water tsunami propagation problems with a quantity of interest of the form
@@ -1851,6 +1851,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
             # Loop over mesh windows *in reverse*
             self.metrics = [Function(P1_ten, name="Metric") for P1_ten in self.P1_ten]
+            adj_solutions_all_steps = []
             for i in reversed(range(self.num_meshes)):
                 fwd_solutions_step = []
                 adj_solutions_step = []
@@ -1873,6 +1874,8 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint_step(i)
                 self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
+                for adj in adj_solutions_step:
+                    adj_solutions_all_steps.append(adj)
 
                 # Assemble indicator
                 n_fwd = len(fwd_solutions_step)
@@ -1882,13 +1885,32 @@ class AdaptiveProblem(AdaptiveProblemBase):
                     raise ValueError(msg.format(n_fwd, n_adj))
                 self.indicators[i]['dwp'] = Function(self.P1[i], name="DWP indicator")
                 op.print_debug("DWP indicators on mesh {:2d}".format(i))
-                for j, solutions in enumerate(zip(fwd_solutions_step, reversed(adj_solutions_step))):
+
+                # Account for time range on future meshes
+                #    NOTE: Assumes T_start = 0
+                qqs = []
+                for adj in adj_solutions_all_steps[:-n_fwd]:
+                    adj_u, adj_eta = adj.split()
+                    adj_proj = Function(self.V[i])
+                    adj_proj_u, adj_proj_eta = adj_proj.split()
+                    adj_proj_u.project(adj_u)
+                    adj_proj_eta.project(adj_eta)
+                    qqs.append(abs(inner(fwd, adj_proj)))
+
+                for j, fwd in enumerate(fwd_solutions_step):
                     if op.timestepper == 'CrankNicolson':
                         w = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
                     else:
                         raise NotImplementedError  # TODO: Other integrators
                     wq.assign(w*op.dt*self.dt_per_mesh)
-                    self.indicators[i]['dwp'] += interpolate(wq*abs(inner(*solutions)), self.P1[i])
+
+                    # Account for time range
+                    qqstar = 0
+                    for qq in qqs:
+                        qqstar = max_value(qq, qqstar)
+                    for adj in adj_solutions_step[:j+1]:
+                        qqstar = max_value(abs(inner(fwd, adj)), qqstar)
+                    self.indicators[i]['dwp'] += interpolate(wq*qqstar, self.P1[i])
 
                 # Construct isotropic metric
                 self.metrics[i].assign(isotropic_metric(self.indicators[i]['dwp'], normalise=False))
