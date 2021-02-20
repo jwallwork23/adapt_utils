@@ -1839,6 +1839,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
         # Loop until we hit the maximum number of iterations, max_adapt
         assert op.min_adapt < op.max_adapt
+        num_steps = int((op.end_time - op.start_time)/op.dt)+1
         for n in range(op.max_adapt):
             self.outer_iteration = n
 
@@ -1874,8 +1875,6 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint_step(i)
                 self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
-                for adj in adj_solutions_step:
-                    adj_solutions_all_steps.append(adj)
 
                 # Assemble indicator
                 n_fwd = len(fwd_solutions_step)
@@ -1887,16 +1886,18 @@ class AdaptiveProblem(AdaptiveProblemBase):
                 op.print_debug("DWP indicators on mesh {:2d}".format(i))
 
                 # Account for time range on future meshes
-                #    NOTE: Assumes T_start = 0
-                qqs = []
-                for adj in adj_solutions_all_steps[:-n_fwd]:
+                adj_projected = []
+                adj_solutions_all_steps = adj_solutions_all_steps[-num_steps:]
+                at_limit = len(adj_solutions_all_steps) == num_steps
+                for adj in adj_solutions_all_steps:
                     adj_u, adj_eta = adj.split()
                     adj_proj = Function(self.V[i])
                     adj_proj_u, adj_proj_eta = adj_proj.split()
                     adj_proj_u.project(adj_u)
                     adj_proj_eta.project(adj_eta)
-                    qqs.append(abs(inner(fwd, adj_proj)))
-
+                    adj_projected.append(adj_proj)
+                for adj in adj_solutions_step:
+                    adj_solutions_all_steps.append(adj)
                 for j, fwd in enumerate(fwd_solutions_step):
                     if op.timestepper == 'CrankNicolson':
                         w = 0.5 if j in (0, n_fwd-1) else 1.0  # Trapezium rule
@@ -1906,11 +1907,15 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                     # Account for time range
                     qqstar = 0
-                    for qq in qqs:
-                        qqstar = max_value(qq, qqstar)
+                    if at_limit:
+                        adj_projected = adj_projected[1:]
+                    for adj_proj in adj_projected:
+                        qqstar = max_value(abs(inner(fwd, adj)), qqstar)
                     for adj in adj_solutions_step[:j+1]:
                         qqstar = max_value(abs(inner(fwd, adj)), qqstar)
-                    self.indicators[i]['dwp'] += interpolate(wq*qqstar, self.P1[i])
+                    self.indicators[i]['dwp'] = interpolate(max_value(self.indicators[i]['dwp'], wq*qqstar), self.P1[i])
+                adj_projected = []
+                at_limit = False
 
                 # Construct isotropic metric
                 self.metrics[i].assign(isotropic_metric(self.indicators[i]['dwp'], normalise=False))
