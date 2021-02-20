@@ -36,6 +36,7 @@ def taylor_test(function, gradient, m, delta_m=None, verbose=False, ratio_tol=1.
     remainders = np.zeros(4)
     epsilons = [0.01*0.5**i for i in range(4)]
     rates = np.zeros(3)
+    passed = True
     for i in range(4):
         h = epsilons[i]
         if verbose:
@@ -50,14 +51,10 @@ def taylor_test(function, gradient, m, delta_m=None, verbose=False, ratio_tol=1.
             if verbose:
                 msg = "remainder = {:.4e}  convergence rate = {:.2f}"
                 print_output(msg.format(remainders[i], rates[i-1]))
-            try:
-                assert rates[i-1] > ratio_tol
-            except AssertionError:
-                msg = "Taylor remainders do not decrease quadratically (ratio {:.2f} < {:.2f})"
-                raise ConvergenceError(msg.format(rates[i-1], ratio_tol))
+            passed = passed and (rates[i-1] > ratio_tol)
     if verbose:
-        print_output(20*"=" + "TAYLOR TEST PASSED!" + 20*"=")
-    return rates
+        print_output(20*"=" + "TAYLOR TEST {:s}!".format("PASSED" if passed else "FAILED") + 20*"=")
+    return min(rates)
 
 
 class StagnationError(Exception):
