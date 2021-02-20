@@ -368,7 +368,7 @@ cpu_time = perf_counter() - tic
 with open(logname + '.log', 'w+') as log:
     log.write("slip minimiser:       {:.8e}\n".format(op.control_trajectory[-1][0]))
     log.write("rake minimiser:       {:.4f}\n".format(op.control_trajectory[-1][1]))
-    log.write("dip minimiser:        {:.4f}\n".format(op.control_trajectory[-1][2]))
+    # log.write("dip minimiser:        {:.4f}\n".format(op.control_trajectory[-1][2]))
     # log.write("strike minimiser:     {:.4f}\n".format(op.control_trajectory[-1][3]))
     log.write("minimum:              {:.8e}\n".format(op.functional_trajectory[-1]))
     log.write("function evaluations: {:d}\n".format(op._feval))
