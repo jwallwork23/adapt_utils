@@ -29,7 +29,7 @@ parser.add_argument("-start_time", help="""
     Start time of period of interest in seconds (default zero)""")
 parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
-    'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
+    'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo', 'Ogasawara'}. (Default 'Fukushima Daiichi')
     """)
 parser.add_argument("-radius", help="Radius of interest (default 100km)")
 
@@ -42,10 +42,7 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-if args.locations is None:  # TODO: Parse as list
-    locations = ['Fukushima Daiichi']
-else:
-    locations = args.locations.split(',')
+locations = ['Fukushima Daiichi'] if args.locations is None else args.locations.split(',')
 radius = float(args.radius or 100.0e+03)
 family = args.family or 'cg-cg'
 nonlinear = bool(args.nonlinear or False)
