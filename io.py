@@ -346,7 +346,7 @@ class OuterLoopLogger(object):
         self.logstr += self.divider + 35*' ' + 'SUMMARY\n' + self.divider
         self.logstr += "{:8s}    {:8s}    {:7s}\n".format('Elements', 'Vertices', 'QoI')
         for num_cells, num_vertices, qoi in zip(self.prob.num_cells, self.prob.num_vertices, self.prob.qois):
-            self.logstr += "{:8d}    {:8d}    {:7.4e}\n".format(num_cells, qoi)
+            self.logstr += "{:8d}    {:8d}    {:7.4e}\n".format(num_cells, num_vertices, qoi)
         if self.verbose:
             print_output(self.logstr)
 

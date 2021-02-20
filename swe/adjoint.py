@@ -64,7 +64,6 @@ class AdjointShallowWaterTerm(ShallowWaterTerm):
         complement of Γ₁.
         """
         homogeneous = False
-        # homogeneous = True
         funcs = bnd_conditions.get(bnd_id)
         if funcs is not None and 'elev' not in funcs and 'un' not in funcs:
             raise Exception('Unsupported bnd type: {:}'.format(funcs.keys()))
@@ -224,7 +223,17 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
                     f += -total_h*eta_star_rie*dot(self.u_star_test, n)*ds_bnd
         else:
             f += -total_h*inner(grad(eta_star), self.u_star_test)*self.dx
-            # NOTE: Boundary conditions are strongly enforced if eta_star is continuous
+            if self.u_star_continuity not in ['dg', 'hdiv']:
+                return -f
+            for bnd_marker in self.boundary_markers:
+                funcs = bnd_conditions.get(bnd_marker)
+                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                if funcs is not None:
+                    eta_star_ext, u_star_ext = self.get_bnd_functions(eta_star, u_star, bnd_marker, bnd_conditions)
+                    # Compute linear riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
+                    un_star_jump = inner(u_star - u_star_ext, n)
+                    eta_star_rie = 0.5*(eta_star + eta_star_ext) + sqrt(g_grav/total_h)*un_star_jump
+                    f += -total_h*(eta_star_rie-eta_star)*dot(self.u_star_test, n)*ds_bnd
         return -f
 
 
