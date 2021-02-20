@@ -55,7 +55,9 @@ gauges = list(op.gauges.keys())
 print(gauges)
 print(op.end_time)
 # op.active_controls = ['slip', 'rake', 'dip', 'strike']
-op.active_controls = ['slip', 'rake']
+# op.active_controls = ['slip', 'rake']  # Fails  FIXME
+op.active_controls = ['slip']
+# op.active_controls = ['slip', 'dip']  # Fails
 num_active_controls = len(op.active_controls)
 op.dt = 4*0.5**level
 
@@ -201,13 +203,13 @@ J = tsunami_propagation(eta0)
 stop_annotating()
 rf_tsunami = ReducedFunctional(J, c)
 
-np.random.seed(0)
-test = Function(eta0)
-test.dat.data[:] *= 0.7
-dtest = Function(eta0)
-dtest.dat.data[:] = np.random.rand(*dtest.dat.data.shape)*test.dat.data
-minconv = taylor_test(rf_tsunami, test, dtest)
-assert minconv > 1.90
+# np.random.seed(0)
+# test = Function(eta0)
+# test.dat.data[:] *= 0.7
+# dtest = Function(eta0)
+# dtest.dat.data[:] = np.random.rand(*dtest.dat.data.shape)*test.dat.data
+# minconv = taylor_test(rf_tsunami, test, dtest)
+# assert minconv > 1.90
 
 
 def gradient_tsunami(eta_init):
@@ -256,9 +258,10 @@ def gradient(m):
     and the tsunami propagation model, interfacing with the
     inverse of `tsunami_ic`.
     """
-    src = okada_source(m)
-    eta_init = tsunami_ic(src)
-    dJdeta0 = gradient_tsunami(eta_init)
+    # src = okada_source(m)
+    # eta_init = tsunami_ic(src)
+    # dJdeta0 = gradient_tsunami(eta_init)
+    dJdeta0 =  rf_tsunami.derivative()
     dJdS = tsunami_ic_inverse(dJdeta0)
     g = gradient_okada(m, m_b=dJdS)
     return g
@@ -266,10 +269,10 @@ def gradient(m):
 
 # --- Taylor tests
 
-np.random.seed(0)
-m_init = 0.7*np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
-minconv = opt.taylor_test(reduced_functional, gradient, m_init, verbose=True)
-assert minconv > 1.90
+# np.random.seed(0)
+# m_init = 0.7*np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
+# minconv = opt.taylor_test(reduced_functional, gradient, m_init, verbose=True)
+# assert minconv > 1.90
 
 
 # --- Optimisation
@@ -315,7 +318,8 @@ print_output("Run optimisation...")
 m_init = np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
 bounds = []
 # for bound in [(0.0, np.Inf), (0.0, 90.0), (0.0, 90.0), (-np.Inf, np.Inf)]:
-for bound in [(0.0, np.Inf), (0.0, 90.0)]:
+# for bound in [(0.0, np.Inf), (0.0, 90.0)]:
+for bound in [(0.0, np.Inf)]:
     for subfault in op.subfaults:
         bounds.append(bound)
 kwargs = dict(
@@ -335,7 +339,7 @@ cpu_time = perf_counter() - tic
 with open(logname + '.log', 'w+') as log:
     log.write("slip minimiser:       {:.8e}\n".format(op.control_trajectory[-1][0]))
     log.write("rake minimiser:       {:.4f}\n".format(op.control_trajectory[-1][1]))
-    log.write("dip minimiser:        {:.4f}\n".format(op.control_trajectory[-1][2]))
+    # log.write("dip minimiser:        {:.4f}\n".format(op.control_trajectory[-1][2]))
     # log.write("strike minimiser:     {:.4f}\n".format(op.control_trajectory[-1][3]))
     log.write("minimum:              {:.8e}\n".format(op.functional_trajectory[-1]))
     log.write("function evaluations: {:d}\n".format(op._feval))
