@@ -1545,7 +1545,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         if op.solve_swe:
             dbcs = []
             ts = self.timesteppers[i]['adjoint_shallow_water']
-            if op.family in ('cg-cg', 'dg-cg'):  # NOTE: This is inconsistent with forward
+            if op.family == 'cg-cg':
                 op.print_debug("SETUP: Applying adjoint DirichletBCs on mesh {:d}...".format(i))
                 for j in bcs['shallow_water']:
                     if 'un' not in bcs['shallow_water'][j]:
