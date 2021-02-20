@@ -15,7 +15,7 @@ parser = argparse.ArgumentParser(prog="plot_kernel")
 parser.add_argument("-level", help="(Integer) mesh resolution (default 0)")
 parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
-    'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
+    'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo', 'Ogasawara'}. (Default 'Fukushima Daiichi')
     """)
 parser.add_argument("-radius", help="Radius of interest (default 100km)")
 parser.add_argument("-kernel_shape", help="""
@@ -26,10 +26,7 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-if args.locations is None:  # TODO: Parse as list
-    locations = ['Fukushima Daiichi', ]
-else:
-    locations = args.locations.split(',')
+locations = ['Fukushima Daiichi'] if args.locations is None else args.locations.split(',')
 radius = float(args.radius or 100.0e+03)
 kwargs = {
     'level': int(args.level or 0),

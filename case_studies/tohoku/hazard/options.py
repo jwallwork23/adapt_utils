@@ -39,15 +39,7 @@ class TohokuHazardOptions(TohokuOptions):
         # self.end_time = kwargs.get('end_time', 60*60.0)
 
         # Location classifications
-        self.locations_to_consider = (
-            # "Onagawa",
-            # "Tokai",
-            # "Hamaoka",
-            # "Tohoku",
-            # "Tokyo",
-            "Fukushima Daiichi",
-            # "Fukushima Daini",
-        )
+        self.locations_to_consider = kwargs.get('locations', ['Fukushima Daiichi'])
         self.get_locations_of_interest(**kwargs)
 
     def get_locations_of_interest(self, **kwargs):
@@ -77,6 +69,7 @@ class TohokuHazardOptions(TohokuOptions):
             "Tokyo": {"lonlat": (139.6917, 35.6895)},
             "Fukushima Daiichi": {"lonlat": (141.0281, 37.4213)},
             "Fukushima Daini": {"lonlat": (141.0249, 37.3166)},
+            "Ogasawara": {"lonlat": (142.1918, 27.0944)},
         }
 
         # Convert coordinates to UTM and create timeseries array
