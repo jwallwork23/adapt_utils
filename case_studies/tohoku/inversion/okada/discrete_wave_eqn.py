@@ -24,6 +24,7 @@ parser.add_argument("-maxiter")
 parser.add_argument("-num_minutes")
 parser.add_argument("-uniform_slip")
 parser.add_argument("-uniform_rake")
+parser.add_argument("-active_controls")
 args = parser.parse_args()
 
 level = int(args.level)
@@ -52,16 +53,21 @@ logname = 'data/discrete_{:d}_{:s}'.format(level, categories)
 op = TohokuOkadaBasisOptions(level=level)
 op.end_time = 60*float(args.num_minutes or 120)
 op.gauge_classifications_to_consider = gauge_classifications_to_consider
+op.active_controls = (args.active_controls or 'slip,rake').split(',')
+num_active_controls = len(op.active_controls)
+if num_active_controls == 0:
+    raise ValueError("No active controls set.")
 if args.load is not None:
     if args.load not in op.gauge_classifications_to_consider:
         op.gauge_classifications_to_consider.append(args.load)
     fname_ = 'data/opt_progress_discrete_{:d}_{:s}'.format(level, args.load) + '_{:s}'
     print("Loading ", fname_.format('ctrl') + '.npy')
     opt_controls = np.load(fname_.format('ctrl') + '.npy')[-1]
-    op.control_parameters['slip'] = opt_controls[:190]
-    # op.control_parameters['rake'] = opt_controls[190:380]
-    # op.control_parameters['dip'] = opt_controls[380:570]
-    # op.control_parameters['strike'] = opt_controls[570:]
+    i = 0
+    for control in ('slip', 'rake', 'dip', 'strike'):
+        if control in op.active_controls:
+            op.control_parameters[control] = opt_controls[190*i:190*(i+1)]
+            i += 1
 if args.uniform_slip is not None:
     op.control_parameters['slip'] = float(args.uniform_slip)*np.ones(190)
 if args.uniform_rake is not None:
@@ -77,13 +83,6 @@ op.end_time = min(op.end_time, latest)
 gauges = list(op.gauges.keys())
 print(gauges)
 print(op.end_time)
-# op.active_controls = ['slip', 'rake', 'dip', 'strike']
-op.active_controls = ['slip', 'rake']
-# op.active_controls = ['slip']  # FIXME: Fails on its own
-# op.active_controls = ['rake']
-# op.active_controls = ['dip']
-# op.active_controls = ['slip', 'dip']  # Fails
-num_active_controls = len(op.active_controls)
 op.dt = 4*0.5**level
 
 op.control_trajectory = []
@@ -373,12 +372,8 @@ def callback(m):
 
 print_output("Run optimisation...")
 m_init = np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
-bounds = []
-# for bound in [(0.0, np.Inf), (0.0, 90.0), (0.0, 90.0), (-np.Inf, np.Inf)]:
-# for bound in [(0.0, np.Inf)]:
-for bound in [(0.0, np.Inf), (0.0, 90.0)]:
-    for subfault in op.subfaults:
-        bounds.append(bound)
+bound_dict = {"slip": (0, np.Inf), "rake": (0, 90), "dip": (0, 90), "strike": (-np.Inf, np.Inf)}
+bounds = [bound_dict[control] for control in op.active_controls for subfault in op.subfaults]
 kwargs = dict(
     fprime=gradient__save,
     callback=callback,

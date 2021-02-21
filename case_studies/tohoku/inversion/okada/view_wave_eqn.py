@@ -45,22 +45,22 @@ gauges = list(op.gauges.keys())
 print(gauges)
 fname = 'data/opt_progress_discrete_{:d}_{:s}'.format(level, category) + '_{:s}'
 loaded = False
+if args.uniform_slip is not None:
+    op.control_parameters['slip'] = float(args.uniform_slip)*np.ones(190)
+if args.uniform_rake is not None:
+    op.control_parameters['rake'] = float(args.uniform_rake)*np.ones(190)
 try:
     assert not ig
     print(fname.format('ctrl') + '.npy')
     opt_controls = np.load(fname.format('ctrl') + '.npy')[-1]
     op.control_parameters['slip'] = opt_controls[:190]
-    # op.control_parameters['rake'] = opt_controls[190:380]
+    op.control_parameters['rake'] = opt_controls[190:380]
     # op.control_parameters['dip'] = opt_controls[380:570]
     # op.control_parameters['strike'] = opt_controls[570:]
     loaded = True
 except Exception:
     print("Could not find optimised controls. Proceeding with initial guess.")
     fname += '_ig'
-if args.uniform_slip is not None:
-    op.control_parameters['slip'] = float(args.uniform_slip)*np.ones(190)
-if args.uniform_rake is not None:
-    op.control_parameters['rake'] = float(args.uniform_rake)*np.ones(190)
 
 # --- Setup tsunami propagation problem
 
