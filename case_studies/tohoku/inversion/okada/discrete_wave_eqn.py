@@ -15,6 +15,9 @@ from adapt_utils.misc import ellipse
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
 parser.add_argument("categories")
+parser.add_argument("-taylor_test_okada")
+parser.add_argument("-taylor_test_tsunami")
+parser.add_argument("-taylor_test")
 parser.add_argument("-load")
 parser.add_argument("-gtol")
 parser.add_argument("-maxiter")
@@ -24,20 +27,22 @@ parser.add_argument("-uniform_rake")
 args = parser.parse_args()
 
 level = int(args.level)
+gauge_classifications = (
+    'all',
+    'near_field_gps',
+    'near_field_pressure',
+    'mid_field_pressure',
+    'far_field_pressure',
+    'southern_pressure',
+)
 if 'all' in args.categories:
     categories = 'all'
+    gauge_classifications_to_consider = gauge_classifications[1:]
 else:
     categories = args.categories.split(',')
     gauge_classifications_to_consider = []
     for category in categories:
-        assert category in (
-            'all',
-            'near_field_gps',
-            'near_field_pressure',
-            'mid_field_pressure',
-            'far_field_pressure',
-            'southern_pressure',
-        )
+        assert category in gauge_classifications
         gauge_classifications_to_consider.append(category)
     categories = '_'.join(categories)
 gtol = float(args.gtol or 1.0e-08)
@@ -73,8 +78,10 @@ gauges = list(op.gauges.keys())
 print(gauges)
 print(op.end_time)
 # op.active_controls = ['slip', 'rake', 'dip', 'strike']
-# op.active_controls = ['slip', 'rake']  # Fails  FIXME
-op.active_controls = ['slip']
+op.active_controls = ['slip', 'rake']
+# op.active_controls = ['slip']  # FIXME: Fails on its own
+# op.active_controls = ['rake']
+# op.active_controls = ['dip']
 # op.active_controls = ['slip', 'dip']  # Fails
 num_active_controls = len(op.active_controls)
 op.dt = 4*0.5**level
@@ -84,36 +91,9 @@ op.functional_trajectory = []
 op.gradient_trajectory = []
 op.line_search_trajectory = []
 op._feval = 0
-
-# --- Setup tsunami propagation problem
-
 mesh = op.default_mesh
 P1 = FunctionSpace(mesh, "CG", 1)
 P0 = FunctionSpace(mesh, "DG", 0)
-b = Function(P1).assign(op.set_bathymetry(P1))
-g = Constant(op.g)
-c_sq = g*b
-dtc = Constant(op.dt)
-dtc_sq = Constant(op.dt**2)
-n = FacetNormal(mesh)
-
-eta = TrialFunction(P1)
-phi = TestFunction(P1)
-eta_ = Function(P1)
-eta__ = Function(P1)
-
-a = inner(eta, phi)*dx
-L = inner(2*eta_ - eta__, phi)*dx - dtc_sq*inner(c_sq*grad(eta_), grad(phi))*dx
-# L += dtc_sq*phi*c_sq*dot(grad(eta_), n)*ds
-
-eta = Function(P1, name="Free surface elevation")
-params = {
-    "snes_type": "ksponly",
-    "ksp_type": "gmres",
-    "pc_type": "sor",
-}
-prob = LinearVariationalProblem(a, L, eta, bcs=DirichletBC(P1, 0, 100))
-solver = LinearVariationalSolver(prob, solver_parameters=params)
 
 # --- Setup source model
 
@@ -151,6 +131,81 @@ def gradient_okada(m, m_b=None):
         dislocation = okada_source(m)  # noqa
         m_b = np.ones(len(op.indices))
     return adolc.fos_reverse(tape_tag, m_b)
+
+
+if bool(args.taylor_test_okada or False):
+    """
+    Consider the reduced functional
+
+        J(m) = e . S(m)
+
+    Then dJdm is the same as propagating e through the reverse mode of AD on S.
+    """
+    print("Taylor test Okada...")
+    # np.random.seed(0)
+    _rf_okada = lambda m: np.sum(okada_source(m))
+    _gradient_okada = lambda _: gradient_okada(_, np.ones(len(op.indices)))
+    m_init = 0.7*np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
+    minconv = opt.taylor_test(_rf_okada, _gradient_okada, m_init, verbose=True)
+    assert minconv > 1.90
+
+
+# --- Setup coupling
+
+def tsunami_ic(dislocation):
+    """
+    Set the initial velocity-elevation tuple for the tsunami
+    propagation model, given some dislocation field.
+    """
+    surf = Function(P1)
+    surf.dat.data[op.indices] = dislocation
+    return surf
+
+
+def tsunami_ic_inverse(eta_init):
+    """
+    Extract the dislocation field associated with an initial
+    velocity-elevation tuple for the tsunami propagation model.
+    """
+    return eta_init.dat.data[op.indices]
+
+
+if bool(args.taylor_test_okada or False):
+    print("Taylor test coupling...")
+    # np.random.seed(0)
+    _rf_coupling = lambda m: np.sum(tsunami_ic(okada_source(m)).dat.data)
+    _gradient_coupling = lambda _: gradient_okada(_, np.ones(len(op.indices)))
+    m_init = 0.7*np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
+    minconv = opt.taylor_test(_rf_coupling, _gradient_coupling, m_init, verbose=True)
+    assert minconv > 1.90
+
+
+# --- Setup tsunami propagation problem
+
+b = Function(P1).assign(op.set_bathymetry(P1))
+g = Constant(op.g)
+c_sq = g*b
+dtc = Constant(op.dt)
+dtc_sq = Constant(op.dt**2)
+n = FacetNormal(mesh)
+
+eta = TrialFunction(P1)
+phi = TestFunction(P1)
+eta_ = Function(P1)
+eta__ = Function(P1)
+
+a = inner(eta, phi)*dx
+L = inner(2*eta_ - eta__, phi)*dx - dtc_sq*inner(c_sq*grad(eta_), grad(phi))*dx
+# L += dtc_sq*phi*c_sq*dot(grad(eta_), n)*ds
+
+eta = Function(P1, name="Free surface elevation")
+params = {
+    "snes_type": "ksponly",
+    "ksp_type": "gmres",
+    "pc_type": "sor",
+}
+prob = LinearVariationalProblem(a, L, eta, bcs=DirichletBC(P1, 0, 100))
+solver = LinearVariationalSolver(prob, solver_parameters=params)
 
 
 # --- Get gauge data
@@ -226,33 +281,22 @@ J = tsunami_propagation(eta0)
 stop_annotating()
 rf_tsunami = ReducedFunctional(J, c)
 
-# np.random.seed(0)
-# test = Function(eta0)
-# test.dat.data[:] *= 0.7
-# dtest = Function(eta0)
-# dtest.dat.data[:] = np.random.rand(*dtest.dat.data.shape)*test.dat.data
-# minconv = taylor_test(rf_tsunami, test, dtest)
-# assert minconv > 1.90
 
+# --- Taylor test
 
-def gradient_tsunami(eta_init):
+if bool(args.taylor_test_tsunami or False):
     """
-    Compute the gradient of the tsunami propagation model with
-    respect to an initial velocity-elevation tuple by reverse
-    propagation on pyadjoint's tape.
+    J(eta0) is the time integrated sum of square differences, averaged over neighbourhoods of each
+    gauge. dJdeta0 is given by propagating unity through the reverse mode of AD.
     """
-    J = rf_tsunami(eta_init)  # noqa
-    return rf_tsunami.derivative()
-
-
-def tsunami_ic(dislocation):
-    """
-    Set the initial velocity-elevation tuple for the tsunami
-    propagation model, given some dislocation field.
-    """
-    surf = Function(P1)
-    surf.dat.data[op.indices] = dislocation
-    return surf
+    print("Taylor test tsunami...")
+    # np.random.seed(0)
+    test = Function(eta0)
+    test.dat.data[:] *= 0.7
+    dtest = Function(eta0)
+    dtest.dat.data[:] = np.random.rand(*dtest.dat.data.shape)*test.dat.data
+    minconv = taylor_test(rf_tsunami, test, dtest)
+    assert minconv > 1.90
 
 
 def reduced_functional(m):
@@ -267,35 +311,25 @@ def reduced_functional(m):
     return J
 
 
-def tsunami_ic_inverse(eta_init):
-    """
-    Extract the dislocation field associated with an initial
-    velocity-elevation tuple for the tsunami propagation model.
-    """
-    return eta_init.dat.data[op.indices]
-
-
-def gradient(m):
+def gradient(_):
     """
     Compose the gradient functions for the Okada source model
     and the tsunami propagation model, interfacing with the
     inverse of `tsunami_ic`.
     """
-    # src = okada_source(m)
-    # eta_init = tsunami_ic(src)
-    # dJdeta0 = gradient_tsunami(eta_init)
     dJdeta0 = rf_tsunami.derivative()
     dJdS = tsunami_ic_inverse(dJdeta0)
-    g = gradient_okada(m, m_b=dJdS)
-    return g
+    return gradient_okada(_, m_b=dJdS)
 
 
-# --- Taylor tests
+# --- Taylor test
 
-# np.random.seed(0)
-# m_init = 0.7*np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
-# minconv = opt.taylor_test(reduced_functional, gradient, m_init, verbose=True)
-# assert minconv > 1.90
+if bool(args.taylor_test or False):
+    print("Taylor test coupled...")
+    # np.random.seed(0)
+    m_init = 0.7*np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
+    minconv = opt.taylor_test(reduced_functional, gradient, m_init, verbose=True)
+    assert minconv > 1.90
 
 
 # --- Optimisation
@@ -341,8 +375,8 @@ print_output("Run optimisation...")
 m_init = np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
 bounds = []
 # for bound in [(0.0, np.Inf), (0.0, 90.0), (0.0, 90.0), (-np.Inf, np.Inf)]:
-# for bound in [(0.0, np.Inf), (0.0, 90.0)]:
-for bound in [(0.0, np.Inf)]:
+# for bound in [(0.0, np.Inf)]:
+for bound in [(0.0, np.Inf), (0.0, 90.0)]:
     for subfault in op.subfaults:
         bounds.append(bound)
 kwargs = dict(

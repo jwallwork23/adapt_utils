@@ -123,7 +123,7 @@ class SubFault(ClawSubFault):
 
         # Use upper case convention for 2d
         if hasattr(self, 'x') and hasattr(self, 'y'):
-            X, Y = self.X, self.Y
+            X, Y = self.x, self.y
         elif hasattr(self, 'X') and hasattr(self, 'Y'):
             X, Y = self.X, self.Y
         else:

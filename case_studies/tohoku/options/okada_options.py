@@ -325,7 +325,11 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                 self._create_topography_active_interpolate(**kwargs)
             else:
                 self._create_topography_active(**kwargs)
-            self.print_debug(msg.format(self.fault.Mw().val), mode='full')
+            if self.debug and self.debug_mode == 'full':
+                try:
+                    print(msg.format(self.fault.Mw().val))
+                except Exception:
+                    print(msg.format(self.fault.Mw()))
         else:
             self._create_topography_passive()
             self.print_debug(msg.format(self.fault.Mw()), mode='full')
@@ -335,7 +339,8 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         for i, subfault in enumerate(self.subfaults):
             for control in self.all_controls:
                 subfault.__setattr__(control, self.control_parameters[control][i])
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo()), mode='full')
+            if self.debug and self.debug_mode == 'full':
+                print(msg.format(i, subfault.mu, subfault.Mo()))
         self.fault.create_dtopography(verbose=self.debug and self.debug_mode == 'full', active=False)
 
     # --- Automatic differentiation
@@ -347,7 +352,7 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
         assert isinstance(tag, int)
         assert tag >= 0
         for control in self.active_controls:
-            assert control in self.all_controls
+            assert control in self.all_controls, "Active control '{:s}' not recognised.".format(control)
 
         # Initialise tape
         adolc.trace_on(tag)
@@ -361,7 +366,11 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                     adolc.independent(subfault.__getattribute__(control))
                 else:
                     subfault.__setattr__(control, self.control_parameters[control][i])
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val), mode='full')
+            if self.debug and self.debug_mode == 'full':
+                try:
+                    print(msg.format(i, subfault.mu, subfault.Mo().val))
+                except Exception:
+                    print(msg.format(i, subfault.mu, subfault.Mo()))
 
         # Create the topography, thereby calling Okada
         self.print_debug("SETUP: Creating topography using Okada model...")
@@ -396,7 +405,11 @@ class TohokuOkadaBasisOptions(TohokuInversionOptions):
                     adolc.independent(subfault.__getattribute__(control))
                 else:
                     subfault.__setattr__(control, self.control_parameters[control][i])
-            self.print_debug(msg.format(i, subfault.mu, subfault.Mo().val), mode='full')
+            if self.debug and self.debug_mode == 'full':
+                try:
+                    print(msg.format(i, subfault.mu, subfault.Mo().val))
+                except Exception:
+                    print(msg.format(i, subfault.mu, subfault.Mo()))
 
         # Create the topography, thereby calling Okada
         self.print_debug("SETUP: Creating topography using Okada model...")
