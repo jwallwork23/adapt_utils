@@ -14,35 +14,53 @@ from adapt_utils.misc import ellipse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
-parser.add_argument("category")
+parser.add_argument("categories")
+parser.add_argument("-load")
 parser.add_argument("-gtol")
 parser.add_argument("-maxiter")
 parser.add_argument("-num_minutes")
+parser.add_argument("-uniform_slip")
+parser.add_argument("-uniform_rake")
 args = parser.parse_args()
 
 level = int(args.level)
-category = args.category
-assert category in (
-    'all',
-    'near_field_gps',
-    'near_field_pressure',
-    'mid_field_pressure',
-    'far_field_pressure',
-    'southern_pressure',
-)
+if 'all' in args.categories:
+    categories = 'all'
+else:
+    categories = args.categories.split(',')
+    gauge_classifications_to_consider = []
+    for category in categories:
+        assert category in (
+            'all',
+            'near_field_gps',
+            'near_field_pressure',
+            'mid_field_pressure',
+            'far_field_pressure',
+            'southern_pressure',
+        )
+        gauge_classifications_to_consider.append(category)
+    categories = '_'.join(categories)
 gtol = float(args.gtol or 1.0e-08)
 maxiter = int(args.maxiter or 1000)
-fname = 'data/opt_progress_discrete_{:d}_{:s}'.format(level, category) + '_{:s}'
-logname = 'data/discrete_{:d}_{:s}'.format(level, category)
+fname = 'data/opt_progress_discrete_{:d}_{:s}'.format(level, categories) + '_{:s}'
+logname = 'data/discrete_{:d}_{:s}'.format(level, categories)
 op = TohokuOkadaBasisOptions(level=level)
 op.end_time = 60*float(args.num_minutes or 120)
-op.control_trajectory = []
-op.functional_trajectory = []
-op.gradient_trajectory = []
-op.line_search_trajectory = []
-op._feval = 0
-if category != 'all':
-    op.gauge_classifications_to_consider = [category]
+op.gauge_classifications_to_consider = gauge_classifications_to_consider
+if args.load is not None:
+    if args.load not in op.gauge_classifications_to_consider:
+        op.gauge_classifications_to_consider.append(args.load)
+    fname_ = 'data/opt_progress_discrete_{:d}_{:s}'.format(level, args.load) + '_{:s}'
+    print("Loading ", fname_.format('ctrl') + '.npy')
+    opt_controls = np.load(fname_.format('ctrl') + '.npy')[-1]
+    op.control_parameters['slip'] = opt_controls[:190]
+    # op.control_parameters['rake'] = opt_controls[190:380]
+    # op.control_parameters['dip'] = opt_controls[380:570]
+    # op.control_parameters['strike'] = opt_controls[570:]
+if args.uniform_slip is not None:
+    op.control_parameters['slip'] = float(args.uniform_slip)*np.ones(190)
+if args.uniform_rake is not None:
+    op.control_parameters['rake'] = float(args.uniform_rake)*np.ones(190)
 op.get_gauges()
 gauges = list(op.gauges.keys())
 latest = 0.0
@@ -61,6 +79,11 @@ op.active_controls = ['slip']
 num_active_controls = len(op.active_controls)
 op.dt = 4*0.5**level
 
+op.control_trajectory = []
+op.functional_trajectory = []
+op.gradient_trajectory = []
+op.line_search_trajectory = []
+op._feval = 0
 
 # --- Setup tsunami propagation problem
 
@@ -261,7 +284,7 @@ def gradient(m):
     # src = okada_source(m)
     # eta_init = tsunami_ic(src)
     # dJdeta0 = gradient_tsunami(eta_init)
-    dJdeta0 =  rf_tsunami.derivative()
+    dJdeta0 = rf_tsunami.derivative()
     dJdS = tsunami_ic_inverse(dJdeta0)
     g = gradient_okada(m, m_b=dJdS)
     return g
