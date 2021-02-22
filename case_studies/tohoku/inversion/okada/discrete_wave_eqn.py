@@ -373,7 +373,7 @@ def callback(m):
 print_output("Run optimisation...")
 m_init = np.concatenate([op.control_parameters[ctrl] for ctrl in op.active_controls])
 bound_dict = {"slip": (0, np.Inf), "rake": (0, 90), "dip": (0, 90), "strike": (-np.Inf, np.Inf)}
-bounds = [bound_dict[control] for control in op.active_controls for subfault in op.subfaults]
+bounds = [bound_dict[control] for subfault in op.subfaults for control in op.active_controls]
 kwargs = dict(
     fprime=gradient__save,
     callback=callback,
