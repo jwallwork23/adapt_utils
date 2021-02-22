@@ -11,14 +11,16 @@ characteristics = {
     "fixed_mesh": {"label": "Uniform refinement", "marker": "*"},
     "integrate": {"label": "Integration", "marker": "v"},
     "intersect": {"label": "Intersection", "marker": "^"},
+    "on_the_fly": {"label": "On-the-fly", "marker": "x"},
+    "metric_advection": {"label": "Metric advection", "marker": "+"},
 }
 levels = 4
 approaches = ['fixed_mesh']
-alldofs = {'integrate': None, 'intersect': None}
-dofs = {'integrate': None, 'intersect': None}
-l2_error = {'integrate': None, 'intersect': None}
-cons_error = {'integrate': None, 'intersect': None}
-time = {'integrate': None, 'intersect': None}
+alldofs = {'integrate': None, 'intersect': None, 'on_the_fly': None, 'metric_advection': None}
+dofs = {'integrate': None, 'intersect': None, 'on_the_fly': None, 'metric_advection': None}
+l2_error = {'integrate': None, 'intersect': None, 'on_the_fly': None, 'metric_advection': None}
+cons_error = {'integrate': None, 'intersect': None, 'on_the_fly': None, 'metric_advection': None}
+time = {'integrate': None, 'intersect': None, 'on_the_fly': None, 'metric_advection': None}
 average_dofs = {}
 plot_dir = create_directory(os.path.join(os.path.dirname(__file__), 'plots'))
 
@@ -40,7 +42,6 @@ for approach in characteristics:
         continue
     di = os.path.join(os.path.dirname(__file__), 'outputs', 'hessian', approach)
     fname = os.path.join(di, "convergence_{:d}.h5")
-    approaches.append(approach)
     for i in range(levels):
         if not os.path.isfile(fname.format(i)):
             print("Cannot find convergence data {:s}".format(fname.format(i)))
@@ -51,13 +52,18 @@ for approach in characteristics:
             time[approach] = concat(time[approach], np.array(outfile['time']))
             l2_error[approach] = concat(l2_error[approach], np.array(outfile['l2_error']))
             cons_error[approach] = concat(cons_error[approach], np.array(outfile['cons_error']))
+    if alldofs[approach] is not None:
+        approaches.append(approach)
 
 # Plot DoF distribution
-for approach in ('integrate', 'intersect'):
+for approach in approaches[1:]:
     fig, axes = plt.subplots()
     for i in [3, 2, 1, 0]:
         label = r'$\mathcal C_T={{{:.0f}}}$'.format(1000*2**i)
-        axes.bar(np.linspace(1, 51, 50), alldofs[approach][i], label=label)
+        try:
+            axes.bar(np.linspace(1, 51, 50), alldofs[approach][i], label=label)
+        except IndexError:
+            continue
     axes.set_xlabel("Subinterval")
     axes.set_ylabel("DoF count")
     axes.set_xlim([0.5, 50.5])
