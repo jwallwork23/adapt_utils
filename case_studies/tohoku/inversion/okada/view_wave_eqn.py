@@ -13,7 +13,6 @@ from adapt_utils.swe.tsunami.conversion import lonlat_to_utm
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
 parser.add_argument("-category")
-parser.add_argument("-num_minutes")
 parser.add_argument("-initial_guess")
 parser.add_argument("-uniform_slip")
 parser.add_argument("-uniform_rake")
@@ -39,7 +38,7 @@ assert category in (
 )
 ig = bool(args.initial_guess or False)
 op = TohokuOkadaBasisOptions(level=level)
-op.end_time = 60*float(args.num_minutes or 120)
+op.end_time = 60*120
 op.dt = 4*0.5**level
 gauges = list(op.gauges.keys())
 print(gauges)
@@ -53,46 +52,21 @@ try:
     assert not ig
     print(fname.format('ctrl') + '.npy')
     opt_controls = np.load(fname.format('ctrl') + '.npy')[-1]
-    op.control_parameters['slip'] = opt_controls[:190]
-    op.control_parameters['rake'] = opt_controls[190:380]
-    # op.control_parameters['dip'] = opt_controls[380:570]
-    # op.control_parameters['strike'] = opt_controls[570:]
+    op.control_parameters['slip'] = opt_controls[0::2]
+    op.control_parameters['rake'] = opt_controls[1::2]
+    if op.control_parameters['rake'].max() > 90.0:
+        print("WARNING: Unrealistic rake {:.2f}".format(op.control_parameters['rake'].max()))
+    # op.control_parameters['dip'] = opt_controls[3::2]
+    # op.control_parameters['strike'] = opt_controls[4::2]
     loaded = True
 except Exception:
     print("Could not find optimised controls. Proceeding with initial guess.")
     fname += '_ig'
 
-# --- Setup tsunami propagation problem
-
 mesh = op.default_mesh
-P1DG = FunctionSpace(mesh, "DG", 1)
 P1 = FunctionSpace(mesh, "CG", 1)
 P0 = FunctionSpace(mesh, "DG", 0)
-b = Function(P1).assign(op.set_bathymetry(P1))
-g = Constant(op.g)
-c_sq = g*b
 
-dtc = Constant(op.dt)
-dtc_sq = Constant(op.dt**2)
-n = FacetNormal(mesh)
-
-eta = TrialFunction(P1)
-phi = TestFunction(P1)
-eta_ = Function(P1)
-eta__ = Function(P1)
-
-a = inner(eta, phi)*dx
-L = inner(2*eta_ - eta__, phi)*dx - dtc_sq*inner(c_sq*grad(eta_), grad(phi))*dx
-# L += dtc_sq*phi*c_sq*dot(grad(eta_), n)*ds
-
-eta = Function(P1, name="Free surface elevation")
-params = {
-    "snes_type": "ksponly",
-    "ksp_type": "gmres",
-    "pc_type": "sor",
-}
-prob = LinearVariationalProblem(a, L, eta, bcs=DirichletBC(P1, 0, 100))
-solver = LinearVariationalSolver(prob, solver_parameters=params)
 
 # --- Setup source model
 
@@ -137,6 +111,34 @@ if not loaded:
     fname += '_ig'
 savefig(fname, "plots", extensions=["jpg"], tight=False)
 
+# --- Setup tsunami propagation problem
+
+b = Function(P1).assign(op.set_bathymetry(P1))
+g = Constant(op.g)
+c_sq = g*b
+dtc = Constant(op.dt)
+dtc_sq = Constant(op.dt**2)
+n = FacetNormal(mesh)
+
+eta = TrialFunction(P1)
+phi = TestFunction(P1)
+eta_ = Function(P1)
+eta__ = Function(P1)
+
+a = inner(eta, phi)*dx
+L = inner(2*eta_ - eta__, phi)*dx - dtc_sq*inner(c_sq*grad(eta_), grad(phi))*dx
+# L += dtc_sq*phi*c_sq*dot(grad(eta_), n)*ds
+
+eta = Function(P1, name="Free surface elevation")
+params = {
+    "snes_type": "ksponly",
+    "ksp_type": "gmres",
+    "pc_type": "sor",
+}
+prob = LinearVariationalProblem(a, L, eta, bcs=DirichletBC(P1, 0, 100))
+solver = LinearVariationalSolver(prob, solver_parameters=params)
+
+
 # --- Get gauge data
 
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
@@ -154,8 +156,21 @@ def tsunami_propagation(init):
     """
     eta_.assign(init)
     eta__.assign(init)
+    t = op.dt
+    J = 0
+    wq = Constant(0.5*0.5*op.dt)
+    eta_obs = Constant(0.0)
 
+    # Setup QoI
     for gauge in gauges:
+        op.gauges[gauge]['init'] = None
+        op.gauges[gauge]['init_smooth'] = None
+        if t < op.gauges[gauge]['arrival_time']:
+            op.gauges[gauge]['timeseries'] = []
+            op.gauges[gauge]['timeseries_smooth'] = []
+            op.gauges[gauge]['diff'] = []
+            op.gauges[gauge]['diff_smooth'] = []
+            continue
         op.gauges[gauge]['data'] = [0.0, 0.0]
         op.gauges[gauge]['init'] = eta__.at(op.gauges[gauge]['coords'])
         op.gauges[gauge]['init_smooth'] = assemble(op.gauges[gauge]['indicator']*eta__*dx)
@@ -163,15 +178,11 @@ def tsunami_propagation(init):
         op.gauges[gauge]['timeseries_smooth'] = [0.0, 0.0]
         op.gauges[gauge]['diff'] = [0.0, 0.0]
         op.gauges[gauge]['diff_smooth'] = [0.0, 0.0]
-
-    t = op.dt
-    J = 0
-    weight = Constant(0.5)
-    eta_obs = Constant(0.0)
-    for gauge in op.gauges:
         eta_obs.assign(op.gauges[gauge]['init'])
-        J = J + assemble(0.5*weight*dtc*op.gauges[gauge]['indicator']*(eta__ - eta_obs)**2*dx)
-        J = J + assemble(0.5*weight*dtc*op.gauges[gauge]['indicator']*(eta_ - eta_obs)**2*dx)
+        J = J + assemble(wq*op.gauges[gauge]['indicator']*(eta__ - eta_obs)**2*dx)
+        J = J + assemble(wq*op.gauges[gauge]['indicator']*(eta_ - eta_obs)**2*dx)
+
+    # Enter timeloop
     while t < op.end_time:
 
         # Solve forward equation at current timestep
@@ -182,10 +193,22 @@ def tsunami_propagation(init):
         print("t = {:.0f} mins".format(t/60))
 
         # Time integrate QoI
-        weight.assign(0.5 if np.allclose(t, 0.0) or t >= op.end_time - 0.5*op.dt else 1.0)
         for gauge in op.gauges:
+            if t < op.gauges[gauge]['arrival_time']:
+                continue
+            elif np.allclose(t, op.gauges[gauge]['arrival_time']):
+                wq.assign(0.5*0.5*op.dt)
+            elif np.allclose(t, op.gauges[gauge]['departure_time']):
+                wq.assign(0.5*0.5*op.dt)
+            elif t > op.gauges[gauge]['departure_time']:
+                continue
+            else:
+                wq.assign(0.5*1.0*op.dt)
 
             # Point evaluation at gauges
+            if op.gauges[gauge]['init'] is None:
+                op.gauges[gauge]['init'] = eta.at(op.gauges[gauge]['coords'])
+                op.gauges[gauge]['init_smooth'] = assemble(op.gauges[gauge]['indicator']*eta*dx)
             eta_discrete = eta.at(op.gauges[gauge]['coords']) - op.gauges[gauge]['init']
             op.gauges[gauge]['timeseries'].append(eta_discrete)
 
@@ -197,12 +220,12 @@ def tsunami_propagation(init):
 
             # Continuous form of error
             I = op.gauges[gauge]['indicator']
-            diff = 0.5*I*(eta - eta_obs)**2
-            J = J + assemble(weight*dtc*diff*dx)
+            diff = I*(eta - eta_obs)**2
+            J = J + assemble(wq*diff*dx)
             op.gauges[gauge]['timeseries_smooth'].append(assemble(I*eta*dx) - op.gauges[gauge]['init_smooth'])
-            op.gauges[gauge]['diff_smooth'].append(assemble(diff*dx))
+            op.gauges[gauge]['diff_smooth'].append(assemble(0.5*diff*dx))
 
-    assert np.allclose(t, op.end_time), print("mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time))
+    assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return J
 
 
@@ -215,12 +238,14 @@ print("Quantity of interest = {:.4e}".format(J))
 # --- Plot gauge timeseries
 
 fig, axes = plt.subplots(ncols=4, nrows=len(gauges)//4, figsize=(17, 13), dpi=100)
-times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 for i, gauge in enumerate(gauges):
     ax = axes[i//4, i % 4]
-    ax.plot(times/60, op.gauges[gauge]['timeseries'], label=gauge, color='C0')
-    ax.plot(times/60, op.gauges[gauge]['timeseries_smooth'], ':', color='C0')
-    ax.plot(times/60, op.gauges[gauge]['data'], 'x', color='C1', markevery=15*2**level)
+    Tstart = op.gauges[gauge]['arrival_time']/60
+    Tend = op.gauges[gauge]['departure_time']/60
+    times = np.linspace(Tstart, Tend, len(op.gauges[gauge]['timeseries']))
+    ax.plot(times, op.gauges[gauge]['timeseries'], label=gauge, color='C0')
+    ax.plot(times, op.gauges[gauge]['timeseries_smooth'], ':', color='C0')
+    ax.plot(times, op.gauges[gauge]['data'], 'x', color='C1', markevery=15*2**level)
     leg = ax.legend(handlelength=0, handletextpad=0, fontsize=20)
     for item in leg.legendHandles:
         item.set_visible(False)
@@ -232,7 +257,7 @@ for i, gauge in enumerate(gauges):
     ax.yaxis.set_tick_params(labelsize=20)
     ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
     ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
-    ax.set_xlim([op.gauges[gauge]["arrival_time"]/60, op.gauges[gauge]["departure_time"]/60])
+    ax.set_xlim([Tstart, Tend])
     ax.grid(True)
 fname = 'discrete_timeseries_both_{:d}_{:s}'.format(level, category)
 if not loaded:
@@ -242,8 +267,11 @@ savefig(fname, 'plots', extensions=['pdf'])
 fig, axes = plt.subplots(ncols=4, nrows=len(gauges)//4, figsize=(17, 13), dpi=100)
 for i, gauge in enumerate(gauges):
     ax = axes[i//4, i % 4]
-    ax.plot(times/60, op.gauges[gauge]['diff'], label=gauge)
-    ax.plot(times/60, op.gauges[gauge]['diff_smooth'])
+    Tstart = op.gauges[gauge]['arrival_time']/60
+    Tend = op.gauges[gauge]['departure_time']/60
+    times = np.linspace(Tstart, Tend, len(op.gauges[gauge]['timeseries']))
+    ax.plot(times, op.gauges[gauge]['diff'], label=gauge)
+    ax.plot(times, op.gauges[gauge]['diff_smooth'])
     ax.legend(handlelength=0, handletextpad=0, fontsize=20)
     if i//len(gauges) == 3:
         ax.set_xlabel("Time [minutes]")
@@ -253,7 +281,7 @@ for i, gauge in enumerate(gauges):
     ax.yaxis.set_tick_params(labelsize=20)
     ax.set_yticks(ax.get_yticks().tolist())  # Avoid matplotlib error
     ax.set_yticklabels(["{:.1f}".format(tick) for tick in ax.get_yticks()])
-    ax.set_xlim([op.gauges[gauge]["arrival_time"]/60, op.gauges[gauge]["departure_time"]/60])
+    ax.set_xlim([Tstart, Tend])
     ax.grid(True)
 fname = 'discrete_timeseries_error_{:d}_{:s}'.format(level, category)
 if not loaded:
