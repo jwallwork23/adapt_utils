@@ -18,6 +18,7 @@ parser.add_argument("categories")
 parser.add_argument("-taylor_test_okada")
 parser.add_argument("-taylor_test_tsunami")
 parser.add_argument("-taylor_test")
+parser.add_argument("-normalise")
 parser.add_argument("-load")
 parser.add_argument("-gtol")
 parser.add_argument("-maxiter")
@@ -48,6 +49,7 @@ else:
     categories = '_'.join(categories)
 gtol = float(args.gtol or 1.0e-08)
 maxiter = int(args.maxiter or 1000)
+normalise = bool(args.normalise or False)
 fname = 'data/opt_progress_discrete_{:d}_{:s}'.format(level, categories) + '_{:s}'
 logname = 'data/discrete_{:d}_{:s}'.format(level, categories)
 op = TohokuOkadaBasisOptions(level=level)
@@ -211,11 +213,23 @@ solver = LinearVariationalSolver(prob, solver_parameters=params)
 
 radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
 for gauge in gauges:
-    loc = op.gauges[gauge]["coords"]
+    loc = op.gauges[gauge]['coords']
     op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
     area = assemble(op.gauges[gauge]['indicator']*dx)
     op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
     op.sample_timeseries(gauge, sample=op.gauges[gauge]['sample'], detide=True)
+    op.gauges[gauge]['weight'] = 1.0
+    if normalise:
+        t = 0.0
+        maxvalue = 0.0
+        while t < op.end_time - 1.0e-05:
+            if t < op.gauges[gauge]['arrival_time'] or t > op.gauges[gauge]['departure_time']:
+                t += op.dt
+                continue
+            maxvalue = max(maxvalue, op.gauges[gauge]['interpolator'](t)**2)
+            t += op.dt
+        assert not np.isclose(maxvalue, 0.0)
+        op.gauges[gauge]['weight'] /= maxvalue
 
 
 def tsunami_propagation(init):
@@ -225,7 +239,7 @@ def tsunami_propagation(init):
     eta_.assign(init)
     eta__.assign(init)
     t = op.dt
-    wq = Constant(0.5*0.5*op.dt)
+    wq = Constant(0.0)
     eta_obs = Constant(0.0)
 
     # Setup QoI
@@ -236,7 +250,9 @@ def tsunami_propagation(init):
             continue
         op.gauges[gauge]['init'] = eta__.at(op.gauges[gauge]['coords'])
         eta_obs.assign(op.gauges[gauge]['init'])
+        wq.assign(0.5*0.5*op.dt*op.gauges[gauge]['weight'])
         J = J + assemble(wq*op.gauges[gauge]['indicator']*(eta__ - eta_obs)**2*dx)
+        wq.assign(0.5*1.0*op.dt*op.gauges[gauge]['weight'])
         J = J + assemble(wq*op.gauges[gauge]['indicator']*(eta_ - eta_obs)**2*dx)
 
     # Enter timeloop
@@ -253,13 +269,13 @@ def tsunami_propagation(init):
             if t < op.gauges[gauge]['arrival_time']:
                 continue
             elif np.allclose(t, op.gauges[gauge]['arrival_time']):
-                wq.assign(0.5*0.5*op.dt)
+                wq.assign(0.5*0.5*op.dt*op.gauges[gauge]['weight'])
             elif np.allclose(t, op.gauges[gauge]['departure_time']):
-                wq.assign(0.5*0.5*op.dt)
+                wq.assign(0.5*0.5*op.dt*op.gauges[gauge]['weight'])
             elif t > op.gauges[gauge]['departure_time']:
                 continue
             else:
-                wq.assign(0.5*1.0*op.dt)
+                wq.assign(0.5*1.0*op.dt*op.gauges[gauge]['weight'])
 
             # Interpolate observations
             if op.gauges[gauge]['init'] is None:

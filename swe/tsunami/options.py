@@ -335,8 +335,8 @@ class TsunamiOptions(CoupledOptions):
         interp = si.interp1d(sampled_times, sampled_data, **kwargs)
 
         # Shift by initial value
-        arrival_time = self.gauges[gauge]["arrival_time"]
-        self.gauges[gauge]["interpolator"] = lambda tau: interp(tau) - interp(arrival_time)
+        Tstart = self.gauges[gauge]["arrival_time"]
+        self.gauges[gauge]["interpolator"] = lambda tau: interp(tau) - interp(Tstart)
 
     def detide(self, gauge):
         """To be implemented in subclass."""
