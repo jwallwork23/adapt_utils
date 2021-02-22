@@ -246,7 +246,10 @@ for i, gauge in enumerate(gauges):
     ax.plot(times, op.gauges[gauge]['timeseries'], label=gauge, color='C0')
     ax.plot(times, op.gauges[gauge]['timeseries_smooth'], ':', color='C0')
     ax.plot(times, op.gauges[gauge]['data'], 'x', color='C1', markevery=15*2**level)
-    leg = ax.legend(handlelength=0, handletextpad=0, fontsize=20)
+    prop = {}
+    if op.gauges[gauge]['class'] == category:
+        prop['weight'] = 'bold'
+    leg = ax.legend(handlelength=0, handletextpad=0, fontsize=20, prop=prop)
     for item in leg.legendHandles:
         item.set_visible(False)
     if i//len(gauges) == 3:
@@ -272,7 +275,10 @@ for i, gauge in enumerate(gauges):
     times = np.linspace(Tstart, Tend, len(op.gauges[gauge]['timeseries']))
     ax.plot(times, op.gauges[gauge]['diff'], label=gauge)
     ax.plot(times, op.gauges[gauge]['diff_smooth'])
-    ax.legend(handlelength=0, handletextpad=0, fontsize=20)
+    prop = {}
+    if op.gauges[gauge]['class'] == category:
+        prop['weight'] = 'bold'
+    ax.legend(handlelength=0, handletextpad=0, fontsize=20, prop=prop)
     if i//len(gauges) == 3:
         ax.set_xlabel("Time [minutes]")
     if i % 4 == 0:
