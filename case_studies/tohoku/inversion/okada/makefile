@@ -1,7 +1,13 @@
-all: plot_equal_order_0
+all: plot
 
-plot_equal_order_0:
-	python3 view_equal_order.py 0 -category all
-	python3 view_equal_order.py 0 -category gps
-	python3 view_equal_order.py 0 -category far
-	python3 view_equal_order.py 0 -category south
+run:
+	python3 discrete_wave_eqn.py 2 southern_pressure -uniform_slip 1 -uniform_rake 90
+	python3 discrete_wave_eqn.py 2 mid_field_pressure -uniform_slip 1 -uniform_rake 90
+	python3 discrete_wave_eqn.py 2 far_field_pressure -uniform_slip 1 -uniform_rake 90
+	python3 discrete_wave_eqn.py 2 all -uniform_slip 1 -uniform_rake 90 -normalise 1
+
+plot:
+	python3 view_wave_eqn.py 2 -category south
+	python3 view_wave_eqn.py 2 -category mid
+	python3 view_wave_eqn.py 2 -category far
+	python3 view_wave_eqn.py 2 -category all

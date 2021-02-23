@@ -243,13 +243,11 @@ for i, gauge in enumerate(gauges):
     Tstart = op.gauges[gauge]['arrival_time']/60
     Tend = op.gauges[gauge]['departure_time']/60
     times = np.linspace(Tstart, Tend, len(op.gauges[gauge]['timeseries']))
-    ax.plot(times, op.gauges[gauge]['timeseries'], label=gauge, color='C0')
+    label = r"\textbf{{{:s}}}".format(gauge) if op.gauges[gauge]['class'] == category else gauge
+    ax.plot(times, op.gauges[gauge]['timeseries'], label=label, color='C0')
     ax.plot(times, op.gauges[gauge]['timeseries_smooth'], ':', color='C0')
     ax.plot(times, op.gauges[gauge]['data'], 'x', color='C1', markevery=15*2**level)
-    prop = {}
-    if op.gauges[gauge]['class'] == category:
-        prop['weight'] = 'bold'
-    leg = ax.legend(handlelength=0, handletextpad=0, fontsize=20, prop=prop)
+    leg = ax.legend(handlelength=0, handletextpad=0, fontsize=20)
     for item in leg.legendHandles:
         item.set_visible(False)
     if i//len(gauges) == 3:
@@ -273,12 +271,10 @@ for i, gauge in enumerate(gauges):
     Tstart = op.gauges[gauge]['arrival_time']/60
     Tend = op.gauges[gauge]['departure_time']/60
     times = np.linspace(Tstart, Tend, len(op.gauges[gauge]['timeseries']))
-    ax.plot(times, op.gauges[gauge]['diff'], label=gauge)
+    label = r"\textbf{{{:s}}}".format(gauge) if op.gauges[gauge]['class'] == category else gauge
+    ax.plot(times, op.gauges[gauge]['diff'], label=label)
     ax.plot(times, op.gauges[gauge]['diff_smooth'])
-    prop = {}
-    if op.gauges[gauge]['class'] == category:
-        prop['weight'] = 'bold'
-    ax.legend(handlelength=0, handletextpad=0, fontsize=20, prop=prop)
+    ax.legend(handlelength=0, handletextpad=0, fontsize=20)
     if i//len(gauges) == 3:
         ax.set_xlabel("Time [minutes]")
     if i % 4 == 0:
