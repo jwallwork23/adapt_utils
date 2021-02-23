@@ -26,16 +26,12 @@ class AdaptiveTsunamiProblem(AdaptiveProblem):
         self.get_qoi_kernels(i)
         self.callbacks[i].add(QoICallback(self, i), 'timestep')
 
-    def get_qoi_timeseries(self):
+    @property
+    def qoi_timeseries(self):
         self._qoi_timeseries = []
         for i in range(self.num_meshes):
             tag = 'qoi_{:5s}'.format(index_string(i))
             self._qoi_timeseries.extend(self.callbacks[i]['timestep'][tag].timeseries)
-
-    @property
-    def qoi_timeseries(self):
-        if not hasattr(self, '_qoi_timeseries'):
-            self.get_qoi_timeseries()
         return self._qoi_timeseries
 
     def quantity_of_interest(self):
