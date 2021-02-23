@@ -9,6 +9,7 @@ tohoku/inversion/radial/outputs/
 tohoku/inversion/okada/outputs/
 tohoku/inversion/okada/plots/
 tohoku/inversion/okada/data/
+tohoku/inversion/simple.py
 tohoku/options/.cache/
 tohoku/outputs/
 tohoku/resources/boundaries_old
