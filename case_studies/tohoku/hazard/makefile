@@ -60,11 +60,15 @@ weighted_hessian:
 
 # --- Plotting
 
-kernel:
-	@python3 plot_kernel.py -level 3
+kernel: ball gaussian
+
+ball:
 	@python3 plot_kernel.py -level 3 -kernel_shape ball
-	@python3 plot_kernel.py -level 3 -locations Ogasawara -radius 50e3
 	@python3 plot_kernel.py -level 3 -locations Ogasawara -radius 50e3 -kernel_shape ball
+
+gaussian:
+	@python3 plot_kernel.py -level 3
+	@python3 plot_kernel.py -level 3 -locations Ogasawara -radius 50e3
 
 
 # --- Cleanup
