@@ -45,6 +45,10 @@ op.dt = 4*0.5**level
 gauges = list(op.gauges.keys())
 print(gauges)
 fname = 'data/opt_progress_discrete_{:d}_{:s}'.format(level, categories) + '_{:s}'
+op.active_controls = (args.active_controls or 'slip,rake').split(',')
+num_active_controls = len(op.active_controls)
+if num_active_controls == 0:
+    raise ValueError("No active controls set.")
 loaded = False
 if args.uniform_slip is not None:
     op.control_parameters['slip'] = float(args.uniform_slip)*np.ones(190)
@@ -59,9 +63,9 @@ try:
         if control in op.active_controls:
             op.control_parameters[control] = opt_controls[i::2]
             i += 1
-    if op.control_parameters['rake'].max() > 90.0:
+    if 'rake' in op.active_controls and op.control_parameters['rake'].max() > 90.0:
         print("WARNING: Unrealistic rake {:.2f}".format(op.control_parameters['rake'].max()))
-    if op.control_parameters['dip'].max() > 90.0:
+    if 'dip' in op.active_controls and op.control_parameters['dip'].max() > 90.0:
         print("WARNING: Unrealistic dip {:.2f}".format(op.control_parameters['dip'].max()))
     loaded = True
 except Exception:
