@@ -234,7 +234,7 @@ for gauge in gauges:
 
 def tsunami_propagation(init):
     """
-    Run tsunami propagation, given an initial velocity-elevation tuple.
+    Run tsunami propagation, given an initial elevation.
     """
     eta_.assign(init)
     eta__.assign(init)
@@ -321,9 +321,7 @@ def reduced_functional(m):
     """
     src = okada_source(m)
     eta_init = tsunami_ic(src)
-    J = rf_tsunami(eta_init)
-    # J = tsunami_propagation(eta_init)
-    return J
+    return rf_tsunami(eta_init)
 
 
 def gradient(_):
@@ -374,9 +372,6 @@ def gradient__save(m):
     np.save(fname.format('ctrl'), op.control_trajectory)
     np.save(fname.format('func'), op.functional_trajectory)
     np.save(fname.format('grad'), op.gradient_trajectory)
-    # if abs(g) < gtol:
-    #     callback(m)
-    #     raise opt.GradientConverged
     return dJdm
 
 
@@ -398,17 +393,10 @@ kwargs = dict(
     bounds=bounds,
 )
 tic = perf_counter()
-try:
-    x, f, d = so.fmin_l_bfgs_b(reduced_functional__save, m_init, **kwargs)
-    print(d['task'])
-except opt.GradientConverged:
-    print("Gradient converged to tolerance {:.1e}: ".format(gtol), op.gradient_trajectory[-1])
+x, f, d = so.fmin_l_bfgs_b(reduced_functional__save, m_init, **kwargs)
+print(d['task'])
 cpu_time = perf_counter() - tic
 with open(logname + '.log', 'w+') as log:
-    log.write("slip minimiser:       {:.8e}\n".format(op.control_trajectory[-1][0]))
-    log.write("rake minimiser:       {:.4f}\n".format(op.control_trajectory[-1][1]))
-    # log.write("dip minimiser:        {:.4f}\n".format(op.control_trajectory[-1][2]))
-    # log.write("strike minimiser:     {:.4f}\n".format(op.control_trajectory[-1][3]))
     log.write("minimum:              {:.8e}\n".format(op.functional_trajectory[-1]))
     log.write("function evaluations: {:d}\n".format(op._feval))
     log.write("gradient evaluations: {:d}\n".format(len(op.gradient_trajectory)))
