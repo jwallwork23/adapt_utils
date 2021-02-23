@@ -58,6 +58,15 @@ weighted_hessian:
 		-dm_plex_prescribed_boundary_sizes 10e3,5e3
 
 
+# --- Plotting
+
+kernel:
+	@python3 plot_kernel.py -level 3
+	@python3 plot_kernel.py -level 3 -kernel_shape ball
+	@python3 plot_kernel.py -level 3 -locations Ogasawara -radius 50e3
+	@python3 plot_kernel.py -level 3 -locations Ogasawara -radius 50e3 -kernel_shape ball
+
+
 # --- Cleanup
 
 clean:
