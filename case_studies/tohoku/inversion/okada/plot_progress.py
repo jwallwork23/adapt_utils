@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from adapt_utils.norms import vecnorm
-from adapt_utils.plotting import *  # NOQA
+from adapt_utils.plotting import *
 
 
 parser = argparse.ArgumentParser()
@@ -53,13 +53,13 @@ axes.loglog(functional_trajectory)
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Quantity of Interest")
 axes.grid(True, which='both')
-plt.tight_layout()
+savefig("qoi_progress_{:d}_{:s}".format(level, categories), "plots", extensions=["pdf"])
 
 fig, axes = plt.subplots(figsize=(8, 8))
 axes.loglog(gradient_norm_trajectory)
 axes.set_xlabel("Iteration")
 axes.set_ylabel("Computed gradient")
 axes.grid(True, which='both')
-plt.tight_layout()
+savefig("gradient_progress_{:d}_{:s}".format(level, categories), "plots", extensions=["pdf"])
 
-plt.show()
+print("Number of line search iterations: {:d}".format(len(line_search_trajectory)))

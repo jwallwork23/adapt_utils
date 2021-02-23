@@ -59,6 +59,6 @@ tc = tricontourf(k_eta, axes=axes, levels=np.linspace(0, 1.05, 50), cmap='coolwa
 cbar = fig.colorbar(tc, ax=cax)
 cbar.set_ticks(np.linspace(0, 1, 6))
 axes.axis(False)
-op.annotate_plot(axes, markercolour='C2', textcolour='C2')
+op.annotate_plot(axes, markercolour='aqua', textcolour='aqua')
 loc = ('_'.join(locations)).replace(' ', '_').lower()
 savefig("{:s}_{:s}_{:d}".format(loc, op.kernel_shape, op.level), plot_dir, extensions=["jpg"], tight=False)
