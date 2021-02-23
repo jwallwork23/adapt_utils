@@ -13,7 +13,7 @@ from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 parser = argparse.ArgumentParser(prog="run_qmesh_convergence")
 
 # Space-time domain
-parser.add_argument("-end_time", help="End time of simulation in seconds (default 1440s i.e. 24min)")
+parser.add_argument("-end_time", help="End time of simulation in seconds (default 1440s, i.e. 24min)")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (for testing, default 1)")
 
 # Solver
@@ -26,7 +26,7 @@ parser.add_argument("-levels", help="Number of mesh levels to consider (default 
 
 # QoI
 parser.add_argument("-start_time", help="""
-    Start time of period of interest in seconds (default zero)""")
+    Start time of period of interest in seconds (default 1200s, i.e. 20min)""")
 parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo', 'Ogasawara'}. (Default 'Fukushima Daiichi')
@@ -54,10 +54,10 @@ kwargs = {
 
     # Space-time domain
     'num_meshes': int(args.num_meshes or 1),
-    'end_time': float(args.end_time or 24*60.0),
+    'end_time': float(args.end_time or 1440.0),
 
     # Physics
-    'bathymetry_cap': 30.0,  # FIXME
+    'bathymetry_cap': 30.0,
 
     # Solver
     'family': family,
@@ -65,7 +65,7 @@ kwargs = {
     'use_wetting_and_drying': False,
 
     # QoI
-    'start_time': float(args.start_time or 0.0),
+    'start_time': float(args.start_time or 1200.0),
     'radius': radius,
     'locations': locations,
 
