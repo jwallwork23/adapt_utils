@@ -1,7 +1,6 @@
 import argparse
 import matplotlib.pyplot as plt
 import numpy as np
-import sys
 
 from adapt_utils.norms import vecnorm
 from adapt_utils.plotting import *  # NOQA
@@ -9,18 +8,34 @@ from adapt_utils.plotting import *  # NOQA
 
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
+parser.add_argument("-categories")
 args = parser.parse_args()
 
 level = int(args.level)
-mode = 'discrete'
-try:
-    control_trajectory = np.load('data/opt_progress_{:s}_{:d}_ctrl.npy'.format(mode, level))
-    functional_trajectory = np.load('data/opt_progress_{:s}_{:d}_func.npy'.format(mode, level))
-    gradient_trajectory = np.load('data/opt_progress_{:s}_{:d}_grad.npy'.format(mode, level))
-    line_search_trajectory = np.load('data/opt_progress_{:s}_{:d}_ls.npy'.format(mode, level))
-except Exception:
-    print("Cannot load {:s} data for level {:d}.".format(mode, level))
-    sys.exit(0)
+gauge_classifications = (
+    'all',
+    'near_field_gps',
+    'near_field_pressure',
+    'mid_field_pressure',
+    'far_field_pressure',
+    'southern_pressure',
+)
+if 'all' in args.categories:
+    categories = 'all'
+    gauge_classifications_to_consider = gauge_classifications[1:]
+else:
+    categories = args.categories.split(',')
+    gauge_classifications_to_consider = []
+    for category in categories:
+        assert category in gauge_classifications
+        gauge_classifications_to_consider.append(category)
+    categories = '_'.join(categories)
+fname = 'data/opt_progress_discrete_{:d}_{:s}'.format(level, categories) + '_{:s}'
+print(fname.format('ctrl') + '.npy')
+control_trajectory = np.load(fname.format('ctrl') + '.npy')
+functional_trajectory = np.load(fname.format('func') + '.npy')
+gradient_trajectory = np.load(fname.format('grad') + '.npy')
+line_search_trajectory = np.load(fname.format('ls') + '.npy')
 i = 0
 indices = [0]
 for j, ctrl in enumerate(control_trajectory):
