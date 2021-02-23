@@ -53,12 +53,12 @@ print_output("elem {:d} vert {:d} vol {:.4f} km^3".format(num_cells, num_vertice
 
 # --- Plot
 fig, axes = plt.subplots(figsize=(5, 5))
-cax = fig.add_axes([0.05, 0.5, 0.1, 0.4])
+cax = fig.add_axes([0.05, 0.55, 0.1, 0.4])
 cax.axis(False)
 tc = tricontourf(k_eta, axes=axes, levels=np.linspace(0, 1.05, 50), cmap='coolwarm')
 cbar = fig.colorbar(tc, ax=cax)
 cbar.set_ticks(np.linspace(0, 1, 6))
-for loc in op.locations_of_interest:
-    axes.plot(*op.locations_of_interest[loc]['utm'], '*', label=loc, color='k', markersize=8)
 axes.axis(False)
-savefig("{:s}_{:d}".format(op.kernel_shape, op.level), plot_dir, extensions=["jpg"], tight=False)
+op.annotate_plot(axes, markercolour='C2', textcolour='C2')
+loc = ('_'.join(locations)).replace(' ', '_').lower()
+savefig("{:s}_{:s}_{:d}".format(loc, op.kernel_shape, op.level), plot_dir, extensions=["jpg"], tight=False)

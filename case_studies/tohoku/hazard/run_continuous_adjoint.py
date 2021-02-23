@@ -12,19 +12,19 @@ from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 parser = argparse.ArgumentParser(prog="run_continuous_adjoint")
 
 # Space-time domain
-parser.add_argument("-end_time", help="End time of simulation in seconds (default 1440s i.e. 24min)")
+parser.add_argument("-end_time", help="End time of simulation in seconds (default 1440s, i.e. 24min)")
 parser.add_argument("-level", help="(Integer) resolution for initial mesh (default 0)")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (for testing, default 1)")
 parser.add_argument("-levels", help="Number of iso-P2 refinements (for testing, default 0)")
 
 # Solver
-parser.add_argument("-family", help="Element family for mixed FE space (default 'dg-cg')")
+parser.add_argument("-family", help="Element family for mixed FE space (default 'cg-cg')")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
 parser.add_argument("-stabilisation", help="Stabilisation method to use (default None)")
 
 # QoI
 parser.add_argument("-start_time", help="""
-    Start time of period of interest in seconds (default zero)""")
+    Start time of period of interest in seconds (default 1200s, i.e. 20min)""")
 parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')""")
@@ -40,10 +40,7 @@ args = parser.parse_args()
 
 # --- Set parameters
 
-if args.locations is None:  # TODO: Parse as list
-    locations = ['Fukushima Daiichi']
-else:
-    locations = args.locations.split(',')
+locations = ['Fukushima Daiichi'] if args.locations is None else args.locations.split(',')
 radius = float(args.radius or 100.0e+03)
 plot_pvd = False if args.plot_pvd == '0' else True
 kwargs = {
@@ -52,21 +49,19 @@ kwargs = {
     # Space-time domain
     'level': int(args.level or 0),
     'num_meshes': int(args.num_meshes or 1),
-    'end_time': float(args.end_time or 24*60.0),
+    'end_time': float(args.end_time or 1440.0),
 
     # Physics
-    'bathymetry_cap': 30.0,  # FIXME
-    # 'bathymetry_cap': None,
+    'bathymetry_cap': 30.0,
 
     # Solver
     'family': args.family or 'cg-cg',
     'stabilisation': args.stabilisation,
-    # 'use_wetting_and_drying': True,
     'use_wetting_and_drying': False,
     'wetting_and_drying_alpha': Constant(10.0),
 
     # QoI
-    'start_time': float(args.start_time or 0.0),
+    'start_time': float(args.start_time or 1200.0),
     'radius': radius,
     'locations': locations,
 

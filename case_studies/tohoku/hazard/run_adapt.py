@@ -12,9 +12,9 @@ from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 parser = argparse.ArgumentParser(prog="run_adapt")
 
 # Space-time domain
-parser.add_argument("-end_time", help="End time of simulation in seconds (default 1400s i.e. 24min)")
+parser.add_argument("-end_time", help="End time of simulation in seconds (default 1400s, i.e. 24min)")
 parser.add_argument("-level", help="(Integer) resolution for initial mesh (default 0)")
-parser.add_argument("-num_meshes", help="Number of meshes to consider (default 12)")
+parser.add_argument("-num_meshes", help="Number of meshes to consider (default 24)")
 
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space (default cg-cg)")
@@ -34,7 +34,7 @@ parser.add_argument("-h_max", help="Maximum tolerated element size (default 1000
 
 # QoI
 parser.add_argument("-start_time", help="""
-    Start time of period of interest in seconds (default zero)""")
+    Start time of period of interest in seconds (default 1220s, i.e. 20min)""")
 parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
@@ -90,13 +90,13 @@ kwargs = {
     # Space-time domain
     'level': int(args.level or 0),
     'end_time': float(args.end_time or 1440.0),
-    'num_meshes': int(args.num_meshes or 12),
+    'num_meshes': int(args.num_meshes or 24),
 
     # Timestepping
     'dt_per_export': 1,
 
     # Physics
-    'bathymetry_cap': 30.0,  # FIXME
+    'bathymetry_cap': 30.0,
 
     # Solver
     'family': family,
@@ -115,7 +115,7 @@ kwargs = {
     'h_max': float(args.h_max or 1.0e+06),
 
     # QoI
-    'start_time': float(args.start_time or 0.0),
+    'start_time': float(args.start_time or 1200.0),
     'radius': radius,
     'locations': locations,
 

@@ -34,9 +34,8 @@ class TohokuHazardOptions(TohokuOptions):
         #     2 hour simulation period.
         #   * In this class we are only interested in the tsunami's approach of the coast and
         #     therefore use a reduced time window.
-        self.start_time = kwargs.get('start_time', 0.0)
-        self.end_time = kwargs.get('end_time', 24*60.0)
-        # self.end_time = kwargs.get('end_time', 60*60.0)
+        self.start_time = kwargs.get('start_time', 1200.0)
+        self.end_time = kwargs.get('end_time', 1440.0)
 
         # Location classifications
         self.locations_to_consider = kwargs.get('locations', ['Fukushima Daiichi'])
@@ -146,7 +145,7 @@ class TohokuHazardOptions(TohokuOptions):
         initial_surface.interpolate(k*initial_surface)
         return initial_surface
 
-    def annotate_plot(self, axes, coords="utm", fontsize=12):
+    def annotate_plot(self, axes, coords="utm", fontsize=12, textcolour='r', markercolour='r'):
         """
         Annotate `axes` in coordinate system `coords` with all locations of interest.
 
@@ -161,16 +160,12 @@ class TohokuHazardOptions(TohokuOptions):
             x, y = np.copy(self.locations_of_interest[loc][coords])
             kwargs = {
                 "xy": self.locations_of_interest[loc][coords],
-                "color": "indigo",
+                "color": textcolour,
                 "ha": "right",
                 "va": "center",
                 "fontsize": fontsize,
             }
-            if loc == "Fukushima Daini":
-                continue
-            elif loc == "Fukushima Daiichi":
-                loc = "Fukushima"
-            x += offset
+            x -= offset
             kwargs["xytext"] = (x, y)
-            axes.plot(*self.locations_of_interest[loc][coords], 'x', color=kwargs["color"])
+            axes.plot(*self.locations_of_interest[loc][coords], '*', color=markercolour)
             axes.annotate(loc, **kwargs)
