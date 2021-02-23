@@ -71,7 +71,7 @@ version of Firedrake, please follow the instructions [here][7].
       * `case_studies/tohoku/inversion/okada` (Section 4.5).
       * `test/adapt` (Sections 5.8 and 6.4).
       * `unsteady/test_cases/bubble_shear` (Sections 5.8 and 6.1).
-      * `unsteady/test_cases/trench_1d` (Sections 6.5).
+      * `unsteady/test_cases/trench_1d` (Section 6.5).
       * `steady/test_cases/turbine_array` (Sections 7.3 and 7.5).
       * `steady/test_cases/idealised_desalination` (Section 7.7).
       * `case_studies/tohoku/hazard` (Section 7.8).

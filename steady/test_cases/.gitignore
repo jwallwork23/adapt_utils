@@ -19,8 +19,4 @@ turbine_array/resources/
 turbine_array/data/
 turbine_array/plots/
 turbine_array/__pycache__/
-turbine_array/stephan.py
-turbine_array/stephan-noid.py
-turbine_array/run.py
-turbine_array/*.geo
-turbine_array/admos_paper_plots.ipynb
+turbine_array/taylor_test.py
