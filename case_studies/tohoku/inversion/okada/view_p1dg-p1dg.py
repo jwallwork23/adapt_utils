@@ -69,19 +69,24 @@ except Exception:
     fname += '_ig'
 
 mesh = op.default_mesh
+P1DG_vec = VectorFunctionSpace(mesh, "DG", 1)
+P1DG = FunctionSpace(mesh, "DG", 1)
 P1 = FunctionSpace(mesh, "CG", 1)
 P0 = FunctionSpace(mesh, "DG", 0)
+EqualOrder = P1DG_vec*P1DG
 
 
 # --- Setup source model
 
 tape_tag = 0
-eta0 = Function(P1)
 dislocation = Function(P1)
 op.create_topography(annotate=False)
 dislocation.dat.data[op.indices] = op.fault.dtopo.dZ.reshape(op.fault.dtopo.X.shape)
 num_subfaults = len(op.subfaults)
-eta0.assign(dislocation)
+
+q0 = Function(EqualOrder)
+u0, eta0 = q0.split()
+eta0.interpolate(dislocation)
 
 # --- Plot initial dislocation field
 
@@ -118,28 +123,49 @@ savefig(fname, "plots", extensions=["jpg"], tight=False)
 
 b = Function(P1).assign(op.set_bathymetry(P1))
 g = Constant(op.g)
-c_sq = g*b
 dtc = Constant(op.dt)
-dtc_sq = Constant(op.dt**2)
 n = FacetNormal(mesh)
 
-eta = TrialFunction(P1)
-phi = TestFunction(P1)
-eta_ = Function(P1)
-eta__ = Function(P1)
+u, eta = TrialFunctions(EqualOrder)
+z, zeta = TestFunctions(EqualOrder)
+q_ = Function(EqualOrder)
+u_, eta_ = q_.split()
 
-a = inner(eta, phi)*dx
-L = inner(2*eta_ - eta__, phi)*dx - dtc_sq*inner(c_sq*grad(eta_), grad(phi))*dx
-# L += dtc_sq*phi*c_sq*dot(grad(eta_), n)*ds
 
-eta = Function(P1, name="Free surface elevation")
+def G(uv, elev):
+    head_star = avg(elev) + sqrt(b/g)*jump(uv, n)
+    hu_star = b*(avg(uv) + sqrt(g/b)*jump(elev, n))
+    c = sqrt(g*b)
+
+    F = -g*elev*nabla_div(z)*dx
+    F += g*head_star*jump(z, n)*dS
+    F += c*dot(uv, n)*dot(z, n)*ds
+    F += 0.5*g*elev*dot(z, n)*ds(100)
+
+    F += f*inner(z, as_vector((-uv[1], uv[0])))*dx
+
+    F += -inner(grad(zeta), b*uv)*dx
+    F += inner(jump(zeta, n), b*hu_star)*dS
+    F += 0.5*zeta*b*dot(uv, n)*ds
+    F += zeta*c*elev*ds(100)
+
+    return F
+
+
+a = inner(z, u)*dx + inner(zeta, eta)*dx + 0.5*dtc*G(u, eta)
+L = inner(z, u_)*dx + inner(zeta, eta_)*dx - 0.5*dtc*G(u_, eta_)
+
+q = Function(EqualOrder)
+u, eta = q.split()
+
 params = {
     "snes_type": "ksponly",
     "ksp_type": "gmres",
-    "pc_type": "sor",
+    "pc_type": "fieldsplit",
+    "pc_fieldsplit_type": "multiplicative",
 }
-prob = LinearVariationalProblem(a, L, eta, bcs=DirichletBC(P1, 0, 100))
-solver = LinearVariationalSolver(prob, solver_parameters=params)
+problem = LinearVariationalProblem(a, L, q)
+solver = LinearVariationalSolver(problem, solver_parameters=params)
 
 
 # --- Get gauge data
@@ -157,9 +183,8 @@ def tsunami_propagation(init):
     """
     Run tsunami propagation, given an initial velocity-elevation tuple.
     """
-    eta_.assign(init)
-    eta__.assign(init)
-    t = op.dt
+    q_.assign(init)
+    t = 0.0
     J = 0
     wq = Constant(0.5*0.5*op.dt)
     eta_obs = Constant(0.0)
@@ -175,14 +200,13 @@ def tsunami_propagation(init):
             op.gauges[gauge]['diff_smooth'] = []
             continue
         op.gauges[gauge]['data'] = [0.0, 0.0]
-        op.gauges[gauge]['init'] = eta__.at(op.gauges[gauge]['coords'])
-        op.gauges[gauge]['init_smooth'] = assemble(op.gauges[gauge]['indicator']*eta__*dx)
+        op.gauges[gauge]['init'] = eta_.at(op.gauges[gauge]['coords'])
+        op.gauges[gauge]['init_smooth'] = assemble(op.gauges[gauge]['indicator']*eta_*dx)
         op.gauges[gauge]['timeseries'] = [0.0, 0.0]
         op.gauges[gauge]['timeseries_smooth'] = [0.0, 0.0]
         op.gauges[gauge]['diff'] = [0.0, 0.0]
         op.gauges[gauge]['diff_smooth'] = [0.0, 0.0]
         eta_obs.assign(op.gauges[gauge]['init'])
-        J = J + assemble(wq*op.gauges[gauge]['indicator']*(eta__ - eta_obs)**2*dx)
         J = J + assemble(wq*op.gauges[gauge]['indicator']*(eta_ - eta_obs)**2*dx)
 
     # Enter timeloop
@@ -190,8 +214,7 @@ def tsunami_propagation(init):
 
         # Solve forward equation at current timestep
         solver.solve()
-        eta__.assign(eta_)
-        eta_.assign(eta)
+        q_.assign(q)
         t += op.dt
         print("t = {:.0f} mins".format(t/60))
 
@@ -234,7 +257,7 @@ def tsunami_propagation(init):
 
 # --- Forward solve
 
-J = tsunami_propagation(eta0)
+J = tsunami_propagation(q0)
 print("Quantity of interest = {:.4e}".format(J))
 
 

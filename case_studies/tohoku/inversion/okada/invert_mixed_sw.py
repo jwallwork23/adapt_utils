@@ -68,7 +68,7 @@ if args.load is not None:
     i = 0
     for control in ('slip', 'rake', 'dip', 'strike'):
         if control in op.active_controls:
-            op.control_parameters[control] = opt_controls[190*i:190*(i+1)]
+            op.control_parameters[control] = opt_controls[i::2]
             i += 1
 if args.uniform_slip is not None:
     op.control_parameters['slip'] = float(args.uniform_slip)*np.ones(190)
