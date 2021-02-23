@@ -1,6 +1,7 @@
 import argparse
 import matplotlib.pyplot as plt
 import os
+from time import perf_counter
 
 from adapt_utils.case_studies.tohoku.hazard.options import TohokuHazardOptions
 from adapt_utils.io import TimeDependentAdaptationLogger
@@ -139,7 +140,9 @@ op.solver_parameters['shallow_water']['ksp_converged_reason'] = None
 
 swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
 logger = TimeDependentAdaptationLogger(swp, nonlinear=nonlinear, **kwargs)
+tic = perf_counter()
 swp.run()
+logger.logstr += "CPU time: {:.2f}".format(perf_counter() - tic)
 logger.log(*unknown, fpath=op.di, save_meshes=save_meshes)
 
 

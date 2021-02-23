@@ -2,6 +2,7 @@ from thetis import print_output, create_directory, MeshHierarchy
 
 import argparse
 import os
+from time import perf_counter
 
 from adapt_utils.case_studies.tohoku.hazard.options import TohokuHazardOptions
 from adapt_utils.io import OuterLoopLogger
@@ -82,6 +83,7 @@ di = create_directory(os.path.join(os.path.dirname(__file__), 'outputs', 'unifor
 qois = []
 num_cells = []
 num_vertices = []
+times = []
 op = TohokuHazardOptions(level=0, **kwargs)
 mh = MeshHierarchy(op.default_mesh, levels-1)
 for level in range(levels):
@@ -89,7 +91,9 @@ for level in range(levels):
 
     # Solve
     swp = AdaptiveTsunamiProblem(op, meshes=mh[level], nonlinear=nonlinear, print_progress=False)
+    tic = perf_counter()
     swp.solve_forward()
+    times.append(perf_counter() - tic)
     qoi = swp.quantity_of_interest()
     print_output("Quantity of interest: {:.8e}".format(qoi))
 
@@ -100,6 +104,7 @@ for level in range(levels):
 swp.qois = qois
 swp.num_cells = num_cells
 swp.num_vertices = num_vertices
+swp.times = times
 
 
 # --- Logging
