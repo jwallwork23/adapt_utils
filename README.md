@@ -68,7 +68,7 @@ version of Firedrake, please follow the instructions [here][7].
     * Test cases:
       * `steady/test_cases/point_discharge2d` (Sections 2.7, 3.6, 7.3 and 7.5).
       * `case_studies/tohoku/inversion/1d` (Section 4.4).
-      * `case_studies/tohoku/inversion/okada` (Section 4.5).
+      * `case_studies/tohoku/inversion/okada` (Sections 4.4 and 4.5).
       * `test/adapt` (Sections 5.8 and 6.4).
       * `unsteady/test_cases/bubble_shear` (Sections 5.8 and 6.1).
       * `unsteady/test_cases/trench_1d` (Section 6.5).
