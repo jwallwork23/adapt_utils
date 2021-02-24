@@ -37,16 +37,8 @@ examples = [
 
     # Moving mesh
     'unsteady/test_cases/balzano/run_moving_mesh.py',               # Has been cut short
-    # 'unsteady/test_cases/beach_slope/run_moving_mesh.py',         # TODO
-    # 'unsteady/test_cases/beach_wall/run_moving_mesh.py',          # TODO
-    # 'unsteady/test_cases/bubble_shear/run_lagrangian.py',         # TODO: xfail it
-    # 'unsteady/test_cases/bubble_shear/run_moving_mesh.py',        # TODO
-    # 'unsteady/test_cases/cosine_prescribed_velocity/compare.py',  # FIXME: Lagrangian coords don't match
-    # 'unsteady/test_cases/pulse_wave/run_moving_mesh.py',          # TODO
     'unsteady/test_cases/rossby_wave/run_moving_mesh.py',           # Has been cut (very) short
     'unsteady/test_cases/solid_body_rotation/run_lagrangian.py',
-    # 'unsteady/test_cases/trench_1d/run_moving_mesh.py',           # TODO
-    # 'unsteady/test_cases/trench_slant/run_moving_mesh.py',        # TODO
 
     # Metric-based
     'case_studies/tohoku/hazard/run_adapt.py',

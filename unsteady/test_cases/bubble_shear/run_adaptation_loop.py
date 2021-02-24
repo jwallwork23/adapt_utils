@@ -16,7 +16,6 @@ parser.add_argument("-n", help="Resolution of initial mesh.")
 parser.add_argument("-dt", help="Timestep.")
 parser.add_argument("-end_time", help="Simulation end time.")
 
-parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 parser.add_argument("-stabilisation", help="Stabilisation method")
 parser.add_argument("-anisotropic_stabilisation", help="Toggle anisotropic stabilisation")
@@ -43,7 +42,6 @@ kwargs = {
     'anisotropic_stabilisation': False if args.anisotropic_stabilisation == "0" else True,
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': bool(args.limiters or False),
-    'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
 
     # Mesh adaptation
     'approach': args.approach or 'hessian',

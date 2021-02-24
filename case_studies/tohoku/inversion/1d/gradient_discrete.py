@@ -9,10 +9,10 @@ from adapt_utils.misc import gaussian, ellipse
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("level")
+parser.add_argument("-level")
 args = parser.parse_args()
 
-level = int(args.level)
+level = int(args.level or 0)
 op = TohokuInversionOptions(level=level)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
