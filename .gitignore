@@ -3,6 +3,7 @@ __pycache__/
 swe/tsunami/tsunami1d/
 steady/spacetime/
 adapt_utils/
+test/interp/plots/
 
 # Specific files
 TODO

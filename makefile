@@ -5,6 +5,7 @@ test: lint test_all
 dir:
 	@echo "Creating directories..."
 	@mkdir -p plots
+	@mkdir -p test/interp/plots
 
 lint:
 	@echo "Checking lint..."
