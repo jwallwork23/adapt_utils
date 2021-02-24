@@ -1,7 +1,9 @@
 from firedrake import *
 
 import matplotlib.pyplot as plt
+import math
 import numpy as np
+import os
 import pytest
 
 from adapt_utils.adapt.recovery import *
@@ -31,7 +33,7 @@ def l2_norm(array, nodes=None):
     return lp_norm(array)
 
 
-def recover_gradient_sinusoidal(n, recovery, no_boundary, plot=False):
+def recover_gradient_sinusoidal(n, recovery, no_boundary, plot=False, norm_type='l2'):
     """
     Apply Zienkiewicz-Zhu and global L2 projection to recover
     the gradient of a sinusoidal function.
@@ -54,6 +56,8 @@ def recover_gradient_sinusoidal(n, recovery, no_boundary, plot=False):
     # Spaces
     P1_vec = VectorFunctionSpace(mesh, "CG", 1)
     P1 = FunctionSpace(mesh, "CG", 1)
+    P0 = FunctionSpace(mesh, "DG", 0)
+    h = interpolate(CellSize(mesh), P0)
     nodes = None
     if no_boundary:
         nodes = set(range(len(mesh.coordinates.dat.data)))
@@ -64,11 +68,18 @@ def recover_gradient_sinusoidal(n, recovery, no_boundary, plot=False):
 
     # Exact gradient interpolated into P1 space
     sigma = interpolate(gradient(x, y), P1_vec)
-    sigma_l2 = l2_norm(sigma.dat.data, nodes=nodes)
+    if norm_type == 'l2':
+        sigma_norm = l2_norm(sigma.dat.data, nodes=nodes)
+    else:
+        assert nodes is None
+        sigma_norm = norm(sigma, norm_type=norm_type)
 
     # Recovered gradient
     sigma_rec = recover_gradient(u_h, op=op)
-    relative_error = l2_norm(sigma.dat.data - sigma_rec.dat.data, nodes=nodes)/sigma_l2
+    if norm_type == 'l2':
+        relative_error = l2_norm(sigma.dat.data - sigma_rec.dat.data, nodes=nodes)/sigma_norm
+    else:
+        relative_error = errornorm(sigma, sigma_rec, norm_type=norm_type)/sigma_norm
 
     # Plotting
     if plot:
@@ -86,7 +97,7 @@ def recover_gradient_sinusoidal(n, recovery, no_boundary, plot=False):
         axes[1].set_xlim([-0.1, 1.1])
         axes[1].set_ylim([-0.1, 1.1])
         plt.show()
-    return relative_error
+    return h.dat.data[0], relative_error
 
 
 # ---------------------------
@@ -252,30 +263,38 @@ def test_hessian_bowl(dim, interp, recovery, plot_mesh=False):
     savefig("hessian_errors_bowl_{:s}".format(recovery), "outputs/hessian", extensions=["pdf"])
 
 
-def test_gradient_convergence(recovery, no_boundary):
+def test_gradient_convergence(recovery, no_boundary, norm_type='l2'):
     r"""
-    Check l2 convergence rate of global L2 projection and Zienkiewicz-Zhu recovery.
+    Check convergence rate of global L2 projection and Zienkiewicz-Zhu recovery
+    under a given norm.
 
-    On the domain interior, ZZ yields ultraconvergence of :math:`\mathcal O(h^4)`.
+    On the domain interior, ZZ yields l2 ultraconvergence of :math:`\mathcal O(h^4)`.
     Since the patches break down on the boundary, inclusion of boundary nodes means
-    that we can only hope for :math:`\mathcal O(h^2)` convergence. This latter rate
-    is also expected for L2 projection.
+    that we can only hope for :math:`\mathcal O(h^2)` convergence. In fact, we are
+    able to attain :math:`\mathcal O(h^{2.5})`. This is also attained for L2 projection.
     """
+    cell_size = []
     relative_error = []
     istart, iend = 3, 7
-    tol = 0.1
-    order = 2 if recovery == 'L2' else 4 if no_boundary else 2
+    order = {
+        'L2': {'l2': 2.5, 'L2': 1.5, 'L1': 2},
+        'ZZ': {'l2': 4 if no_boundary else 2.5, 'L2': 1.5, 'L1': 2},
+    }[recovery][norm_type]
     name = 'Zienkiewicz-Zhu' if recovery == 'ZZ' else 'L2 projection'
     for i in range(istart, iend):
-        relative_error.append(recover_gradient_sinusoidal(2**i, recovery, no_boundary))
+        h, err = recover_gradient_sinusoidal(2**i, recovery, no_boundary, norm_type=norm_type)
+        cell_size.append(h)
+        relative_error.append(err)
         if i > istart:
-            rate, expected = relative_error[-2]/relative_error[-1], 2**order
-            msg = "{:s} convergence rate {:.2f} < {:.2f}"
-            assert rate > (2 - tol)**order, msg.format(name, rate, expected)
-    return [2**(2*i+1) for i in range(istart, iend)], relative_error
+            tol = 0.15 if i == istart + 1 else 0.1
+            rate, expected = math.log(relative_error[-2]/relative_error[-1], 2), order
+            msg = "{:s} {:s} convergence rate {:.2f} < {:.2f}"
+            assert rate > (1 - tol)*order, msg.format(name, norm_type, rate, expected)
+            print(msg[:-9].format(name, norm_type, rate))
+    return cell_size, relative_error
 
 
-def plot_gradient_convergence(elements, relative_error_zz, relative_error_l2, no_boundary):
+def plot_gradient_convergence(cell_size, rel_error_zz, rel_error_l2, no_boundary, norm_type='l2'):
     """
     Plot convergence curves for both Zienkiewicz-Zhu and L2 projection recovery methods applied to
     the sinusoidal test case.
@@ -284,25 +303,40 @@ def plot_gradient_convergence(elements, relative_error_zz, relative_error_l2, no
 
     # Plot convergence curves on a log-log axis
     fig, axes = plt.subplots(figsize=(5, 5))
-    axes.loglog(elements, relative_error_zz, '--x', label=r'$Z^2$')
-    axes.loglog(elements, relative_error_l2, '--x', label=r'$\mathcal L_2$')
-    axes.set_xlabel("Element count")
-    axes.set_xticks([100, 1000, 10000])
-    axes.set_ylabel(r"Relative $\ell_2$ error")
-    axes.legend()
+    axes.loglog(cell_size, rel_error_zz, '--x', label='Zienkiewicz-Zhu')
+    axes.loglog(cell_size, rel_error_l2, '--x', label=r'$\mathcal L_2$ projection')
+    axes.set_xlabel("Element size")
+    axes.set_xlim([0.01, 0.3])
+    assert norm_type[0] in ('l', 'L'), "Norm type '{:s}' not recognised".format(norm_type)
+    _norm_type = r"\ell" if norm_type[0] == 'l' else r"\mathcal L"
+    _order = norm_type[1]
+    label = r"Relative ${{{:s}}}_{{{:s}}}$ error".format(_norm_type, _order)
+    axes.set_ylabel(label)
     axes.grid(True)
 
     # Add slope markers
-    xy = (300, 2.0e-04) if no_boundary else (300, 1.8e-03)
-    annotation.slope_marker(xy, -1, invert=True, ax=axes)
-    xy = (200, 2.0e-03) if no_boundary else (200, 1.2e-02)
-    annotation.slope_marker(xy, -2 if no_boundary else -1, ax=axes)
+    slope = 2.5 if norm_type[0] == 'l' else 2.0 if norm_type == 'L1' else 1.5
+    y = 3.0e-02 if norm_type[0] == 'L' else 1.0e-04 if no_boundary else 7.0e-03
+    annotation.slope_marker((0.1, y), slope, ax=axes, invert=not no_boundary, size_frac=0.15)
+    if no_boundary:
+        annotation.slope_marker((0.1, 8.0e-04), 4, invert=True, ax=axes, size_frac=0.15)
 
     # Save to file
-    fname = 'gradient_recovery_convergence'
+    fname = 'gradient_recovery_convergence_{:s}'.format(norm_type)
     if no_boundary:
         fname += '_interior'
-    savefig(fname, 'outputs', extensions=['pdf'])
+    plot_dir = 'outputs'
+    savefig(fname, plot_dir, extensions=['pdf'])
+
+    fname = 'legend_gradient_recovery'
+    if not os.path.exists(os.path.join(plot_dir, fname + '.pdf')):
+        fig2, axes2 = plt.subplots()
+        lines, labels = axes.get_legend_handles_labels()
+        legend = axes2.legend(lines, labels, fontsize=18, frameon=False, ncol=2)
+        fig2.canvas.draw()
+        axes2.set_axis_off()
+        bbox = legend.get_window_extent().transformed(fig2.dpi_scale_trans.inverted())
+        savefig(fname, plot_dir, bbox_inches=bbox, extensions=['pdf'], tight=False)
 
 
 # ---------------------------
@@ -317,14 +351,16 @@ if __name__ == "__main__":
     parser.add_argument('recover', help="Choose 'gradient' or 'hessian'")
     parser.add_argument('-level', help="Mesh resolution level in each direction.")
     parser.add_argument('-convergence', help="Check convergence.")
-    parser.add_argument('-no_boundary', help="Only compute l2 error at interior nodes.")
+    parser.add_argument('-no_boundary', help="Only compute error at interior nodes.")
+    parser.add_argument('-norm_type', help="Choose from 'l2' or 'Lp', for any p >= 1.")
     args = parser.parse_args()
     no_bdy = bool(0 if args.no_boundary == "0" else args.no_boundary or False)
+    norm_type = args.norm_type or 'l2'
     if args.recover == 'gradient':
         if bool(args.convergence or False):
-            elements, zz = test_gradient_convergence('ZZ', no_bdy)
-            elements, l2 = test_gradient_convergence('L2', no_bdy)
-            plot_gradient_convergence(elements, zz, l2, no_bdy)
+            cell_size, zz = test_gradient_convergence('ZZ', no_bdy, norm_type=norm_type)
+            cell_size, l2 = test_gradient_convergence('L2', no_bdy, norm_type=norm_type)
+            plot_gradient_convergence(cell_size, zz, l2, no_bdy, norm_type=norm_type)
         else:
             recover_gradient_sinusoidal(2**int(args.level or 3), no_bdy, plot=True)
     else:
