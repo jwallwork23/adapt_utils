@@ -18,7 +18,6 @@ parser.add_argument("-end_time", help="Simulation end time.")
 parser.add_argument("-family", help="Choose finite element from 'cg' and 'dg'")
 parser.add_argument("-stabilisation", help="Stabilisation method")
 parser.add_argument("-anisotropic_stabilisation", help="Use anisotropic stabilisation.")
-parser.add_argument("-conservative", help="Toggle conservative tracer equation")
 parser.add_argument("-limiters", help="Toggle limiters for tracer equation")
 
 parser.add_argument("-debug", help="Toggle debugging mode.")
@@ -36,7 +35,6 @@ kwargs = {
     'use_automatic_sipg_parameter': False,  # We have an inviscid problem
     'use_limiter_for_tracers': False if args.limiters == "0" else True,
     # 'use_limiter_for_tracers': bool(args.limiters or False),
-    'use_tracer_conservative_form': bool(args.conservative or False),  # FIXME?
 
     # Mesh movement
     'nonlinear_method': 'relaxation',
@@ -88,8 +86,6 @@ init_l1_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L1')
 init_l2_norm = norm(tp.fwd_solutions_tracer[0], norm_type='L2')
 init_sol = tp.fwd_solutions_tracer[0].copy(deepcopy=True)
 tp.solve_forward()
-
-# TODO: Plot inverted elements
 
 # Compare initial and final tracer concentrations
 final_vol = assemble(Constant(1.0)*dx(domain=tp.mesh))

@@ -28,12 +28,12 @@ plot_continuous:
 plot: plot_discrete plot_continuous
 
 gradient:
-	@python3 gradient_discrete.py 0
-	@python3 gradient_continuous.py 0
-	@python3 gradient_discrete.py 1
-	@python3 gradient_continuous.py 1
-	@python3 gradient_discrete.py 2
-	@python3 gradient_continuous.py 2
+	@python3 gradient_discrete.py -level 0
+	@python3 gradient_continuous.py -level 0
+	@python3 gradient_discrete.py -level 1
+	@python3 gradient_continuous.py -level 1
+	@python3 gradient_discrete.py -level 2
+	@python3 gradient_continuous.py -level 2
 
 sample:
 	@python3 sample.py 0

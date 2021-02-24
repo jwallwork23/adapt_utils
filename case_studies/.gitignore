@@ -1,6 +1,8 @@
 tohoku/hazard/outputs/
 tohoku/hazard/plots/
 tohoku/hazard/screenshots/
+tohoku/inversion/debug*
+tohoku/inversion/simple.py
 tohoku/inversion/1d/outputs/
 tohoku/inversion/1d/data/
 tohoku/inversion/2d/outputs/
@@ -9,7 +11,6 @@ tohoku/inversion/radial/outputs/
 tohoku/inversion/okada/outputs/
 tohoku/inversion/okada/plots/
 tohoku/inversion/okada/data/
-tohoku/inversion/simple.py
 tohoku/options/.cache/
 tohoku/outputs/
 tohoku/resources/boundaries_old
