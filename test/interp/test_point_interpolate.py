@@ -1,12 +1,8 @@
 from firedrake import *
-
-import matplotlib.pyplot as plt
-
 from adapt_utils.interpolation import point_interpolate
-from adapt_utils.plotting import *
 
 
-plot = True
+plot = False
 
 # Setup two function spaces and a source
 Hs = UnitSquareMesh(20, 25, diagonal='left')
@@ -35,6 +31,8 @@ assert np.isclose(mass_error[-2], mass_error[-1])
 
 # Plot results
 if plot:
+    import matplotlib.pyplot as plt
+    from adapt_utils.plotting import *
     fig, axes = plt.subplots(figsize=(7, 4))
     axes.plot(100*np.array(l2_error))
     axes.set_xlabel("Number of interpolation steps")
