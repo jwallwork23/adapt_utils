@@ -41,6 +41,9 @@ parser.add_argument("-locations", help="""
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')
     """)
 parser.add_argument("-radius", help="Radius of interest (default 100km)")
+parser.add_argument("-kernel_shape", help="""
+    Choose kernel shape from {'gaussian', 'circular_bump', 'ball'}.
+    """)
 
 # Outer loop
 parser.add_argument("-max_adapt", help="Maximum number of adaptation loop iterations (default 35)")
@@ -119,6 +122,7 @@ kwargs = {
     'start_time': float(args.start_time or 1200.0),
     'radius': radius,
     'locations': locations,
+    'kernel_shape': args.kernel_shape or 'ball',
 
     # Outer loop
     'element_rtol': float(args.element_rtol or 0.005),
