@@ -1,14 +1,9 @@
 from firedrake import *
 import firedrake.supermeshing as supermesh
-
-import matplotlib.pyplot as plt
-
-from adapt_utils.plotting import *
 from adapt_utils.interpolation import supermesh_project
 
 
-# plot = False
-plot = True
+plot = False
 
 # Setup two function spaces and a source
 Hs = UnitSquareMesh(20, 25, diagonal='left')
@@ -51,6 +46,8 @@ assert np.allclose(mass_error, 0.0, atol=1.0e-04)
 
 # Plot results
 if plot:
+    import matplotlib.pyplot as plt
+    from adapt_utils.plotting import *
     fig, axes = plt.subplots(figsize=(7, 4))
     axes.plot(100*np.array(l2_error))
     axes.set_xlabel("Number of interpolation steps")
