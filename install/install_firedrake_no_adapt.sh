@@ -10,8 +10,8 @@ unset PYTHONPATH
 
 # Check SOFTWARE environment variable
 if [ ! -e "$SOFTWARE" ]; then
-    echo "SOFTWARE environment variable $SOFTWARE does not exist."
-    exit 1
+	echo "SOFTWARE environment variable $SOFTWARE does not exist."
+	exit 1
 fi
 
 # Environment variables for MPI
@@ -47,6 +47,4 @@ make
 python3 helmholtz/helmholtz.py
 
 # Install pip dependencies for adapt_utils
-python3 -m pip install gmsh jupyter matplotlib meshio mpltools netCDF4 pandas pyvista scipy triangle \
-	utide utm wurlitzer
-# python3 -m pip install qmesh
+./install_pip_dependencies

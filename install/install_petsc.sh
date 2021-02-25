@@ -11,8 +11,8 @@
 
 # Set environment variables
 if [ ! -e "$SOFTWARE" ]; then
-    echo "SOFTWARE environment variable $SOFTWARE does not exist."
-    exit 1
+	echo "SOFTWARE environment variable $SOFTWARE does not exist."
+	exit 1
 fi
 export INSTALL_DIR=$SOFTWARE  # Modify as appropriate
 export PETSC_DIR=$INSTALL_DIR/petsc
