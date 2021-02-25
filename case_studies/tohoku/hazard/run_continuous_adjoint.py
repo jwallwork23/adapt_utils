@@ -29,6 +29,9 @@ parser.add_argument("-locations", help="""
     Locations of interest, separated by commas. Choose from {'Fukushima Daiichi', 'Onagawa',
     'Fukushima Daini', 'Tokai', 'Hamaoka', 'Tohoku', 'Tokyo'}. (Default 'Fukushima Daiichi')""")
 parser.add_argument("-radius", help="Radius of interest (default 100km)")
+parser.add_argument("-kernel_shape", help="""
+    Choose kernel shape from {'gaussian', 'circular_bump', 'ball'}.
+    """)
 
 # I/O and debugging
 parser.add_argument("-plot_pvd", help="Toggle saving output to .pvd")
@@ -64,6 +67,7 @@ kwargs = {
     'start_time': float(args.start_time or 1200.0),
     'radius': radius,
     'locations': locations,
+    'kernel_shape': args.kernel_shape or 'ball',
 
     # I/O and debugging
     'plot_pvd': plot_pvd,
@@ -77,15 +81,16 @@ op = TohokuHazardOptions(**kwargs)
 # --- Initialisation
 
 # Wrap mesh(es) in an iso-P2 refined mesh hiearchy and choose the finest level(s)
-levels = int(args.levels or 0)
-base_meshes = [op.default_mesh for i in range(op.num_meshes)]
-hierarchies = [MeshHierarchy(mesh, levels) for mesh in base_meshes]
-meshes = [hierarchy[levels] for hierarchy in hierarchies]
+# levels = int(args.levels or 0)
+# base_meshes = [op.default_mesh for i in range(op.num_meshes)]
+# hierarchies = [MeshHierarchy(mesh, levels) for mesh in base_meshes]
+# meshes = [hierarchy[levels] for hierarchy in hierarchies]
+# swp = AdaptiveTsunamiProblem(op, meshes=meshes, nonlinear=nonlinear)
 
 
 # --- Solve continuous adjoint
 
-swp = AdaptiveTsunamiProblem(op, meshes=meshes, nonlinear=nonlinear)
+swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
 if plot_pvd:
     kernel_file = File(os.path.join(op.di, 'kernel.pvd'))
     for i, P1 in enumerate(swp.P1):

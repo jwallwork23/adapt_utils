@@ -16,11 +16,13 @@ parser = argparse.ArgumentParser(prog="run_adapt")
 parser.add_argument("-end_time", help="End time of simulation in seconds (default 1400s, i.e. 24min)")
 parser.add_argument("-level", help="(Integer) resolution for initial mesh (default 0)")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (default 24)")
+parser.add_argument("-dt", help="Timestep")
 
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space (default cg-cg)")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
 parser.add_argument("-stabilisation", help="Stabilisation method to use (default None)")
+parser.add_argument("-lu", help="Hit both forward and adjoint systems with LU")
 
 # Mesh adaptation
 parser.add_argument("-approach", help="Mesh adaptation approach")
@@ -137,7 +139,15 @@ kwargs = {
 assert 0.0 <= kwargs['start_time'] <= kwargs['end_time']
 save_meshes = bool(args.save_meshes or False)
 op = TohokuHazardOptions(**kwargs)
+if args.dt is not None:
+    op.dt = float(args.dt)
+
+if bool(args.lu or False):
+    from adapt_utils.params import lu_params
+    op.solver_parameters['shallow_water'] = lu_params
+    op.adjoint_solver_parameters['shallow_water'] = lu_params
 op.solver_parameters['shallow_water']['ksp_converged_reason'] = None
+op.adjoint_solver_parameters['shallow_water']['ksp_converged_reason'] = None
 
 
 # --- Solve
@@ -146,7 +156,7 @@ swp = AdaptiveTsunamiProblem(op, nonlinear=nonlinear)
 logger = TimeDependentAdaptationLogger(swp, nonlinear=nonlinear, **kwargs)
 tic = perf_counter()
 swp.run()
-logger.logstr += "CPU time: {:.2f}".format(perf_counter() - tic)
+logger.logstr += logger.msg.format("CPU time", perf_counter() - tic)
 logger.log(*unknown, fpath=op.di, save_meshes=save_meshes)
 
 
