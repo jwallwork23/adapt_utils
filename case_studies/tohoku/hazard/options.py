@@ -91,6 +91,7 @@ class TohokuHazardOptions(TohokuOkadaBasisOptions):
         self.region_of_interest = [loi[loc]["coords"] + (radius, ) for loc in loi]
 
     def set_qoi_kernel(self, prob, i):
+        from firedrake import Function
         prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
         kernel_u, kernel_eta = prob.kernels[i].split()
         kernel_u.rename("QoI kernel (velocity component)")
