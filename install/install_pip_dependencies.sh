@@ -29,9 +29,9 @@ if [ ! -e "$VIRTUAL_ENV" ]; then
 fi
 
 # Install pip dependencies for adapt_utils
-python3 -m pip install matplotlib netCDF4 numpy pandas scipy utide
-# python3 -m pip install jupyter
-# python3 -m pip install qmesh  # FIXME
+python3 -m pip install gmsh jupyter matplotlib meshio mpltools netCDF4 pandas pyvista scipy triangle \
+	utide utm wurlitzer
+# python3 -m pip install qmesh
 
 # Install ClawPack
 #   If you don't have write access to python3.x/site-packages then you will need to specify --prefix
