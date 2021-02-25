@@ -8,14 +8,6 @@ GeoClaw dtopotools Module `$CLAW/geoclaw/src/python/geoclaw/dtopotools.py` for o
 **********************************************************************************************
 """
 from __future__ import absolute_import
-try:
-    import adolc
-    have_adolc = True
-except ImportError:
-    import warnings
-    warnings.warn("PyADOL-C could not be imported")
-    have_adolc = False
-
 import numpy as np
 from time import perf_counter
 
@@ -59,8 +51,6 @@ class Fault(ClawFault):
         if self.rupture_type != 'static':
             raise NotImplementedError("Only static ruptures currently considered.")
         if active:
-            if not have_adolc:
-                raise ValueError("Cannot annotate the rupture process without an appropriate AD tool.")
             self._create_dtopography_active(**kwargs)
         else:
             self._create_dtopography_passive(**kwargs)
@@ -80,6 +70,7 @@ class Fault(ClawFault):
         return self.dtopo
 
     def _create_dtopography_active(self, verbose=False):
+        import adolc
         num_subfaults = len(self.subfaults)
         tic = perf_counter()
         msg = "created topography for subfault {:d}/{:d} ({:.1f} seconds)"
