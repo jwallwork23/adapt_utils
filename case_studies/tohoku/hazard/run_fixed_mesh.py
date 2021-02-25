@@ -14,6 +14,9 @@ from adapt_utils.swe.tsunami.solver import AdaptiveTsunamiProblem
 
 parser = argparse.ArgumentParser(prog="run_fixed_mesh")
 
+# Initial condition
+parser.add_argument("-load_okada", help="Gauge timeseries category to load (default 'all').")
+
 # Space-time domain
 parser.add_argument("-end_time", help="End time of simulation in seconds (default 1440s, i.e. 24min)")
 parser.add_argument("-level", help="(Integer) mesh resolution (default 0)")
@@ -78,11 +81,12 @@ nonlinear = bool(args.nonlinear or False)
 stabilisation = args.stabilisation or 'lax_friedrichs'
 if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
     stabilisation = None
+level = int(args.level or 0)
 kwargs = {
     'approach': 'fixed_mesh',
 
     # Space-time domain
-    'level': int(args.level or 0),
+    'level': level,
     'num_meshes': int(args.num_meshes or 1),
     'end_time': float(args.end_time or 1440.0),
 
@@ -98,7 +102,7 @@ kwargs = {
     'start_time': float(args.start_time or 1200.0),
     'radius': radius,
     'locations': locations,
-    'kernel_shape': args.kernel_shape or 'gaussian',
+    'kernel_shape': args.kernel_shape or 'ball',
 
     # I/O and debugging
     'plot_pvd': plot_pvd,

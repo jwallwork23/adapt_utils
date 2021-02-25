@@ -1805,7 +1805,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
             raise ValueError("Approach '{:s}' not recognised".format(self.approach))
         run_scripts[self.approach](**kwargs)
 
-    def run_dwp(self, **kwargs):
+    def run_dwp(self, plot_pvd=None, **kwargs):
         r"""
         The "dual weighted primal" approach, first used (not under this name) in [1]. For shallow
         water tsunami propagation problems with a quantity of interest of the form
@@ -1836,6 +1836,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
         """
         op = self.op
         wq = Constant(1.0)  # Quadrature weight
+        plot_pvd = plot_pvd or op.plot_pvd
 
         # Loop until we hit the maximum number of iterations, max_adapt
         assert op.min_adapt < op.max_adapt
@@ -1874,7 +1875,7 @@ class AdaptiveProblem(AdaptiveProblemBase):
 
                 self.transfer_adjoint_solution(i)
                 self.setup_solver_adjoint_step(i)
-                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=False, export_initial=True)
+                self.solve_adjoint_step(i, export_func=export_func, plot_pvd=plot_pvd, export_initial=True)
 
                 # Assemble indicator
                 n_fwd = len(fwd_solutions_step)
