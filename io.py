@@ -166,9 +166,9 @@ def save_mesh(mesh, fname, fpath='.'):
     if COMM_WORLD.size > 1:
         raise IOError("Saving a mesh to HDF5 only works in serial.")
     try:
-        plex = mesh._topology_dm
+        plex = mesh.topology_dm
     except AttributeError:
-        plex = mesh._plex  # Backwards compatability
+        plex = mesh._topology_dm  # Backwards compatability
     viewer = PETSc.Viewer().createHDF5(os.path.join(fpath, fname + '.h5'), 'w')
     viewer(plex)
 

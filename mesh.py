@@ -140,7 +140,11 @@ def make_consistent(mesh, h_mesh=None):
     coord_section = dmplex.create_section(h_mesh or mesh, entity_dofs)
 
     # Set plex coords to mesh coords
-    plex = (h_mesh or mesh)._topology_dm
+    mesh = h_mesh or mesh
+    try:
+        plex = mesh.topology_dm
+    except AttributeError:
+        plex = mesh._topology_dm  # Backwards compatibility
     dm_coords = plex.getCoordinateDM()
     dm_coords.setDefaultSection(coord_section)
     coords_local = dm_coords.createLocalVec()
@@ -168,7 +172,11 @@ def get_patch(vertex, mesh=None, plex=None, coordinates=None, midfacets=False, e
     if coordinates is None:
         assert mesh is not None
         plex, offset, coordinates = make_consistent(mesh)
-    plex = plex or mesh._topology_dm
+    if plex is None:
+        try:
+            plex = mesh.topology_dm
+        except AttributeError:
+            plex = mesh._topology_dm  # Backwards compatibility
     dim = plex.getDimension()
     assert dim in (2, 3)
     if mesh is not None:

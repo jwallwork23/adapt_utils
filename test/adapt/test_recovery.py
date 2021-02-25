@@ -277,7 +277,7 @@ def test_gradient_convergence(recovery, no_boundary, norm_type='l2'):
     relative_error = []
     istart, iend = 3, 7
     order = {
-        'L2': {'l2': 2.5, 'L2': 1.5, 'L1': 2},
+        'L2': {'l2': 2 if no_boundary else 2.5, 'L2': 1.5, 'L1': 2},
         'ZZ': {'l2': 4 if no_boundary else 2.5, 'L2': 1.5, 'L1': 2},
     }[recovery][norm_type]
     name = 'Zienkiewicz-Zhu' if recovery == 'ZZ' else 'L2 projection'

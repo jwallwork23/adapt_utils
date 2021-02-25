@@ -44,12 +44,10 @@ def method(request):
 def test_sensors(sensor, monitor_type, method, plot_mesh=False):
     alpha = Constant(5.0)
     hessian_kwargs = dict(enforce_constraints=False, normalise=True, noscale=True)
-    if monitor_type == 'gradient' and sensor in (multiscale, interweaved):
-        pytest.xfail("This test requires too much memory / needs tweaking")  # FIXME
-    if monitor_type == 'frobenius' and sensor in (multiscale, interweaved):
+    if monitor_type in ('gradient', 'frobenius') and sensor in (multiscale, interweaved):
         pytest.xfail("This test requires too much memory / needs tweaking")  # FIXME
     if monitor_type == 'density' and sensor in (hyperbolic, multiscale, interweaved):
-        pytest.xfail("This test requires too much memory / needs tweaking")  # FIXME
+        pytest.xfail("Monitor function is too kinky!")  # TODO: Apply a smoother
 
     def shift_and_scale(mesh):
         """
