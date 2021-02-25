@@ -55,7 +55,6 @@ python3 firedrake-install --honour-petsc-dir --install thetis --venv-name $FIRED
 	--mpicc $MPICC --mpicxx $MPICXX --mpif90 $MPIF90 --mpiexec $MPIEXEC \
 	--package-branch petsc4py joe/dm-adapt-cell-tags \
 	--package-branch firedrake joe/meshadapt_patched
-        # --package-branch firedrake joe/meshadapt
 source $FIREDRAKE_DIR/bin/activate
 
 # Very basic test of installation
@@ -63,5 +62,6 @@ cd $FIREDRAKE_DIR/src/firedrake
 python3 tests/test_adapt_2d.py
 
 # Install pip dependencies for adapt_utils
-python3 -m pip install gmsh matplotlib meshio mpltools netCDF4 pandas pyvista scipy triangle utide utm
+python3 -m pip install gmsh jupyter matplotlib meshio mpltools netCDF4 pandas pyvista scipy triangle \
+	utide utm wurlitzer
 # python3 -m pip install jupyter qmesh

@@ -1,5 +1,3 @@
-.PHONY: test
-
 test: lint test_all
 
 dir:
@@ -13,7 +11,7 @@ lint:
 		--exclude=*/test_cases/spaceship/nic*
 	@echo "PASS"
 
-test_all:
+test_all: clean
 	@echo "Running test suite..."
 	@pytest test
 	@echo "PASS"
