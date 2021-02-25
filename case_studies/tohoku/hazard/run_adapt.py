@@ -92,6 +92,7 @@ if stabilisation == 'none' or family == 'cg-cg' or not nonlinear:
 approach = args.approach or 'hessian'
 kwargs = {
     'approach': approach,
+    'inversion_level': 2,  # TODO: Avoid this hard-code
 
     # Space-time domain
     'level': int(args.level or 0),
