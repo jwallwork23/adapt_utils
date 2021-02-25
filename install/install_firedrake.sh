@@ -39,8 +39,8 @@ echo "MPIF90="$MPIF90
 echo "MPIEXEC="$MPIEXEC
 echo "PETSC_DIR="$PETSC_DIR
 if [ ! -e "$PETSC_DIR" ]; then
-    echo "$PETSC_DIR does not exist. Please run install_petsc.sh."
-    exit 1
+	echo "$PETSC_DIR does not exist. Please run install_petsc.sh."
+	exit 1
 fi
 echo "PETSC_ARCH="$PETSC_ARCH
 echo "FIREDRAKE_ENV="$FIREDRAKE_ENV
@@ -62,6 +62,4 @@ cd $FIREDRAKE_DIR/src/firedrake
 python3 tests/test_adapt_2d.py
 
 # Install pip dependencies for adapt_utils
-python3 -m pip install gmsh jupyter matplotlib meshio mpltools netCDF4 pandas pyvista scipy triangle \
-	utide utm wurlitzer
-# python3 -m pip install jupyter qmesh
+./install_pip_dependencies

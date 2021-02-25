@@ -20,14 +20,14 @@
 
 # Check existence of SOFTWARE environment variable
 if [ ! -e "$SOFTWARE" ]; then
-    echo "SOFTWARE environment variable $SOFTWARE does not exist."
-    exit 1
+	echo "SOFTWARE environment variable $SOFTWARE does not exist."
+	exit 1
 fi
 
 # Check virtual environment is active
 if [ ! -e "$VIRTUAL_ENV" ]; then
-    echo "Virtual environment is not active."
-    exit 1
+	echo "Virtual environment is not active."
+	exit 1
 fi
 
 # KNOWN INSTALL BUG:
@@ -45,17 +45,22 @@ sudo apt-get install -y libtool libboost-all-dev wget
 # Clone repo from GitHub
 cp pyadolc_python3.patch $SOFTWARE/
 cd $SOFTWARE
-mkdir PyADOL-C
-cd PyADOL-C
-git clone https://github.com/b45ch1/pyadolc.git
-export PYTHONPATH=$SOFTWARE/PyADOL-C:$PYTHONPATH
-cd pyadolc
+if [[ ! -f PyADOL-C ]]; then
 
-# Install ADOL-C
-./bootstrap.sh
+	# Download PyADOL-C
+	mkdir PyADOL-C
+	cd PyADOL-C
+	git clone https://github.com/b45ch1/pyadolc.git
+	export PYTHONPATH=$SOFTWARE/PyADOL-C:$PYTHONPATH
+	cd ..
 
-# Apply compile flags patch for Python3
-git apply $SOFTWARE/pyadolc_python3.patch
+	# Install ADOL-C
+	./bootstrap.sh
+
+	# Apply compile flags patch for Python3
+	git apply $SOFTWARE/pyadolc_python3.patch
+fi
+cd PyADOL-C/pyadolc
 
 # Build
 CC=gcc CXX=g++ python3 setup.py build
@@ -66,5 +71,4 @@ python3 setup.py install
 
 # Test (outside of install directory)
 cd $SOTWARE
-python3 -m pip install matplotlib nose
 python3 -c "import adolc; adolc.test()"

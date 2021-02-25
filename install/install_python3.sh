@@ -16,8 +16,8 @@
 
 # Check existence of SOFTWARE environment variable
 if [ ! -e "$SOFTWARE" ]; then
-    echo "SOFTWARE environment variable $SOFTWARE does not exist."
-    exit 1
+	echo "SOFTWARE environment variable $SOFTWARE does not exist."
+	exit 1
 fi
 cd $SOFTWARE
 
