@@ -168,7 +168,7 @@ serial_quasi_newton = {
     "snes_linesearch_max_it": 5,
     "snes_linesearch_maxstep": 1.05,
     "snes_linesearch_damping": 0.8,
-    "snes_lag_preconditioner": -1,
+    "snes_lag_preconditioner": -2,
 }
 
 parallel_quasi_newton = {
@@ -194,5 +194,5 @@ parallel_quasi_newton = {
     "snes_linesearch_max_it": 5,
     "snes_linesearch_maxstep": 1.05,
     "snes_linesearch_damping": 0.8,
-    "snes_lag_preconditioner": -1,
+    "snes_lag_preconditioner": -2,
 }
