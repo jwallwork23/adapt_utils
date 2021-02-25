@@ -1,6 +1,7 @@
 import numpy as np
+import os
 
-from adapt_utils.case_studies.tohoku.options.options import TohokuOptions
+from adapt_utils.case_studies.tohoku.options.okada_options import TohokuOkadaBasisOptions
 from adapt_utils.misc import box
 from adapt_utils.swe.tsunami.conversion import from_latlon
 
@@ -8,11 +9,13 @@ from adapt_utils.swe.tsunami.conversion import from_latlon
 __all__ = ["TohokuHazardOptions"]
 
 
-class TohokuHazardOptions(TohokuOptions):
+class TohokuHazardOptions(TohokuOkadaBasisOptions):
     """
-    Parameter class for hazard assessment applications for the Tohoku tsunami case study.
+    Parameter class for hazard assessment applications for the Tohoku tsunami case study,
+    starting with the initial condition deduced in the inversion section.
 
-    The hazard being assessed is determined by the QoI.
+    The hazard being assessed is determined by the QoI. By default, we integrate over only a
+    subinterval of the time period, starting with :attr:`start_time`.
     """
     def __init__(self, *args, kernel_shape='gaussian', **kwargs):
         """
@@ -27,19 +30,22 @@ class TohokuHazardOptions(TohokuOptions):
             raise ValueError("Please choose kernel_shape from {:}.".format(supported_kernels))
         self.kernel_shape = kernel_shape
         self.kernel_function = self.__getattribute__(kernel_shape)
-
-        # Timestepping
-        # ============
-        #   * The parent class is geared up for gauge timeseries inversion and therefore uses a
-        #     2 hour simulation period.
-        #   * In this class we are only interested in the tsunami's approach of the coast and
-        #     therefore use a reduced time window.
         self.start_time = kwargs.get('start_time', 1200.0)
         self.end_time = kwargs.get('end_time', 1440.0)
+        assert self.start_time < self.end_time
 
         # Location classifications
         self.locations_to_consider = kwargs.get('locations', ['Fukushima Daiichi'])
         self.get_locations_of_interest(**kwargs)
+
+        # Load results of inversion
+        fpath = os.path.join(os.path.dirname(__file__), '..', 'inversion', 'okada', 'data')
+        level = kwargs.get('level', 0)
+        inversion_level = kwargs.get('inversion_level', level)
+        fname = os.path.join(fpath, 'opt_progress_discrete_{:d}_all_ctrl.npy'.format(inversion_level))
+        opt_controls = np.load(fname)[-1]
+        self.control_parameters['slip'] = opt_controls[0::2]
+        self.control_parameters['rake'] = opt_controls[1::2]
 
     def get_locations_of_interest(self, **kwargs):
         """
@@ -135,15 +141,15 @@ class TohokuHazardOptions(TohokuOptions):
     def get_regularisation_term(self, prob):
         raise NotImplementedError
 
-    def set_initial_surface(self, fs=None, **kwargs):
-        """
-        Multiply by a rotated kernel function to remove spurious lines introduced by rectangular
-        spline interpolation.
-        """
-        initial_surface = super(TohokuHazardOptions, self).set_initial_surface(fs=fs, **kwargs)
-        k = box([(0.7e+06, 4.2e+06, 300.0e+03, 140.0e+03)], fs.mesh(), rotation=7*np.pi/12)
-        initial_surface.interpolate(k*initial_surface)
-        return initial_surface
+    # def set_initial_surface(self, fs=None, **kwargs):
+    #     """
+    #     Multiply by a rotated kernel function to remove spurious lines introduced by rectangular
+    #     spline interpolation.
+    #     """
+    #     initial_surface = super(TohokuHazardOptions, self).set_initial_surface(fs=fs, **kwargs)
+    #     k = box([(0.7e+06, 4.2e+06, 300.0e+03, 140.0e+03)], fs.mesh(), rotation=7*np.pi/12)
+    #     initial_surface.interpolate(k*initial_surface)
+    #     return initial_surface
 
     def annotate_plot(self, axes, coords="utm", fontsize=12, textcolour='r', markercolour='r'):
         """
