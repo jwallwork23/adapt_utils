@@ -91,65 +91,25 @@ class TohokuHazardOptions(TohokuOkadaBasisOptions):
         self.region_of_interest = [loi[loc]["coords"] + (radius, ) for loc in loi]
 
     def set_qoi_kernel(self, prob, i):
-        from firedrake import assemble, Constant, dx, Function
-
-        # Evaluate kernel function
-        b = self.kernel_function(prob.meshes[i], source=False)
-
-        # Normalise by area computed on fine reference mesh (if available)
-        locations = list(self.locations_of_interest.keys())
-        r = self.radius
-        if locations == ['Fukushima Daiichi', ] and np.isclose(r, 50e+03):
-            area_fine_mesh = {
-                'ball': 4.07920324e+09,
-                'circular_bump': 3.30611745e+09,
-                'gaussian': 4.18761028e+09,
-            }[self.kernel_shape]
-            area = assemble(b*dx)
-            rescaling = Constant(1.0 if np.isclose(area, 0.0) else area_fine_mesh/area)
-        elif locations == ['Fukushima Daiichi', ] and np.isclose(r, 100e+03):
-            area_fine_mesh = {
-                'ball': 1.73829649e+10,
-                'circular_bump': 1.38578518e+10,
-                'gaussian': 1.66879811e+10,
-            }[self.kernel_shape]
-            area = assemble(b*dx)
-            rescaling = Constant(1.0 if np.isclose(area, 0.0) else area_fine_mesh/area)
-        else:
-            rescaling = Constant(1.0)
-
         prob.kernels[i] = Function(prob.V[i], name="QoI kernel")
         kernel_u, kernel_eta = prob.kernels[i].split()
         kernel_u.rename("QoI kernel (velocity component)")
         kernel_eta.rename("QoI kernel (elevation component)")
-        kernel_eta.interpolate(rescaling*b)
+        kernel_eta.interpolate(self.kernel_function(prob.meshes[i], source=False))
 
     def _get_update_forcings_forward(self, prob, i):
-
-        def update_forcings(t):
-            return
-
-        return update_forcings
+        return lambda t: None
 
     def _get_update_forcings_adjoint(self, prob, i):
-
-        def update_forcings(t):
-            return
-
-        return update_forcings
+        return lambda t: None
 
     def get_regularisation_term(self, prob):
         raise NotImplementedError
 
-    # def set_initial_surface(self, fs=None, **kwargs):
-    #     """
-    #     Multiply by a rotated kernel function to remove spurious lines introduced by rectangular
-    #     spline interpolation.
-    #     """
-    #     initial_surface = super(TohokuHazardOptions, self).set_initial_surface(fs=fs, **kwargs)
-    #     k = box([(0.7e+06, 4.2e+06, 300.0e+03, 140.0e+03)], fs.mesh(), rotation=7*np.pi/12)
-    #     initial_surface.interpolate(k*initial_surface)
-    #     return initial_surface
+    def set_initial_condition(self, prob, **kwargs):
+        self.default_mesh = prob.mesh
+        self.get_subfaults(reset=True)
+        super(TohokuHazardOptions, self).set_initial_condition(prob, **kwargs)
 
     def annotate_plot(self, axes, coords="utm", fontsize=12, textcolour='r', markercolour='r'):
         """

@@ -87,8 +87,6 @@ class TsunamiOptions(CoupledOptions):
     def lonlat_mesh(self):
         if self.coordinate_system == 'lonlat':
             return self.default_mesh
-        # elif not hasattr(self, '_lonlat_mesh'):
-        #     self.get_lonlat_mesh()
         self.get_lonlat_mesh()
         return self._lonlat_mesh
 
