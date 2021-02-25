@@ -1,7 +1,6 @@
 from thetis import *
 from thetis.configuration import *
 
-import numpy as np
 import os
 import scipy.interpolate as si
 
@@ -243,22 +242,16 @@ class TsunamiOptions(CoupledOptions):
     def set_qoi_kernel(self, prob, i):
         raise NotImplementedError("Should be implemented in derived class.")
 
-    def set_terminal_condition(self, prob):  # TODO: For hazard case
-        prob.adj_solutions[-1].assign(0.0)
-
-        # # b = self.ball(prob.meshes[-1], source=False)
-        # # b = self.circular_bump(prob.meshes[-1], source=False)
-        # b = self.gaussian(prob.meshes[-1], source=False)
-
-        # # TODO: Normalise by area computed on fine reference mesh
-        # # area = assemble(b*dx)
-        # # area_fine_mesh = ...
-        # # rescaling = 1.0 if np.isclose(area, 0.0) else area_fine_mesh/area
-        # rescaling = 1.0
-
-        # z, zeta = prob.adj_solutions[-1].split()
-        # zeta.interpolate(rescaling*b)
-        return
+    def set_terminal_condition(self, prob):
+        """
+        If the start time and end time coincide then we have an instantaneous pulse.
+        Otherwise, the terminal condition is zero.
+        """
+        if np.isclose(self.start_time, self.end_time):
+            self.set_qoi_kernel(prob, -1)
+            self.adj_solutions[-1].assign(prob.kernels[-1])
+        else:
+            prob.adj_solutions[-1].assign(0.0)
 
     def get_gauge_data(self, gauge, **kwargs):
         raise NotImplementedError("Implement in derived class")
