@@ -188,7 +188,7 @@ for axis in (axes.xaxis, axes.yaxis):
     axis.grid(True, which='minor', color='lightgrey')
     axis.grid(True, which='major', color='lightgrey')
 axes.set_xlabel("Iteration")
-axes.set_ylabel(r"$\ell_2$-norm of gradient")
+axes.set_ylabel(r"$\ell^2$-norm of gradient")
 axes.legend(loc='best', fontsize=fontsize_legend)
 savefig('optimisation_progress_dJdm_l2', plot_dir, extensions=plot.extensions)
 

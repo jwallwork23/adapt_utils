@@ -201,7 +201,7 @@ if not (plot_pdf or plot_png):
 # Plot timeseries errors over mesh iterations
 for tt in errors:
     fig, axes = plt.subplots(nrows=N, ncols=N, figsize=(14, 12))
-    label = r"$\ell_2$-error" if norm_type == 'l2' else 'total variation'
+    label = r"$\ell^2$-error" if norm_type == 'l2' else 'total variation'
     for i, gauge in enumerate(gauges):
         ax = axes[i//N, i % N]
         ax.plot(num_cells, errors[tt][gauge], '--x', label=gauge, **plotting_kwargs)

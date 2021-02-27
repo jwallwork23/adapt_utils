@@ -59,7 +59,7 @@ axes.set_xticklabels(["$10^{{-{:d}}}$".format(t) for t in x])
 p1, = host.plot(x, disc_err, '-o', linewidth=2)
 p2, = par1.plot(x, time, '-o', linewidth=2)
 host.set_xlabel("Relative solver tolerance")
-host.set_ylabel(r"Relative $\ell_2$ error")
+host.set_ylabel(r"Relative $\ell^2$ error")
 par1.set_ylabel("CPU time / maximum")
 if np.isclose(res, 0.0625):
     yticks = [43, 44, 45, 46, 47, 48]

@@ -304,13 +304,13 @@ def plot_gradient_convergence(cell_size, rel_error_zz, rel_error_l2, no_boundary
     # Plot convergence curves on a log-log axis
     fig, axes = plt.subplots(figsize=(5, 5))
     axes.loglog(cell_size, rel_error_zz, '--x', label='Zienkiewicz-Zhu')
-    axes.loglog(cell_size, rel_error_l2, '--x', label=r'$\mathcal L_2$ projection')
+    axes.loglog(cell_size, rel_error_l2, '--x', label=r'$L^2$ projection')
     axes.set_xlabel("Element size")
     axes.set_xlim([0.01, 0.3])
     assert norm_type[0] in ('l', 'L'), "Norm type '{:s}' not recognised".format(norm_type)
-    _norm_type = r"\ell" if norm_type[0] == 'l' else r"\mathcal L"
+    _norm_type = r"\ell" if norm_type[0] == 'l' else r"L"
     _order = norm_type[1]
-    label = r"Relative ${{{:s}}}_{{{:s}}}$ error".format(_norm_type, _order)
+    label = r"Relative ${{{:s}}}^{{{:s}}}$ error".format(_norm_type, _order)
     axes.set_ylabel(label)
     axes.grid(True)
 

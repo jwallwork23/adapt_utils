@@ -83,7 +83,7 @@ fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(dofs[approach], l2_error[approach], **characteristics[approach])
 axes.set_xlabel("Mean spatial DoFs")
-axes.set_ylabel(r"Relative $\mathcal L_2$ error")
+axes.set_ylabel(r"Relative $L^2$ error")
 yticks = [20, 40, 60, 80]
 axes.set_yticks(yticks)
 axes.set_yticklabels([r"{{{:.0f}}}\%".format(yt) for yt in yticks])
@@ -96,7 +96,7 @@ fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(dofs[approach], cons_error[approach], **characteristics[approach])
 axes.set_xlabel("Mean spatial DoFs")
-axes.set_ylabel(r"$\mathcal L_1$ conservation error (\%)")
+axes.set_ylabel(r"$L^1$ conservation error (\%)")
 axes.grid(True)
 savefig("cons_error", plot_dir, extensions=["pdf"])
 
@@ -105,7 +105,7 @@ fig, axes = plt.subplots()
 for approach in approaches:
     axes.semilogx(time[approach], l2_error[approach], **characteristics[approach])
 axes.set_xlabel(r"CPU time [$\mathrm s$]")
-axes.set_ylabel(r"Relative $\mathcal L_2$ error")
+axes.set_ylabel(r"Relative $L^2$ error")
 xticks = [100, 1000, 10000]
 axes.set_xticks(xticks)
 axes.set_xlim([60, 10000])

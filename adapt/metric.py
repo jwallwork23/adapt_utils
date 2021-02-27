@@ -215,7 +215,7 @@ def space_normalise(M, f=None, integral=None, boundary=False, **kwargs):
       * 'abs'        - divide by the maximum of `abs(f)` and some minimum tolerated value (see
                        equation (18) of [1]);
 
-    and two :math:`\mathcal L_p` normalisation approaches, for :math:`p\geq1` or :math:`p=\infty`:
+    and two :math:`L^p` normalisation approaches, for :math:`p\geq1` or :math:`p=\infty`:
 
       * 'complexity' - Lp normalisation with a target metric complexity (see equation (2.10) of [2]);
       * 'error'      - Lp normalisation with a target interpolation error (see equation (7) of [3]).

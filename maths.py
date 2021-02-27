@@ -1,5 +1,4 @@
 from ufl import *
-
 import numpy as np
 
 
@@ -16,7 +15,8 @@ def monomials(x, order=1):
     elif order == 2:
         if len(x) == 2:
             return np.array([1.0, x[0], x[1], x[0]*x[0], x[0]*x[1], x[1]*x[1]])
-    raise NotImplementedError  # TODO: General expression
+    else:
+        raise NotImplementedError
 
 
 def bessi0(x):

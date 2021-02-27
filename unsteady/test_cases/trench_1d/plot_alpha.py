@@ -50,7 +50,7 @@ for res, colour in zip(data, colours):
     axes.semilogy(alphas, data[res]['total_err'], '-o', label=label, color=colour)
     axes.hlines(y=data[res]['fixed_total_err'], linestyle='--', color=colour, xmin=alphas[0], xmax=alphas[-1])
 axes.set_xlabel(r"Monitor function parameter, $\alpha$")
-axes.set_ylabel(r"Relative $\ell_2$ error")
+axes.set_ylabel(r"Relative $\ell^2$ error")
 axes.set_xlim([alphas[0], alphas[-1]])
 yticks = [1, 10, 100]
 axes.set_yticks(yticks)
@@ -69,7 +69,7 @@ for res, colour in zip(data, colours):
     axes.semilogy(alphas, data[res]['disc_err'], '-o', label=label, color=colour)
     axes.hlines(y=data[res]['fixed_disc_err'], linestyle='--', color=colour, xmin=alphas[0], xmax=alphas[-1])
 axes.set_xlabel(r"Monitor function parameter, $\alpha$")
-axes.set_ylabel(r"Relative $\ell_2$ error")
+axes.set_ylabel(r"Relative $\ell^2$ error")
 axes.set_xlim([alphas[0], alphas[-1]])
 yticks = [0.1, 1, 10, 100]
 axes.set_yticks(yticks)
