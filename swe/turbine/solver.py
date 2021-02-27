@@ -13,7 +13,6 @@ class AdaptiveTurbineProblem(AdaptiveProblem):
     """
     Solver object for time-dependent adaptive tidal turbine problems.
     """
-    # TODO: doc
 
     # --- Setup
 

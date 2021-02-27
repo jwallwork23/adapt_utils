@@ -5,7 +5,6 @@ import numpy as np
 __all__ = ["taylor_test", "ConvergenceError", "StagnationError", "GradientConverged"]
 
 
-# TODO: Taylor test gradient using Frobenius norm as QoI
 def taylor_test(function, gradient, m, delta_m=None, verbose=False, ratio_tol=1.90):
     """
     Apply a 'Taylor test' to verify that the provided `gradient` function is a consistent

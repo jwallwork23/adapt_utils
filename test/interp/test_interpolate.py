@@ -21,7 +21,7 @@ def plot_error(error, error_type, interp='interpolation'):
     fig, axes = plt.subplots(figsize=(7, 4))
     axes.plot(100*np.array(error))
     axes.set_xlabel("Number of interpolation steps")
-    axes.set_ylabel(r"$\mathcal L_2$ error (\%)")
+    axes.set_ylabel(r"$L^2$ error (\%)")
     axes.grid(True)
     savefig("{:s}_error_{:s}".format(error_type, interp), "plots", ["pdf"])
 

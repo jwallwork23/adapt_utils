@@ -13,7 +13,6 @@ __all__ = ["AdaptiveDesalinationProblem"]
 
 class AdaptiveDesalinationProblem(AdaptiveProblem):
     """General solver object for adaptive desalination outfall problems."""
-    # TODO: doc
 
     # --- Setup
 
@@ -24,7 +23,7 @@ class AdaptiveDesalinationProblem(AdaptiveProblem):
         self.load_mesh = kwargs.get('load_mesh')
 
     def _get_fields_for_tracer_timestepper(self, i):
-        u, eta = self.fwd_solutions[i].split()  # FIXME: Not fully annotated
+        u, eta = self.fwd_solutions[i].split()
         fields = AttrDict({
             'elev_2d': eta,
             'uv_2d': u,
