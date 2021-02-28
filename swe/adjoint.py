@@ -1,6 +1,6 @@
 r"""
-Continuous adjoint shallow water equations for some quantity of interest :math:`J`. The momentum equation
-is given by
+Continuous adjoint shallow water equations for some quantity of interest :math:`J`. The momentum
+equation is given by
 
 ..math::
 
@@ -29,16 +29,18 @@ where :math:`(\mathbf u^*,\eta^*)` are the adjoint variables corresponding to fl
 surface elevation, :math:`(\mathbf u, eta)`. If Manning friction is used then
 :math:`\widetilde{C_d} = \frac43 C_d`, otherwise :math:`\widetilde{C_d} = C_d`.
 
-This implementation only accounts for Dirichlet conditions for elevation on segment :math:`\Gamma_D` and
-free-slip conditions for velocity on segment :math:`\Gamma_{\mathrm{freeslip}}`. In the adjoint model
-these become free-slip conditions for the adjoint velocity on :math:`\partial\Omega\backslash\Gamma_D`
-and Dirichlet conditions for adjoint elevation on :math:`\partial\Omega\backslash\Gamma_{\mathrm{freeslip}}`.
+This implementation only accounts for Dirichlet conditions for elevation on segment :math:`\Gamma_D`
+and free-slip conditions for velocity on segment :math:`\Gamma_{\mathrm{freeslip}}`. In the adjoint
+model these become free-slip conditions for the adjoint velocity on
+:math:`\partial\Omega\backslash\Gamma_D` and Dirichlet conditions for adjoint elevation on
+:math:`\partial\Omega\backslash\Gamma_{\mathrm{freeslip}}`.
 
-The mixed discontinuous-continuous :math:`\mathbb P1_{DG}-\mathbb P2` discretisation used is very similar
-to that presented in [1]. A :math:`\mathbb P2-\mathbb P1` Taylor-Hood element pair is also allowed.
+The mixed discontinuous-continuous :math:`\mathbb P1_{DG}-\mathbb P2` discretisation used is very
+similar to that presented in [1]. A :math:`\mathbb P2-\mathbb P1` Taylor-Hood element pair is also
+allowed.
 
-[1] Funke, S. W., P. E. Farrell, and M. D. Piggott. "Reconstructing wave profiles from inundation data."
-    Computer Methods in Applied Mechanics and Engineering 322 (2017): 167-186.
+[1] Funke, S. W., P. E. Farrell, and M. D. Piggott. "Reconstructing wave profiles from inundation
+    data", Computer Methods in Applied Mechanics and Engineering 322 (2017): 167-186.
 """
 from __future__ import absolute_import
 from thetis.shallowwater_eq import ShallowWaterTerm
@@ -146,9 +148,9 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
 
   ..math::
 
-        -\langle g \nabla \cdot \mathbf u^*, \zeta\rangle_K
-          = \langle g\nabla(\zeta), \mathbf u^*\rangle_K
-            -\langle g\zeta, \mathbf u^*\cdot\widehat{\mathbf n}\rangle_{\partial K}.
+        \langle g \nabla \cdot \mathbf u^*, \zeta\rangle_K
+          = - \langle g\nabla(\zeta), \mathbf u^*\rangle_K
+            + \langle g\zeta, \mathbf u^*\cdot\widehat{\mathbf n}\rangle_{\partial K}.
 
     Unlike in the discretisation of the forward equations, we do not include fluxes for this term.
     """
@@ -193,7 +195,7 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
 
   ..math::
 
-        -\langle H \nabla \eta^*, z\rangle_K
+        \langle H \nabla \eta^*, z\rangle_K
 
     where :math:`H = b + \eta` in the nonlinear case and :math:`H = b` otherwise.
 
@@ -244,8 +246,8 @@ class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
 
   ..math::
 
-        -\langle \zeta, \mathbf u \cdot \nabla \eta^* \rangle_\Omega
-          + \langle \zeta, \eta^*\mathbf u\cdot\widehat{\mathbf n}\rangle_\Gamma,
+        \langle \zeta, \mathbf u \cdot \nabla \eta^* \rangle_\Omega
+          - \langle \zeta, \eta^*\mathbf u\cdot\widehat{\mathbf n}\rangle_\Gamma,
 
     where the integral over :math:`\Gamma = \partial\Omega\backslash\Gamma_D` enforces the no-slip
     condition on the adjoint velocity.
@@ -282,13 +284,13 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
 
   ..math::
 
-        langle (\nabla\mathbf u)^T \mathbf u^*, \mathbf z \rangle_K
-        - langle (\nabla \cdot \mathbf u) \mathbf u^*, \mathbf z \rangle_K
-        - langle \mathbf u \cdot \nabla \mathbf u^*, \mathbf z \rangle_K
+        - langle (\nabla\mathbf u)^T \mathbf u^*, \mathbf z \rangle_K
+          langle (\nabla \cdot \mathbf u) \mathbf u^*, \mathbf z \rangle_K
+          langle \mathbf u \cdot \nabla \mathbf u^*, \mathbf z \rangle_K
           = \langle (\mathbf z \cdot \nabla)\mathbf u, \mathbf u^* \rangle_K
-            + \langle (\mathbf u \cdot \nabla)\mathbf z, \mathbf u^* \rangle_K
-            - \langle [[\mathbf z]], \mathbf u \cdot \widehat{\mathbf n} \mathbf u^*\rangle_{\Gamma^-}
-            - \langle [[\mathbf u]], \mathbf z \cdot \widehat{\mathbf n} \mathbf u^*\rangle_{\Gamma^-},
+            - \langle (\mathbf u \cdot \nabla)\mathbf z, \mathbf u^* \rangle_K
+            + \langle [[\mathbf z]], \mathbf u \cdot \widehat{\mathbf n} \mathbf u^*\rangle_{\Gamma^-}
+            + \langle [[\mathbf u]], \mathbf z \cdot \widehat{\mathbf n} \mathbf u^*\rangle_{\Gamma^-},
 
     where :math:`\Gamma^-=\{\gamma\in\partial K\mid\mathbf u\cdot \widehat{\mathbf n}|_\gamma < 0\}` is
     comprised of downwind faces of :math:`K`.
@@ -318,28 +320,77 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
 
 class HorizontalViscosityTerm(AdjointShallowWaterMomentumTerm):
     r"""
+    This term is identical to that in the forward model:
 
   ..math::
 
-        \langle \nabla \cdot (\nu \nabla \mathbf u^*), \mathbf z\rangle_K
-    """  # TODO: doc
+        -\langle \nabla \cdot (\nu \nabla \mathbf u^*), \mathbf z\rangle_K
+    """
     def residual(self, u_star, eta_star, fields, fields_old, bnd_conditions=None):
-        # total_h = self.depth.get_total_depth(fields.get('elev_2d'))
+        total_h = self.depth.get_total_depth(fields.get('elev_2d'))
 
         nu = fields_old.get('viscosity_h')
         if nu is None:
             return 0
 
-        raise NotImplementedError  # TODO
+        n = self.normal
+        h = self.cellsize
+
+        if self.options.use_grad_div_viscosity_term:
+            stress = nu*2.*sym(grad(u_star))
+            stress_jump = avg(nu)*2.*sym(tensor_jump(u_star, n))
+        else:
+            stress = nu*grad(u_star)
+            stress_jump = avg(nu)*tensor_jump(u_star, n)
+
+        f = inner(grad(self.u_star_test), stress)*self.dx
+
+        if self.u_star_continuity in ['dg', 'hdiv']:
+            alpha = self.options.sipg_parameter
+            assert alpha is not None
+            f += (
+                + avg(alpha/h)*inner(tensor_jump(self.u_star_test, n), stress_jump)*self.dS
+                - inner(avg(grad(self.u_star_test)), stress_jump)*self.dS
+                - inner(tensor_jump(self.u_star_test, n), avg(stress))*self.dS
+            )
+
+            # Dirichlet bcs only for DG
+            for bnd_marker in self.boundary_markers:
+                funcs = bnd_conditions.get(bnd_marker)
+                ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
+                if funcs is not None:
+                    if 'un' in funcs:
+                        delta_u_star = (dot(u_star, n) - funcs['un'])*n
+                    else:
+                        eta_star_ext, u_star_ext = self.get_bnd_functions(eta_star, u_star, bnd_marker, bnd_conditions)
+                        if u_star_ext is u_star:
+                            continue
+                        delta_u_star = u_star - u_star_ext
+
+                    if self.options.use_grad_div_viscosity_term:
+                        stress_jump = nu*2.*sym(outer(delta_u_star, n))
+                    else:
+                        stress_jump = nu*outer(delta_u_star, n)
+
+                    f += (
+                        alpha/h*inner(outer(self.u_star_test, n), stress_jump)*ds_bnd
+                        - inner(grad(self.u_star_test), stress_jump)*ds_bnd
+                        - inner(outer(self.u_star_test, n), stress)*ds_bnd
+                    )
+
+        if self.options.use_grad_depth_viscosity_term:
+            f += -dot(self.u_star_test, dot(grad(total_h)/total_h, stress))*self.dx
+
+        return -f
 
 
 class CoriolisTerm(AdjointShallowWaterMomentumTerm):
     r"""
-    This term is identical to that in the forward model, except for the opposite sign:
+    This term is identical to that in the forward model:
 
   ..math::
 
-        -\langle f \widehat{\mathbf z} \times \mathbf u^*, \mathbf z\rangle_K
+        \langle f \widehat{\mathbf z} \times \mathbf u^*, \mathbf z\rangle_K
 
     where :math:`f` is the user-specified Coriolis parameter.
     """
@@ -538,8 +589,6 @@ class AdjointShallowWaterEquations(BaseAdjointShallowWaterEquation):
         :arg options: :class:`.AttrDict` object containing all circulation model options
         """
         super(AdjointShallowWaterEquations, self).__init__(function_space, depth, options, **kwargs)
-        if options.get('family') == 'dg-dg':
-            raise NotImplementedError("Equal order DG finite element not supported.")
         if options.get('wind_stress') is not None:
             raise NotImplementedError("Wind stress not supported in continuous adjoint model.")
         if options.get('bottom_drag') is not None:
