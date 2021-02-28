@@ -48,7 +48,8 @@ parser.add_argument("-kernel_shape", help="""
     """)
 
 # Outer loop
-parser.add_argument("-max_adapt", help="Maximum number of adaptation loop iterations (default 35)")
+parser.add_argument("-min_adapt", help="Minimum number of adaptation loop iterations (default 3)")
+parser.add_argument("-max_adapt", help="Maximum number of adaptation loop iterations (default 5)")
 parser.add_argument("-element_rtol", help="Relative tolerance for element count (default 0.005)")
 parser.add_argument("-qoi_rtol", help="Relative tolerance for quantity of interest (default 0.005)")
 
@@ -117,7 +118,6 @@ kwargs = {
     'normalisation': args.normalisation or 'complexity',
     'norm_order': 1 if p is None else None if p == 'inf' else float(p),
     'target': float(args.target or 5.0e+03),
-    'min_adapt': 3,
     'h_min': float(args.h_min or 1.0e+02),
     'h_max': float(args.h_max or 1.0e+06),
 
@@ -130,6 +130,7 @@ kwargs = {
     # Outer loop
     'element_rtol': float(args.element_rtol or 0.005),
     'qoi_rtol': float(args.qoi_rtol or 0.005),
+    'min_adapt': int(args.min_adapt or 3),
     'max_adapt': int(args.max_adapt or 5),  # As recommended in [Belme et al. 2012]
 
     # Misc

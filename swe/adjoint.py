@@ -159,11 +159,11 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
 
         n = self.normal
         if u_star_by_parts:
-            f = g_grav*inner(grad(self.eta_star_test), u_star)*self.dx
+            f = -g_grav*inner(grad(self.eta_star_test), u_star)*self.dx
             if self.eta_star_is_dg:
                 h_av = avg(total_h)
                 u_star_star = avg(u_star) + sqrt(h_av/g_grav)*jump(eta_star, n)
-                f += -g_grav*inner(jump(self.eta_star_test, n), u_star_star)*dS
+                f += g_grav*inner(jump(self.eta_star_test, n), u_star_star)*dS
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
@@ -171,14 +171,14 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
                 # Compute linear Riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
                 eta_star_jump = eta_star - eta_star_ext
                 un_star_rie = 0.5*inner(u_star + u_star_ext, n) + sqrt(total_h/g_grav)*eta_star_jump
-                f += -g_grav*self.eta_star_test*un_star_rie*ds_bnd
+                f += g_grav*self.eta_star_test*un_star_rie*ds_bnd
         else:
-            f = -g_grav*self.eta_star_test*div(u_star)*self.dx
+            f = g_grav*self.eta_star_test*div(u_star)*self.dx
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
                 if funcs is not None and 'elev' not in funcs:
-                    f += g_grav*dot(u_star, self.normal)*self.eta_star_test*ds_bnd
+                    f += -g_grav*dot(u_star, self.normal)*self.eta_star_test*ds_bnd
 
         return -f
 
@@ -208,10 +208,10 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
         f = 0
         n = self.normal
         if eta_star_by_parts:
-            f += eta_star*div(total_h*self.u_star_test)*self.dx
+            f += -eta_star*div(total_h*self.u_star_test)*self.dx
             h_av = avg(total_h)
             eta_star_star = avg(eta_star) + sqrt(g_grav/h_av)*jump(u_star, n)
-            f += -total_h*eta_star_star*jump(self.u_star_test, n)*dS
+            f += total_h*eta_star_star*jump(self.u_star_test, n)*dS
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
@@ -220,9 +220,9 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
                     # Compute linear riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
                     un_star_jump = inner(u_star - u_star_ext, n)
                     eta_star_rie = 0.5*(eta_star + eta_star_ext) + sqrt(g_grav/total_h)*un_star_jump
-                    f += -total_h*eta_star_rie*dot(self.u_star_test, n)*ds_bnd
+                    f += total_h*eta_star_rie*dot(self.u_star_test, n)*ds_bnd
         else:
-            f += -total_h*inner(grad(eta_star), self.u_star_test)*self.dx
+            f += total_h*inner(grad(eta_star), self.u_star_test)*self.dx
             if self.u_star_continuity not in ['dg', 'hdiv']:
                 return -f
             for bnd_marker in self.boundary_markers:
@@ -233,7 +233,7 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
                     # Compute linear riemann solution with eta_star, eta_star_ext, u_star, u_star_ext
                     un_star_jump = inner(u_star - u_star_ext, n)
                     eta_star_rie = 0.5*(eta_star + eta_star_ext) + sqrt(g_grav/total_h)*un_star_jump
-                    f += -total_h*(eta_star_rie-eta_star)*dot(self.u_star_test, n)*ds_bnd
+                    f += total_h*(eta_star_rie-eta_star)*dot(self.u_star_test, n)*ds_bnd
         return -f
 
 
@@ -267,12 +267,12 @@ class HUDivTermContinuity(AdjointShallowWaterContinuityTerm):
         f = 0
         uv = fields.get('uv_2d')
         if not eta_star_by_parts:
-            f += -inner(grad(eta_star), test*uv)*self.dx
+            f += inner(grad(eta_star), test*uv)*self.dx
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)
                 if funcs is not None and 'elev' not in funcs:
-                    f += eta_star*dot(uv, self.normal)*test*ds_bnd
+                    f += -eta_star*dot(uv, self.normal)*test*ds_bnd
         return -f
 
 
@@ -305,13 +305,13 @@ class HorizontalAdvectionTerm(AdjointShallowWaterMomentumTerm):
         downwind = lambda x: conditional(un < 0, dot(x, self.normal), 0)
 
         f = 0
-        f += inner(dot(self.u_star_test, nabla_grad(uv)), u_star)*self.dx
-        f += inner(dot(uv, nabla_grad(self.u_star_test)), u_star)*self.dx
+        f += -inner(dot(self.u_star_test, nabla_grad(uv)), u_star)*self.dx
+        f += -inner(dot(uv, nabla_grad(self.u_star_test)), u_star)*self.dx
         if horiz_advection_by_parts:
-            f += -inner(jump(self.u_star_test), 2*avg(un*u_star))*self.dS
-            f += -inner(2*avg(downwind(self.u_star_test)*u_star), jump(uv))*self.dS
+            f += inner(jump(self.u_star_test), 2*avg(un*u_star))*self.dS
+            f += inner(2*avg(downwind(self.u_star_test)*u_star), jump(uv))*self.dS
         else:
-            f += inner(dot(transpose(grad(uv)), u_star), self.u_star_test)*self.dx
+            f += -inner(dot(transpose(grad(uv)), u_star), self.u_star_test)*self.dx
 
         return -f
 
@@ -347,7 +347,7 @@ class CoriolisTerm(AdjointShallowWaterMomentumTerm):
         coriolis = fields_old.get('coriolis')
         f = 0
         if coriolis is not None:
-            f += -coriolis*(-u_star[1]*self.u_star_test[0] + u_star[0]*self.u_star_test[1])*self.dx
+            f += coriolis*(-u_star[1]*self.u_star_test[0] + u_star[0]*self.u_star_test[1])*self.dx
         return -f
 
 
@@ -383,8 +383,8 @@ class QuadraticDragTermMomentum(AdjointShallowWaterMomentumTerm):
             raise Exception('Adjoint equation does not have access to forward solution velocity')
 
         unorm = speed(uv, smoother=self.options.norm_smoother)
-        f += C_D*unorm*inner(self.u_star_test, u_star)*self.dx
-        f += C_D*inner(self.u_star_test, uv)*inner(u_star, uv)/unorm*self.dx
+        f += -C_D*unorm*inner(self.u_star_test, u_star)*self.dx
+        f += -C_D*inner(self.u_star_test, uv)*inner(u_star, uv)/unorm*self.dx
         return -f
 
 
@@ -424,7 +424,7 @@ class QuadraticDragTermContinuity(AdjointShallowWaterContinuityTerm):
             C_D = C_D*self.depth.heaviside_approx(self.options.get('elev_2d'))
 
         unorm = speed(uv, smoother=self.options.norm_smoother)
-        f += -C_D*unorm*inner(u_star, uv)*self.eta_star_test/total_h**2*self.dx
+        f += C_D*unorm*inner(u_star, uv)*self.eta_star_test/total_h**2*self.dx
         return -f
 
 
