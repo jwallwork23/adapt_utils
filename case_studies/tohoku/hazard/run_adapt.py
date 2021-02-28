@@ -18,6 +18,9 @@ parser.add_argument("-level", help="(Integer) resolution for initial mesh (defau
 parser.add_argument("-num_meshes", help="Number of meshes to consider (default 24)")
 parser.add_argument("-dt", help="Timestep")
 
+# Physics
+parser.add_argument("-base_viscosity", help="Base viscosity (default 1.0e-03)")
+
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space (default cg-cg)")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
@@ -105,6 +108,7 @@ kwargs = {
 
     # Physics
     'bathymetry_cap': 30.0,
+    'base_viscosity': float(args.base_viscosity or 1.0e-03),
 
     # Solver
     'family': family,

@@ -22,6 +22,9 @@ parser.add_argument("-end_time", help="End time of simulation in seconds (defaul
 parser.add_argument("-level", help="(Integer) mesh resolution (default 0)")
 parser.add_argument("-num_meshes", help="Number of meshes to consider (for testing, default 1)")
 
+# Physics
+parser.add_argument("-base_viscosity", help="Base viscosity (default 1.0e-03)")
+
 # Solver
 parser.add_argument("-family", help="Element family for mixed FE space (default 'cg-cg')")
 parser.add_argument("-nonlinear", help="Toggle nonlinear equations (default False)")
@@ -92,6 +95,7 @@ kwargs = {
 
     # Physics
     'bathymetry_cap': 30.0,
+    'base_viscosity': float(args.base_viscosity or 1.0e-03),
 
     # Solver
     'family': family,
@@ -113,7 +117,6 @@ op = TohokuHazardOptions(**kwargs)
 data_dir = create_directory(os.path.join(op.di, 'data'))
 plot_dir = create_directory(os.path.join(op.di, 'plots'))
 op.di = create_directory(os.path.join(op.di, op.kernel_shape))
-
 
 # --- Solve
 
