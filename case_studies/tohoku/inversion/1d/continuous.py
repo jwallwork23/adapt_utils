@@ -36,11 +36,6 @@ TaylorHood = P2_vec*P1
 b = Function(P1).assign(op.set_bathymetry(P1))
 g = Constant(op.g)
 f = Function(P1).assign(op.set_coriolis(P1))
-boundary_conditions = {
-    100: ['freeslip', 'dirichlet'],
-    200: ['freeslip'],
-    300: ['freeslip'],
-}
 dtc = Constant(op.dt)
 n = FacetNormal(mesh)
 
@@ -57,9 +52,6 @@ def G(uv, elev):
     F = g*inner(z, grad(elev))*dx
     F += f*inner(z, as_vector((-uv[1], uv[0])))*dx
     F += -inner(grad(zeta), b*uv)*dx
-    for tag in boundary_conditions:
-        if "freeslip" not in boundary_conditions[tag]:
-            F += inner(zeta*n, b*uv)*ds(tag)
     return F
 
 
@@ -69,11 +61,6 @@ L += -0.5*dtc*G(u_, eta_)
 q = Function(TaylorHood)
 u, eta = q.split()
 
-bcs = []
-for tag in boundary_conditions:
-    if "dirichlet" in boundary_conditions[tag]:
-        bcs.append(DirichletBC(TaylorHood.sub(1), 0, tag))
-
 params = {
     "snes_type": "ksponly",
     "ksp_type": "gmres",
@@ -81,7 +68,7 @@ params = {
     "pc_fieldsplit_type": "multiplicative",
 }
 
-problem = LinearVariationalProblem(a, L, q, bcs=bcs)
+problem = LinearVariationalProblem(a, L, q, bcs=DirichletBC(TaylorHood.sub(1), 0, 100))
 solver = LinearVariationalSolver(problem, solver_parameters=params)
 
 
@@ -176,12 +163,10 @@ L_star += inner(zeta, eta_star_)*dx
 
 
 def G_star(uv_star, elev_star):
-    F = -b*inner(z, grad(elev_star))*dx
-    F += -f*inner(z, as_vector((-uv_star[1], uv_star[0])))*dx
-    F += g*inner(grad(zeta), uv_star)*dx
-    for tag in boundary_conditions:
-        if "dirichlet" in boundary_conditions[tag]:
-            F += -inner(zeta*n, uv_star)*ds(tag)
+    F = b*inner(z, grad(elev_star))*dx
+    F += f*inner(z, as_vector((-uv_star[1], uv_star[0])))*dx
+    F += -g*inner(grad(zeta), uv_star)*dx
+    F += inner(zeta*n, uv_star)*ds(100)
     return F
 
 
@@ -195,12 +180,7 @@ L_star += dtc*zeta*rhs*dx
 q_star = Function(TaylorHood)
 u_star, eta_star = q_star.split()
 
-adj_bcs = []
-for tag in boundary_conditions:
-    if "freeslip" not in boundary_conditions[tag]:
-        adj_bcs.append(DirichletBC(TaylorHood.sub(1), 0, tag))
-
-adj_problem = LinearVariationalProblem(a_star, L_star, q_star, bcs=adj_bcs)
+adj_problem = LinearVariationalProblem(a_star, L_star, q_star)
 adj_solver = LinearVariationalSolver(adj_problem, solver_parameters=params)
 
 for gauge in gauges:
