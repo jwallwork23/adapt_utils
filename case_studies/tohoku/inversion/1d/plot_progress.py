@@ -49,7 +49,8 @@ delta_m = 0.25
 for m, f, g in zip(control_trajectory, functional_trajectory, gradient_trajectory):
     x = np.array([m - delta_m, m + delta_m])
     axes.plot(x, g*(x-m) + f, '-', color='C2', linewidth=5)
-axes.plot(control_trajectory, functional_trajectory, 'o', color='C1', markersize=8)
+label = r"$m_{{{:d}}}={{{:.4f}}}$".format(i, control_trajectory[-1])
+axes.plot(control_trajectory, functional_trajectory, 'o', color='C1', markersize=8, label=label)
 axes.plot(l_min, l(l_min), '*', markersize=14, color='C0', label=r"$m^\star={:.4f}$".format(l_min))
 axes.set_xlabel(r"Control parameter, $m$")
 axes.set_ylabel("Quantity of Interest")
@@ -57,7 +58,8 @@ if mode == 'continuous':
     axes.yaxis.set_label_position("right")
     axes.yaxis.tick_right()
 axes.grid(True)
-axes.legend()
+lines, labels = axes.get_legend_handles_labels()
+axes.legend([lines[1], lines[0]], [labels[1], labels[0]])
 plt.tight_layout()
 plt.savefig("plots/opt_progress_{:s}_{:d}.pdf".format(mode, level))
 
