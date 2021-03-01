@@ -10,12 +10,14 @@ from adapt_utils.misc import gaussian, ellipse
 from adapt_utils.optimisation import GradientConverged
 
 
+# Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
 parser.add_argument("-gtol")
 parser.add_argument("-family")
 args = parser.parse_args()
 
+# Set parameters
 level = int(args.level)
 gtol = float(args.gtol or 1.0e-08)
 family = args.family or 'dg-cg'
@@ -28,6 +30,7 @@ for gauge in gauges:
 gauges = list(op.gauges.keys())
 op.end_time = 60*30
 
+# Create function spaces
 mesh = op.default_mesh
 P1 = FunctionSpace(mesh, "CG", 1)
 if family == 'dg-cg':
@@ -35,42 +38,36 @@ if family == 'dg-cg':
 elif family == 'cg-cg':
     V = VectorFunctionSpace(mesh, "CG", 2)*P1
 
-
-# --- Setup forward problem
-
+# Setup forward problem
 b = Function(P1).assign(op.set_bathymetry(P1))
 g = Constant(op.g)
 f = Function(P1).assign(op.set_coriolis(P1))
 c = g*b
 dtc = Constant(op.dt)
 n = FacetNormal(mesh)
-
 u, eta = TrialFunctions(V)
 z, zeta = TestFunctions(V)
 q_ = Function(V)
 u_, eta_ = q_.split()
-a = inner(z, u)*dx + inner(zeta, eta)*dx
-L = inner(z, u_)*dx + inner(zeta, eta_)*dx
 
 
 def G(uv, elev):
+    F = f*inner(z, as_vector([-uv[1], uv[0]]))*dx
     if family == 'dg-cg':
-        F = g*inner(z, grad(elev))*dx
+        F += g*inner(z, grad(elev))*dx
         F += c*dot(uv, n)*dot(z, n)*ds
         F += -0.5*g*elev*dot(z, n)*ds(100)
-        F += f*inner(z, as_vector([-uv[1], uv[0]]))*dx
         F += -inner(grad(zeta), b*uv)*dx
         F += 0.5*zeta*b*dot(uv, n)*ds
         F += zeta*c*elev*ds(100)
     elif family == 'cg-cg':
-        F = g*inner(z, grad(elev))*dx
-        F += f*inner(z, as_vector((-uv[1], uv[0])))*dx
+        F += g*inner(z, grad(elev))*dx
         F += -inner(grad(zeta), b*uv)*dx
     return F
 
 
-a += 0.5*dtc*G(u, eta)
-L += -0.5*dtc*G(u_, eta_)
+a = inner(z, u)*dx + inner(zeta, eta)*dx + 0.5*dtc*G(u, eta)
+L = inner(z, u_)*dx + inner(zeta, eta_)*dx - 0.5*dtc*G(u_, eta_)
 q = Function(V)
 u, eta = q.split()
 params = {
@@ -83,9 +80,7 @@ bcs = None if 'dg' in family else DirichletBC(V.sub(1), 0, 100)
 problem = LinearVariationalProblem(a, L, q, bcs=bcs)
 solver = LinearVariationalSolver(problem, solver_parameters=params)
 
-
-# --- Define basis
-
+# Define basis
 R = FunctionSpace(mesh, "R", 0)
 optimum = 5.0
 m = Function(R).assign(optimum)
@@ -95,6 +90,15 @@ loc = (0.7e+06, 4.2e+06)
 radii = (48e+03, 96e+03)
 angle = pi/12
 phi.interpolate(gaussian([loc + radii], mesh, rotation=angle))
+
+# Define gauge indicators
+radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
+P0 = FunctionSpace(mesh, "DG", 0)
+for gauge in gauges:
+    loc = op.gauges[gauge]["coords"]
+    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
+    area = assemble(op.gauges[gauge]['indicator']*dx)
+    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
 
 
 def solve_forward(control, store=False):
@@ -139,19 +143,7 @@ def solve_forward(control, store=False):
     return None if store else J
 
 
-# --- Gauge indicators
-
-radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
-P0 = FunctionSpace(mesh, "DG", 0)
-for gauge in gauges:
-    loc = op.gauges[gauge]["coords"]
-    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
-    area = assemble(op.gauges[gauge]['indicator']*dx)
-    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
-
-
-# --- Get 'data'
-
+# Get 'data'
 print("Solve forward to get 'data'...")
 times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 with stop_annotating():
@@ -159,9 +151,7 @@ with stop_annotating():
     for gauge in gauges:
         op.gauges[gauge]['interpolator'] = si.interp1d(times, op.gauges[gauge]['data'])
 
-
-# --- Annotate tape
-
+# Annotate tape
 print("Solve forward to annotate tape...")
 m.assign(10.0)
 J = solve_forward(m)
@@ -169,22 +159,11 @@ c = Control(m)
 stop_annotating()
 Jhat = ReducedFunctional(J, c)
 
-
-# --- Taylor test
-
+# Taylor test
 print("Taylor test at m = 10...")
 dm0 = Function(R).assign(0.1)
 minconv = taylor_test(Jhat, m, dm0)
 assert minconv > 1.90, minconv
-
-
-# --- Optimisation
-
-print("Run optimisation...")
-op.control_trajectory = []
-op.functional_trajectory = []
-op.gradient_trajectory = []
-op.line_search_trajectory = []
 
 
 def cb_post(j, dj, mm):
@@ -208,6 +187,12 @@ def cb(mm):
     np.save('data/opt_progress_discrete_{:d}_ls'.format(level), op.line_search_trajectory)
 
 
+# Run optimisation
+print("Run optimisation...")
+op.control_trajectory = []
+op.functional_trajectory = []
+op.gradient_trajectory = []
+op.line_search_trajectory = []
 Jhat = ReducedFunctional(J, c, derivative_cb_post=cb_post)
 c.assign(10.0)
 tic = perf_counter()

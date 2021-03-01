@@ -10,13 +10,18 @@ from adapt_utils.misc import gaussian, ellipse
 from adapt_utils.optimisation import GradientConverged
 
 
+# Parse arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("level")
 parser.add_argument("-gtol")
+parser.add_argument("-family")
 args = parser.parse_args()
 
+# Set parameters
 level = int(args.level)
 gtol = float(args.gtol or 1.0e-08)
+family = args.family or 'dg-cg'
+assert family in ('dg-cg', 'cg-cg')
 op = TohokuInversionOptions(level=level)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
@@ -25,66 +30,75 @@ for gauge in gauges:
 gauges = list(op.gauges.keys())
 op.end_time = 60*30
 
+# Create function spaces
 mesh = op.default_mesh
-P2_vec = VectorFunctionSpace(mesh, "CG", 2)
 P1 = FunctionSpace(mesh, "CG", 1)
-TaylorHood = P2_vec*P1
+if family == 'dg-cg':
+    V = VectorFunctionSpace(mesh, "DG", 1)*FunctionSpace(mesh, "CG", 2)
+elif family == 'cg-cg':
+    V = VectorFunctionSpace(mesh, "CG", 2)*P1
 
-
-# --- Setup forward problem
-
+# Setup forward problem
 b = Function(P1).assign(op.set_bathymetry(P1))
 g = Constant(op.g)
 f = Function(P1).assign(op.set_coriolis(P1))
+c = g*b
 dtc = Constant(op.dt)
 n = FacetNormal(mesh)
-
-u, eta = TrialFunctions(TaylorHood)
-z, zeta = TestFunctions(TaylorHood)
-q_ = Function(TaylorHood)
+u, eta = TrialFunctions(V)
+z, zeta = TestFunctions(V)
+q_ = Function(V)
 u_, eta_ = q_.split()
-
-a = inner(z, u)*dx + inner(zeta, eta)*dx
-L = inner(z, u_)*dx + inner(zeta, eta_)*dx
 
 
 def G(uv, elev):
-    F = g*inner(z, grad(elev))*dx
-    F += f*inner(z, as_vector((-uv[1], uv[0])))*dx
-    F += -inner(grad(zeta), b*uv)*dx
+    F = f*inner(z, as_vector([-uv[1], uv[0]]))*dx
+    if family == 'dg-cg':
+        F += g*inner(z, grad(elev))*dx
+        F += c*dot(uv, n)*dot(z, n)*ds
+        F += -0.5*g*elev*dot(z, n)*ds(100)
+        F += -inner(grad(zeta), b*uv)*dx
+        F += 0.5*zeta*b*dot(uv, n)*ds
+        F += zeta*c*elev*ds(100)
+    elif family == 'cg-cg':
+        F += g*inner(z, grad(elev))*dx
+        F += -inner(grad(zeta), b*uv)*dx
     return F
 
 
-a += 0.5*dtc*G(u, eta)
-L += -0.5*dtc*G(u_, eta_)
-
-q = Function(TaylorHood)
+a = inner(z, u)*dx + inner(zeta, eta)*dx + 0.5*dtc*G(u, eta)
+L = inner(z, u_)*dx + inner(zeta, eta_)*dx - 0.5*dtc*G(u_, eta_)
+q = Function(V)
 u, eta = q.split()
-
 params = {
     "snes_type": "ksponly",
     "ksp_type": "gmres",
     "pc_type": "fieldsplit",
     "pc_fieldsplit_type": "multiplicative",
 }
-
-problem = LinearVariationalProblem(a, L, q, bcs=DirichletBC(TaylorHood.sub(1), 0, 100))
+bcs = None if 'dg' in family else DirichletBC(V.sub(1), 0, 100)
+problem = LinearVariationalProblem(a, L, q, bcs=bcs)
 solver = LinearVariationalSolver(problem, solver_parameters=params)
 
-
-# --- Define basis
-
+# Define basis
 R = FunctionSpace(mesh, "R", 0)
 optimum = 5.0
 m = Function(R).assign(optimum)
-
-basis_function = Function(TaylorHood)
+basis_function = Function(V)
 psi, phi = basis_function.split()
-
 loc = (0.7e+06, 4.2e+06)
 radii = (48e+03, 96e+03)
 angle = pi/12
-phi.interpolate(gaussian([loc + radii, ], mesh, rotation=angle))
+phi.interpolate(gaussian([loc + radii], mesh, rotation=angle))
+
+# Define gauge indicators
+radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
+P0 = FunctionSpace(mesh, "DG", 0)
+for gauge in gauges:
+    loc = op.gauges[gauge]["coords"]
+    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
+    area = assemble(op.gauges[gauge]['indicator']*dx)
+    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/area)
 
 
 def solve_forward(control, store=False, keep=False):
@@ -131,58 +145,43 @@ def solve_forward(control, store=False, keep=False):
     return None if store else J
 
 
-# --- Gauge indicators
-
-radius = 20.0e+03*pow(0.5, level)  # The finer the mesh, the more precise the indicator region
-P0 = FunctionSpace(mesh, "DG", 0)
-for gauge in gauges:
-    loc = op.gauges[gauge]["coords"]
-    op.gauges[gauge]['indicator'] = interpolate(ellipse([loc + (radius,)], mesh), P0)
-    op.gauges[gauge]['indicator'].assign(op.gauges[gauge]['indicator']/assemble(op.gauges[gauge]['indicator']*dx))
-
-
-# --- Solve forward to get 'data'
-
+# Solve forward to get 'data'
 print("Solve forward to get 'data'...")
 times = np.linspace(0, op.end_time, int(op.end_time/op.dt)+1)
 solve_forward(m, store=True)
 for gauge in gauges:
     op.gauges[gauge]['interpolator'] = si.interp1d(times, op.gauges[gauge]['data'])
 
-
-# --- Setup continuous adjoint
-
-u_star, eta_star = TrialFunctions(TaylorHood)
-q_star_ = Function(TaylorHood)
+# Setup continuous adjoint
+u_star, eta_star = TrialFunctions(V)
+q_star_ = Function(V)
 u_star_, eta_star_ = q_star_.split()
-
-a_star = inner(z, u_star)*dx
-L_star = inner(z, u_star_)*dx
-a_star += inner(zeta, eta_star)*dx
-L_star += inner(zeta, eta_star_)*dx
+rhs = Function(P1)
 
 
 def G_star(uv_star, elev_star):
-    F = b*inner(z, grad(elev_star))*dx
-    F += f*inner(z, as_vector((-uv_star[1], uv_star[0])))*dx
-    F += -g*inner(grad(zeta), uv_star)*dx
-    F += inner(zeta*n, uv_star)*ds(100)
+    F = f*inner(z, as_vector((-uv_star[1], uv_star[0])))*dx
+    if family == 'dg-cg':
+        F += b*inner(z, grad(elev_star))*dx
+        F += c*dot(uv_star, n)*dot(z, n)*ds
+        F += -0.5*b*elev_star*dot(z, n)*ds(100)
+        F += -g*inner(grad(zeta), uv_star)*dx
+        F += 0.5*g*zeta*inner(uv_star, n)*ds
+        F += c*inner(zeta*n, uv_star)*ds(100)
+    elif family == 'cg-cg':
+        F += b*inner(z, grad(elev_star))*dx
+        F += -g*inner(grad(zeta), uv_star)*dx
+        F += g*inner(zeta*n, uv_star)*ds(100)
     return F
 
 
-a_star += 0.5*dtc*G_star(u_star, eta_star)
-L_star += -0.5*dtc*G_star(u_star_, eta_star_)
-
-rhs = Function(P1)
-
+a_star = inner(z, u_star)*dx + inner(zeta, eta_star)*dx + 0.5*dtc*G_star(u_star, eta_star)
+L_star = inner(z, u_star_)*dx + inner(zeta, eta_star_)*dx - 0.5*dtc*G_star(u_star_, eta_star_)
 L_star += dtc*zeta*rhs*dx
-
-q_star = Function(TaylorHood)
+q_star = Function(V)
 u_star, eta_star = q_star.split()
-
 adj_problem = LinearVariationalProblem(a_star, L_star, q_star)
 adj_solver = LinearVariationalSolver(adj_problem, solver_parameters=params)
-
 for gauge in gauges:
     op.gauges[gauge]['obs'] = Constant(0.0)
 
@@ -209,17 +208,6 @@ def compute_gradient_continuous(control):
 
     assert np.allclose(t, 0.0)
     return assemble(phi*eta_star*dx)
-
-
-# --- Optimisation
-
-print("Run optimisation...")
-m.assign(10.0)
-op.control_trajectory = []
-op.functional_trajectory = []
-op.gradient_trajectory = []
-op.line_search_trajectory = []
-op._feval = 0
 
 
 def continuous_rf(control):
@@ -255,6 +243,14 @@ def cb(control):
     np.save('data/opt_progress_continuous_{:d}_ls'.format(level), op.line_search_trajectory)
 
 
+# Run optimisation
+print("Run optimisation...")
+m.assign(10.0)
+op.control_trajectory = []
+op.functional_trajectory = []
+op.gradient_trajectory = []
+op.line_search_trajectory = []
+op._feval = 0
 kwargs = dict(fprime=continuous_gradient, callback=cb, gtol=gtol, full_output=True)
 tic = perf_counter()
 try:
