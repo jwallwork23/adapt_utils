@@ -213,7 +213,7 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
             f += -eta_star*div(total_h*self.u_star_test)*self.dx
             h_av = avg(total_h)
             eta_star_star = avg(eta_star) + sqrt(g_grav/h_av)*jump(u_star, n)
-            f += total_h*eta_star_star*jump(self.u_star_test, n)*dS
+            f += h_av*eta_star_star*jump(self.u_star_test, n)*dS
             for bnd_marker in self.boundary_markers:
                 funcs = bnd_conditions.get(bnd_marker)
                 ds_bnd = ds(int(bnd_marker), degree=self.quad_degree)

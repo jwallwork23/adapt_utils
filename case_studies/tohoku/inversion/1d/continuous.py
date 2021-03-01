@@ -20,8 +20,8 @@ args = parser.parse_args()
 # Set parameters
 level = int(args.level)
 gtol = float(args.gtol or 1.0e-08)
-family = args.family or 'dg-cg'
-assert family in ('dg-cg', 'cg-cg')
+family = args.family or 'cg-cg'
+assert family in ('dg-dg', 'dg-cg', 'cg-cg')
 op = TohokuInversionOptions(level=level)
 gauges = list(op.gauges.keys())
 for gauge in gauges:
@@ -33,7 +33,9 @@ op.end_time = 60*30
 # Create function spaces
 mesh = op.default_mesh
 P1 = FunctionSpace(mesh, "CG", 1)
-if family == 'dg-cg':
+if family == 'dg-dg':
+    V = VectorFunctionSpace(mesh, "DG", 1)*FunctionSpace(mesh, "DG", 1)
+elif family == 'dg-cg':
     V = VectorFunctionSpace(mesh, "DG", 1)*FunctionSpace(mesh, "CG", 2)
 elif family == 'cg-cg':
     V = VectorFunctionSpace(mesh, "CG", 2)*P1
@@ -42,7 +44,7 @@ elif family == 'cg-cg':
 b = Function(P1).assign(op.set_bathymetry(P1))
 g = Constant(op.g)
 f = Function(P1).assign(op.set_coriolis(P1))
-c = g*b
+c = sqrt(g*b)
 dtc = Constant(op.dt)
 n = FacetNormal(mesh)
 u, eta = TrialFunctions(V)
@@ -52,17 +54,39 @@ u_, eta_ = q_.split()
 
 
 def G(uv, elev):
+    """
+    **HARD-CODED** formulation for LSWE.
+
+    Uses the same flux terms as Thetis.
+    """
+
+    # Coriolis
     F = f*inner(z, as_vector([-uv[1], uv[0]]))*dx
-    if family == 'dg-cg':
+
+    # Gravity
+    if 'cg' in family:
         F += g*inner(z, grad(elev))*dx
+        if family == 'dg-cg':
+            F += c*dot(uv, n)*dot(z, n)*ds
+            F += -0.5*g*elev*dot(z, n)*ds(100)
+    else:
+        head_star = avg(elev) + sqrt(b/g)*jump(uv, n)
+        F = -g*elev*nabla_div(z)*dx
+        F += g*head_star*jump(z, n)*dS
         F += c*dot(uv, n)*dot(z, n)*ds
-        F += -0.5*g*elev*dot(z, n)*ds(100)
+        F += 0.5*g*elev*dot(z, n)*ds(100)
+
+    # HUDiv
+    if 'dg' in family:
         F += -inner(grad(zeta), b*uv)*dx
         F += 0.5*zeta*b*dot(uv, n)*ds
         F += zeta*c*elev*ds(100)
-    elif family == 'cg-cg':
-        F += g*inner(z, grad(elev))*dx
+        if family == 'dg-dg':
+            hu_star = b*(avg(uv) + sqrt(g/b)*jump(elev, n))
+            inner(jump(zeta, n), b*hu_star)*dS
+    else:
         F += -inner(grad(zeta), b*uv)*dx
+
     return F
 
 
@@ -160,17 +184,37 @@ rhs = Function(P1)
 
 
 def G_star(uv_star, elev_star):
+    """
+    **HARD-CODED** formulation for continuous adjoint LSWE.
+
+    Uses the same flux terms as Thetis.
+    """
+
+    # Coriolis
     F = f*inner(z, as_vector((-uv_star[1], uv_star[0])))*dx
-    if family == 'dg-cg':
+
+    # HUDiv
+    if 'cg' in family:
         F += b*inner(z, grad(elev_star))*dx
+        if family == 'dg-cg':
+            F += -0.5*b*elev_star*dot(z, n)*ds(100)
+            F += c*dot(uv_star, n)*dot(z, n)*ds
+    else:
+        F += -elev_star*div(b*z)*dx
+        elev_star_star = avg(elev_star) + avg(c)*jump(uv_star, n)
+        F += elev_star_star*jump(z, n)*dS
+        F += 0.5*b*elev_star*dot(z, n)*ds(100)
         F += c*dot(uv_star, n)*dot(z, n)*ds
-        F += -0.5*b*elev_star*dot(z, n)*ds(100)
-        F += -g*inner(grad(zeta), uv_star)*dx
+
+    # Gravity
+    F += -g*inner(grad(zeta), uv_star)*dx
+    if 'dg' in family:
         F += 0.5*g*zeta*inner(uv_star, n)*ds
         F += c*inner(zeta*n, uv_star)*ds(100)
-    elif family == 'cg-cg':
-        F += b*inner(z, grad(elev_star))*dx
-        F += -g*inner(grad(zeta), uv_star)*dx
+        if family == 'dg-dg':
+            uv_star_star = avg(uv_star) + avg(c)*jump(elev_star, n)
+            F += g*inner(jump(zeta, n), uv_star_star)*dS
+    else:
         F += g*inner(zeta*n, uv_star)*ds(100)
     return F
 

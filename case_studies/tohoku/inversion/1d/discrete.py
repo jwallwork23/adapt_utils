@@ -54,6 +54,11 @@ u_, eta_ = q_.split()
 
 
 def G(uv, elev):
+    """
+    **HARD-CODED** formulation for LSWE.
+
+    Uses the same flux terms as Thetis.
+    """
 
     # Coriolis
     F = f*inner(z, as_vector([-uv[1], uv[0]]))*dx
