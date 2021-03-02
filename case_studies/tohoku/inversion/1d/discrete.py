@@ -15,6 +15,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("level")
 parser.add_argument("-gtol")
 parser.add_argument("-family")
+parser.add_argument("-taylor_test")
 args = parser.parse_args()
 
 # Set parameters
@@ -184,10 +185,11 @@ stop_annotating()
 Jhat = ReducedFunctional(J, c)
 
 # Taylor test
-print("Taylor test at m = 10...")
-dm0 = Function(R).assign(0.1)
-minconv = taylor_test(Jhat, m, dm0)
-assert minconv > 1.90, minconv
+if bool(args.taylor_test or False):
+    print("Taylor test at m = 10...")
+    dm0 = Function(R).assign(0.1)
+    minconv = taylor_test(Jhat, m, dm0)
+    assert minconv > 1.90, minconv
 
 
 def cb_post(j, dj, mm):
