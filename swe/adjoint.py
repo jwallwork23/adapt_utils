@@ -152,7 +152,6 @@ class ExternalPressureGradientTerm(AdjointShallowWaterContinuityTerm):
           = - \langle g\nabla(\zeta), \mathbf u^*\rangle_K
             + \langle g\zeta, \mathbf u^*\cdot\widehat{\mathbf n}\rangle_{\partial K}.
 
-    Unlike in the discretisation of the forward equations, we do not include fluxes for this term.
     """
     def residual(self, u_star, eta_star, fields, fields_old, bnd_conditions=None):
         total_h = self.depth.get_total_depth(fields.get('elev_2d'))
@@ -198,9 +197,6 @@ class HUDivTermMomentum(AdjointShallowWaterMomentumTerm):
         \langle H \nabla \eta^*, z\rangle_K
 
     where :math:`H = b + \eta` in the nonlinear case and :math:`H = b` otherwise.
-
-    Note that, unlike in the forward model, Dirichlet boundary conditions on the adjoint free surface
-    elevation are applied strongly.
     """
     def residual(self, u_star, eta_star, fields, fields_old, bnd_conditions=None):
         total_h = self.depth.get_total_depth(fields.get('elev_2d'))
