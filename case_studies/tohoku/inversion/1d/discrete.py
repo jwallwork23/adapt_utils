@@ -155,7 +155,6 @@ def solve_forward(control, store=False):
         # Time integrate QoI
         wq.assign(0.5 if t >= op.end_time - 0.5*op.dt else 1.0)
         for gauge in gauges:
-
             if store:
                 # Point evaluation at gauges
                 op.gauges[gauge]['data'].append(eta.at(op.gauges[gauge]['coords']))
@@ -163,7 +162,6 @@ def solve_forward(control, store=False):
                 # Continuous form of error
                 eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
                 J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
-
     assert np.allclose(t, op.end_time), "mismatching end time ({:.2f} vs {:.2f})".format(t, op.end_time)
     return None if store else J
 

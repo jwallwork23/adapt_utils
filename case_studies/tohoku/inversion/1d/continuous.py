@@ -143,7 +143,8 @@ def solve_forward(control, store=False, keep=False):
     wq = Constant(0.5)
     eta_obs = Constant(0.0)
     for gauge in gauges:
-        J += assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta_ - eta_obs)**2*dx)
+        eta_obs.assign(op.gauges[gauge]['init'])
+        J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta_ - eta_obs)**2*dx)
     while t < op.end_time:
 
         # Solve forward equation at current timestep
@@ -161,7 +162,7 @@ def solve_forward(control, store=False, keep=False):
             else:
                 # Continuous form of error
                 eta_obs.assign(op.gauges[gauge]['data'][iteration] + op.gauges[gauge]['init'])
-                J += assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
+                J = J + assemble(0.5*op.gauges[gauge]['indicator']*wq*dtc*(eta - eta_obs)**2*dx)
         if keep:
             op.eta_saved.append(eta.copy(deepcopy=True))
 
